@@ -3,7 +3,6 @@ package components
 import (
 	"encoding/json"
 	"math"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -35,12 +34,69 @@ type ChartProps struct {
 	Marks map[int]string
 }
 
-// The plot is drawn in a box of chartWidth × chartHeight; the SVG
-// stretches it to its place, and the strokes keep their width.
-const (
-	chartWidth  = 1000
-	chartHeight = 100
-)
+// chartLineData and chartData are the data of a <moin-chart> (ui/docs,
+// Line chart): the numbers it draws and the words it shows.
+type chartLineData struct {
+	Label  string     `json:"label"`
+	Values []*float64 `json:"values"`
+	Text   []string   `json:"text"`
+}
+
+type chartData struct {
+	Lines []chartLineData `json:"lines"`
+	At    []float64       `json:"at"`
+	Gap   float64         `json:"gap,omitempty"`
+	Top   float64         `json:"top"`
+	Scale []string        `json:"scale"`
+	Times []string        `json:"times"`
+	Ticks []string        `json:"ticks"`
+	Marks map[int]string  `json:"marks,omitempty"`
+}
+
+// chartJSON is the data of the chart as JSON; the encoder escapes < and >,
+// so it cannot end the script element it sits in.
+func chartJSON(p ChartProps) string {
+	top := chartTop(p)
+	data := chartData{
+		Lines: make([]chartLineData, len(p.Lines)),
+		At:    make([]float64, len(p.Times)),
+		Gap:   p.Gap.Seconds(),
+		Top:   top,
+		Scale: []string{p.Value(top), p.Value(top / 2), p.Value(0)},
+		Times: make([]string, len(p.Times)),
+		Ticks: chartTicks(p),
+	}
+	for i, at := range p.Times {
+		data.At[i] = at.Sub(p.Times[0]).Seconds()
+		data.Times[i] = p.Time(at)
+	}
+	for n, line := range p.Lines {
+		values := make([]*float64, len(p.Times))
+		text := make([]string, len(p.Times))
+		for i := range p.Times {
+			text[i] = "—"
+			if i < len(line.Values) && !math.IsNaN(line.Values[i]) {
+				values[i] = &line.Values[i]
+				text[i] = p.Value(line.Values[i])
+			}
+		}
+		data.Lines[n] = chartLineData{Label: line.Label, Values: values, Text: text}
+	}
+	for index, words := range p.Marks {
+		if index >= 0 && index < len(p.Times) {
+			if data.Marks == nil {
+				data.Marks = map[int]string{}
+			}
+			data.Marks[index] = words
+		}
+	}
+	var out strings.Builder
+	encoder := json.NewEncoder(&out)
+	if err := encoder.Encode(data); err != nil {
+		return "{}"
+	}
+	return strings.TrimSpace(out.String())
+}
 
 // chartTop is the top of the scale: Top, or the highest value a little
 // rounded up, and 1 when there is nothing above 0.
@@ -74,170 +130,16 @@ func niceCeil(v float64) float64 {
 	return 10 * power
 }
 
-// chartXs places the times from 0 (the first) to 1 (the last); a single
-// time sits in the middle.
-func chartXs(times []time.Time) []float64 {
-	xs := make([]float64, len(times))
-	if len(times) == 1 {
-		xs[0] = 0.5
-		return xs
-	}
-	if len(times) == 0 {
-		return xs
-	}
-	span := times[len(times)-1].Sub(times[0]).Seconds()
-	for i, t := range times {
-		if span > 0 {
-			xs[i] = t.Sub(times[0]).Seconds() / span
-		} else {
-			xs[i] = float64(i) / float64(len(times)-1)
-		}
-	}
-	return xs
-}
-
-// chartBreaks marks each time that starts a new piece of line: the time
-// before it is more than gap away.
-func chartBreaks(times []time.Time, gap time.Duration) []bool {
-	breaks := make([]bool, len(times))
-	if gap <= 0 {
-		return breaks
-	}
-	for i := 1; i < len(times); i++ {
-		breaks[i] = times[i].Sub(times[i-1]) > gap
-	}
-	return breaks
-}
-
-// chartPaths is one line in the box, as SVG path data: the line, and the
-// area under it down to 0. xs run from 0 to 1, values from 0 to top. A NaN
-// value, or a time in breaks, starts a new piece; a piece of one point is
-// a dot (a round cap on a line of no length) and has no area. No values
-// is no path.
-func chartPaths(xs, values []float64, breaks []bool, top float64) (line, area string) {
-	var l, a strings.Builder
-	var piece [][2]float64
-	flush := func() {
-		if len(piece) == 0 {
-			return
-		}
-		for i, pt := range piece {
-			if i == 0 {
-				l.WriteString("M" + chartNum(pt[0]) + " " + chartNum(pt[1]))
-			} else {
-				l.WriteString("L" + chartNum(pt[0]) + " " + chartNum(pt[1]))
-			}
-		}
-		if len(piece) == 1 {
-			l.WriteString("h0")
-		} else {
-			a.WriteString("M" + chartNum(piece[0][0]) + " " + chartNum(chartHeight))
-			for _, pt := range piece {
-				a.WriteString("L" + chartNum(pt[0]) + " " + chartNum(pt[1]))
-			}
-			a.WriteString("L" + chartNum(piece[len(piece)-1][0]) + " " + chartNum(chartHeight) + "Z")
-		}
-		piece = piece[:0]
-	}
-	for i, v := range values {
-		if i >= len(xs) {
-			break
-		}
-		if math.IsNaN(v) || (i < len(breaks) && breaks[i]) {
-			flush()
-		}
-		if math.IsNaN(v) {
-			continue
-		}
-		piece = append(piece, [2]float64{xs[i] * chartWidth, chartY(v, top)})
-	}
-	flush()
-	return l.String(), a.String()
-}
-
-// chartY is where a value sits from the top of the box, inside it.
-func chartY(v, top float64) float64 {
-	y := chartHeight - v/top*chartHeight
-	return math.Max(0, math.Min(chartHeight, y))
-}
-
-// chartNum is a coordinate, one decimal at most: short paths.
-func chartNum(v float64) string {
-	return strconv.FormatFloat(math.Round(v*10)/10, 'f', -1, 64)
-}
-
-// chartPoint is what the pointer shows at one time: where it is (x and the
-// y of each line in percent of the plot), the values read, the time and
-// a mark. hub.js reads them from data-chart-points.
-type chartPoint struct {
-	X    float64   `json:"x"`
-	Y    []float64 `json:"y"`
-	V    []string  `json:"v"`
-	T    string    `json:"t"`
-	Mark string    `json:"m,omitempty"`
-}
-
-// chartPoints are the points of the chart for hub.js, as JSON; the encoder
-// escapes < and >, so it cannot end the script element it sits in.
-func chartPoints(p ChartProps, xs []float64, top float64) string {
-	points := make([]chartPoint, len(p.Times))
-	for i := range p.Times {
-		point := chartPoint{X: math.Round(xs[i]*10000) / 100, T: p.Time(p.Times[i]), Mark: p.Marks[i]}
-		for _, line := range p.Lines {
-			v := math.NaN()
-			if i < len(line.Values) {
-				v = line.Values[i]
-			}
-			if math.IsNaN(v) {
-				point.Y = append(point.Y, -1)
-				point.V = append(point.V, "—")
-				continue
-			}
-			point.Y = append(point.Y, math.Round(chartY(v, top)*100)/100)
-			point.V = append(point.V, p.Value(v))
-		}
-		points[i] = point
-	}
-	data, _ := json.Marshal(points)
-	return string(data)
-}
-
-// chartLast is the index of the newest time with a value, -1 for none: what
-// the chart shows while the pointer is away.
-func chartLast(p ChartProps) int {
-	for i := len(p.Times) - 1; i >= 0; i-- {
-		for _, line := range p.Lines {
-			if i < len(line.Values) && !math.IsNaN(line.Values[i]) {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 // chartTicks are the times on the axis: the first, the middle and the last.
 func chartTicks(p ChartProps) []string {
 	n := len(p.Times)
 	switch {
 	case n == 0:
-		return nil
+		return []string{}
 	case n == 1:
 		return []string{p.Tick(p.Times[0])}
 	case n == 2:
 		return []string{p.Tick(p.Times[0]), p.Tick(p.Times[1])}
 	}
 	return []string{p.Tick(p.Times[0]), p.Tick(p.Times[n/2]), p.Tick(p.Times[n-1])}
-}
-
-// chartLineValue is the value of line at index, or "—".
-func chartLineValue(p ChartProps, line ChartLine, index int) string {
-	if index < 0 || index >= len(line.Values) || math.IsNaN(line.Values[index]) {
-		return "—"
-	}
-	return p.Value(line.Values[index])
-}
-
-// chartPercent is a share of the plot as a CSS percentage.
-func chartPercent(v float64) string {
-	return strconv.FormatFloat(math.Round(v*100)/100, 'f', -1, 64) + "%"
 }

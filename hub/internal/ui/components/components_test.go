@@ -2,11 +2,14 @@ package components
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/a-h/templ"
 )
@@ -20,6 +23,21 @@ func flat(html string) string {
 
 func text(words string) templ.Component {
 	return templ.Raw(words)
+}
+
+// exampleChart is the chart of the example: a pause, no value at one time
+// and a mark.
+func exampleChart() ChartProps {
+	at := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	clock := func(t time.Time) string { return t.Format("15:04") }
+	return ChartProps{
+		Times: []time.Time{at, at.Add(time.Minute), at.Add(2 * time.Minute), at.Add(3 * time.Minute), at.Add(10 * time.Minute), at.Add(11 * time.Minute)},
+		Lines: []ChartLine{{Label: "CPU", Values: []float64{20, 35, math.NaN(), 30, 45, 40}}},
+		Top:   100, Gap: 5 * time.Minute,
+		Value: func(v float64) string { return fmt.Sprintf("%.0f%%", v) },
+		Time:  clock, Tick: clock,
+		Marks: map[int]string{3: "v12 went live"},
+	}
 }
 
 // TestComponentsPrintTheExamples: the HTML of a file in ui/examples is the
@@ -53,6 +71,7 @@ func TestComponentsPrintTheExamples(t *testing.T) {
 		{"bar-floating", BarLinks(BarLinksProps{Label: "Acme", Links: []BarLink{{Label: "Docs", Href: "#"}, {Label: "Pricing", Href: "#", Current: true}}}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "On", Checked: true}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "Cannot change", Disabled: true}), ""},
+		{"line-chart-with-marks", Chart(exampleChart()), ""},
 	}
 	for _, test := range tests {
 		file, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "ui", "examples", test.example+".html"))

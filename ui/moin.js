@@ -269,72 +269,127 @@
     }
   });
 
-  // A chart: one or two lines, the newest value big, the pointer reads any
-  // point. values="1,2,3" and second="1,2,3"; the page draws nothing itself.
+  // A chart: one or two lines over time, the newest values big, the plot under
+  // them. The pointer or a finger reads any point; leaving shows the newest
+  // again. Its data is JSON in a script element inside it, see the docs.
+  const escapeHTML = (text) => String(text).replace(/[&<>"]/g, (char) => `&#${char.charCodeAt(0)};`);
+
   class KitChart extends HTMLElement {
-    static observedAttributes = ["values", "second"];
-
     connectedCallback() {
-      this.render();
-    }
-
-    attributeChangedCallback() {
-      if (this.isConnected) this.render();
+      // A page that loads this file in its head gets here before the data.
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => this.render(), { once: true });
+      else this.render();
     }
 
     render() {
-      if (!this.hasAttribute("values")) return;
-      const numbers = (name) => (this.getAttribute(name) || "").split(",").filter(Boolean).map(Number);
-      const lines = [{ label: this.getAttribute("label") || "", values: numbers("values"), ink: "var(--chart-1)" }];
-      if (this.hasAttribute("second")) lines.push({ label: this.getAttribute("second-label") || "", values: numbers("second"), ink: "var(--chart-3)" });
-      const unit = this.getAttribute("unit") || "";
-      const top = Number(this.getAttribute("top")) || Math.ceil(Math.max(...lines.flatMap((line) => line.values)) * 1.15) || 1;
-      const count = lines[0].values.length;
-      const x = (i) => (count < 2 ? 0 : (i / (count - 1)) * 600);
-      const y = (v) => 144 - (v / top) * 144;
-      const text = (v) => `${Math.round(v * 10) / 10}${unit}`;
-      const start = Number(this.getAttribute("start-hour")) || 0;
-      const clock = (i) => {
-        const minutes = start * 60 + Math.round((i / Math.max(count - 1, 1)) * 24 * 60);
-        return `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+      const script = this.querySelector(":scope > script");
+      if (!script) return;
+      const data = JSON.parse(script.textContent);
+      const lines = data.lines;
+      const count = lines[0]?.values.length ?? 0;
+      const top = data.top || Math.ceil(Math.max(0, ...lines.flatMap((line) => line.values)) * 1.15) || 1;
+      const at = data.at ?? [...Array(count).keys()];
+      const span = at[count - 1] - at[0];
+      const x = (i) => (count === 1 ? 50 : span > 0 ? ((at[i] - at[0]) / span) * 100 : (i / (count - 1)) * 100);
+      const y = (value) => Math.max(0, Math.min(100, 100 - (value / top) * 100));
+      const word = (value) => `${Math.round(value * 10) / 10}${data.unit ?? ""}`;
+      const said = (line, i) => line.text?.[i] ?? (line.values[i] == null ? "—" : word(line.values[i]));
+      const scale = data.scale ?? [word(top), word(top / 2), word(0)];
+      const ink = (n) => (n === 0 ? "0" : "1");
+
+      // A line and the area under it, in a box of 100 × 100. No value, or a
+      // pause longer than gap, starts a new piece; a piece of one point is a
+      // dot and has no area.
+      const trace = (values) => {
+        let stroke = "";
+        let area = "";
+        let piece = [];
+        const flush = () => {
+          if (!piece.length) return;
+          stroke += `M${piece.join("L")}${piece.length === 1 ? "h0" : ""}`;
+          if (piece.length > 1) area += `M${piece[0][0]} 100L${piece.join("L")}L${piece.at(-1)[0]} 100Z`;
+          piece = [];
+        };
+        values.forEach((value, i) => {
+          if (value == null || (i > 0 && data.gap > 0 && at[i] - at[i - 1] > data.gap)) flush();
+          if (value != null) piece.push([x(i), y(value)]);
+        });
+        flush();
+        return { stroke, area };
       };
-      const path = (values) => values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("");
-      const two = lines.length > 1;
-      this.className = "moin-chart";
+
+      const marks = Object.entries(data.marks ?? {}).map(([index, words]) => {
+        const i = Number(index);
+        const value = lines[0]?.values[i];
+        return `<span class="moin-chart-mark" style="--x:${x(i)}%;--y:${value == null ? 100 : y(value)}%" title="${escapeHTML(`${words}, ${data.times?.[i] ?? ""}`)}"><span class="moin-sr-only">${escapeHTML(words)}</span></span>`;
+      });
       this.innerHTML = `<div class="moin-chart-head">
-          <div class="moin-chart-values">${lines.map((line) => `<span class="moin-stack" style="--gap:0;--ink:${line.ink}">${two ? `<span class="moin-chart-key">${line.label}</span>` : ""}<span class="moin-number" data-value></span></span>`).join("")}</div>
-          <span class="moin-small moin-digits moin-muted" data-time></span>
+          <div class="moin-chart-values">${lines.map((line, n) => `<span class="moin-chart-value">${lines.length > 1 ? `<span class="moin-chart-key" data-ink="${ink(n)}"><span class="moin-muted">${escapeHTML(line.label ?? "")}</span></span>` : ""}<span class="moin-number" data-value></span></span>`).join("")}</div>
+          <span class="moin-small moin-muted moin-digits" data-time></span>
         </div>
         <div class="moin-chart-grid">
           <div class="moin-chart-plot">
-            <svg viewBox="0 0 600 144" preserveAspectRatio="none" aria-hidden="true">
-              ${lines.map((line, n) => `<g style="color:${line.ink}">${n === 0 ? `<path d="${path(line.values)}L600 144L0 144Z" fill="currentColor" fill-opacity="0.08"/>` : ""}<path d="${path(line.values)}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>`).join("")}
+            <div class="moin-chart-line" data-at="top"></div>
+            <div class="moin-chart-line" data-at="middle"></div>
+            <div class="moin-chart-line" data-at="bottom"></div>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              ${lines.map((line, n) => {
+                const { stroke, area } = trace(line.values);
+                return `<g data-ink="${ink(n)}">${area && `<path d="${area}" fill="currentColor" fill-opacity="0.08" stroke="none"/>`}${stroke && `<path d="${stroke}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`}</g>`;
+              }).join("")}
             </svg>
+            ${marks.join("")}
             <div class="moin-chart-cursor" hidden></div>
+            ${lines.map((_, n) => `<span class="moin-chart-dot" data-ink="${ink(n)}" hidden></span>`).join("")}
           </div>
-          <div class="moin-chart-scale"><span>${text(top)}</span><span>${text(top / 2)}</span><span>0${unit}</span></div>
-          <div class="moin-chart-times"><span>${clock(0)}</span><span>${clock((count - 1) / 2)}</span><span>${clock(count - 1)}</span></div>
+          <div class="moin-chart-scale" aria-hidden="true">${scale.map((tick) => `<span>${escapeHTML(tick)}</span>`).join("")}</div>
+          <div class="moin-chart-times">${(data.ticks ?? []).map((tick) => `<span>${escapeHTML(tick)}</span>`).join("")}</div>
         </div>`;
+      // The data stays in the element, so moving it draws it again.
+      this.prepend(script);
+
       const plot = this.querySelector(".moin-chart-plot");
       const cursor = this.querySelector(".moin-chart-cursor");
       const shown = this.querySelectorAll("[data-value]");
+      const dots = this.querySelectorAll(".moin-chart-dot");
       const time = this.querySelector("[data-time]");
+      let last = count - 1;
+      while (last >= 0 && !lines.some((line) => line.values[last] != null)) last--;
+
+      // Shows point i under the pointer, or the newest values for -1.
       const show = (i) => {
-        lines.forEach((line, n) => (shown[n].textContent = text(line.values[i])));
-        time.textContent = clock(i);
+        const pointing = i >= 0;
+        const point = pointing ? i : last;
+        lines.forEach((line, n) => {
+          shown[n].textContent = point < 0 ? "—" : said(line, point);
+        });
+        const mark = data.marks?.[point];
+        time.textContent = point < 0 ? "" : `${mark ? `${mark} · ` : ""}${data.times?.[point] ?? ""}`;
+        cursor.hidden = !pointing;
+        if (pointing) cursor.style.left = `${x(i)}%`;
+        dots.forEach((dot, n) => {
+          const value = lines[n].values[i];
+          dot.hidden = !pointing || value == null;
+          if (!dot.hidden) Object.assign(dot.style, { left: `${x(i)}%`, top: `${y(value)}%` });
+        });
       };
-      show(count - 1);
-      plot.addEventListener("pointermove", (event) => {
+      show(-1);
+
+      const read = (event) => {
+        if (!count) return;
         const box = plot.getBoundingClientRect();
-        const i = Math.max(0, Math.min(count - 1, Math.round(((event.clientX - box.left) / box.width) * (count - 1))));
-        cursor.hidden = false;
-        cursor.style.left = `${(i / (count - 1)) * 100}%`;
-        show(i);
+        const wanted = ((event.clientX - box.left) / box.width) * 100;
+        let best = 0;
+        for (let i = 1; i < count; i++) if (Math.abs(x(i) - wanted) < Math.abs(x(best) - wanted)) best = i;
+        show(best);
+      };
+      plot.addEventListener("pointermove", read);
+      plot.addEventListener("pointerdown", read);
+      plot.addEventListener("pointerleave", () => show(-1));
+      plot.addEventListener("pointerup", (event) => {
+        if (event.pointerType !== "mouse") show(-1);
       });
-      plot.addEventListener("pointerleave", () => {
-        cursor.hidden = true;
-        show(count - 1);
-      });
+      plot.addEventListener("pointercancel", () => show(-1));
     }
   }
   customElements.define("moin-chart", KitChart);

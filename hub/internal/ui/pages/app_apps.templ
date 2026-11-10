@@ -432,10 +432,10 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 		aria-label="Deploys"
 	>
 		if len(deploys) == 0 {
-			<div class="moin-card">
+			@components.Card(components.CardProps{}) {
 				<p class="moin-strong">No deploys yet</p>
 				@components.Command(components.CommandProps{Text: "moin deploy " + app.Name})
-			</div>
+			}
 		} else {
 			<div role="list">
 				for _, deploy := range deploys[:min(len(deploys), deploysShown)] {
@@ -535,12 +535,12 @@ templ AppLogs(lines []string, message string) {
 		} else if len(lines) == 0 {
 			<p class="moin-inset moin-text moin-muted">No log lines yet.</p>
 		} else {
-			<div class="hub-term hub-term-lines">
+			<div class="moin-log" data-meta>
 				for _, line := range lines {
 					{{ entry := parseLogLine(line) }}
-					<div class="hub-term-line hub-term-log">
-						<span class="hub-term-dim moin-hidden-phone" title={ entry.Time }>{ entry.Clock }</span>
-						<span class="hub-term-dim moin-hidden-phone moin-truncate">{ entry.Service }</span>
+					<div>
+						<span class="moin-hidden-phone" data-dim title={ entry.Time }>{ entry.Clock }</span>
+						<span class="moin-hidden-phone moin-truncate" data-dim>{ entry.Service }</span>
 						<span>{ entry.Message }</span>
 					</div>
 				}

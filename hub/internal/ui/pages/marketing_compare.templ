@@ -79,7 +79,7 @@ templ Compare(competitor Competitor) {
 // says whose it is; the score over the table is there for it.
 templ compareHeader(name string, score CompareScore) {
 	<div aria-hidden="true" class="moin-hidden-phone">
-		<div class="moin-list" style="--card:transparent">
+		@components.List(templ.Attributes{"style": "--card:transparent"}) {
 			@components.Item(components.ItemProps{}) {
 				<div class="moin-grid moin-fill moin-text moin-muted" data-cols="2-3-3">
 					<span></span>
@@ -87,7 +87,7 @@ templ compareHeader(name string, score CompareScore) {
 					<span class="moin-stack" style="--gap:0"><span class="moin-strong">{ name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Theirs, score.Facts) }</span></span>
 				</div>
 			}
-		</div>
+		}
 	</div>
 }
 

@@ -100,11 +100,11 @@ templ UpdateNotice(info model.VersionInfo) {
 // updateLine is the notice: one card over the page, its words left and
 // what to do right, under them on a phone.
 templ updateLine(attributes templ.Attributes) {
-	<section class="moin-card" { attributes... }>
+	@components.Card(components.CardProps{Attrs: attributes}) {
 		<div class="moin-row" data-between data-gap="3" data-phone="stack">
 			{ children... }
 		</div>
-	</section>
+	}
 }
 
 // DaemonUpdatesForm is the switch for automatic daemon updates, a row of a

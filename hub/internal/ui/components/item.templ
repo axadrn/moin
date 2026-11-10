@@ -1,10 +1,21 @@
 package components
 
-// List is a group of items on one card.
-templ List() {
-	<div class="moin-list">
+// List is a group of items on one card. Attrs go on the list.
+templ List(attrs ...templ.Attributes) {
+	<div class="moin-list" { joinAttrs(attrs)... }>
 		{ children... }
 	</div>
+}
+
+// joinAttrs puts the attributes of a variadic parameter together.
+func joinAttrs(attrs []templ.Attributes) templ.Attributes {
+	joined := templ.Attributes{}
+	for _, one := range attrs {
+		for key, value := range one {
+			joined[key] = value
+		}
+	}
+	return joined
 }
 
 // ItemProps is one Item of a List. What it does decides what it is:

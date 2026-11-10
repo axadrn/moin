@@ -26,7 +26,7 @@ templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
 				} else {
 					<div
 						id="deploy-log"
-						class="hub-term hub-term-lines"
+						class="moin-log"
 						hx-sse:connect={ appPath + "/deploys/" + strconv.Itoa(deploy.Number) + "/log" }
 						hx-sse:close="done"
 						hx-swap="beforeend"
@@ -110,16 +110,14 @@ templ DeployLogChunk(chunk LogChunk) {
 		if item.Line != nil {
 			@logRow(*item.Line)
 		} else {
-			<details class="hub-term-fold">
-				<summary class="hub-term-toggle">
-					<span class="hub-term-arrow" aria-hidden="true">▸</span>
+			<details id={ fmt.Sprintf("fold-%d", item.Fold.ID) }>
+				<summary>
+					<span aria-hidden="true">▸</span>
 					@foldCount(*item.Fold, false)
 				</summary>
-				<div id={ fmt.Sprintf("fold-%d", item.Fold.ID) }>
-					for _, line := range item.Fold.Lines {
-						@logRow(line)
-					}
-				</div>
+				for _, line := range item.Fold.Lines {
+					@logRow(line)
+				}
 			</details>
 		}
 	}
@@ -130,11 +128,11 @@ templ foldCount(fold LogFold, oob bool) {
 }
 
 templ logRow(line LogLine) {
-	<div class="hub-term-line" data-kind={ line.Kind } data-n={ strconv.Itoa(line.N) }>
+	<div data-kind={ line.Kind } data-n={ strconv.Itoa(line.N) }>
 		<span>
 			{ line.Text }
 			if line.Path != "" {
-				<span class="hub-term-dim" title={ line.Path }>{ " (" + shortPath(line.Path) + ")" }</span>
+				<span data-dim title={ line.Path }>{ " (" + shortPath(line.Path) + ")" }</span>
 			}
 		</span>
 	</div>

@@ -139,14 +139,14 @@ templ homeLiveNumber(count int, label, name string) {
 // ---------------------------------------------------------------- start
 // homeMoment is the one big thing of a section: what you get, as you see it.
 templ homeMoment(state, big, small string) {
-	<div class="moin-card" data-center style="--pad:2rem">
+	@components.Card(components.CardProps{Attrs: templ.Attributes{"data-center": true, "style": "--pad:2rem"}}) {
 		<span class="moin-row moin-strong" data-gap="3">
 			@components.Dot(components.DotProps{State: components.StateLive})
 			{ state }
 		</span>
 		<p class="moin-statement">{ big }</p>
 		<p class="moin-small moin-muted">{ small }</p>
-	</div>
+	}
 }
 
 // homeSurface is one way to do the four steps of Get started.
@@ -308,7 +308,7 @@ templ HomePricing() {
 	<section id="pricing" class="moin-band">
 		<h2 class="moin-statement">One price. Every feature.</h2>
 		<div class="moin-grid" data-cols="2">
-			<div class="moin-card" data-gap="6" style="--pad:2rem" data-plan="hosted">
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem", "data-plan": "hosted"}}) {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$29</span><span class="moin-small moin-muted">a month per workspace</span></span>
@@ -318,8 +318,8 @@ templ HomePricing() {
 					{ homeStartLabel(ctx) }
 				}
 				@homePlanRows("Ready in minutes", "We run and update it", "GitHub and email set up", "Support by email")
-			</div>
-			<div class="moin-card" data-gap="6" style="--pad:2rem" data-plan="self-hosted">
+			}
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem", "data-plan": "self-hosted"}}) {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Self-hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever</span></span>
@@ -329,7 +329,7 @@ templ HomePricing() {
 					Host it yourself
 				}
 				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, email optional", "Help on GitHub")
-			</div>
+			}
 		</div>
 		<p class="moin-lead" data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
 	</section>
@@ -381,7 +381,7 @@ templ homeQuestion(question, answer string) {
 // "Lose nothing".
 templ HomeEnd() {
 	<section id="start" class="moin-band">
-		<div class="moin-card" data-gap="8" style="--pad:clamp(2rem,6vw,3.5rem)">
+		@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "8", "style": "--pad:clamp(2rem,6vw,3.5rem)"}}) {
 			<div class="moin-huge">
 				@components.Wordmark(components.WordmarkProps{Size: "1em"})
 			</div>
@@ -407,7 +407,7 @@ templ HomeEnd() {
 					Free and open source.
 				}
 			</p>
-		</div>
+		}
 	</section>
 }
 

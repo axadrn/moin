@@ -66,9 +66,9 @@ templ Activity(view ActivityView) {
 						<div class="moin-section-head">
 							<h2>Newest first, in UTC</h2>
 						</div>
-						<div class="moin-list" role="list" data-activity>
+						@components.List(templ.Attributes{"role": "list", "data-activity": true}) {
 							@ActivityRows(view)
-						</div>
+						}
 					</section>
 				}
 			</div>

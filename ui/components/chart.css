@@ -1,92 +1,4 @@
 @layer moin-components {
-  /* A chart: the newest value big, the plot under it. */
-  .moin-chart {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    min-width: 0;
-  }
-  .moin-chart-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-4);
-    min-height: 2rem;
-  }
-  .moin-chart-values {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0 var(--space-5);
-  }
-  .moin-chart-key {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1rem;
-  }
-  .moin-chart-key::before {
-    content: "";
-    width: 0.75rem;
-    height: 2px;
-    border-radius: var(--radius-sm);
-    background: var(--ink);
-  }
-  .moin-chart-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-2) var(--space-3);
-  }
-  .moin-chart-plot {
-    position: relative;
-    height: 9rem;
-    border-top: 1px dashed var(--border);
-    border-bottom: 1px solid var(--border);
-    touch-action: pan-y;
-    user-select: none;
-  }
-  .moin-chart-plot::before {
-    content: "";
-    position: absolute;
-    inset: 50% 0 auto;
-    border-top: 1px dashed var(--border);
-  }
-  .moin-chart-plot > svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-  }
-  .moin-chart-cursor {
-    position: absolute;
-    inset-block: 0;
-    width: 1px;
-    background: color-mix(in oklab, var(--foreground) 30%, transparent);
-    pointer-events: none;
-  }
-  .moin-chart-scale {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-  .moin-chart-times {
-    display: flex;
-    justify-content: space-between;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-variant-numeric: tabular-nums;
-  }
-
   /* Plain HTML charts: a share, amounts, days, a trend in a row. */
   .moin-meter {
     height: 0.5rem;
@@ -235,19 +147,19 @@
     background: var(--c);
   }
 
-  /* A chart the server draws: the newest values big, the plot under them
-     with a soft area under the first line, the scale on its right and three
-     times under it. hub.js shows what is under the pointer. */
-  .moin-plot {
+  /* A chart: the newest values big, the plot under them with a soft area
+     under its lines, the scale on its right and the times under it. moin.js
+     draws it; until then it keeps its place. */
+  moin-chart {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
     min-width: 0;
-    margin: 0;
+    min-height: 13.25rem;
   }
-  .moin-plot [data-ink] { color: var(--foreground); }
-  .moin-plot [data-ink="1"] { color: var(--muted-foreground); }
-  .moin-plot-head {
+  moin-chart [data-ink] { color: var(--chart-1); }
+  moin-chart [data-ink="1"] { color: var(--muted-foreground); }
+  .moin-chart-head {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
@@ -255,76 +167,77 @@
     gap: var(--space-1) var(--space-4);
     min-height: 2rem;
   }
-  .moin-plot-values {
+  .moin-chart-values {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 0 var(--space-5);
     min-width: 0;
   }
-  .moin-plot-value {
+  .moin-chart-value {
     display: flex;
     flex-direction: column;
   }
-  .moin-plot-key {
+  .moin-chart-key {
     display: flex;
     align-items: center;
     gap: 0.375rem;
     font-size: 0.75rem;
     line-height: 1rem;
   }
-  .moin-plot-swatch {
+  .moin-chart-key::before {
+    content: "";
     width: 0.75rem;
     height: 2px;
     border-radius: var(--radius-sm);
     background: currentColor;
   }
-  .moin-plot-grid {
+  .moin-chart-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--space-2) var(--space-3);
   }
-  .moin-plot-area {
+  .moin-chart-plot {
     position: relative;
     height: 9rem;
     touch-action: pan-y;
     user-select: none;
   }
-  .moin-plot-line {
+  .moin-chart-line {
     position: absolute;
     inset-inline: 0;
     border-top: 1px dashed var(--border);
   }
-  .moin-plot-line[data-at="top"] { top: 0; }
-  .moin-plot-line[data-at="middle"] { top: 50%; }
-  .moin-plot-line[data-at="bottom"] { bottom: 0; border-top-style: solid; }
-  .moin-plot-area > svg {
+  .moin-chart-line[data-at="top"] { top: 0; }
+  .moin-chart-line[data-at="middle"] { top: 50%; }
+  .moin-chart-line[data-at="bottom"] { bottom: 0; border-top-style: solid; }
+  .moin-chart-plot > svg {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     overflow: visible;
   }
-  .moin-plot-mark,
-  .moin-plot-dot {
+  .moin-chart-mark,
+  .moin-chart-dot {
     position: absolute;
     width: 0.625rem;
     height: 0.625rem;
     border-radius: var(--radius-full);
     translate: -50% -50%;
   }
-  .moin-plot-mark {
+  .moin-chart-mark {
     top: var(--y);
     left: var(--x);
     border: 2px solid var(--foreground);
     background: var(--card);
   }
-  .moin-plot-dot {
+  .moin-chart-dot {
     background: currentColor;
     box-shadow: 0 0 0 2px var(--card);
     pointer-events: none;
   }
-  .moin-plot-cursor {
+  .moin-chart-cursor {
     position: absolute;
     inset-block: 0;
     width: 1px;
@@ -332,7 +245,7 @@
     translate: -50%;
     pointer-events: none;
   }
-  .moin-plot-scale {
+  .moin-chart-scale {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -343,7 +256,7 @@
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
-  .moin-plot-times {
+  .moin-chart-times {
     display: flex;
     justify-content: space-between;
     gap: var(--space-2);

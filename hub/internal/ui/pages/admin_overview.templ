@@ -133,7 +133,7 @@ type adminNumber struct {
 // adminNumbers are counts side by side on one card: the word, the number
 // under it. Three in a row on a phone, all in one row from sm.
 templ adminNumbers(numbers []adminNumber) {
-	<div class="moin-card">
+	@components.Card(components.CardProps{}) {
 		<dl class="moin-grid" data-fit style="--min:5rem">
 			for _, number := range numbers {
 				<div class="moin-stack" data-gap="1">
@@ -142,7 +142,7 @@ templ adminNumbers(numbers []adminNumber) {
 				</div>
 			}
 		</dl>
-	</div>
+	}
 }
 
 // adminCount is the quiet count at the end of a section title.
