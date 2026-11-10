@@ -4,23 +4,9 @@
 (() => {
   const root = document.documentElement;
 
-  // The theme you are trying stays on while you walk through the pages of moin UI.
-  // Only there: a site that uses moin UI has its own values.
-  function applyTheme() {
-    let theme = {};
-    try {
-      theme = JSON.parse(moin.read("moin-theme")) || {};
-    } catch {}
-    for (const name of [...root.style]) {
-      if (name.startsWith("--")) root.style.removeProperty(name);
-    }
-    if (theme.radius) root.style.setProperty("--radius", theme.radius);
-    for (const [name, value] of Object.entries(theme.vars || {})) root.style.setProperty(name, value);
-    for (const [name, [light, dark]] of Object.entries(theme.colors || {})) {
-      root.style.setProperty(name, `light-dark(${light}, ${dark})`);
-    }
-  }
-  applyTheme();
+  // The base layout sets the saved theme before the first paint. This
+  // sets it again after a change.
+  const applyTheme = () => window.themeUtils.applySavedTheme();
 
   // A block is a page of its own in a frame: it wears the theme too.
   function themeFrame(frame) {

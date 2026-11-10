@@ -157,6 +157,23 @@ templ themeScript() {
 				root.style.colorScheme = preference === 'system' ? '' : preference;
 				document.dispatchEvent(new CustomEvent('theme-changed'));
 			};
+			// A theme tried in the editor, on the pages of moin UI only. Here,
+			// before the first paint, like the mode above.
+			window.themeUtils.applySavedTheme = function() {
+				if (!/^\/ui(\/|$)/.test(location.pathname)) return;
+				const root = document.documentElement;
+				let theme = {};
+				try { theme = JSON.parse(localStorage.getItem('moin-theme')) || {}; } catch {}
+				for (const name of [...root.style]) {
+					if (name.startsWith('--')) root.style.removeProperty(name);
+				}
+				if (theme.radius) root.style.setProperty('--radius', theme.radius);
+				for (const [name, value] of Object.entries(theme.vars || {})) root.style.setProperty(name, value);
+				for (const [name, [light, dark]] of Object.entries(theme.colors || {})) {
+					root.style.setProperty(name, `light-dark(${light}, ${dark})`);
+				}
+			};
+			window.themeUtils.applySavedTheme();
 			window.themeUtils.applyTheme();
 			media.addEventListener('change', function() {
 				if (window.themeUtils.getThemePreference() === 'system') window.themeUtils.applyTheme();
