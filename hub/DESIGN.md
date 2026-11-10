@@ -45,7 +45,7 @@ uppercase mono "eyebrow" labels over every section, stretched type, stock
 phrases ("supercharge", "unleash", "seamless", "effortless",
 "revolutionize", "next-generation"), fake testimonials, made-up numbers.
 
-## Tokens (assets/css/globals.css)
+## Tokens (ui/theme.css)
 
 | Token | Use |
 | --- | --- |

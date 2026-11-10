@@ -24,7 +24,7 @@ templ App(title string) {
 // AppShell is the hub: the bar on top, the page under it. No
 // sidebar: the search in the bar goes everywhere (DESIGN.md, Navigation).
 // Every link loads a whole page; the browser keeps the old one on screen
-// until the new one is painted and fades between them (globals.css).
+// until the new one is painted and fades between them (hub.css).
 templ AppShell(p AppProps) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@Base(SEOProps{

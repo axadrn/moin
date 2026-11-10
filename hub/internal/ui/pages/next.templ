@@ -9,12 +9,12 @@ import (
 // Next is the story of moin next. What is planned, item by item, is in the
 // roadmap: one list.
 templ Next() {
-	@layouts.Home(layouts.SEOProps{Title: brand.Name + " next", Description: "Everything you build software with, in one open source app. Highly experimental.", Path: "/next"}) {
+	@layouts.Home(layouts.SEOProps{Title: brand.Name + " next", Description: "One app to build it. Ship it. Run it. Open source. Highly experimental.", Path: "/next"}) {
 		<main class="moin-page moin-content moin-narrow">
 			<div class="moin-stack" data-gap="6">
 				<span class="moin-row"><span class="moin-badge">Highly experimental</span></span>
-				<h1 class="moin-statement">One app to build it, ship it and run it.</h1>
-				<p class="moin-lead" data-large>Deploying stays the core. Everything around it moves in. One login, one look, your servers. Open source, self-hosted or hosted, and agent-ready through MCP from day one.</p>
+				<h1 class="moin-statement">One app to build it. Ship it. Run it.</h1>
+				<p class="moin-lead" data-large>Think Linear. Slack. Mail. GitHub boards. All in one app. Open source. On your servers. Ready for your AI agents.</p>
 			</div>
 			<section class="moin-section">
 				<div class="moin-section-head"><h2>Moving in</h2></div>
@@ -28,8 +28,8 @@ templ Next() {
 				}
 			</section>
 			<div class="moin-stack" data-gap="6">
-				<p class="moin-lead">It will break. It can change or vanish any day. A few users get in first, and nothing here can touch your deploys.</p>
-				<p class="moin-lead">Nobody builds this for you. We build it together, in the open. Open an issue today and it can decide what ships tomorrow.</p>
+				<p class="moin-lead">It will break. It can change. It can vanish any day. A few users get in first. Your deploys stay out of it.</p>
+				<p class="moin-lead">Nobody builds this for you. We build it together. In the open. Open an issue today. It can decide what ships tomorrow.</p>
 			</div>
 			<div class="moin-row" data-gap="2" data-wrap>
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: layouts.GitHubURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
