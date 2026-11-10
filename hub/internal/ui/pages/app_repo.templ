@@ -33,7 +33,6 @@ templ AppRepo(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	<div
 		id="app-repo"
-		class="grid"
 		if view.Loading {
 			hx-get={ appPath + "/repo" }
 			hx-trigger="load"
@@ -42,7 +41,7 @@ templ AppRepo(view RepoView) {
 	>
 		@components.Card(components.CardProps{Title: "GitHub", Action: repoAction(view)}) {
 			if view.Error != "" {
-				<p class="px-1 text-sm text-failed" data-repo-error>{ view.Error }</p>
+				<p class="moin-text moin-failed" data-repo-error>{ view.Error }</p>
 			}
 			if !view.Enabled {
 				<p class="moin-small moin-muted">
@@ -67,7 +66,7 @@ templ AppRepo(view RepoView) {
 templ repoAction(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	if view.Enabled && !view.Connected {
-		@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx)+"/github/install?next="+appPath+"/deploys", Attrs: templ.Attributes{"data-connect-github": true}}) {
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath + "/deploys", Attrs: templ.Attributes{"data-connect-github": true}}) {
 			@components.Icon("git-hub")
 			Connect GitHub
 		}
@@ -93,7 +92,7 @@ templ repoLink(view RepoView) {
 		<p class="moin-small moin-muted">
 			moin can read no repo yet.
 		</p>
-		<div class="flex flex-wrap gap-2" data-no-repos>
+		<div class="moin-row" data-wrap data-gap="2" data-no-repos>
 			@repoAccess(view)
 			@components.Button(components.ButtonProps{Attrs: templ.Attributes{"hx-get": appPath + "/repo", "hx-target": "#app-repo", "hx-swap": "outerHTML", "hx-disable": "this", "data-refresh-repos": true}}) {
 				Refresh
@@ -103,19 +102,19 @@ templ repoLink(view RepoView) {
 		<form class="moin-stack" data-gap="4" hx-post={ appPath + "/repo" } hx-target="#app-repo" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-link-repo>
 			@components.CSRF()
 			<input type="hidden" name="deploy" value="1"/>
-			<div class="grid gap-4 sm:grid-cols-2">
-				<div class="min-w-0" hx-get={ appPath + "/repo/branches" } hx-trigger="change" hx-include="closest form" hx-target="#link-branch-field" hx-swap="outerHTML">
+			<div class="moin-grid">
+				<div hx-get={ appPath + "/repo/branches" } hx-trigger="change" hx-include="closest form" hx-target="#link-branch-field" hx-swap="outerHTML">
 					@components.Field(components.FieldProps{Label: "Repo", For: "link-repo"}) {
 						@components.Select(components.SelectProps{ID: "link-repo", Name: "repo", Label: "Repo", Options: repoOptions(view.Repos), Disabled: view.Loading})
 					}
 				</div>
 				@repoBranchField(view.Branches, view.Loading)
 			</div>
-			<label class="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-1">
-				<span class="text-sm font-medium">Deploy every push</span>
+			<label class="moin-row" data-between data-gap="3">
+				<span class="moin-text moin-strong">Deploy every push</span>
 				@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "link-auto-deploy", "name": "auto_deploy", "value": "1", "checked": true}})
 			</label>
-			<div class="flex flex-wrap items-center gap-2">
+			<div class="moin-row" data-wrap data-gap="2">
 				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"disabled": view.Loading}}) {
 					Deploy
 				}
@@ -132,7 +131,7 @@ templ RepoBranchField(branches []string) {
 }
 
 templ repoBranchField(branches []string, loading bool) {
-	<div id="link-branch-field" class="min-w-0">
+	<div id="link-branch-field">
 		@components.Field(components.FieldProps{Label: "Branch", For: "link-branch"}) {
 			@components.Select(components.SelectProps{ID: "link-branch", Name: "branch", Label: "Branch", Options: branchOptions(branches, loading), Disabled: loading})
 		}
@@ -159,8 +158,8 @@ templ repoAccess(view RepoView) {
 // repoLinked is a linked repo: deploy a ref, deploy on push.
 templ repoLinked(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
-	<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="w-fit max-w-full truncate px-1 font-mono text-sm hover:underline hover:underline-offset-4" data-linked-repo>
-		{ view.App.Repo }<span class="text-muted-foreground">{ "@" + view.App.Branch }</span>
+	<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="moin-link moin-truncate moin-mono moin-text" data-quiet data-linked-repo>
+		{ view.App.Repo }<span class="moin-muted">{ "@" + view.App.Branch }</span>
 	</a>
 	<form hx-post={ appPath + "/repo/deploy" } hx-target="#app-repo" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-deploy-ref>
 		@components.CSRF()
@@ -181,8 +180,8 @@ templ repoLinked(view RepoView) {
 templ AutoDeployForm(app model.App) {
 	<form id="auto-deploy-form" hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/repo/auto-deploy" } hx-trigger="change" hx-target="this" hx-swap="outerHTML" hx-disable="find input[type='checkbox']">
 		@components.CSRF()
-		<label class="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-1">
-			<span class="text-sm font-medium">Deploy every push to { app.Branch }</span>
+		<label class="moin-row" data-between data-gap="3">
+			<span class="moin-text moin-strong">Deploy every push to { app.Branch }</span>
 			@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "repo-auto-deploy", "name": "on", "value": "1", "checked": app.AutoDeploy}})
 		</label>
 	</form>

@@ -67,7 +67,7 @@
     --lit-bottom: var(--lit);
   }
   .moin-item[data-control] { flex-wrap: wrap; }
-  .moin-item[data-control] > .moin-select { flex: none; width: 9rem; }
+  .moin-item[data-control] > .moin-select { flex: none; width: var(--select-width, 9rem); }
   :is(a, button, label).moin-item { cursor: pointer; }
   :is(a, button, label).moin-item:is(:hover, :focus-visible)::after,
   a.moin-item[aria-current]::after,
@@ -139,4 +139,6 @@
     mask-image: url("../icons/check.svg");
   }
   label.moin-item:has(:checked) .moin-item-check { visibility: visible; }
+
+  .moin-item > [data-lead] { display: flex; flex: none; }
 }

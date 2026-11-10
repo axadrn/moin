@@ -9,7 +9,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
@@ -31,9 +30,7 @@ templ Overview(view OverviewView) {
 	{{ now := time.Now() }}
 	@layouts.App("Overview") {
 		@panelPage() {
-			@components.Header(components.HeaderProps{Title: overviewHeadline(view)}) {
-				<p class="w-full text-muted-foreground">{ overviewSummary(view.Status) }</p>
-			}
+			@components.Header(components.HeaderProps{Title: overviewHeadline(view), Line: overviewLine(overviewSummary(view.Status))})
 			if len(view.Servers) == 0 {
 				@overviewStart(basePath)
 			} else {
@@ -44,12 +41,7 @@ templ Overview(view OverviewView) {
 						</div>
 						@components.List() {
 							for _, issue := range view.Status.Issues {
-								@components.Item(components.ItemProps{Href: basePath + issue.Path}) {
-									<span data-lead class={ "flex size-9 shrink-0 items-center justify-center rounded-full", overviewIssueTone(issue.Kind) } aria-hidden="true">
-										@overviewIssueIcon(issue.Kind)
-									</span>
-									@kit.RowText(issue.Target, issue.Detail)
-								}
+								@components.Item(components.ItemProps{Href: basePath + issue.Path, Name: issue.Target, Note: issue.Detail, Lead: overviewIssueLead(issue.Kind)})
 							}
 						}
 					</section>
@@ -84,10 +76,10 @@ templ Overview(view OverviewView) {
 				}
 				@components.List() {
 					@components.Item(components.ItemProps{Href: basePath + "/apps", Name: "All apps"}) {
-						<span class="text-muted-foreground tabular-nums">{ strconv.Itoa(view.Apps) }</span>
+						<span class="moin-muted moin-digits">{ strconv.Itoa(view.Apps) }</span>
 					}
 					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "All servers", Note: serversLine(view.Servers, now)}) {
-						<span class="text-muted-foreground tabular-nums">{ strconv.Itoa(len(view.Servers)) }</span>
+						<span class="moin-muted moin-digits">{ strconv.Itoa(len(view.Servers)) }</span>
 					}
 				}
 			}
@@ -188,10 +180,9 @@ templ appState(app model.App) {
 				{ fmt.Sprintf("v%d failed", app.LatestNumber) }
 			}
 		default:
-			<span class="flex size-8 shrink-0 items-center justify-center" title="Live">
-				@components.Dot(components.DotProps{State: components.StateLive})
+			@components.Status(components.StatusProps{State: components.StateLive, Attrs: templ.Attributes{"title": "Live", "data-alone": true}}) {
 				<span class="moin-sr-only">Live</span>
-			</span>
+			}
 	}
 }
 
@@ -204,19 +195,35 @@ func ifElse(ok bool, yes, no string) string {
 
 // overviewNewApp is the action next to the apps: start a new one.
 templ overviewNewApp(basePath string) {
-	<a href={ templ.SafeURL(basePath + "/new-app") } class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium hover:bg-muted/70">New app</a>
+	@components.Button(components.ButtonProps{Href: basePath + "/new-app"}) {
+		New app
+	}
 }
 
 // overviewStart is the first visit: no server yet.
 templ overviewStart(basePath string) {
 	@components.List() {
-		@components.Item(components.ItemProps{Href: basePath + "/servers"}) {
-			<span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background" aria-hidden="true">
-				@components.Icon("server")
-			</span>
-			@kit.RowText("Connect your first server", "Any Linux box you own. One command, no open port.")
-		}
+		@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect your first server", Note: "Any Linux box you own. One command, no open port.", Lead: overviewStartLead()})
 	}
+}
+
+// overviewStartLead is the icon in front of the first server.
+templ overviewStartLead() {
+	<span class="moin-bubble" data-ink aria-hidden="true">
+		@components.Icon("server")
+	</span>
+}
+
+// overviewLine is the summary under the title: quiet, it answers nothing.
+templ overviewLine(text string) {
+	<span class="moin-muted">{ text }</span>
+}
+
+// overviewIssueLead is the icon of an issue in its color.
+templ overviewIssueLead(kind string) {
+	<span class="moin-bubble" style={ overviewIssueTone(kind) } aria-hidden="true">
+		@overviewIssueIcon(kind)
+	</span>
 }
 
 templ overviewIssueIcon(kind string) {
@@ -238,9 +245,9 @@ templ overviewIssueIcon(kind string) {
 
 // overviewIssueTone colors an issue: red for what is broken, amber for what
 // waits.
-func overviewIssueTone(kind string) string {
+func overviewIssueTone(kind string) templ.SafeCSS {
 	if kind == service.IssueDaemonBehind {
-		return "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+		return "--tint:var(--running)"
 	}
-	return "bg-failed/12 text-failed"
+	return ""
 }

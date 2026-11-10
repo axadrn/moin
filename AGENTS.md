@@ -1,6 +1,6 @@
 # AGENTS.md
 
-All of moin in one repo, open source under AGPL-3.0: the `moin` binary (daemon,
+All of moin in one repo, open source: the `moin` binary (daemon,
 CLI, TUI) at the root and the hub in `hub/`, with its own
 `AGENTS.md`. Never commit
 secrets, customer data, `.env` files or anything private: names of companies,
@@ -14,6 +14,7 @@ addresses, personal details.
 - Every feature works in the web UI, the hub API, the CLI and an MCP tool; it is done when each one works end to end. The TUI covers the daily work and opens the web for setup. The docs page "Where things work" (`hub/content/docs/reference/surfaces.md`) lists what each surface does; update it with every feature.
 - Every feature is documented in the hub docs (`hub/content/docs`), the only source of truth. Update them in the same change, and `usage` in `internal/cli/cli.go` for commands. `README.md` stays short and punchy, like shadcn/ui's: what moin is, the first commands, a pointer to the docs, the license. It never repeats the docs.
 - `protocol` is the contract with the hub. Change it in a way old daemons keep working, or bump `protocol.Version`.
+- The license is explained once, in the FAQ of the docs. `LICENSE` and `ui/LICENSE` are the texts; everywhere else says "open source" without a license name.
 - The product name lives only in `internal/build.Name`. One exception: moin UI in `ui/`, whose `moin-` classes and `moin.css` and `moin.js` have no Go to ask.
 - Words: one thing, one word, in every layer, from the list in `hub/DESIGN.md` (Words): hub, daemon, server, app, deploy, backup, check, uptime, AI agent. Not "node", "host" or "control plane".
 - Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`. Add one only when the standard library does not solve it well.

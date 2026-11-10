@@ -31,6 +31,23 @@
   .moin-input::placeholder,
   .moin-textarea::placeholder { color: var(--muted-foreground); }
   .moin-input:disabled { opacity: 0.4; }
+  /* A field without a box until you press it, for a cell of a table. */
+  .moin-input[data-bare] {
+    max-width: 22rem;
+    min-width: 6rem;
+    padding-inline: var(--space-3);
+    overflow: hidden;
+    background: transparent;
+    font-family: var(--font-mono);
+    text-overflow: ellipsis;
+    field-sizing: content;
+  }
+  .moin-input[data-bare]:hover { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
+  .moin-input[data-bare]:focus-visible { background: var(--muted); }
+  .moin-input[data-bare]::placeholder { font-style: italic; }
+  .moin-input[data-num] { text-align: right; }
+  .moin-input[data-state="saved"] { color: var(--live-text); }
+  .moin-input[data-state="failed"] { color: var(--failed-text); }
   .moin-input[aria-invalid="true"] {
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--failed) 30%, transparent);
   }

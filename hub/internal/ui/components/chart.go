@@ -1,4 +1,4 @@
-package kit
+package components
 
 import (
 	"encoding/json"
@@ -168,7 +168,7 @@ func chartNum(v float64) string {
 
 // chartPoint is what the pointer shows at one time: where it is (x and the
 // y of each line in percent of the plot), the values read, the time and
-// a mark. The script of Chart reads them from data-chart-points.
+// a mark. hub.js reads them from data-chart-points.
 type chartPoint struct {
 	X    float64   `json:"x"`
 	Y    []float64 `json:"y"`
@@ -177,8 +177,8 @@ type chartPoint struct {
 	Mark string    `json:"m,omitempty"`
 }
 
-// chartPoints are the points of the chart for its script, as JSON; the
-// encoder escapes < and >, so it cannot end the script it sits in.
+// chartPoints are the points of the chart for hub.js, as JSON; the encoder
+// escapes < and >, so it cannot end the script element it sits in.
 func chartPoints(p ChartProps, xs []float64, top float64) string {
 	points := make([]chartPoint, len(p.Times))
 	for i := range p.Times {

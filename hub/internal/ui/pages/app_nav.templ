@@ -3,7 +3,6 @@ package pages
 import (
 	"fmt"
 
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -54,13 +53,16 @@ func appSectionLabel(id string) string {
 templ appHeader(app model.App, section string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	if section != "app" {
-		<div class="sm:hidden">
+		<div class="moin-only-phone">
 			@components.Header(components.HeaderProps{Back: components.Back{Label: app.Name, Href: appPath}, Title: appSectionLabel(section)})
 		</div>
 	}
-	<div class={ templ.KV("hidden sm:block", section != "app") }>
-		@components.Header(components.HeaderProps{Back: components.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, Title: app.Name}) {
-			@appStateLine(app)
+	<div
+		if section != "app" {
+			class="moin-hidden-phone"
+		}
+	>
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Apps", Href: ctxkeys.AppBasePath(ctx) + "/apps"}, Title: app.Name, Line: appStateLine(app)}) {
 			@appActions(app)
 		}
 	</div>
@@ -74,49 +76,47 @@ templ appHeader(app model.App, section string) {
 // name from sm.
 templ appActions(app model.App) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
-	<div id="app-actions" hx-swap-oob="true" class="flex w-full flex-col gap-2 empty:hidden sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+	<div id="app-actions" hx-swap-oob="true" class="moin-contents">
 		if app.ChangesWaiting > 0 && !app.Stopped && app.LiveNumber > 0 {
-			<span class="hidden text-sm text-muted-foreground sm:inline" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
+			<span class="moin-hidden-phone moin-text moin-muted" data-changes-waiting>{ changesWaiting(app.ChangesWaiting) }</span>
 		}
-		<div class="grid w-full auto-cols-fr grid-flow-col gap-2 empty:hidden sm:flex sm:w-auto">
 		if app.Stopped {
 			@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"hx-post": appPath + "/start", "hx-swap": "none", "hx-disable": "this", "data-start": true}}) {
 				Start
 			}
 		} else if app.LiveNumber > 0 {
-			@kit.Button(restartKind(app), "", templ.Attributes{"hx-post": appPath + "/restart", "hx-swap": "none", "hx-disable": "this", "data-restart": true}) {
+			@components.Button(components.ButtonProps{Kind: restartKind(app), Attrs: templ.Attributes{"hx-post": appPath + "/restart", "hx-swap": "none", "hx-disable": "this", "data-restart": true}}) {
 				Restart
 			}
 		}
 		if app.LatestNumber > 0 && !app.Stopped {
-			@kit.Button(deployKind(app), "", templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true}) {
+			@components.Button(components.ButtonProps{Kind: deployKind(app), Attrs: templ.Attributes{"hx-post": appPath + "/redeploy", "hx-swap": "none", "hx-disable": "this", "data-redeploy": true}}) {
 				Deploy
 			}
 		}
-		</div>
 	</div>
 }
 
-func restartKind(app model.App) kit.Kind {
+func restartKind(app model.App) components.Kind {
 	if app.ChangesWaiting > 0 {
-		return kit.Primary
+		return components.Primary
 	}
-	return kit.Secondary
+	return ""
 }
 
-func deployKind(app model.App) kit.Kind {
+func deployKind(app model.App) components.Kind {
 	if app.ChangesWaiting > 0 {
-		return kit.Secondary
+		return ""
 	}
-	return kit.Primary
+	return components.Primary
 }
 
 // appStateLine is the answer of an app's page in one line: does it run.
 templ appStateLine(app model.App) {
-	<p id="app-state" hx-swap-oob="true" class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium sm:order-last" data-status>
+	<span id="app-state" hx-swap-oob="true" class="moin-contents" data-status>
 		@components.Dot(components.DotProps{State: appStateKind(app)})
 		<span>{ appStateWords(app) }</span>
-	</p>
+	</span>
 }
 
 func appStateKind(app model.App) components.State {
@@ -153,12 +153,12 @@ func changesWaiting(n int) string {
 // to its page. Only from sm: a phone gets the list on the App section.
 templ appTabs(appName, appLink, active string) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink }}
-	{{ segments := make([]kit.Segment, 0, len(appSections)) }}
+	{{ tabs := make([]components.Tab, 0, len(appSections)) }}
 	for _, s := range appSections {
-		{{ segments = append(segments, kit.Segment{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
+		{{ tabs = append(tabs, components.Tab{Label: s.Label, Href: appPath + s.Path, Key: s.Key, Active: s.ID == active}) }}
 	}
-	<div class="hidden sm:block">
-		@kit.Segmented("app-tabs", appName, segments)
+	<div class="moin-hidden-phone">
+		@components.Tabs(components.TabsProps{ID: "app-tabs", Label: appName, Tabs: tabs})
 	</div>
 }
 

@@ -12,6 +12,7 @@ templ List() {
 //   - Href: it opens a page, the whole item is a link with a chevron.
 //     External opens another site in a new tab.
 //   - Button: it does something on this page. Danger makes its words red.
+//     A Note makes it two lines.
 //   - Pick: one to pick of a list in a form, a radio. Attrs go on the radio.
 //   - For: it holds the control with that id, and its words are the label.
 //     Form makes the item the form, for a control that saves itself.
@@ -51,7 +52,9 @@ templ Item(p ItemProps) {
 			</a>
 		case p.Button:
 			<button type="button" class="moin-item" data-danger?={ p.Danger } { p.Attrs... }>
-				if p.Name != "" {
+				if p.Note != "" {
+					@itemText(p)
+				} else if p.Name != "" {
 					<span class="moin-strong">{ p.Name }</span>
 				}
 				{ children... }
@@ -101,10 +104,12 @@ templ itemText(p ItemProps) {
 }
 
 templ itemLabel(p ItemProps) {
-	<label for={ p.For } class="moin-item-text">
-		<span class="moin-item-name">{ p.Name }</span>
-		if p.Note != "" {
-			<span class="moin-item-note">{ p.Note }</span>
-		}
-	</label>
+	if p.Name != "" {
+		<label for={ p.For } class="moin-item-text">
+			<span class="moin-item-name">{ p.Name }</span>
+			if p.Note != "" {
+				<span class="moin-item-note">{ p.Note }</span>
+			}
+		</label>
+	}
 }

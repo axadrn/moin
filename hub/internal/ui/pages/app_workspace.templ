@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
@@ -34,23 +33,25 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				<form
 					action={ templ.SafeURL(basePath + "/workspace/invitations") }
 					method="POST"
-					class="flex flex-col gap-2 sm:flex-row sm:items-center"
+					class="moin-row"
+					data-gap="2"
+					data-phone="stack"
 					hx-post={ basePath + "/workspace/invitations" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
 				>
 					@components.CSRF()
 					<label for="invite-email" class="moin-sr-only">Email</label>
-					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "invite-email", "name": "email", "type": "email", "placeholder": "teammate@example.com", "autocomplete": "off"}})
-					<div class="flex gap-2">
-						<div class="w-36 shrink-0">
+					<div class="moin-fill">
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "invite-email", "name": "email", "type": "email", "placeholder": "teammate@example.com", "autocomplete": "off"}})
+					</div>
+					<div class="moin-row" data-gap="2">
+						<div class="moin-width" data-fixed style="--width:9rem">
 							@components.Select(components.SelectProps{ID: "invite-role", Name: "role", Label: "Role", Options: []components.Option{{Value: model.WorkspaceRoleMember, Label: "Member"}, {Value: model.WorkspaceRoleAdmin, Label: "Admin"}}, Value: model.WorkspaceRoleMember})
 						</div>
-						<div class="flex-1 sm:flex-none [&>button]:w-full">
-							@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-								Send invite
-							}
-						</div>
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-phone": "fill"}}) {
+							Send invite
+						}
 					</div>
 				</form>
 			}
@@ -62,15 +63,15 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 			</div>
 			@components.List() {
 				for _, member := range members {
-					@kit.RowControl(templ.Attributes{"data-member": member.ID}) {
-						@kit.Avatar("", member.Name, model.Initial(member.Name+member.Email), "size-9")
-						@kit.RowText(member.Name, member.Email)
+					@components.Item(components.ItemProps{Name: member.Name, Note: member.Email, Lead: components.Avatar(components.AvatarProps{Name: member.Name, Initials: model.Initial(member.Name + member.Email)}), Attrs: templ.Attributes{"data-member": member.ID, "data-control": true}}) {
 						if viewer.Can(model.WorkspacePermissionManageMembers) && (member.Role != model.WorkspaceRoleOwner || viewer.Can(model.WorkspacePermissionManageOwners)) {
-							<div class="flex w-full items-center gap-2 sm:w-auto">
+							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
 								<form
 									action={ templ.SafeURL(basePath + "/workspace/members/" + member.ID + "/role") }
 									method="POST"
-									class="w-36 shrink-0"
+									class="moin-width"
+									data-fixed
+									style="--width:9rem"
 									hx-post={ basePath + "/workspace/members/" + member.ID + "/role" }
 									hx-trigger="change"
 									hx-swap="none"
@@ -88,7 +89,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 								}
 							</div>
 						} else {
-							<span class="shrink-0 text-sm text-muted-foreground">{ model.WorkspaceRoleLabel(member.Role) }</span>
+							<span class="moin-text moin-muted">{ model.WorkspaceRoleLabel(member.Role) }</span>
 						}
 					}
 				}
@@ -101,9 +102,8 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 				</div>
 				@components.List() {
 					for _, invitation := range invitations {
-						@kit.RowControl(templ.Attributes{"data-invitation": invitation.Email}) {
-							@kit.RowText(invitation.Email, model.WorkspaceRoleLabel(invitation.Role)+" · expires "+invitation.ExpiresAt.Local().Format("Jan 2, 2006"))
-							<div class="flex w-full items-center gap-2 sm:w-auto">
+						@components.Item(components.ItemProps{Name: invitation.Email, Note: model.WorkspaceRoleLabel(invitation.Role) + " · expires " + invitation.ExpiresAt.Local().Format("Jan 2, 2006"), Attrs: templ.Attributes{"data-invitation": invitation.Email, "data-control": true}}) {
+							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
 								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 									"hx-post":    basePath + "/workspace/invitations/" + invitation.ID + "/resend",
 									"hx-swap":    "none",
@@ -169,7 +169,7 @@ templ WorkspaceContent(members []model.WorkspaceMember, invitations []model.Work
 
 // seatCount is the count at the end of the members' title.
 templ seatCount(text string) {
-	<span class="text-sm text-muted-foreground tabular-nums">{ text }</span>
+	<span class="moin-text moin-muted moin-digits">{ text }</span>
 }
 
 // roleOptions are the roles a viewer may give; only owners make owners.

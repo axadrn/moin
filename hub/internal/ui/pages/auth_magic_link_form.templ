@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
@@ -14,7 +13,8 @@ templ AuthMagicLinkForm(errorMsg string) {
 		id="magic-link-form"
 		action="/auth/magic-link"
 		method="POST"
-		class="moin-stack" data-gap="3"
+		class="moin-stack"
+		data-gap="3"
 		hx-post="/auth/magic-link"
 		hx-target="#magic-link-form"
 		hx-swap="outerHTML"
@@ -35,15 +35,15 @@ templ AuthMagicLinkForm(errorMsg string) {
 				"required":         true,
 			}})
 		}
-		@kit.Button(magicLinkKind(second), "", templ.Attributes{"type": "submit"}) {
+		@components.Button(components.ButtonProps{Kind: magicLinkKind(second), Type: "submit"}) {
 			Continue with email
 		}
 	</form>
 }
 
-func magicLinkKind(second bool) kit.Kind {
+func magicLinkKind(second bool) components.Kind {
 	if second {
-		return kit.Secondary
+		return ""
 	}
-	return kit.Primary
+	return components.Primary
 }

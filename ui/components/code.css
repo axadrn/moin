@@ -23,6 +23,7 @@
     white-space: pre;
     tab-size: 2;
   }
+  .moin-code[data-wrap] > pre { white-space: pre-wrap; overflow-wrap: anywhere; }
   .moin-code > .moin-copy {
     position: absolute;
     /* Off the corner also when the theme has no radius. */

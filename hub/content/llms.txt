@@ -1,6 +1,6 @@
 # moin
 
-> Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule, checked every day. moin deploys any Docker Compose app to your servers, copies its SQLite or Postgres database into your own bucket on the schedule you pick, checks every day that the newest copy restores and lets you edit the data live. It installs 47 open-source apps in one click, gives every app an HTTPS address before it has a domain, and checks every domain every minute. It works from the web, the moin CLI, a terminal UI, a JSON API and an MCP server for AI agents. Open source under AGPL-3.0.
+> Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule, checked every day. moin deploys any Docker Compose app to your servers, copies its SQLite or Postgres database into your own bucket on the schedule you pick, checks every day that the newest copy restores and lets you edit the data live. It installs 47 open-source apps in one click, gives every app an HTTPS address before it has a domain, and checks every domain every minute. It works from the web, the moin CLI, a terminal UI, a JSON API and an MCP server for AI agents. Open source under open source.
 
 Every docs page is also available as Markdown: add .md to its URL.
 

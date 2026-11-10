@@ -6,7 +6,6 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
@@ -25,7 +24,7 @@ type AlertsView struct {
 var alertKinds = []components.Option{
 	{Value: model.AlertSlack, Label: "Slack"},
 	{Value: model.AlertDiscord, Label: "Discord"},
-	{Value: model.AlertTelegram, Label: "Telegram"},
+	{Value: model.AlertTelegram, Label: "Telegram", Attrs: templ.Attributes{"data-other": true}},
 	{Value: model.AlertWebhook, Label: "Webhook"},
 }
 
@@ -41,7 +40,7 @@ templ Alerts(view AlertsView) {
 					<div data-signing-secret>
 						@components.Card(components.CardProps{Title: "Signing secret of "+view.Created.Name}) {
 							<p class="moin-small moin-muted">
-								Shown this once. Every post carries <code class="font-mono text-foreground">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret.
+								Shown this once. Every post carries <code class="moin-mono moin-foreground">X-Moin-Signature: sha256=…</code>, the HMAC-SHA256 of the body with this secret.
 							</p>
 							@components.Command(components.CommandProps{Text: view.SigningSecret})
 						}
@@ -80,28 +79,30 @@ templ alertDestinations(view AlertsView) {
 					@components.Item(components.ItemProps{Name: "None yet", Note: "Alerts go by mail only"})
 				}
 				for _, destination := range view.Destinations {
-					@kit.RowControl(templ.Attributes{"data-alert-destination": destination.Name}) {
-						<div class="min-w-0 flex-1">
-							<div class="flex min-w-0 items-center gap-2">
-								<span class="truncate font-medium">{ destination.Name }</span>
-								<span class="shrink-0 text-sm text-muted-foreground">{ model.AlertKindLabel(destination.Kind) }</span>
-							</div>
-							<div class="truncate text-sm text-muted-foreground">
-								<span class="font-mono">{ destination.Hint }</span>
-								{ " · " + alertEventsText(destination) }
-								if destination.FailingSince == nil && destination.LastSentAt != nil {
-									<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + human.Ago(*destination.LastSentAt, now) }</span>
-								}
+					@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-alert-destination": destination.Name, "data-control": true}}) {
+						<div class="moin-fill moin-stack" data-gap="1">
+							<div>
+								<div class="moin-row" data-gap="2">
+									<span class="moin-truncate moin-strong">{ destination.Name }</span>
+									<span class="moin-text moin-muted">{ model.AlertKindLabel(destination.Kind) }</span>
+								</div>
+								<div class="moin-truncate moin-text moin-muted">
+									<span class="moin-mono">{ destination.Hint }</span>
+									{ " · " + alertEventsText(destination) }
+									if destination.FailingSince == nil && destination.LastSentAt != nil {
+										<span title={ stamp(*destination.LastSentAt) }>{ " · sent " + human.Ago(*destination.LastSentAt, now) }</span>
+									}
+								</div>
 							</div>
 							if destination.FailingSince != nil {
-								<div class="flex min-w-0 items-center gap-2 pt-1 text-sm text-failed" data-alert-failing>
+								<div class="moin-row moin-text moin-failed" data-gap="2" data-alert-failing>
 									@components.Dot(components.DotProps{State: components.StateFailed})
-									<span class="truncate">{ "Failing since " + human.Ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
+									<span class="moin-truncate">{ "Failing since " + human.Ago(*destination.FailingSince, now) + ": " + destination.LastError }</span>
 								</div>
 							}
 						</div>
 						if manage {
-							<div class="flex w-full items-center gap-2 sm:w-auto">
+							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
 								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 									"hx-post":    basePath + "/alerts/destinations/" + destination.Name + "/test",
 									"hx-target":  "#alerts",
@@ -135,7 +136,9 @@ templ alertDestinations(view AlertsView) {
 templ alertDestinationForm() {
 	@components.Card(components.CardProps{Title: "Add a destination"}) {
 		<form
-			class="group/alert flex flex-col gap-4"
+			class="moin-stack"
+			data-gap="4"
+			data-either
 			hx-post={ ctxkeys.AppBasePath(ctx) + "/alerts/destinations" }
 			hx-target="#alerts"
 			hx-select="#alerts"
@@ -144,7 +147,7 @@ templ alertDestinationForm() {
 			data-alert-form
 		>
 			@components.CSRF()
-			<div class="grid items-start gap-4 sm:grid-cols-2">
+			<div class="moin-grid">
 				@components.Field(components.FieldProps{Label: "Kind", For: "alert-kind"}) {
 					@components.Select(components.SelectProps{ID: "alert-kind", Name: "kind", Label: "Kind", Options: alertKinds, Value: model.AlertSlack})
 				}
@@ -154,12 +157,12 @@ templ alertDestinationForm() {
 			@alertField("bot_token", "Bot token", "123456:ABC-DEF…", "From @BotFather; add the bot to the chat first", "password", "telegram")
 			@alertField("chat_id", "Chat ID", "-1001234567890", "The chat, group or channel, or @channelname", "text", "telegram")
 			<div class="moin-stack" data-gap="2">
-				<span class="px-1 text-sm font-medium">Events</span>
-				<div class="grid gap-x-6 sm:grid-cols-2">
+				<span class="moin-text moin-strong">Events</span>
+				<div class="moin-grid" data-gap="6">
 					for _, event := range model.AlertEvents {
 						{{ id := "alert-event-" + strings.ReplaceAll(event, ".", "-") }}
-						<label for={ id } class="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-1">
-							<span class="text-sm">{ model.AlertEventLabel(event) }</span>
+						<label for={ id } class="moin-row" data-between data-gap="3">
+							<span class="moin-text">{ model.AlertEventLabel(event) }</span>
 							@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id, "name": "events", "value": event, "checked": true}})
 						</label>
 					}
@@ -180,7 +183,12 @@ templ alertField(name, label, placeholder, hint, kind, forKind string) {
 	{{ id := "alert-" + strings.ReplaceAll(name, "_", "-") }}
 	<div
 		data-alert-kind={ forKind }
-		class={ templ.KV("group-has-[input[value=telegram]:checked]/alert:hidden", forKind == "url"), templ.KV("hidden group-has-[input[value=telegram]:checked]/alert:block", forKind == "telegram") }
+		if forKind == "url" {
+			data-way="first"
+		}
+		if forKind == "telegram" {
+			data-way="other"
+		}
 	>
 		@components.Field(components.FieldProps{Label: label, For: id, Hint: hint}) {
 			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "name": name, "type": kind, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"}})

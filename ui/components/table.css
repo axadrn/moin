@@ -19,6 +19,11 @@
     font-family: var(--font-mono);
     font-size: 0.8125rem;
   }
+  .moin-table td:not(:has(> :is(form, .moin-button, .moin-check))) {
+    max-width: 22rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .moin-table :is(th, td):first-child { padding-inline-start: var(--space-6); }
   .moin-table :is(th, td):last-child { padding-inline-end: var(--space-6); }
   .moin-table [data-num] {
@@ -54,4 +59,26 @@
   }
   .moin-table th[aria-sort="ascending"] a::after { rotate: 180deg; }
   .moin-table :is(th, td):has(> .moin-check) { width: 1%; }
+
+  /* A head that stays while the rows scroll under it. */
+  .moin-table[data-sticky] th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    height: var(--press);
+    background: var(--card);
+  }
+  /* A cell that edits itself: the field brings its own space. */
+  .moin-table td[data-edit] {
+    padding-block: 0;
+    padding-inline: var(--space-1);
+  }
+  .moin-table td[data-edit]:first-child { padding-inline-start: var(--space-3); }
+  /* A cell with only a round button in it. */
+  .moin-table td:has(> .moin-button[data-icon]) {
+    width: 1%;
+    padding-block: 0;
+    padding-inline: 0 var(--space-2);
+    text-align: right;
+  }
 }

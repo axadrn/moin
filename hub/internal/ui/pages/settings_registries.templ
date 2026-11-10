@@ -3,7 +3,6 @@ package pages
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
@@ -24,13 +23,12 @@ templ SettingsRegistriesSection(logins []service.RegistryLogin) {
 					}
 				}
 				for _, login := range logins {
-					@kit.RowControl(templ.Attributes{"data-registry": login.Host}) {
-						<div class="min-w-0 flex-1">
-							<div class="truncate font-mono font-medium">{ login.Host }</div>
-							<div class="truncate text-sm text-muted-foreground">{ "as " + login.Username }</div>
+					@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-registry": login.Host, "data-control": true}}) {
+						<div class="moin-fill">
+							<div class="moin-truncate moin-mono moin-strong">{ login.Host }</div>
+							<div class="moin-truncate moin-text moin-muted">{ "as " + login.Username }</div>
 						</div>
 						@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-							"type":       "button",
 							"hx-delete":  basePath + "/settings/registries/" + login.Host,
 							"hx-target":  "#settings-registries",
 							"hx-swap":    "outerHTML",

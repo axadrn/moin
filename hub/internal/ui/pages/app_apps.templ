@@ -2,7 +2,6 @@ package pages
 
 import (
 	"fmt"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"strconv"
 	"strings"
@@ -12,8 +11,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
-	"github.com/axadrn/moin/protocol"
 	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Apps is every app of the workspace, in the one order: what needs you,
@@ -23,11 +22,9 @@ templ Apps(apps []model.App, servers []model.Server) {
 	@layouts.App("Apps") {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: basePath + "/overview"}, Title: "Apps"}) {
-				<div class="sm:ml-auto">
-					@components.Button(components.ButtonProps{Kind: components.Primary, Href: basePath+"/new-app"}) {
-						New app
-					}
-				</div>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: basePath + "/new-app"}) {
+					New app
+				}
 			}
 			if len(apps) == 0 {
 				@components.List() {
@@ -69,7 +66,7 @@ templ NewApp(servers []model.Server) {
 						Umami, n8n, Ghost and 44 more, the newest release in one click.
 					</p>
 					<div>
-						@components.Button(components.ButtonProps{Href: basePath+"/catalog", Attrs: templ.Attributes{"data-catalog-link": true}}) {
+						@components.Button(components.ButtonProps{Href: basePath + "/catalog", Attrs: templ.Attributes{"data-catalog-link": true}}) {
 							Open the catalog
 						}
 					</div>
@@ -85,7 +82,9 @@ templ AppAddForm(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	<form
 		id="app-add-form"
-		class="flex flex-col gap-2 sm:flex-row"
+		class="moin-row"
+		data-gap="2"
+		data-phone="stack"
 		hx-post={ basePath + "/apps" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
@@ -93,7 +92,7 @@ templ AppAddForm(servers []model.Server) {
 		@components.CSRF()
 		<label for="app-name" class="moin-sr-only">App name</label>
 		@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "app-name", "name": "name", "type": "text", "placeholder": "Name, like my-app", "maxlength": "63", "autocomplete": "off", "spellcheck": "false", "data-hotkey-focus": true}})
-		<div class="flex gap-2 sm:w-64">
+		<div class="moin-row moin-width" data-gap="2" style="--width:16rem">
 			@components.Select(components.SelectProps{ID: "app-server", Name: "server", Label: "Server", Options: serverOptions(servers)})
 			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 				Add
@@ -116,9 +115,6 @@ func plural(n int, one, many string) string {
 	}
 	return strconv.Itoa(n) + " " + many
 }
-
-// panelHeadClasses is the head of a card on pages not yet on panel.
-const panelHeadClasses = "flex min-h-14 items-center justify-between gap-3 px-5 pt-4 pb-1.5"
 
 // AppPageView is an app and the section of it to show.
 type AppPageView struct {
@@ -183,16 +179,14 @@ templ appHomeSection(view AppPageView) {
 	if view.Catalog != nil {
 		@CatalogUpdate(*view.Catalog)
 	}
-	<div class="sm:hidden">
+	<div class="moin-only-phone">
 		@components.List() {
 			for _, section := range appSections[1:] {
-				@components.Item(components.ItemProps{Href: appPath + section.Path, Name: section.Label}) {
-					<span class="truncate text-sm text-muted-foreground">{ appSectionValue(app, section.ID) }</span>
-				}
+				@components.Item(components.ItemProps{Href: appPath + section.Path, Name: section.Label, Value: appSectionValue(app, section.ID)})
 			}
 		}
 	</div>
-	<div class="hidden sm:block">
+	<div class="moin-hidden-phone">
 		<section class="moin-section">
 			<div class="moin-section-head">
 				<h2>Domains</h2>
@@ -202,9 +196,8 @@ templ appHomeSection(view AppPageView) {
 					@components.Item(components.ItemProps{Href: "https://" + domain, External: true, Name: domain})
 				}
 				if len(appDomains(app)) == 0 {
-					@kit.RowControl(nil) {
-						@kit.RowText("No domain yet", "")
-						@components.Button(components.ButtonProps{Href: appPath+"/domains"}) {
+					@components.Item(components.ItemProps{Name: "No domain yet"}) {
+						@components.Button(components.ButtonProps{Href: appPath + "/domains"}) {
 							Add a domain
 						}
 					}
@@ -255,7 +248,7 @@ func appDomains(app model.App) []string {
 // appDeploysSection answers "how does code get in?": the versions, the log
 // of the one picked, GitHub and CI.
 templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follow bool, repo *RepoView) {
-	<div class="grid items-stretch gap-4 lg:grid-cols-2">
+	<div class="moin-grid" data-fit style="--min:30rem">
 		@appDeploys(app, deploys, selected, follow)
 		@DeployLogPanel(app, selectedDeploy(deploys, selected), follow, false)
 	</div>
@@ -284,12 +277,12 @@ templ appDomainsSection(view AppPageView) {
 templ appLogsSection(app model.App, deploys []api.Deploy, logs *AppLogsView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	@components.Card(components.CardProps{Title: "Last 200 lines", Action: loadLogsButton(appPath)}) {
-		<div class="-mx-6">
+		<div class="moin-bleed">
 			if logs != nil {
 				@AppLogs(logs.Lines, logs.Message)
 			} else {
-				<div id="app-logs" hx-get={ appPath + "/logs/lines" } hx-trigger="load" hx-swap="outerHTML" class={ appLogsBox, "h-80 sm:h-[30rem]" }>
-					<p class="px-6 text-sm text-muted-foreground">Reading the logs…</p>
+				<div id="app-logs" hx-get={ appPath + "/logs/lines" } hx-trigger="load" hx-swap="outerHTML" class="moin-tail" data-top data-hold>
+					<p class="moin-inset moin-text moin-muted">Reading the logs…</p>
 				</div>
 			}
 		</div>
@@ -303,10 +296,6 @@ type AppLogsView struct {
 	Lines   []string
 	Message string
 }
-
-// appLogsBox is the box of the container logs: the newest line at the
-// bottom and in view (flex-col-reverse), few lines at the top.
-const appLogsBox = "flex max-h-[30rem] flex-col-reverse justify-end-safe overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 
 // appSettingsSection answers "how is it set up?": its name, its env, the
 // pin, and at the end what stops or removes it.
@@ -439,16 +428,16 @@ templ appDeploys(app model.App, deploys []api.Deploy, selected int, follow bool)
 		hx-swap="none"
 		data-latest-number={ strconv.Itoa(app.LatestNumber) }
 		data-latest-status={ app.LatestStatus }
-		class="flex min-w-0 flex-col rounded-4xl bg-card p-1.5"
+		class="moin-list"
 		aria-label="Deploys"
 	>
 		if len(deploys) == 0 {
-			<div class="flex flex-col gap-3 px-5 py-4">
+			<div class="moin-card">
 				<p class="moin-strong">No deploys yet</p>
 				@components.Command(components.CommandProps{Text: "moin deploy " + app.Name})
 			</div>
 		} else {
-			<div class="flex flex-col" role="list">
+			<div role="list">
 				for _, deploy := range deploys[:min(len(deploys), deploysShown)] {
 					@deployRow(app, deploys, deploy, selected)
 				}
@@ -470,17 +459,17 @@ templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
 	@components.Item(components.ItemProps{Href: deployHref(basePath, app.Link(), deploys, deploy.Number), Attrs: deployRowAttributes(deploy.Number, deploy.Number == selectedNumber(deploys, selected))}) {
-		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-			<span class="flex min-w-0 items-center gap-3">
-				<span class="font-semibold tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
+		<div class="moin-stack moin-fill" data-gap="1">
+			<span class="moin-row" data-gap="3">
+				<span class="moin-strong moin-digits">{ fmt.Sprintf("v%d", deploy.Number) }</span>
 				@deployStatus(deploy, app.LiveNumber)
-				<span class="ml-auto text-sm whitespace-nowrap text-muted-foreground tabular-nums" title={ stamp(deploy.CreatedAt) }>
+				<span class="moin-end moin-text moin-muted moin-digits" title={ stamp(deploy.CreatedAt) }>
 					{ human.Ago(deploy.CreatedAt, now) }
 				</span>
 			</span>
 			if deploy.Commit != "" {
-				<span class="truncate text-sm text-muted-foreground" title={ deploy.CommitMessage } data-deploy-commit>
-					<span class="font-mono">{ shortCommit(deploy.Commit) }</span>
+				<span class="moin-truncate moin-text moin-muted" title={ deploy.CommitMessage } data-deploy-commit>
+					<span class="moin-mono">{ shortCommit(deploy.Commit) }</span>
 					{ deploy.CommitMessage }
 				</span>
 			}
@@ -488,7 +477,7 @@ templ deployRow(app model.App, deploys []api.Deploy, deploy api.Deploy, selected
 				<span class="moin-small moin-muted">{ fmt.Sprintf("rollback to v%d", deploy.FromNumber) }</span>
 			}
 			if deploy.Error != "" {
-				<span class="truncate text-sm text-failed" title={ deploy.Error }>{ deploy.Error }</span>
+				<span class="moin-truncate moin-text moin-failed" title={ deploy.Error }>{ deploy.Error }</span>
 			}
 		</div>
 	}
@@ -540,21 +529,19 @@ templ deployStatus(deploy api.Deploy, liveNumber int) {
 // AppLogs shows the container logs, or why they could not be read, in the
 // box the page kept for them.
 templ AppLogs(lines []string, message string) {
-	<div id="app-logs" class={ appLogsBox } tabindex="0" aria-label="Container logs">
+	<div id="app-logs" class="moin-tail" data-top tabindex="0" aria-label="Container logs">
 		if message != "" {
-			<p class="flex gap-2 px-6 text-sm text-failed"><span aria-hidden="true">✗</span>{ message }</p>
+			<p class="moin-row moin-inset moin-text moin-failed" data-gap="2" data-top><span aria-hidden="true">✗</span>{ message }</p>
 		} else if len(lines) == 0 {
-			<p class="px-6 text-sm text-muted-foreground">No log lines yet.</p>
+			<p class="moin-inset moin-text moin-muted">No log lines yet.</p>
 		} else {
 			<div class="hub-term hub-term-lines">
 				for _, line := range lines {
 					{{ entry := parseLogLine(line) }}
 					<div class="hub-term-line hub-term-log">
-						if entry.Service != "" {
-							<span class="hub-term-dim hidden sm:block" title={ entry.Time }>{ entry.Clock }</span>
-							<span class="hub-term-dim hidden truncate pr-3 sm:block">{ entry.Service }</span>
-						}
-						<span class={ templ.KV("sm:col-span-3", entry.Service == "") }>{ entry.Message }</span>
+						<span class="hub-term-dim moin-hidden-phone" title={ entry.Time }>{ entry.Clock }</span>
+						<span class="hub-term-dim moin-hidden-phone moin-truncate">{ entry.Service }</span>
+						<span>{ entry.Message }</span>
 					</div>
 				}
 			</div>
@@ -604,29 +591,27 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 					@components.Item(components.ItemProps{Name: "No env vars yet"})
 				}
 				for _, key := range keys {
-					@kit.RowControl(nil) {
-						<span data-env={ key } class="max-w-[55%] shrink-0 truncate font-mono text-sm" title={ key }>{ key }</span>
-						<span class="min-w-0 flex-1 truncate text-right font-mono text-sm text-muted-foreground">
+					@components.Item(components.ItemProps{}) {
+						<span data-env={ key } class="moin-item-text moin-truncate moin-mono moin-text" title={ key }>{ key }</span>
+						<span class="moin-item-value moin-mono">
 							if value, ok := values[key]; ok {
-								<span data-env-value class="text-foreground">{ value }</span>
+								<span data-env-value class="moin-foreground">{ value }</span>
 							} else {
 								<span aria-label="hidden">••••••</span>
 							}
 						</span>
-						<button
-							type="button"
-							aria-label={ "Remove " + key }
-							title={ "Remove " + key }
-							hx-delete={ envPath + "/" + key }
-							hx-target="#app-env"
-							hx-swap="outerHTML"
-							hx-disable="this"
-							hx-confirm={ "Remove " + key + "? The next deploy or restart drops it." }
-							data-confirm-action="Remove"
-							class="-my-1.5 -mr-3.5 flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
-						>
+						@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{
+							"aria-label":          "Remove " + key,
+							"title":               "Remove " + key,
+							"hx-delete":           envPath + "/" + key,
+							"hx-target":           "#app-env",
+							"hx-swap":             "outerHTML",
+							"hx-disable":          "this",
+							"hx-confirm":          "Remove " + key + "? The next deploy or restart drops it.",
+							"data-confirm-action": "Remove",
+						}}) {
 							@components.Icon("x")
-						</button>
+						}
 					}
 				}
 				if len(keys) > 0 {
@@ -636,11 +621,11 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 						@components.Item(components.ItemProps{Button: true, Name: "Hide values", Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}})
 					}
 				}
-				@kit.RowForm(templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}) {
-					<div class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
+				@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}}) {
+					<div class="moin-row moin-fill" data-gap="2" data-phone="stack">
 						@components.CSRF()
 						<label for="env-key" class="moin-sr-only">Name</label>
-						<div class="sm:w-56 sm:shrink-0">
+						<div class="moin-width" style="--width:14rem">
 							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "env-key", "name": "key", "type": "text", "placeholder": "Name", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "required": true}})
 						</div>
 						<label for="env-value" class="moin-sr-only">Value</label>

@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
@@ -54,17 +53,13 @@ templ ServerSecurity(view SecurityView) {
 				}
 				@components.List() {
 					if server.Online && daemonOutdated(server) {
-						@components.Item(components.ItemProps{Button: true, Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}}) {
-							@kit.RowText("Update daemon", server.DaemonVersion+" → "+build.Version)
-						}
+						@components.Item(components.ItemProps{Button: true, Name: "Update daemon", Note: server.DaemonVersion + " → " + build.Version, Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/update", "hx-swap": "none", "hx-disable": "this", "data-update-daemon": server.Name}})
 					}
-					@components.Item(components.ItemProps{Button: true, Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}}) {
-						@kit.RowText("New install command", "The old one stops working")
-					}
+					@components.Item(components.ItemProps{Button: true, Name: "New install command", Note: "The old one stops working", Attrs: templ.Attributes{"hx-post": basePath + "/servers/" + server.Link() + "/install", "hx-swap": "none", "hx-disable": "this", "data-new-install": server.Name}})
 				}
 				// The new command shows here, out of band, until its daemon
 				// used it.
-				<div id="server-added" class="empty:hidden"></div>
+				<div id="server-added" class="moin-hide-empty"></div>
 				@components.List() {
 					if view.Integrations.Cloudflare {
 						@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
@@ -129,7 +124,7 @@ templ securityState(view SecurityView, securityPath string) {
 						@securityFact("Tailnet", tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
 						for _, problem := range report.Problems {
 							@components.Item(components.ItemProps{}) {
-								<div class="min-w-0 flex-1 text-sm text-running">{ problem }</div>
+								<div class="moin-fill moin-text moin-running">{ problem }</div>
 							}
 						}
 					}
@@ -142,8 +137,8 @@ templ securityState(view SecurityView, securityPath string) {
 // securityFact is a row of what the daemon set up: the name and a note
 // left, the value right.
 templ securityFact(name, note, value string) {
-	@kit.RowFact(name, note) {
-		<span class="font-mono">{ value }</span>
+	@components.Item(components.ItemProps{Name: name, Note: note}) {
+		<span class="moin-item-value moin-mono">{ value }</span>
 	}
 }
 
@@ -303,17 +298,17 @@ templ serverRules(server model.Server) {
 			if len(rules.Lines()) == 0 {
 				@components.List() {
 					@components.Item(components.ItemProps{}) {
-						<div class="min-w-0 flex-1">
+						<div class="moin-fill">
 							<div class="moin-strong">None</div>
-							<div class="moin-small moin-muted">moin may do everything here. Write <code class="font-mono text-foreground">/etc/moin/rules</code> on the server to limit it.</div>
+							<div class="moin-small moin-muted">moin may do everything here. Write <code class="moin-mono moin-foreground">/etc/moin/rules</code> on the server to limit it.</div>
 						</div>
 					}
 				}
 			} else {
 				@components.Card(components.CardProps{}) {
-					<pre class="overflow-x-auto font-mono text-sm leading-relaxed" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
+					<pre class="moin-mono moin-text moin-scroll" data-rules>{ strings.Join(rules.Lines(), "\n") }</pre>
 					<p class="moin-small moin-muted">
-						From <code class="font-mono">/etc/moin/rules</code> on the server. The daemon refuses the rest.
+						From <code class="moin-mono">/etc/moin/rules</code> on the server. The daemon refuses the rest.
 					</p>
 				}
 			}

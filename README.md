@@ -27,4 +27,4 @@ The hub is in [`hub`](hub).
 
 ## License
 
-AGPL-3.0, except `ui/`, which is MIT. See [LICENSE](LICENSE) and [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).
+Open source: [what the licenses cover](https://moin.run/docs/faq#is-moin-open-source). See also [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).

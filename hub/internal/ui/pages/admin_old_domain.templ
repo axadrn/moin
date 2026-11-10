@@ -34,11 +34,11 @@ templ AdminOldDomain(report *model.OldDomain) {
 						@components.List() {
 							for _, row := range report.Rows {
 								@components.Item(components.ItemProps{}) {
-									<div class="min-w-0 flex-1">
-										<div class="truncate font-medium tabular-nums">{ row.Day }</div>
-										<div class="truncate text-sm text-muted-foreground"><span class="font-mono">{ row.Host }</span> · { row.Kind }</div>
+									<div class="moin-item-text">
+										<div class="moin-item-name moin-digits">{ row.Day }</div>
+										<div class="moin-item-note"><span class="moin-mono">{ row.Host }</span> · { row.Kind }</div>
 									</div>
-									<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ strconv.Itoa(row.Requests) }</span>
+									<span class="moin-item-value">{ strconv.Itoa(row.Requests) }</span>
 								}
 							}
 						}

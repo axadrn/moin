@@ -6,7 +6,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
@@ -101,32 +100,40 @@ templ billingOffer(plan access.Plan, basePath string) {
 		hx-post={ basePath + "/billing/checkout" }
 		hx-swap="none"
 		hx-disable="find button[type='submit']"
-		class="group/offer flex flex-col items-start gap-6 rounded-4xl bg-card p-6 sm:p-8"
+		class="moin-card"
 		data-offer
+		data-either
 	>
 		@components.CSRF()
 		<input type="hidden" name="plan_id" value={ plan.ID }/>
-		<div class="flex w-full flex-wrap items-center justify-between gap-4">
-			<h2 class="text-base font-medium">{ plan.Name }</h2>
-			@kit.Choice("interval", "Pay", []components.Option{{Value: "yearly", Label: "Yearly"}, {Value: "monthly", Label: "Monthly"}}, "yearly")
-		</div>
-		<div class="flex flex-col gap-1">
-			<p class="flex items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:hidden">
-				<span class="text-2xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
-				<span class="text-muted-foreground">a year</span>
-				<span class="text-sm font-medium">Save { yearlySaving(plan) }</span>
-			</p>
-			<p class="hidden items-baseline gap-3 group-has-[#interval-monthly:checked]/offer:flex">
-				<span class="text-2xl font-semibold tracking-tight tabular-nums">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
-				<span class="text-muted-foreground">a month</span>
-			</p>
-			<p class="text-muted-foreground">Unlimited servers, apps and teammates.</p>
-		</div>
-		<div class="flex flex-col items-start gap-3">
-			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-subscribe": true}}) {
-				Subscribe
-			}
-			<p class="moin-small moin-muted">Plus tax where it applies. Cancel any time.</p>
+		<div class="moin-stack" data-gap="6">
+			<div class="moin-row" data-wrap data-between data-gap="4">
+				<h2 class="moin-heading">{ plan.Name }</h2>
+				@components.Choice(components.ChoiceProps{Name: "interval", Label: "Pay", Options: []components.Option{
+					{Value: "yearly", Label: "Yearly", Attrs: templ.Attributes{"id": "interval-yearly"}},
+					{Value: "monthly", Label: "Monthly", Attrs: templ.Attributes{"id": "interval-monthly", "data-other": true}},
+				}, Checked: "yearly"})
+			</div>
+			<div class="moin-stack" data-gap="1">
+				<p class="moin-row" data-baseline data-gap="3" data-way="first">
+					<span class="moin-number">{ model.FormatPlanPrice(plan.YearlyPrice) }</span>
+					<span class="moin-muted">a year</span>
+					<span class="moin-text moin-strong">Save { yearlySaving(plan) }</span>
+				</p>
+				<p class="moin-row" data-baseline data-gap="3" data-way="other">
+					<span class="moin-number">{ model.FormatPlanPrice(plan.MonthlyPrice) }</span>
+					<span class="moin-muted">a month</span>
+				</p>
+				<p class="moin-muted">Unlimited servers, apps and teammates.</p>
+			</div>
+			<div class="moin-stack" data-gap="3">
+				<div class="moin-row">
+					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-subscribe": true}}) {
+						Subscribe
+					}
+				</div>
+				<p class="moin-small moin-muted">Plus tax where it applies. Cancel any time.</p>
+			</div>
 		</div>
 	</form>
 }

@@ -1,4 +1,4 @@
-package kit
+package components
 
 import (
 	"context"
@@ -91,6 +91,9 @@ func TestChartRenders(t *testing.T) {
 		page := html.String()
 		if len(p.Times) == 3 && (!strings.Contains(page, "v12 went live") || !strings.Contains(page, ">3%<") || !strings.Contains(page, "13:00")) {
 			t.Errorf("the chart misses its newest value, time or mark:\n%s", page)
+		}
+		if len(p.Times) == 3 && !strings.Contains(page, "--x:") {
+			t.Errorf("a mark lost its place, the CSS variables of its style:\n%s", page)
 		}
 		if len(p.Times) == 0 && !strings.Contains(page, `data-chart-last="-1"`) {
 			t.Errorf("an empty chart has a newest point:\n%s", page)

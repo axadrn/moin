@@ -1,6 +1,6 @@
 ---
 title: "moin UI"
-description: "The UI moin runs on: native HTML, CSS and JS for any stack, under the MIT license."
+description: "The UI moin runs on: native HTML, CSS and JS for any stack."
 group: "Start"
 order: 1
 ---
@@ -39,7 +39,7 @@ ui/
 ├── examples/      one file per example
 ├── blocks/        whole pages to copy
 ├── CHANGELOG.md   what changed
-├── LICENSE        MIT
+├── LICENSE        the license
 └── README.md
 ```
 
@@ -111,7 +111,22 @@ templ Actions() {
 ### Go
 
 ```go
-const page = \
+const page = `
+{{define "button"}}<button type="button" class="moin-button"{{if .Kind}} data-kind="{{.Kind}}"{{end}}>{{.Label}}</button>{{end}}
+
+<div class="moin-row" data-gap="2">
+  {{template "button" .Deploy}}
+  {{template "button" .Cancel}}
+</div>`
+
+type Button struct{ Kind, Label string }
+
+func main() {
+	template.Must(template.New("page").Parse(page)).Execute(os.Stdout, map[string]Button{
+		"Deploy": {Kind: "primary", Label: "Deploy"},
+		"Cancel": {Label: "Cancel"},
+	})
+}
 ```
 
 ### Ruby

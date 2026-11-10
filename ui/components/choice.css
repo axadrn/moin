@@ -44,6 +44,15 @@
   }
   .moin-choice input { position: absolute; opacity: 0; pointer-events: none; }
 
+  /* The parts of a choice: inside data-surfaces, the data-surface of the
+     checked radio shows and the others go. */
+  [data-surface] { display: none; }
+  [data-surfaces]:has([value="web"]:checked) [data-surface="web"],
+  [data-surfaces]:has([value="cli"]:checked) [data-surface="cli"],
+  [data-surfaces]:has([value="tui"]:checked) [data-surface="tui"],
+  [data-surfaces]:has([value="api"]:checked) [data-surface="api"],
+  [data-surfaces]:has([value="mcp"]:checked) [data-surface="mcp"] { display: block; }
+
   /* Quiet: only words, for tabs under tabs. */
   .moin-tabs[data-quiet] {
     gap: var(--space-5);

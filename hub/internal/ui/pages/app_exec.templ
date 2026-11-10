@@ -46,13 +46,14 @@ templ appExec(app model.App, deploys []api.Deploy) {
 		if len(services) > 0 {
 			@components.Card(components.CardProps{Title: "Run a command"}) {
 				<form
-					class="moin-stack" data-gap="4"
+					class="moin-stack"
+					data-gap="4"
 					data-exec-form
 					data-exec-url={ "/api/v1/apps/" + app.Link() + "/exec?workspace=" + ctxkeys.Workspace(ctx).Link() }
 				>
-					<div class="flex flex-col gap-2 sm:flex-row">
+					<div class="moin-row" data-gap="2" data-phone="stack">
 						if len(services) > 1 {
-							<div class="sm:w-40 sm:shrink-0">
+							<div class="moin-width" style="--width:10rem">
 								@components.Select(components.SelectProps{ID: "exec-service", Name: "service", Label: "Service", Options: execServiceOptions(services)})
 							</div>
 						} else {
@@ -64,9 +65,9 @@ templ appExec(app model.App, deploys []api.Deploy) {
 							Run
 						}
 					</div>
-					<p class="px-1 text-sm text-muted-foreground" data-exec-status hidden></p>
-					<div class="-mx-6 flex max-h-[30rem] flex-col-reverse overflow-auto overscroll-contain" data-exec-box hidden>
-						<pre class="hub-term px-6 whitespace-pre-wrap" data-exec-output></pre>
+					<p class="moin-text moin-muted" data-exec-status hidden></p>
+					<div class="moin-bleed moin-tail" data-exec-box hidden>
+						<pre class="hub-term moin-inset moin-wrap" data-exec-output></pre>
 					</div>
 				</form>
 				@appExecScript()
@@ -90,8 +91,8 @@ templ appExecScript() {
 			const say = (text, failed) => {
 				status.hidden = false;
 				status.textContent = text;
-				status.classList.toggle("text-failed", !!failed);
-				status.classList.toggle("text-muted-foreground", !failed);
+				status.classList.toggle("moin-failed", !!failed);
+				status.classList.toggle("moin-muted", !failed);
 			};
 			form.addEventListener("submit", async (event) => {
 				event.preventDefault();

@@ -36,4 +36,7 @@
     translate: 1.25rem 0;
     background: var(--background);
   }
+
+  /* A tap on the words next to a switch works it too. */
+  label:has(.moin-switch) { cursor: pointer; }
 }

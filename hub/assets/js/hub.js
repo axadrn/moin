@@ -140,7 +140,7 @@ addEventListener("unhandledrejection", (event) => {
 });
 
 // Feedback (DESIGN.md): the answer to a click shows where you clicked. The
-// server sends it into #feedback (kit.Feedback); it goes to the element that
+// server sends it into #feedback (components.Feedback); it goes to the element that
 // sent the request. "done" turns its button into a check for a moment,
 // "failed" and "note" put the words in a line under its form.
 let asking = null;
@@ -298,7 +298,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-// Dialogs (kit.Dialog): a button with data-open-dialog opens its dialog, one
+// Dialogs (components.Dialog): a button with data-open-dialog opens its dialog, one
 // with data-close-dialog closes the dialog it is in, and a click beside the
 // dialog closes it, as Escape does.
 document.addEventListener("click", (event) => {
@@ -343,3 +343,122 @@ document.addEventListener("click", async (event) => {
 document.addEventListener("click", (event) => {
   if (event.target.closest?.('.moin-preview-stage a[href^="#"]')) event.preventDefault();
 });
+
+// Asking first (DESIGN.md): every request whose element has hx-confirm opens
+// the one dialog of the page (components.ConfirmDialog) before it goes. The
+// question is the hx-confirm text: up to the first "? " the title, the rest
+// the note. The button repeats the label of the clicked button, or
+// data-confirm-action. With data-confirm-name on the element or one around it,
+// the button works only once that name is typed, for what is big and cannot
+// be undone; the typed name goes along as X-Moin-Confirm, URI-encoded, and the
+// service checks it again.
+{
+  let pending = null;
+  const popup = () => document.getElementById("confirm-dialog");
+  const part = (name) => popup().querySelector("[data-confirm-" + name + "]");
+  document.addEventListener("htmx:confirm", (event) => {
+    if (!popup()) return;
+    event.preventDefault();
+    const { ctx, issueRequest, dropRequest } = event.detail;
+    pending?.drop();
+    const text = ctx.confirm || "";
+    const split = text.indexOf("? ");
+    popup().querySelector("[data-dialog-title]").textContent = split < 0 ? text : text.slice(0, split + 1);
+    popup().querySelector("[data-dialog-note]").textContent = split < 0 ? "" : text.slice(split + 2);
+    const source = ctx.sourceEvent?.submitter || event.target;
+    const label = source.closest("[data-confirm-action]")?.dataset.confirmAction || (source.matches("button") ? source.textContent.trim() : "");
+    const accept = part("accept");
+    accept.textContent = label && label.length <= 24 ? label : "Continue";
+    const name = event.target.closest("[data-confirm-name]")?.dataset.confirmName || "";
+    const typed = part("typed");
+    typed.hidden = name === "";
+    // The name shows with its copy button (Command).
+    part("shown").querySelector("code").textContent = name;
+    part("shown").querySelector("[data-copy]").dataset.copy = name;
+    const field = part("input");
+    field.value = "";
+    accept.disabled = name !== "";
+    pending = { name, accepted: false, ctx, issue: issueRequest, drop: dropRequest };
+    popup().showModal();
+    if (name) field.focus();
+    else accept.focus();
+  });
+  document.addEventListener("input", (event) => {
+    if (pending && event.target.matches("[data-confirm-input]")) part("accept").disabled = event.target.value.trim() !== pending.name;
+  });
+  const accept = () => {
+    if (!pending || part("accept").disabled) return;
+    pending.accepted = true;
+    if (pending.name) pending.ctx.request.headers["X-Moin-Confirm"] = encodeURIComponent(part("input").value.trim());
+    popup().close();
+  };
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-confirm-accept]")) accept();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.matches("[data-confirm-input]")) {
+      event.preventDefault();
+      accept();
+    }
+  });
+  // The dialog closed: by the button, Cancel, Escape or a click outside.
+  // Only the button lets the request go.
+  document.addEventListener("close", (event) => {
+    if (!pending || event.target !== popup()) return;
+    const done = pending;
+    pending = null;
+    done.accepted ? done.issue() : done.drop();
+  }, true);
+}
+
+// The chart a server draws (components.Chart): what is under the pointer or
+// the finger shows the cursor, a dot on each line, and the values and the
+// time on top, from the points the server wrote into data-chart-points.
+// Leaving the plot, or lifting the finger, shows the newest values again.
+(() => {
+  if (window.moinChart) return;
+  window.moinChart = true;
+  const pointsOf = (chart) => (chart.chartPoints ||= JSON.parse(chart.querySelector("[data-chart-points]")?.textContent || "[]"));
+  const show = (chart, at) => {
+    const points = pointsOf(chart);
+    const pointing = at >= 0;
+    const point = points[pointing ? at : Number(chart.dataset.chartLast)];
+    chart.querySelectorAll("[data-chart-value]").forEach((value, n) => { value.textContent = point ? point.v[n] : "—"; });
+    chart.querySelector("[data-chart-time]").textContent = point ? (point.m ? point.m + " · " : "") + point.t : "";
+    const cursor = chart.querySelector("[data-chart-cursor]");
+    cursor.hidden = !pointing;
+    if (pointing) cursor.style.left = point.x + "%";
+    chart.querySelectorAll("[data-chart-dot]").forEach((dot, n) => {
+      dot.hidden = !pointing || point.y[n] < 0;
+      if (!dot.hidden) Object.assign(dot.style, { left: point.x + "%", top: point.y[n] + "%" });
+    });
+  };
+  const nearest = (points, x) => {
+    let best = -1;
+    points.forEach((point, i) => { if (best < 0 || Math.abs(point.x - x) < Math.abs(points[best].x - x)) best = i; });
+    return best;
+  };
+  let active = null;
+  const leave = () => {
+    if (active) show(active, -1);
+    active = null;
+  };
+  const point = (event) => {
+    const plot = event.target.closest?.("[data-chart-plot]");
+    const chart = plot?.closest("[data-chart]");
+    if (active && active !== chart) leave();
+    if (!chart) return;
+    const box = plot.getBoundingClientRect();
+    const at = nearest(pointsOf(chart), ((event.clientX - box.left) / box.width) * 100);
+    if (at < 0) return;
+    active = chart;
+    show(chart, at);
+  };
+  document.addEventListener("pointermove", point);
+  document.addEventListener("pointerdown", point);
+  document.addEventListener("pointerout", (event) => {
+    if (active && !active.querySelector("[data-chart-plot]").contains(event.relatedTarget)) leave();
+  });
+  document.addEventListener("pointerup", (event) => { if (event.pointerType !== "mouse") leave(); });
+  document.addEventListener("pointercancel", leave);
+})();

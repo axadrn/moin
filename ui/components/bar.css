@@ -30,10 +30,13 @@
     max-width: 64rem;
     height: 3.5rem;
     margin-inline: auto;
-    /* A pill by default, square in a theme without radius. */
+    /* A pill by default, square in a theme without radius. What you press
+       in it nests: its corner is the bar's minus the gap to it. */
     --bar-gap: 0.375rem;
+    --bar-corner: calc(var(--radius) * 4);
+    --radius-press: max(0px, calc(var(--bar-corner) - var(--bar-gap)));
     padding-inline: var(--space-5) var(--bar-gap);
-    border-radius: calc(var(--radius) * 4);
+    border-radius: var(--bar-corner);
     background: color-mix(in oklab, var(--card) 85%, transparent);
     box-shadow: var(--shadow-low), 0 0 0 1px color-mix(in oklab, var(--foreground) 5%, transparent);
     backdrop-filter: blur(24px);

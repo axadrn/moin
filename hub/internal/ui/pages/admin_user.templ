@@ -19,15 +19,13 @@ templ AdminUser(user *model.AdminUser) {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Admin", Href: "/admin"}, Title: adminUserName(*user)}) {
 				if !self && !user.IsAdmin {
-					<div class="sm:ml-auto">
-						@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{
-							"hx-post":    "/admin/users/" + user.ID + "/impersonate",
-							"hx-swap":    "none",
-							"hx-disable": "this",
-						}}) {
-							View as user
-						}
-					</div>
+					@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{
+						"hx-post":    "/admin/users/" + user.ID + "/impersonate",
+						"hx-swap":    "none",
+						"hx-disable": "this",
+					}}) {
+						View as user
+					}
 				}
 			}
 			@AdminUserFacts(user)
@@ -70,7 +68,7 @@ templ AdminUserFacts(user *model.AdminUser) {
 // A paying workspace is not made free forever, so it has no button.
 templ AdminUserPlan(user *model.AdminUser) {
 	{{ on := user.Plan != model.AdminPlanFreeForever }}
-	<div id="admin-user-plan" class="grid gap-3" hx-swap-oob="true">
+	<div id="admin-user-plan" class="moin-stack" data-gap="3" hx-swap-oob="true">
 		@components.List() {
 			@adminFact("Plan", adminPlanLabel(*user))
 			if user.Plan != model.AdminPlanPaying {

@@ -5,7 +5,6 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/build"
@@ -33,7 +32,7 @@ templ Servers(servers []model.Server, canAdd bool, removed *RemovedServer, autoU
 	@layouts.App("Servers") {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: basePath + "/overview"}, Title: "Servers"})
-			<div id="server-added" class="empty:hidden">
+			<div id="server-added" class="moin-hide-empty">
 				if removed != nil {
 					@serverRemoved(*removed)
 				}
@@ -111,10 +110,7 @@ templ ServerAdded(added AddedServer) {
 templ ServerConnected(name string) {
 	<div id="server-added" data-server-greeting={ name }>
 		@components.List() {
-			@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/new-app"}) {
-				@components.Dot(components.DotProps{State: components.StateLive})
-				@kit.RowText(name+" is online", "Deploy an app to it")
-			}
+			@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/new-app", Name: name + " is online", Note: "Deploy an app to it", Lead: components.Dot(components.DotProps{State: components.StateLive})})
 		}
 	</div>
 }
@@ -122,7 +118,7 @@ templ ServerConnected(name string) {
 // ServerGone empties the place of the install command when its server was
 // removed meanwhile.
 templ ServerGone() {
-	<div id="server-added" class="empty:hidden"></div>
+	<div id="server-added" class="moin-hide-empty"></div>
 }
 
 // serverRemoved tells that the daemon of a server just removed is still
@@ -181,10 +177,9 @@ func serverNote(server model.Server, now time.Time) string {
 templ serverState(server model.Server) {
 	switch  {
 		case server.Online:
-			<span class="flex size-8 shrink-0 items-center justify-center" title="Online">
-				@components.Dot(components.DotProps{State: components.StateLive})
+			@components.Status(components.StatusProps{State: components.StateLive, Attrs: templ.Attributes{"title": "Online", "data-alone": true}}) {
 				<span class="moin-sr-only">Online</span>
-			</span>
+			}
 		case server.LastSeenAt == nil:
 			@components.Chip(components.ChipProps{State: components.StateWaiting}) {
 				Waiting

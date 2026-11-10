@@ -11,6 +11,10 @@
     background: var(--card);
     color: var(--card-foreground);
   }
+  .moin-card[data-center] { justify-content: center; }
+  .moin-card[data-gap="1"] { gap: var(--space-1); }
+  .moin-card[data-gap="6"] { gap: var(--space-6); }
+  .moin-card[data-gap="8"] { gap: var(--space-8); }
   .moin-card[data-flush] { padding-inline: 0; }
   .moin-card[data-flush] > :is(.moin-card-head, .moin-card-foot) { padding-inline: var(--pad); }
   .moin-card-head {

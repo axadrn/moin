@@ -59,12 +59,11 @@ templ Base(props ...SEOProps) {
 			}
 		</head>
 		<body
-			class="style-nova min-h-screen"
 			hx-headers:inherited={ `{"X-CSRF-Token":"` + ctxkeys.CSRFToken(ctx) + `"}` }
 		>
 			{{ session := ctxkeys.Session(ctx) }}
 			if session.IsImpersonating() {
-				<div class="sticky top-0 z-50 flex items-center justify-center gap-3 border-b border-amber-500/30 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+				<div class="moin-alert moin-text" data-state="running" data-sticky>
 					<span>You are viewing the application as another user.</span>
 					<form
 						action="/admin/impersonation/stop"
@@ -74,7 +73,9 @@ templ Base(props ...SEOProps) {
 						hx-disable="find button[type='submit']"
 					>
 						@components.CSRF()
-						<button type="submit" class="font-medium underline-offset-4 hover:underline">Return to Admin</button>
+						@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
+							Return to Admin
+						}
 					</form>
 				</div>
 			}
@@ -148,24 +149,17 @@ templ themeScript() {
 			window.themeUtils.applyTheme = function() {
 				const preference = window.themeUtils.getThemePreference();
 				const isDark = preference === 'system' ? media.matches : preference === 'dark';
-				document.documentElement.classList.toggle('dark', isDark);
+				const root = document.documentElement;
+				root.classList.toggle('dark', isDark);
+				root.classList.toggle('light', preference === 'light');
+				// moin.js pins the scheme for a stored choice; system follows
+				// the rules in the stylesheet again.
+				root.style.colorScheme = preference === 'system' ? '' : preference;
 				document.dispatchEvent(new CustomEvent('theme-changed'));
-			};
-			window.themeUtils.cycleTheme = function() {
-				const current = window.themeUtils.getThemePreference();
-				const next = current === 'system' ? (media.matches ? 'light' : 'dark') : (current === 'light' ? 'dark' : 'light');
-				localStorage.setItem('moin-mode', next);
-				window.themeUtils.applyTheme();
 			};
 			window.themeUtils.applyTheme();
 			media.addEventListener('change', function() {
 				if (window.themeUtils.getThemePreference() === 'system') window.themeUtils.applyTheme();
-			});
-			document.addEventListener('click', function(event) {
-				const switcher = event.target.closest('[data-theme-switcher]');
-				if (!switcher) return;
-				event.preventDefault();
-				window.themeUtils.cycleTheme();
 			});
 		})();
 	</script>

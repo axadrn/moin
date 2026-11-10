@@ -88,10 +88,19 @@
     background: var(--muted);
     color: var(--foreground);
   }
+  .moin-button[data-icon][data-kind="danger"]:hover { color: var(--failed-text); }
   .moin-button[data-quiet] { background: transparent; }
+  /* Quiet words: a way elsewhere under the real buttons. */
+  .moin-button[data-muted] { color: var(--muted-foreground); }
+  .moin-button[data-muted]:hover { color: var(--foreground); }
   .moin-button[data-quiet]:hover { background: var(--muted); }
   .moin-button[data-icon][aria-current] {
     background: var(--primary);
     color: var(--primary-foreground);
+  }
+
+  /* The button of a row that shares the line with a short control. */
+  @media (max-width: 39.99rem) {
+    .moin-button[data-phone="fill"] { flex: 1; }
   }
 }

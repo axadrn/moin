@@ -108,10 +108,9 @@ templ dataListPage(view DataView) {
 					}
 					for _, database := range view.NoBackup {
 						@components.Item(components.ItemProps{Name: database.Service, Note: databaseKind(database)}) {
-							<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" data-no-backup>
-								@components.Dot(components.DotProps{State: components.StateFailed})
+							@components.Status(components.StatusProps{State: components.StateFailed, Attrs: templ.Attributes{"data-no-backup": true}}) {
 								moin can't back this up
-							</span>
+							}
 						}
 					}
 				}
@@ -126,19 +125,17 @@ templ dataListPage(view DataView) {
 templ databaseBackupValue(view DataView, database string) {
 	{{ backup, known := backupStatusOf(view.Status, database) }}
 	if view.Backups.Bucket == nil {
-		<span class="shrink-0 text-sm text-muted-foreground">No backups</span>
+		<span class="moin-item-value">No backups</span>
 	} else if known && backup.BackupError() != "" {
-		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.BackupError()) }>
-			@components.Dot(components.DotProps{State: components.StateFailed})
+		@components.Status(components.StatusProps{State: components.StateFailed, Attrs: templ.Attributes{"title": service.BackupProblem(backup.BackupError())}}) {
 			Backup fails
-		</span>
+		}
 	} else if known && backup.CheckError != "" {
-		<span class="flex shrink-0 items-center gap-1.5 text-sm text-failed" title={ service.BackupProblem(backup.CheckError) }>
-			@components.Dot(components.DotProps{State: components.StateFailed})
+		@components.Status(components.StatusProps{State: components.StateFailed, Attrs: templ.Attributes{"title": service.BackupProblem(backup.CheckError)}}) {
 			Check failed
-		</span>
+		}
 	} else if known && backup.CopiedAt != nil {
-		<span class="shrink-0 text-sm text-muted-foreground" title={ "Newest copy " + stamp(*backup.CopiedAt) }>Backed up</span>
+		<span class="moin-item-value" title={ "Newest copy " + stamp(*backup.CopiedAt) }>Backed up</span>
 	}
 }
 
@@ -173,13 +170,13 @@ templ dataDatabasePage(view DataView) {
 					@components.List() {
 						for _, table := range view.Tables {
 							@components.Item(components.ItemProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, 0), Name: table.Name, Note: tableKind(table)}) {
-								<span class="shrink-0 text-sm text-muted-foreground tabular-nums" data-table-link={ table.Name }>{ plural(int(table.Rows), "row", "rows") }</span>
+								<span class="moin-item-value" data-table-link={ table.Name }>{ plural(int(table.Rows), "row", "rows") }</span>
 							}
 						}
 						if view.Migration != nil {
 							@components.Item(components.ItemProps{}) {
-								<span class="flex-1 font-medium" data-migration>Migrations</span>
-								<span class="min-w-0 truncate text-sm text-muted-foreground" title={ view.Migration.AppliedAt }>{ view.Migration.Tool } · <span class="font-mono">{ view.Migration.Version }</span></span>
+								<span class="moin-fill moin-strong" data-migration>Migrations</span>
+								<span class="moin-truncate moin-text moin-muted" title={ view.Migration.AppliedAt }>{ view.Migration.Tool } · <span class="moin-mono">{ view.Migration.Version }</span></span>
 							}
 						}
 					}
@@ -208,9 +205,9 @@ templ dataTablePage(view DataView) {
 
 // dataError is why the server could not answer: a state of the page.
 templ dataError(message string) {
-	<p role="alert" class="flex items-center gap-2 px-1 text-sm text-failed" data-data-error>
+	<p role="alert" class="moin-row moin-text moin-failed" data-gap="2" data-data-error>
 		@components.Dot(components.DotProps{State: components.StateFailed})
-		<span class="min-w-0 break-words">{ message }</span>
+		<span class="moin-break">{ message }</span>
 	</p>
 }
 
@@ -286,59 +283,57 @@ templ dataRows(view DataView) {
 				No rows yet.
 			</p>
 		} else {
-			<div class={ dataScroll }>
-				<table class={ dataTableClass } data-rows>
+			<div class="moin-bleed moin-scroll" data-both>
+				<table class="moin-table" data-sticky data-rows>
 					<thead>
 						<tr>
 							for _, column := range table.Columns {
-								<th scope="col" class={ dataHead, templ.KV("text-right", isNumeric(column)) }>
-									<span class="inline-flex items-center gap-1.5">
+								<th scope="col" data-num?={ isNumeric(column) }>
+									<span class="moin-row" data-gap="2" data-end?={ isNumeric(column) }>
 										if column.PrimaryKey {
 											<span role="img" aria-label="primary key">
 												@components.Icon("key")
 											</span>
 										}
-										<span class="text-foreground">{ column.Name }</span>
-										<span class="font-mono text-xs font-normal">{ strings.ToLower(column.Type) }</span>
+										<span class="moin-foreground">{ column.Name }</span>
+										<span class="moin-mono moin-small">{ strings.ToLower(column.Type) }</span>
 									</span>
 								</th>
 							}
 							if editable {
-								<th scope="col" class={ dataHead }><span class="moin-sr-only">Delete</span></th>
+								<th scope="col"><span class="moin-sr-only">Delete</span></th>
 							}
 						</tr>
 					</thead>
 					<tbody>
 						for _, row := range view.Result.Rows {
 							{{ ref := rowRefOf(table, row, table.RowID) }}
-							<tr class={ dataRow } data-row={ ref.RowID + ref.Key }>
+							<tr data-row={ ref.RowID + ref.Key }>
 								for index, column := range table.Columns {
 									{{ value := cellValue(row, index, table.RowID) }}
 									if editable && !isBlob(column) {
-										<td class="py-0 pr-1 first:pl-3">
+										<td data-edit>
 											@DataCell(dataPath(ctx, view.App.Link()), view.Database, table.Name, ref, column, value, "")
 										</td>
 									} else {
-										<td class={ dataCell, templ.KV("text-right", isNumeric(column)), templ.KV("text-muted-foreground italic", value == nil) }>{ cellText(value) }</td>
+										<td data-num?={ isNumeric(column) } data-null?={ value == nil }>{ cellText(value) }</td>
 									}
 								}
 								if editable {
-									<td class="w-11 py-0 text-right">
-										<button
-											type="button"
-											class="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-foreground/5 hover:text-failed focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-40 [&_svg]:size-4"
-											aria-label={ "Delete " + strings.ToLower(ref.Label()) }
-											title="Delete"
-											hx-post={ dataPath(ctx, view.App.Link()) + "/delete" }
-											hx-vals={ deleteRowVals(view.Database, table.Name, ref) }
-											hx-target="closest tr"
-											hx-swap="outerHTML"
-											hx-disable="this"
-											hx-confirm={ "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone." }
-											data-confirm-action="Delete"
-										>
+									<td>
+										@components.Button(components.ButtonProps{Icon: true, Quiet: true, Kind: components.Danger, Attrs: templ.Attributes{
+											"aria-label":          "Delete " + strings.ToLower(ref.Label()),
+											"title":               "Delete",
+											"hx-post":             dataPath(ctx, view.App.Link()) + "/delete",
+											"hx-vals":             deleteRowVals(view.Database, table.Name, ref),
+											"hx-target":           "closest tr",
+											"hx-swap":             "outerHTML",
+											"hx-disable":          "this",
+											"hx-confirm":          "Delete " + strings.ToLower(ref.Label()) + " of " + table.Name + "? This cannot be undone.",
+											"data-confirm-action": "Delete",
+										}}) {
 											@components.Icon("trash")
-										</button>
+										}
 									</td>
 								}
 							</tr>
@@ -348,9 +343,9 @@ templ dataRows(view DataView) {
 			</div>
 		}
 		if view.Offset > 0 || int64(shown) < table.Rows {
-			<div class="flex items-center justify-between gap-2" data-pager>
-				<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
-				<div class="flex gap-2">
+			<div class="moin-row" data-between data-gap="2" data-pager>
+				<span class="moin-small moin-muted moin-digits">{ fmt.Sprintf("%d–%d of %d", view.Offset+1, shown, table.Rows) }</span>
+				<div class="moin-row" data-gap="2">
 					if view.Offset > 0 {
 						@components.Button(components.ButtonProps{Href: tableURL(ctx, view.App.Name, view.Database, table.Name, max(view.Offset-view.Limit, 0))}) {
 							Newer
@@ -382,18 +377,6 @@ templ addRowButton() {
 	}
 }
 
-// The tables of the data pages run edge to edge in their card, a line
-// between two rows; the first and the last column sit on the card's 24 px,
-// so values line up with its title.
-const (
-	dataScroll     = "-mx-6 max-h-[36rem] overflow-auto overscroll-contain"
-	dataTableClass = "w-full border-collapse text-sm"
-	dataHead       = "sticky top-0 z-10 h-11 bg-card px-3 text-left align-middle font-medium whitespace-nowrap text-muted-foreground first:pl-6 last:pr-6"
-	dataRow        = "border-t border-border"
-	dataCell       = "h-11 max-w-[22rem] truncate px-3 font-mono whitespace-nowrap first:pl-6 last:pr-6"
-	dataTerm       = "hub-term overflow-x-auto rounded-3xl bg-terminal px-5 py-4 whitespace-pre-wrap text-terminal-foreground"
-)
-
 // dataSchema is how a table is built: its columns, then the statement that
 // made it and its indexes. The schema changes with the migrations in the
 // repo, not here.
@@ -405,7 +388,7 @@ templ dataSchema(table protocol.DBTable) {
 		@components.List() {
 			for _, column := range table.Columns {
 				@components.Item(components.ItemProps{Name: column.Name, Note: columnNote(column), Attrs: templ.Attributes{"data-schema-column": column.Name}}) {
-					<span class="shrink-0 font-mono text-sm text-muted-foreground">{ columnType(column) }</span>
+					<span class="moin-item-value moin-mono">{ columnType(column) }</span>
 				}
 			}
 		}
@@ -415,9 +398,13 @@ templ dataSchema(table protocol.DBTable) {
 			<h2>Statement</h2>
 		</div>
 		<div class="moin-stack" data-gap="2">
-			<pre class={ dataTerm } data-table-sql>{ table.SQL }</pre>
+			<div class="moin-code" data-wrap>
+				<pre data-table-sql>{ table.SQL }</pre>
+			</div>
 			for _, index := range table.Indexes {
-				<pre class={ dataTerm }>{ index }</pre>
+				<div class="moin-code" data-wrap>
+					<pre>{ index }</pre>
+				</div>
 			}
 		</div>
 	</section>
@@ -448,14 +435,14 @@ templ newRowForm(dataPath, database string, table protocol.DBTable) {
 		@components.CSRF()
 		<input type="hidden" name="db" value={ database }/>
 		<input type="hidden" name="table" value={ table.Name }/>
-		<div class="grid items-start gap-4 sm:grid-cols-2">
+		<div class="moin-grid">
 			for _, column := range table.Columns {
-				@components.Field(components.FieldProps{Label: column.Name, For: "new-row-"+column.Name, Hint: strings.ToLower(column.Type)}) {
+				@components.Field(components.FieldProps{Label: column.Name, For: "new-row-" + column.Name, Hint: strings.ToLower(column.Type)}) {
 					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "new-row-" + column.Name, "type": "text", "name": "value:" + column.Name, "placeholder": newRowPlaceholder(column), "spellcheck": "false", "autocomplete": "off"}})
 				}
 			}
 		</div>
-		<div class="flex flex-wrap items-center justify-end gap-2">
+		<div class="moin-row" data-wrap data-end data-gap="2">
 			@components.Button(components.ButtonProps{Attrs: templ.Attributes{"data-new-row-cancel": true}}) {
 				Cancel
 			}
@@ -480,7 +467,6 @@ func newRowPlaceholder(column protocol.DBColumn) string {
 // loses focus with a changed value. No box until it has the focus.
 templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol.DBColumn, value any, state string) {
 	<form
-		class="m-0"
 		hx-post={ dataPath + "/cell" }
 		hx-swap="outerHTML"
 		hx-trigger="submit, change"
@@ -498,21 +484,20 @@ templ DataCell(dataPath, database, table string, ref DataRowRef, column protocol
 		if value == nil {
 			<input type="hidden" name="was_null" value="1"/>
 		}
-		<input
-			type="text"
-			name="value"
-			value={ cellInput(value) }
-			if value == nil {
-				placeholder="NULL"
-			}
-			aria-label={ column.Name }
-			spellcheck="false"
-			autocomplete="off"
-			data-original={ cellInput(value) }
-			class={ "h-11 w-full min-w-24 max-w-[22rem] truncate rounded-full bg-transparent px-3 font-mono text-base outline-none field-sizing-content placeholder:text-muted-foreground placeholder:italic hover:bg-foreground/4 focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-sm",
-				templ.KV("text-right", isNumeric(column)), templ.KV("text-live", state == "saved"), templ.KV("text-failed", state == "failed") }
-		/>
+		@components.Input(components.InputProps{Type: "text", Name: "value", Value: cellInput(value), Attrs: dataCellAttributes(column, value, state)})
 	</form>
+}
+
+// dataCellAttributes are the attributes of the field of a cell.
+func dataCellAttributes(column protocol.DBColumn, value any, state string) templ.Attributes {
+	attributes := templ.Attributes{"aria-label": column.Name, "spellcheck": "false", "autocomplete": "off", "data-original": cellInput(value), "data-bare": true, "data-num": isNumeric(column)}
+	if value == nil {
+		attributes["placeholder"] = "NULL"
+	}
+	if state != "" {
+		attributes["data-state"] = state
+	}
+	return attributes
 }
 
 // dataConsole runs SQL on the database: reads only, unless Allow changes
@@ -528,18 +513,18 @@ templ dataConsole(view DataView) {
 				<input type="hidden" name="db" value={ view.Database }/>
 				<label for="sql" class="moin-sr-only">SQL</label>
 				@components.TextArea(components.TextAreaProps{Attrs: templ.Attributes{"id": "sql", "name": "sql", "rows": "4", "placeholder": sqlPlaceholder(view), "spellcheck": "false", "autocomplete": "off", "data-sql": true}})
-				<p hidden class="px-1 text-sm text-running" data-sql-schema-hint>This changes the schema. Put it in a migration, or the next deploy will not know about it.</p>
-				<div class="flex flex-wrap items-center justify-between gap-3">
-					<label class="flex cursor-pointer items-center gap-3 px-1">
+				<p hidden class="moin-text moin-running" data-sql-schema-hint>This changes the schema. Put it in a migration, or the next deploy will not know about it.</p>
+				<div class="moin-row" data-wrap data-between data-gap="3">
+					<label class="moin-row" data-gap="3">
 						@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"name": "write", "value": "1", "data-sql-write": true}})
-						<span class="text-sm font-medium">Allow changes</span>
+						<span class="moin-text moin-strong">Allow changes</span>
 					</label>
 					@components.Button(components.ButtonProps{Type: "submit"}) {
 						Run
 					}
 				</div>
 			</form>
-			<div id="sql-result" class="min-w-0 empty:hidden"></div>
+			<div id="sql-result" class="moin-hide-empty"></div>
 		}
 	</section>
 }
@@ -611,15 +596,15 @@ func sqlPlaceholder(view DataView) string {
 // the rows it changed, a read the rows it found.
 templ DataResult(result protocol.DBResult, write bool, message string) {
 	if message != "" {
-		<p role="alert" class="px-1 font-mono text-sm break-words text-failed" data-sql-error>{ message }</p>
+		<p role="alert" class="moin-mono moin-text moin-break moin-failed" data-sql-error>{ message }</p>
 	} else if write {
-		<p role="status" class="flex items-center gap-2 px-1 text-sm font-medium" data-sql-changes>
+		<p role="status" class="moin-row moin-text moin-strong" data-gap="2" data-sql-changes>
 			@components.Icon("check")
 			{ plural(int(result.Changes), "row changed", "rows changed") }
 		</p>
 	} else {
 		<div class="moin-stack" data-gap="2">
-			<p role="status" class="px-1 text-xs text-muted-foreground tabular-nums">
+			<p role="status" class="moin-small moin-muted moin-digits">
 				{ plural(len(result.Rows), "row", "rows") }
 				if result.Truncated {
 					, more not shown
@@ -627,20 +612,20 @@ templ DataResult(result protocol.DBResult, write bool, message string) {
 			</p>
 			if len(result.Columns) > 0 {
 				{{ numeric := numericColumns(result) }}
-				<div class={ dataScroll }>
-					<table class={ dataTableClass } data-sql-result>
+				<div class="moin-bleed moin-scroll" data-both>
+					<table class="moin-table" data-sticky data-sql-result>
 						<thead>
 							<tr>
 								for index, column := range result.Columns {
-									<th scope="col" class={ dataHead, templ.KV("text-right", numeric[index]) }>{ column }</th>
+									<th scope="col" data-num?={ numeric[index] }>{ column }</th>
 								}
 							</tr>
 						</thead>
 						<tbody>
 							for _, row := range result.Rows {
-								<tr class={ dataRow }>
+								<tr>
 									for index, value := range row {
-										<td class={ dataCell, templ.KV("text-right", numeric[index]), templ.KV("text-muted-foreground italic", value == nil) }>{ cellText(value) }</td>
+										<td data-num?={ numeric[index] } data-null?={ value == nil }>{ cellText(value) }</td>
 									}
 								</tr>
 							}

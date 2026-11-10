@@ -68,4 +68,7 @@
     }
     .moin-header-line { order: 9; }
   }
+
+  /* A quiet line says no more than a line of text. */
+  .moin-header-line > .moin-muted { font-weight: 400; }
 }

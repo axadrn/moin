@@ -84,7 +84,7 @@ func allowedDuringImpersonation(r *http.Request) bool {
 		strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/components/") ||
 		path == "/blog" || strings.HasPrefix(path, "/blog/") ||
 		path == "/docs" || strings.HasPrefix(path, "/docs/") ||
-		path == "/ui" || strings.HasPrefix(path, "/ui/") || strings.HasPrefix(path, "/legal/")
+		path == "/next" || path == "/ui" || strings.HasPrefix(path, "/ui/") || strings.HasPrefix(path, "/legal/")
 }
 
 // privateDuringImpersonation names the reads that show what a user keeps

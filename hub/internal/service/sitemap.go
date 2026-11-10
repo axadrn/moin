@@ -17,6 +17,7 @@ var publicRoutes = []struct {
 }{
 	{"/", "1.0", "daily"},
 	{"/docs", "0.8", "weekly"},
+	{"/next", "0.7", "weekly"},
 	{"/ui", "0.8", "weekly"},
 	{"/ui/components", "0.7", "weekly"},
 	{"/ui/layout", "0.7", "weekly"},

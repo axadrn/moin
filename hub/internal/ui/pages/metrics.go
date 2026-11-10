@@ -8,7 +8,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 )
 
@@ -29,7 +29,7 @@ type AppMetricsView struct {
 // deploys marked on it.
 type metricsChartProps struct {
 	ID    string
-	Lines []kit.ChartLine
+	Lines []components.ChartLine
 	Value func(float64) string
 	Top   float64
 	Marks map[int]string
@@ -45,12 +45,12 @@ func metricsTimes(points []service.MetricsPoint) []time.Time {
 }
 
 // metricsLine is one metric of the points as a line of a chart.
-func metricsLine(label string, points []service.MetricsPoint, of func(service.MetricsPoint) float64) kit.ChartLine {
+func metricsLine(label string, points []service.MetricsPoint, of func(service.MetricsPoint) float64) components.ChartLine {
 	values := make([]float64, len(points))
 	for i, point := range points {
 		values[i] = of(point)
 	}
-	return kit.ChartLine{Label: label, Values: values}
+	return components.ChartLine{Label: label, Values: values}
 }
 
 func cpuOf(p service.MetricsPoint) float64    { return math.Round(p.CPU*10) / 10 }
@@ -76,12 +76,12 @@ func deployMarks(points []service.MetricsPoint, deploys []model.MetricsDeploy) m
 // metricsChart is a chart of the range: the lines break where the daemon
 // sent nothing for a while, the axis reads the clock for a day or less
 // and the date for longer.
-func metricsChart(p metricsChartProps, times []time.Time, r service.MetricsRange) kit.ChartProps {
+func metricsChart(p metricsChartProps, times []time.Time, r service.MetricsRange) components.ChartProps {
 	tick := func(at time.Time) string { return at.Format("15:04") }
 	if r.Name == "7d" || r.Name == "30d" {
 		tick = func(at time.Time) string { return at.Format("Jan 2") }
 	}
-	return kit.ChartProps{
+	return components.ChartProps{
 		Times: times,
 		Lines: p.Lines,
 		Top:   p.Top,

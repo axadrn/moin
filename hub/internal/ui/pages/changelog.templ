@@ -13,15 +13,13 @@ templ Changelog(html string) {
 		Description: "What changed in moin, newest first.",
 		Path:        "/changelog",
 	}) {
-		<main class={ components.Page, "flex flex-col gap-8 pt-10 pb-20 sm:pt-14" }>
+		<main class="moin-page moin-content">
 			@components.Header(components.HeaderProps{Title: "Changelog"}) {
-				<span class="sm:ml-auto">
-					@components.Button(components.ButtonProps{Href: "/changelog.xml"}) {
-						RSS
-					}
-				</span>
+				@components.Button(components.ButtonProps{Href: "/changelog.xml"}) {
+					RSS
+				}
 			}
-			<article class="max-w-2xl min-w-0 text-base">
+			<article class="moin-narrow">
 				@components.Prose(components.ProseProps{HTML: html})
 			</article>
 		</main>

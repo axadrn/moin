@@ -1,31 +1,15 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/components"
 	"context"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"strconv"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
-)
-
-// The type of the home page: the display size only for the hero, one big
-// statement per section, the rest the sizes of the app.
-const (
-	homeStatement = "text-4xl font-semibold tracking-tight text-balance sm:text-5xl"
-	homeLead      = "text-lg text-muted-foreground text-balance"
-	// homeNumber is a big number: the live counts, a price, a score.
-	homeNumber = "text-3xl font-semibold tracking-tight tabular-nums"
-	// homeNote is a line under a section. Every one fills the same width
-	// and breaks at the same place, so none is balanced by itself.
-	homeNote = "text-lg text-muted-foreground text-pretty max-w-[76ch]"
-	// homeSection is the one gap between the sections, and the room a
-	// section a link jumps to keeps above itself for the floating navbar.
-	homeSection = "flex scroll-mt-24 flex-col gap-8 pt-28 sm:pt-36"
 )
 
 // Home is the landing page: the promise over the container wall, how to
@@ -41,7 +25,7 @@ templ Home(network model.Network, open HomeOpen) {
 	}) {
 		<main>
 			@HomeHero()
-			<div class={ components.Page, "pb-28 sm:pb-36" }>
+			<div class="moin-page">
 				if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 					@HomeLive(network)
 				}
@@ -84,25 +68,23 @@ func homeStartLabel(ctx context.Context) string {
 // top, and the wall of containers across the full width below, every
 // container an app.
 templ HomeHero() {
-	<section class="-mt-[4.25rem] flex min-h-svh flex-col overflow-hidden sm:-mt-[4.75rem]">
-		<div class={ components.Page, "flex flex-1 flex-col items-center justify-center gap-8 pt-[calc(4.25rem+2rem)] pb-8 text-center sm:pt-[calc(4.75rem+2.5rem)] sm:pb-10" }>
-			<div class="flex flex-col items-center gap-6">
-				<h1 class="font-display text-[12vw] leading-[0.95] tracking-[-0.06em] sm:text-[clamp(3rem,5.4vw,5.75rem)] sm:tracking-[-0.05em]">
-					<span class="block">Deploy <br class="sm:hidden"/>anything.</span>
-					<span class="block text-muted-foreground">Lose nothing.</span>
+	<section class="moin-hero">
+		<div class="moin-page">
+			<div class="moin-stack" data-gap="6" data-center>
+				<h1 class="moin-display moin-stack" style="--gap:0">
+					<span>Deploy <br class="moin-only-phone"/>anything.</span>
+					<span class="moin-muted">Lose nothing.</span>
 				</h1>
-				<p class={ homeLead, "max-w-[34ch] max-sm:hidden" }>Your apps on your servers. Backups on your schedule, checked every day.</p>
+				<p class="moin-lead moin-center moin-hidden-phone" style="--measure:34ch">Your apps on your servers. Backups on your schedule, checked every day.</p>
 			</div>
-			<div class="flex justify-center gap-2">
+			<div class="moin-row" data-gap="2" data-center data-wrap>
 				@homePrimary()
-				<span class="max-[339px]:hidden">
-					@components.Button(components.ButtonProps{Href: "/docs"}) {
-						Read the docs
-					}
-				</span>
+				@components.Button(components.ButtonProps{Href: "/docs"}) {
+					Read the docs
+				}
 			</div>
 		</div>
-		<div class="h-[42svh] w-full shrink-0 sm:h-[44svh]">
+		<div>
 			@homeHarbor()
 		</div>
 	</section>
@@ -117,12 +99,12 @@ const liveShowsAt = 1000
 // HomeLive is what moin runs right now: the hosted hub counts
 // itself, self-hosted ones report every five minutes. We say what is true.
 templ HomeLive(network model.Network) {
-	<section id="live" class={ homeSection } data-live>
-		<h2 class="flex items-center gap-2 px-1 text-sm font-medium text-muted-foreground">
-			<span class="size-2 rounded-full bg-live"></span>
+	<section id="live" class="moin-band" data-live>
+		<h2 class="moin-row moin-text moin-strong moin-muted" data-gap="2">
+			@components.Dot(components.DotProps{State: components.StateLive})
 			Running on { brand.Name } right now
 		</h2>
-		<dl class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+		<dl class="moin-grid" data-fit style="--min:9rem">
 			@homeLiveNumber(network.SelfHosted, "self-hosted hubs", "self-hosted")
 			@homeLiveNumber(network.HostedWorkspaces, "teams on hosted moin", "hosted")
 			@homeLiveNumber(network.Servers, "servers", "servers")
@@ -133,9 +115,9 @@ templ HomeLive(network model.Network) {
 }
 
 templ homeLiveNumber(count int, label, name string) {
-	<div class="flex flex-col gap-1 rounded-4xl bg-card p-6" data-live-number={ name }>
+	<div class="moin-card" data-gap="1" data-live-number={ name }>
 		<dt class="moin-sr-only">{ label }</dt>
-		<dd class={ homeNumber }>{ liveCount(count) }</dd>
+		<dd class="moin-title moin-digits">{ liveCount(count) }</dd>
 		<dd class="moin-small moin-muted">{ label }</dd>
 	</div>
 }
@@ -143,12 +125,12 @@ templ homeLiveNumber(count int, label, name string) {
 // ---------------------------------------------------------------- start
 // homeMoment is the one big thing of a section: what you get, as you see it.
 templ homeMoment(state, big, small string) {
-	<div class="flex h-full min-w-0 flex-col justify-center gap-4 rounded-4xl bg-card p-8">
-		<span class="flex items-center gap-3 font-medium">
+	<div class="moin-card" data-center style="--pad:2rem">
+		<span class="moin-row moin-strong" data-gap="3">
 			@components.Dot(components.DotProps{State: components.StateLive})
 			{ state }
 		</span>
-		<p class={ homeStatement, "break-words" }>{ big }</p>
+		<p class="moin-statement">{ big }</p>
 		<p class="moin-small moin-muted">{ small }</p>
 	</div>
 }
@@ -185,16 +167,14 @@ func homeSurfaceOptions() []components.Option {
 // HomeStart is how to begin: the four steps of Get started, on the surface
 // the reader picks. The checked radio shows its part by CSS alone.
 templ HomeStart() {
-	<section id="how" class={ homeSection }>
-		<h2 class={ homeStatement }>Four steps. Live.</h2>
-		<p class={ homeNote }>In the web, the terminal or with your AI agent. You pick.</p>
-		<div class="grid items-stretch gap-4 lg:grid-cols-2">
-			<div class={ "flex min-w-0 flex-col gap-4", kit.SurfaceShown }>
-				<div class="max-w-full overflow-x-auto [scrollbar-width:none]">
-					@kit.Choice("home-surface", "Where", homeSurfaceOptions(), "web")
-				</div>
+	<section id="how" class="moin-band">
+		<h2 class="moin-statement">Four steps. Live.</h2>
+		<p class="moin-lead">In the web, the terminal or with your AI agent. You pick.</p>
+		<div class="moin-grid">
+			<div class="moin-stack" data-surfaces>
+				@components.Choice(components.ChoiceProps{Name: "home-surface", Label: "Where", Options: homeSurfaceOptions(), Checked: "web"})
 				for _, surface := range homeSurfaces {
-					<div class="hidden min-w-0" data-surface={ surface.Value }>
+					<div data-surface={ surface.Value }>
 						@components.List() {
 							for index, step := range surface.Steps {
 								@homeStep(strconv.Itoa(index+1), homeStepNames[index], step)
@@ -205,9 +185,9 @@ templ HomeStart() {
 			</div>
 			@homeMoment("my-app", "It's live.", "my-app.203-0-113-7.sslip.io, with HTTPS.")
 		</div>
-		<p class={ homeNote }>
+		<p class="moin-lead">
 			Node, Bun, Python, Ruby, PHP, Go, any Dockerfile or compose.yml.
-			<a href="/docs/getting-started" class="text-foreground underline underline-offset-4">Get started</a>
+			<a href="/docs/getting-started" class="moin-link moin-foreground">Get started</a>
 		</p>
 	</section>
 }
@@ -215,10 +195,10 @@ templ HomeStart() {
 // homeStep is one step: its number, what you do, and how.
 templ homeStep(number, name, how string) {
 	@components.Item(components.ItemProps{}) {
-		<span class="w-4 shrink-0 text-sm text-muted-foreground tabular-nums">{ number }</span>
-		<div class="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
-			<span class="flex-1 font-medium">{ name }</span>
-			<code class="truncate font-mono text-sm text-muted-foreground">{ how }</code>
+		<span class="moin-text moin-muted moin-digits">{ number }</span>
+		<div class="moin-row moin-fill" data-gap="1" data-phone="stack">
+			<span class="moin-fill moin-strong">{ name }</span>
+			<code class="moin-truncate moin-mono moin-text moin-muted">{ how }</code>
 		</div>
 	}
 }
@@ -226,19 +206,19 @@ templ homeStep(number, name, how string) {
 // ---------------------------------------------------------------- backups
 // HomeBackups is why the backups can be trusted.
 templ HomeBackups() {
-	<section id="backups" class={ homeSection }>
-		<h2 class={ homeStatement }>Backups that actually restore.</h2>
-		<div class="grid gap-4 md:grid-cols-3 md:grid-rows-3">
-			<div class="md:col-span-2 md:row-span-3">
-				@homeMoment("my-app", "Checked today.", "A real restore, by itself. Every day.")
+	<section id="backups" class="moin-band">
+		<h2 class="moin-statement">Backups that actually restore.</h2>
+		<div class="moin-grid" data-cols="2-1">
+			@homeMoment("my-app", "Checked today.", "A real restore, by itself. Every day.")
+			<div class="moin-stack">
+				@homeTile("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
+				@homeTile("Download anytime.", "One file.", "/docs/guides/backups#download-a-copy")
+				@homeTile("Undo a restore.", "One step back.", "/docs/guides/backups#undo-a-restore")
 			</div>
-			@homeTile("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
-			@homeTile("Download anytime.", "One file.", "/docs/guides/backups#download-a-copy")
-			@homeTile("Undo a restore.", "One step back.", "/docs/guides/backups#undo-a-restore")
 		</div>
-		<p class={ homeNote }>
+		<p class="moin-lead">
 			SQLite and Postgres, on your schedule.
-			<a href="/docs/guides/backups" class="text-foreground underline underline-offset-4">Backups</a>
+			<a href="/docs/guides/backups" class="moin-link moin-foreground">Backups</a>
 		</p>
 	</section>
 }
@@ -246,9 +226,9 @@ templ HomeBackups() {
 // ---------------------------------------------------------------- security
 // HomeSecurity is how moin reaches a server, and what the server can refuse.
 templ HomeSecurity() {
-	<section id="security" class={ homeSection }>
-		<h2 class={ homeStatement }>Your server. Your keys.</h2>
-		<div class="grid gap-4 md:grid-cols-3">
+	<section id="security" class="moin-band">
+		<h2 class="moin-statement">Your server. Your keys.</h2>
+		<div class="moin-grid" data-cols="3">
 			@homeTile("Only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
 			@homeTile("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
 			@homeTile("Your rules.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
@@ -258,22 +238,25 @@ templ HomeSecurity() {
 
 // homeTile is a small tile of a section: a few words and where to read on.
 templ homeTile(statement, line, href string) {
-	<a href={ templ.SafeURL(href) } class="flex min-h-28 min-w-0 items-center gap-3 rounded-4xl bg-card p-6 transition-colors hover:bg-muted">
-		<span class="flex min-w-0 flex-1 flex-col gap-1">
-			<span class="moin-strong">{ statement }</span>
-			<span class="moin-small moin-muted">{ line }</span>
-		</span>
-		@components.Chevron()
-	</a>
+	<div style="--row:7rem">
+		@components.List() {
+			@components.Item(components.ItemProps{Href: href}) {
+				<span class="moin-stack moin-fill" data-gap="1">
+					<span class="moin-strong">{ statement }</span>
+					<span class="moin-small moin-muted">{ line }</span>
+				</span>
+			}
+		}
+	</div>
 }
 
 // ---------------------------------------------------------------- does
 // HomeDoes is everything moin does, as grouped rows like Settings: the
 // name, a few words, and the guide.
 templ HomeDoes() {
-	<section id="product" class={ homeSection }>
-		<h2 class={ homeStatement }>Everything. Built in.</h2>
-		<div class="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
+	<section id="product" class="moin-band">
+		<h2 class="moin-statement">Everything. Built in.</h2>
+		<div class="moin-grid" data-gap="8">
 			<section class="moin-section">
 				<div class="moin-section-head">
 					<h2>Ship</h2>
@@ -308,13 +291,13 @@ templ homeFeature(name, note, href string) {
 // HomePricing puts the free self-hosted moin next to the hosted one: the
 // same product, so the rows say what running it takes.
 templ HomePricing() {
-	<section id="pricing" class={ homeSection }>
-		<h2 class={ homeStatement }>One price. Every feature.</h2>
+	<section id="pricing" class="moin-band">
+		<h2 class="moin-statement">One price. Every feature.</h2>
 		<div class="moin-grid" data-cols="2">
-			<div class="flex flex-col gap-6 rounded-4xl bg-card p-8" data-plan="hosted">
-				<div class="flex flex-col gap-1">
+			<div class="moin-card" data-gap="6" style="--pad:2rem" data-plan="hosted">
+				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Hosted</span>
-					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$29</span><span class="moin-small moin-muted">a month per workspace</span></span>
+					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$29</span><span class="moin-small moin-muted">a month per workspace</span></span>
 					<span class="moin-small moin-muted" data-yearly-deal>Or $249 a year. 30 days free, no card.</span>
 				</div>
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
@@ -322,10 +305,10 @@ templ HomePricing() {
 				}
 				@homePlanRows("Ready in minutes", "We run and update it", "GitHub and email set up", "Support by email")
 			</div>
-			<div class="flex flex-col gap-6 rounded-4xl bg-card p-8" data-plan="self-hosted">
-				<div class="flex flex-col gap-1">
+			<div class="moin-card" data-gap="6" style="--pad:2rem" data-plan="self-hosted">
+				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Self-hosted</span>
-					<span class="flex items-baseline gap-2"><span class={ homeNumber }>$0</span><span class="moin-small moin-muted">forever</span></span>
+					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever</span></span>
 					<span class="moin-small moin-muted">Your own moin hub, on your server. Open source.</span>
 				</div>
 				@components.Button(components.ButtonProps{Href: "/docs/self-hosting"}) {
@@ -334,15 +317,15 @@ templ HomePricing() {
 				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, email optional", "Help on GitHub")
 			</div>
 		</div>
-		<p class={ homeNote } data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
+		<p class="moin-lead" data-one-price>Unlimited servers, apps and team. Nothing to unlock.</p>
 	</section>
 }
 
 templ homePlanRows(rows ...string) {
-	<ul class="flex flex-col gap-3 text-sm">
+	<ul class="moin-stack moin-text" data-gap="3">
 		for _, row := range rows {
-			<li class="flex items-center gap-3">
-				<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 text-muted-foreground"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+			<li class="moin-row" data-gap="3">
+				<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" class="moin-muted"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 				{ row }
 			</li>
 		}
@@ -353,8 +336,8 @@ templ homePlanRows(rows ...string) {
 // HomeQuestions are the five questions people ask first; the rest is in the
 // FAQ.
 templ HomeQuestions() {
-	<section id="questions" class={ homeSection }>
-		<h2 class={ homeStatement }>Good questions.</h2>
+	<section id="questions" class="moin-band">
+		<h2 class="moin-statement">Good questions.</h2>
 		@components.List() {
 			@homeQuestion("Is "+brand.Name+" open source?", "Yes. AGPL-3.0, free to host yourself.")
 			@homeQuestion("What if "+brand.Name+" is down?", "Your apps keep running. They are on your servers.")
@@ -362,8 +345,8 @@ templ HomeQuestions() {
 			@homeQuestion("Do I need Docker?", "No. "+brand.Name+" installs it.")
 			@homeQuestion("Which servers?", "Any Linux server with root access, at any provider.")
 		}
-		<p class={ homeNote }>
-			<a href="/docs/faq" class="text-foreground underline underline-offset-4">All questions</a>
+		<p class="moin-lead">
+			<a href="/docs/faq" class="moin-link moin-foreground">All questions</a>
 		</p>
 	</section>
 }
@@ -371,7 +354,7 @@ templ HomeQuestions() {
 templ homeQuestion(question, answer string) {
 	@components.Expand(components.ExpandProps{Name: question}) {
 		@components.Item(components.ItemProps{}) {
-			<span class="min-w-0 flex-1 text-sm text-pretty text-muted-foreground">{ answer }</span>
+			<span class="moin-fill moin-text moin-muted">{ answer }</span>
 		}
 	}
 }
@@ -383,21 +366,23 @@ templ homeQuestion(question, answer string) {
 // from, the promise and the way in. "Nothing goes missing" leads into
 // "Lose nothing".
 templ HomeEnd() {
-	<section id="start" class={ homeSection, "items-start" }>
-		<div class="flex w-full flex-col items-start gap-8 rounded-4xl bg-card p-8 sm:p-14">
-			@kit.Wordmark("text-[clamp(4rem,13vw,8rem)] leading-none")
-			<p class="text-lg text-muted-foreground sm:text-xl">
-				<span class="font-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
+	<section id="start" class="moin-band">
+		<div class="moin-card" data-gap="8" style="--pad:clamp(2rem,6vw,3.5rem)">
+			<div class="moin-huge">
+				@components.Wordmark(components.WordmarkProps{Size: "1em"})
+			</div>
+			<p class="moin-lead" data-large>
+				<span class="moin-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
 			</p>
-			<div class="flex max-w-2xl flex-col gap-5 text-lg text-pretty text-muted-foreground sm:text-xl">
+			<div class="moin-lead moin-stack" data-large style="--gap:1.25rem">
 				<p>I'm Axel. Born and raised in Hamburg, next to one of Europe's busiest ports.</p>
 				<p>Millions of containers. Packed once. Shipped anywhere. Nothing goes missing.</p>
 				<p>Your apps are containers too. So I built { brand.Name }, and named it after home.</p>
 			</div>
-			<p class={ homeStatement, "pt-4" }>
-				Deploy anything. <span class="text-muted-foreground">Lose nothing.</span>
+			<p class="moin-statement">
+				Deploy anything. <span class="moin-muted">Lose nothing.</span>
 			</p>
-			<div class="flex flex-wrap gap-2">
+			<div class="moin-row" data-gap="2" data-wrap>
 				@homePrimary()
 				@components.Button(components.ButtonProps{Href: "/docs/why-moin"}) {
 					Why { brand.Name }
@@ -405,7 +390,7 @@ templ HomeEnd() {
 			</div>
 			<p class="moin-small moin-muted">
 				if ctxkeys.RenderConfig(ctx).Billing {
-					30 days free, no card. Or <a href="/docs/self-hosting" class="text-foreground underline underline-offset-4">host it yourself</a>, free forever.
+					30 days free, no card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
 				} else {
 					Free and open source.
 				}

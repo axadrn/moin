@@ -70,4 +70,7 @@
   .moin-chip[data-state="live"] { --tint: var(--live); }
   .moin-chip:is([data-state="running"], [data-state="waiting"]) { --tint: var(--running); }
   .moin-chip[data-state="failed"] { --tint: var(--failed); }
+
+  /* A dot alone, in the room of a chip: the mark at the end of an item. */
+  .moin-status[data-alone] { width: 2rem; justify-content: center; }
 }

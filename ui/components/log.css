@@ -46,4 +46,25 @@
     }
     .moin-log > div::before { padding-right: var(--space-4); }
   }
+
+  /* Lines that keep the newest in view while you are at the bottom and stay
+     put when you scroll up. --tail is how high it grows; data-top keeps few
+     lines at the top; data-hold keeps the place of lines still to come. */
+  .moin-tail {
+    display: flex;
+    flex-direction: column-reverse;
+    max-height: var(--tail, 30rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    outline: none;
+  }
+  .moin-tail:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+  .moin-tail[data-top] { justify-content: safe flex-end; }
+  .moin-tail[data-hold] { height: 20rem; }
+  @media (min-width: 40rem) {
+    .moin-tail[data-hold] { height: var(--tail, 30rem); }
+  }
+  @media (min-width: 64rem) {
+    .moin-tail[data-tall] { min-height: 18rem; }
+  }
 }

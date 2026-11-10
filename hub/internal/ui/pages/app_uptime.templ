@@ -8,7 +8,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
@@ -71,7 +70,7 @@ templ AppUptimeBody(view UptimeView) {
 // so its uptimes say little.
 templ uptimeServerOffline(view UptimeView) {
 	if !view.Uptime.ServerOnline && view.App.ServerName != "" {
-		<p class="px-1" data-server-offline>
+		<p data-server-offline>
 			@components.Status(components.StatusProps{State: components.StateFailed}) {
 				{ view.App.ServerName } is offline
 			}
@@ -106,8 +105,8 @@ templ uptimeDomain(view UptimeView, domain service.UptimeDomain) {
 						@components.List() {
 							for _, outage := range domain.Outages {
 								@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-outage": stamp(outage.StartedAt)}}) {
-									<div class="min-w-0 flex-1">
-										<div class="font-medium tabular-nums" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
+									<div class="moin-fill">
+										<div class="moin-strong moin-digits" title={ stamp(outage.StartedAt) }>{ outage.StartedAt.UTC().Format("Jan 2, 15:04 UTC") }</div>
 										<div class="moin-small moin-muted">{ outageText(outage, view.Now) }</div>
 									</div>
 								}
@@ -153,13 +152,13 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 	{{ action := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/path" }}
 	{{ id := "uptime-" + domain.Domain }}
 	@components.List() {
-		@kit.RowForm(templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}) {
+		@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": action, "hx-target": "#app-uptime", "hx-select": "#app-uptime", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-uptime-path-form": domain.Domain}}) {
 			@components.CSRF()
 			<input type="hidden" name="domain" value={ domain.Domain }/>
-			<div class="min-w-0 flex-1 pb-2">
+			<div class="moin-fill">
 				@components.Field(components.FieldProps{Label: "Path", For: id+"-path"}) {
 					<div class="moin-row" data-gap="2" data-phone="stack">
-						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellvisit": "false"}})
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id + "-path", "name": "path", "type": "text", "value": customPath(domain), "placeholder": domain.Path, "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false"}})
 						@components.Button(components.ButtonProps{Type: "submit"}) {
 							Save
 						}
@@ -175,7 +174,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@components.Item(components.ItemProps{Form: true, For: id+"-on", Name: "Visit every minute", Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='visitbox']"}}) {
+	@components.Item(components.ItemProps{Form: true, For: id+"-on", Name: "Visit every minute", Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
 		@components.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
 		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused}})

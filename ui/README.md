@@ -11,4 +11,4 @@ Experimental. It can change or disappear at any time.
 
 Docs, components, blocks and the theme editor: [moin.run/ui](https://moin.run/ui).
 
-MIT licensed.
+See `LICENSE`.

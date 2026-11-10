@@ -142,6 +142,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /docs", docs.ShowDocs)
 	mux.HandleFunc("GET /docs.md", docs.ShowDocs)
 	mux.HandleFunc("GET /docs/", docs.ShowDocs)
+	mux.HandleFunc("GET /next", handler.Next)
 	ui := handler.NewUIHandler(app.UIDocsService, app.UIFiles)
 	mux.HandleFunc("GET /ui", ui.Show)
 	mux.HandleFunc("GET /ui.md", ui.Show)

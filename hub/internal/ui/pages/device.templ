@@ -60,10 +60,12 @@ templ Device(view DeviceView) {
 			<form id="device-approve-form" action="/device/approve" method="POST" class="moin-stack" data-gap="4">
 				@components.CSRF()
 				<input type="hidden" name="code" value={ view.Code }/>
-				<div class="flex flex-col items-center gap-2 rounded-4xl bg-card px-6 py-5">
-					<p class="font-mono text-2xl font-semibold tracking-tight" data-device-code>{ view.Code }</p>
-					<p class="text-center text-sm text-muted-foreground">Approve only if your terminal shows this code.</p>
-				</div>
+				@components.Card(components.CardProps{}) {
+					<div class="moin-stack moin-center" data-gap="2">
+						<p class="moin-number moin-mono" data-device-code>{ view.Code }</p>
+						<p class="moin-text moin-muted">Approve only if your terminal shows this code.</p>
+					</div>
+				}
 				@components.List() {
 					@factRow("You", ctxkeys.User(ctx).Email)
 					if len(view.Workspaces) == 1 {
@@ -78,7 +80,7 @@ templ Device(view DeviceView) {
 				} else {
 					<input type="hidden" name="workspace_id" value={ view.WorkspaceID }/>
 					if view.WorkspaceError != "" {
-						<p class="px-1 text-sm text-failed" role="alert">{ view.WorkspaceError }</p>
+						<p class="moin-message" data-state="failed" role="alert">{ view.WorkspaceError }</p>
 					}
 				}
 				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
@@ -99,22 +101,18 @@ templ DeviceDone(login *model.DeviceLogin, approved bool) {
 			@authLine() {
 				{ deviceName(login) } is logged in. Go back to your terminal.
 			}
-			<div class="flex flex-col">
-				@authLink("/app") {
-					{ "Open " + brand.Name }
-				}
-			</div>
+			@authLink("/app") {
+				{ "Open " + brand.Name }
+			}
 		}
 	} else {
 		@authScreen(deviceSEO, "Login denied") {
 			@authLine() {
 				Nothing got access.
 			}
-			<div class="flex flex-col">
-				@authLink("/app") {
-					{ "Open " + brand.Name }
-				}
-			</div>
+			@authLink("/app") {
+				{ "Open " + brand.Name }
+			}
 		}
 	}
 }

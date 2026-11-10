@@ -12,7 +12,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 )
 
@@ -50,10 +50,10 @@ func (v CatalogView) URL() string {
 }
 
 // categoryOptions are the categories for the select, All first.
-func categoryOptions(view CatalogView) []kit.Option {
-	options := []kit.Option{{Value: "", Label: "All categories"}}
+func categoryOptions(view CatalogView) []components.Option {
+	options := []components.Option{{Value: "", Label: "All categories"}}
 	for _, category := range view.Categories {
-		options = append(options, kit.Option{Value: categorySlug(category), Label: category})
+		options = append(options, components.Option{Value: categorySlug(category), Label: category})
 	}
 	return options
 }
@@ -213,10 +213,10 @@ func catalogJSONLD(view CatalogEntryView, url string) string {
 }
 
 // versionOptions are the releases for the version select, newest first.
-func versionOptions(versions []catalog.Version) []kit.Option {
-	options := make([]kit.Option, 0, len(versions))
+func versionOptions(versions []catalog.Version) []components.Option {
+	options := make([]components.Option, 0, len(versions))
 	for _, version := range versions {
-		options = append(options, kit.Option{Value: version.Tag, Label: version.Tag})
+		options = append(options, components.Option{Value: version.Tag, Label: version.Tag})
 	}
 	return options
 }

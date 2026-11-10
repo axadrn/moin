@@ -5,7 +5,6 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
@@ -53,7 +52,7 @@ templ bucketPanel(bucket service.Bucket) {
 				@bucketFact("Access key", bucket.AccessKey, true, nil)
 				if len(bucket.Older) > 0 {
 					@components.Item(components.ItemProps{}) {
-						<div class="min-w-0 flex-1" data-bucket-older>
+						<div class="moin-item-text" data-bucket-older>
 							<div class="moin-strong">Left by</div>
 							<div class="moin-small moin-muted">{ strings.Join(bucket.Older, ", ") }: what they had stays here.</div>
 						</div>
@@ -90,17 +89,17 @@ templ bucketPanel(bucket service.Bucket) {
 
 // bucketFact is one fact of a bucket: its name left, the value right.
 templ bucketFact(name, value string, mono bool, attributes templ.Attributes) {
-	@kit.RowFact(name, "") {
-		<span class={ templ.KV("font-mono", mono) } { attributes... }>{ value }</span>
+	@components.Item(components.ItemProps{Name: name}) {
+		<span class={ "moin-item-value", templ.KV("moin-mono", mono) } { attributes... }>{ value }</span>
 	}
 }
 
 // bucketDisclosure is a row of a List that opens a form under it, in
-// place (kit.RowMore).
+// place.
 templ bucketDisclosure(label string) {
 	@components.Expand(components.ExpandProps{Name: label}) {
-		@kit.RowControl(nil) {
-			<div class="min-w-0 flex-1 pt-1 pb-2">
+		@components.Item(components.ItemProps{}) {
+			<div class="moin-fill">
 				{ children... }
 			</div>
 		}
@@ -132,7 +131,7 @@ templ bucketAdd(first bool) {
 templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 	<form class="moin-stack" data-gap="4" hx-post={ action } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-bucket-form>
 		@components.CSRF()
-		<div class="grid items-start gap-4 sm:grid-cols-2">
+		<div class="moin-grid">
 			@bucketField(prefix, "name", "Name", bucket.Name, "like client-a", "Your name for it in moin", "text", false)
 			@bucketField(prefix, "region", "Region", bucket.Region, "auto", "auto for R2", "text", false)
 			@bucketField(prefix, "endpoint", "Endpoint", bucket.Endpoint, "https://<account>.r2.cloudflarestorage.com", "Empty for AWS S3", "text", true)
@@ -141,8 +140,8 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 			@bucketField(prefix, "access_key", "Access key", bucket.AccessKey, "", "", "text", false)
 			@bucketField(prefix, "secret_key", "Secret key", "", secretPlaceholder(adding), "Stored encrypted", "password", false)
 		</div>
-		<div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-			<p class="px-1 text-sm text-muted-foreground">moin writes and deletes a test file first.</p>
+		<div class="moin-row" data-wrap data-end data-gap="3">
+			<p class="moin-text moin-muted">moin writes and deletes a test file first.</p>
 			if adding {
 				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Add bucket
@@ -158,8 +157,8 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 
 // bucketField is one field of a bucket form, with a hint below.
 templ bucketField(prefix, name, label, value, placeholder, hint, kind string, wide bool) {
-	<div class={ templ.KV("sm:col-span-2", wide) }>
-		@components.Field(components.FieldProps{Label: label, For: prefix+name, Hint: hint}) {
+	<div data-wide?={ wide }>
+		@components.Field(components.FieldProps{Label: label, For: prefix + name, Hint: hint}) {
 			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": prefix + name, "name": name, "type": kind, "value": value, "placeholder": placeholder, "autocomplete": "off", "spellcheck": "false"}})
 		}
 	</div>

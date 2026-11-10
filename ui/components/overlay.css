@@ -50,6 +50,7 @@
     box-shadow: var(--shadow-float);
   }
   .moin-palette-box > .moin-input-icon { flex: none; }
+  .moin-palette-box .moin-input::-webkit-search-cancel-button { display: none; }
   .moin-palette-box .moin-input {
     height: 4rem;
     border-radius: 0;
@@ -67,4 +68,13 @@
     overflow-y: auto;
   }
   .moin-palette-list:empty { display: none; }
+
+  /* The name of a group of options, starting where their text starts. */
+  .moin-palette-group {
+    padding: var(--space-3) calc(var(--space-5) - max(2 * var(--inset), var(--scroll-edge))) var(--space-1);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+  }
 }

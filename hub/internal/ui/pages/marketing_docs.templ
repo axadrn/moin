@@ -3,14 +3,13 @@ package pages
 import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// DocsHome is /docs, like a support site, in the one column of a docs
-// page: every page under its topic, as grouped rows. No sidebar and no
-// search of its own: the magnifier of the navbar searches the docs.
+// DocsHome is /docs, like a support site: every page under its topic, as
+// grouped rows, two columns from a desktop up and one on a phone. No sidebar
+// and no search of its own: the magnifier of the navbar searches the docs.
 templ DocsHome(groups []model.DocGroup) {
 	@layouts.Home(layouts.SEOProps{
 		Title:        "Docs",
@@ -18,20 +17,22 @@ templ DocsHome(groups []model.DocGroup) {
 		Path:         "/docs",
 		MarkdownPath: "/docs.md",
 	}) {
-		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
+		<main class="moin-page moin-content">
 			@components.Header(components.HeaderProps{Title: "Docs"})
-			for _, group := range groups {
-				<section class="moin-section">
-					<div class="moin-section-head">
-						<h2>{ group.Title }</h2>
-					</div>
-					@components.List() {
-						for _, page := range group.Pages {
-							@components.Item(components.ItemProps{Href: docsPageURL(page), Name: page.Title})
+			<div class="moin-columns">
+				for _, group := range groups {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>{ group.Title }</h2>
+						</div>
+						@components.List() {
+							for _, page := range group.Pages {
+								@components.Item(components.ItemProps{Href: docsPageURL(page), Name: page.Title})
+							}
 						}
-					}
-				</section>
-			}
+					</section>
+				}
+			</div>
 		</main>
 	}
 }
@@ -46,26 +47,25 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 		Path:         ctxkeys.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(page),
 	}) {
-		<main class="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-10 pb-20 sm:px-6 sm:pt-14">
+		<main class="moin-page moin-narrow moin-content">
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Docs", Href: "/docs"}, Title: page.Title})
-			<article class="min-w-0 text-base [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
+			<article>
 				@components.Prose(components.ProseProps{HTML: page.HTMLContent})
 			</article>
 			<div class="moin-stack" data-gap="3">
 				if next != nil {
 					@components.List() {
 						@components.Item(components.ItemProps{Href: docsPageURL(next)}) {
-							<div class="min-w-0 flex-1 truncate font-medium"><span class="text-muted-foreground">Next: </span>{ next.Title }</div>
+							<div class="moin-fill moin-truncate moin-strong"><span class="moin-muted">Next: </span>{ next.Title }</div>
 						}
 					}
 				}
-				<p class="px-1 text-xs text-muted-foreground">
-					<a href={ templ.SafeURL(docsMarkdownURL(page)) } class="underline-offset-4 hover:text-foreground hover:underline">This page as Markdown</a>
+				<p class="moin-small moin-muted">
+					<a href={ templ.SafeURL(docsMarkdownURL(page)) } class="moin-link" data-quiet>This page as Markdown</a>
 				</p>
 			</div>
 		</main>
 		@docsSurfaces()
-		@kit.HighlightScripts()
 	}
 }
 

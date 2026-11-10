@@ -37,6 +37,16 @@
   .moin-expand > summary .moin-chevron { transition: rotate var(--fast) var(--ease); }
   .moin-expand[open] > summary .moin-chevron { rotate: 90deg; }
   .moin-expand > div > .moin-item:first-child::before { display: block; }
+
+  /* A few words that open more words under them. */
+  .moin-details > summary {
+    padding-block: var(--space-1);
+    list-style: none;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-details > summary::-webkit-details-marker { display: none; }
+  .moin-details > summary:is(:hover, :focus-visible) { color: var(--foreground); }
   .moin-list > .moin-expand:first-child::before { display: none; }
   /* A lit item and the lines next to it give way, as for any other item. */
   .moin-expand:has(> summary:is(:hover, :focus-visible))::before,

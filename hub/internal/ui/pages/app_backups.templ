@@ -9,7 +9,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/protocol"
@@ -66,19 +65,18 @@ templ BackupSettings(view BackupsView) {
 			@components.List() {
 				if view.Bucket == nil {
 					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
-						<span class="flex-1 font-medium" data-add-bucket>Add your bucket</span>
+						<span class="moin-fill moin-item-name" data-add-bucket>Add your bucket</span>
 					}
 				} else {
-					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
-						<span class="shrink-0 font-medium">Bucket</span>
-						<span class="min-w-0 flex-1 truncate text-right text-sm text-muted-foreground" data-bucket={ view.Bucket.Name }>{ view.Bucket.Name }</span>
+					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket", Name: "Bucket"}) {
+						<span class="moin-item-value" data-bucket={ view.Bucket.Name }>{ view.Bucket.Name }</span>
 					}
-					@kit.RowFact("Folder", "") {
-						<span class="font-mono" data-bucket-folder>{ view.Bucket.AppFolder(&view.App) }</span>
+					@components.Item(components.ItemProps{Name: "Folder"}) {
+						<span class="moin-item-value moin-mono" data-bucket-folder>{ view.Bucket.AppFolder(&view.App) }</span>
 					}
 					if len(view.Older) > 0 {
-						@kit.RowFact("Left", "") {
-							<span data-bucket-older>{ olderNames(view.Older) }</span>
+						@components.Item(components.ItemProps{Name: "Left"}) {
+							<span class="moin-item-value" data-bucket-older>{ olderNames(view.Older) }</span>
 						}
 					}
 					if len(view.Buckets) > 1 {
@@ -97,7 +95,9 @@ templ BackupSettings(view BackupsView) {
 templ AppBucketForm(view BackupsView) {
 	<form
 		id="app-bucket-form"
-		class="flex flex-col gap-3 sm:flex-row sm:items-center"
+		class="moin-row"
+		data-gap="3"
+		data-phone="stack"
 		hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/bucket" }
 		hx-target="#data-backups"
 		hx-select="#data-backups"
@@ -146,7 +146,7 @@ func appBucketOptions(buckets []service.Bucket) []components.Option {
 // first row while it does.
 templ DatabaseBackups(view BackupsView, database string) {
 	{{ backup, known := view.backupOf(database) }}
-	<div id="db-backups" class="group/backups flex flex-col gap-6" data-database-backup={ database }>
+	<div id="db-backups" class="moin-stack" data-gap="6" data-busy-scope data-database-backup={ database }>
 		if view.Bucket == nil {
 			<section class="moin-section">
 				<div class="moin-section-head">
@@ -154,7 +154,7 @@ templ DatabaseBackups(view BackupsView, database string) {
 				</div>
 				@components.List() {
 					@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/bucket"}) {
-						<span class="flex-1 font-medium" data-add-bucket>Add your bucket</span>
+						<span class="moin-fill moin-item-name" data-add-bucket>Add your bucket</span>
 					}
 				}
 			</section>
@@ -222,7 +222,8 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 				<h2>{ title }</h2>
 			</div>
 			<form
-				class="moin-stack" data-gap="2"
+				class="moin-stack"
+				data-gap="2"
 				hx-post={ appPath + "/backups/restore" }
 				hx-target="#db-backups"
 				hx-swap="outerHTML"
@@ -231,6 +232,7 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 				data-confirm-name={ view.App.Name }
 				data-confirm-action="Restore"
 				data-restore
+				data-busy-from
 			>
 				@components.CSRF()
 				<input type="hidden" name="database" value={ database }/>
@@ -238,7 +240,7 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 				@components.List() {
 					if len(backup.Moments) == 0 {
 						@components.Item(components.ItemProps{}) {
-							<p class="flex-1 text-sm text-muted-foreground">Nothing to go back to yet.</p>
+							<p class="moin-fill moin-text moin-muted">Nothing to go back to yet.</p>
 						}
 					}
 					for _, moment := range backup.Moments {
@@ -257,36 +259,35 @@ templ backupGoBack(view BackupsView, backup service.DatabaseBackups, database, p
 	}
 }
 
-
 // backupState is the first row of a database's backup: backed up and when
 // it was last checked, or why it does not work in one sentence with the
 // details under it. While a restore runs, it says so.
 templ backupState(backup service.DatabaseBackups, known bool, database string, now time.Time) {
-	@kit.RowControl(templ.Attributes{"data-backup-state": true}) {
-		<div class="hidden min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:flex" role="status">
+	@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-backup-state": true}}) {
+		<div class="moin-row moin-fill" data-gap="3" data-show-busy role="status">
 			@components.Dot(components.DotProps{State: components.StateRunning})
-			<span class="truncate font-medium">Restoring { databaseName(database) }</span>
+			<span class="moin-item-name">Restoring { databaseName(database) }</span>
 		</div>
-		<div class="flex min-w-0 flex-1 items-center gap-3 group-has-[[data-restore].htmx-request]/backups:hidden">
+		<div class="moin-row moin-fill" data-gap="3" data-hide-busy>
 			switch  {
 				case !known:
 					@components.Dot(components.DotProps{State: components.StateRunning})
-					@kit.RowText("Starting", "")
+					<span class="moin-fill moin-item-name">Starting</span>
 				case backup.Problem != "":
 					@components.Dot(components.DotProps{State: components.StateFailed})
-					<div class="min-w-0 flex-1">
-						<div class="font-medium text-failed" data-backup-problem>{ backup.Problem }</div>
-						<details class="group/details text-sm text-muted-foreground">
-							<summary class="cursor-pointer list-none py-1 outline-none hover:text-foreground focus-visible:text-foreground [&::-webkit-details-marker]:hidden">Show details</summary>
-							<p class="font-mono text-xs break-words" data-backup-error>{ backup.Error }</p>
+					<div class="moin-fill">
+						<div class="moin-strong moin-failed" data-backup-problem>{ backup.Problem }</div>
+						<details class="moin-details moin-text moin-muted">
+							<summary>Show details</summary>
+							<p class="moin-mono moin-small moin-break" data-backup-error>{ backup.Error }</p>
 						</details>
 					</div>
 				case backup.CopiedAt != nil:
 					@components.Dot(components.DotProps{State: components.StateLive})
-					<span class="min-w-0 flex-1 truncate font-medium" data-checked?={ backup.CheckedAt != nil } title={ checkedStamp(backup) }>{ "Last copy " + human.Ago(*backup.CopiedAt, now) + " · " + checkedText(backup, now) }</span>
+					<span class="moin-fill moin-item-name" data-checked?={ backup.CheckedAt != nil } title={ checkedStamp(backup) }>{ "Last copy " + human.Ago(*backup.CopiedAt, now) + " · " + checkedText(backup, now) }</span>
 				default:
 					@components.Dot(components.DotProps{State: components.StateRunning})
-					@kit.RowText("Starting", "")
+					<span class="moin-fill moin-item-name">Starting</span>
 			}
 		</div>
 	}
@@ -309,8 +310,8 @@ func checkedStamp(backup service.DatabaseBackups) string {
 // momentPick is one moment to pick for a restore: what it is and when.
 templ momentPick(moment service.Moment, now time.Time) {
 	@components.Item(components.ItemProps{Pick: true, Attrs: templ.Attributes{"name": "moment", "value": moment.ID, "data-moment": moment.ID}}) {
-		<span class="min-w-0 flex-1 font-medium break-words">{ moment.Label }</span>
-		<span class="shrink-0 text-sm text-muted-foreground tabular-nums" title={ stamp(moment.At) }>{ momentTime(moment.At, now) }</span>
+		<span class="moin-fill moin-strong moin-break">{ moment.Label }</span>
+		<span class="moin-item-value" title={ stamp(moment.At) }>{ momentTime(moment.At, now) }</span>
 	}
 }
 
@@ -329,33 +330,33 @@ func momentTime(at, now time.Time) string {
 templ backupRestore(view BackupsView, database string) {
 	{{ restore := view.Restore }}
 	if restore != nil && restore.Active() {
-		@kit.RowControl(templ.Attributes{"hx-get": databaseURL(ctx, view.App.Name, database), "hx-trigger": "apps from:body", "hx-select": "#db-backups", "hx-target": "#db-backups", "hx-swap": "outerHTML", "data-restore-running": true}) {
+		@components.Item(components.ItemProps{Attrs: templ.Attributes{"hx-get": databaseURL(ctx, view.App.Name, database), "hx-trigger": "apps from:body", "hx-select": "#db-backups", "hx-target": "#db-backups", "hx-swap": "outerHTML", "data-restore-running": true}}) {
 			@components.Dot(components.DotProps{State: components.StateRunning})
-			<div class="min-w-0 flex-1">
-				<div class="truncate font-medium">Restoring { databaseName(database) } to { lowerFirst(restore.To) }</div>
+			<div class="moin-fill">
+				<div class="moin-item-name">Restoring { databaseName(database) } to { lowerFirst(restore.To) }</div>
 				if restore.State == service.RestoreUnknown {
 					<div class="moin-small moin-muted" data-restore-unknown>The server is offline; moin asks it how the restore went when it is back.</div>
 				}
 			</div>
 		}
 	} else if restore != nil && restore.State == service.RestoreFailed {
-		@kit.RowControl(templ.Attributes{"data-restore-failed": true}) {
+		@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-restore-failed": true}}) {
 			@components.Dot(components.DotProps{State: components.StateFailed})
-			<div class="min-w-0 flex-1">
+			<div class="moin-fill">
 				if strings.HasPrefix(restore.Error, service.RestoreNoWord) {
-					<div class="font-medium text-failed">Unknown how the restore to { lowerFirst(restore.To) } ended: check the app</div>
+					<div class="moin-strong moin-failed">Unknown how the restore to { lowerFirst(restore.To) } ended: check the app</div>
 				} else {
-					<div class="font-medium text-failed">The restore to { lowerFirst(restore.To) } failed</div>
+					<div class="moin-strong moin-failed">The restore to { lowerFirst(restore.To) } failed</div>
 				}
-				<details class="moin-small moin-muted">
-					<summary class="cursor-pointer list-none py-1 outline-none hover:text-foreground focus-visible:text-foreground [&::-webkit-details-marker]:hidden">Show details</summary>
-					<p class="font-mono text-xs break-words">{ restore.Error }</p>
+				<details class="moin-details moin-small moin-muted">
+					<summary>Show details</summary>
+					<p class="moin-mono moin-small moin-break">{ restore.Error }</p>
 				</details>
 			</div>
 		}
 	} else if restore != nil && restore.FinishedAt != nil && view.Now.Sub(*restore.FinishedAt) < time.Hour {
-		@kit.RowControl(templ.Attributes{"data-restore-done": true}) {
-			<span class="min-w-0 flex-1 truncate text-muted-foreground">Restored to { lowerFirst(restore.To) } { human.Ago(*restore.FinishedAt, view.Now) }</span>
+		@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-restore-done": true}}) {
+			<span class="moin-fill moin-truncate moin-muted">Restored to { lowerFirst(restore.To) } { human.Ago(*restore.FinishedAt, view.Now) }</span>
 		}
 	}
 }
@@ -374,30 +375,26 @@ func lowerFirst(label string) string {
 // hold for every database of the app.
 templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database string) {
 	{{ path := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/schedule" }}
-	{{ form := templ.Attributes{"hx-post": path, "hx-trigger": "change", "hx-target": "#db-backups", "hx-swap": "outerHTML"} }}
+	{{ form := templ.Attributes{"hx-post": path, "hx-trigger": "change", "hx-target": "#db-backups", "hx-swap": "outerHTML", "style": "--select-width:11rem"} }}
 	@components.Item(components.ItemProps{Form: true, For: "backup-every", Name: "How often", Attrs: form}) {
 		@components.CSRF()
 		@scheduleFields(view.App, database, "every")
-		<div class="w-44 shrink-0">
-			@components.Select(components.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
-		</div>
+		@components.Select(components.SelectProps{ID: "backup-every", Name: "every", Label: "How often", Options: everyOptions(), Value: strconv.Itoa(view.App.BackupEvery)})
 	}
 	@components.Item(components.ItemProps{Form: true, For: "backup-keep", Name: "Keep", Attrs: form}) {
 		@components.CSRF()
 		@scheduleFields(view.App, database, "keep")
-		<div class="w-44 shrink-0">
-			@components.Select(components.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
-		</div>
+		@components.Select(components.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
 	}
 }
 
 // scheduleInFile shows the schedule compose.yml sets. Only the file changes it.
 templ scheduleInFile(view BackupsView, backup service.DatabaseBackups) {
 	@components.Item(components.ItemProps{Name: "How often", Note: "from compose.yml"}) {
-		<span class="shrink-0 text-sm text-muted-foreground" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
+		<span class="moin-item-value" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
 	}
 	@components.Item(components.ItemProps{Name: "Keep", Note: "from compose.yml"}) {
-		<span class="shrink-0 text-sm text-muted-foreground">{ service.KeepText(view.App.BackupKeep) }</span>
+		<span class="moin-item-value">{ service.KeepText(view.App.BackupKeep) }</span>
 	}
 }
 
@@ -441,8 +438,8 @@ func upperFirst(text string) string {
 templ backupDownload(view BackupsView, backup service.DatabaseBackups, database string) {
 	if len(backup.Copies) > 0 {
 		@components.Item(components.ItemProps{Button: true, Attrs: templ.Attributes{"id": "db-download", "data-download": true, "hx-get": ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/backups/download?database=" + url.QueryEscape(database), "hx-swap": "none", "hx-disable": "this"}}) {
-			<span class="min-w-0 flex-1 truncate font-medium">Download a copy</span>
-			<span class="shrink-0 text-sm text-muted-foreground tabular-nums">{ human.Size(float64(backup.Copies[0].Size)) }</span>
+			<span class="moin-fill moin-item-name">Download a copy</span>
+			<span class="moin-item-value">{ human.Size(float64(backup.Copies[0].Size)) }</span>
 		}
 	}
 }

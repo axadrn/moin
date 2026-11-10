@@ -48,3 +48,11 @@ func TestUIPages(t *testing.T) {
 		}
 	}
 }
+
+func TestNextIsAPage(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	Next(recorder, httptest.NewRequest(http.MethodGet, "/next", nil))
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `href="/docs/roadmap"`) {
+		t.Fatalf("status %d, or the page has no way to the roadmap", recorder.Code)
+	}
+}

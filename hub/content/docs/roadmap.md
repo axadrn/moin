@@ -1,11 +1,11 @@
 ---
 title: "Roadmap"
-description: "What moin does today, what comes next and what comes later"
+description: "What moin does today, what comes soon, what comes later, and moin next"
 group: "Reference"
 order: 7
 ---
 
-moin is in beta. It runs real sites today. There are no dates: "next" is soon after launch, "later" after that.
+moin is in beta. It runs real sites today. There are no dates: "soon" is shortly after launch, "later" after that.
 
 ## Now
 
@@ -29,7 +29,7 @@ On every surface: web, CLI, terminal UI, API and MCP.
 - **Team and activity**: who changed what, to the second. [Activity](/docs/guides/activity)
 - **Self-hosting**, free, every feature, one command. [Self-hosting](/docs/self-hosting)
 
-## Next
+## Soon
 
 - **Servers in one click** at Hetzner, DigitalOcean, Vultr and UpCloud, right from moin. [#1](https://github.com/axadrn/moin/issues/1)
 - **MySQL backups**, like Postgres. MongoDB and the rest run like any service, but moin cannot back them up yet. They show in red.
@@ -42,3 +42,15 @@ Zero trust: even someone in full control of moin can't read your data or command
 - **Secrets encrypted end to end**: only your servers can read your env vars.
 - **Signed commands**: your server only obeys changes signed by a key on your own device.
 - **Signed daemon updates**: your server checks every new daemon before it runs it.
+
+## moin next
+
+Deploying stays the main thing. [moin next](/next) is what grows next to it: the other tools a team needs to build software, in the same app.
+
+Each one starts with a few users behind a switch, and runs on its own, so a bug in one never touches another or your deploys. What is ready for everyone leaves this list and is simply part of moin.
+
+- **Tasks and roadmaps**: what to do, who does it, and what comes after.
+- **Docs**: what your team knows, next to the work.
+- **Chat**: talk where the work is.
+- **Mail**: your team's mail, on your own domain.
+- **Analytics**: who uses what you shipped.

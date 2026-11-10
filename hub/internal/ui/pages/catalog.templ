@@ -8,7 +8,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/kit"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -27,7 +27,7 @@ templ Catalog(view CatalogView) {
 		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server in one click. Every version, updates with a backup first.",
 		Path:        "/catalog",
 	}) {
-		<main class={ components.Page, "flex flex-col gap-6 pt-10 pb-20 sm:pt-14" }>
+		<main class="moin-page moin-content">
 			@components.Header(components.HeaderProps{Title: "Catalog"})
 			@catalogBody(view)
 		</main>
@@ -43,15 +43,15 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 		Path:        "/catalog/" + view.Entry.Slug,
 	}) {
 		@templ.Raw(catalogJSONLD(view, appURL+"/catalog/"+view.Entry.Slug))
-		<main class={ components.Page, "flex flex-col gap-6 pt-10 pb-20 sm:pt-14" }>
-			@catalogHead(kit.Back{Label: "Catalog", Href: "/catalog"}, view.Entry)
+		<main class="moin-page moin-content">
+			@catalogHead(components.Back{Label: "Catalog", Href: "/catalog"}, view.Entry)
 			if note := view.Entry.DatabaseNote(); note != "" {
 				<p class="moin-small moin-muted">
 					<span data-catalog-database-note>{ note }</span>
 				</p>
 			}
 			<div>
-				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/catalog/"+view.Entry.Slug+"/install", Attrs: templ.Attributes{"data-catalog-install": true}}) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/catalog/" + view.Entry.Slug + "/install", Attrs: templ.Attributes{"data-catalog-install": true}}) {
 					Deploy with { brand.Name }
 				}
 			</div>
@@ -81,7 +81,7 @@ templ CatalogInstall(view CatalogInstallView) {
 	{{ entry := view.App.Entry }}
 	@layouts.App("Install " + entry.Name) {
 		@panelPage() {
-			@catalogHead(kit.Back{Label: "Catalog", Href: basePath + "/catalog"}, entry)
+			@catalogHead(components.Back{Label: "Catalog", Href: basePath + "/catalog"}, entry)
 			if len(view.Servers) == 0 {
 				@components.List() {
 					@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers"})
@@ -90,16 +90,17 @@ templ CatalogInstall(view CatalogInstallView) {
 				@components.Card(components.CardProps{}) {
 					<form
 						id="catalog-install-form"
-						class="moin-stack" data-gap="4"
+						class="moin-stack"
+						data-gap="4"
 						hx-post={ basePath + "/catalog/" + entry.Slug + "/install" }
 						hx-swap="none"
 						hx-disable="find button[type='submit']"
 					>
 						@components.CSRF()
 						if note := entry.DatabaseNote(); note != "" {
-							<p class="px-1 text-sm text-muted-foreground" data-catalog-database-note>{ note }</p>
+							<p class="moin-text moin-muted" data-catalog-database-note>{ note }</p>
 						}
-						<div class="grid items-start gap-4 sm:grid-cols-2">
+						<div class="moin-grid">
 							@components.Field(components.FieldProps{Label: "Version", For: "catalog-version"}) {
 								@components.Select(components.SelectProps{ID: "catalog-version", Name: "version", Label: "Version", Options: versionOptions(view.App.Versions), Disabled: len(view.App.Versions) == 0})
 							}
@@ -137,7 +138,10 @@ templ catalogBody(view CatalogView) {
 		id="catalog-form"
 		method="get"
 		action={ templ.SafeURL(view.Base) }
-		class="grid grid-cols-2 gap-2 sm:max-w-sm"
+		class="moin-grid moin-narrow"
+		data-fit
+		data-gap="2"
+		style="--min:8rem;--width:24rem"
 		hx-get={ view.Base }
 		hx-trigger="change, submit"
 		hx-target="#catalog-results"
@@ -151,9 +155,7 @@ templ catalogBody(view CatalogView) {
 }
 
 // CatalogResults is the list of apps of the category, also the answer to
-// a choice of the category or the order. Each icon sits in a
-// box of its size: its padding is a share of what holds it, and without
-// the box that is the whole row.
+// a choice of the category or the order.
 templ CatalogResults(view CatalogView) {
 	<div id="catalog-results" class="moin-stack" data-gap="2" data-catalog-results>
 		if len(view.Apps) > 0 {
@@ -163,20 +165,14 @@ templ CatalogResults(view CatalogView) {
 				</div>
 				@components.List() {
 					for _, app := range view.Apps {
-						@components.Item(components.ItemProps{Href: view.Base + "/" + app.Entry.Slug}) {
-							<span data-lead class="flex size-9 shrink-0">
-								@kit.AppIcon(app.Entry.Name, catalogLogo(app.Entry), false)
-							</span>
-							@kit.RowText(app.Entry.Name, app.Entry.Pitch)
-						}
+						@components.Item(components.ItemProps{Href: view.Base + "/" + app.Entry.Slug, Lead: components.AppIcon(components.AppIconProps{Name: app.Entry.Name, Initial: model.Initial(app.Entry.Name), Logo: catalogLogo(app.Entry)}), Name: app.Entry.Name, Note: app.Entry.Pitch})
 					}
 				}
 			</section>
-			<p class="px-1 text-sm text-muted-foreground">
-				Missing one? <a href="/docs/guides/catalog#add-an-app" class="text-foreground underline-offset-4 hover:underline">Ask for it</a>
+			<p class="moin-text moin-muted">
+				Missing one? <a href="/docs/guides/catalog#add-an-app" class="moin-link moin-foreground" data-quiet>Ask for it</a>
 			</p>
 		}
-
 	</div>
 }
 
@@ -189,9 +185,9 @@ func appCount(n int) string {
 
 // catalogHead is the head of a catalog app's page: its icon before its
 // name, and its one sentence under it.
-templ catalogHead(back kit.Back, entry catalog.Entry) {
+templ catalogHead(back components.Back, entry catalog.Entry) {
 	<div class="moin-stack" data-gap="2">
-		@kit.HeaderIcon(back, kit.AppIcon(entry.Name, catalogLogo(entry), true), entry.Name)
+		@components.Header(components.HeaderProps{Back: back, Icon: components.AppIcon(components.AppIconProps{Name: entry.Name, Initial: model.Initial(entry.Name), Logo: catalogLogo(entry), Large: true}), Title: entry.Name})
 		<p class="moin-small moin-muted">
 			{ entry.Pitch }
 		</p>
@@ -225,7 +221,7 @@ templ catalogFacts(view CatalogEntryView) {
 			</div>
 			@components.List() {
 				@components.Item(components.ItemProps{}) {
-					<p class="min-w-0 flex-1 text-sm" data-catalog-login>{ entry.Login }</p>
+					<p class="moin-fill moin-text" data-catalog-login>{ entry.Login }</p>
 				}
 			}
 		</section>
@@ -237,8 +233,8 @@ templ catalogFacts(view CatalogEntryView) {
 // its value, and ↗.
 templ catalogLink(label, value, href string, mono bool) {
 	@components.Item(components.ItemProps{Href: href, External: true}) {
-		<span class="shrink-0 font-medium" data-catalog-link={ label }>{ label }</span>
-		<span class={ "min-w-0 flex-1 truncate text-right text-sm text-muted-foreground", templ.KV("font-mono", mono) }>{ value }</span>
+		<span class="moin-strong" data-catalog-link={ label }>{ label }</span>
+		<span class={ "moin-item-value moin-end", templ.KV("moin-mono", mono) }>{ value }</span>
 	}
 }
 
@@ -257,13 +253,13 @@ templ catalogVersions(versions []catalog.Version) {
 				}
 				for _, version := range shownVersions(versions, 8) {
 					@components.Item(components.ItemProps{}) {
-						<span class="min-w-0 flex-1 truncate font-mono text-sm">{ version.Tag }</span>
-						<span class="shrink-0 text-sm text-muted-foreground">{ released(version, now) }</span>
+						<span class="moin-fill moin-truncate moin-mono moin-text">{ version.Tag }</span>
+						<span class="moin-text moin-muted">{ released(version, now) }</span>
 					}
 				}
 			}
 			if more := len(versions) - 8; more > 0 {
-				<p class="px-1 text-sm text-muted-foreground">{ strconv.Itoa(more) } older</p>
+				<p class="moin-text moin-muted">{ strconv.Itoa(more) } older</p>
 			}
 		</div>
 	</section>
@@ -273,32 +269,32 @@ templ catalogVersions(versions []catalog.Version) {
 // runs, the newest, and the way to another one.
 templ CatalogUpdate(view CatalogUpdateView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="catalog-update" class="grid" data-catalog-update>
+	<div id="catalog-update" data-catalog-update>
 		@components.Card(components.CardProps{}) {
-			<div class="flex flex-col gap-4 sm:flex-row sm:items-center">
-				<div class="flex min-w-0 flex-1 items-center gap-4">
-					<div class="min-w-0">
-						<p class="truncate font-medium">{ view.Entry.Name }</p>
-						<p class="moin-small moin-muted">
-							{ catalogUpdateLine(view) }
-							if note := view.Entry.DatabaseNote(); note != "" {
-								<span data-catalog-database-note>{ note }</span>
-							}
-						</p>
-					</div>
+			<div class="moin-row" data-gap="4" data-phone="stack">
+				<div class="moin-fill">
+					<p class="moin-truncate moin-strong">{ view.Entry.Name }</p>
+					<p class="moin-small moin-muted">
+						{ catalogUpdateLine(view) }
+						if note := view.Entry.DatabaseNote(); note != "" {
+							<span data-catalog-database-note>{ note }</span>
+						}
+					</p>
 				</div>
 				<form
-					class="flex gap-2"
+					class="moin-row"
+					data-gap="2"
+					data-phone="stack"
 					hx-post={ basePath + "/apps/" + view.App.Link() + "/update" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
 					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }
 				>
 					@components.CSRF()
-					<div class="min-w-0 flex-1 sm:w-36 sm:flex-none">
+					<div class="moin-width" style="--width:9rem">
 						@components.Select(components.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Value: view.Latest.Tag, Disabled: len(view.Versions) == 0})
 					</div>
-					@kit.Button(catalogUpdateKind(view.Newer), "", templ.Attributes{"type": "submit", "data-catalog-update-submit": true}) {
+					@components.Button(components.ButtonProps{Kind: catalogUpdateKind(view.Newer), Type: "submit", Attrs: templ.Attributes{"data-catalog-update-submit": true}}) {
 						if view.Newer {
 							Update
 						} else {
@@ -323,11 +319,11 @@ func catalogUpdateLine(view CatalogUpdateView) string {
 }
 
 // catalogUpdateKind makes Update the primary button: it is the thing to do.
-func catalogUpdateKind(newer bool) kit.Kind {
+func catalogUpdateKind(newer bool) components.Kind {
 	if newer {
-		return kit.Primary
+		return components.Primary
 	}
-	return kit.Secondary
+	return ""
 }
 
 func firstVersion(versions []catalog.Version) string {

@@ -26,25 +26,27 @@ templ AppTrialCard() {
 	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
 		{{ current := subscription.Access() }}
 		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-4xl bg-card px-6 py-4" data-trial={ string(current.State) }>
-				<p class="min-w-64 flex-1 text-sm">
-					if current.State == access.StateTrial {
-						{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
-						<span class="moin-strong" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
-						<span class="text-muted-foreground">After it, moin turns read-only. Your apps keep running.</span>
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-trial": string(current.State)}}) {
+				<div class="moin-row" data-gap="4" data-phone="stack">
+					<p class="moin-fill moin-text">
+						if current.State == access.StateTrial {
+							{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
+							<span class="moin-strong" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
+							<span class="moin-muted">After it, moin turns read-only. Your apps keep running.</span>
+						} else {
+							<span class="moin-strong">Your trial has ended.</span>
+							<span class="moin-muted">Your apps keep running, and you can stop and start them.</span>
+						}
+					</p>
+					if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
+						@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/billing"}) {
+							Subscribe
+						}
 					} else {
-						<span class="moin-strong">Your trial has ended.</span>
-						<span class="text-muted-foreground">Your apps keep running, and you can stop and start them.</span>
+						<p class="moin-small moin-muted">An owner can subscribe.</p>
 					}
-				</p>
-				if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
-					@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx)+"/billing"}) {
-						Subscribe
-					}
-				} else {
-					<p class="moin-small moin-muted">An owner can subscribe.</p>
-				}
-			</div>
+				</div>
+			}
 		}
 	}
 }

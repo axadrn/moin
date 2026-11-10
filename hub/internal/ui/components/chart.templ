@@ -1,0 +1,117 @@
+package components
+
+import "strconv"
+
+// Chart is one or two lines over time, like Stocks or Weather: the values
+// at the newest time big on top, the plot under them with a soft area
+// under the first line, the scale on the right and three times under it.
+// The server draws it as SVG, sized to its place; the pointer or a finger
+// on the plot shows the values and the time under it, and leaving it
+// shows the newest again (hub.js). The first line is ink, the second
+// muted: a chart has no colors of its own (DESIGN.md, Character).
+templ Chart(p ChartProps) {
+	{{ xs := chartXs(p.Times) }}
+	{{ top := chartTop(p) }}
+	{{ last := chartLast(p) }}
+	{{ breaks := chartBreaks(p.Times, p.Gap) }}
+	<figure class="moin-plot" data-chart data-chart-last={ strconv.Itoa(last) }>
+		// The points for hub.js, as JSON that is never run: shorter than an
+		// attribute, where every quote would be escaped.
+		@templ.Raw(`<script type="application/json" data-chart-points>` + chartPoints(p, xs, top) + `</script>`)
+		<div class="moin-plot-head">
+			<div class="moin-plot-values">
+				for i, line := range p.Lines {
+					<span class="moin-plot-value">
+						if len(p.Lines) > 1 {
+							<span class="moin-plot-key" data-ink={ chartInk(i) }>
+								<span class="moin-plot-swatch" aria-hidden="true"></span>
+								<span class="moin-muted">{ line.Label }</span>
+							</span>
+						}
+						<span class="moin-number" data-chart-value>{ chartLineValue(p, line, last) }</span>
+					</span>
+				}
+			</div>
+			<span class="moin-small moin-muted moin-digits" data-chart-time>
+				if last >= 0 {
+					{ chartMarkTime(p, last) }
+				}
+			</span>
+		</div>
+		<div class="moin-plot-grid">
+			<div class="moin-plot-area" data-chart-plot>
+				<div class="moin-plot-line" data-at="top"></div>
+				<div class="moin-plot-line" data-at="middle"></div>
+				<div class="moin-plot-line" data-at="bottom"></div>
+				<svg viewBox={ "0 0 " + strconv.Itoa(chartWidth) + " " + strconv.Itoa(chartHeight) } preserveAspectRatio="none" aria-hidden="true">
+					for i, line := range p.Lines {
+						{{ stroke, area := chartPaths(xs, line.Values, breaks, top) }}
+						<g data-ink={ chartInk(i) }>
+							if area != "" {
+								<path d={ area } fill="currentColor" fill-opacity="0.08" stroke="none"></path>
+							}
+							if stroke != "" {
+								<path d={ stroke } fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+							}
+						</g>
+					}
+				</svg>
+				for index, words := range p.Marks {
+					if index >= 0 && index < len(xs) {
+						<span class="moin-plot-mark" style={ chartAt(xs[index], chartMarkY(p, index, top)) } title={ words + ", " + p.Time(p.Times[index]) } data-chart-mark>
+							<span class="moin-sr-only">{ words }</span>
+						</span>
+					}
+				}
+				<div class="moin-plot-cursor" data-chart-cursor hidden></div>
+				for i := range p.Lines {
+					<span class="moin-plot-dot" data-ink={ chartInk(i) } data-chart-dot hidden></span>
+				}
+			</div>
+			<div class="moin-plot-scale" aria-hidden="true">
+				<span>{ p.Value(top) }</span>
+				<span>{ p.Value(top / 2) }</span>
+				<span>{ p.Value(0) }</span>
+			</div>
+			<div class="moin-plot-times">
+				for _, tick := range chartTicks(p) {
+					<span>{ tick }</span>
+				}
+			</div>
+		</div>
+	</figure>
+}
+
+// chartInk is the ink of a line: 0 the first, 1 the others, muted.
+func chartInk(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	return "1"
+}
+
+// chartMarkTime is the time of a point as the chart shows it on top: its
+// mark first, when it has one.
+func chartMarkTime(p ChartProps, i int) string {
+	if words := p.Marks[i]; words != "" {
+		return words + " · " + p.Time(p.Times[i])
+	}
+	return p.Time(p.Times[i])
+}
+
+// chartMarkY is where a mark sits: on the first line, or at the bottom.
+func chartMarkY(p ChartProps, i int, top float64) float64 {
+	if len(p.Lines) == 0 || i >= len(p.Lines[0].Values) {
+		return chartHeight
+	}
+	v := p.Lines[0].Values[i]
+	if v != v {
+		return chartHeight
+	}
+	return chartY(v, top)
+}
+
+// chartAt places a mark: x from 0 to 1, y in the box, as CSS variables.
+func chartAt(x, y float64) templ.SafeCSS {
+	return templ.SafeCSS("--x:" + chartPercent(x*100) + ";--y:" + chartPercent(y/chartHeight*100))
+}

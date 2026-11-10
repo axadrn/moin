@@ -1,8 +1,8 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/components"
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"strconv"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -13,16 +13,16 @@ import (
 // DeployLogPanel is the log of one deploy. It streams from the server as
 // HTML (hx-sse): each message is lines to append, and the last one the
 // state; then the stream ends. The newest lines stay in view while you are
-// at the bottom (flex-col-reverse), and stay put when you scroll up. No
+// at the bottom (moin-tail), and stay put when you scroll up. No
 // script. Follow is true when it shows the newest deploy and moves on to
 // the next one that starts; then AppDetail sends it again, out of band.
 templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
-	<div id="deploy-log-panel" class="flex min-w-0 *:flex-1" data-following?={ follow } hx-swap-oob?={ oob }>
-		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(app, deploy), Body: panelBodyFlush}) {
-			<div class="flex max-h-[32rem] flex-1 flex-col-reverse overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:min-h-72" tabindex="0" aria-label="Deploy log">
+	<div id="deploy-log-panel" class="moin-stack" data-following?={ follow } hx-swap-oob?={ oob }>
+		@panel(panelProps{Heading: "deploy-log-heading", Title: "Log", Action: deployLogActions(app, deploy)}) {
+			<div class="moin-tail moin-fill" data-tall style="--tail:32rem" tabindex="0" aria-label="Deploy log">
 				if deploy == nil {
-					<p class="px-6 font-sans text-sm text-muted-foreground">No deploy yet.</p>
+					<p class="moin-inset moin-text moin-muted">No deploy yet.</p>
 				} else {
 					<div
 						id="deploy-log"
@@ -42,7 +42,7 @@ templ DeployLogPanel(app model.App, deploy *api.Deploy, follow, oob bool) {
 // you look at.
 templ deployLogActions(app model.App, deploy *api.Deploy) {
 	if deploy != nil {
-		<span class="text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("v%d", deploy.Number) }</span>
+		<span class="moin-small moin-muted moin-digits">{ fmt.Sprintf("v%d", deploy.Number) }</span>
 		@deployLogState(deploy.Status, false)
 		@copyButton("", "#deploy-log", "Copy the log")
 		if canRollBack(app, *deploy) {
@@ -67,25 +67,32 @@ func DeployLogStateOOB(status string) templ.Component { return deployLogState(st
 // deployLogState is the chip by the log: following while it runs, then
 // how it ended.
 templ deployLogState(status string, oob bool) {
-	{{ word, chip, dot := deployLogChip(status) }}
-	<span id="deploy-log-state" hx-swap-oob?={ oob } class={ "inline-flex h-7 items-center gap-2 rounded-full pr-3 pl-2.5 text-[0.8125rem] font-semibold", chip }>
-		<span class={ "inline-block size-2 rounded-full", dot }></span>
+	{{ word, state := deployLogChip(status) }}
+	@components.Chip(components.ChipProps{State: state, Attrs: deployLogStateAttributes(oob)}) {
 		{ word }
-	</span>
+	}
 }
 
-func deployLogChip(status string) (string, string, string) {
+func deployLogStateAttributes(oob bool) templ.Attributes {
+	attributes := templ.Attributes{"id": "deploy-log-state"}
+	if oob {
+		attributes["hx-swap-oob"] = true
+	}
+	return attributes
+}
+
+func deployLogChip(status string) (string, components.State) {
 	switch status {
 	case model.DeployRunning:
-		return "following", "bg-running/16 text-[color-mix(in_oklab,var(--running),var(--foreground)_28%)]", "hub-dot-run bg-running"
+		return "following", components.StateRunning
 	case model.DeploySucceeded:
-		return "succeeded", "bg-live/16 text-[color-mix(in_oklab,var(--live),var(--foreground)_18%)]", "bg-live"
+		return "succeeded", components.StateLive
 	case model.DeployFailed:
-		return "failed", "bg-failed/15 text-[color-mix(in_oklab,var(--failed),var(--foreground)_12%)]", "bg-failed"
+		return "failed", components.StateFailed
 	case "stopped":
-		return "stopped following", "bg-muted text-muted-foreground", "bg-muted-foreground"
+		return "stopped following", components.StateIdle
 	}
-	return status, "bg-muted text-muted-foreground", "bg-muted-foreground"
+	return status, components.StateIdle
 }
 
 // DeployLogChunk is one message of the log stream: the lines that continue

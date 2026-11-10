@@ -26,11 +26,12 @@ templ Status(p StatusProps) {
 // ChipProps is a Chip: the state, and its word as children.
 type ChipProps struct {
 	State State
+	Attrs templ.Attributes
 }
 
 // Chip is a state's dot and its word in a soft pill, next to a thing's name.
 templ Chip(p ChipProps) {
-	<span class="moin-chip" data-state={ string(p.State) }>
+	<span class="moin-chip" data-state={ string(p.State) } { p.Attrs... }>
 		<i class="moin-dot" data-state={ string(p.State) }></i>
 		<span>
 			{ children... }

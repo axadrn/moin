@@ -9,7 +9,7 @@ import (
 // image built elsewhere, and the deploy hook CI calls; hook says the app
 // has one.
 templ appCI(appName, appLink string, hook bool) {
-	<div class="grid" data-app-ci>
+	<div data-app-ci>
 		@components.Card(components.CardProps{Title: "Deploy from CI"}) {
 			<form
 				hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/image" }
@@ -35,9 +35,9 @@ templ appCI(appName, appLink string, hook bool) {
 // new hook's URL once, with the curl CI runs.
 templ AppHook(appName, appLink, url string, on bool) {
 	<div id="app-hook" class="moin-stack" data-gap="3" data-hook-on?={ on }>
-		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-			<div class="min-w-0 px-1">
-				<p class="text-sm font-medium">Deploy hook</p>
+		<div class="moin-row" data-wrap data-between data-gap="3">
+			<div>
+				<p class="moin-text moin-strong">Deploy hook</p>
 				<p class="moin-small moin-muted">
 					if on {
 						On
@@ -46,7 +46,7 @@ templ AppHook(appName, appLink, url string, on bool) {
 					}
 				</p>
 			</div>
-			<div class="flex flex-wrap gap-2">
+			<div class="moin-row" data-wrap data-gap="2">
 				if on {
 					@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
@@ -64,7 +64,7 @@ templ AppHook(appName, appLink, url string, on bool) {
 		</div>
 		if url != "" {
 			<p class="moin-small moin-muted">
-				Copy it now, it shows only once. Store it in CI as the secret <code class="font-mono text-foreground">MOIN_DEPLOY_HOOK</code>.
+				Copy it now, it shows only once. Store it in CI as the secret <code class="moin-mono moin-foreground">MOIN_DEPLOY_HOOK</code>.
 			</p>
 			<div data-deploy-hook>
 				@components.Command(components.CommandProps{Text: url})

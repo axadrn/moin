@@ -8,31 +8,26 @@ import "github.com/axadrn/moin/hub/internal/ui/components"
 // the server answers (/search, pages.SiteSearchOptions). The arrows or
 // ctrl+j / ctrl+k pick, Enter opens, Escape or a click outside closes.
 templ SiteSearch() {
-	<dialog id="site-search" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search">
-		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl">
-			<form method="get" action="/search" role="search" class="relative shrink-0">
+	<dialog id="site-search" class="moin-palette" aria-label="Search">
+		<div class="moin-palette-box">
+			<form method="get" action="/search" role="search" class="moin-input-icon">
 				<label for="site-search-input" class="moin-sr-only">Search the docs and the catalog</label>
 				@components.Icon("search")
-				<input
-					id="site-search-input"
-					name="q"
-					type="search"
-					autocomplete="off"
-					spellcheck="false"
-					placeholder="Search the docs and the catalog"
-					role="combobox"
-					aria-expanded="true"
-					aria-controls="site-search-results"
-					aria-autocomplete="list"
-					hx-get="/search"
-					hx-trigger="input changed delay:80ms, open"
-					hx-target="#site-search-results"
-					hx-swap="innerHTML"
-					hx-sync="this:replace"
-					class="h-16 w-full bg-transparent pr-5 pl-14 text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
-				/>
+				@components.Input(components.InputProps{ID: "site-search-input", Name: "q", Type: "search", Placeholder: "Search the docs and the catalog", Attrs: templ.Attributes{
+					"autocomplete":      "off",
+					"spellcheck":        "false",
+					"role":              "combobox",
+					"aria-expanded":     "true",
+					"aria-controls":     "site-search-results",
+					"aria-autocomplete": "list",
+					"hx-get":            "/search",
+					"hx-trigger":        "input changed delay:80ms, open",
+					"hx-target":         "#site-search-results",
+					"hx-swap":           "innerHTML",
+					"hx-sync":           "this:replace",
+				}})
 			</form>
-			<div id="site-search-results" role="listbox" aria-label="Answers" class="flex flex-col gap-0.5 overflow-y-auto border-t border-border p-1.5"></div>
+			<div id="site-search-results" role="listbox" aria-label="Answers" class="moin-palette-list"></div>
 		</div>
 	</dialog>
 	<script nonce={ templ.GetNonce(ctx) }>

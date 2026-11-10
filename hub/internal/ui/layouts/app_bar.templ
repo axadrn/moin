@@ -36,30 +36,25 @@ templ AppBar() {
 // search); the arrows pick one, Enter opens it, Escape or a click outside
 // closes it.
 templ palette(basePath string) {
-	<dialog id="palette" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-black/30" aria-label="Search">
-		<div class="mx-auto mt-[12vh] flex max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-popover text-popover-foreground shadow-2xl" data-search>
-			<div class="relative shrink-0">
+	<dialog id="palette" class="moin-palette" aria-label="Search">
+		<div class="moin-palette-box" data-search>
+			<div class="moin-input-icon">
 				<label for="search" class="moin-sr-only">Search or run a command</label>
 				@components.Icon("search")
-				<input
-					id="search"
-					name="q"
-					type="search"
-					autocomplete="off"
-					spellcheck="false"
-					placeholder="Search, or type: deploy my-app"
-					role="combobox"
-					aria-expanded="false"
-					aria-controls="search-results"
-					aria-autocomplete="list"
-					hx-get={ basePath + "/search" }
-					hx-include="#search-here, #search-recent"
-					hx-trigger="input changed delay:80ms, focus"
-					hx-target="#search-results"
-					hx-swap="innerHTML"
-					hx-sync="this:replace"
-					class="h-16 w-full bg-transparent pr-5 pl-14 text-base outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
-				/>
+				@components.Input(components.InputProps{ID: "search", Name: "q", Type: "search", Placeholder: "Search, or type: deploy my-app", Attrs: templ.Attributes{
+					"autocomplete":      "off",
+					"spellcheck":        "false",
+					"role":              "combobox",
+					"aria-expanded":     "false",
+					"aria-controls":     "search-results",
+					"aria-autocomplete": "list",
+					"hx-get":            basePath + "/search",
+					"hx-include":        "#search-here, #search-recent",
+					"hx-trigger":        "input changed delay:80ms, focus",
+					"hx-target":         "#search-results",
+					"hx-swap":           "innerHTML",
+					"hx-sync":           "this:replace",
+				}})
 				<input type="hidden" id="search-here" name="here" value=""/>
 				<input type="hidden" id="search-recent" name="recent" value=""/>
 			</div>
@@ -67,7 +62,7 @@ templ palette(basePath string) {
 				id="search-results"
 				role="listbox"
 				aria-label="Results"
-				class="flex flex-col gap-0.5 overflow-y-auto border-t border-border p-1.5 empty:hidden"
+				class="moin-palette-list"
 			></div>
 		</div>
 	</dialog>
@@ -76,14 +71,14 @@ templ palette(basePath string) {
 // UserAvatar carries an id, so a changed name or picture swaps it in place
 // (IdentityUpdates).
 templ UserAvatar(user *model.User) {
-	<span id="bar-avatar" class="contents">
+	<span id="bar-avatar" class="moin-row">
 		@components.Avatar(components.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})
 	</span>
 }
 
 // IdentityUpdates is what a changed name or picture swaps into the bar.
 templ IdentityUpdates(user *model.User) {
-	<span id="bar-avatar" class="contents" hx-swap-oob="true">
+	<span id="bar-avatar" class="moin-row" hx-swap-oob="true">
 		@components.Avatar(components.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})
 	</span>
 }

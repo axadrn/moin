@@ -19,7 +19,8 @@ templ UpdateNotice(info model.VersionInfo) {
 	{{ running := update != nil && update.Running() }}
 	<div
 		id="update-notice"
-		class={ components.Page, "pt-4 empty:hidden" }
+		class={ components.Page, "moin-hide-empty" }
+		style="--page-top:var(--space-4)"
 		if running {
 			hx-get={ basePath + "/update" }
 			hx-trigger="every 5s"
@@ -49,7 +50,7 @@ templ UpdateNotice(info model.VersionInfo) {
 								{ " " + build.Name + " runs " + info.Version + " again." }
 							}
 							{ " " }
-							<a class="text-foreground underline underline-offset-4" href={ templ.SafeURL("/docs/self-hosting#updates") }>What to do</a>
+							<a class="moin-link moin-foreground" href={ templ.SafeURL("/docs/self-hosting#updates") }>What to do</a>
 						</p>
 					}
 				case update != nil && update.State == "done" && update.Version == info.Version && time.Since(update.At) < 10*time.Minute:
@@ -65,7 +66,7 @@ templ UpdateNotice(info model.VersionInfo) {
 					}
 				case info.UpdateAvailable:
 					@updateLine(templ.Attributes{"data-update-available": info.Latest}) {
-						<div class="flex flex-col gap-1">
+						<div class="moin-stack" data-gap="1">
 							<p class="moin-strong">{ build.Name + " " + info.Latest + " is out" }</p>
 							if info.Summary != "" {
 								<p class="moin-small moin-muted">
@@ -73,7 +74,7 @@ templ UpdateNotice(info model.VersionInfo) {
 								</p>
 							}
 						</div>
-						<div class="flex flex-wrap items-center gap-2">
+						<div class="moin-row" data-wrap data-gap="2">
 							if info.CanUpdate {
 								<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button">
 									@components.CSRF()
@@ -82,7 +83,7 @@ templ UpdateNotice(info model.VersionInfo) {
 									}
 								</form>
 							} else {
-								<span class="moin-small moin-muted">On the server: <code class="font-mono text-foreground">sh update.sh</code></span>
+								<span class="moin-small moin-muted">On the server: <code class="moin-mono moin-foreground">sh update.sh</code></span>
 							}
 							if info.NotesURL != "" {
 								@components.Button(components.ButtonProps{Href: info.NotesURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
@@ -99,8 +100,10 @@ templ UpdateNotice(info model.VersionInfo) {
 // updateLine is the notice: one card over the page, its words left and
 // what to do right, under them on a phone.
 templ updateLine(attributes templ.Attributes) {
-	<section class="flex flex-col gap-3 rounded-4xl bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6" { attributes... }>
-		{ children... }
+	<section class="moin-card" { attributes... }>
+		<div class="moin-row" data-between data-gap="3" data-phone="stack">
+			{ children... }
+		</div>
 	</section>
 }
 
