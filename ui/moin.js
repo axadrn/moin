@@ -134,6 +134,10 @@
   // Select: radios show what you picked in the button, icon and all, and close
   // the list. With the keyboard it stays open while the arrows walk, and Enter
   // closes it. Checkboxes keep it open and the button says how many.
+  let pointed = false;
+  document.addEventListener("pointerdown", (event) => {
+    pointed = Boolean(event.target.closest?.(".moin-select [popover]"));
+  }, true);
   document.addEventListener("change", (event) => {
     const select = event.target.closest?.(".moin-select");
     if (!select || !event.target.matches("[type=radio], [type=checkbox]")) return;
@@ -145,7 +149,8 @@
     }
     const option = event.target.closest("label");
     shown.replaceChildren(...[...option.childNodes].filter((node) => node !== event.target && (node.nodeType === Node.ELEMENT_NODE || node.textContent.trim())).map((node) => node.cloneNode(true)));
-    if (!event.target.matches(":focus-visible")) select.querySelector("[popover]").hidePopover();
+    if (pointed) select.querySelector("[popover]").hidePopover();
+    pointed = false;
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || !event.target.closest?.(".moin-select [popover]")) return;

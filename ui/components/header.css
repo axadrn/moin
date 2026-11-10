@@ -52,6 +52,8 @@
     width: 100%;
     gap: var(--space-2);
   }
+  /* A chip or a status is a word, not a button: it keeps its own width. */
+  .moin-header-actions > :is(.moin-chip, .moin-status) { justify-self: start; }
   .moin-header-line {
     display: flex;
     flex-wrap: wrap;

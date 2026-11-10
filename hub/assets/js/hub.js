@@ -123,11 +123,11 @@ addEventListener("pageshow", (event) => {
 });
 
 // A switch shows what is stored. A refused change is answered with
-// HX-Reswap: none and a failed request with nothing, so no new switch comes:
-// put this one back.
+// HX-Reswap: none, a server error with an error status and a failed request
+// with nothing, so no new switch comes: put this one back.
 document.addEventListener("htmx:finally:request", (event) => {
   const { sourceElement: source, response } = event.detail.ctx;
-  if (response && response.raw.headers.get("HX-Reswap") !== "none") return;
+  if (response && response.raw.ok && response.raw.headers.get("HX-Reswap") !== "none") return;
   const box = source.matches("input[role=switch]") ? source : source.querySelector("input[role=switch]");
   if (box?.isConnected) box.checked = !box.checked;
 });

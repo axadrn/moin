@@ -9,7 +9,7 @@ import (
 // token once it is made, the list, and the form for another. Requests
 // replace its parts by id.
 templ SettingsAPITokensSection(view APITokensView) {
-	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true"></div>
+	<div id="api-token-reveal" class="moin-hide-empty" hx-swap-oob="true"></div>
 	<section class="moin-section">
 		<div class="moin-section-head">
 			<h2>API tokens</h2>
@@ -107,7 +107,7 @@ templ APITokenList(view APITokensView) {
 // APITokenReveal shows a new token once, at the top of the tab, until the
 // page is left.
 templ APITokenReveal(raw string) {
-	<div id="api-token-reveal" class="empty:hidden" hx-swap-oob="true">
+	<div id="api-token-reveal" class="moin-hide-empty" hx-swap-oob="true">
 		@components.Card(components.CardProps{Title: "Copy your new token"}) {
 			@components.Command(components.CommandProps{Text: raw})
 			<p class="moin-small moin-muted">

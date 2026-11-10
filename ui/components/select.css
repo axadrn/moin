@@ -44,7 +44,12 @@
     overflow-y: auto;
   }
   /* As wide as its button, wider only for an option that needs it. */
-  .moin-select > [popover] { min-width: max-content; }
+  /* As wide as its longest option, within the screen. */
+  .moin-select > [popover] {
+    width: max-content;
+    min-width: max(12rem, anchor-size(width));
+    max-width: calc(100vw - 2rem);
+  }
   .moin-menu {
     right: anchor(right);
     left: auto;

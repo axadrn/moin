@@ -22,6 +22,8 @@ November 10, 2026
 
 ### Fixed
 - **Switches tell the truth**: A change that is refused or fails goes back to what is saved. The back button shows the real state too. (#49)
+- **GitHub sign-in says what went wrong**: A failed sign-in shows one clear line. The email field stays clean.
+- **Select lists work with the keyboard in Safari**: The arrow keys move. The list stays open.
 
 ### Upgrade
 

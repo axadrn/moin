@@ -12,3 +12,5 @@ Styles: `components/button.css`, `components/card.css`, `components/status.css`,
 ```example
 header
 ```
+
+On a phone buttons share the width. A chip or status next to them keeps its own.

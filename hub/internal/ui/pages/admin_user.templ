@@ -90,17 +90,19 @@ templ AdminUserPlan(user *model.AdminUser) {
 			}
 		}
 		if user.Plan != model.AdminPlanPaying {
-			<form hx-post={ "/admin/users/" + user.ID + "/offer" } hx-swap="none" hx-disable="find button[type='submit']">
-				@components.CSRF()
-				@components.Field(components.FieldProps{Label: "Apply an offer", For: "admin-offer-email", Hint: "The address the offer waits for."}) {
-					<div class="moin-row" data-gap="2" data-phone="stack">
-						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "admin-offer-email", "name": "email", "type": "email", "required": true, "autocomplete": "off"}})
-						@components.Button(components.ButtonProps{Type: "submit"}) {
-							Apply
-						}
-					</div>
-				}
-			</form>
+			@components.Card(components.CardProps{}) {
+				<form hx-post={ "/admin/users/" + user.ID + "/offer" } hx-swap="none" hx-disable="find button[type='submit']">
+					@components.CSRF()
+					@components.Field(components.FieldProps{Label: "Apply an offer", For: "admin-offer-email", Hint: "The address the offer waits for."}) {
+						<div class="moin-row" data-gap="2" data-phone="stack">
+							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "admin-offer-email", "name": "email", "type": "email", "required": true, "autocomplete": "off"}})
+							@components.Button(components.ButtonProps{Type: "submit"}) {
+								Apply
+							}
+						</div>
+					}
+				</form>
+			}
 		}
 	</div>
 }

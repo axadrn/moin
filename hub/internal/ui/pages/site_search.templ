@@ -31,7 +31,7 @@ func FindSite(groups []model.DocGroup, apps []CatalogEntryView, kit []SiteHit, q
 		if len(groups) > 0 {
 			out = FindDocs(groups[:1], "", 0)
 		}
-		return append(out, SiteHit{Title: "Catalog", Where: "Apps you install in one click", Href: "/catalog"}, SiteHit{Title: "Kit", Where: "The UI kit moin runs on", Href: "/kit"})
+		return append(out, SiteHit{Title: "Catalog", Where: "Apps you install in one click", Href: "/catalog"}, SiteHit{Title: "UI", Where: "The UI kit moin runs on", Href: "/ui"})
 	}
 	var named, other []SiteHit
 	for _, app := range FilterCatalog(apps, "", query, SortName) {
