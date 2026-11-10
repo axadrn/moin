@@ -9,38 +9,36 @@ import (
 // Next is the story of moin next. What is planned, item by item, is in the
 // roadmap: one list.
 templ Next() {
-	@layouts.Home(layouts.SEOProps{Title: brand.Name + " next", Description: "The tools a team needs to build software, growing next to deploys, in one open source app.", Path: "/next"}) {
-		<main class="moin-page moin-content">
-			@components.Header(components.HeaderProps{Title: brand.Name + " next", Line: nextLine()})
-			<p class="moin-text">{ brand.Name } deploys your apps, and that stays the main thing. { brand.Name } next is what grows next to it: the other tools a team needs to build software, in the same app, with the same login and the same look.</p>
-			<div class="moin-columns">
-				<section class="moin-section">
-					<div class="moin-section-head"><h2>What is coming</h2></div>
-					@components.List() {
-						@components.Item(components.ItemProps{Name: "Tasks and roadmaps", Note: "What to do, who does it, what comes after"})
-						@components.Item(components.ItemProps{Name: "Docs", Note: "What your team knows, next to the work"})
-						@components.Item(components.ItemProps{Name: "Chat", Note: "Talk where the work is"})
-						@components.Item(components.ItemProps{Name: "Mail", Note: "Your team's mail, on your own domain"})
-						@components.Item(components.ItemProps{Name: "Analytics", Note: "Who uses what you shipped"})
-					}
-				</section>
-				<section class="moin-section">
-					<div class="moin-section-head"><h2>How it works</h2></div>
-					@components.List() {
-						@components.Item(components.ItemProps{Name: "Open source", Note: "Like the rest of " + brand.Name})
-						@components.Item(components.ItemProps{Name: "A few users first", Note: "Behind a switch, until it is ready"})
-						@components.Item(components.ItemProps{Name: "One at a time", Note: "A bug in one never touches another or your deploys"})
-						@components.Item(components.ItemProps{Name: "Then simply " + brand.Name, Note: "What is ready for everyone leaves Next"})
-					}
-				</section>
+	@layouts.Home(layouts.SEOProps{Title: brand.Name + " next", Description: "Everything you build software with, in one open source app. Highly experimental.", Path: "/next"}) {
+		<main class="moin-page moin-content moin-narrow">
+			<div class="moin-stack" data-gap="6">
+				<span class="moin-row"><span class="moin-badge">Highly experimental</span></span>
+				<h1 class="moin-statement">One app to build it, ship it and run it.</h1>
+				<p class="moin-lead" data-large>Deploying stays the core. Everything around it moves in. One login, one look, your servers. Open source, self-hosted or hosted, and agent-ready through MCP from day one.</p>
 			</div>
-			@components.List() {
-				@components.Item(components.ItemProps{Href: "/docs/roadmap", Name: "The roadmap", Note: "Everything planned, deploys first"})
-			}
+			<section class="moin-section">
+				<div class="moin-section-head"><h2>Moving in</h2></div>
+				@components.List() {
+					@components.Item(components.ItemProps{Name: "Tasks and roadmaps"})
+					@components.Item(components.ItemProps{Name: "Docs"})
+					@components.Item(components.ItemProps{Name: "Chat"})
+					@components.Item(components.ItemProps{Name: "Mail"})
+					@components.Item(components.ItemProps{Name: "Analytics"})
+					@components.Item(components.ItemProps{Name: "And many more"})
+				}
+			</section>
+			<div class="moin-stack" data-gap="6">
+				<p class="moin-lead">It will break. It can change or vanish any day. A few users get in first, and nothing here can touch your deploys.</p>
+				<p class="moin-lead">Nobody builds this for you. We build it together, in the open. Open an issue today and it can decide what ships tomorrow.</p>
+			</div>
+			<div class="moin-row" data-gap="2" data-wrap>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: layouts.GitHubURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+					Shape it on GitHub
+				}
+				@components.Button(components.ButtonProps{Href: "/docs/roadmap"}) {
+					See the roadmap
+				}
+			</div>
 		</main>
 	}
-}
-
-templ nextLine() {
-	Everything you build software with, in one open source app.
 }

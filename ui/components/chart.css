@@ -32,7 +32,7 @@
     content: "";
     width: 0.75rem;
     height: 2px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--ink);
   }
   .moin-chart-grid {
@@ -91,7 +91,7 @@
   .moin-meter {
     height: 0.5rem;
     overflow: hidden;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--muted);
   }
   .moin-meter > span {
@@ -276,7 +276,7 @@
   .moin-plot-swatch {
     width: 0.75rem;
     height: 2px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: currentColor;
   }
   .moin-plot-grid {

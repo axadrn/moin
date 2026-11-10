@@ -139,7 +139,6 @@ templ UITheme(page *model.DocPage) {
 templ UIBlocks(groups []model.UIBlockGroup) {
 	@uiPage(layouts.SEOProps{Title: "Blocks · moin UI", Description: "Whole pages to copy.", Path: "/ui/blocks"}) {
 		@uiHead(uiBlocksTab)
-		<p class="moin-text moin-muted">Whole pages made of components. Copy one and change the two paths at the top.</p>
 		<div class="moin-columns">
 			for _, group := range groups {
 				<div class="moin-section">

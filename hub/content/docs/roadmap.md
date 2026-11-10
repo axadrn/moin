@@ -47,10 +47,11 @@ Zero trust: even someone in full control of moin can't read your data or command
 
 Deploying stays the main thing. [moin next](/next) is what grows next to it: the other tools a team needs to build software, in the same app.
 
-Each one starts with a few users behind a switch, and runs on its own, so a bug in one never touches another or your deploys. What is ready for everyone leaves this list and is simply part of moin.
+Highly experimental: it can break, change or vanish any day. Each one starts with a few users behind a switch, and runs on its own, so a bug in one never touches another or your deploys. What is ready for everyone leaves this list and is simply part of moin. We shape it together, in the open: [open an issue](https://github.com/axadrn/moin/issues).
 
 - **Tasks and roadmaps**: what to do, who does it, and what comes after.
 - **Docs**: what your team knows, next to the work.
 - **Chat**: talk where the work is.
 - **Mail**: your team's mail, on your own domain.
 - **Analytics**: who uses what you shipped.
+- **And many more.**
