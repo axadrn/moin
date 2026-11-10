@@ -39,7 +39,6 @@
     --radius-md: calc(var(--radius) * 1.5);
     --radius-lg: calc(var(--radius) * 2);
     /* The floating bar: a pill, square in a theme without radius. */
-    --radius-bar: calc(var(--radius) * 4);
     --radius-full: 9999px;
     /* The gap around anything lit inside a group. */
     --inset: 0.1875rem;

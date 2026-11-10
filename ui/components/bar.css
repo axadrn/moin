@@ -33,16 +33,11 @@
     /* What you press in it nests: its corner is the bar's minus the gap. */
     --bar-gap: 0.375rem;
     padding-inline: var(--space-5) var(--bar-gap);
-    border-radius: var(--radius-bar);
+    border-radius: var(--radius-lg);
     background: color-mix(in oklab, var(--card) 85%, transparent);
     box-shadow: var(--shadow-low), 0 0 0 1px color-mix(in oklab, var(--foreground) 5%, transparent);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-  }
-  /* Only what sits at the end touches the curve: its corner is the bar's
-     minus the gap to it. Everything else keeps its own corner. */
-  .moin-bar[data-float] > .moin-bar-inner > :last-child {
-    --radius-md: max(0px, calc(var(--radius-bar) - var(--bar-gap)));
   }
   @media (min-width: 40rem) {
     .moin-bar[data-float] {
