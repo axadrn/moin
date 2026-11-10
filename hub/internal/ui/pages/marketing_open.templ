@@ -26,19 +26,24 @@ func NewHomeOpen(releases []service.Release) HomeOpen {
 	return HomeOpen{Releases: len(releases), Since: releases[len(releases)-1].Date, Latest: releases[0]}
 }
 
-// HomeOpenSection is the trust a young product can show without logos: the
+// HomeOpenAndNext is the trust a young product can show without logos: the
 // code is open, and it ships often, counted from the real changelog.
-templ HomeOpenSection(open HomeOpen) {
-	if open.Releases > 0 {
-		<section id="open" class="moin-band">
-			<h2 class="moin-statement">Built in the open.</h2>
-			@components.List() {
-				@components.Item(components.ItemProps{Href: layouts.GitHubURL, Name: "Open source", Note: "Every line on GitHub"})
-				@components.Item(components.ItemProps{Href: "/changelog", Name: homeVersions(open.Releases), Note: "Since " + open.Since.Format("January 2, 2006")})
-				@components.Item(components.ItemProps{Href: "/changelog", Name: open.Latest.Version, Note: open.Latest.Date.Format("January 2")})
+templ HomeOpenAndNext(open HomeOpen) {
+	<section class="moin-band">
+		<div class="moin-grid" data-cols="2">
+			if open.Releases > 0 {
+				@components.Card(components.CardProps{Attrs: templ.Attributes{"id": "open", "data-gap": "6", "style": "--pad:2rem"}}) {
+					<h2 class="moin-statement">Built in the open.</h2>
+					@components.List(templ.Attributes{"style": "--card:transparent"}) {
+						@components.Item(components.ItemProps{Href: layouts.GitHubURL, Name: "Open source", Note: "Every line on GitHub"})
+						@components.Item(components.ItemProps{Href: "/changelog", Name: homeVersions(open.Releases), Note: "Since " + open.Since.Format("January 2, 2006")})
+						@components.Item(components.ItemProps{Href: "/changelog", Name: open.Latest.Version, Note: open.Latest.Date.Format("January 2")})
+					}
+				}
 			}
-		</section>
-	}
+			@HomeNext()
+		</div>
+	</section>
 }
 
 func homeVersions(n int) string {

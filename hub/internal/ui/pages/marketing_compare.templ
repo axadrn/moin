@@ -15,13 +15,11 @@ templ HomeCompare() {
 	<section id="compare" class="moin-band">
 		<h2 class="moin-statement">Look at the score.</h2>
 		<p class="moin-lead">None of these seven documents a daily restore check. { brand.Name } runs one.</p>
-		@components.List() {
+		<div class="moin-bento">
 			for _, competitor := range Competitors {
-				@components.Item(components.ItemProps{Href: "/compare/" + competitor.Slug}) {
-					@compareLine(competitor.Name, competitor.ScoreLine())
-				}
+				@homeFeature(competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
 			}
-		}
+		</div>
 		<p class="moin-text moin-muted">Fact by fact, from each tool's own docs, read { compareRead }.</p>
 	</section>
 }

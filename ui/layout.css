@@ -63,6 +63,20 @@
     .moin-grid[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
     .moin-grid[data-cols="1-2"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
   }
+  /* Tiles of different sizes. data-wide takes two columns, data-tall two
+     rows. Two columns, four on a desktop. */
+  .moin-bento {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: dense;
+    gap: var(--space-4);
+  }
+  .moin-bento > [data-wide] { grid-column: span 2; }
+  @media (min-width: 64rem) {
+    .moin-bento { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .moin-bento > [data-tall] { grid-row: span 2; }
+  }
+
   /* Groups of different length, two columns from a tablet up: each column
      fills up, so no holes stay. */
   .moin-columns > * { break-inside: avoid; margin-block-end: var(--space-6); }

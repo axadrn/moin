@@ -31,11 +31,8 @@ templ Home(network model.Network, open HomeOpen) {
 				}
 				@HomeStart()
 				@HomeDoes()
-				@HomeBackups()
-				@HomeSecurity()
 				@HomeCompare()
-				@HomeOpenSection(open)
-				@HomeNext()
+				@HomeOpenAndNext(open)
 				if ctxkeys.RenderConfig(ctx).Billing {
 					@HomePricing()
 				}
@@ -94,14 +91,14 @@ templ HomeHero() {
 
 // HomeNext says what grows next to deploys, and where to read more.
 templ HomeNext() {
-	<section id="next" class="moin-band">
+	@components.Card(components.CardProps{Attrs: templ.Attributes{"id": "next", "data-gap": "6", "style": "--pad:2rem"}}) {
 		<h2 class="moin-statement">What grows next.</h2>
-		<p class="moin-lead">Deploying stays the main thing. Next to it come the other tools a team needs to build software: tasks, docs, chat and mail.</p>
-		@components.List() {
-			@components.Item(components.ItemProps{Href: "/next", Name: brand.Name + " next", Note: "The story, and how it works"})
-			@components.Item(components.ItemProps{Href: "/docs/roadmap", Name: "The roadmap", Note: "Everything planned, deploys first"})
+		<p class="moin-text moin-muted">Deploying stays the core. Everything else moves in. Tasks. Docs. Chat. Mail.</p>
+		@components.List(templ.Attributes{"style": "--card:transparent"}) {
+			@components.Item(components.ItemProps{Href: "/next", Name: brand.Name + " next", Note: "Highly experimental"})
+			@components.Item(components.ItemProps{Href: "/docs/roadmap", Name: "The roadmap", Note: "Deploys first"})
 		}
-	</section>
+	}
 }
 
 // ---------------------------------------------------------------- live
@@ -219,36 +216,9 @@ templ homeStep(number, name, how string) {
 
 // ---------------------------------------------------------------- backups
 // HomeBackups is why the backups can be trusted.
-templ HomeBackups() {
-	<section id="backups" class="moin-band">
-		<h2 class="moin-statement">Backups that actually restore.</h2>
-		<div class="moin-grid" data-cols="2-1">
-			@homeMoment("my-app", "Checked today.", "A real restore, by itself. Every day.")
-			<div class="moin-stack">
-				@homeTile("Your own bucket.", "Never through "+brand.Name+".", "/docs/guides/bucket")
-				@homeTile("Download anytime.", "One file.", "/docs/guides/backups#download-a-copy")
-				@homeTile("Undo a restore.", "One step back.", "/docs/guides/backups#undo-a-restore")
-			</div>
-		</div>
-		<p class="moin-lead">
-			SQLite and Postgres, on your schedule.
-			<a href="/docs/guides/backups" class="moin-link moin-foreground">Backups</a>
-		</p>
-	</section>
-}
 
 // ---------------------------------------------------------------- security
 // HomeSecurity is how moin reaches a server, and what the server can refuse.
-templ HomeSecurity() {
-	<section id="security" class="moin-band">
-		<h2 class="moin-statement">Your server. Your keys.</h2>
-		<div class="moin-grid" data-cols="3">
-			@homeTile("Only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
-			@homeTile("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
-			@homeTile("Your rules.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
-		</div>
-	</section>
-}
 
 // homeTile is a small tile of a section: a few words and where to read on.
 templ homeTile(statement, line, href string) {
@@ -270,35 +240,50 @@ templ homeTile(statement, line, href string) {
 templ HomeDoes() {
 	<section id="product" class="moin-band">
 		<h2 class="moin-statement">Everything. Built in.</h2>
-		<div class="moin-grid" data-gap="8">
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>Ship</h2>
+		<div class="moin-bento">
+			@components.Card(components.CardProps{Href: "/docs/guides/backups", Attrs: templ.Attributes{"data-wide": true, "data-tall": true, "data-center": true, "style": "--pad:2rem"}}) {
+				<span class="moin-row moin-strong" data-gap="3">
+					@components.Dot(components.DotProps{State: components.StateLive})
+					my-app
+				</span>
+				<p class="moin-statement">Checked today.</p>
+				<p class="moin-small moin-muted">A real restore. By itself. Every day. SQLite and Postgres. On your schedule.</p>
+			}
+			@components.Card(components.CardProps{Ink: true, Attrs: templ.Attributes{"data-wide": true, "data-gap": "6", "style": "--pad:2rem"}}) {
+				<p class="moin-statement">Your server. Your keys.</p>
+				<div class="moin-grid" data-cols="3">
+					@homeInk("Only dials out.", "No port open for "+brand.Name+".", "/docs/why-moin#the-daemon-only-dials-out")
+					@homeInk("No SSH key.", brand.Name+" never has one.", "/docs/guides/security")
+					@homeInk("Your rules.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
 				</div>
-				@components.List() {
-					@homeFeature("Deploy", "Any repo, a compose.yml or an image", "/docs/guides/deploy")
-					@homeFeature("Domains", "HTTPS from the first deploy", "/docs/guides/domains")
-					@homeFeature("GitHub", "Every push, or one commit", "/docs/guides/github")
-					@homeFeature("Catalog", "n8n, Umami, Open WebUI and more", "/catalog")
-				}
-			</section>
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>Keep</h2>
-				</div>
-				@components.List() {
-					@homeFeature("Backups", "Restore, undo, download", "/docs/guides/backups")
-					@homeFeature("Data", "Browse, edit, run SQL", "/docs/guides/data")
-					@homeFeature("Uptime and alerts", "Mail, Slack, Discord, Telegram", "/docs/guides/alerts")
-					@homeFeature("AI agents", "Claude, Cursor, any MCP client", "/docs/guides/mcp")
-				}
-			</section>
+			}
+			@homeFeature("Deploy", "Any repo. A compose.yml. An image.", "/docs/guides/deploy")
+			@homeFeature("Domains", "HTTPS from the first deploy.", "/docs/guides/domains")
+			@homeFeature("GitHub", "Every push. Or one commit.", "/docs/guides/github")
+			@homeFeature("Catalog", "n8n. Umami. Open WebUI. And more.", "/catalog")
+			@homeFeature("Data", "Browse. Edit. Run SQL.", "/docs/guides/data")
+			@homeFeature("Uptime and alerts", "Mail. Slack. Discord. Telegram.", "/docs/guides/alerts")
+			@homeFeature("AI agents", "Claude. Cursor. Any MCP client.", "/docs/guides/mcp")
+			@homeFeature("Your own bucket", "Never through "+brand.Name+".", "/docs/guides/bucket")
+			@homeFeature("Download anytime", "One file.", "/docs/guides/backups#download-a-copy")
+			@homeFeature("Undo a restore", "One step back.", "/docs/guides/backups#undo-a-restore")
 		</div>
 	</section>
 }
 
 templ homeFeature(name, note, href string) {
-	@components.Item(components.ItemProps{Href: href, Name: name, Note: note})
+	@components.Card(components.CardProps{Href: href, Attrs: templ.Attributes{"data-gap": "1"}}) {
+		<span class="moin-strong">{ name }</span>
+		<span class="moin-small moin-muted">{ note }</span>
+	}
+}
+
+// homeInk is one fact on the card that stands out.
+templ homeInk(name, note, href string) {
+	<a href={ templ.SafeURL(href) } class="moin-stack" data-gap="1">
+		<span class="moin-strong">{ name }</span>
+		<span class="moin-small moin-muted">{ note }</span>
+	</a>
 }
 
 // ---------------------------------------------------------------- pricing

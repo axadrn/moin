@@ -32,3 +32,18 @@
     gap: var(--space-2);
   }
 }
+
+@layer moin-components {
+  /* A whole card can be a link. */
+  a.moin-card { transition: background-color var(--fast) var(--ease); }
+  a.moin-card:hover { background: color-mix(in oklab, var(--card), var(--foreground) 4%); }
+  a.moin-card:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  /* The one card that stands out. */
+  .moin-card[data-ink] {
+    --card: var(--foreground);
+    --card-foreground: var(--background);
+    --muted-foreground: color-mix(in oklab, var(--background) 65%, var(--foreground));
+  }
+  a.moin-card[data-ink]:hover { background: color-mix(in oklab, var(--foreground), var(--background) 12%); }
+}

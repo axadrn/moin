@@ -4,20 +4,29 @@ package components
 type CardProps struct {
 	Title  string
 	Action templ.Component
-	Attrs  templ.Attributes
+	// Href makes the whole card a link. Ink is the one card that stands out.
+	Href  string
+	Ink   bool
+	Attrs templ.Attributes
 }
 
 // Card is a block with one topic.
 templ Card(p CardProps) {
-	<section class="moin-card" { p.Attrs... }>
-		if p.Title != "" || p.Action != nil {
-			<div class="moin-card-head">
-				<h2 class="moin-heading">{ p.Title }</h2>
-				if p.Action != nil {
-					@p.Action
-				}
-			</div>
-		}
-		{ children... }
-	</section>
+	if p.Href != "" {
+		<a href={ templ.SafeURL(p.Href) } class="moin-card" data-ink?={ p.Ink } { p.Attrs... }>
+			{ children... }
+		</a>
+	} else {
+		<section class="moin-card" data-ink?={ p.Ink } { p.Attrs... }>
+			if p.Title != "" || p.Action != nil {
+				<div class="moin-card-head">
+					<h2 class="moin-heading">{ p.Title }</h2>
+					if p.Action != nil {
+						@p.Action
+					}
+				</div>
+			}
+			{ children... }
+		</section>
+	}
 }

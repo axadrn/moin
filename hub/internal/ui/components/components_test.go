@@ -54,6 +54,7 @@ func TestComponentsPrintTheExamples(t *testing.T) {
 			{Title: "Product", Links: []FooterLink{{Label: "Pricing", Href: "#"}, {Label: "Changelog", Href: "#"}}},
 			{Title: "Company", Links: []FooterLink{{Label: "About", Href: "#"}, {Label: "Blog", Href: "https://example.com", External: true}}},
 		}, End: text("<span>© 2026 Acme</span>")}), `<span class="moin-strong">Acme</span>`},
+		{"bento", Card(CardProps{Href: "#"}), `<span class="moin-strong">Deploy</span><span class="moin-small moin-muted">A tile that opens.</span>`},
 		{"button", Button(ButtonProps{Kind: Primary}), "Deploy"},
 		{"button", Button(ButtonProps{}), "Restart"},
 		{"button", Button(ButtonProps{Kind: Danger}), "Remove"},
