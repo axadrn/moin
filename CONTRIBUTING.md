@@ -10,19 +10,11 @@ broken link, are welcome anytime.
 
 ## License of your contribution
 
-Your contribution comes in under the
-Apache License 2.0, so the project can keep choosing its license later. You
-keep the copyright of your work.
+Your contribution comes in under the Apache License 2.0, so the project can
+keep choosing its license later. You keep the copyright of your work.
 
-On your first pull request a bot asks you to agree to the
-[Contributor License Agreement](CLA.md). Agree once with a comment:
-
-```
-I have read the CLA Document and I hereby sign the CLA
-```
-
-It covers every later pull request. A pull request without it cannot be
-merged.
+The pull request template says so in one line. Leave it in. Without it, a check
+turns red and tells you what to add.
 
 ## Commits and releases
 

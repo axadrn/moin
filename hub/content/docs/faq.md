@@ -77,7 +77,7 @@ Yes, all of it: AGPL-3.0, and [moin UI](/ui) under MIT, at [github.com/axadrn/mo
 
 ## Why AGPL, and can I contribute?
 
-AGPL keeps moin open: whoever runs a changed moin as a service shares the changes. Open an issue first, then a pull request. On your first one you agree once to the [Contributor License Agreement](https://github.com/axadrn/moin/blob/main/CLA.md). [CONTRIBUTING.md](https://github.com/axadrn/moin/blob/main/CONTRIBUTING.md).
+AGPL keeps moin open: whoever runs a changed moin as a service shares the changes. Open an issue first, then a pull request. The pull request template holds one line about the license. Leave it in. [CONTRIBUTING.md](https://github.com/axadrn/moin/blob/main/CONTRIBUTING.md).
 
 ## Why the name?
 

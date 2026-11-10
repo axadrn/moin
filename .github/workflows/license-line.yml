@@ -1,0 +1,30 @@
+name: License line
+
+# A pull request keeps the line from the template: the contribution comes in
+# under Apache 2.0. This reads only the text of the pull request and runs no
+# code from it.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  license:
+    if: github.event.pull_request.user.login != 'axadrn' && github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check the license line
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          if printf '%s' "$BODY" | grep -qF 'I license my contribution under the Apache License 2.0'; then
+            exit 0
+          fi
+          gh pr comment "$PR" --edit-last --create-if-none --body 'Thanks for this. One thing is missing. Please add this line to the description of this pull request. The check turns green by itself.
+
+          By opening this pull request, I license my contribution under the Apache License 2.0 (see CONTRIBUTING.md).'
+          exit 1
