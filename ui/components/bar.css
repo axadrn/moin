@@ -18,7 +18,7 @@
     gap: var(--space-1);
   }
 
-  /* Floating: a pill over the page, for a public site. */
+  /* Floating: over the page, for a public site. */
   .moin-bar[data-float] {
     padding: var(--space-3) var(--space-3) 0;
     background: none;

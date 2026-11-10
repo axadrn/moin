@@ -32,7 +32,6 @@ One number, `--radius`, sets them all. Every step is a multiple of it, so at `0`
 | `--radius-sm` | `--radius` x 0.5 | Tiny things: check, key, inline code, chart bars |
 | `--radius-md` | `--radius` x 1.5 | What you press: buttons, fields, selects |
 | `--radius-lg` | `--radius` x 2 | What holds it: cards, lists, code blocks, dialogs |
-| `--radius-bar` | `--radius` x 4 | The floating bar: a pill, square at `0` |
 | `--radius-full` | `9999px` | Round things: badge, avatar |
 
 Something inside a box takes the box's corner minus the gap between them: `max(0px, calc(var(--radius-lg) - var(--inset)))`. The curves then run side by side.
