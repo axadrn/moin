@@ -88,6 +88,8 @@ MCP: rename_server
 
 The daemons update themselves to the version of the hub. One server at a time, never during a deploy. Your apps keep running while the daemon restarts.
 
+Some updates need something first, like stopping the apps that use SQLite. moin does it: it stops them, updates the daemon and starts them again. You never do a step by hand. If a step fails before the update, moin starts the apps again, so all is as before, and alerts you (`server.daemon_update_failed`). If the hub or the server stops halfway, moin finishes the update when the daemon is back.
+
 If a daemon does not come back, moin stops there and says so in the activity. The hub itself: we update the hosted one. For your own, see [Self-hosting](/docs/self-hosting#updates).
 
 ```surfaces

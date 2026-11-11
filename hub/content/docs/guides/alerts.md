@@ -28,6 +28,7 @@ One alert per event, and one when it is fixed.
 | `check.failed`, `check.recovered` | the daily check could not restore the newest copy; passes again |
 | `disk.full`, `disk.ok` | a server's data disk is over 90%; under 85% again |
 | `update.available` | a newer version of a [catalog](/docs/guides/catalog) app is out |
+| `server.daemon_update_failed` | a daemon could not update by itself ([Servers](/docs/guides/servers#updates)) |
 
 ## Who gets it
 

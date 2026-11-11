@@ -81,6 +81,8 @@ func (s *AlertService) message(workspace *model.Workspace, action, target string
 		message = diskOKMessage(event)
 	case "update.available":
 		message = s.updateAvailableMessage(event)
+	case "server.daemon_update_failed":
+		message = daemonUpdateFailedMessage(event)
 	}
 	message.Lines = nonEmpty(message.Lines)
 	message.Payload.Event, message.Payload.Workspace = action, workspace.Slug
@@ -222,6 +224,20 @@ func diskOKMessage(e alertEvent) alertMessage {
 		Lines:   []string{e.details["used"] + " of " + e.details["total"] + " used, " + percent + "%."},
 		URL:     e.base + "/servers",
 		Payload: alertPayload{Server: e.target, Reason: percent + "% used"},
+	}
+}
+
+func daemonUpdateFailedMessage(e alertEvent) alertMessage {
+	reason := clipText(e.details["error"], 300)
+	lines := []string{"Error: " + orDash(reason)}
+	if step := e.details["step"]; step != "" {
+		lines = []string{"It stopped at: " + step + ".", "Error: " + orDash(reason), "moin does not try again by itself. Fix it, then update the daemon by hand."}
+	}
+	return alertMessage{
+		Symbol: "🔴", Heading: "Daemon update of " + e.target + " failed",
+		Lines:   lines,
+		URL:     e.base + "/servers",
+		Payload: alertPayload{Server: e.target, Reason: reason},
 	}
 }
 

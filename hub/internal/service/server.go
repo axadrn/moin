@@ -61,6 +61,11 @@ type ServerService struct {
 	autoVersion string
 	autoRunning map[string]bool
 	autoHalted  map[string]bool
+	// updating are the servers whose daemon updates right now.
+	updating map[string]bool
+	// apps stops and starts apps for the steps of a daemon update; nil
+	// without an AppService.
+	apps *AppService
 	// alerts mails the owners and admins when a site or a server goes down
 	// or comes back, or a deploy fails; nil sends nothing.
 	alerts *AlertService
@@ -96,6 +101,7 @@ func NewServerService(servers *repository.Servers, activity *repository.Activity
 		subscribers: map[string]map[chan struct{}]struct{}{},
 		autoRunning: map[string]bool{},
 		autoHalted:  map[string]bool{},
+		updating:    map[string]bool{},
 	}
 }
 
@@ -332,7 +338,10 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	if onConnect != nil {
 		go onConnect(server.ID, server.WorkspaceID)
 	}
-	go s.autoUpdate(server.WorkspaceID)
+	go func() {
+		s.finishDaemonUpdate(server.WorkspaceID, server.ID)
+		s.autoUpdate(server.WorkspaceID)
+	}()
 
 	return func() {
 		session.goneOnce.Do(func() { close(session.gone) })

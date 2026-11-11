@@ -239,3 +239,31 @@ func (r *Servers) SetAutoUpdateDaemons(workspaceID string, on bool) error {
 	_, err := r.db.Exec(`UPDATE workspaces SET auto_update_daemons = $1 WHERE id = $2`, on, workspaceID)
 	return err
 }
+
+// DaemonUpdate is the unfinished daemon update of a server, nil when there
+// is none.
+func (r *Servers) DaemonUpdate(serverID string) (*model.DaemonUpdate, error) {
+	var update model.DaemonUpdate
+	err := r.db.Get(&update, `SELECT * FROM daemon_updates WHERE server_id = $1`, serverID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &update, nil
+}
+
+// SaveDaemonUpdate writes the note of a running daemon update.
+func (r *Servers) SaveDaemonUpdate(update model.DaemonUpdate) error {
+	_, err := r.db.Exec(`INSERT INTO daemon_updates (server_id, from_version, stopped_apps, started_at) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (server_id) DO UPDATE SET from_version = excluded.from_version, stopped_apps = excluded.stopped_apps, started_at = excluded.started_at`,
+		update.ServerID, update.FromVersion, update.StoppedApps, update.StartedAt)
+	return err
+}
+
+// DeleteDaemonUpdate removes the note once the update is done.
+func (r *Servers) DeleteDaemonUpdate(serverID string) error {
+	_, err := r.db.Exec(`DELETE FROM daemon_updates WHERE server_id = $1`, serverID)
+	return err
+}
