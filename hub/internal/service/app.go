@@ -115,6 +115,7 @@ func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Bo
 		metrics:     newMetricsStore(),
 		subscribers: map[string]map[chan struct{}]struct{}{},
 	}
+	servers.apps = service
 	servers.OnDaemonMessage(service.receive)
 	servers.OnDaemonConnect(func(serverID, workspaceID string) {
 		_, err := apps.DefaultBucket(workspaceID)

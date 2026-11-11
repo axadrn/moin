@@ -216,7 +216,11 @@ var serverSummaries = map[string]summarize{
 		return "updated the daemon of " + target + " from " + d["from"] + " to " + d["to"]
 	},
 	"server.daemon_update_failed": func(target string, d map[string]string) string {
-		return "could not update the daemon of " + target + " from " + d["from"] + " to " + d["to"] + ", so daemons of this workspace no longer update by themselves until one is updated by hand: " + d["error"]
+		stopped := ""
+		if d["step"] != "" {
+			stopped = " (it stopped at: " + d["step"] + ")"
+		}
+		return "could not update the daemon of " + target + " from " + d["from"] + " to " + d["to"] + stopped + ", so daemons of this workspace no longer update by themselves until one is updated by hand: " + d["error"]
 	},
 	"server.security_set": func(target string, d map[string]string) string {
 		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", SSH on Tailscale " + d["ssh_tailscale"] + ", firewall " + d["firewall"]
