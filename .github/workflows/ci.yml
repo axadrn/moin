@@ -1,8 +1,8 @@
 name: CI
 
-# Pushes to main run nothing: changes are tested locally first. CI checks
-# pull requests from others, runs by hand (Actions, Run workflow) and before
-# every deploy.
+# CI checks every pull request, and merging needs it green. It also runs by
+# hand (Actions, Run workflow) and before every deploy. A newer push to the
+# same pull request stops the run before it.
 on:
   pull_request:
   workflow_dispatch:
