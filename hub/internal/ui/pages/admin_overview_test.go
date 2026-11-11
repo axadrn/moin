@@ -106,3 +106,40 @@ func TestAdminActivityShowsEventsAndTheirKeep(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminOffersSaysWhoGotWhich(t *testing.T) {
+	claimed := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
+	user := "grace"
+	html := renderAdmin(t, AdminOffers(&model.AdminOfferPage{
+		Offers: []model.Offer{
+			{Email: "open@example.com", TrialDays: 30, CreatedAt: claimed},
+			{Email: "bought@example.com", TrialDays: 365, CouponID: "half", Reason: "goilerplate buyer", ClaimedAt: &claimed, ClaimedUserID: &user, ClaimedEmail: "signed-up@example.com"},
+		},
+		Page: 1, TotalPages: 1, Total: 2, Open: 1, Coupons: []string{"half"},
+	}))
+	for _, want := range []string{`hx-post="/admin/offers"`, `<option value="half">`, "2 offers · 1 open",
+		`href="/admin/users/grace"`, "applied to signed-up@example.com", "Claimed Nov 11, 2026", `hx-post="/admin/offers/delete"`, `hx-post="/admin/offers/claim"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("offers page missing %q", want)
+		}
+	}
+	if strings.Count(html, `hx-post="/admin/offers/delete"`) != 1 {
+		t.Error("only the open offer can go")
+	}
+}
+
+func TestAdminUserPageShowsTheOfferAndTheNote(t *testing.T) {
+	now := time.Now()
+	by := "operator"
+	html := renderAdmin(t, AdminUser(&model.AdminUser{ID: "grace", Email: "grace@example.com", CreatedAt: now, EmailVerifiedAt: &now, Plan: model.AdminPlanTrial,
+		Offer: &model.Offer{Email: "bought@example.com", TrialDays: 365, ClaimedAt: &now},
+		Note:  &model.UserNote{UserID: "grace", Note: "Asked by mail.", UpdatedBy: &by, UpdatedAt: now, UpdatedByEmail: "operator@example.com"}}))
+	for _, want := range []string{"bought@example.com", ">Asked by mail.", "by operator@example.com", `hx-post="/admin/users/grace/note"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("user page missing %q", want)
+		}
+	}
+	if strings.Contains(html, `hx-post="/admin/users/grace/offer"`) {
+		t.Error("a user who got an offer is offered another")
+	}
+}

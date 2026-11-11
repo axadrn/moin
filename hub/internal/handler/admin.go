@@ -131,6 +131,7 @@ func (h *AdminHandler) ApplyOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	answerDone(w, r, "Offer applied", "")
 	render(w, r, pages.AdminUserPlan(user))
+	render(w, r, pages.AdminUserOffer(user))
 }
 
 // ClaimOffers applies every open offer to the account with that address.
@@ -141,7 +142,7 @@ func (h *AdminHandler) ClaimOffers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isAction(r) {
-		redirect(w, r, "/admin", http.StatusSeeOther)
+		redirect(w, r, "/admin/offers", http.StatusSeeOther)
 		return
 	}
 	answerDone(w, r, "Offers applied", strconv.Itoa(claimed)+" applied.")
@@ -184,6 +185,14 @@ func (h *AdminHandler) handleError(w http.ResponseWriter, r *http.Request, err e
 		errors.Is(err, service.ErrNoWorkspace), errors.Is(err, service.ErrPaying), errors.Is(err, service.ErrNoOffer):
 		status = http.StatusConflict
 		title = "Action not allowed"
+		description = err.Error()
+	case errors.Is(err, repository.ErrOfferExists), errors.Is(err, repository.ErrOfferNotOpen):
+		status = http.StatusConflict
+		title = "Nothing changed"
+		description = err.Error()
+	case errors.Is(err, service.ErrAdminInput):
+		status = http.StatusUnprocessableEntity
+		title = "Nothing changed"
 		description = err.Error()
 	case errors.Is(err, service.ErrConfirmMismatch):
 		status = http.StatusUnprocessableEntity

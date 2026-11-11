@@ -1,7 +1,7 @@
 ---
 title: Privacy Policy
 description: What the hosted moin service stores, why, where it lives and how to get rid of it
-lastUpdated: November 4, 2026
+lastUpdated: November 11, 2026
 ---
 
 Short version: moin stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
@@ -75,6 +75,14 @@ To help with a problem, our support team can open your account as you see it. Wh
 
 Legal basis: the contract with you and our legitimate interest in a secure service (Art. 6(1)(b) and (f) GDPR).
 
+## Support notes and offers
+
+When you write to us, our support team may keep a short note on your account: what you asked and what we did. Only our support team sees it. It holds facts, never opinions. Ask and we show it to you.
+
+When we promise you something before you sign up, like free months for buying one of our earlier products, we keep your email address with that offer. Once it is used, we also keep which account and workspace got it, so an offer is used only once.
+
+Legal basis: the contract with you and our legitimate interest in good support and in keeping our promises (Art. 6(1)(b) and (f) GDPR).
+
 ## Payments
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: it takes your payment details, handles tax, invoices and receipts, and has its own [privacy policy](https://stripe.com/privacy). We pass Stripe your email address for the checkout. We never see your card number. We store the Stripe customer and subscription reference, the plan, its price, interval and status, so we know what your workspace may do.
@@ -113,6 +121,8 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 - **Activity log**: as long as its workspace. Your email stays on your entries in the workspaces that remain after you delete your account.
 - **Invitations**: deleted 180 days after they were sent.
 - **Support log**: 180 days.
+- **Support notes**: while your account exists. Deleting your account deletes them.
+- **Offers**: an open one until it expires or we remove it. A used one stays with its email address, so it is not used twice.
 - **Server logs**: a short time, for security and troubleshooting.
 - **Our database backup**: a copy of the hub's database goes to our bucket within seconds, so we can restore moin after a failure. Deleted data drops out of that copy within 7 days.
 - **Payment records**: Stripe keeps them as long as tax law requires.

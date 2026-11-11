@@ -31,7 +31,7 @@ func (s *OfferService) Claim(user *model.User, workspaceID string) (bool, error)
 	if err != nil || first == nil || first.ID != workspaceID {
 		return false, err
 	}
-	return s.offers.Claim(offerEmail(user.Email), workspaceID, s.now().UTC())
+	return s.offers.Claim(offerEmail(user.Email), user.ID, workspaceID, s.now().UTC())
 }
 
 // ClaimOpen applies every open offer to the first workspace of the account
@@ -65,10 +65,10 @@ func (s *OfferService) ClaimOpen() (int, error) {
 	return claimed, nil
 }
 
-// Apply gives the workspace the offer of another address, for someone who
-// signed up with a different one.
-func (s *OfferService) Apply(email, workspaceID string) (bool, error) {
-	return s.offers.Claim(offerEmail(email), workspaceID, s.now().UTC())
+// Apply gives the workspace of the user the offer of another address, for
+// someone who signed up with a different one.
+func (s *OfferService) Apply(email, userID, workspaceID string) (bool, error) {
+	return s.offers.Claim(offerEmail(email), userID, workspaceID, s.now().UTC())
 }
 
 func offerEmail(email string) string {

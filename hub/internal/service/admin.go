@@ -57,13 +57,13 @@ func NewAdminService(repo *repository.Admin, users *repository.Users, auth *Auth
 	return &AdminService{repository: repo, users: users, auth: auth, adminEmails: allowed}
 }
 
-// UsePlans shows the plan of every user and lets admins make them free
-// forever. Without billing there are no plans to show.
-// UseOffers lets an operator apply offers. The hosted hub sets it.
+// UseOffers lets an operator add and apply offers. The hosted hub sets it.
 func (s *AdminService) UseOffers(offers *OfferService) {
 	s.offers = offers
 }
 
+// UsePlans shows the plan of every user and lets admins make them free
+// forever. Without billing there are no plans to show.
 func (s *AdminService) UsePlans(subscriptions *repository.Subscriptions, activity *repository.Activity) {
 	s.subscriptions = subscriptions
 	s.activity = activity
@@ -150,6 +150,14 @@ func (s *AdminService) User(actor *model.User, actorSession *model.Session, user
 	}
 	_, user.IsAdmin = s.adminEmails[strings.ToLower(user.Email)]
 	if err := s.describePlan(user, now); err != nil {
+		return nil, err
+	}
+	if s.offers != nil {
+		if user.Offer, err = s.offers.offers.ForUser(user.ID, user.Email); err != nil {
+			return nil, err
+		}
+	}
+	if user.Note, err = s.repository.UserNote(user.ID); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -314,14 +322,14 @@ func (s *AdminService) ApplyOffer(actor *model.User, actorSession *model.Session
 	if workspace == nil {
 		return ErrNoWorkspace
 	}
-	applied, err := s.offers.Apply(email, workspace.ID)
+	applied, err := s.offers.Apply(email, targetUserID, workspace.ID)
 	if err != nil {
 		return err
 	}
 	if !applied {
 		return ErrNoOffer
 	}
-	return s.recordAdminAction(actor.ID, "admin.offer_applied", "workspace", workspace.ID)
+	return s.recordAdminAction(actor.ID, "admin.offer_applied", "user", targetUserID)
 }
 
 // ClaimOffers applies every open offer to the account with that address and

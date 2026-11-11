@@ -68,6 +68,16 @@ func TestOfferIsClaimedOnce(t *testing.T) {
 		t.Fatalf("first claim = %v, %v", applied, err)
 	}
 	assertOffered(t, subscriptionOf(t, database, ada.Workspace.ID))
+	var got struct {
+		User      string `db:"claimed_user_id"`
+		Workspace string `db:"claimed_workspace_id"`
+	}
+	if err := database.Get(&got, `SELECT claimed_user_id, claimed_workspace_id FROM offers WHERE email = 'ada@example.com'`); err != nil {
+		t.Fatal(err)
+	}
+	if got.User != ada.User.ID || got.Workspace != ada.Workspace.ID {
+		t.Fatalf("claimed by %+v", got)
+	}
 	before := subscriptionOf(t, database, ada.Workspace.ID).UpdatedAt
 	if applied, err := offers.Claim(ada.User, ada.Workspace.ID); err != nil || applied {
 		t.Fatalf("second claim = %v, %v", applied, err)
@@ -262,6 +272,14 @@ func TestAdminAppliesAnOfferOfAnotherAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertOffered(t, subscriptionOf(t, database, target.Workspace.ID))
+	page, err := admin.User(operator.User, session, target.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offer := page.Offer; offer == nil || offer.Email != "bought@example.com" || offer.ClaimedEmail != "other@example.com" ||
+		offer.ClaimedWorkspaceID == nil || *offer.ClaimedWorkspaceID != target.Workspace.ID {
+		t.Fatalf("the user's page shows the offer %+v", page.Offer)
+	}
 	if err := admin.ApplyOffer(operator.User, session, target.User.ID, "bought@example.com"); !errors.Is(err, ErrNoOffer) {
 		t.Fatalf("applied twice: %v", err)
 	}

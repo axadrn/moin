@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"net/url"
 	"strconv"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -9,10 +10,10 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// AdminUser is one user for the operator: the facts, View as user (the one
-// thing you come here for), free forever, and revoking every session at
-// the end. Nothing here is offered for your own account or, to view as,
-// for another operator.
+// AdminUser is one user for the operator, top to bottom: the facts, View
+// as user (the one thing you come here for), the plan, the offer, the note,
+// and revoking every session at the end. Nothing here is offered for your
+// own account or, to view as, for another operator.
 templ AdminUser(user *model.AdminUser) {
 	{{ self := ctxkeys.User(ctx) != nil && ctxkeys.User(ctx).ID == user.ID }}
 	@layouts.Admin(adminUserName(*user) + " · Admin") {
@@ -30,12 +31,22 @@ templ AdminUser(user *model.AdminUser) {
 			}
 			@AdminUserFacts(user)
 			if adminCanBeFreeForever(*user) {
-				@AdminUserPlan(user)
+				@adminSection("Plan") {
+					@AdminUserPlan(user)
+				}
+			}
+			if adminHasOffer(*user) {
+				@adminSection("Offer") {
+					@AdminUserOffer(user)
+				}
+			}
+			@adminSection("Note") {
+				@AdminUserNote(user)
 			}
 			if !self {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
-						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Revoke sessions", Attrs: templ.Attributes{
+						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Revoke sessions", Note: "Signs them out everywhere. Their API tokens stop working.", Attrs: templ.Attributes{
 							"hx-post":    "/admin/users/" + user.ID + "/sessions/revoke",
 							"hx-swap":    "none",
 							"hx-disable": "this",
@@ -72,7 +83,7 @@ templ AdminUserFacts(user *model.AdminUser) {
 // A paying workspace is not made free forever, so it has no button.
 templ AdminUserPlan(user *model.AdminUser) {
 	{{ on := user.Plan != model.AdminPlanFreeForever }}
-	<div id="admin-user-plan" class="moin-stack" data-gap="3" hx-swap-oob="true">
+	<div id="admin-user-plan" hx-swap-oob="true">
 		@components.Card(components.CardProps{}) {
 			@components.List() {
 				@adminFact("Plan", adminPlanLabel(*user))
@@ -89,22 +100,106 @@ templ AdminUserPlan(user *model.AdminUser) {
 				}
 			}
 		}
-		if user.Plan != model.AdminPlanPaying {
+	</div>
+}
+
+// AdminUserOffer is the offer of a user: the one they got and from which
+// address, or the one that waits for theirs. With none yet, an admin gives
+// them the offer of another address, for someone who bought with one and
+// signed up with another.
+templ AdminUserOffer(user *model.AdminUser) {
+	<div id="admin-user-offer" hx-swap-oob="true">
+		if offer := user.Offer; offer != nil && offer.ClaimedAt != nil {
 			@components.Card(components.CardProps{}) {
-				<form hx-post={ "/admin/users/" + user.ID + "/offer" } hx-swap="none" hx-disable="find button[type='submit']">
-					@components.CSRF()
-					@components.Field(components.FieldProps{Label: "Apply an offer", For: "admin-offer-email", Hint: "The address the offer waits for."}) {
-						<div class="moin-row" data-gap="2" data-phone="stack">
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "admin-offer-email", "name": "email", "type": "email", "required": true, "autocomplete": "off"}})
-							@components.Button(components.ButtonProps{Type: "submit"}) {
-								Apply
-							}
-						</div>
+				@components.List() {
+					@adminFact("For", offer.Email)
+					@adminFact("Applied", offer.ClaimedAt.UTC().Format("Jan 2, 2006"))
+					@adminFact("Free days", strconv.Itoa(offer.TrialDays))
+					if offer.CouponID != "" {
+						@adminFact("Coupon", offer.CouponID)
 					}
-				</form>
+					if offer.Reason != "" {
+						@adminFact("Reason", offer.Reason)
+					}
+				}
+			}
+		} else {
+			if offer := user.Offer; offer != nil {
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@components.Item(components.ItemProps{Name: "One waits for this address", Note: adminOfferNote(*offer) + ". They get it with their first workspace, or with Apply open offers.", Href: "/admin/offers?q=" + url.QueryEscape(offer.Email)})
+					}
+				}
+			}
+			if user.Plan != model.AdminPlanPaying {
+				@components.Card(components.CardProps{}) {
+					<form hx-post={ "/admin/users/" + user.ID + "/offer" } hx-swap="none" hx-disable="find button[type='submit']">
+						@components.CSRF()
+						@components.Field(components.FieldProps{Label: "Apply an offer of another address", For: "admin-offer-email", Hint: "They bought with one address and signed up with this one? Type the one they bought with."}) {
+							<div class="moin-row" data-gap="2" data-phone="stack">
+								@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "admin-offer-email", "name": "email", "type": "email", "required": true, "autocomplete": "off", "spellcheck": "false"}})
+								@components.Button(components.ButtonProps{Type: "submit"}) {
+									Apply
+								}
+							</div>
+						}
+					</form>
+				}
 			}
 		}
 	</div>
+}
+
+// AdminUserNote is what admins wrote about a user. Only admins see it.
+// Facts only: the user may ask to see what is kept about them.
+templ AdminUserNote(user *model.AdminUser) {
+	<div id="admin-user-note" hx-swap-oob="true">
+		@components.Card(components.CardProps{}) {
+			<form class="moin-stack" data-gap="3" hx-post={ "/admin/users/" + user.ID + "/note" } hx-swap="none" hx-disable="find button[type='submit']">
+				@components.CSRF()
+				@components.Field(components.FieldProps{Label: "Only admins see this", For: "admin-user-note-text", Hint: adminNoteHint(user.Note)}) {
+					@components.TextArea(components.TextAreaProps{Attrs: templ.Attributes{"id": "admin-user-note-text", "name": "note", "rows": "4", "maxlength": strconv.Itoa(model.UserNoteMax), "placeholder": "Facts only. Like: gave the offer of their old address, they asked by mail."}}) {
+						if user.Note != nil {
+							{ user.Note.Note }
+						}
+					}
+				}
+				<div class="moin-row" data-end>
+					@components.Button(components.ButtonProps{Type: "submit"}) {
+						Save note
+					}
+				</div>
+			</form>
+		}
+	</div>
+}
+
+// adminSection is a titled part of an admin page.
+templ adminSection(title string) {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>{ title }</h2>
+		</div>
+		{ children... }
+	</section>
+}
+
+// adminHasOffer is whether the page shows the offer part: billing is on and
+// the user has a workspace to get one, or got one already.
+func adminHasOffer(user model.AdminUser) bool {
+	return adminCanBeFreeForever(user) || (user.Offer != nil && user.Offer.ClaimedAt != nil)
+}
+
+// adminNoteHint is who saved the note last and when, or what it is for.
+func adminNoteHint(note *model.UserNote) string {
+	if note == nil {
+		return "The user may ask to see what we keep about them. Write what you would say to them."
+	}
+	by := note.UpdatedByEmail
+	if by == "" {
+		by = "an admin"
+	}
+	return "Saved " + note.UpdatedAt.UTC().Format("Jan 2, 2006") + " by " + by + "."
 }
 
 func adminForeverFreeAttributes(user *model.AdminUser, on bool) templ.Attributes {

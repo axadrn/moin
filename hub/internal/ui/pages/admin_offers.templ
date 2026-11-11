@@ -1,0 +1,192 @@
+package pages
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// AdminOffers is every offer: add one, see who got which, apply the open
+// ones. An offer waits for one address; whoever signs up with it gets
+// it.
+templ AdminOffers(data *model.AdminOfferPage) {
+	@layouts.Admin("Offers · Admin") {
+		@panelPage() {
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Admin", Href: "/admin"}, Title: "Offers"})
+			<p class="moin-text moin-muted">
+				An offer waits for one email address. Free days now. A coupon for when they pay.
+				Whoever signs up with that address gets it. Signed up with another one? Apply it on their page under Users.
+			</p>
+			@adminNewOffer(data.Coupons)
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>All offers</h2>
+					@adminCount(fmt.Sprintf("%s · %d open", plural(data.Total, "offer", "offers"), data.Open))
+				</div>
+				<form method="GET" action="/admin/offers" role="search">
+					<div class="moin-row" data-gap="2" data-phone="stack">
+						<label for="admin-offer-search" class="moin-sr-only">Email or reason</label>
+						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "admin-offer-search", "name": "q", "type": "search", "value": data.Query, "placeholder": "Email or reason", "autocomplete": "off", "spellcheck": "false"}})
+						@components.Button(components.ButtonProps{Type: "submit"}) {
+							Search
+						}
+					</div>
+				</form>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, offer := range data.Offers {
+							@adminOfferRow(offer)
+						}
+						if len(data.Offers) == 0 {
+							@components.Item(components.ItemProps{Name: adminNoOffers(data.Query)})
+						}
+					}
+				}
+				if data.TotalPages > 1 {
+					<div class="moin-row" data-between data-gap="3">
+						<span class="moin-text moin-muted moin-digits">{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }</span>
+						<div class="moin-row" data-gap="2">
+							if data.Page > 1 {
+								@components.Button(components.ButtonProps{Href: adminOffersURL(data.Query, data.Page-1)}) {
+									Newer
+								}
+							}
+							if data.TotalPages > data.Page {
+								@components.Button(components.ButtonProps{Href: adminOffersURL(data.Query, data.Page+1)}) {
+									Older
+								}
+							}
+						</div>
+					</div>
+				}
+			</section>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Button: true, Name: "Apply open offers", Note: "For accounts that signed up before their offer was added.", Attrs: templ.Attributes{
+						"hx-post":             "/admin/offers/claim",
+						"hx-swap":             "none",
+						"hx-disable":          "this",
+						"hx-confirm":          "Apply every open offer to the account with that address?",
+						"data-confirm-name":   "offers",
+						"data-confirm-action": "Apply offers",
+					}})
+				}
+			}
+		}
+	}
+}
+
+// adminNewOffer is the form that adds an offer.
+templ adminNewOffer(coupons []string) {
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>New offer</h2>
+		</div>
+		@components.Card(components.CardProps{}) {
+			<form class="moin-stack" data-gap="4" hx-post="/admin/offers" hx-swap="none" hx-disable="find button[type='submit']">
+				@components.CSRF()
+				@components.Field(components.FieldProps{Label: "Email", For: "offer-email", Hint: "The address it waits for."}) {
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "offer-email", "name": "email", "type": "email", "required": true, "autocomplete": "off", "spellcheck": "false"}})
+				}
+				@components.Field(components.FieldProps{Label: "Free days", For: "offer-days", Hint: "Counted from the day they get it."}) {
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "offer-days", "name": "trial_days", "type": "number", "value": "365", "min": "1", "max": strconv.Itoa(model.OfferMaxDays), "required": true}})
+				}
+				@components.Field(components.FieldProps{Label: "Coupon", For: "offer-coupon", Hint: "A coupon ID from Stripe. Used once they pay. Empty for none."}) {
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "offer-coupon", "name": "coupon_id", "type": "text", "list": "offer-coupons", "maxlength": "100", "autocomplete": "off", "spellcheck": "false"}})
+					<datalist id="offer-coupons">
+						for _, coupon := range coupons {
+							<option value={ coupon }></option>
+						}
+					</datalist>
+				}
+				@components.Field(components.FieldProps{Label: "Reason", For: "offer-reason", Hint: "Why they get it. Like: goilerplate buyer."}) {
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "offer-reason", "name": "reason", "type": "text", "maxlength": strconv.Itoa(model.OfferMaxReason), "autocomplete": "off"}})
+				}
+				<div class="moin-row" data-end>
+					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+						Add offer
+					}
+				</div>
+			</form>
+		}
+	</section>
+}
+
+// adminOfferRow is one offer. A claimed one opens the page of who got it.
+// An open one can go, like one with a typo.
+templ adminOfferRow(offer model.Offer) {
+	if offer.ClaimedUserID != nil {
+		@components.Item(components.ItemProps{Href: "/admin/users/" + *offer.ClaimedUserID, Name: offer.Email, Note: adminOfferNote(offer), Value: adminOfferState(offer)})
+	} else {
+		@components.Item(components.ItemProps{Name: offer.Email, Note: adminOfferNote(offer), Value: adminOfferState(offer)}) {
+			if offer.ClaimedAt == nil {
+				@components.Button(components.ButtonProps{Quiet: true, Attrs: templ.Attributes{
+					"hx-post":    "/admin/offers/delete",
+					"hx-vals":    adminOfferVals(offer.Email),
+					"hx-swap":    "none",
+					"hx-disable": "this",
+					"hx-confirm": "Remove the offer for " + offer.Email + "? Nobody got it yet.",
+				}}) {
+					Remove
+				}
+			}
+		}
+	}
+}
+
+// adminOfferNote is what an offer gives, why, and who got it when that is
+// another address.
+func adminOfferNote(offer model.Offer) string {
+	parts := []string{plural(offer.TrialDays, "day", "days")}
+	if offer.CouponID != "" {
+		parts = append(parts, offer.CouponID)
+	}
+	if offer.Reason != "" {
+		parts = append(parts, offer.Reason)
+	}
+	if offer.ClaimedEmail != "" && !strings.EqualFold(offer.ClaimedEmail, offer.Email) {
+		parts = append(parts, "applied to "+offer.ClaimedEmail)
+	}
+	return strings.Join(parts, " · ")
+}
+
+// adminOfferState is open, expired, or the day someone got it.
+func adminOfferState(offer model.Offer) string {
+	switch {
+	case offer.ClaimedAt != nil:
+		return "Claimed " + offer.ClaimedAt.UTC().Format("Jan 2, 2006")
+	case offer.Open(time.Now()):
+		return "Open"
+	default:
+		return "Expired"
+	}
+}
+
+func adminOffersURL(query string, page int) string {
+	values := url.Values{}
+	if query != "" {
+		values.Set("q", query)
+	}
+	values.Set("page", strconv.Itoa(page))
+	return "/admin/offers?" + values.Encode()
+}
+
+func adminNoOffers(query string) string {
+	if query == "" {
+		return "No offers yet"
+	}
+	return "No offer matches “" + query + "”"
+}
+
+// adminOfferVals is the address an offer button sends, as hx-vals.
+func adminOfferVals(email string) string {
+	vals, _ := json.Marshal(map[string]string{"email": email})
+	return string(vals)
+}

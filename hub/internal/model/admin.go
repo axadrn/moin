@@ -25,6 +25,11 @@ type AdminUser struct {
 	// TrialEndsAt when its trial ends.
 	Plan        string     `db:"-"`
 	TrialEndsAt *time.Time `db:"-"`
+	// Offer is the offer the user got, or the one that waits for their
+	// address, and Note what admins wrote about them. Only the page of
+	// one user has them.
+	Offer *Offer    `db:"-"`
+	Note  *UserNote `db:"-"`
 }
 
 // The plans the admin list shows per user.
@@ -54,9 +59,12 @@ type AdminOverview struct {
 }
 
 type AdminActivityEvent struct {
-	ID          string    `db:"id"`
-	ActorUserID *string   `db:"actor_user_id"`
-	ActorEmail  string    `db:"actor_email"`
+	ID          string  `db:"id"`
+	ActorUserID *string `db:"actor_user_id"`
+	ActorEmail  string  `db:"actor_email"`
+	// TargetEmail is the address of the user an event touched, when it
+	// touched one that still exists.
+	TargetEmail string    `db:"target_email"`
 	WorkspaceID *string   `db:"workspace_id"`
 	Action      string    `db:"action"`
 	TargetType  string    `db:"target_type"`
@@ -67,10 +75,16 @@ type AdminActivityEvent struct {
 
 func AdminActivityActionLabel(action string) string {
 	switch action {
+	case "admin.offer_created":
+		return "Offer added"
+	case "admin.offer_deleted":
+		return "Offer removed"
 	case "admin.offer_applied":
 		return "Offer applied"
 	case "admin.offers_claimed":
 		return "Open offers applied"
+	case "admin.note_saved":
+		return "Note saved"
 	case "admin.impersonation_started":
 		return "Impersonation started"
 	case "admin.impersonation_stopped":

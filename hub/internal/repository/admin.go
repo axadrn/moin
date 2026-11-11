@@ -150,9 +150,10 @@ func (r *Admin) StopImpersonationSession(sessionID, targetUserID, operatorUserID
 func (r *Admin) ListActivityEvents(limit int) ([]model.AdminActivityEvent, error) {
 	events := []model.AdminActivityEvent{}
 	err := r.db.Select(&events, `
-		SELECT e.*, COALESCE(u.email, '') AS actor_email
+		SELECT e.*, COALESCE(u.email, '') AS actor_email, COALESCE(t.email, '') AS target_email
 		FROM admin_activity_events e
 		LEFT JOIN users u ON u.id = e.actor_user_id
+		LEFT JOIN users t ON e.target_type = 'user' AND t.id = e.target_id
 		ORDER BY e.created_at DESC, e.id DESC
 		LIMIT $1
 	`, limit)

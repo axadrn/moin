@@ -12,8 +12,8 @@ import (
 )
 
 // AdminOverview is Admin, for whoever runs moin: the numbers at a glance,
-// the way to the operator activity and the old domain, and the users, each
-// a row that opens its own page with what an operator can do to it.
+// the way to offers, activity and the old domain, and the users, each a row
+// that opens its own page with what an operator can do to it.
 templ AdminOverview(data *model.AdminOverview) {
 	@layouts.Admin("Admin") {
 		@panelPage() {
@@ -41,16 +41,9 @@ templ AdminOverview(data *model.AdminOverview) {
 			}
 			@components.Card(components.CardProps{}) {
 				@components.List() {
-					@components.Item(components.ItemProps{Href: "/admin/activity", Name: "Activity"})
-					@components.Item(components.ItemProps{Button: true, Name: "Apply open offers", Attrs: templ.Attributes{
-						"hx-post":             "/admin/offers/claim",
-						"hx-swap":             "none",
-						"hx-disable":          "this",
-						"hx-confirm":          "Apply every open offer to the account with that address?",
-						"data-confirm-name":   "offers",
-						"data-confirm-action": "Apply offers",
-					}})
-					@components.Item(components.ItemProps{Href: "/admin/old-domain", Name: "Old domain"})
+					@components.Item(components.ItemProps{Href: "/admin/offers", Name: "Offers", Note: "Free days and a coupon, waiting for an address."})
+					@components.Item(components.ItemProps{Href: "/admin/activity", Name: "Activity", Note: "What admins did."})
+					@components.Item(components.ItemProps{Href: "/admin/old-domain", Name: "Old domain", Note: "Can the old domain go?"})
 				}
 			}
 			@adminUsers(data.Users)
@@ -209,13 +202,23 @@ func adminEventNote(event model.AdminActivityEvent) string {
 	if actor == "" {
 		actor = "System"
 	}
-	return actor + " · " + event.TargetType + " " + event.TargetID
+	target := event.TargetID
+	if event.TargetEmail != "" {
+		target = event.TargetEmail
+	}
+	return actor + " · " + event.TargetType + " " + target
 }
 
-// adminEventHref is the page of what an event touched: a user has one.
+// adminEventHref is the page of what an event touched: a user's own, an
+// offer in the list of offers.
 func adminEventHref(event model.AdminActivityEvent) string {
-	if event.TargetType == "user" && event.TargetID != "" {
+	switch {
+	case event.TargetID == "":
+		return ""
+	case event.TargetType == "user":
 		return "/admin/users/" + event.TargetID
+	case event.TargetType == "offer":
+		return "/admin/offers?q=" + url.QueryEscape(event.TargetID)
 	}
 	return ""
 }
