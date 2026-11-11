@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/axadrn/moin/hub/internal/api"
+	"github.com/axadrn/moin/hub/internal/model"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -13,6 +14,11 @@ type VersionOutput struct {
 	// AutoUpdateDaemons is whether the daemons of the token's workspace
 	// update to the hub's version by themselves.
 	AutoUpdateDaemons bool `json:"auto_update_daemons"`
+}
+
+// UpdateHubInput confirms that the user read the release notes.
+type UpdateHubInput struct {
+	Confirm bool `json:"confirm,omitempty" jsonschema:"true once the user read the release notes; without it update_hub only returns them and updates nothing"`
 }
 
 // DaemonUpdatesInput turns automatic daemon updates on or off.
@@ -40,8 +46,9 @@ func registerUpdateTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:  "update_hub",
 		Title: "Update the hub",
-		Description: "Updates a self-hosted hub to the newest release, for an admin of it (can_update in get_version). The updater next to it pulls the new version and restarts it; " +
-			"if the new version does not come up within two minutes, the old one starts again. The hub is away for a minute meanwhile: poll get_version until update.state is done, rolled_back or failed. Ask the user first. Needs a token with read and write access.",
+		Description: "Updates a self-hosted hub to the newest release, for an admin of it (can_update in get_version). Call it first without confirm: it returns the release notes (notes) and read_first, and updates nothing. " +
+			"Show the user read_first and the whole notes, since some updates need a step from them first. Once they agree, call it again with confirm true. The updater next to the hub pulls the new version and restarts it; " +
+			"if the new version does not come up within two minutes, the old one starts again. The hub is away for a minute meanwhile: poll get_version until update.state is done, rolled_back or failed. Needs a token with read and write access.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Update the hub", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(true)},
 	}, Write(member(services, tools.updateHub)))
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
@@ -61,8 +68,14 @@ func (t moinTools) getVersion(_ context.Context, caller Caller, _ NoInput) (Vers
 	return VersionOutput{VersionInfo: api.NewVersion(t.services.Updates.Info(caller.User)), AutoUpdateDaemons: auto}, nil
 }
 
-func (t moinTools) updateHub(_ context.Context, caller Caller, _ NoInput) (VersionOutput, error) {
-	info, err := t.services.Updates.Start(caller.actor(), caller.User)
+func (t moinTools) updateHub(_ context.Context, caller Caller, input UpdateHubInput) (VersionOutput, error) {
+	var info model.VersionInfo
+	var err error
+	if input.Confirm {
+		info, err = t.services.Updates.Start(caller.actor(), caller.User)
+	} else {
+		info, err = t.services.Updates.Notes(caller.User)
+	}
 	if err != nil {
 		return VersionOutput{}, err
 	}

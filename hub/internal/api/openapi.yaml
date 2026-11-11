@@ -4823,6 +4823,9 @@ components:
         notes:
           type: string
           description: The release notes in Markdown.
+        read_first:
+          type: string
+          description: While an update is out, the line every client shows above the notes before it updates.
         checked_at:
           type: [string, 'null']
           format: date-time

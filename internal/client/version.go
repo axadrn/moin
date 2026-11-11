@@ -16,6 +16,8 @@ type Version struct {
 	PublishedAt     *time.Time `json:"published_at"`
 	NotesURL        string     `json:"notes_url"`
 	Summary         string     `json:"summary"`
+	Notes           string     `json:"notes"`
+	ReadFirst       string     `json:"read_first"`
 	CanUpdate       bool       `json:"can_update"`
 	Updater         bool       `json:"updater"`
 	Update          *Update    `json:"update"`
