@@ -9,8 +9,9 @@ type Release struct {
 	PublishedAt time.Time
 	// Summary is the "In short" line of the notes.
 	Summary string
-	// Notes are the release notes in Markdown.
-	Notes string
+	// Notes are the release notes in Markdown, NotesHTML the same as HTML.
+	Notes     string
+	NotesHTML string
 }
 
 // UpdateState is an update of the hub: requested, under way or
@@ -31,6 +32,10 @@ func (u UpdateState) Running() bool {
 
 // VersionInfo is the version of the hub and, on a self-hosted
 // one, the newest release and how to get it.
+// ReadFirst is what the web, the CLI and MCP show above the release notes
+// before every update of a self-hosted hub.
+const ReadFirst = "Read this first. Some updates need a step from you before you update."
+
 type VersionInfo struct {
 	Version string
 	// SelfHosted is false on the hosted hub, which updates with
@@ -42,6 +47,7 @@ type VersionInfo struct {
 	NotesURL        string
 	Summary         string
 	Notes           string
+	NotesHTML       string
 	CheckedAt       *time.Time
 	// Admin is whether the user runs this hub.
 	Admin bool

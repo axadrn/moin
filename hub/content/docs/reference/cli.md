@@ -16,7 +16,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin logout` | forgets the token, and what the terminal UI kept for its next start |
 | `moin status` | is everything OK: what needs you, catalog updates, what runs; exits `1` when something needs you ([Overview](/docs/guides/overview)) |
 | `moin version` | the version of `moin` and of the hub, and whether a newer one is out |
-| `moin update [--yes]` | updates a self-hosted hub to the newest version and waits until it is back; for its admins |
+| `moin update [--yes]` | updates a self-hosted hub to the newest version and waits until it is back; for its admins. It prints the whole release notes first, then asks; `--yes` skips the question |
 | `moin help` | the list of commands |
 
 `--url` defaults to the saved hub, else `https://moin.run`. It must be https; plain http works only for localhost and your tailnet (`100.x` addresses, `*.ts.net`).

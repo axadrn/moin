@@ -95,7 +95,22 @@ func update(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return nil
 	}
 	if !info.Update.Running() {
-		fmt.Fprintln(stdout, style.Bold.Render(build.Name+" "+info.Latest)+" "+info.Summary)
+		// The whole release notes come first: some updates need a step
+		// before them.
+		fmt.Fprintln(stdout, style.Bold.Render(build.Name+" "+info.Latest))
+		if info.ReadFirst != "" {
+			fmt.Fprintln(stdout, style.Warning.Render(info.ReadFirst))
+		}
+		fmt.Fprintln(stdout)
+		if info.Notes != "" {
+			fmt.Fprintln(stdout, info.Notes)
+		} else {
+			fmt.Fprintln(stdout, info.Summary)
+			if info.NotesURL != "" {
+				fmt.Fprintln(stdout, style.Muted.Render(info.NotesURL))
+			}
+		}
+		fmt.Fprintln(stdout)
 		if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Update the hub from %s to %s? It is away for a minute; your apps keep running.", info.Version, info.Latest)); err != nil {
 			return err
 		}

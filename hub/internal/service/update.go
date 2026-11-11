@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/markdown"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/internal/build"
@@ -176,9 +177,13 @@ func (s *UpdateService) Check(ctx context.Context) error {
 	if len(notes) > notesMax {
 		notes = notes[:notesMax]
 	}
+	html, err := markdown.NewParser().Parse([]byte(notes))
+	if err != nil {
+		return fmt.Errorf("releases: %w", err)
+	}
 	release := &model.Release{
 		Version: found.TagName, URL: found.HTMLURL, PublishedAt: found.PublishedAt.UTC(),
-		Summary: releaseSummary(notes), Notes: notes,
+		Summary: releaseSummary(notes), Notes: notes, NotesHTML: string(html),
 	}
 	s.mu.Lock()
 	s.release, s.etag, s.checkedAt = release, response.Header.Get("ETag"), s.now().UTC()
@@ -223,7 +228,7 @@ func (s *UpdateService) Info(user *model.User) model.VersionInfo {
 	}
 	if release != nil {
 		published := release.PublishedAt
-		info.Latest, info.NotesURL, info.Summary, info.Notes = release.Version, release.URL, release.Summary, release.Notes
+		info.Latest, info.NotesURL, info.Summary, info.Notes, info.NotesHTML = release.Version, release.URL, release.Summary, release.Notes, release.NotesHTML
 		if !published.IsZero() {
 			info.PublishedAt = &published
 		}
@@ -238,8 +243,9 @@ func (s *UpdateService) Info(user *model.User) model.VersionInfo {
 	return info
 }
 
-// Start asks the updater to install the newest release, for an admin.
-func (s *UpdateService) Start(actor Actor, user *model.User) (model.VersionInfo, error) {
+// Notes is what an admin reads before an update, the release notes among
+// it, with the same answer Start would give when it cannot update now.
+func (s *UpdateService) Notes(user *model.User) (model.VersionInfo, error) {
 	if !s.selfHosted {
 		return model.VersionInfo{}, ErrUpdateHosted
 	}
@@ -254,6 +260,15 @@ func (s *UpdateService) Start(actor Actor, user *model.User) (model.VersionInfo,
 		return info, ErrNoUpdate
 	case !info.Updater:
 		return info, ErrUpdaterMissing
+	}
+	return info, nil
+}
+
+// Start asks the updater to install the newest release, for an admin.
+func (s *UpdateService) Start(actor Actor, user *model.User) (model.VersionInfo, error) {
+	info, err := s.Notes(user)
+	if err != nil {
+		return info, err
 	}
 	if err := os.MkdirAll(s.dir, 0o755); err != nil {
 		return info, err
