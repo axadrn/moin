@@ -86,9 +86,9 @@ MCP: rename_server
 
 ## Updates
 
-The daemons update themselves to the version of the hub. One server at a time, never during a deploy. Your apps keep running while the daemon restarts.
+The daemons update themselves to the version of the hub. How, step by step: [How a daemon updates](/docs/reference/shipping#how-a-daemon-updates).
 
-If a daemon does not come back, moin stops there and says so in the activity. The hub itself: we update the hosted one. For your own, see [Self-hosting](/docs/self-hosting#updates).
+The hub itself: we update the hosted one. For your own, see [Self-hosting](/docs/self-hosting#updates).
 
 ```surfaces
 Web: **Servers**, **Update daemons automatically**
