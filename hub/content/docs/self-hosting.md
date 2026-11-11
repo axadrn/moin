@@ -201,6 +201,7 @@ Once a day the hub asks GitHub for the newest version. When one is out, the admi
 - `UPDATE_CHECK=false` stops the check; then update with `sh update.sh`.
 - A hub set up before v1.0.0-beta.26 keeps its old folders until you run the install line once more (from a clone: `git pull`, then `sh hub/deploy/update.sh`). `update.sh` moves its settings to `/etc/moin-hub` and its data to `/var/lib/moin-hub`.
 - The daemons update themselves to the version of the hub, one server at a time, never during a deploy: [Servers](/docs/guides/servers#updates).
+- Your hub runs the image `ghcr.io/axadrn/moin:stable`, the newest release. Which versions exist and when they come: [How moin ships](/docs/reference/shipping).
 
 ## Database backup
 

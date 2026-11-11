@@ -38,8 +38,12 @@ Everyone, maintainers too:
 
 The title follows [Conventional Commits](https://www.conventionalcommits.org):
 `feat:`, `fix:`, `docs:`, `chore:`, `refactor:` or `test:`, an optional
-scope, short. Like `fix(tui): say stopping at once`. Commits on your branch
-can say anything. They get squashed.
+scope, short. Like `fix(tui): say stopping at once`. The description is
+plain text: no bold, no headings. Commits on your branch can say anything.
+They get squashed.
+
+What happens after the merge, deploys, releases and versions:
+[How moin ships](https://moin.run/docs/reference/shipping).
 
 ## License
 

@@ -47,7 +47,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # A tag is the version, stable and latest; main by hand is latest.
+      # A release is its version, stable and latest; a deploy by hand is
+      # main-<commit> alone. hub/content/docs/reference/shipping.md
       - name: Tags
         id: tags
         run: |
@@ -59,7 +60,7 @@ jobs:
           else
             echo "version=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-            echo "tags=${image}:latest,${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "tags=${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
