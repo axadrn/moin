@@ -9,18 +9,17 @@ name: Deploy
 #      hub/content/changelog.md.
 #   4. deploy: through Tailscale, the hosted hub gets the deploy
 #      files of this commit and runs update.sh with the new box.
-# A push to main runs nothing. Forks only build: the deploy runs in
-# axadrn/moin alone, with the repository variables DEPLOY_HOST and
-# TS_CLIENT_ID. No secret passes through GitHub.
+# Only main and tags ship: run by hand on another branch, it does nothing.
+# Forks only build: the deploy runs in axadrn/moin alone, with the
+# repository variables DEPLOY_HOST and TS_CLIENT_ID. No secret passes
+# through GitHub. Each job gets only the rights it needs.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: deploy
@@ -28,11 +27,15 @@ concurrency:
 
 jobs:
   test:
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
     uses: ./.github/workflows/ci.yml
 
   box:
     needs: test
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     outputs:
       image: ${{ steps.tags.outputs.image }}
     steps:
@@ -72,6 +75,8 @@ jobs:
     needs: box
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The notes are the tag's section of the changelog, without its date.
@@ -91,6 +96,9 @@ jobs:
     needs: box
     if: github.repository == 'axadrn/moin'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
     env:
       HOST: ${{ vars.DEPLOY_HOST }}
       TS_CLIENT_ID: ${{ vars.TS_CLIENT_ID }}
