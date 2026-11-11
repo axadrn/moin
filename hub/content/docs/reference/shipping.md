@@ -37,7 +37,23 @@ A release has a version, like `v1.0.0-beta.28`, and its notes in the [changelog]
 
 - **moin.run** runs the last deploy or release.
 - **Your own hub** runs releases only. A new one shows up in the web UI, and one click updates. [Self-hosting](/docs/self-hosting#updates)
-- **Daemons** run releases only. They update themselves, one server at a time, and your apps keep running. [Servers](/docs/guides/servers#updates)
+- **Daemons** run releases only. They update themselves, one server at a time, and your apps keep running. [How a daemon updates](#how-a-daemon-updates)
+
+## How a daemon updates
+
+A daemon always runs the version of its hub. When the hub gets a new release:
+
+1. The hub tells the daemon: update to this version.
+2. The daemon downloads the new `moin` from the hub and checks it.
+3. It swaps itself and restarts. Your apps keep running.
+4. It calls the hub again, now on the new version.
+
+- One server at a time, never during a deploy. A server that is busy gets its turn later.
+- If a daemon does not come back, moin stops there and says so in the activity.
+- A server with [rules](/docs/guides/security#rules) never updates its daemon from moin. You update it on the server.
+- Turn the automatic updates off, or update one server by hand: [Servers](/docs/guides/servers#updates).
+
+The hub only sends the order. The code that does it is in the daemon. [What the daemon does](/docs/concepts/how-moin-works#what-the-daemon-does)
 
 ## Images
 
