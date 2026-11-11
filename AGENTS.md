@@ -20,7 +20,7 @@ addresses, personal details.
 - Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
 - Formatted (`cd hub && task fmt`, a test checks it), `go vet ./...` clean.
-- Every change goes through a pull request, from maintainers too. Nobody pushes to `main`; GitHub blocks it. One branch per change, CI green, a maintainer reviews it to the best of their knowledge, with AI where it helps, then a squash merge: the pull request's title and description become the one commit on `main`.
+- Every change goes through a pull request, from maintainers too. Nobody pushes to `main`; GitHub blocks it. One small thing per branch, CI green, a maintainer reviews it to the best of their knowledge, with AI where it helps, then a squash merge: the pull request's title and description become the one commit on `main`.
 - Pull request titles and commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
 - Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
 - An issue is closed by writing `Fixes #N` once, in the pull request's description. Commits on the branch may mention `#N` without "Fixes".
