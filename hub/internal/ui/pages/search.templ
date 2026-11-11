@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
 // SearchItem is one answer of the palette: a page to go to, or something to
@@ -102,7 +103,7 @@ func SearchItems(in SearchInput) []SearchItem {
 		{Title: "Overview", Key: "G H", Icon: "gauge", Href: in.Base + "/overview"},
 		{Title: "Apps", Key: "G A", Icon: "apps", Href: in.Base + "/apps"},
 		{Title: "New app", Where: "Apps", Icon: "plus", Href: in.Base + "/new-app"},
-		{Title: "Catalog", Where: "Apps › New app", Icon: "catalog", Href: in.Base + "/catalog"},
+		{Title: "Catalog", Icon: "catalog", Href: in.Base + "/catalog"},
 		{Title: "Servers", Key: "G S", Icon: "server", Href: in.Base + "/servers"},
 		{Title: "Settings", Key: "G ,", Icon: "settings", Href: in.Base + "/settings"},
 		{Title: "Team", Where: "Settings", Key: "G T", Icon: "users", Href: in.Base + "/workspace"},
@@ -112,6 +113,7 @@ func SearchItems(in SearchInput) []SearchItem {
 		{Title: "Account", Where: "Settings", Icon: "user", Href: in.Base + "/settings/account"},
 		{Title: "Security", Where: "Settings › Account", Icon: "shield", Href: in.Base + "/settings/account?tab=security"},
 		{Title: "Tokens", Where: "Settings › Account", Icon: "key", Href: in.Base + "/settings/account?tab=tokens"},
+		{Title: "Source code", Where: "GitHub", Icon: "git-hub", Href: layouts.GitHubURL, External: true},
 	}
 	if in.GitHub {
 		places = append(places, SearchItem{Title: "GitHub", Where: "Settings", Icon: "git-hub", Href: in.Base + "/settings/github"})
