@@ -29,10 +29,11 @@ The palette is a box in the middle of the screen. Type what you want. Press `ent
 
 ## What it finds
 
-- **Every page**: Overview, Apps, Servers, Settings, Team, Alerts, Bucket, Activity, and each section of every app.
+- **Every page**: Overview, Apps, Catalog, Servers, Settings, Team, Alerts, Bucket, Activity, and each section of every app.
 - **Every app and every server**.
 - **Actions**: deploy, restart, start, roll back, open the app's domain. In the web the harmless ones run at once; rolling back asks first. In the terminal UI deploy, restart, stop and roll back ask first: `y` does it.
 - **The catalog**: an app you can install, such as ntfy or Umami (web only).
+- **The source code** of moin on GitHub (web only).
 - **The docs**, last, at most three pages (web only).
 
 On the website, signed out, the magnifier at the top right is the same box. It finds the docs and the catalog.

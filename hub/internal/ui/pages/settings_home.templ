@@ -98,6 +98,7 @@ templ SettingsHome(view SettingsHomeView) {
 							@components.Dot(components.DotProps{State: components.StateLive, Attrs: templ.Attributes{"data-changelog-dot": true, "hidden": true, "aria-label": "New"}})
 						}
 						@components.Item(components.ItemProps{Name: "Support", Value: cfg.SupportEmail})
+						@components.Item(components.ItemProps{Href: layouts.GitHubURL, External: true, Name: "Source code", Value: "GitHub"})
 					}
 				}
 			</section>
