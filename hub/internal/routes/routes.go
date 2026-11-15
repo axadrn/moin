@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -19,12 +18,6 @@ import (
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
-
-var immutableAssetPathPattern = regexp.MustCompile(`^/?js/.+\.[0-9a-f]{8}(?:\.min)?\.js$`)
-
-// fontAssetPathPattern is the font files. Their names carry no hash, but a
-// font changes so rarely that browsers may keep it for a year.
-var fontAssetPathPattern = regexp.MustCompile(`^/?fonts/.+\.(?:woff2|ttf)$`)
 
 // limiter wraps a handler in a rate limit.
 type limiter = func(http.HandlerFunc) http.HandlerFunc
@@ -99,8 +92,8 @@ func uiAssets(app *app.App) http.Handler {
 }
 
 // assetHandler serves the files under assets: from disk in development,
-// without caching, else from the binary, hashed scripts and fonts cached
-// for a year.
+// without caching, else from the binary. Pages link them with the version
+// in the path, which caches them (versioned).
 func assetHandler(app *app.App) http.Handler {
 	if app.Cfg.IsDevelopment() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -109,16 +102,7 @@ func assetHandler(app *app.App) http.Handler {
 		})
 	}
 	sub, _ := fs.Sub(assets.AssetsFS, ".")
-	fileServer := http.FileServer(http.FS(sub))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case immutableAssetPathPattern.MatchString(r.URL.Path):
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		case fontAssetPathPattern.MatchString(r.URL.Path):
-			w.Header().Set("Cache-Control", "public, max-age=31536000")
-		}
-		fileServer.ServeHTTP(w, r)
-	})
+	return http.FileServer(http.FS(sub))
 }
 
 // assetRoutes serve the files under /assets/: assets/, ui/, the bundles

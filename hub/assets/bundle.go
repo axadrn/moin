@@ -21,8 +21,8 @@ var importPattern = regexp.MustCompile(`@import\s+"([^"]+)"\s*;`)
 var urlPattern = regexp.MustCompile(`url\(\s*(?:"([^"]*)"|'([^']*)'|([^"'()\s]*))\s*\)`)
 
 // CSS is ui/moin.css with each @import replaced by its file, then
-// css/hub.css. It is served from the folder above ui/, so a relative url()
-// of a ui file gets the path from there.
+// css/hub.css. It is served from the folder above ui/ and css/, so a
+// relative url() of either gets the path from there.
 func CSS(ui, hub fs.FS) ([]byte, error) {
 	var out bytes.Buffer
 	if err := inline(&out, ui, "moin.css"); err != nil {
@@ -32,7 +32,7 @@ func CSS(ui, hub fs.FS) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	out.Write(own)
+	out.Write(rebase(own, "css"))
 	return out.Bytes(), nil
 }
 
@@ -58,7 +58,7 @@ func inline(out *bytes.Buffer, ui fs.FS, name string) error {
 		return fmt.Errorf("css bundle: %w", err)
 	}
 	dir := path.Dir(name)
-	source = rebase(source, dir)
+	source = rebase(source, path.Join("ui", dir))
 	last := 0
 	for _, match := range importPattern.FindAllSubmatchIndex(source, -1) {
 		out.Write(source[last:match[0]])
@@ -71,8 +71,9 @@ func inline(out *bytes.Buffer, ui fs.FS, name string) error {
 	return nil
 }
 
-// rebase points each relative url() of a ui file in dir at ui/: from the
-// bundle, components/x.css's "../icons/a.svg" is "ui/icons/a.svg".
+// rebase points each relative url() of a file in dir at the bundle's
+// folder: ui/components/x.css's "../icons/a.svg" is "ui/icons/a.svg",
+// css/hub.css's "../fonts/a.woff2" is "fonts/a.woff2".
 func rebase(source []byte, dir string) []byte {
 	return urlPattern.ReplaceAllFunc(source, func(match []byte) []byte {
 		parts := urlPattern.FindSubmatch(match)
@@ -80,6 +81,6 @@ func rebase(source []byte, dir string) []byte {
 		if target == "" || strings.HasPrefix(target, "/") || strings.HasPrefix(target, "#") || strings.Contains(target, ":") {
 			return match
 		}
-		return []byte(`url("` + path.Join("ui", dir, target) + `")`)
+		return []byte(`url("` + path.Join(dir, target) + `")`)
 	})
 }

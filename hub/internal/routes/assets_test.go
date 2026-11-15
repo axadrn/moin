@@ -13,45 +13,6 @@ import (
 	"github.com/axadrn/moin/internal/build"
 )
 
-func TestImmutableAssetPathPattern(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		path string
-		want bool
-	}{
-		{path: "js/runtime-1.2.3.deadbeef.js", want: true},
-		{path: "/js/runtime-1.2.3.deadbeef.js", want: true},
-		{path: "/js/runtime-1.2.3.deadbeef.min.js", want: true},
-		{path: "/js/runtime.js", want: false},
-		{path: "/css/site.deadbeef.css", want: false},
-	}
-
-	for _, test := range tests {
-		t.Run(test.path, func(t *testing.T) {
-			t.Parallel()
-			if got := immutableAssetPathPattern.MatchString(test.path); got != test.want {
-				t.Fatalf("immutableAssetPathPattern.MatchString(%q) = %t, want %t", test.path, got, test.want)
-			}
-		})
-	}
-}
-
-func TestFontAssetPathPattern(t *testing.T) {
-	t.Parallel()
-
-	for path, want := range map[string]bool{
-		"fonts/geist/geist-variable.woff2":              true,
-		"/fonts/bricolage/bricolage-grotesque-bold.ttf": true,
-		"/fonts/geist/README.md":                        false,
-		"/css/hub.css":                                  false,
-	} {
-		if got := fontAssetPathPattern.MatchString(path); got != want {
-			t.Errorf("fontAssetPathPattern.MatchString(%q) = %t, want %t", path, got, want)
-		}
-	}
-}
-
 // A page links its files with the version in the path. The hub serves them
 // there as at the plain path, cached for a year outside development.
 func TestVersionedAssets(t *testing.T) {
@@ -76,6 +37,8 @@ func TestVersionedAssets(t *testing.T) {
 		components.AssetURL("/assets/img/og.png"),
 		components.AssetURL("/assets/css/theme-editor.css"),
 		components.AssetURL("/assets/ui/icons/check.svg"),
+		components.AssetURL("/assets/js/htmx-4.0.0.min.js"),
+		components.AssetURL("/assets/fonts/geist/geist-variable.woff2"),
 	} {
 		w := serve(config.EnvironmentProduction, path)
 		if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != immutable {

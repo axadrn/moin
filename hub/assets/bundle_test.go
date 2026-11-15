@@ -44,7 +44,7 @@ func TestCSS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasSuffix(css, own) {
+	if !bytes.HasSuffix(css, rebase(own, "css")) {
 		t.Error("app.css does not end with css/hub.css")
 	}
 
@@ -89,13 +89,14 @@ func firstRule(source []byte) []byte {
 
 func TestRebase(t *testing.T) {
 	for _, test := range []struct{ dir, in, want string }{
-		{"components", `mask: url("../icons/check.svg") center;`, `mask: url("ui/icons/check.svg") center;`},
-		{".", `--i: url("icons/x.svg");`, `--i: url("ui/icons/x.svg");`},
-		{".", `--i: url('icons/x.svg');`, `--i: url("ui/icons/x.svg");`},
-		{"components", `src: url(../fonts/a.woff2);`, `src: url("ui/fonts/a.woff2");`},
-		{"components", `src: url("/assets/fonts/a.woff2");`, `src: url("/assets/fonts/a.woff2");`},
-		{"components", `mask: url("data:image/svg+xml,%3Csvg/%3E");`, `mask: url("data:image/svg+xml,%3Csvg/%3E");`},
-		{"components", `background: url("https://example.com/a.png");`, `background: url("https://example.com/a.png");`},
+		{"ui/components", `mask: url("../icons/check.svg") center;`, `mask: url("ui/icons/check.svg") center;`},
+		{"ui", `--i: url("icons/x.svg");`, `--i: url("ui/icons/x.svg");`},
+		{"ui", `--i: url('icons/x.svg');`, `--i: url("ui/icons/x.svg");`},
+		{"ui/components", `src: url(../fonts/a.woff2);`, `src: url("ui/fonts/a.woff2");`},
+		{"css", `src: url("../fonts/geist/a.woff2");`, `src: url("fonts/geist/a.woff2");`},
+		{"ui/components", `src: url("/assets/fonts/a.woff2");`, `src: url("/assets/fonts/a.woff2");`},
+		{"ui/components", `mask: url("data:image/svg+xml,%3Csvg/%3E");`, `mask: url("data:image/svg+xml,%3Csvg/%3E");`},
+		{"ui/components", `background: url("https://example.com/a.png");`, `background: url("https://example.com/a.png");`},
 	} {
 		if got := string(rebase([]byte(test.in), test.dir)); got != test.want {
 			t.Errorf("rebase(%q, %q) = %q, want %q", test.in, test.dir, got, test.want)

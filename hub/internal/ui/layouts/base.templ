@@ -35,16 +35,16 @@ templ Base(props ...SEOProps) {
 			<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png"/>
 			// The text font loads with the stylesheet, not after it, so the
 			// first paint is already in Geist.
-			<link rel="preload" href="/assets/fonts/geist/geist-variable.woff2" as="font" type="font/woff2" crossorigin/>
+			<link rel="preload" href={ components.AssetURL("/assets/fonts/geist/geist-variable.woff2") } as="font" type="font/woff2" crossorigin/>
 			// One stylesheet and one script: moin UI and the hub's own, joined
 			// at start (assets/bundle.go).
 			<link href={ components.AssetURL("/assets/app.css") } rel="stylesheet"/>
 			// Scripts in swapped content get the page's nonce, so the CSP lets
 			// them run.
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
-			<script src="/assets/js/htmx-4.0.0.e484d917.min.js"></script>
+			<script src={ components.AssetURL("/assets/js/htmx-4.0.0.min.js") }></script>
 			// Server-sent events swap HTML as it streams (hx-sse:connect).
-			<script src="/assets/js/hx-sse-4.0.0.min.js"></script>
+			<script src={ components.AssetURL("/assets/js/hx-sse-4.0.0.min.js") }></script>
 			<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/app.js") }></script>
 			// A link starts loading when the pointer rests on it, so the page
 			// is there on the click (Chrome and Edge; others ignore it). Only
