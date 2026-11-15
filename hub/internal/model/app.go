@@ -72,8 +72,9 @@ type App struct {
 	LatestNumber  int    `db:"latest_number"`
 	LatestStatus  string `db:"latest_status"`
 	LiveNumber    int    `db:"live_number"`
-	// LiveImage is the image of the live deploy, with its tag; empty when
-	// it was built from the app's repo.
+	// LiveImage is the image that runs, with its tag: the one of the newest
+	// succeeded deploy that set what runs (a build, an image or a rollback;
+	// a restart keeps it). Empty when it was built from the app's repo.
 	LiveImage string `db:"live_image"`
 	// LiveDetected is what the daemon found in the live deploy, as JSON;
 	// empty before the first.

@@ -881,20 +881,39 @@ func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.
 	if !KeptDeploys(deploys, app.LiveNumber)[target.Number] {
 		return nil, ErrDeployGone
 	}
+	// The rollback records the image it runs again, so the deploy hook
+	// follows it.
 	deploy := &model.Deploy{
 		ID:         uuid.New().String(),
 		AppID:      app.ID,
 		Status:     model.DeployRunning,
 		FromNumber: target.Number,
+		Image:      imageAt(deploys, target.Number),
 		CreatedAt:  s.now().UTC(),
 	}
 	return s.start(actor, "app.rolled_back", app, deploy, protocol.DeployStart{FromNumber: target.Number})
 }
 
+// imageAt is the image that runs after deploy number, from deploys newest
+// first: the one of the newest succeeded deploy up to it that set what runs.
+// A restart sets nothing. Empty when the repo built it.
+func imageAt(deploys []model.Deploy, number int) string {
+	for _, deploy := range deploys {
+		if deploy.Number > number || deploy.Status != model.DeploySucceeded {
+			continue
+		}
+		if deploy.SourceKey != "" || deploy.Image != "" || deploy.FromNumber > 0 {
+			return deploy.Image
+		}
+	}
+	return ""
+}
+
 // Builds reports whether a deploy brought something new, a source build or
-// an image. Restarts, domain changes and rollbacks do not.
+// an image. Restarts, domain changes and rollbacks do not; a rollback keeps
+// the image it runs again.
 func Builds(deploy model.Deploy) bool {
-	return deploy.SourceKey != "" || deploy.Image != ""
+	return deploy.FromNumber == 0 && (deploy.SourceKey != "" || deploy.Image != "")
 }
 
 // KeptDeploys returns the numbers of the deploys whose release the server
