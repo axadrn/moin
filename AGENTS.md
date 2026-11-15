@@ -20,11 +20,12 @@ addresses, personal details.
 - Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
 - Formatted (`cd hub && task fmt`, a test checks it), `go vet ./...` clean.
+- How a change ships, from the pull request to the release, is in `hub/content/docs/reference/shipping.md`, the one source for it. Change how moin ships and change that page in the same pull request.
 - Every change goes through a pull request, from maintainers too. Nobody pushes to `main`; GitHub blocks it. One small thing per branch, CI green, a maintainer reviews it to the best of their knowledge, with AI where it helps, then a squash merge: the pull request's title and description become the one commit on `main`.
-- Pull request titles and commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps.
+- Pull request titles and commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps. Plain text: `-` lists and backticks, no bold, headings or tables, because the description becomes the commit.
 - Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
 - An issue is closed by writing `Fixes #N` once, in the pull request's description. Commits on the branch may mention `#N` without "Fixes".
-- Merge, deploy, release. CI runs on every pull request, and merging needs it green. The Deploy workflow ships, from `main` or a tag only: tests, the box, for a tag the GitHub release from `hub/content/changelog.md`, then the hosted hub updates itself through Tailscale. Deploy for typos, docs and design: Actions, Deploy, Run workflow. Release for a feature or a fix: its notes in the changelog, then the tag `v…`.
+- Ship as the shipping page says. Deploy: Actions, Deploy, Run workflow. Release: its notes in the changelog, then the tag `v…`. The Deploy workflow runs the tests, builds the box, for a tag makes the GitHub release from `hub/content/changelog.md`, then updates the hosted hub through Tailscale.
 - Small releases: one finished thing is one tag. `main` is always releasable; only unfinished work stays on a branch.
 - Release notes follow one format, the same in moin, goilerplate and shadcn-templ, so the eye finds things fast. The same text is the GitHub release and the newest section of `hub/content/changelog.md` (`## v…`, the date like `November 3, 2026`, then the notes), which `/changelog` shows and a test checks:
   - First line: `**In short:**` and one sentence, what is new and why to update.

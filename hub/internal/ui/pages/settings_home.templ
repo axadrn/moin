@@ -94,7 +94,7 @@ templ SettingsHome(view SettingsHomeView) {
 							}})
 						}
 						@components.Item(components.ItemProps{Href: "/docs", Name: "Docs"})
-						@components.Item(components.ItemProps{Href: "/changelog", Name: "Changelog", Value: build.Version, Attrs: templ.Attributes{"data-changelog": build.Version}}) {
+						@components.Item(components.ItemProps{Href: "/changelog", Name: "Version", Value: build.Version, Attrs: templ.Attributes{"data-changelog": build.Version}}) {
 							@components.Dot(components.DotProps{State: components.StateLive, Attrs: templ.Attributes{"data-changelog-dot": true, "hidden": true, "aria-label": "New"}})
 						}
 						@components.Item(components.ItemProps{Name: "Support", Value: cfg.SupportEmail})
