@@ -3,6 +3,20 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.29
+
+November 15, 2026
+
+**In short:** Safer deploy hooks. A leaked hook URL can only ship new versions of your own image.
+
+### Changed
+- **Deploy hooks deploy only new tags**: A hook deploys new tags of the image running now. Another image gets `422`. Any registry works, Docker Hub too. **Deploy from CI** and `moin hook` show the image. (#70)
+- **First image by hand**: An app that runs from its repo needs one image deploy by hand. Then the hook takes over. To change the image, deploy the new one by hand. The hook follows, its URL stays. (#70)
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves.
+
 ## v1.0.0-beta.28
 
 November 15, 2026
