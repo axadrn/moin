@@ -35,7 +35,15 @@ func TestUpdateTools(t *testing.T) {
 	if result := call(t, bobSession, "update_hub", nil); !result.IsError || !strings.Contains(text(result), `"forbidden"`) {
 		t.Fatalf("bob's update = %s", text(result))
 	}
-	updated := output[mcp.VersionOutput](t, call(t, adaSession, "update_hub", nil))
+	// First the notes: nothing updates until ada confirms.
+	notes := output[mcp.VersionOutput](t, call(t, adaSession, "update_hub", nil))
+	if notes.ReadFirst == "" || notes.Notes == "" || notes.Update != nil {
+		t.Fatalf("ada's notes = %+v", notes)
+	}
+	if _, err := os.Stat(filepath.Join(env.updates, "request")); err == nil {
+		t.Fatal("update_hub without confirm updated")
+	}
+	updated := output[mcp.VersionOutput](t, call(t, adaSession, "update_hub", map[string]any{"confirm": true}))
 	if updated.Update == nil || updated.Update.State != "requested" || updated.Update.Version != "v0.3.0" {
 		t.Fatalf("ada's update = %+v", updated)
 	}

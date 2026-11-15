@@ -44,3 +44,20 @@ func TestDaemonAutoUpdate(t *testing.T) {
 		t.Fatalf("code %d, requests %v", code, api.requests)
 	}
 }
+
+// TestUpdateShowsTheNotesFirst: the whole release notes and the line above
+// them come before the question, and nothing updates without an answer.
+func TestUpdateShowsTheNotesFirst(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/version": `{"version":"v0.2.0","self_hosted":true,"latest":"v0.3.0","update_available":true,"summary":"One-click updates.","notes":"**In short:** One-click updates.\n\n### Upgrade\n\nChange your tunnel first.","read_first":"Read this first. Some updates need a step from you before you update.","can_update":true,"updater":true,"update":null}`,
+	}}
+	code, stdout, _ := runCLI(t, api, "update")
+	if code == 0 || api.seen("POST /api/v1/version/update") {
+		t.Fatalf("updated without an answer: code %d, requests %v", code, api.requests)
+	}
+	for _, want := range []string{"moin v0.3.0", "Read this first.", "Change your tunnel first."} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout %q misses %q", stdout, want)
+		}
+	}
+}

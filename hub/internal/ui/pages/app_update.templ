@@ -76,12 +76,10 @@ templ UpdateNotice(info model.VersionInfo) {
 						</div>
 						<div class="moin-row" data-wrap data-gap="2">
 							if info.CanUpdate {
-								<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button">
-									@components.CSRF()
-									@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-										Update now
-									}
-								</form>
+								@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: components.OpenDialog("update-dialog")}) {
+									Update now
+								}
+								@updateDialog(info)
 							} else {
 								<span class="moin-small moin-muted">On the server: <code class="moin-mono moin-foreground">sh update.sh</code></span>
 							}
@@ -95,6 +93,30 @@ templ UpdateNotice(info model.VersionInfo) {
 			}
 		}
 	</div>
+}
+
+// updateDialog shows the whole release notes before every update: some
+// updates need a step from the admin first, and the notes say which.
+templ updateDialog(info model.VersionInfo) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	@components.Dialog(components.DialogProps{ID: "update-dialog", Title: "Update to " + info.Latest + "?", Note: model.ReadFirst}) {
+		if info.NotesHTML != "" {
+			@components.Prose(components.ProseProps{HTML: info.NotesHTML})
+		} else if info.NotesURL != "" {
+			<p class="moin-text"><a class="moin-link" href={ templ.SafeURL(info.NotesURL) } target="_blank" rel="noopener">The release notes</a></p>
+		}
+		<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button[type='submit']">
+			@components.CSRF()
+			@components.DialogButtons() {
+				@components.Button(components.ButtonProps{Attrs: components.CloseDialog()}) {
+					Cancel
+				}
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-update-start": true}}) {
+					Update
+				}
+			}
+		</form>
+	}
 }
 
 // updateLine is the notice: one card over the page, its words left and

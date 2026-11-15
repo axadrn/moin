@@ -33,7 +33,9 @@ type VersionInfo struct {
 	NotesURL        string     `json:"notes_url"`
 	Summary         string     `json:"summary"`
 	Notes           string     `json:"notes"`
-	CheckedAt       *time.Time `json:"checked_at"`
+	// ReadFirst goes above the notes before every update, while one is out.
+	ReadFirst string     `json:"read_first,omitempty"`
+	CheckedAt *time.Time `json:"checked_at"`
 	// CanUpdate is true for an admin of a self-hosted hub while
 	// an update is out and the updater runs.
 	CanUpdate bool `json:"can_update"`
@@ -44,8 +46,13 @@ type VersionInfo struct {
 
 // NewVersion is the JSON shape of the version info.
 func NewVersion(info model.VersionInfo) VersionInfo {
+	readFirst := ""
+	if info.UpdateAvailable {
+		readFirst = model.ReadFirst
+	}
 	return VersionInfo{
-		Version: info.Version, SelfHosted: info.SelfHosted, Latest: info.Latest, UpdateAvailable: info.UpdateAvailable,
+		ReadFirst: readFirst,
+		Version:   info.Version, SelfHosted: info.SelfHosted, Latest: info.Latest, UpdateAvailable: info.UpdateAvailable,
 		PublishedAt: info.PublishedAt, NotesURL: info.NotesURL, Summary: info.Summary, Notes: info.Notes,
 		CheckedAt: info.CheckedAt, CanUpdate: info.CanUpdate, Updater: info.Updater, Update: info.Update,
 	}

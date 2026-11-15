@@ -18,9 +18,10 @@ func renderNotice(t *testing.T, info model.VersionInfo) string {
 }
 
 func TestUpdateNotice(t *testing.T) {
-	out := model.VersionInfo{Version: "v0.2.0", SelfHosted: true, Latest: "v0.3.0", UpdateAvailable: true, Summary: "One-click updates.", NotesURL: "https://github.com/axadrn/moin/releases/tag/v0.3.0", Admin: true, Updater: true, CanUpdate: true}
+	out := model.VersionInfo{Version: "v0.2.0", SelfHosted: true, Latest: "v0.3.0", UpdateAvailable: true, Summary: "One-click updates.", NotesURL: "https://github.com/axadrn/moin/releases/tag/v0.3.0", NotesHTML: "<h3>Upgrade</h3><p>Change your tunnel first.</p>", Admin: true, Updater: true, CanUpdate: true}
 	html := renderNotice(t, out)
-	for _, want := range []string{"v0.3.0 is out", "One-click updates.", "Update now", "releases/tag/v0.3.0"} {
+	// Update now opens the whole notes first; only the dialog updates.
+	for _, want := range []string{"v0.3.0 is out", "One-click updates.", "Update now", "releases/tag/v0.3.0", `data-open-dialog="update-dialog"`, model.ReadFirst, "Change your tunnel first.", `data-update-start`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("notice misses %q: %s", want, html)
 		}

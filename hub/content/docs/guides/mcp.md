@@ -53,7 +53,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `update_daemon` | puts the hub's daemon version on a server | write |
 | `set_daemon_updates` | turns automatic daemon updates on or off | write |
 | `get_version` | the hub's version, the newest version of moin and whether daemons update by themselves | read |
-| `update_hub` | updates a self-hosted hub to the newest version, for its admins | write |
+| `update_hub` | updates a self-hosted hub to the newest version, for its admins: first it returns the release notes, then it updates with `confirm` | write |
 | `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server | write |

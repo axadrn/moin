@@ -193,6 +193,8 @@ With the client ID and secret, moin connects an installation only for someone wh
 
 Once a day the hub asks GitHub for the newest version. When one is out, the admins see a note at the top of the web: the version, what is new, a link to the [changelog](/changelog). Then click **Update now**, run `moin update`, or `sh update.sh` on the server.
 
+Before every update moin shows the whole release notes, under one line: "Read this first. Some updates need a step from you before you update." The web shows them in a dialog, `moin update` prints them before it asks, and the MCP tool `update_hub` returns them until you confirm. A step you do by hand is in the notes under **Upgrade**.
+
 - moin is away for about a minute; your apps keep running.
 - Before the database changes it keeps a copy next to it, like `/var/lib/moin-hub/backup-before-v0.3.0.db`; the last three stay.
 - If the new version is not up within two minutes, the old one starts again and the note says why.
