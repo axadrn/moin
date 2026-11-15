@@ -550,7 +550,7 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 		return false, err
 	}
 	// x-moin wins, so a change here would never reach the app.
-	if fromCompose, _ := s.composeDomains(app); len(fromCompose) > 0 {
+	if fromCompose, _ := app.ComposeDomains(); len(fromCompose) > 0 {
 		return false, ErrComposeDomains
 	}
 	clean, err := cleanDomains(domains)
@@ -694,17 +694,6 @@ func (s *AppService) FileConfig(app *model.App) protocol.Config {
 	return *detected.Config
 }
 
-// composeDomains are the domains x-moin.domains sets for the main service in
-// the live deploy, and its canonical one; none when compose.yml sets none
-// for it.
-func (s *AppService) composeDomains(app *model.App) (domains []string, canonical string) {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil || (len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0) {
-		return nil, ""
-	}
-	return detected.Domains, detected.Canonical
-}
-
 // composeServiceDomains are the domains x-moin.domains sets for the other
 // services in the live deploy, by service.
 func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
@@ -829,11 +818,8 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 		return domain
 	}
 	checks := []DomainCheck{}
-	domains, canonical := app.DomainList(), app.Canonical
-	fromCompose, composeCanonical := s.composeDomains(app)
-	if len(fromCompose) > 0 {
-		domains, canonical = fromCompose, composeCanonical
-	}
+	domains, canonical := app.MainDomains()
+	fromCompose, _ := app.ComposeDomains()
 	for _, domain := range domains {
 		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
 	}

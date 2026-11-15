@@ -145,6 +145,7 @@ type envRequest struct {
 }
 
 func NewApp(app model.App) App {
+	domains, canonical := app.MainDomains()
 	return App{
 		ID:              link.ID(app.ID),
 		Name:            app.Name,
@@ -153,8 +154,8 @@ func NewApp(app model.App) App {
 		LatestNumber:    app.LatestNumber,
 		LatestStatus:    app.LatestStatus,
 		LiveNumber:      app.LiveNumber,
-		Domains:         app.DomainList(),
-		Canonical:       app.Canonical,
+		Domains:         domains,
+		Canonical:       canonical,
 		Protected:       app.Protect != "",
 		ServiceDomains:  app.ServiceDomainMap(),
 		Instant:         instantURL(app.InstantHost),

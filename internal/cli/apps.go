@@ -720,7 +720,7 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		fmt.Fprintf(stdout, "It deploys new tags of %s.\n", detail.App.HookImage)
 	}
 	fmt.Fprintln(stdout)
-	hint(stdout, "Add it to your CI:", "/docs/guides/ci#3-the-workflow")
+	hint(stdout, "Add it to your CI:", api.URL()+"/docs/guides/ci#3-the-workflow")
 	return nil
 }
 

@@ -521,7 +521,8 @@ func TestEnvPullCountsOneVar(t *testing.T) {
 }
 
 // The first deploy hook replaces nothing, so it asks nothing. It says the
-// image it deploys new tags of, or how to deploy one first.
+// image it deploys new tags of, or how to deploy one first, and links the
+// docs on the hub.
 func TestFirstHookAsksNothing(t *testing.T) {
 	for image, want := range map[string]string{
 		"docker.io/me/shop": "It deploys new tags of docker.io/me/shop.",
@@ -532,7 +533,7 @@ func TestFirstHookAsksNothing(t *testing.T) {
 			"POST /api/v1/apps/shop/hook": `{"url":"http://localhost/webhooks/deploy/dph_x"}`,
 		}}
 		code, stdout, stderr := runCLI(t, api, "hook", "shop")
-		if code != 0 || !strings.Contains(stdout, "dph_x") || !strings.Contains(stdout, want) || !strings.Contains(stdout, "Keep it secret, like a password.") {
+		if code != 0 || !strings.Contains(stdout, "dph_x") || !strings.Contains(stdout, want) || !strings.Contains(stdout, "Keep it secret, like a password.") || !strings.Contains(stdout, "http://127.0.0.1:") || !strings.Contains(stdout, "/docs/guides/ci#3-the-workflow") {
 			t.Errorf("image %q: code %d, stdout %q, stderr %q, requests %v", image, code, stdout, stderr, api.requests)
 		}
 	}

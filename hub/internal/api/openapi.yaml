@@ -5290,6 +5290,7 @@ components:
           description: The newest successful deploy, which is running. 0 before the first.
         domains:
           type: array
+          description: The domains the app answers on. The ones x-moin.domains in compose.yml sets, else the ones saved in moin.
           items:
             type: string
         canonical:
