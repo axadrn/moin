@@ -12,6 +12,7 @@ November 15, 2026
 ### Changed
 - **Deploy hooks deploy only new tags**: A hook deploys new tags of the image running now. Another image gets `422`. Any registry works, Docker Hub too. **Deploy from CI** and `moin hook` show the image. (#70)
 - **First image by hand**: An app that runs from its repo needs one image deploy by hand. Then the hook takes over. To change the image, deploy the new one by hand. The hook follows, its URL stays. (#70)
+- **A calmer Deploy from CI**: One line says what runs. A new hook shows in one box, with a link to add it to your CI. (#70)
 
 ### Upgrade
 
