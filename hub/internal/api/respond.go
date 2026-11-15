@@ -78,6 +78,10 @@ func ServiceError(w http.ResponseWriter, err error) {
 // the same codes. known is false for errors without a mapping; they get 500
 // internal and the caller should log them.
 func ErrorFor(err error) (int, ErrorDetail, bool) {
+	var stepErr *service.StepError
+	if errors.As(err, &stepErr) {
+		return http.StatusFailedDependency, ErrorDetail{Code: "daemon_update_failed", Message: "The daemon update stopped at: " + stepErr.Error() + ". The activity says what moin did."}, true
+	}
 	var daemonErr *service.DaemonError
 	if errors.As(err, &daemonErr) {
 		return http.StatusFailedDependency, ErrorDetail{Code: "daemon_error", Message: daemonErr.Message}, true
@@ -229,6 +233,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to moin under Billing to add servers."},
 	{err: service.ErrNoDaemonBinary, status: http.StatusConflict, code: "no_daemon_binary", message: "This hub serves no daemon binary for the server's system. Update the daemon on the server instead."},
 	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its daemon and try again."},
+	{err: service.ErrDaemonUpdating, status: http.StatusConflict, code: "daemon_updating", message: "The daemon of this server is updating. Try again in a minute."},
 	{err: repository.ErrAppNotFound, status: http.StatusNotFound, code: "not_found", message: "The app was not found."},
 	{err: repository.ErrDuplicateApp, field: "name", message: "An app with this name already exists."},
 	{err: service.ErrAppName, field: "name", message: "Use 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit."},
@@ -244,7 +249,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrAlertURL, field: "url", message: "Use the incoming webhook URL: https://hooks.slack.com/services/… for Slack, https://discord.com/api/webhooks/… for Discord, an http or https URL for a webhook."},
 	{err: service.ErrAlertBotToken, field: "bot_token", message: "Use the token @BotFather gave the bot, like 123456:ABC-DEF…"},
 	{err: service.ErrAlertChatID, field: "chat_id", message: "Use the chat ID, a number like -1001234567890, or @channelname."},
-	{err: service.ErrAlertEvents, field: "events", message: "Choose from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok and update.available."},
+	{err: service.ErrAlertEvents, field: "events", message: "Choose from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available and server.daemon_update_failed."},
 	{err: service.ErrAlertLimit, status: http.StatusConflict, code: "alert_limit", message: "A workspace has at most 20 alert destinations. Remove one first."},
 	{err: repository.ErrDuplicateAlertDestination, field: "name", message: "An alert destination with this name already exists."},
 	{err: repository.ErrAlertDestinationNotFound, status: http.StatusNotFound, code: "not_found", message: "The alert destination was not found."},

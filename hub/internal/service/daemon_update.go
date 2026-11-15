@@ -52,7 +52,8 @@ func (s *ServerService) DaemonBinary(goos, arch string) (string, error) {
 }
 
 // UpdateDaemon has the daemon of a server swap its binary for the one the
-// hub serves, and returns the server once the new daemon is back.
+// hub serves, with the steps its version needs (daemon_steps.go), and
+// returns the server once the new daemon is back.
 func (s *ServerService) UpdateDaemon(ctx context.Context, actor Actor, idOrName string) (*model.Server, error) {
 	server, err := s.Get(actor.WorkspaceID, idOrName)
 	if err != nil {
@@ -61,6 +62,17 @@ func (s *ServerService) UpdateDaemon(ctx context.Context, actor Actor, idOrName 
 	if !server.Online {
 		return nil, ErrServerOffline
 	}
+	if _, err := s.DaemonBinary(server.OS, server.Arch); err != nil {
+		return nil, err
+	}
+	// An update left halfway is finished first.
+	s.finishDaemonUpdate(server.WorkspaceID, server.ID)
+	return s.runDaemonUpdate(ctx, actor, server)
+}
+
+// swapDaemon is the update itself: the daemon swaps its binary and comes
+// back. The step updateDaemon runs it.
+func (s *ServerService) swapDaemon(ctx context.Context, actor Actor, server *model.Server) (*model.Server, error) {
 	sum, err := s.DaemonBinary(server.OS, server.Arch)
 	if err != nil {
 		return nil, err
@@ -200,8 +212,16 @@ func (s *ServerService) autoUpdate(workspaceID string) {
 		tried[next.ID] = true
 		_, err = s.UpdateDaemon(context.Background(), System(workspaceID), next.ID)
 		var daemonErr *DaemonError
+		var stepErr *StepError
 		switch {
-		case err == nil, errors.As(err, &daemonErr), errors.Is(err, ErrServerOffline), errors.Is(err, ErrNoDaemonBinary):
+		case errors.As(err, &stepErr):
+			// A step failed: it did not try again by itself, so apps it
+			// stops do not go down and up on every connect.
+			s.mu.Lock()
+			s.autoHalted[workspaceID] = true
+			s.mu.Unlock()
+			return
+		case err == nil, errors.As(err, &daemonErr), errors.Is(err, ErrServerOffline), errors.Is(err, ErrNoDaemonBinary), errors.Is(err, ErrDaemonUpdating):
 			// Updated, or refused for now: the next connect tries again.
 		default:
 			s.mu.Lock()

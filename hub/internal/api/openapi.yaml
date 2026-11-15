@@ -1158,9 +1158,10 @@ paths:
           description: '`not_found`. No server with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, or `no_daemon_binary` when the hub serves no binary for the server.'
+          description: '`server_offline`, `no_daemon_binary` when the hub serves no binary for the server, or `daemon_updating` while an update of this daemon runs.'
         '424':
           $ref: '#/components/responses/DaemonError'
+          description: '`daemon_error`, or `daemon_update_failed` when a step of the update failed (the message names it; the activity says what moin did).'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3123,7 +3124,7 @@ paths:
       tags: [Alerts]
       operationId: createAlertDestination
       summary: Add an alert destination
-      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok and update.available; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Moin-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
+      description: 'Stores a destination with its URL or bot token sealed with AES-256-GCM. `slack` takes an incoming webhook `url` (https://hooks.slack.com/services/…), `discord` a webhook `url` (https://discord.com/api/webhooks/…), `telegram` a `bot_token` and a `chat_id`, `webhook` any http or https `url`. `events` picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available and server.daemon_update_failed; empty means all. A webhook answers with its `signing_secret`, this once: every post carries `X-Moin-Signature: sha256=<hex HMAC-SHA256 of the body>`. Only owners and admins.'
       requestBody:
         required: true
         content:
@@ -5604,7 +5605,7 @@ components:
           type: array
           items:
             type: string
-            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available]
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available, server.daemon_update_failed]
         failing:
           type: boolean
         failing_since:
@@ -5657,7 +5658,7 @@ components:
           description: Empty for all five.
           items:
             type: string
-            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available]
+            enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available, server.daemon_update_failed]
     Registry:
       type: object
       required: [host, username, created_at]
