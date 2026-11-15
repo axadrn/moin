@@ -47,10 +47,10 @@ The CLI reads the token from stdin. It is stored encrypted. The daemon gets it o
 
 ## 2. Create a deploy hook
 
-moin shows the URL once. Store it as the CI secret `MOIN_DEPLOY_HOOK`.
+moin shows the URL once. Store it as a CI secret, for example `MOIN_DEPLOY_HOOK`. Keep it secret, like a password.
 
 ```surfaces
-Web: the app's **Deploys** tab, **Deploy from CI**, **New deploy hook**
+Web: the app's **Deploys** tab, **Deploy from CI**, **New hook**
 CLI: moin hook <app-name>
 TUI: on the app, `W` opens **Deploy from CI** in the web
 API: POST /api/v1/apps/{app}/hook
@@ -120,7 +120,7 @@ With `image` it deploys that image. Without it, the repo goes through [your buck
 ## Deploy an image by hand
 
 ```surfaces
-Web: the app's **Deploys** tab, **Deploy from CI**, **Deploy image**
+Web: the app's **Deploys** tab, **Deploy from CI**, **By hand**, **Deploy**
 CLI: moin deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
 TUI: on the app, `I`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys
