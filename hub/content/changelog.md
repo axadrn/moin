@@ -9,11 +9,11 @@ November 15, 2026
 
 **In short:** Pages load faster and never show old styles after an update.
 
-### Fixed
-- **No old styles after an update**: After a release, some pages showed old styles for hours, like a gray square instead of an icon. Every file now carries the version in its address, so browsers and CDNs always load the new one.
-
 ### Changed
 - **Faster pages**: The web loads one stylesheet and one script instead of about fifty files.
+
+### Fixed
+- **No old styles after an update**: After a release, some pages showed old styles for hours, like a gray square instead of an icon. Every file now carries the version in its address, so browsers and CDNs always load the new one.
 
 ### Upgrade
 
