@@ -3,6 +3,28 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.28
+
+November 15, 2026
+
+**In short:** Updates you can trust. The daemon does its own steps. Your hub shows the notes first.
+
+### New
+- **Daemon updates do their own steps**: Some updates need something first, like stopping the apps that use SQLite. moin does it. You never do a step by hand. If a step fails, moin puts everything back and alerts you with `server.daemon_update_failed`. (#58)
+- **Read the notes before you update**: On a self-hosted hub, **Update now** shows the whole release notes first. So do `moin update` and MCP. (#58)
+- **How moin ships**: One page says how a change reaches your server. Pull requests, deploys, releases, images and daemon updates. See `/docs/reference/shipping`.
+- **What the daemon does**: How moin works now says who talks to whom and what the daemon may do on your server.
+- **The catalog in the search**: An empty search shows the catalog. Settings and the search link to the source code.
+
+### Changed
+- **`latest` is the newest release**: Like `stable`. A pull without a tag never gets work in between.
+- **`update_hub` asks first**: The MCP tool shows the notes. It updates only with `confirm`.
+- **Settings say Version**: The row that opens the changelog is called **Version**.
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves.
+
 ## v1.0.0-beta.27
 
 November 10, 2026
