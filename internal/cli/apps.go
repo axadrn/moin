@@ -713,16 +713,14 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	}
 	done(stdout, "New deploy hook for %s. It is shown once; the old one stops working:", name)
 	fmt.Fprintf(stdout, "\n  %s\n\n", url)
-	fmt.Fprintln(stdout, "Keep it secret, like a password. Anyone with it can deploy new tags of your image.")
-	fmt.Fprintln(stdout)
-	image := detail.App.HookImage
-	if image == "" {
-		image = "ghcr.io/me/" + name
-		hint(stdout, "No image runs yet. Deploy one by hand once, then the hook deploys its new tags:", "moin deploy --image "+image+":<tag> "+name)
+	fmt.Fprintln(stdout, "Keep it secret, like a password.")
+	if detail.App.HookImage == "" {
+		fmt.Fprintln(stdout, "It waits for an image. Deploy one by hand once, then it deploys its new tags.")
 	} else {
-		fmt.Fprintf(stdout, "It deploys only new tags of %s, the image running now.\n\n", image)
+		fmt.Fprintf(stdout, "It deploys new tags of %s.\n", detail.App.HookImage)
 	}
-	hint(stdout, "Store it as a CI secret and call it after pushing a new tag:", `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=`+image+`:$GITHUB_SHA"`)
+	fmt.Fprintln(stdout)
+	hint(stdout, "How CI calls it:", "/docs/guides/ci")
 	return nil
 }
 

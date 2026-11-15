@@ -23,8 +23,9 @@ func TestNewHookAsksOnlyToReplace(t *testing.T) {
 	}
 }
 
-// A hook says the image it deploys new tags of, the one running now, and
-// its curl uses it; without an image running, it says to deploy one first.
+// A hook says the image it deploys new tags of, the one running now, or
+// that it waits for one; a new hook's URL comes with the note to keep it
+// secret and guesses no registry or CI.
 func TestHookShowsItsImage(t *testing.T) {
 	for image, want := range map[string]string{
 		"docker.io/me/shop": `New tags of <code class="moin-mono moin-foreground">docker.io/me/shop</code>`,
@@ -35,11 +36,8 @@ func TestHookShowsItsImage(t *testing.T) {
 			t.Fatal(err)
 		}
 		page := html.String()
-		if !strings.Contains(page, want) || !strings.Contains(page, "Keep it secret, like a password.") {
+		if !strings.Contains(page, want) || !strings.Contains(page, "Keep it secret, like a password.") || strings.Contains(page, "ghcr.io") || strings.Contains(page, "GITHUB") {
 			t.Errorf("image %q: %s", image, page)
-		}
-		if image != "" && !strings.Contains(page, "?image=docker.io/me/shop:$GITHUB_SHA") {
-			t.Errorf("curl without the image: %s", page)
 		}
 	}
 }

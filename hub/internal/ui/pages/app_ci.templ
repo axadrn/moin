@@ -51,8 +51,7 @@ templ appCI(appName, appLink, running string, live, hook bool, hookImage string)
 }
 
 // AppHook is the deploy hook: on or off, the image it deploys new tags of,
-// the one running now; and a new hook's URL once, in a box of its own with
-// the curl CI runs.
+// the one running now; and a new hook's URL once, in a box of its own.
 templ AppHook(appName, appLink, url, image string, on bool) {
 	<div id="app-hook" class="moin-stack" data-gap="3" data-hook-on?={ on }>
 		<div class="moin-row" data-wrap data-between data-gap="3">
@@ -99,9 +98,9 @@ templ AppHook(appName, appLink, url, image string, on bool) {
 			<div class="moin-alert moin-stack" data-gap="3" data-state="running" data-deploy-hook>
 				<p class="moin-text moin-strong">Your new deploy hook. Shown once.</p>
 				@components.Command(components.CommandProps{Text: url})
-				<p class="moin-small" data-hook-secret>Keep it secret, like a password.</p>
-				<p class="moin-small moin-muted">In CI, after the push:</p>
-				@components.Command(components.CommandProps{Text: `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=` + cmp.Or(image, "ghcr.io/me/"+appName) + `:$GITHUB_SHA"`})
+				<p class="moin-small" data-hook-secret>
+					Keep it secret, like a password. <a href="/docs/guides/ci" class="moin-link moin-foreground">How CI calls it</a>
+				</p>
 			</div>
 		}
 	</div>

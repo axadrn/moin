@@ -524,8 +524,8 @@ func TestEnvPullCountsOneVar(t *testing.T) {
 // image it deploys new tags of, or how to deploy one first.
 func TestFirstHookAsksNothing(t *testing.T) {
 	for image, want := range map[string]string{
-		"docker.io/me/shop": "deploys only new tags of docker.io/me/shop",
-		"":                  "moin deploy --image ghcr.io/me/shop:<tag> shop",
+		"docker.io/me/shop": "It deploys new tags of docker.io/me/shop.",
+		"":                  "It waits for an image.",
 	} {
 		api := &fakeAPI{answers: map[string]string{
 			"GET /api/v1/apps/shop":       `{"app":{"name":"shop","hook_image":"` + image + `"},"deploys":[]}`,
