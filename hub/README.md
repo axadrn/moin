@@ -15,7 +15,8 @@ Development uses a real bucket of its own, such as `moin-development` on R2, so
 it runs the same storage code as production.
 
 Keep your settings in 1Password? Copy `.env.example` to `.env.tpl` and put
-`op://vault/item/field` references in place of the secrets. `task dev` then
+plain `op://vault/item/field` references in place of the secrets, without
+`{{ }}` around them. `task dev` then
 reads them fresh on every start, and no `.env` lies on disk.
 
 Without Cloudflare credentials, emails go to the log. The hub and the `moin` binary are one Go module: a change to the daemon, the CLI or the protocol shows up here right away.

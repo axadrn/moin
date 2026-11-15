@@ -1,9 +1,10 @@
 package routes
 
 import (
+	"bytes"
 	"io/fs"
 	"net/http"
-	"regexp"
+	"os"
 	"strings"
 	"time"
 
@@ -17,12 +18,6 @@ import (
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
-
-var immutableAssetPathPattern = regexp.MustCompile(`^/?js/.+\.[0-9a-f]{8}(?:\.min)?\.js$`)
-
-// fontAssetPathPattern is the font files. Their names carry no hash, but a
-// font changes so rarely that browsers may keep it for a year.
-var fontAssetPathPattern = regexp.MustCompile(`^/?fonts/.+\.(?:woff2|ttf)$`)
 
 // limiter wraps a handler in a rate limit.
 type limiter = func(http.HandlerFunc) http.HandlerFunc
@@ -97,8 +92,8 @@ func uiAssets(app *app.App) http.Handler {
 }
 
 // assetHandler serves the files under assets: from disk in development,
-// without caching, else from the binary, hashed scripts and fonts cached
-// for a year.
+// without caching, else from the binary. Pages link them with the version
+// in the path, which caches them (versioned).
 func assetHandler(app *app.App) http.Handler {
 	if app.Cfg.IsDevelopment() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -107,15 +102,66 @@ func assetHandler(app *app.App) http.Handler {
 		})
 	}
 	sub, _ := fs.Sub(assets.AssetsFS, ".")
-	fileServer := http.FileServer(http.FS(sub))
+	return http.FileServer(http.FS(sub))
+}
+
+// assetRoutes serve the files under /assets/: assets/, ui/, the bundles
+// app.css and app.js, each also under the version (versioned).
+func assetRoutes(mux *http.ServeMux, app *app.App) {
+	assetHandler := assetHandler(app)
+	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
+	mux.Handle("GET /assets/ui/", http.StripPrefix("/assets/ui/", middleware.Gzip(uiAssets(app))))
+	mux.Handle("GET /assets/app.css", middleware.Gzip(bundle(app, "text/css; charset=utf-8", assets.CSS)))
+	mux.Handle("GET /assets/app.js", middleware.Gzip(bundle(app, "text/javascript; charset=utf-8", assets.JS)))
+	prefix := "/assets/" + build.Version + "/"
+	mux.Handle("GET "+prefix, versioned(mux, prefix, app.Cfg.IsDevelopment()))
+	// Browsers, link previews and analytics ask for /favicon.ico at the root.
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		asset := r.Clone(r.Context())
+		asset.URL.Path = "/img/favicon.ico"
+		assetHandler.ServeHTTP(w, asset)
+	})
+}
+
+// bundle serves the file join makes from ui/ and assets/: made once at
+// start, or on every request in development, so an edit shows on reload.
+func bundle(app *app.App, contentType string, join func(ui, hub fs.FS) ([]byte, error)) http.Handler {
+	development := app.Cfg.IsDevelopment()
+	hub := fs.FS(assets.AssetsFS)
+	if development {
+		hub = os.DirFS("assets")
+	}
+	made, err := join(app.UIFiles, hub)
+	if err != nil && !development {
+		panic(err)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case immutableAssetPathPattern.MatchString(r.URL.Path):
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		case fontAssetPathPattern.MatchString(r.URL.Path):
-			w.Header().Set("Cache-Control", "public, max-age=31536000")
+		body := made
+		if development {
+			w.Header().Set("Cache-Control", "no-store")
+			var err error
+			if body, err = join(app.UIFiles, hub); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
-		fileServer.ServeHTTP(w, r)
+		w.Header().Set("Content-Type", contentType)
+		http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
+	})
+}
+
+// versioned serves /assets/<version>/x as /assets/x. The pages link files
+// so (components.AssetURL), and the version changes with every release and
+// deploy, so browsers and CDNs may keep them for a year.
+func versioned(mux *http.ServeMux, prefix string, development bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !development {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		plain := r.Clone(r.Context())
+		plain.URL.Path = "/assets/" + strings.TrimPrefix(r.URL.Path, prefix)
+		plain.URL.RawPath = ""
+		mux.ServeHTTP(w, plain)
 	})
 }
 
@@ -125,16 +171,8 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	seo := handler.NewSEOHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.Cfg.AppURL, app.Texts, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
 	docs := handler.NewDocsHandler(app.DocsService)
-	assetHandler := assetHandler(app)
-	mux.Handle("GET /assets/", http.StripPrefix("/assets/", middleware.Gzip(assetHandler)))
-	mux.Handle("GET /assets/ui/", http.StripPrefix("/assets/ui/", middleware.Gzip(uiAssets(app))))
+	assetRoutes(mux, app)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
-	// Browsers, link previews and analytics ask for /favicon.ico at the root.
-	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		asset := r.Clone(r.Context())
-		asset.URL.Path = "/img/favicon.ico"
-		assetHandler.ServeHTTP(w, asset)
-	})
 	mux.HandleFunc("GET /robots.txt", seo.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
