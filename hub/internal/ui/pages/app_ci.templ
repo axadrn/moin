@@ -1,63 +1,87 @@
 package pages
 
 import (
+	"cmp"
+
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
-// appCI is the "Deploy from CI" card of the Deploys section: deploy an
-// image built elsewhere, and the deploy hook CI calls; hook says the app
-// has one, hookImage the image it may deploy.
-templ appCI(appName, appLink string, hook bool, hookImage string) {
+// appCI is the "Deploy from CI" card of the Deploys section. One line on
+// top says what runs; under it deploying an image by hand, and the deploy
+// hook CI calls. running is the live deploy's image, empty when it was
+// built from the repo; live says a deploy is live at all. hookImage is the
+// image the hook deploys new tags of.
+templ appCI(appName, appLink, running string, live, hook bool, hookImage string) {
 	<div data-app-ci>
 		@components.Card(components.CardProps{Title: "Deploy from CI"}) {
-			<form
-				hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/image" }
-				hx-swap="none"
-				hx-disable="find button[type='submit']"
-			>
-				@components.CSRF()
-				@components.Field(components.FieldProps{Label: "Deploy an image", For: "image-ref"}) {
-					<div class="moin-row" data-gap="2" data-phone="stack">
-						@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "placeholder": "ghcr.io/me/" + appName + ":3f2a9c1", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
-						@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-deploy-image": true}}) {
-							Deploy image
-						}
-					</div>
-				}
-			</form>
-			@AppHook(appName, appLink, "", hookImage, hook)
+			<div class="moin-stack" data-gap="6">
+				<p class="moin-text" data-running>
+					<span class="moin-muted">Running</span>
+					if running != "" {
+						<code class="moin-mono">{ running }</code>
+					} else if live {
+						built from the repo
+					} else {
+						nothing yet
+					}
+				</p>
+				<form
+					class="moin-stack"
+					data-gap="3"
+					hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/image" }
+					hx-swap="none"
+					hx-disable="find button[type='submit']"
+				>
+					@components.CSRF()
+					<p class="moin-text moin-strong">By hand</p>
+					@components.Field(components.FieldProps{For: "image-ref"}) {
+						<div class="moin-row" data-gap="2" data-phone="stack">
+							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "aria-label": "Image", "placeholder": cmp.Or(running, "ghcr.io/me/"+appName+":3f2a9c1"), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+							@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-deploy-image": true}}) {
+								Deploy
+							}
+						</div>
+					}
+				</form>
+				@AppHook(appName, appLink, "", hookImage, hook)
+			</div>
 		}
 	</div>
 }
 
-// AppHook is the deploy hook: whether the app has one and the image it
-// deploys new tags of, the one running now; the buttons, and a new hook's
-// URL once, with the curl CI runs.
+// AppHook is the deploy hook: on or off, the image it deploys new tags of,
+// the one running now; and a new hook's URL once, in a box of its own with
+// the curl CI runs.
 templ AppHook(appName, appLink, url, image string, on bool) {
-	{{
-		example := image
-		if example == "" {
-			example = "ghcr.io/me/" + appName
-		}
-	}}
 	<div id="app-hook" class="moin-stack" data-gap="3" data-hook-on?={ on }>
 		<div class="moin-row" data-wrap data-between data-gap="3">
-			<div>
-				<p class="moin-text moin-strong">Deploy hook</p>
-				<p class="moin-small moin-muted" data-hook-image>
-					if on && image != "" {
-						On. Deploys new tags of <code class="moin-mono moin-foreground">{ image }</code>, the image running now.
-					} else if on {
-						On. No image runs yet: deploy one above once, then the hook deploys its new tags.
+			<div class="moin-stack" data-gap="1">
+				<div class="moin-row" data-gap="2">
+					<p class="moin-text moin-strong">Deploy hook</p>
+					if on {
+						@components.Status(components.StatusProps{State: components.StateLive}) {
+							On
+						}
 					} else {
-						Off
+						@components.Status(components.StatusProps{State: components.StateIdle}) {
+							Off
+						}
+					}
+				</div>
+				<p class="moin-small moin-muted" data-hook-image>
+					if image != "" {
+						New tags of <code class="moin-mono moin-foreground">{ image }</code>.
+					} else if on {
+						Waits for an image. Deploy one by hand.
+					} else {
+						Lets CI deploy new tags of the running image.
 					}
 				</p>
 			</div>
-			<div class="moin-row" data-wrap data-gap="2">
+			<div class="moin-row" data-gap="2">
 				if on {
-					@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+					@components.Button(components.ButtonProps{Quiet: true, Attrs: templ.Attributes{
 						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
 						"hx-target":     "#app-hook",
 						"hx-swap":       "outerHTML",
@@ -72,19 +96,13 @@ templ AppHook(appName, appLink, url, image string, on bool) {
 			</div>
 		</div>
 		if url != "" {
-			<p class="moin-small moin-muted">
-				Copy it now, it shows only once. Store it in CI as a secret, for example <code class="moin-mono moin-foreground">MOIN_DEPLOY_HOOK</code>.
-			</p>
-			<div data-deploy-hook>
+			<div class="moin-alert moin-stack" data-gap="3" data-state="running" data-deploy-hook>
+				<p class="moin-text moin-strong">Your new deploy hook. Shown once.</p>
 				@components.Command(components.CommandProps{Text: url})
+				<p class="moin-small" data-hook-secret>Keep it secret, like a password.</p>
+				<p class="moin-small moin-muted">In CI, after the push:</p>
+				@components.Command(components.CommandProps{Text: `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=` + cmp.Or(image, "ghcr.io/me/"+appName) + `:$GITHUB_SHA"`})
 			</div>
-			<p class="moin-small moin-strong" data-hook-secret>
-				Treat it like a password. Anyone with it can deploy new tags of your image. Never put it in code, a chat or a log.
-			</p>
-			<p class="moin-small moin-muted">
-				CI calls it after pushing a new tag:
-			</p>
-			@components.Command(components.CommandProps{Text: `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=` + example + `:$GITHUB_SHA"`})
 		}
 	</div>
 }
@@ -105,6 +123,6 @@ templ newHookButton(appLink string, replaces bool) {
 		}
 	}}
 	@components.Button(components.ButtonProps{Attrs: attributes}) {
-		New deploy hook
+		New hook
 	}
 }

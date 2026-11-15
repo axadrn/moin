@@ -267,7 +267,7 @@ templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follo
 	} else {
 		@AppRepo(RepoView{App: app, Enabled: true, Connected: true, Loading: app.Repo == ""})
 	}
-	@appCI(app.Name, app.Link(), app.DeployHookHash != nil, app.HookImage())
+	@appCI(app.Name, app.Link(), app.LiveImage, app.LiveNumber > 0, app.DeployHookHash != nil, app.HookImage())
 }
 
 // appDomainsSection answers "where is it reached?": the instant address

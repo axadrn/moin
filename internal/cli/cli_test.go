@@ -532,7 +532,7 @@ func TestFirstHookAsksNothing(t *testing.T) {
 			"POST /api/v1/apps/shop/hook": `{"url":"http://localhost/webhooks/deploy/dph_x"}`,
 		}}
 		code, stdout, stderr := runCLI(t, api, "hook", "shop")
-		if code != 0 || !strings.Contains(stdout, "dph_x") || !strings.Contains(stdout, want) || !strings.Contains(stdout, "Treat it like a password.") {
+		if code != 0 || !strings.Contains(stdout, "dph_x") || !strings.Contains(stdout, want) || !strings.Contains(stdout, "Keep it secret, like a password.") {
 			t.Errorf("image %q: code %d, stdout %q, stderr %q, requests %v", image, code, stdout, stderr, api.requests)
 		}
 	}
