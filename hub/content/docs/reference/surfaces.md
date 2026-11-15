@@ -55,9 +55,9 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | --- | --- | --- | --- | --- | --- |
 | Add a server, install command | ✓ | ✓ `servers add` | Opens the web. | ✓ | ✓ |
 | Rename, remove a server | ✓ | ✓ | Opens the web. | ✓ | ✓ |
-| Tunnel, SSH on Tailscale, firewall | ✓ | ✓ `servers secure` | Shows what the daemon set up; `W` changes it in the web. | ✓ | ✓ |
+| Visitors, SSH, firewall: what is on the server | ✓ | ✓ `servers secure` | Shows what is on the server; `W` changes it in the web. | ✓ | ✓ |
 | Server rules | ✓ | ✓ `servers rules` | ✓ on the server | ✓ | ✓ |
-| Cloudflare token, Tailscale key | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
+| Integrations: Cloudflare, Tailscale | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
 | Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
 | Uninstall the daemon | Runs on the server. | ✓ `daemon uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
 | Create, remove an app | ✓ | ✓ `apps add`, `deploy` asks first | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
@@ -77,6 +77,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Team and invitations | ✓ | ✓ `team` | Opens the web. | ✓ | ✓ |
 | Rename the workspace | ✓ | ✓ `team rename` | Opens the web. | ✓ | ✓ |
 | Update a self-hosted hub | ✓ | ✓ `update` | Opens the web. | ✓ | ✓ |
+| Hub backup, for the admins of the hub | ✓ Admin, or Settings on a self-hosted hub | ✓ `version` | Opens the web. | ✓ `GET /api/v1/version` | ✓ `get_version` |
 
 ## Account, roles and money
 

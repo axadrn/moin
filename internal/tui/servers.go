@@ -126,17 +126,19 @@ func (m model) serverView(u ui, w, h int) string {
 	var right []string
 	sec := []string{}
 	if s.Security != nil {
-		sec = append(sec, padR(u.muted("proxy"), 12)+u.text(s.Security.Proxy))
+		// What is on the server; a line that is not as set says both.
+		for _, line := range s.SecurityLines() {
+			value := u.text(line.Is)
+			if line.Is != line.Set {
+				value = u.bad(line.Is + " ✗ set: " + line.Set)
+			}
+			sec = append(sec, padR(u.muted(line.Name), 12)+value)
+		}
 		if len(s.Security.OpenPorts) > 0 {
 			sec = append(sec, padR(u.muted("open ports"), 12)+u.text(strings.Join(s.Security.OpenPorts, ", ")))
 		}
-		fw := u.faint("off")
-		if s.Security.Firewall {
-			fw = u.good("on")
-		}
-		sec = append(sec, padR(u.muted("firewall"), 12)+fw)
 		if s.Security.TailscaleIP != "" {
-			sec = append(sec, padR(u.muted("tailscale"), 12)+u.text(s.Security.TailscaleIP))
+			sec = append(sec, padR(u.muted("tailnet"), 12)+u.text(s.Security.TailscaleIP))
 		}
 		for _, p := range s.Security.Problems {
 			sec = append(sec, u.bad("✗ "+p))

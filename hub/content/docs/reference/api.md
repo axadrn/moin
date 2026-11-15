@@ -94,8 +94,8 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `POST /api/v1/servers/{id}/update` | write | updates the daemon to the hub's version |
 | `GET` · `PUT /api/v1/daemon-updates` | read · write | whether daemons update by themselves, `{"auto": true}`; on by default |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | read | CPU, memory, disk, network and load now and over `1h`, `24h`, `7d` or `30d`, and its apps now, the most memory first |
-| `PUT /api/v1/servers/{id}/security` | write | Cloudflare Tunnel, SSH on Tailscale, firewall ([Security](/docs/guides/security)) |
-| `GET` · `PUT /api/v1/integrations` | read · write | the Cloudflare API token and the Tailscale auth key; an empty key removes it |
+| `PUT /api/v1/servers/{id}/security` | write | `tunnel`, `ssh` (`tailnet`, `everyone` or `off`) and `firewall` ([Security](/docs/guides/security)) |
+| `GET` · `PUT /api/v1/integrations` | read · write | connect Cloudflare and Tailscale with their keys; an empty key disconnects ([Integrations](/docs/guides/security#integrations)) |
 
 ## Apps
 

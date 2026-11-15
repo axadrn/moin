@@ -4,18 +4,21 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/axadrn/moin/protocol"
 )
 
 func TestFirewallRules(t *testing.T) {
-	direct := firewallRules(openPorts("direct", false, false), false)
+	direct := firewallRules(openPorts("direct", true, false), false)
 	for _, want := range []string{"policy drop", "ct state established,related accept", "tcp dport 22 accept", "tcp dport 80 accept", "tcp dport 443 accept"} {
 		if !strings.Contains(direct, want) {
 			t.Errorf("direct rules miss %q:\n%s", want, direct)
 		}
 	}
-	tunnel := firewallRules(openPorts("tunnel", true, true), true)
+	tunnel := firewallRules(openPorts("tunnel", false, true), true)
 	for _, unwanted := range []string{"tcp dport 80", "tcp dport 443", "\t\ttcp dport 22 accept"} {
 		if strings.Contains(tunnel, unwanted) {
 			t.Errorf("tunnel rules with SSH on Tailscale open %q:\n%s", unwanted, tunnel)
@@ -38,6 +41,50 @@ func TestFirewallRules(t *testing.T) {
 		os.WriteFile(path+"-ssh.nft", []byte("table inet moin\ndelete table inet moin\n"+ssh), 0o644)
 		os.WriteFile(path+"-direct.nft", []byte("table inet moin\ndelete table inet moin\n"+direct), 0o644)
 		os.WriteFile(path+"-tunnel.nft", []byte("table inet moin\ndelete table inet moin\n"+tunnel), 0o644)
+	}
+}
+
+// TestDriftedNamesWhatACheckPutBack: what came back between two looks is
+// what the activity says moin put back.
+func TestDriftedNamesWhatACheckPutBack(t *testing.T) {
+	config := protocol.ServerConfig{TunnelToken: "token", SSH: protocol.SSHOff, Firewall: true}
+	before := seen{table: "", sshd: true}
+	after := seen{tunnel: true, table: "table inet moin {}", sshd: false, tailnet: "100.64.0.1"}
+	got := drifted(config, before, after)
+	want := []string{"the Cloudflare Tunnel", "the tailnet", "SSH off", "the firewall"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("drifted = %q, want %q", got, want)
+	}
+	if fixed := drifted(config, after, after); len(fixed) != 0 {
+		t.Fatalf("nothing drifted, but drifted = %q", fixed)
+	}
+}
+
+// TestSSHNow: who reaches SSH, from sshd and the rules in front of it.
+func TestSSHNow(t *testing.T) {
+	for _, test := range []struct {
+		sshd, tailnetOnly, closed bool
+		want                      string
+	}{
+		{false, false, false, protocol.SSHOff},
+		{true, false, true, protocol.SSHOff},
+		{true, true, false, protocol.SSHTailnet},
+		{true, false, false, protocol.SSHEveryone},
+	} {
+		if got := sshNow(test.sshd, test.tailnetOnly, test.closed); got != test.want {
+			t.Errorf("sshNow(%v, %v, %v) = %q, want %q", test.sshd, test.tailnetOnly, test.closed, got, test.want)
+		}
+	}
+}
+
+// TestKeepWithoutAConfigOnlyLooks: before the hub sent anything, a check
+// changes nothing and fixes nothing.
+func TestKeepWithoutAConfigOnlyLooks(t *testing.T) {
+	fakeCommand(t, "docker", "exit 1\n")
+	s := newSecurity(t.TempDir(), &apps{})
+	report := s.keep(context.Background())
+	if report.Proxy != "direct" || len(report.Fixed) != 0 || report.Firewall || !protocol.ValidSSH(report.SSH) {
+		t.Fatalf("report = %+v", report)
 	}
 }
 

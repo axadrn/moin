@@ -9,7 +9,7 @@ The questions people ask most.
 
 ## Does my server need open ports?
 
-Not for moin. The daemon dials out. Visitors reach your apps on ports 80 and 443, and with a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel) not even those are open.
+Not for moin. The daemon dials out. Visitors reach your apps on ports 80 and 443, and with a [Cloudflare Tunnel](/docs/guides/security#visitors) not even those are open.
 
 ## Does moin build on its own servers?
 

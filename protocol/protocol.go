@@ -101,6 +101,11 @@ const (
 	// it changes. The daemon answers with TypeServerConfigResult.
 	TypeServerConfig       MessageType = "server.config"
 	TypeServerConfigResult MessageType = "server.config.result"
+	// TypeServerSecurity is what really is on the server and what the
+	// daemon put back (ServerConfigResult), sent by the daemon after each
+	// start, on each session and every SecurityEvery, without a request. A
+	// hub that does not know it drops it.
+	TypeServerSecurity MessageType = "server.security"
 
 	// TypeDaemonUpdate has the daemon replace its binary with the one the
 	// hub serves under DownloadPath, check it against SHA256 and

@@ -27,13 +27,13 @@ func TestSettingsHome(t *testing.T) {
 		ctx = ctxkeys.WithWorkspaces(ctx, []model.WorkspaceMembership{{Workspace: *workspace, Role: role}, {Workspace: model.Workspace{ID: "workspace-2", Name: "Second Workspace", Slug: "second-workspace"}, Role: model.WorkspaceRoleMember}})
 		ctx = ctxkeys.WithAdmin(ctx, admin)
 		var output bytes.Buffer
-		if err := SettingsHome(SettingsHomeView{GitHub: true, GitHubAccounts: []string{"acme"}}).Render(ctx, &output); err != nil {
+		if err := SettingsHome(SettingsHomeView{HubBackup: &model.HubBackup{State: model.HubBackupLate, Bucket: "acme-hub"}}).Render(ctx, &output); err != nil {
 			t.Fatal(err)
 		}
 		return output.String()
 	}
 	owner := render(model.WorkspaceRoleOwner, false)
-	for _, want := range []string{"First Workspace", "Second Workspace", `aria-label="Open now"`, `href="/app/second-workspace/settings"`, "/workspaces/new", "/settings/github", "acme", `href="/app/first-workspace/registries"`, "/billing", "/settings/account", `hx-post="/auth/logout"`} {
+	for _, want := range []string{"First Workspace", "Second Workspace", `aria-label="Open now"`, `href="/app/second-workspace/settings"`, "/workspaces/new", `href="/app/first-workspace/integrations"`, "Hub backup", "late · bucket acme-hub", `href="/app/first-workspace/registries"`, "/billing", "/settings/account", `hx-post="/auth/logout"`} {
 		if !strings.Contains(owner, want) {
 			t.Fatalf("settings lack %s", want)
 		}

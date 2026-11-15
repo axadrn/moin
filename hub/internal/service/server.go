@@ -123,12 +123,20 @@ func (s *ServerService) Create(actor Actor, name string) (*model.Server, string,
 	hash := hashToken(raw)
 	now := s.now().UTC()
 	expiresAt := now.Add(InstallTokenLifetime)
+	// With Cloudflare connected a new server gets the tunnel: its daemon
+	// creates it when it first connects.
+	integrations, err := s.servers.Integrations(actor.WorkspaceID)
+	if err != nil {
+		return nil, "", err
+	}
 	server := &model.Server{
 		ID:               uuid.New().String(),
 		WorkspaceID:      actor.WorkspaceID,
 		Name:             name,
 		InstallTokenHash: &hash,
 		InstallExpiresAt: &expiresAt,
+		Tunnel:           integrations.CloudflareToken != "",
+		SSH:              protocol.SSHEveryone,
 		CreatedAt:        now,
 	}
 	err = s.servers.Create(server)

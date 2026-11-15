@@ -61,7 +61,6 @@ type SearchInput struct {
 	Catalog   []catalog.Entry
 	CanChange bool
 	IsOwner   bool
-	GitHub    bool
 }
 
 // The groups of the palette, in the order it shows them.
@@ -110,14 +109,12 @@ func SearchItems(in SearchInput) []SearchItem {
 		{Title: "Alerts", Where: "Settings", Key: "G L", Icon: "bell", Href: in.Base + "/alerts"},
 		{Title: "Bucket", Where: "Settings", Key: "G B", Icon: "bucket", Href: in.Base + "/bucket"},
 		{Title: "Registries", Where: "Settings", Icon: "package", Href: in.Base + "/registries"},
+		{Title: "Integrations", Where: "Settings", Icon: "key", Href: in.Base + "/integrations"},
 		{Title: "Activity", Where: "Settings", Key: "G Y", Icon: "activity", Href: in.Base + "/activity"},
 		{Title: "Account", Where: "Settings", Icon: "user", Href: in.Base + "/settings/account"},
 		{Title: "Security", Where: "Settings › Account", Icon: "shield", Href: in.Base + "/settings/account?tab=security"},
 		{Title: "Tokens", Where: "Settings › Account", Icon: "key", Href: in.Base + "/settings/account?tab=tokens"},
 		{Title: "Source code", Where: "GitHub", Icon: "git-hub", Href: layouts.GitHubURL, External: true},
-	}
-	if in.GitHub {
-		places = append(places, SearchItem{Title: "GitHub", Where: "Settings", Icon: "git-hub", Href: in.Base + "/settings/github"})
 	}
 	if in.IsOwner {
 		places = append(places, SearchItem{Title: "Billing", Where: "Settings", Icon: "card", Href: in.Base + "/billing"})

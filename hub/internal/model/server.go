@@ -21,15 +21,15 @@ type Server struct {
 	Addresses  string     `db:"addresses"`
 	LastSeenAt *time.Time `db:"last_seen_at"`
 	// Tunnel carries app traffic through a Cloudflare Tunnel; TunnelToken
-	// is sealed. SSHTailscale answers SSH only on the tailnet, Firewall
-	// drops every other inbound connection. Security is the daemon's last
-	// report, as JSON.
-	Tunnel       bool   `db:"tunnel"`
-	TunnelID     string `db:"tunnel_id"`
-	TunnelToken  string `db:"tunnel_token"`
-	SSHTailscale bool   `db:"ssh_tailscale"`
-	Firewall     bool   `db:"firewall"`
-	Security     string `db:"security"`
+	// is sealed. SSH is who SSH answers: protocol.SSHTailnet,
+	// SSHEveryone or SSHOff. Firewall drops every other inbound
+	// connection. Security is the daemon's last report, as JSON.
+	Tunnel      bool   `db:"tunnel"`
+	TunnelID    string `db:"tunnel_id"`
+	TunnelToken string `db:"tunnel_token"`
+	SSH         string `db:"ssh"`
+	Firewall    bool   `db:"firewall"`
+	Security    string `db:"security"`
 	// Rules are the server's own rules for moin, as JSON; see
 	// service.ServerRules.
 	Rules     string    `db:"rules"`

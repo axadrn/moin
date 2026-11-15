@@ -115,6 +115,11 @@ templ itemText(p ItemProps) {
 }
 
 templ itemLabel(p ItemProps) {
+	if p.Lead != nil {
+		<span data-lead>
+			@p.Lead
+		</span>
+	}
 	if p.Name != "" {
 		<label for={ p.For } class="moin-item-text">
 			<span class="moin-item-name">{ p.Name }</span>

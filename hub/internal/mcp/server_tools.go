@@ -34,13 +34,13 @@ func registerServerTools(server *mcpsdk.Server, services Services) {
 		"Has the daemon of a server download the moin binary this hub serves, check its SHA-256, swap it in and restart, and returns the server once the new daemon is back, within three minutes. list_servers shows each daemon's version; get it to the hub's. The daemon refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.updateDaemon)))
 	mcpsdk.AddTool(server, newTool("get_integrations", "Get integrations",
-		"Says whether a Cloudflare API token and a Tailscale auth key are stored; the keys never come back. Needs the read scope.",
+		"Says whether Cloudflare (an API token, for tunnels) and Tailscale (an auth key, for the tailnet) are connected, as in Settings, Integrations; the keys never come back. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getIntegrations)))
 	mcpsdk.AddTool(server, newTool("set_integrations", "Set integrations",
-		"Stores the Cloudflare API token (checked first) and the Tailscale auth key, encrypted. A missing field keeps its key, an empty one removes it. Needs a token with read and write access.",
+		"Connects Cloudflare with an API token (checked first) and Tailscale with an auth key, stored encrypted. A missing field keeps its key, an empty one disconnects it. With Cloudflare connected, every new server gets a tunnel. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setIntegrations)))
 	mcpsdk.AddTool(server, newTool("set_server_security", "Lock down a server",
-		"Sets how a server is reached: tunnel routes app traffic through a Cloudflare Tunnel and closes 80 and 443, ssh_tailscale answers SSH only on the tailnet, firewall drops every other inbound connection. Returns what the daemon set up. Needs a token with read and write access.",
+		"Sets how a server is reached, all three at once: tunnel routes visitors through a Cloudflare Tunnel and closes 80 and 443 (needs Cloudflare connected, no_cloudflare otherwise), ssh is tailnet (SSH only in the tailnet; needs Tailscale connected or a tailnet joined by hand, no_tailscale otherwise), everyone, or off (the daemon stops sshd), firewall drops every other inbound connection. The daemon keeps it: it puts back what drifts and the activity says so. Returns the server with security, what the daemon last saw: proxy, ssh, firewall, open_ports, tailscale_ip and problems. Ask the user first. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.setServerSecurity)))
 }
 
@@ -79,10 +79,10 @@ type IntegrationsInput struct {
 
 // SecurityInput is the input of set_server_security.
 type SecurityInput struct {
-	Server       string `json:"server" jsonschema:"the server name or ID"`
-	Tunnel       bool   `json:"tunnel" jsonschema:"route app traffic through a Cloudflare Tunnel; closes 80 and 443"`
-	SSHTailscale bool   `json:"ssh_tailscale" jsonschema:"answer SSH only on the tailnet"`
-	Firewall     bool   `json:"firewall" jsonschema:"drop every other inbound connection"`
+	Server   string `json:"server" jsonschema:"the server name or ID"`
+	Tunnel   bool   `json:"tunnel" jsonschema:"route app traffic through a Cloudflare Tunnel; closes 80 and 443"`
+	SSH      string `json:"ssh" jsonschema:"who SSH answers: tailnet (only there), everyone, or off (sshd stopped)"`
+	Firewall bool   `json:"firewall" jsonschema:"drop every other inbound connection"`
 }
 
 // Integrations is the output of get_integrations and set_integrations.
@@ -239,7 +239,7 @@ func (t moinTools) setIntegrations(ctx context.Context, caller Caller, input Int
 }
 
 func (t moinTools) setServerSecurity(ctx context.Context, caller Caller, input SecurityInput) (ServerOutput, error) {
-	server, err := t.services.Apps.SetServerSecurity(ctx, caller.actor(), input.Server, service.SecurityInput{Tunnel: input.Tunnel, SSHTailscale: input.SSHTailscale, Firewall: input.Firewall})
+	server, err := t.services.Apps.SetServerSecurity(ctx, caller.actor(), input.Server, service.SecurityInput{Tunnel: input.Tunnel, SSH: input.SSH, Firewall: input.Firewall})
 	if err != nil {
 		return ServerOutput{}, err
 	}

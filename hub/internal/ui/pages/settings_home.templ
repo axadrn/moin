@@ -1,8 +1,6 @@
 package pages
 
 import (
-	"strings"
-
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
@@ -10,12 +8,8 @@ import (
 	"github.com/axadrn/moin/internal/build"
 )
 
-// SettingsHomeView is what Settings shows beyond the request: GitHub.
+// SettingsHomeView is what Settings shows beyond the request.
 type SettingsHomeView struct {
-	// GitHub is whether this hub has the GitHub App, GitHubAccounts
-	// the accounts this workspace connected.
-	GitHub         bool
-	GitHubAccounts []string
 	// HubBackup is how the backup of the hub's own database stands, for
 	// the admins of a self-hosted hub, which has no Admin.
 	HubBackup *model.HubBackup
@@ -40,12 +34,10 @@ templ SettingsHome(view SettingsHomeView) {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
 						@components.Item(components.ItemProps{Href: base + "/workspace", Name: "Team"})
-						if view.GitHub {
-							@components.Item(components.ItemProps{Href: base + "/settings/github", Name: "GitHub", Value: gitHubValue(view.GitHubAccounts)})
-						}
 						@components.Item(components.ItemProps{Href: base + "/alerts", Name: "Alerts"})
 						@components.Item(components.ItemProps{Href: base + "/bucket", Name: "Bucket"})
 						@components.Item(components.ItemProps{Href: base + "/registries", Name: "Registries"})
+						@components.Item(components.ItemProps{Href: base + "/integrations", Name: "Integrations"})
 						@components.Item(components.ItemProps{Href: base + "/activity", Name: "Activity"})
 						if member != nil && member.Can(model.WorkspacePermissionManageBilling) && cfg.Billing {
 							@components.Item(components.ItemProps{Href: base + "/billing", Name: "Billing"})
@@ -132,45 +124,4 @@ templ SettingsHome(view SettingsHomeView) {
 // workspaceLead is the initial of a workspace in the list.
 templ workspaceLead(item model.WorkspaceMembership) {
 	@components.Avatar(components.AvatarProps{Name: item.Name, Initials: model.Initial(item.Name)})
-}
-
-// gitHubValue is what the GitHub row says: the accounts, or Connect.
-func gitHubValue(accounts []string) string {
-	if len(accounts) == 0 {
-		return "Connect"
-	}
-	return strings.Join(accounts, ", ")
-}
-
-// SettingsGitHub is the GitHub connection of the workspace, once for every
-// app: the accounts it reaches, each with the page on GitHub where its owner
-// picks the repos moin may read (and can remove moin), and Connect.
-templ SettingsGitHub(installations []model.GitHubInstallation) {
-	{{ base := ctxkeys.AppBasePath(ctx) }}
-	@layouts.App("GitHub · Settings") {
-		@panelPage() {
-			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: base + "/settings"}, Title: "GitHub"})
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					for _, installation := range installations {
-						if installation.SettingsURL != "" {
-							@components.Item(components.ItemProps{Href: installation.SettingsURL, External: true, Name: installation.Account}) {
-								<span class="moin-small moin-muted">Repos on GitHub</span>
-							}
-						} else {
-							@components.Item(components.ItemProps{Name: installation.Account})
-						}
-					}
-					@components.Item(components.ItemProps{Href: base + "/github/install?next=" + base + "/settings/github", Name: gitHubConnectLabel(installations)})
-				}
-			}
-		}
-	}
-}
-
-func gitHubConnectLabel(installations []model.GitHubInstallation) string {
-	if len(installations) == 0 {
-		return "Connect GitHub"
-	}
-	return "Connect another account"
 }

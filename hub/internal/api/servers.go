@@ -38,12 +38,13 @@ type Server struct {
 	DaemonVersion string     `json:"daemon_version"`
 	LastSeenAt    *time.Time `json:"last_seen_at"`
 	// Tunnel carries app traffic through a Cloudflare Tunnel, with no open
-	// port. SSHTailscale answers SSH only on the tailnet; Firewall drops
-	// every other inbound connection. Security is what the daemon set up.
-	Tunnel       bool                         `json:"tunnel"`
-	SSHTailscale bool                         `json:"ssh_tailscale"`
-	Firewall     bool                         `json:"firewall"`
-	Security     *protocol.ServerConfigResult `json:"security"`
+	// port. SSH is who SSH answers: tailnet, everyone or off. Firewall
+	// drops every other inbound connection. They are what is set; Security
+	// is what the daemon last saw on the server.
+	Tunnel   bool                         `json:"tunnel"`
+	SSH      string                       `json:"ssh"`
+	Firewall bool                         `json:"firewall"`
+	Security *protocol.ServerConfigResult `json:"security"`
 	// Rules are what the owner of the server allows moin to do there, from
 	// /etc/moin/rules on the server. Null without rules.
 	Rules     *protocol.Rules `json:"rules"`
@@ -89,7 +90,7 @@ func NewServer(server model.Server) Server {
 		DaemonVersion: server.DaemonVersion,
 		LastSeenAt:    utcTime(server.LastSeenAt),
 		Tunnel:        server.Tunnel,
-		SSHTailscale:  server.SSHTailscale,
+		SSH:           server.SSH,
 		Firewall:      server.Firewall,
 		Security:      service.SecurityReport(server),
 		Rules:         service.ServerRules(server),

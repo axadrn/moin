@@ -3441,18 +3441,20 @@ paths:
       tags: [Servers]
       operationId: setServerSecurity
       summary: Lock down a server
-      description: 'How the server is reached: `tunnel` creates a Cloudflare Tunnel with the stored Cloudflare token, routes every app domain through it, points their DNS at it and closes 80 and 443. `ssh_tailscale` joins the tailnet with the stored Tailscale key and answers SSH only there, once Tailscale is up. `firewall` drops every other inbound connection. The daemon applies it at once, or when it connects; `security` in the answer says what it set up.'
+      description: 'How the server is reached, all three at once: `tunnel` creates a Cloudflare Tunnel with the workspace''s Cloudflare token, routes every app domain through it, points their DNS at it and closes 80 and 443. `ssh` is `tailnet` (SSH answers only in the tailnet, once the server is in it: with the workspace''s Tailscale key or joined by hand), `everyone`, or `off` (the daemon stops sshd). `firewall` drops every other inbound connection. The daemon applies it at once, or when it connects, and keeps it: it puts back what drifts and the activity says so as moin. `security` in the answer is what it saw on the server.'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required: [ssh]
               properties:
                 tunnel:
                   type: boolean
-                ssh_tailscale:
-                  type: boolean
+                ssh:
+                  type: string
+                  enum: [tailnet, everyone, off]
                 firewall:
                   type: boolean
       security:
@@ -3475,7 +3477,10 @@ paths:
           description: '`not_found`. No server with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`no_cloudflare` or `no_tailscale` when the key is missing.'
+          description: '`no_cloudflare` or `no_tailscale` when the account is not connected under Settings, Integrations.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` on `ssh` for anything but tailnet, everyone or off.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -5172,22 +5177,28 @@ components:
           description: The last connect or disconnect. Null before the daemon first connected.
         tunnel:
           type: boolean
-          description: App traffic comes through a Cloudflare Tunnel; no port is open.
-        ssh_tailscale:
-          type: boolean
-          description: SSH answers only on the user's tailnet.
+          description: Set to bring visitors through a Cloudflare Tunnel; no port is open.
+        ssh:
+          type: string
+          enum: [tailnet, everyone, off]
+          description: Who SSH should answer.
         firewall:
           type: boolean
-          description: Every other inbound connection is dropped.
+          description: Set to drop every other inbound connection.
         security:
           type: [object, 'null']
-          description: What the daemon set up last.
+          description: What the daemon last saw on the server, after each start, every five minutes and after each change. Compare it with the settings above to see what differs.
           properties:
             proxy:
               type: string
               enum: [direct, tunnel]
             tailscale_ip:
               type: string
+              description: The server's address in a tailnet, also one joined by hand.
+            ssh:
+              type: string
+              enum: [tailnet, everyone, off]
+              description: Who reaches SSH now.
             firewall:
               type: boolean
             open_ports:

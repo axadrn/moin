@@ -18,9 +18,9 @@ type SecurityView struct {
 	Integrations service.Integrations
 }
 
-// ServerSecurity is the page of one server: how it is reached, what the
-// daemon set up, the keys all servers share, its rules, its name, a new
-// install command, and removing it at the end.
+// ServerSecurity is the page of one server: how it is reached in three
+// lines, its rules, its name, a new install command, and removing it at
+// the end.
 templ ServerSecurity(view SecurityView) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ server := view.Server }}
@@ -30,7 +30,6 @@ templ ServerSecurity(view SecurityView) {
 			@serverHead(server, "security")
 			<div id="server-security" class="moin-stack" data-gap="6">
 				@securityState(view, securityPath)
-				@securityKeys(view)
 				@serverRules(server)
 				@components.Card(components.CardProps{Title: "Name"}) {
 					<form
@@ -64,12 +63,6 @@ templ ServerSecurity(view SecurityView) {
 				<div id="server-added" class="moin-hide-empty"></div>
 				@components.Card(components.CardProps{}) {
 					@components.List() {
-						if view.Integrations.Cloudflare {
-							@removeKeyButton(server.ID, "cloudflare", "Remove Cloudflare API token", "Remove the Cloudflare API token? Turn tunnels off first: without the token moin cannot delete them in Cloudflare.")
-						}
-						if view.Integrations.Tailscale {
-							@removeKeyButton(server.ID, "tailscale", "Remove Tailscale auth key", "Remove the Tailscale auth key? The next change of a server's security opens SSH again on every interface.")
-						}
 						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove server", Attrs: templ.Attributes{
 							"hx-delete":           basePath + "/servers/" + server.Link(),
 							"hx-swap":             "none",
@@ -84,215 +77,165 @@ templ ServerSecurity(view SecurityView) {
 				@idLine(server.ID)
 			</div>
 			@components.Live(components.LiveProps{URL: "/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
-			@securityScript()
 		}
 	}
 }
 
-// securityState is the switches and what the daemon set up. The page
-// reloads it when the server changes, unless a switch waits for Apply.
+// securityState is the three lines: who reaches the apps, who reaches
+// SSH, and the firewall. Each shows what really is on the server, with a
+// dot, and saves itself. It reloads when the server changes.
 templ securityState(view SecurityView, securityPath string) {
-	{{ report := service.SecurityReport(view.Server) }}
-	<div id="security-state" class="moin-stack" data-gap="6" hx-get={ securityPath } hx-trigger="security-changed from:body" hx-select="#security-state" hx-swap="outerHTML">
-		<form class="moin-stack" data-gap="3" hx-post={ securityPath } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-security-form>
-			@components.CSRF()
-			// What the page showed: Apply changes only the switches flipped here
-			// and keeps what changed elsewhere meanwhile.
-			<input type="hidden" name="was_tunnel" value={ onValue(view.Server.Tunnel) }/>
-			<input type="hidden" name="was_ssh_tailscale" value={ onValue(view.Server.SSHTailscale) }/>
-			<input type="hidden" name="was_firewall" value={ onValue(view.Server.Firewall) }/>
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>Access</h2>
-				</div>
-				@components.Card(components.CardProps{}) {
-					@components.List() {
-						@securityToggle("tunnel", "Cloudflare Tunnel", "Ports 80 and 443 close, Cloudflare serves HTTPS", view.Server.Tunnel, !view.Integrations.Cloudflare, "Needs a Cloudflare API token, below")
-						@securityToggle("ssh_tailscale", "SSH only on Tailscale", "SSH answers only on your tailnet", view.Server.SSHTailscale, !view.Integrations.Tailscale, "Needs a Tailscale auth key, below")
-						@securityToggle("firewall", "Firewall", "Drops every connection the server does not need", view.Server.Firewall, false, "")
-					}
+	{{ server := view.Server }}
+	{{ report := service.SecurityReport(server) }}
+	{{ tailnet := report != nil && report.TailscaleIP != "" }}
+	<div id="security-state" hx-get={ securityPath } hx-trigger="servers from:body" hx-select="#security-state" hx-swap="outerHTML">
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				{{ visitors := visitorsLine(server, report) }}
+				if !view.Integrations.Cloudflare && !server.Tunnel {
+					@needsKey(visitors, "Connect Cloudflare in Settings, Integrations first")
+				} else {
+					@securitySwitch(securityPath, "tunnel", visitors, server.Tunnel, ifElse(server.Tunnel,
+						"Open ports 80 and 443 again? moin deletes the tunnel and its DNS records. Point your domains back at the server.",
+						"Send visitors through Cloudflare? Ports 80 and 443 close. Cloudflare serves HTTPS."))
 				}
-			</section>
-			<div class="moin-row" data-end>
-				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-					Apply
+				{{ ssh := sshLine(server, report) }}
+				if !view.Integrations.Tailscale && !tailnet && server.SSH == protocol.SSHEveryone {
+					@needsKey(ssh, "Connect Tailscale in Settings, Integrations first")
+				} else {
+					@sshChoice(securityPath, ssh, server, view.Integrations.Tailscale || tailnet)
 				}
-			</div>
-		</form>
-		if report != nil {
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>What the daemon set up</h2>
-				</div>
-				<div data-security-report>
-					@components.Card(components.CardProps{}) {
-						@components.List() {
-							@securityFact("Traffic", "", proxyText(report.Proxy))
-							@securityFact("Open to everyone", portsNote(report.Firewall), portsText(*report, view.Server.SSHTailscale))
-							@securityFact("Tailnet", tailnetNote(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale), tailnetText(report.TailscaleIP, view.Integrations.Tailscale, view.Server.SSHTailscale))
-							for _, problem := range report.Problems {
-								@components.Item(components.ItemProps{}) {
-									<div class="moin-fill moin-text moin-running">{ problem }</div>
-								}
-							}
+				@securitySwitch(securityPath, "firewall", firewallLine(server, report), server.Firewall, ifElse(server.Firewall,
+					"Turn off the firewall? Every port that listens is open again.",
+					"Turn on the firewall? It drops every connection the server does not need."))
+				if report != nil {
+					for _, problem := range report.Problems {
+						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-security-problem": true}}) {
+							<div class="moin-fill moin-text moin-failed">{ problem }</div>
 						}
 					}
-				</div>
-			</section>
+				}
+			}
 		}
 	</div>
 }
 
-// securityFact is a row of what the daemon set up: the name and a note
-// left, the value right.
-templ securityFact(name, note, value string) {
-	@components.Item(components.ItemProps{Name: name, Note: note}) {
-		<span class="moin-item-value moin-mono">{ value }</span>
-	}
+// securityLine is one line of the Security page: its name, the dot and
+// the short state of what is on the server.
+type securityLine struct {
+	Name  string
+	State components.State
+	Note  string
 }
 
-// securityToggle is one switch of Access. A switch whose key is missing
-// cannot be turned on and says what it needs.
-templ securityToggle(name, title, note string, on, locked bool, lockedNote string) {
-	{{ id := "security-" + strings.ReplaceAll(name, "_", "-") }}
-	@components.Item(components.ItemProps{For: id, Name: title, Note: ifElse(locked && !on, lockedNote, note)}) {
-		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id, "name": name, "value": "1", "checked": on, "disabled": locked && !on, "data-toggle": name}})
-	}
-}
-
-// securityKeys are the Cloudflare token and the Tailscale key, for every
-// server of the workspace. The fields only add or replace a key; a stored
-// key is removed at the end of the page.
-templ securityKeys(view SecurityView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@components.Card(components.CardProps{Title: "Keys for every server"}) {
-		<form class="moin-stack" data-gap="4" hx-post={ basePath + "/integrations" } hx-target="#server-security" hx-select="#server-security" hx-swap="outerHTML" hx-disable="find button[type='submit']" hx-vals={ templ.JSONString(map[string]string{"server": view.Server.ID}) } data-integrations-form>
-			@components.CSRF()
-			@keyField("cloudflare-token", "cloudflare_token", "Cloudflare API token", "Tunnel Edit, DNS Edit", view.Integrations.Cloudflare, "Stored for account "+view.Integrations.CloudflareAccount, "Tunnel Edit and DNS Edit; Zone Settings Edit for Always Use HTTPS")
-			@keyField("tailscale-key", "tailscale_key", "Tailscale auth key", "tskey-auth-…", view.Integrations.Tailscale, "Stored", "A reusable auth key")
-			<div class="moin-row" data-end>
-				@components.Button(components.ButtonProps{Type: "submit"}) {
-					Save keys
-				}
-			</div>
-		</form>
-	}
-}
-
-templ keyField(id, name, label, placeholder string, stored bool, storedText, help string) {
-	@components.Field(components.FieldProps{Label: label, For: id, Hint: ifElse(stored, "✓ "+storedText, help)}) {
-		@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "name": name, "type": "password", "placeholder": ifElse(stored, "Paste a new one to replace it", placeholder), "autocomplete": "off"}})
-	}
-}
-
-// securityScriptOnce puts the script on the page once.
-var securityScriptOnce = templ.NewOnceHandle()
-
-// securityScript reloads the switches and the report when the server
-// changes, like the servers page, but not while a flipped switch waits for
-// Apply or the server is being removed.
-templ securityScript() {
-	@securityScriptOnce.Once() {
-		<script nonce={ templ.GetNonce(ctx) }>
-			(() => {
-				if (window.moinSecurity) return;
-				window.moinSecurity = true;
-				const waiting = () => {
-					if (document.querySelector("[data-remove-server]:disabled")) return true;
-					const form = document.querySelector("[data-security-form]");
-					if (!form) return false;
-					return [...form.querySelectorAll("input[type=checkbox][name]")].some((box) => {
-						const was = form.querySelector(`input[name="was_${box.name}"]`);
-						return was && box.checked !== (was.value === "1");
-					});
-				};
-				document.addEventListener("servers", () => {
-					if (document.querySelector("[data-security-form]") && !waiting()) document.body.dispatchEvent(new Event("security-changed"));
-				});
-			})();
-		</script>
-	}
-}
-
-// removeKeyButton takes one stored key away; the fields only add or replace.
-templ removeKeyButton(server, key, label, question string) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@components.Item(components.ItemProps{Button: true, Danger: true, Name: label, Attrs: templ.Attributes{
-		"hx-post":         basePath + "/integrations",
-		"hx-vals":         `{"server":"` + server + `","remove":"` + key + `"}`,
-		"hx-target":       "#server-security",
-		"hx-select":       "#server-security",
-		"hx-swap":         "outerHTML",
-		"hx-disable":      "this",
-		"hx-confirm":      question,
-		"data-remove-key": key,
-	}})
-}
-
-func proxyText(proxy string) string {
-	if proxy == "tunnel" {
-		return "Cloudflare Tunnel"
-	}
-	return "Ports 80, 443"
-}
-
-func onValue(on bool) string {
-	if on {
-		return "1"
-	}
-	return "0"
-}
-
-// portsText is what is open to everyone. Without the firewall it is what
-// moin itself listens on; any other service on the server is open too.
-func portsText(report protocol.ServerConfigResult, sshOnTailscale bool) string {
-	ports := report.OpenPorts
-	if !report.Firewall {
-		ports = nil
-		if !sshOnTailscale || report.TailscaleIP == "" {
-			ports = append(ports, "22/tcp")
-		}
-		if report.Proxy != "tunnel" {
-			ports = append(ports, "80/tcp", "443/tcp")
-		}
-	}
-	if len(ports) == 0 {
-		return "nothing"
-	}
-	return strings.Join(ports, ", ")
-}
-
-func portsNote(firewall bool) string {
-	if firewall {
-		return "Everything else is dropped."
-	}
-	return "Firewall off: every other listening port too."
-}
-
-// tailnetText and tailnetNote say where the server stands on the tailnet.
-// The daemon joins it only for SSH on Tailscale.
-func tailnetText(ip string, key, sshOnTailscale bool) string {
+// truth is the line for what is (is) against what is set (want), in
+// words: green when they match and it is locked down (locked), quiet when
+// they match and it is open, red with both when they differ, waiting
+// before the daemon reported.
+func truth(name, is, want string, known, locked bool) securityLine {
 	switch {
-	case ip != "":
-		return ip
-	case key && sshOnTailscale:
-		return "not up"
-	case key:
-		return "not used"
+	case !known:
+		return securityLine{name, components.StateWaiting, want + ", once the daemon reports"}
+	case is != want:
+		return securityLine{name, components.StateFailed, is + " · set: " + want}
+	case locked:
+		return securityLine{name, components.StateLive, is}
 	}
-	return "not joined"
+	return securityLine{name, components.StateIdle, is}
 }
 
-func tailnetNote(ip string, key, sshOnTailscale bool) string {
-	switch {
-	case ip != "":
-		return "The server's IP on your tailnet."
-	case key && sshOnTailscale:
-		return "The server could not join your tailnet yet."
-	case key:
-		return "Turn on SSH only on Tailscale: the server then joins your tailnet."
+func visitorsLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
+	words := func(tunnel bool) string { return ifElse(tunnel, "Cloudflare Tunnel", "Ports 80 and 443 open") }
+	is := false
+	if report != nil {
+		is = report.Proxy == "tunnel"
 	}
-	return "Add a Tailscale auth key below: the server joins your tailnet, then SSH can answer only there."
+	return truth("Visitors", words(is), words(server.Tunnel), report != nil, is)
+}
+
+func sshLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
+	if report == nil {
+		return truth("SSH", "", sshWords(server.SSH), false, false)
+	}
+	line := truth("SSH", sshWords(report.SSH), sshWords(server.SSH), true, report.SSH != protocol.SSHEveryone)
+	if report.TailscaleIP != "" && line.State != components.StateFailed {
+		line.Note += " · " + report.TailscaleIP
+	}
+	return line
+}
+
+func firewallLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
+	words := func(on bool) string { return ifElse(on, "On", "Off") }
+	is := report != nil && report.Firewall
+	line := truth("Firewall", words(is), words(server.Firewall), report != nil, is)
+	if is && line.State != components.StateFailed {
+		line.Note = "Open to everyone: " + ifElse(len(report.OpenPorts) == 0, "nothing", strings.Join(report.OpenPorts, ", "))
+	}
+	return line
+}
+
+// sshWords says who SSH answers.
+func sshWords(ssh string) string {
+	switch ssh {
+	case protocol.SSHTailnet:
+		return "Only in the tailnet"
+	case protocol.SSHOff:
+		return "Off"
+	}
+	return "Everyone"
+}
+
+func lineDot(line securityLine) templ.Component {
+	return components.Dot(components.DotProps{State: line.State})
+}
+
+// needsKey is a line whose action needs an account first: it opens
+// Integrations.
+templ needsKey(line securityLine, connect string) {
+	@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/integrations", Lead: lineDot(line), Name: line.Name, Note: line.Note + ". " + connect, Attrs: templ.Attributes{"data-security-line": strings.ToLower(line.Name)}})
+}
+
+// securitySwitch is a line with a switch that saves itself after one
+// question.
+templ securitySwitch(securityPath, set string, line securityLine, on bool, question string) {
+	{{ id := "security-" + set }}
+	{{ attrs := securityForm(securityPath, set, question) }}
+	{{ attrs["hx-disable"] = "find input[type='checkbox']" }}
+	@components.Item(components.ItemProps{Form: true, For: id, Lead: lineDot(line), Name: line.Name, Note: line.Note, Attrs: attrs}) {
+		@components.CSRF()
+		<input type="hidden" name="set" value={ set }/>
+		@components.Switch(components.SwitchProps{ID: id, Name: "on", Value: "1", Checked: on})
+	}
+}
+
+// sshChoice is the SSH line: tailnet, everyone or off, saved after one
+// question. Tailnet waits for Tailscale or a tailnet joined by hand.
+templ sshChoice(securityPath string, line securityLine, server model.Server, tailnet bool) {
+	@components.Item(components.ItemProps{Form: true, For: "security-ssh-" + server.SSH, Lead: lineDot(line), Name: line.Name, Note: line.Note, Attrs: securityForm(securityPath, "ssh",
+		"Change who reaches SSH on "+server.Name+"? Keep another way in, like your provider's console.")}) {
+		@components.CSRF()
+		<input type="hidden" name="set" value="ssh"/>
+		@components.Choice(components.ChoiceProps{Name: "ssh", Label: "SSH", Checked: server.SSH, Options: []components.Option{
+			{Value: protocol.SSHTailnet, Label: "Tailnet", Attrs: templ.Attributes{"id": "security-ssh-tailnet", "disabled": !tailnet && server.SSH != protocol.SSHTailnet}},
+			{Value: protocol.SSHEveryone, Label: "Everyone", Attrs: templ.Attributes{"id": "security-ssh-everyone"}},
+			{Value: protocol.SSHOff, Label: "Off", Attrs: templ.Attributes{"id": "security-ssh-off"}},
+		}})
+	}
+}
+
+// securityForm makes a line the form that posts its control when it
+// changes, after the question, and answers the three lines as stored.
+func securityForm(securityPath, set, question string) templ.Attributes {
+	return templ.Attributes{
+		"hx-post":             securityPath,
+		"hx-trigger":          "change",
+		"hx-target":           "#security-state",
+		"hx-select":           "#security-state",
+		"hx-swap":             "outerHTML",
+		"hx-confirm":          question,
+		"data-confirm-action": "Change",
+		"data-security-line":  set,
+	}
 }
 
 // serverRules shows /etc/moin/rules of the server as the daemon reported it.

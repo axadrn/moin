@@ -53,7 +53,7 @@ Servers
   servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
   servers update     Update the daemon to the hub's version now: servers update [web-1]
   servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
-  servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]
+  servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailnet|everyone|off] [--firewall on|off] [--yes]
   servers rules      The server's own rules for moin, from /etc/moin/rules on it
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
   integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
