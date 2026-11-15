@@ -314,10 +314,15 @@ func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
 	answerDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+app.Name+".")
 }
 
+// Registries is the workspace's registry logins, under Settings.
+func (h *AppsHandler) Registries(w http.ResponseWriter, r *http.Request) {
+	h.renderRegistries(w, r)
+}
+
 // registryFields are the fields of the registry form, by API field name.
 var registryFields = map[string]string{"host": "registry-host", "password": "registry-password"}
 
-// SetRegistry saves a registry login from the settings form.
+// SetRegistry saves a registry login from the form on Registries.
 func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 	host := strings.TrimSpace(r.FormValue("host"))
 	err := h.apps.SetRegistry(actor(r), host, r.FormValue("username"), r.FormValue("password"))
@@ -346,7 +351,7 @@ func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list registries failed", err)
 		return
 	}
-	render(w, r, pages.SettingsRegistriesSection(logins))
+	render(w, r, pages.Registries(logins))
 }
 
 // logLines is how many of the last lines of an app's containers the Logs

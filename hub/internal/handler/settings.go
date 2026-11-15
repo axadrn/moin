@@ -89,14 +89,7 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
 		return
 	}
-	registries, err := h.apps.Registries(ctxkeys.Workspace(r.Context()).ID)
-	if err != nil {
-		slog.Error("failed to list registries", "error", err, "user_id", user.ID)
-		w.WriteHeader(http.StatusInternalServerError)
-		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
-		return
-	}
-	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, r.URL.Query().Get("password_removed") == "1", pages.SettingsAPITokensSection(tokens), pages.SettingsRegistriesSection(registries)))
+	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, r.URL.Query().Get("password_removed") == "1", pages.SettingsAPITokensSection(tokens)))
 }
 
 func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {

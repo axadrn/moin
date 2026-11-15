@@ -99,9 +99,10 @@ func (m model) webPages() []page {
 		{"t", "Team", "Invite people and change roles.", "/workspace"},
 		{"g", "Connect GitHub", "GitHub asks for a browser to install the app.", "/github/install"},
 		{"k", "Buckets", "Where backups and uploads go.", "/bucket"},
+		{"r", "Registries", "Logins for private images.", "/registries"},
 		{"n", "Alerts", "Slack, Discord, Telegram and webhooks.", "/alerts"},
 		data,
-		{"s", "Settings", "Your account, API tokens, registry logins.", "/settings"},
+		{"s", "Settings", "Your account and API tokens.", "/settings"},
 	}
 	if !m.ws.selfHosted {
 		out = append(out, page{"b", "Billing", "Your card belongs to Stripe, not your terminal.", "/billing"})

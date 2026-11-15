@@ -29,7 +29,7 @@ func TestReadOnlyAllows(t *testing.T) {
 		{"POST /app/{workspaceSlug}/apps/{app}/redeploy", "/app/acme/apps/blog/redeploy", false},
 		{"POST /api/v1/servers", "/api/v1/servers", false},
 		{"PATCH /api/v1/apps/{app}/env", "/api/v1/apps/blog/env", false},
-		{"POST /app/{workspaceSlug}/settings/registries", "/app/acme/settings/registries", false},
+		{"POST /app/{workspaceSlug}/registries", "/app/acme/registries", false},
 		{"POST /api/v1/apps/{app}/deploys", "/api/v1/apps/stop/deploys", false},
 		{"DELETE /api/v1/apps/{app}", "/api/v1/apps/stop", false},
 		{"DELETE /app/{workspaceSlug}/apps/{app}", "/app/acme/apps/start", false},

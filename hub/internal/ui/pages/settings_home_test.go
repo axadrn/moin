@@ -11,7 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-// Settings lists the workspaces with a check on the open one, Billing only
+// Settings lists Registries with the workspace, the workspaces with a check on the open one, Billing only
 // for those who may manage it, and Admin only for operators.
 func TestSettingsHome(t *testing.T) {
 	render := func(role string, admin bool) string {
@@ -33,7 +33,7 @@ func TestSettingsHome(t *testing.T) {
 		return output.String()
 	}
 	owner := render(model.WorkspaceRoleOwner, false)
-	for _, want := range []string{"First Workspace", "Second Workspace", `aria-label="Open now"`, `href="/app/second-workspace/settings"`, "/workspaces/new", "/settings/github", "acme", "/billing", "/settings/account", `hx-post="/auth/logout"`} {
+	for _, want := range []string{"First Workspace", "Second Workspace", `aria-label="Open now"`, `href="/app/second-workspace/settings"`, "/workspaces/new", "/settings/github", "acme", `href="/app/first-workspace/registries"`, "/billing", "/settings/account", `hx-post="/auth/logout"`} {
 		if !strings.Contains(owner, want) {
 			t.Fatalf("settings lack %s", want)
 		}

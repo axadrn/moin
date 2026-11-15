@@ -36,9 +36,9 @@ The deploy hook is a secret URL. When CI calls it, moin deploys the image. Only 
 Only for private images. For GitHub Container Registry, use a token with `read:packages`.
 
 ```surfaces
-Web: **Settings**, **Account**, **Tokens** tab, **Registries**, **Save login**
+Web: **Settings**, **Registries**, **Save login**
 CLI: moin registry set ghcr.io <username>
-TUI: opens the web: `w`, then `s`
+TUI: opens the web: `w`, then `r`
 API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
@@ -144,10 +144,10 @@ MCP: remove_deploy_hook
 ## Registry logins
 
 ```surfaces
-Web: **Settings**, **Account**, **Tokens** tab, **Registries**; **Remove** on a login
+Web: **Settings**, **Registries**; **Remove** on a login
 CLI: moin registry
 CLI: moin registry rm ghcr.io
-TUI: opens the web: `w`, then `s`
+TUI: opens the web: `w`, then `r`
 API: GET /api/v1/registries
 API: DELETE /api/v1/registries/{host}
 MCP: list_registries

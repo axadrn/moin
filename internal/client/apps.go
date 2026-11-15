@@ -310,7 +310,7 @@ type Registry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Registries lists the account's registry logins.
+// Registries lists the workspace's registry logins.
 func (c *Client) Registries(ctx context.Context) ([]Registry, error) {
 	var response struct {
 		Items []Registry `json:"items"`
