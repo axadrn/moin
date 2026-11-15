@@ -16,10 +16,11 @@ type SettingsHandler struct {
 	authService *service.AuthService
 	apiTokens   *service.APITokenService
 	apps        *service.AppService
+	updates     *service.UpdateService
 }
 
-func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService, apps *service.AppService) *SettingsHandler {
-	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps}
+func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService, apps *service.AppService, updates *service.UpdateService) *SettingsHandler {
+	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps, updates: updates}
 }
 
 // Home is Settings: you, your workspaces, this workspace, moin, sign out.
@@ -33,6 +34,10 @@ func (h *SettingsHandler) Home(w http.ResponseWriter, r *http.Request) {
 	view.GitHub = enabled
 	for _, installation := range installations {
 		view.GitHubAccounts = append(view.GitHubAccounts, installation.Account)
+	}
+	// A self-hosted hub has no Admin: its admins see the hub backup here.
+	if !ctxkeys.RenderConfig(r.Context()).Billing {
+		view.HubBackup = h.updates.Info(ctxkeys.User(r.Context())).HubBackup
 	}
 	render(w, r, pages.SettingsHome(view))
 }

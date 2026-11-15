@@ -66,6 +66,13 @@ func (r *Workspaces) CreateWithOwner(
 	return tx.Commit()
 }
 
+// ConfirmBusiness keeps who confirmed that the workspace subscribes as a
+// business, and when.
+func (r *Workspaces) ConfirmBusiness(workspaceID, userID string, at time.Time) error {
+	_, err := r.db.Exec(`UPDATE workspaces SET business_confirmed_by = $1, business_confirmed_at = $2 WHERE id = $3`, userID, at, workspaceID)
+	return err
+}
+
 func (r *Workspaces) ByID(id string) (*model.Workspace, error) {
 	workspace := &model.Workspace{}
 	if err := r.db.Get(workspace, `SELECT * FROM workspaces WHERE id = $1`, id); err != nil {

@@ -77,6 +77,15 @@
     }
   });
 
+  // Check: a form's submit buttons wait for its required boxes, off until
+  // each one is ticked. The page renders them off.
+  document.addEventListener("change", (event) => {
+    const form = event.target.matches?.(".moin-check > input[required]") && event.target.form;
+    if (!form) return;
+    const open = [...form.querySelectorAll(".moin-check > input[required]")].every((box) => box.checked);
+    form.querySelectorAll("button[type=submit]").forEach((button) => (button.disabled = !open));
+  });
+
   // Asking first: data-confirm="Stop my-app? It goes offline." asks in the one
   // dialog, up to the first "? " the title. With data-confirm-name the button
   // works only once the name is typed. On yes the element gets moin:confirmed.

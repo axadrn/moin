@@ -20,3 +20,7 @@ item-with-check
 ```example
 check-on-its-own
 ```
+
+## Before a button
+
+A required box holds the form's buttons: render them `disabled`, and `moin.js` turns them on once every required box is ticked. The server checks it again.

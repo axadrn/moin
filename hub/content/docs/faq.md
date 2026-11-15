@@ -63,6 +63,8 @@ The whole team is included, with no per-seat fee, and so is everything else: bac
 
 Your first workspace gets 30 days with everything, no card. Then it is read-only until you subscribe. Your apps and their backups keep running.
 
+The hosted plans are for businesses. Before **Subscribe** you tick one box: you subscribe as a business, not as a consumer. No tax ID, no company name. Self-hosted, moin asks nothing of the kind.
+
 ## Can an AI agent do everything?
 
 Almost. Every action on servers, apps, data, backups, domains and invitations is an [MCP tool](/docs/guides/mcp). Your account, roles and deleting a workspace stay on the web.

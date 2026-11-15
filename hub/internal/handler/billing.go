@@ -36,7 +36,7 @@ func (h *BillingHandler) BillingPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	checkoutURL, err := h.workspaceService.Checkout(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.User(ctx), r.FormValue("plan_id"), r.FormValue("interval"), service.RequestSource(ctx), h.paymentService.CreateCheckoutURL)
+	checkoutURL, err := h.workspaceService.Checkout(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.User(ctx), r.FormValue("plan_id"), r.FormValue("interval"), r.FormValue("business") == "1", service.RequestSource(ctx), h.paymentService.CreateCheckoutURL)
 	switch {
 	case err == nil:
 		redirect(w, r, checkoutURL, http.StatusSeeOther)
@@ -44,6 +44,8 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 		checkoutFailed(w, r, http.StatusForbidden, "Action not allowed", "Action not allowed", "Only workspace owners can start checkout.")
 	case errors.Is(err, service.ErrPlan):
 		checkoutFailed(w, r, http.StatusBadRequest, "Invalid plan", "Invalid plan", "Choose an available paid plan.")
+	case errors.Is(err, service.ErrNotBusiness):
+		checkoutFailed(w, r, http.StatusUnprocessableEntity, "Not subscribed", "Businesses only", "Hosted plans are for businesses only. Confirm that you subscribe as a business, not as a consumer.")
 	case errors.Is(err, service.ErrInterval):
 		checkoutFailed(w, r, http.StatusBadRequest, "Invalid billing interval", "Invalid billing interval", "Choose monthly or yearly billing.")
 	case errors.Is(err, repository.ErrCheckoutPending), errors.Is(err, repository.ErrCheckoutSelection), errors.Is(err, repository.ErrSubscriptionAlreadyPaid):

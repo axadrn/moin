@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/dbbackup"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
@@ -227,5 +229,26 @@ func TestDaemonBehind(t *testing.T) {
 		if got := DaemonBehind(test.release, test.daemon); got != test.behind {
 			t.Errorf("DaemonBehind(%q, %q) = %v, want %v", test.release, test.daemon, got, test.behind)
 		}
+	}
+}
+
+func TestHubBackupGoesToTheAdminsOfEveryHub(t *testing.T) {
+	now := time.Now()
+	verified := &model.User{Email: "ada@example.com", EmailVerifiedAt: &now}
+	member := &model.User{Email: "grace@example.com", EmailVerifiedAt: &now}
+	hosted := NewUpdateService("v0.2.0", "", t.TempDir(), false, false, []string{"ada@example.com"}, nil)
+	if backup := hosted.Info(verified).HubBackup; backup == nil || backup.State != model.HubBackupOff {
+		t.Fatalf("hub backup without one = %+v, want off", backup)
+	}
+	if hosted.Info(member).HubBackup != nil {
+		t.Fatal("a member who does not run the hub sees its backup")
+	}
+	hosted.UseHubBackup(&dbbackup.Backup{Bucket: "acme-hub", Started: now})
+	if backup := hosted.HubBackup(); backup.State != model.HubBackupOn || backup.Bucket != "acme-hub" {
+		t.Fatalf("hub backup just started = %+v, want on", backup)
+	}
+	hosted.UseHubBackup(&dbbackup.Backup{Bucket: "acme-hub", Started: now.Add(-model.HubBackupLateAfter - time.Second)})
+	if backup := hosted.HubBackup(); backup.State != model.HubBackupLate {
+		t.Fatalf("hub backup without a copy for long = %+v, want late", backup)
 	}
 }

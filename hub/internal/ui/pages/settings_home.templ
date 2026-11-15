@@ -16,6 +16,9 @@ type SettingsHomeView struct {
 	// the accounts this workspace connected.
 	GitHub         bool
 	GitHubAccounts []string
+	// HubBackup is how the backup of the hub's own database stands, for
+	// the admins of a self-hosted hub, which has no Admin.
+	HubBackup *model.HubBackup
 }
 
 // SettingsHome is Settings of the workspace: what belongs to it first, then
@@ -107,6 +110,13 @@ templ SettingsHome(view SettingsHomeView) {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
 						@components.Item(components.ItemProps{Href: "/admin", Name: "Admin"})
+					}
+				}
+			}
+			if view.HubBackup != nil {
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@hubBackupItem(*view.HubBackup)
 					}
 				}
 			}

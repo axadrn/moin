@@ -223,6 +223,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrBillingPermission, status: http.StatusForbidden, code: "forbidden", message: "Only workspace owners can manage billing."},
 	{err: service.ErrPlan, status: http.StatusUnprocessableEntity, code: "invalid_plan", message: "Choose an available paid plan."},
 	{err: service.ErrInterval, status: http.StatusUnprocessableEntity, code: "invalid_interval", message: "Choose monthly or yearly billing."},
+	{err: service.ErrNotBusiness, status: http.StatusUnprocessableEntity, code: "business_only", message: "Hosted plans are for businesses only. Confirm that you subscribe as a business, not as a consumer."},
 	{err: service.ErrNoBillingAccount, status: http.StatusConflict, code: "no_billing_account", message: "Start a paid plan before managing billing."},
 	{err: service.ErrCheckoutFailed, status: http.StatusInternalServerError, code: "internal", message: "Checkout could not be started. Please try again."},
 	{err: service.ErrBillingManagementFailed, status: http.StatusInternalServerError, code: "internal", message: "Billing management could not be opened. Please try again."},

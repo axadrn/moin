@@ -209,6 +209,8 @@ Before every update moin shows the whole release notes, under one line: "Read th
 
 The hub's own SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `hub/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
 
+The admins of the hub (`ADMIN_EMAILS`) see how it stands in **Settings**, **Hub backup** (on the hosted hub under **Admin**), in `moin version`, in `GET /api/v1/version` and in `get_version`: `● on · bucket <name> · last copy just now`, red when it is off or no copy reached the bucket for two minutes.
+
 | File | What is in it | Backup |
 | --- | --- | --- |
 | `app.db` (the name in `DB_CONNECTION`) | users, apps, deploys, settings, the uptime state of each domain and every outage | every change, within a second |

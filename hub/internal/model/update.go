@@ -57,4 +57,29 @@ type VersionInfo struct {
 	CanUpdate bool
 	// Update is the update under way, or the last one of the past day.
 	Update *UpdateState
+	// HubBackup is how the backup of the hub's own database stands, only
+	// for the admins of the hub, on every hub.
+	HubBackup *HubBackup
 }
+
+// HubBackup is how the backup of the hub's own database stands. Its
+// settings stay in the env (S3_*, BACKUP_DATABASE): the place to restore
+// from must not live in the database it restores.
+type HubBackup struct {
+	// State is on, off, or late when no copy reached the bucket for
+	// HubBackupLateAfter.
+	State    string     `json:"state"`
+	Bucket   string     `json:"bucket"`
+	LastCopy *time.Time `json:"last_copy"`
+}
+
+// HubBackupLateAfter is how long the bucket may go without a copy before
+// the backup counts as late. Litestream checks in every second.
+const HubBackupLateAfter = 2 * time.Minute
+
+// Words of HubBackup.State.
+const (
+	HubBackupOn   = "on"
+	HubBackupOff  = "off"
+	HubBackupLate = "late"
+)

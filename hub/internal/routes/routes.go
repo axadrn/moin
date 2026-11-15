@@ -246,7 +246,7 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 // the overview, settings, the account, billing, the team and alerts.
 func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations limiter) {
 	workspace := inWorkspace(app)
-	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService)
+	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService, app.UpdateService)
 	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
@@ -401,7 +401,7 @@ func adminRoutes(mux *http.ServeMux, app *app.App) {
 	if !app.Cfg.Billing {
 		return
 	}
-	admin := handler.NewAdminHandler(app.AdminService)
+	admin := handler.NewAdminHandler(app.AdminService, app.UpdateService)
 	adminRoute := func(next http.HandlerFunc) http.HandlerFunc {
 		return middleware.RequireAuth(middleware.RequireAdmin(next))
 	}

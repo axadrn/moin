@@ -42,6 +42,9 @@ type VersionInfo struct {
 	// Updater says whether the updater runs next to the hub.
 	Updater bool               `json:"updater"`
 	Update  *model.UpdateState `json:"update"`
+	// HubBackup is how the backup of the hub's own database stands, for
+	// the admins of the hub only; null for everyone else.
+	HubBackup *model.HubBackup `json:"hub_backup"`
 }
 
 // NewVersion is the JSON shape of the version info.
@@ -54,7 +57,7 @@ func NewVersion(info model.VersionInfo) VersionInfo {
 		ReadFirst: readFirst,
 		Version:   info.Version, SelfHosted: info.SelfHosted, Latest: info.Latest, UpdateAvailable: info.UpdateAvailable,
 		PublishedAt: info.PublishedAt, NotesURL: info.NotesURL, Summary: info.Summary, Notes: info.Notes,
-		CheckedAt: info.CheckedAt, CanUpdate: info.CanUpdate, Updater: info.Updater, Update: info.Update,
+		CheckedAt: info.CheckedAt, CanUpdate: info.CanUpdate, Updater: info.Updater, Update: info.Update, HubBackup: info.HubBackup,
 	}
 }
 

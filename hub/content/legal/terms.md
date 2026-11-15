@@ -1,7 +1,7 @@
 ---
 title: Terms of Service
 description: The plain-language rules for using the hosted moin service
-lastUpdated: November 4, 2026
+lastUpdated: November 15, 2026
 ---
 
 These terms are the agreement between you and us, Berry Good Ideas LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA, the company that runs the hosted moin service. They cover the website, the hub, its API and MCP server, and the `moin` command line tool and daemon when you use them with the hosted service. By creating an account you agree to them. How we handle data is in the [Privacy Policy](/legal/privacy).
@@ -50,7 +50,7 @@ If you see abuse or content that infringes your rights and it involves moin, wri
 
 ## Plans and payment
 
-moin is a subscription per workspace, monthly or yearly. A subscription covers one workspace, with all its servers, apps and members, within the limits shown for your plan. A new account gets a free trial for its first workspace, without a payment method. After the trial the workspace is read-only until you subscribe: your apps keep running on your servers, their backups continue, and you can still stop and start them, see everything and manage your account. Prices are shown before you buy.
+moin.run is for businesses only: you subscribe as a business, not as a consumer, and confirm it before you subscribe. moin is a subscription per workspace, monthly or yearly. A subscription covers one workspace, with all its servers, apps and members, within the limits shown for your plan. A new account gets a free trial for its first workspace, without a payment method. After the trial the workspace is read-only until you subscribe: your apps keep running on your servers, their backups continue, and you can still stop and start them, see everything and manage your account. Prices are shown before you buy.
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: its checkout shows the price, tax and terms of the purchase, and Stripe handles invoices, receipts and refunds required by law. A subscription renews automatically until you cancel it. You can cancel at any time in the billing settings; your plan stays active until the end of the period you paid for. Payments already made are not refunded, except where the law requires it or these terms say so.
 

@@ -22,8 +22,8 @@ import (
 // says otherwise.
 const Folder = "hub/litestream"
 
-// LegacyFolder is Folder up to v1.0.0-beta.25, when the hub was called the
-// control plane. A restore looks there when Folder is empty.
+// LegacyFolder is Folder up to v1.0.0-beta.25, before the hub got its
+// name. A restore looks there when Folder is empty.
 const LegacyFolder = "controlplane/litestream"
 
 // empty reports whether a restore found nothing to restore.
@@ -100,9 +100,35 @@ func RestoreIfMissing(ctx context.Context, bucket Bucket, file string) error {
 	return nil
 }
 
-// Start sends every change of the database to the bucket until stop is
+// Backup is the backup that runs: where it goes and when the last copy
+// reached the bucket.
+type Backup struct {
+	// Bucket is the name of the bucket.
+	Bucket string
+	// Started is when the backup started.
+	Started time.Time
+	db      *litestream.DB
+	store   *litestream.Store
+}
+
+// LastCopy is when the bucket last took every change, zero before the
+// first time. Litestream copies within a second and checks in every
+// second when nothing changed.
+func (b *Backup) LastCopy() time.Time {
+	if b.db == nil {
+		return time.Time{}
+	}
+	return b.db.LastSuccessfulSyncAt()
+}
+
+// Stop ends the backup.
+func (b *Backup) Stop() {
+	_ = b.store.Close(context.Background())
+}
+
+// Start sends every change of the database to the bucket until Stop is
 // called.
-func Start(ctx context.Context, bucket Bucket, file string) (stop func(), err error) {
+func Start(ctx context.Context, bucket Bucket, file string) (*Backup, error) {
 	store := litestream.NewStore(nil, litestream.DefaultCompactionLevels)
 	store.SnapshotRetention = retention
 	store.Logger = quiet()
@@ -119,7 +145,7 @@ func Start(ctx context.Context, bucket Bucket, file string) (stop func(), err er
 		return nil, fmt.Errorf("start the database backup: %w", err)
 	}
 	slog.Info("database backup on", "bucket", bucket.Bucket, "folder", bucket.client().Path)
-	return func() { _ = store.Close(context.Background()) }, nil
+	return &Backup{Bucket: bucket.Bucket, Started: time.Now(), db: db, store: store}, nil
 }
 
 // quiet is the logger Litestream gets: its warnings and errors, not a line

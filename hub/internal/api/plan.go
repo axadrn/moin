@@ -79,4 +79,7 @@ type URLResponse struct {
 type checkoutRequest struct {
 	PlanID   string `json:"plan_id"`
 	Interval string `json:"interval"`
+	// Business confirms that the workspace subscribes as a business, not
+	// as a consumer. A checkout without it is refused.
+	Business bool `json:"business"`
 }

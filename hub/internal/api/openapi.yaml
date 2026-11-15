@@ -145,7 +145,7 @@ paths:
       tags: [Meta]
       operationId: getVersion
       summary: Get the version and the newest release
-      description: The hub's version for everyone. A self-hosted hub (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted hub updates with every release and leaves these fields empty.
+      description: The hub's version for everyone. A self-hosted hub (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted hub updates with every release and leaves these fields empty. `hub_backup` is how the backup of the hub's own database stands, for an admin in `ADMIN_EMAILS` on every hub.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -4691,7 +4691,7 @@ components:
           schema:
             $ref: '#/components/schemas/URLResponse'
     InvalidCheckout:
-      description: '`invalid_plan` for an unknown or unpurchasable plan, `invalid_interval` for an interval other than monthly or yearly.'
+      description: '`invalid_plan` for an unknown or unpurchasable plan, `invalid_interval` for an interval other than monthly or yearly, `business_only` without `business`.'
       content:
         application/json:
           schema:
@@ -4852,6 +4852,22 @@ components:
             at:
               type: string
               format: date-time
+        hub_backup:
+          type: [object, 'null']
+          description: How the backup of the hub's own database stands, for an admin in `ADMIN_EMAILS` on every hub; null for everyone else. Read only, its settings are `S3_*` and `BACKUP_DATABASE`.
+          required: [state, bucket, last_copy]
+          properties:
+            state:
+              type: string
+              enum: [on, off, late]
+              description: '`late` when no copy reached the bucket for two minutes.'
+            bucket:
+              type: string
+              description: The bucket's name; empty when off.
+            last_copy:
+              type: [string, 'null']
+              format: date-time
+              description: When the bucket last took every change.
     DaemonUpdates:
       type: object
       required: [auto]
@@ -6985,6 +7001,10 @@ components:
           type: string
           enum: [monthly, yearly]
           default: monthly
+        business:
+          type: boolean
+          default: false
+          description: Confirms that the workspace subscribes as a business, not as a consumer. Hosted plans are for businesses only; without it the checkout is refused with `business_only`.
     URLResponse:
       type: object
       required: [url]

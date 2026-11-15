@@ -20,6 +20,16 @@ func TestVersionSaysANewerReleaseIsOut(t *testing.T) {
 	}
 }
 
+func TestVersionShowsTheHubBackupToItsAdmins(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/version": `{"version":"v0.3.0","self_hosted":false,"update":null,"hub_backup":{"state":"late","bucket":"acme-hub","last_copy":"2026-01-02T03:04:05Z"}}`,
+	}}
+	code, stdout, _ := runCLI(t, api, "version")
+	if code != 0 || !strings.Contains(stdout, "hub backup ✗ late · bucket acme-hub · last copy") {
+		t.Fatalf("code %d, stdout %q", code, stdout)
+	}
+}
+
 func TestUpdateOnTheHostedHub(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"GET /api/v1/version": `{"version":"v0.3.0","self_hosted":false,"update":null}`,

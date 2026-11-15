@@ -91,5 +91,5 @@ These stay in the web on purpose: they move money or decide who is in charge, so
 | Change roles, remove someone, leave, delete the workspace | ✓ | Who is in charge is decided with a password. | Web only. | ✓ with a session | Web only. |
 | Create a workspace, accept an invitation | ✓ | It starts with a signed-in browser. | Web only. | ✓ with a session | Web only. |
 | Plan and trial | ✓ | Web only. | Web only. | ✓ | ✓ `get_billing` |
-| Checkout, card, invoices | ✓ | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | AI agents never move money. |
+| Checkout, card, invoices | ✓, as a business | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | AI agents never move money. |
 | Delete your account | ✓ | Web only, with your password. | Web only. | ✓ with a session | AI agents never delete accounts. |

@@ -129,8 +129,11 @@ templ billingOffer(plan access.Plan, basePath string) {
 				<p class="moin-muted">Unlimited servers, apps and teammates.</p>
 			</div>
 			<div class="moin-stack" data-gap="3">
+				// Hosted plans are for businesses: Subscribe waits for the box,
+				// and the hub refuses a checkout without it.
+				@components.Check(components.CheckProps{ID: "business-" + plan.ID, Name: "business", Value: "1", Label: "I subscribe as a business, not as a consumer.", Attrs: templ.Attributes{"required": true, "data-business": true}})
 				<div class="moin-row">
-					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-subscribe": true}}) {
+					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-subscribe": true, "disabled": true}}) {
 						Subscribe
 					}
 				</div>

@@ -36,7 +36,7 @@ func newBillingHandler(t *testing.T, provider *paymentProviderStub) *BillingHand
 func TestCreateCheckoutUsesAuthenticatedUserAndDefaultInterval(t *testing.T) {
 	provider := &paymentProviderStub{checkoutURL: "https://payments.example.com/checkout"}
 	handler := newBillingHandler(t, provider)
-	form := url.Values{"plan_id": {model.SubscriptionPlanPro}}
+	form := url.Values{"plan_id": {model.SubscriptionPlanPro}, "business": {"1"}}
 	request := authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", form)
 	recorder := httptest.NewRecorder()
 
@@ -89,10 +89,20 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 		}
 	})
 
+	t.Run("not confirmed as a business", func(t *testing.T) {
+		provider := &paymentProviderStub{checkoutURL: "https://payments.example.com/checkout"}
+		handler := newBillingHandler(t, provider)
+		recorder := httptest.NewRecorder()
+		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}}))
+		if recorder.Code != http.StatusUnprocessableEntity || provider.checkoutCalls != 0 {
+			t.Fatalf("status = %d, checkout calls = %d", recorder.Code, provider.checkoutCalls)
+		}
+	})
+
 	t.Run("provider failure", func(t *testing.T) {
 		provider := &paymentProviderStub{checkoutErr: errors.New("provider unavailable")}
 		handler := newBillingHandler(t, provider)
-		form := url.Values{"plan_id": {model.SubscriptionPlanPro}, "interval": {model.SubscriptionIntervalYearly}}
+		form := url.Values{"plan_id": {model.SubscriptionPlanPro}, "interval": {model.SubscriptionIntervalYearly}, "business": {"1"}}
 		recorder := httptest.NewRecorder()
 
 		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", form))
@@ -107,7 +117,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 
-		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}}))
+		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}, "business": {"1"}}))
 
 		if recorder.Code != http.StatusConflict {
 			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusConflict)
@@ -119,7 +129,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 		handler := newBillingHandler(t, provider)
 		recorder := httptest.NewRecorder()
 
-		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}}))
+		handler.CreateCheckout(recorder, authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}, "business": {"1"}}))
 
 		if recorder.Code != http.StatusConflict {
 			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusConflict)
@@ -130,7 +140,7 @@ func TestCreateCheckoutRejectsInvalidRequestAndProviderFailure(t *testing.T) {
 func TestBillingRequiresOwner(t *testing.T) {
 	provider := &paymentProviderStub{}
 	handler := newBillingHandler(t, provider)
-	request := authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}})
+	request := authenticatedBillingRequest(http.MethodPost, "/app/test-workspace/billing/checkout", url.Values{"plan_id": {model.SubscriptionPlanPro}, "business": {"1"}})
 	request = request.WithContext(ctxkeys.WithWorkspaceMember(request.Context(), &model.WorkspaceMember{WorkspaceID: "workspace-1", UserID: "user-1", Role: model.WorkspaceRoleAdmin}))
 	recorder := httptest.NewRecorder()
 

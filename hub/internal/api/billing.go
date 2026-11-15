@@ -49,7 +49,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	ctx := r.Context()
-	checkoutURL, err := h.workspaceService.Checkout(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.User(ctx), request.PlanID, request.Interval, source(r), h.paymentService.CreateCheckoutURL)
+	checkoutURL, err := h.workspaceService.Checkout(ctxkeys.WorkspaceMember(ctx), ctxkeys.Workspace(ctx), ctxkeys.User(ctx), request.PlanID, request.Interval, request.Business, source(r), h.paymentService.CreateCheckoutURL)
 	if err != nil {
 		ServiceError(w, err)
 		return

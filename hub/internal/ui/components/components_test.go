@@ -75,6 +75,8 @@ func TestComponentsPrintTheExamples(t *testing.T) {
 		{"tabs-quiet", Tabs(TabsProps{Label: "Sections", Quiet: true, Tabs: []Tab{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#"}, {Label: "Domains", Href: "#"}, {Label: "Logs", Href: "#"}}}), ""},
 		{"bar-floating", BarLinks(BarLinksProps{Label: "Acme", Links: []BarLink{{Label: "Docs", Href: "#"}, {Label: "Pricing", Href: "#", Current: true}}}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "On", Checked: true}), ""},
+		{"check-on-its-own", Check(CheckProps{Label: "I agree to the terms", Checked: true}), ""},
+		{"check-on-its-own", Check(CheckProps{Label: "Send me the changelog"}), ""},
 		{"switch-on-its-own", Switch(SwitchProps{Label: "Cannot change", Disabled: true}), ""},
 		{"line-chart-with-marks", Chart(exampleChart()), ""},
 		{"app-icon", AppIcon(AppIconProps{Logo: exampleLogo}), ""},

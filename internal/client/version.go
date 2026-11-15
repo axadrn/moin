@@ -21,6 +21,17 @@ type Version struct {
 	CanUpdate       bool       `json:"can_update"`
 	Updater         bool       `json:"updater"`
 	Update          *Update    `json:"update"`
+	// HubBackup is how the backup of the hub's own database stands; only
+	// the admins of the hub get it.
+	HubBackup *HubBackup `json:"hub_backup"`
+}
+
+// HubBackup is how the backup of the hub's own database stands: State is
+// on, off or late.
+type HubBackup struct {
+	State    string     `json:"state"`
+	Bucket   string     `json:"bucket"`
+	LastCopy *time.Time `json:"last_copy"`
 }
 
 // Update is an update of the hub: requested, updating, done,
