@@ -368,10 +368,9 @@ templ appSettingsSection(app model.App, envKeys []string) {
 // of its settings: the one the API answers, to match it there and in the
 // bucket.
 templ idLine(id string) {
-	<div class="moin-row moin-small moin-muted" data-gap="2" data-id>
-		<span>ID</span>
-		<code class="moin-mono moin-truncate">{ link.ID(id) }</code>
-		@components.Copy(components.CopyProps{Text: link.ID(id), Label: "Copy the ID"})
+	<div class="moin-stack" data-gap="2" data-id>
+		<p class="moin-small moin-muted">ID</p>
+		@components.Command(components.CommandProps{Text: link.ID(id)})
 	</div>
 }
 
