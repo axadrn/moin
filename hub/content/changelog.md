@@ -3,6 +3,22 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.31
+
+November 15, 2026
+
+**In short:** Pages load faster and never show old styles after an update.
+
+### Changed
+- **Faster pages**: The web loads one stylesheet and one script instead of about fifty files.
+
+### Fixed
+- **No old styles after an update**: After a release, some pages showed old styles for hours, like a gray square instead of an icon. Every file now carries the version in its address, so browsers and CDNs always load the new one.
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves.
+
 ## v1.0.0-beta.30
 
 November 15, 2026
