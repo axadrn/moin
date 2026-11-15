@@ -202,7 +202,8 @@ Before every update moin shows the whole release notes, under one line: "Read th
 - **Update now** needs the updater next to the hub, the only part with access to Docker: someone who breaks into moin can at most ask for an official version, never run their own code. A hub set up before it gets it once with `git pull`, then `sh update.sh`.
 - `UPDATE_CHECK=false` stops the check; then update with `sh update.sh`.
 - A hub set up before v1.0.0-beta.26 keeps its old folders until you run the install line once more (from a clone: `git pull`, then `sh hub/deploy/update.sh`). `update.sh` moves its settings to `/etc/moin-hub` and its data to `/var/lib/moin-hub`.
-- The daemons update themselves to the version of the hub, one server at a time, never during a deploy: [Servers](/docs/guides/servers#updates).
+- The daemons update themselves to the version of the hub, one server at a time, never during a deploy: [How a daemon updates](/docs/reference/shipping#how-a-daemon-updates).
+- Your hub runs the image `ghcr.io/axadrn/moin:stable`, the newest release. Which versions exist and when they come: [How moin ships](/docs/reference/shipping).
 
 ## Database backup
 

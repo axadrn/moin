@@ -45,3 +45,13 @@ type Integrations struct {
 	TailscaleKey      string    `db:"tailscale_key"`
 	UpdatedAt         time.Time `db:"updated_at"`
 }
+
+// DaemonUpdate is a daemon update that is not done yet: the note the hub
+// keeps while it runs the steps of an update (service/daemon_steps.go).
+// StoppedApps are the IDs of the apps it stopped, as a JSON array.
+type DaemonUpdate struct {
+	ServerID    string    `db:"server_id"`
+	FromVersion string    `db:"from_version"`
+	StoppedApps string    `db:"stopped_apps"`
+	StartedAt   time.Time `db:"started_at"`
+}
