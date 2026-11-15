@@ -407,12 +407,23 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatalf("registries = %+v", logins)
 	}
 
-	// The hook deploys an image and hands the daemon the matching login.
+	// A hook deploys nothing while no image runs: a person picks the image.
 	url, err := apps.RotateDeployHook(owner, "blog")
 	if err != nil || !strings.HasPrefix(url, "https://moin.example.com/webhooks/deploy/dph_") {
 		t.Fatalf("hook url = %q, %v", url, err)
 	}
 	token := url[strings.LastIndex(url, "/")+1:]
+	var refused *HookImageError
+	if _, _, err := apps.DeployHook(token, "ghcr.io/me/blog:abc"); !errors.As(err, &refused) || refused.Image != "" {
+		t.Fatalf("hook before an image runs: err = %v", err)
+	}
+	first, err := apps.Deploy(owner, "blog", "ghcr.io/me/blog:v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
+
+	// Then the hook deploys a new tag and hands the daemon the matching login.
 	_, deploy, err := apps.DeployHook(token, "ghcr.io/me/blog:abc")
 	if err != nil {
 		t.Fatal(err)
@@ -423,6 +434,14 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatalf("deploy.start = %+v", start)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+
+	// A leaked hook URL cannot start another image, not even one with the
+	// same name on another host.
+	for _, other := range []string{"nginx:1.27", "ghcr.io/evil/blog:abc", "evil.example.com/me/blog:abc"} {
+		if _, _, err := apps.DeployHook(token, other); !errors.As(err, &refused) || refused.Image != "ghcr.io/me/blog" {
+			t.Fatalf("hook deployed %s: err = %v", other, err)
+		}
+	}
 
 	// A Docker Hub image gets no ghcr.io login; a redeploy pulls the image again.
 	deploy, err = apps.Deploy(owner, "blog", "nginx:1.27")
@@ -438,6 +457,11 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	redeploy, err := apps.Redeploy(owner, "blog")
 	if err != nil || redeploy.Image != "nginx:1.27" {
 		t.Fatalf("redeploy = %+v, %v", redeploy, err)
+	}
+
+	// A person changed the image by hand, so the hook follows it.
+	if _, _, err := apps.DeployHook(token, "ghcr.io/me/blog:abc"); !errors.As(err, &refused) || refused.Image != "docker.io/library/nginx" {
+		t.Fatalf("hook after nginx by hand: err = %v", err)
 	}
 
 	// A new hook replaces the old one.

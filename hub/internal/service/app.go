@@ -59,6 +59,23 @@ var (
 
 const deployHookMarker = "dph_"
 
+// HookImageError refuses an image the deploy hook may not deploy. A hook
+// deploys only new tags of the image running now, so a leaked hook URL
+// cannot start another image; a person picks that image, with a deploy by
+// hand.
+type HookImageError struct {
+	// Image is the one running now, without its tag; empty while the app
+	// runs from its repo.
+	Image string
+}
+
+func (e *HookImageError) Error() string {
+	if e.Image == "" {
+		return "No image runs on this app yet. Deploy one by hand once, then the hook deploys its new tags."
+	}
+	return "This deploy hook deploys only new tags of " + e.Image + ", the image running now. To change the image, deploy it by hand once."
+}
+
 var (
 	imagePattern        = regexp.MustCompile(`^[a-z0-9][A-Za-z0-9._/:@-]{0,254}$`)
 	registryHostPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,252}[a-z0-9])?(:[0-9]{1,5})?$`)
@@ -275,7 +292,8 @@ func (s *AppService) newDeploy(app *model.App) *model.Deploy {
 }
 
 // DeployHook deploys an image for the app whose deploy hook token this is.
-// CI calls it after pushing the image.
+// CI calls it after pushing the image: a new tag or digest of the image
+// running now, never another image.
 func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy, error) {
 	if !strings.HasPrefix(token, deployHookMarker) {
 		return nil, nil, ErrDeployHook
@@ -290,6 +308,12 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 	err = s.servers.RequireChanges(app.WorkspaceID)
 	if err != nil {
 		return app, nil, err
+	}
+	if !imagePattern.MatchString(image) {
+		return app, nil, ErrImage
+	}
+	if app.HookImage() == "" || model.ImageName(image) != app.HookImage() {
+		return app, nil, &HookImageError{Image: app.HookImage()}
 	}
 	deploy, err := s.Deploy(Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaHook}}, app.ID, image)
 	return app, deploy, err

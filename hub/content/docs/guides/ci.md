@@ -9,6 +9,8 @@ CI is a computer elsewhere that builds your app. GitHub Actions, for example. It
 
 Deploy the repo once with `moin deploy` first. An image deploy keeps that compose file and swaps only the image of the main service.
 
+Then [deploy your image once by hand](#deploy-an-image-by-hand). That picks the image. From then on the hook deploys only new tags of it.
+
 ```text
 git push
    │
@@ -27,7 +29,7 @@ daemon     pulls the image from
 live ✓     started and checked
 ```
 
-The deploy hook is a secret URL. When CI calls it, moin deploys the image.
+The deploy hook is a secret URL. When CI calls it, moin deploys the image. Only a new tag of the image running now. Nothing else.
 
 ## 1. Save a registry login
 
@@ -56,6 +58,15 @@ MCP: create_deploy_hook
 ```
 
 A new hook stops the old one, so moin asks first when there is one. `--yes` skips it.
+
+### One image, new tags
+
+A secret URL can leak, in a log or a screenshot. So a hook deploys only new tags of the image running now: `ghcr.io/me/app:3f2a9c1` after `ghcr.io/me/app:v1`. Any registry works, Docker Hub too.
+
+- Another image gets `422`: "This deploy hook deploys only new tags of ghcr.io/me/app, the image running now."
+- While the app runs from its repo, the hook deploys nothing. Deploy an image by hand once.
+- To change the image, deploy the new one by hand once. The hook follows. Its URL stays.
+- **Deploy from CI** and `moin hook` show the image. The API and MCP call it `hook_image`.
 
 ## 3. The workflow
 

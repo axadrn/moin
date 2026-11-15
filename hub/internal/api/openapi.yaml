@@ -1790,7 +1790,7 @@ paths:
       tags: [Apps]
       operationId: rotateDeployHook
       summary: Create a deploy hook
-      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook reuses the compose file of the live deploy.'
+      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs from its repo, gets `422` `validation_failed` on `image`. The hook reuses the compose file of the live deploy.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -5334,6 +5334,10 @@ components:
         hook:
           type: boolean
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
+        hook_image:
+          type: string
+          description: The image the deploy hook deploys new tags of, the one running now, without its tag. Empty while the app runs from its repo; the hook then deploys nothing until an image is deployed by hand.
+          example: ghcr.io/me/blog
         bucket:
           type: string
           description: The bucket the app uploads and backs up to, by name. Empty follows the workspace's default bucket.
@@ -5584,7 +5588,7 @@ components:
       properties:
         url:
           type: string
-          description: Shown once. Anyone with it can deploy images to the app.
+          description: Shown once. Anyone with it can deploy new tags of the image running now.
     AlertDestination:
       type: object
       required: [id, name, kind, hint, chat_id, events, failing, failing_since, last_error, last_sent_at, created_at]

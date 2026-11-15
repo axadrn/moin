@@ -46,6 +46,9 @@ type App struct {
 	Pinned     bool   `json:"pinned"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`
+	// HookImage is the image the hook deploys new tags of, the one running
+	// now; empty while the app runs from its repo.
+	HookImage string `json:"hook_image"`
 	// Bucket is the bucket the app uploads and backs up to; empty follows
 	// the workspace's default.
 	Bucket string `json:"bucket"`

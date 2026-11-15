@@ -7,8 +7,8 @@ import (
 
 // appCI is the "Deploy from CI" card of the Deploys section: deploy an
 // image built elsewhere, and the deploy hook CI calls; hook says the app
-// has one.
-templ appCI(appName, appLink string, hook bool) {
+// has one, hookImage the image it may deploy.
+templ appCI(appName, appLink string, hook bool, hookImage string) {
 	<div data-app-ci>
 		@components.Card(components.CardProps{Title: "Deploy from CI"}) {
 			<form
@@ -26,21 +26,30 @@ templ appCI(appName, appLink string, hook bool) {
 					</div>
 				}
 			</form>
-			@AppHook(appName, appLink, "", hook)
+			@AppHook(appName, appLink, "", hookImage, hook)
 		}
 	</div>
 }
 
-// AppHook is the deploy hook: whether the app has one, the buttons, and a
-// new hook's URL once, with the curl CI runs.
-templ AppHook(appName, appLink, url string, on bool) {
+// AppHook is the deploy hook: whether the app has one and the image it
+// deploys new tags of, the one running now; the buttons, and a new hook's
+// URL once, with the curl CI runs.
+templ AppHook(appName, appLink, url, image string, on bool) {
+	{{
+		example := image
+		if example == "" {
+			example = "ghcr.io/me/" + appName
+		}
+	}}
 	<div id="app-hook" class="moin-stack" data-gap="3" data-hook-on?={ on }>
 		<div class="moin-row" data-wrap data-between data-gap="3">
 			<div>
 				<p class="moin-text moin-strong">Deploy hook</p>
-				<p class="moin-small moin-muted">
-					if on {
-						On
+				<p class="moin-small moin-muted" data-hook-image>
+					if on && image != "" {
+						On. Deploys new tags of <code class="moin-mono moin-foreground">{ image }</code>, the image running now.
+					} else if on {
+						On. No image runs yet: deploy one above once, then the hook deploys its new tags.
 					} else {
 						Off
 					}
@@ -70,9 +79,9 @@ templ AppHook(appName, appLink, url string, on bool) {
 				@components.Command(components.CommandProps{Text: url})
 			</div>
 			<p class="moin-small moin-muted">
-				CI calls it after pushing the image:
+				CI calls it after pushing a new tag:
 			</p>
-			@components.Command(components.CommandProps{Text: `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=ghcr.io/me/` + appName + `:$GITHUB_SHA"`})
+			@components.Command(components.CommandProps{Text: `curl -fsS -X POST "$MOIN_DEPLOY_HOOK?image=` + example + `:$GITHUB_SHA"`})
 		}
 	</div>
 }
