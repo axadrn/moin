@@ -12,6 +12,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/link"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -360,6 +361,18 @@ templ appSettingsSection(app model.App, envKeys []string) {
 			}
 		}
 	}
+	@idLine(app.ID)
+}
+
+// idLine is the ID of a workspace, an app or a server, quietly at the end
+// of its settings: the one the API answers, to match it there and in the
+// bucket.
+templ idLine(id string) {
+	<div class="moin-row moin-small moin-muted" data-gap="2" data-id>
+		<span>ID</span>
+		<code class="moin-mono moin-truncate">{ link.ID(id) }</code>
+		@components.Copy(components.CopyProps{Text: link.ID(id), Label: "Copy the ID"})
+	</div>
 }
 
 func appLiveLine(app model.App) string {

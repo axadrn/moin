@@ -70,6 +70,7 @@ func TestComponentsPrintTheExamples(t *testing.T) {
 		{"status-word", Status(StatusProps{State: StateLive}), "live"},
 		{"status-pill", Chip(ChipProps{State: StateFailed}), "v13 failed"},
 		{"code-command", Command(CommandProps{Text: "moin deploy my-app"}), ""},
+		{"code-command", Copy(CopyProps{Text: "moin deploy my-app", Label: "Copy the command"}), ""},
 		{"tabs", Tabs(TabsProps{Label: "Sections", Tabs: []Tab{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#"}, {Label: "Domains", Href: "#"}, {Label: "Logs", Href: "#"}}}), ""},
 		{"tabs-quiet", Tabs(TabsProps{Label: "Sections", Quiet: true, Tabs: []Tab{{Label: "App", Href: "#", Active: true}, {Label: "Deploys", Href: "#"}, {Label: "Domains", Href: "#"}, {Label: "Logs", Href: "#"}}}), ""},
 		{"bar-floating", BarLinks(BarLinksProps{Label: "Acme", Links: []BarLink{{Label: "Docs", Href: "#"}, {Label: "Pricing", Href: "#", Current: true}}}), ""},

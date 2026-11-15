@@ -81,6 +81,7 @@ templ ServerSecurity(view SecurityView) {
 						}})
 					}
 				}
+				@idLine(server.ID)
 			</div>
 			@components.Live(components.LiveProps{URL: "/api/v1/servers/events?workspace=" + ctxkeys.Workspace(ctx).Link()})
 			@securityScript()

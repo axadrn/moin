@@ -104,10 +104,22 @@ type CommandProps struct {
 templ Command(p CommandProps) {
 	<div class="moin-command">
 		<code>{ p.Text }</code>
-		<button type="button" class="moin-copy" data-copy={ p.Text } aria-label="Copy the command">
-			<i class="moin-icon moin-icon-copy"></i>
-		</button>
+		@Copy(CopyProps{Text: p.Text, Label: "Copy the command"})
 	</div>
+}
+
+// CopyProps is a Copy: the text it copies and what it says to screen
+// readers.
+type CopyProps struct {
+	Text  string
+	Label string
+}
+
+// Copy is the button that copies a text, the one of a Command.
+templ Copy(p CopyProps) {
+	<button type="button" class="moin-copy" data-copy={ p.Text } aria-label={ p.Label }>
+		<i class="moin-icon moin-icon-copy"></i>
+	</button>
 }
 
 // DialogProps is a Dialog: a title and a line under it. A script can fill

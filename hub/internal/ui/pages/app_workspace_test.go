@@ -3,6 +3,7 @@ package pages
 import (
 	"bytes"
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -42,5 +43,30 @@ func TestWorkspaceContentUsesViewerPermissionsForMemberActions(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The workspace and an app show their ID at the end of their settings, as
+// the API answers it, with a copy button.
+func TestSettingsShowTheID(t *testing.T) {
+	const uuid, id = "0f8e2c4a-1b3d-4e5f-8a9b-0c1d2e3f4a5b", "0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b"
+	ctx := context.Background()
+	ctx = ctxkeys.WithWorkspace(ctx, &model.Workspace{ID: uuid, Name: "Acme", Slug: "acme"})
+	ctx = ctxkeys.WithWorkspaceMember(ctx, &model.WorkspaceMember{ID: "viewer", WorkspaceID: uuid, UserID: "viewer", Role: model.WorkspaceRoleOwner})
+	ctx = ctxkeys.WithSubscription(ctx, &model.Subscription{WorkspaceID: uuid, PlanID: model.SubscriptionPlanPro, Status: model.SubscriptionStatusActive})
+	ctx = ctxkeys.WithCSRFToken(ctx, "csrf-token")
+	for name, page := range map[string]interface {
+		Render(context.Context, io.Writer) error
+	}{
+		"workspace": WorkspaceContent(nil, nil),
+		"app":       appSettingsSection(model.App{ID: uuid, Name: "my-app"}, nil),
+	} {
+		var output bytes.Buffer
+		if err := page.Render(ctx, &output); err != nil {
+			t.Fatal(err)
+		}
+		if html := output.String(); !strings.Contains(html, "data-id") || !strings.Contains(html, ">"+id+"</code>") || !strings.Contains(html, `data-copy="`+id+`"`) {
+			t.Errorf("%s shows no ID to copy: %s", name, html)
+		}
 	}
 }
