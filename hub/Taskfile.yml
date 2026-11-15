@@ -9,7 +9,9 @@ tasks:
       APP_URL: 'http://localhost:{{.DEV_PORT}}'
       PORT: '{{.APP_PORT}}'
     cmds:
-      - go tool templ generate --watch --log-level=warn --cmd="go run ./cmd/server" --proxy="http://localhost:{{.APP_PORT}}" --proxyport="{{.DEV_PORT}}" --proxybind="0.0.0.0" --open-browser="{{.OPEN_BROWSER}}"
+      # With .env.tpl (op:// references), 1Password fills the settings on
+      # every start and no .env lies on disk. Without it, .env counts.
+      - $([ -f .env.tpl ] && echo "op run --env-file .env.tpl --") go tool templ generate --watch --log-level=warn --cmd="go run ./cmd/server" --proxy="http://localhost:{{.APP_PORT}}" --proxyport="{{.DEV_PORT}}" --proxybind="0.0.0.0" --open-browser="{{.OPEN_BROWSER}}"
 
   fmt:
     desc: Format every .go and .templ file

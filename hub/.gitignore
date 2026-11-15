@@ -18,6 +18,7 @@ go.work
 
 # Environment variables
 .env
+.env.tpl
 .env.local
 .env.*.local
 
