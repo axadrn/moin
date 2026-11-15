@@ -33,6 +33,38 @@ backups
   server ─▶ your bucket
 ```
 
+## Who talks to whom
+
+```text
+web, CLI, TUI, MCP ──▶ hub ◀── daemon on each server
+          the API      │        a line the daemon opens
+```
+
+- **You talk to the hub.** The web, the CLI, the terminal UI and AI agents all use the same API.
+- **The hub talks to the daemons.** Each daemon calls the hub and keeps one line open. The hub sends its orders down that line.
+- **You never talk to a daemon.** Nothing on your server waits for calls.
+
+## What the daemon does
+
+The hub is the brain. The daemon is the hands. The hub decides what happens and when. The daemon does it on the server.
+
+The daemon knows a fixed list of orders, and the code for each is in the daemon itself. The hub can only send orders from that list. It cannot send new code. A new kind of order comes with a new version of moin.
+
+| The daemon | With |
+| --- | --- |
+| builds, starts, stops and removes your apps | Docker |
+| shows logs, runs a command in an app | Docker |
+| reads and edits your databases | `psql` in your Postgres container, SQLite directly |
+| copies your databases to your bucket, and restores them | your bucket |
+| measures CPU, memory and disk | the server |
+| routes your domains, with HTTPS | Traefik |
+| locks the server down: tunnel, SSH, firewall | the server |
+| updates itself | the hub, which serves the new version |
+
+**The rules on your server win.** A file, `/etc/moin/rules`, can turn orders off, such as reading data or running commands. The daemon checks every order against it. The hub cannot change that file. [Rules](/docs/guides/security#rules)
+
+**The daemon runs as root.** It has to: it runs Docker, and whoever runs Docker can do what root can. That is why the list of orders is fixed and the rules file is yours.
+
 ## The words
 
 The first five are in [moin in five words](/docs/moin-in-five-words). The rest:
