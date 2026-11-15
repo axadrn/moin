@@ -46,6 +46,8 @@ type App struct {
 	Pinned     bool   `json:"pinned"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`
+	// DeployFrom is folder, github or ci: where new versions come from.
+	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the hook deploys new tags of, the one running
 	// now; empty while the app runs from its repo.
 	HookImage string `json:"hook_image"`

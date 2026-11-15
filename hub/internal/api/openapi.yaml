@@ -5335,6 +5335,10 @@ components:
         hook:
           type: boolean
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
+        deploy_from:
+          type: string
+          enum: [folder, github, ci]
+          description: Where new versions come from, one at a time. `folder` deploys with `moin deploy`, `github` every push to the linked branch, `ci` through the deploy hook. Linking a repo or making a deploy hook switches it; unlinking or turning the hook off goes back to `folder`.
         hook_image:
           type: string
           description: The image the deploy hook deploys new tags of, the one running now, without its tag. Empty while the app runs from its repo; the hook then deploys nothing until an image is deployed by hand.

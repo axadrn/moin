@@ -134,6 +134,7 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 			renderError(w, "load github installations failed", err)
 			return
 		}
+		repo.Show = r.URL.Query().Get("source")
 		view.Repo = &repo
 	case "logs":
 		// The page comes with the logs, unless the daemon is slow: then the

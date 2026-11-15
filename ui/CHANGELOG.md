@@ -12,6 +12,9 @@ of the moin release it ships with.
 - **Components**: Every component as one CSS file, with its examples and a page of docs.
 - **Blocks**: Whole pages to start from, only HTML to copy.
 - **Themes**: A theme editor with light and dark, and twelve well-known dev themes.
+- **Tabs with an icon and a dot**: A tab can start with an icon, and `data-live` puts a green dot after it: the one in use.
+- **A folder icon**: `moin-icon-folder`.
+- **A pick opens its part**: In a list, `data-picked` after a pick item shows only while that one is picked, with no script.
 
 ### Upgrade
 

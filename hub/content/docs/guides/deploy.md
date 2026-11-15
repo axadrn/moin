@@ -35,6 +35,19 @@ All of them work. Mix them as you like.
 
 The web and MCP cannot reach the files on your computer. Everything else does the same work.
 
+## Deploy from
+
+An app deploys from one place at a time: your folder, GitHub or CI. The app's **Deploys** tab shows it as **Deploy from**, with a green dot on the one in use. Pick another to switch. moin asks first, because the old one stops.
+
+```surfaces
+Web: the app's **Deploys** tab, **Deploy from**
+CLI: moin apps <app-name>, the line deploy from
+API: GET /api/v1/apps/{app}, the field deploy_from: folder, github or ci
+MCP: get_app, deploy_from
+```
+
+Switch with what turns one on: [link a repo](/docs/guides/github), [turn on the deploy hook](/docs/guides/ci). Unlinking or turning the hook off goes back to your folder.
+
 Settings: [who decides](/docs/guides/config#who-decides).
 
 ## Deploy from your folder

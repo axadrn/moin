@@ -492,12 +492,12 @@ func TestOneNamePerCommand(t *testing.T) {
 
 // moin apps shop shows one app; a typo says what exists.
 func TestAppsWithANameShowsTheApp(t *testing.T) {
-	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true},
+	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true,"deploy_from":"github"},
 		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"],"config":{"domains":["shop.example.com"]}}}]}`
 	for _, args := range [][]string{{"apps", "shop"}} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": detail}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "me/shop, branch main, auto deploy on") || !strings.Contains(stdout, "v2") {
+		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "deploy from GitHub, me/shop, branch main, every push") || !strings.Contains(stdout, "v2") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
 		}
 	}

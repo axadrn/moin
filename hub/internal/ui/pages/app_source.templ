@@ -1,72 +1,73 @@
 package pages
 
 import (
+	"cmp"
+	"context"
+
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/build"
 )
 
-// AppSource is the one question of the Deploys section: who brings new
-// versions? You by hand, GitHub on every push, or your CI through the
-// deploy hook. One at a time: linking a repo turns the hook off, a hook
-// unlinks the repo. Under the picked answer only its own part shows. Every
-// action in it answers the whole card.
+// AppSource is the "Deploy from" card of the Deploys section: one tab per
+// place new versions come from, your folder, GitHub or your CI, each with
+// an icon; a green dot marks the one in use. One at a time: linking a repo
+// turns the deploy hook off, a hook unlinks the repo. Under a tab only its
+// own part, almost no words; the docs explain. Every action in it answers
+// the whole card.
 templ AppSource(view RepoView) {
 	{{ app := view.App }}
-	{{ source := sourceOf(app) }}
+	{{ current := app.DeployFrom() }}
+	{{ shown := cmp.Or(view.Show, current) }}
 	<div id="app-source">
-		@components.Card(components.CardProps{Title: "Who brings new versions?"}) {
-			@components.List() {
-				@sourcePick("hand", "You, by hand", build.Name+" deploy", source)
-				@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-picked": true}}) {
-					@sourceHand(app)
-				}
-				@sourcePick("github", "GitHub", "Every push. The server builds.", source)
-				@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-picked": true}}) {
-					@AppRepo(view)
-				}
-				@sourcePick("ci", "Your CI", "CI builds. The deploy hook ships.", source)
-				@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-picked": true}}) {
-					@appCI(view)
-				}
-			}
-		}
-	</div>
-}
-
-// sourcePick is one answer. Picking it only shows its part; what it turns
-// on or off happens there.
-templ sourcePick(value, name, note, source string) {
-	@components.Item(components.ItemProps{Pick: true, Name: name, Note: note, Attrs: templ.Attributes{"name": "source", "value": value, "checked": value == source, "data-source": value}})
-}
-
-// sourceHand is the part of "You, by hand": the command, which always
-// works, and turning off what brings versions now.
-templ sourceHand(app model.App) {
-	<div class="moin-stack moin-fill" data-gap="4" data-source-hand>
-		@components.Command(components.CommandProps{Text: build.Name + " deploy " + app.Name})
-		<p class="moin-small moin-muted">It always works, next to GitHub and CI too.</p>
-		if app.Repo != "" || app.DeployHookHash != nil {
-			<div class="moin-row" data-wrap data-gap="2">
-				if app.Repo != "" {
-					@unlinkButton(app, true)
-				}
-				if app.DeployHookHash != nil {
-					@hookOffButton(app, false)
+		@components.Card(components.CardProps{Title: "Deploy from"}) {
+			<div class="moin-stack" data-gap="6">
+				@components.Tabs(components.TabsProps{ID: "source-tabs", Label: "Deploy from", Tabs: []components.Tab{
+					sourceTab(ctx, app, "folder", "Folder", "folder", shown, current),
+					sourceTab(ctx, app, "github", "GitHub", "git-hub", shown, current),
+					sourceTab(ctx, app, "ci", "CI", "package", shown, current),
+				}})
+				switch shown {
+					case "github":
+						@AppRepo(view)
+					case "ci":
+						@appCI(view)
+					default:
+						@sourceFolder(app, current)
 				}
 			</div>
 		}
 	</div>
 }
 
-// sourceOf is the answer an app has now: GitHub when it follows a repo, CI
-// when it has a deploy hook, else by hand.
-func sourceOf(app model.App) string {
-	switch {
-	case app.Repo != "":
-		return "github"
-	case app.DeployHookHash != nil:
-		return "ci"
-	}
-	return "hand"
+// sourceTab is one place new versions come from. It only shows its part,
+// in place; the green dot says it is in use.
+func sourceTab(ctx context.Context, app model.App, value, label, icon, shown, current string) components.Tab {
+	href := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/deploys?source=" + value
+	return components.Tab{Label: label, Icon: icon, Href: href, Active: value == shown, Live: value == current, Attrs: templ.Attributes{
+		"hx-get":      href,
+		"hx-select":   "#app-source",
+		"hx-target":   "#app-source",
+		"hx-swap":     "outerHTML",
+		"data-source": value,
+	}}
+}
+
+// sourceFolder is "Folder": the command, which always works. While GitHub
+// or CI is in use, the one button that goes back to the folder.
+templ sourceFolder(app model.App, current string) {
+	<div class="moin-stack" data-gap="4" data-source-folder>
+		@components.Command(components.CommandProps{Text: build.Name + " deploy " + app.Name})
+		switch current {
+			case "github":
+				<div>
+					@unlinkButton(app, "Use folder")
+				</div>
+			case "ci":
+				<div>
+					@hookOffButton(app, false, "Use folder")
+				</div>
+		}
+	</div>
 }

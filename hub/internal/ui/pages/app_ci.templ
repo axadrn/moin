@@ -8,86 +8,46 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
-// appCI is the CI part of "Who brings new versions?". One line on top says
-// what runs; under it deploying an image by hand, and the deploy hook CI
-// calls.
+// appCI is the part of "CI": two steps. 1 Image: deploy an image by hand,
+// which picks the image; the one that runs is the placeholder. 2 Hook: the deploy hook that ships its new tags.
+// A new hook's URL shows once, in a box of its own.
 templ appCI(view RepoView) {
 	{{ app := view.App }}
-	{{ running := app.LiveImage }}
-	<div class="moin-stack moin-fill" data-gap="6" data-app-ci>
-		<p class="moin-text" data-running>
-			<span class="moin-muted">Running</span>
-			if running != "" {
-				<code class="moin-mono">{ running }</code>
-			} else if app.LiveNumber > 0 {
-				built from the repo
-			} else {
-				nothing yet
-			}
-		</p>
+	{{ on := app.DeployHookHash != nil }}
+	<div class="moin-stack" data-gap="4" data-app-ci data-hook-on?={ on }>
 		<form
 			class="moin-stack"
-			data-gap="3"
+			data-gap="2"
 			hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/image" }
 			hx-swap="none"
 			hx-disable="find button[type='submit']"
 		>
 			@components.CSRF()
-			<p class="moin-text moin-strong">By hand</p>
+			<p class="moin-text"><span class="moin-muted">1</span> Image</p>
 			@components.Field(components.FieldProps{For: "image-ref"}) {
 				<div class="moin-row" data-gap="2" data-phone="stack">
-					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "aria-label": "Image", "placeholder": cmp.Or(running, "ghcr.io/me/"+app.Name+":3f2a9c1"), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "aria-label": "Image", "placeholder": cmp.Or(app.LiveImage, "ghcr.io/me/"+app.Name+":3f2a9c1"), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
 					@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-deploy-image": true}}) {
 						Deploy
 					}
 				</div>
 			}
 		</form>
-		@appHook(app, view.HookURL)
-	</div>
-}
-
-// appHook is the deploy hook: on or off, the image it deploys new tags of,
-// the one running now; and a new hook's URL once, in a box of its own.
-templ appHook(app model.App, url string) {
-	{{ on := app.DeployHookHash != nil }}
-	{{ image := app.HookImage() }}
-	<div class="moin-stack" data-gap="3" data-hook-on?={ on }>
 		<div class="moin-row" data-wrap data-between data-gap="3">
-			<div class="moin-stack" data-gap="1">
-				<div class="moin-row" data-gap="2">
-					<p class="moin-text moin-strong">Deploy hook</p>
-					if on {
-						@components.Status(components.StatusProps{State: components.StateLive}) {
-							On
-						}
-					} else {
-						@components.Status(components.StatusProps{State: components.StateIdle}) {
-							Off
-						}
-					}
-				</div>
-				<p class="moin-small moin-muted" data-hook-image>
-					if image != "" {
-						New tags of <code class="moin-mono moin-foreground">{ image }</code>.
-					} else if on {
-						Waits for an image. Deploy one by hand.
-					} else {
-						Lets CI deploy new tags of the running image.
-					}
-				</p>
-			</div>
+			<p class="moin-text" data-hook-image><span class="moin-muted">2</span> Hook</p>
 			<div class="moin-row" data-gap="2">
 				if on {
-					@hookOffButton(app, true)
+					@hookOffButton(app, true, "Turn off")
+					@newHookButton(app, "New hook")
+				} else {
+					@newHookButton(app, "Turn on")
 				}
-				@newHookButton(app)
 			</div>
 		</div>
-		if url != "" {
+		if view.HookURL != "" {
 			<div class="moin-alert moin-stack" data-gap="3" data-state="running" data-deploy-hook>
 				<p class="moin-text moin-strong">Your new deploy hook. Shown once.</p>
-				@components.Command(components.CommandProps{Text: url})
+				@components.Command(components.CommandProps{Text: view.HookURL})
 				<p class="moin-small" data-hook-secret>
 					Keep it secret, like a password. <a href="/docs/guides/ci#3-the-workflow" class="moin-link moin-foreground">Add it to your CI</a>
 				</p>
@@ -98,7 +58,7 @@ templ appHook(app model.App, url string) {
 
 // hookOffButton turns the deploy hook off, after asking. quiet is the
 // button next to New hook; else it names what it does.
-templ hookOffButton(app model.App, quiet bool) {
+templ hookOffButton(app model.App, quiet bool, label string) {
 	@components.Button(components.ButtonProps{Quiet: quiet, Attrs: templ.Attributes{
 		"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/hook",
 		"hx-target":     "#app-source",
@@ -107,17 +67,13 @@ templ hookOffButton(app model.App, quiet bool) {
 		"hx-confirm":    "Turn off the deploy hook? Its URL stops working and CI can no longer deploy " + app.Name + ".",
 		"data-hook-off": true,
 	}}) {
-		if quiet {
-			Turn off
-		} else {
-			Turn off the deploy hook
-		}
+		{ label }
 	}
 }
 
 // newHookButton makes a new deploy hook URL. It asks first when it
 // replaces a hook, whose URL then stops working, or unlinks the repo.
-templ newHookButton(app model.App) {
+templ newHookButton(app model.App, label string) {
 	{{
 		attributes := templ.Attributes{
 			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/hook",
@@ -131,7 +87,7 @@ templ newHookButton(app model.App) {
 		}
 	}}
 	@components.Button(components.ButtonProps{Attrs: attributes}) {
-		New hook
+		{ label }
 	}
 }
 

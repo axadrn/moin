@@ -118,6 +118,19 @@ type Registry struct {
 	CreatedAt   time.Time `db:"created_at"`
 }
 
+// DeployFrom is where new versions of the app come from, one place at a
+// time: "github" when it follows a repo, "ci" when it has a deploy hook,
+// else "folder", deploys from your folder with moin deploy.
+func (a App) DeployFrom() string {
+	switch {
+	case a.Repo != "":
+		return "github"
+	case a.DeployHookHash != nil:
+		return "ci"
+	}
+	return "folder"
+}
+
 // HookImage is the image the deploy hook may deploy: the one running now,
 // without its tag. CI changes only the tag or digest. Empty while the app
 // runs from its repo or no deploy succeeded, so the hook deploys nothing.

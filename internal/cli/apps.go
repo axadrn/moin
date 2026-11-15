@@ -227,13 +227,19 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 			domainText += ", from compose.yml"
 		}
 	}
-	repo := "none"
-	if app.Repo != "" {
-		auto := "off"
-		if app.AutoDeploy {
-			auto = "on"
+	from := "your folder, " + build.Name + " deploy"
+	switch app.DeployFrom {
+	case "github":
+		auto := "every push"
+		if !app.AutoDeploy {
+			auto = "by hand"
 		}
-		repo = app.Repo + ", branch " + app.Branch + ", auto deploy " + auto
+		from = "GitHub, " + app.Repo + ", branch " + app.Branch + ", " + auto
+	case "ci":
+		from = "your CI, through the deploy hook"
+		if app.HookImage != "" {
+			from += ": new tags of " + app.HookImage
+		}
 	}
 	password := "off"
 	if app.Protected {
@@ -248,7 +254,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	} else if app.InstantProvider == "off" {
 		instantText = "off"
 	}
-	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"instant", instantText}, {"password", password}, {"repo", repo}}
+	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"instant", instantText}, {"password", password}, {"deploy from", from}}
 	for _, service := range slices.Sorted(maps.Keys(app.ServiceDomains)) {
 		rows = append(rows, []string{service, strings.Join(app.ServiceDomains[service], ", ")})
 	}
@@ -256,7 +262,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 		rows = append(rows, []string{"built", built})
 	}
 	for _, row := range rows {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-9s", row[0]))+" "+row[1])
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-11s", row[0]))+" "+row[1])
 	}
 	if app.ChangesWaiting > 0 {
 		fmt.Fprintln(stdout)

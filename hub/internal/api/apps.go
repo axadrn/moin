@@ -66,6 +66,10 @@ type App struct {
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook bool `json:"hook"`
+	// DeployFrom is where new versions come from, one at a time: folder
+	// (moin deploy), github (every push to the linked branch) or ci (the
+	// deploy hook). Linking a repo or making a hook switches it.
+	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the deploy hook deploys new tags of: the one
 	// running now, without its tag. Empty while the app runs from its
 	// repo; the hook then deploys nothing until an image is deployed by
@@ -168,6 +172,7 @@ func NewApp(app model.App) App {
 		AutoDeploy:      app.AutoDeploy,
 		Pinned:          app.Pinned,
 		Hook:            app.DeployHookHash != nil,
+		DeployFrom:      app.DeployFrom(),
 		HookImage:       app.HookImage(),
 		Bucket:          app.BucketName,
 		Catalog:         app.Catalog,

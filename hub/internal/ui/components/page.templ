@@ -54,6 +54,10 @@ type Tab struct {
 	Label  string
 	Href   string
 	Active bool
+	// Icon is an icon before the label, like "folder"; Live a green dot
+	// after it, drawn by the kit: this one is in use.
+	Icon string
+	Live bool
 	// Key opens it from the keyboard. Attrs swap a part of a page instead,
 	// when the address should stay.
 	Key   string
@@ -89,8 +93,17 @@ templ Tabs(p TabsProps) {
 				if tab.Key != "" {
 					data-key={ tab.Key }
 				}
+				data-live?={ tab.Live }
 				{ tab.Attrs... }
-			>{ tab.Label }</a>
+			>
+				if tab.Live {
+					<span class="moin-sr-only">In use: </span>
+				}
+				if tab.Icon != "" {
+					<i class={ "moin-icon moin-icon-" + tab.Icon } aria-hidden="true"></i>
+				}
+				{ tab.Label }
+			</a>
 		}
 	</nav>
 }

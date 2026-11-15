@@ -34,6 +34,7 @@
   .moin-icon-external { --i: url("icons/external.svg"); }
   .moin-icon-failed { --i: url("icons/failed.svg"); }
   .moin-icon-gauge { --i: url("icons/gauge.svg"); }
+  .moin-icon-folder { --i: url("icons/folder.svg"); }
   .moin-icon-globe { --i: url("icons/globe.svg"); }
   .moin-icon-key { --i: url("icons/key.svg"); }
   .moin-icon-logs { --i: url("icons/logs.svg"); }

@@ -11,6 +11,8 @@ Styles: `components/choice.css`, `components/card.css`.
 
 ## Default
 
+A tab can start with an icon. `data-live` puts a green dot after it: this one is in use.
+
 ```example
 tabs
 ```

@@ -28,6 +28,8 @@ type RepoView struct {
 	Loading bool
 	// HookURL is a new deploy hook's URL, shown once.
 	HookURL string
+	// Show is the tab of "Deploy from" to show; empty shows the way in use.
+	Show string
 }
 
 // AppRepo is the GitHub part: connect GitHub, link a repo and branch,
@@ -73,7 +75,7 @@ templ AppRepo(view RepoView) {
 
 // unlinkButton stops the app from following its repo, after asking. named
 // says the repo on the button, where nothing else around it does.
-templ unlinkButton(app model.App, named bool) {
+templ unlinkButton(app model.App, label string) {
 	@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 		"hx-post":          ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/repo/unlink",
 		"hx-target":        "#app-source",
@@ -82,11 +84,7 @@ templ unlinkButton(app model.App, named bool) {
 		"hx-confirm":       "Unlink " + app.Repo + "? Pushes no longer deploy " + app.Name + ". It keeps running.",
 		"data-unlink-repo": true,
 	}}) {
-		if named {
-			Unlink { app.Repo }
-		} else {
-			Unlink
-		}
+		{ label }
 	}
 }
 
@@ -181,7 +179,7 @@ templ repoLinked(view RepoView) {
 		<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="moin-link moin-truncate moin-mono moin-text" data-quiet data-linked-repo>
 			{ view.App.Repo }<span class="moin-muted">{ "@" + view.App.Branch }</span>
 		</a>
-		@unlinkButton(view.App, false)
+		@unlinkButton(view.App, "Unlink")
 	</div>
 	<form hx-post={ appPath + "/repo/deploy" } hx-target="#app-source" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-deploy-ref>
 		@components.CSRF()
