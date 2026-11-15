@@ -1125,6 +1125,7 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 				if done.Detected.Config != nil && done.Detected.Config.Backups != nil {
 					s.applyScheduleInFile(app, *done.Detected.Config.Backups)
 				}
+				s.forgetGoneDatabases(app)
 			}
 		}
 	}

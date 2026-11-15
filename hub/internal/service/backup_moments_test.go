@@ -667,6 +667,48 @@ func TestScheduleInFileAndDatabaseFoundLater(t *testing.T) {
 	}
 }
 
+// A database that is gone from the live deploy is forgotten: a report that
+// holds a part only forgets nothing, the next deploy without it forgets it.
+func TestGoneDatabaseIsForgotten(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	first, err := deployUpload(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	both := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db"}, {Path: "/data/old.db"}, {Path: "postgres-db", Kind: protocol.DatabasePostgres}}}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: both})
+	daemonSays(t, servers, server.ID, protocol.TypeBackupStatus, protocol.Backups{App: "blog", Databases: []protocol.DatabaseBackup{{Database: "/data/app.db"}, {Database: "/data/old.db"}, {Database: "postgres-db"}, {Database: "postgres-db/analytics"}}})
+	daemonSays(t, servers, server.ID, protocol.TypeBackupStatus, protocol.Backups{App: "blog", Databases: []protocol.DatabaseBackup{}, Detected: &both})
+	names := func() string {
+		t.Helper()
+		statuses, err := apps.BackupStatus(owner.WorkspaceID, "blog")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for _, status := range statuses {
+			names = append(names, status.Database)
+		}
+		return strings.Join(names, " ")
+	}
+	if got := names(); got != "/data/app.db /data/old.db postgres-db postgres-db/analytics" {
+		t.Fatalf("a part of the list forgot something: %s", got)
+	}
+
+	second, err := deployUpload(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Databases: []protocol.Database{{Path: "/data/app.db"}}}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: second.ID, OK: true, Detected: one})
+	if got := names(); got != "/data/app.db" {
+		t.Fatalf("the gone databases stay: %s", got)
+	}
+}
+
 // A setting in compose.yml is locked: the instant address, and the
 // password compose.yml requires. A new password is still fine.
 func TestFileLocksInstantAndPassword(t *testing.T) {

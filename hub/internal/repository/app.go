@@ -426,6 +426,13 @@ func (r *Apps) BackupStatus(appID string) ([]model.BackupStatus, error) {
 	return statuses, err
 }
 
+// RemoveBackupStatus forgets what the daemon said about one database of an
+// app.
+func (r *Apps) RemoveBackupStatus(appID, database string) error {
+	_, err := r.db.Exec(`DELETE FROM backup_status WHERE app_id = $1 AND database = $2`, appID, database)
+	return err
+}
+
 func (r *Apps) SetBackupStatus(status model.BackupStatus) error {
 	_, err := r.db.Exec(`
 		INSERT INTO backup_status (app_id, database, checked_at, error, updated_at, check_error, copied_at)

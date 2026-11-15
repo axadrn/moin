@@ -177,5 +177,6 @@ moin backs up every database of the service. One you made yourself, like `analyt
 - A restore that fails says why. Mostly nothing changed, and the app runs again.
 - When an app moves to another bucket, its copies start again there. What is in the old bucket stays. So does what is in a bucket you removed from moin.
 - Removing an app keeps its copies in your bucket until you delete them.
+- A database that is gone leaves the list at the next deploy or restart. Its copies stay in your bucket.
 - To keep a server's backups in one bucket only, use the `backups-to` [rule](/docs/guides/security#rules).
 - Not sure which database to pick? [SQLite or Postgres?](/docs/guides/sqlite-or-postgres)
