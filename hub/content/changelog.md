@@ -3,6 +3,30 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.30
+
+November 15, 2026
+
+**In short:** Clearer apps. See where an app deploys from, find registries and IDs, and see only the databases that exist.
+
+### New
+- **Deploy from**: One card on the Deploys tab: Folder, GitHub or CI. A green dot shows the one in use. `moin apps <app>` shows it too, the API and MCP call it `deploy_from`.
+- **Registries in the workspace**: Settings, Registries, right under Bucket.
+- **IDs to copy**: The workspace, each app and each server show their ID at the end of their settings.
+
+### Changed
+- **One place at a time**: Linking a repo turns the deploy hook off. Turning the hook on unlinks the repo. moin asks first, `--yes` skips it.
+- **Domains from compose.yml everywhere**: The app overview, the API, the CLI and MCP list them.
+- **`moin hook` links the docs**: A full link to the CI workflow, on your hub.
+
+### Fixed
+- **Deploy hooks after a restart**: A restart no longer stops the hook from deploying new tags.
+- **Deleted databases leave the list**: At the next deploy or restart. Their copies stay in your bucket.
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves.
+
 ## v1.0.0-beta.29
 
 November 15, 2026
