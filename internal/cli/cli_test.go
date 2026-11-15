@@ -183,6 +183,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"env", "rm", "--app", "shop", "KEY"},
 		{"domains", "rm", "--app", "shop", "blog.example.com"},
 		{"unlink", "shop"},
+		{"link", "me/blog", "shop"},
 		{"hook", "shop"},
 		{"buckets", "rm", "client-a"},
 		{"registry", "rm", "ghcr.io"},
@@ -370,6 +371,10 @@ func TestEnvPush(t *testing.T) {
 
 func TestLinkUnreadableRepo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"app":{"name":"shop"},"deploys":[]}`))
+			return
+		}
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_, _ = w.Write([]byte(`{"error":{"code":"validation_failed","message":"Check the highlighted fields and try again.","fields":{"repo":"moin cannot read this repo. Install the moin GitHub App on its account and give it the repo."}}}`))
 	}))
@@ -487,12 +492,12 @@ func TestOneNamePerCommand(t *testing.T) {
 
 // moin apps shop shows one app; a typo says what exists.
 func TestAppsWithANameShowsTheApp(t *testing.T) {
-	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true},
+	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true,"deploy_from":"github"},
 		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"],"config":{"domains":["shop.example.com"]}}}]}`
 	for _, args := range [][]string{{"apps", "shop"}} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": detail}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "me/shop, branch main, auto deploy on") || !strings.Contains(stdout, "v2") {
+		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "deploy from GitHub, me/shop, branch main, every push") || !strings.Contains(stdout, "v2") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
 		}
 	}
@@ -521,7 +526,8 @@ func TestEnvPullCountsOneVar(t *testing.T) {
 }
 
 // The first deploy hook replaces nothing, so it asks nothing. It says the
-// image it deploys new tags of, or how to deploy one first.
+// image it deploys new tags of, or how to deploy one first, and links the
+// docs on the hub.
 func TestFirstHookAsksNothing(t *testing.T) {
 	for image, want := range map[string]string{
 		"docker.io/me/shop": "It deploys new tags of docker.io/me/shop.",
@@ -532,7 +538,7 @@ func TestFirstHookAsksNothing(t *testing.T) {
 			"POST /api/v1/apps/shop/hook": `{"url":"http://localhost/webhooks/deploy/dph_x"}`,
 		}}
 		code, stdout, stderr := runCLI(t, api, "hook", "shop")
-		if code != 0 || !strings.Contains(stdout, "dph_x") || !strings.Contains(stdout, want) || !strings.Contains(stdout, "Keep it secret, like a password.") {
+		if code != 0 || !strings.Contains(stdout, "dph_x") || !strings.Contains(stdout, want) || !strings.Contains(stdout, "Keep it secret, like a password.") || !strings.Contains(stdout, "http://127.0.0.1:") || !strings.Contains(stdout, "/docs/guides/ci#3-the-workflow") {
 			t.Errorf("image %q: code %d, stdout %q, stderr %q, requests %v", image, code, stdout, stderr, api.requests)
 		}
 	}

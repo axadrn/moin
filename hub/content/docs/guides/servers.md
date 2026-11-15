@@ -84,6 +84,8 @@ API: PATCH /api/v1/servers/{id}
 MCP: rename_server
 ```
 
+The server's ID is at the end of its page, with a copy button.
+
 ## Updates
 
 The daemons update themselves to the version of the hub. How, step by step: [How a daemon updates](/docs/reference/shipping#how-a-daemon-updates).

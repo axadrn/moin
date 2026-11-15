@@ -320,10 +320,14 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 }
 
 // RotateDeployHook gives the app a new deploy hook URL, shown once. The old
-// one stops working.
+// one stops working. One thing brings new versions: a hook unlinks the
+// app's repo.
 func (s *AppService) RotateDeployHook(actor Actor, idOrName string) (string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
+		return "", err
+	}
+	if err := s.UnlinkRepo(actor, app.ID); err != nil {
 		return "", err
 	}
 	token := deployHookMarker + randomToken()
@@ -550,7 +554,7 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 		return false, err
 	}
 	// x-moin wins, so a change here would never reach the app.
-	if fromCompose, _ := s.composeDomains(app); len(fromCompose) > 0 {
+	if fromCompose, _ := app.ComposeDomains(); len(fromCompose) > 0 {
 		return false, ErrComposeDomains
 	}
 	clean, err := cleanDomains(domains)
@@ -694,17 +698,6 @@ func (s *AppService) FileConfig(app *model.App) protocol.Config {
 	return *detected.Config
 }
 
-// composeDomains are the domains x-moin.domains sets for the main service in
-// the live deploy, and its canonical one; none when compose.yml sets none
-// for it.
-func (s *AppService) composeDomains(app *model.App) (domains []string, canonical string) {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil || (len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0) {
-		return nil, ""
-	}
-	return detected.Domains, detected.Canonical
-}
-
 // composeServiceDomains are the domains x-moin.domains sets for the other
 // services in the live deploy, by service.
 func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
@@ -829,11 +822,8 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 		return domain
 	}
 	checks := []DomainCheck{}
-	domains, canonical := app.DomainList(), app.Canonical
-	fromCompose, composeCanonical := s.composeDomains(app)
-	if len(fromCompose) > 0 {
-		domains, canonical = fromCompose, composeCanonical
-	}
+	domains, canonical := app.MainDomains()
+	fromCompose, _ := app.ComposeDomains()
 	for _, domain := range domains {
 		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
 	}
@@ -891,20 +881,39 @@ func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.
 	if !KeptDeploys(deploys, app.LiveNumber)[target.Number] {
 		return nil, ErrDeployGone
 	}
+	// The rollback records the image it runs again, so the deploy hook
+	// follows it.
 	deploy := &model.Deploy{
 		ID:         uuid.New().String(),
 		AppID:      app.ID,
 		Status:     model.DeployRunning,
 		FromNumber: target.Number,
+		Image:      imageAt(deploys, target.Number),
 		CreatedAt:  s.now().UTC(),
 	}
 	return s.start(actor, "app.rolled_back", app, deploy, protocol.DeployStart{FromNumber: target.Number})
 }
 
+// imageAt is the image that runs after deploy number, from deploys newest
+// first: the one of the newest succeeded deploy up to it that set what runs.
+// A restart sets nothing. Empty when the repo built it.
+func imageAt(deploys []model.Deploy, number int) string {
+	for _, deploy := range deploys {
+		if deploy.Number > number || deploy.Status != model.DeploySucceeded {
+			continue
+		}
+		if deploy.SourceKey != "" || deploy.Image != "" || deploy.FromNumber > 0 {
+			return deploy.Image
+		}
+	}
+	return ""
+}
+
 // Builds reports whether a deploy brought something new, a source build or
-// an image. Restarts, domain changes and rollbacks do not.
+// an image. Restarts, domain changes and rollbacks do not; a rollback keeps
+// the image it runs again.
 func Builds(deploy model.Deploy) bool {
-	return deploy.SourceKey != "" || deploy.Image != ""
+	return deploy.FromNumber == 0 && (deploy.SourceKey != "" || deploy.Image != "")
 }
 
 // KeptDeploys returns the numbers of the deploys whose release the server
@@ -1116,6 +1125,7 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 				if done.Detected.Config != nil && done.Detected.Config.Backups != nil {
 					s.applyScheduleInFile(app, *done.Detected.Config.Backups)
 				}
+				s.forgetGoneDatabases(app)
 			}
 		}
 	}

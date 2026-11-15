@@ -227,13 +227,19 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 			domainText += ", from compose.yml"
 		}
 	}
-	repo := "none"
-	if app.Repo != "" {
-		auto := "off"
-		if app.AutoDeploy {
-			auto = "on"
+	from := "your folder, " + build.Name + " deploy"
+	switch app.DeployFrom {
+	case "github":
+		auto := "every push"
+		if !app.AutoDeploy {
+			auto = "by hand"
 		}
-		repo = app.Repo + ", branch " + app.Branch + ", auto deploy " + auto
+		from = "GitHub, " + app.Repo + ", branch " + app.Branch + ", " + auto
+	case "ci":
+		from = "your CI, through the deploy hook"
+		if app.HookImage != "" {
+			from += ": new tags of " + app.HookImage
+		}
 	}
 	password := "off"
 	if app.Protected {
@@ -248,7 +254,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	} else if app.InstantProvider == "off" {
 		instantText = "off"
 	}
-	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"instant", instantText}, {"password", password}, {"repo", repo}}
+	rows := [][]string{{"server", app.ServerName}, {"domains", domainText}, {"instant", instantText}, {"password", password}, {"deploy from", from}}
 	for _, service := range slices.Sorted(maps.Keys(app.ServiceDomains)) {
 		rows = append(rows, []string{service, strings.Join(app.ServiceDomains[service], ", ")})
 	}
@@ -256,7 +262,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 		rows = append(rows, []string{"built", built})
 	}
 	for _, row := range rows {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-9s", row[0]))+" "+row[1])
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(fmt.Sprintf("%-11s", row[0]))+" "+row[1])
 	}
 	if app.ChangesWaiting > 0 {
 		fmt.Fprintln(stdout)
@@ -670,8 +676,8 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 	return follow(ctx, api, name, started, "Redeploy", false, stdout)
 }
 
-// hook gives the app a new deploy hook URL for CI. It asks first: the old
-// URL stops working.
+// hook gives the app a new deploy hook URL for CI. It asks first when the
+// old URL stops working or the repo unlinks.
 func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("hook", "hook [app] [--yes], or hook off [app] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
@@ -700,9 +706,18 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if err != nil {
 		return err
 	}
-	// Only a hook that exists stops working; the first one asks nothing.
+	// Only a hook that exists stops working, and only a linked repo
+	// unlinks: one thing brings new versions. The first hook of an app
+	// without a repo asks nothing.
+	question := ""
 	if detail.App.Hook {
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name))
+		question = fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name)
+	}
+	if detail.App.Repo != "" {
+		question = fmt.Sprintf("Make a deploy hook for %s? It unlinks %s. Pushes no longer deploy it.", name, detail.App.Repo)
+	}
+	if question != "" {
+		err = confirm(stdin, stdout, flags.yes(), question)
 		if err != nil {
 			return err
 		}
@@ -720,7 +735,7 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		fmt.Fprintf(stdout, "It deploys new tags of %s.\n", detail.App.HookImage)
 	}
 	fmt.Fprintln(stdout)
-	hint(stdout, "Add it to your CI:", "/docs/guides/ci#3-the-workflow")
+	hint(stdout, "Add it to your CI:", api.URL()+"/docs/guides/ci#3-the-workflow")
 	return nil
 }
 

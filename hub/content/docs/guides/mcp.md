@@ -63,7 +63,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `get_deploy` | one deploy with its log | read |
 | `redeploy_app` | runs the newest source or image again | write |
 | `deploy_image` | deploys an image built in CI | write |
-| `create_deploy_hook` | a new deploy hook URL for CI, shown once; the old one stops working | write, destructive |
+| `create_deploy_hook` | a new deploy hook URL for CI, shown once; the old one stops working and the repo unlinks | write, destructive |
 | `remove_deploy_hook` | turns the deploy hook off; CI can no longer deploy | write, destructive |
 | `list_registries` | registry logins, without passwords | read |
 | `set_registry` | stores a registry login | write |
@@ -106,7 +106,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `get_github` | GitHub installations and the install link | read |
 | `list_branches` | the branches of a repo, the default first | read |
 | `list_repos` | repos moin may read, and where on GitHub to give it more | read |
-| `link_repo` | follows a repo and branch | write |
+| `link_repo` | follows a repo and branch; the deploy hook turns off | write, destructive |
 | `unlink_repo` | stops following it | write, destructive |
 | `deploy_ref` | deploys a branch, tag or commit from GitHub | write |
 | `get_integrations` | whether the Cloudflare token and Tailscale key are stored | read |

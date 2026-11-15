@@ -222,7 +222,8 @@ func (s *AppService) gitHubRepo(ctx context.Context, workspaceID, repo string) (
 }
 
 // LinkRepo makes an app follow a repo and branch. An empty branch is the
-// repo's default branch.
+// repo's default branch. One thing brings new versions: linking turns the
+// deploy hook off.
 func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, branch string, autoDeploy bool) (*model.App, error) {
 	// The branch goes into GitHub URLs and the push matching; git's rules
 	// keep it a plain name. GitHub's default branch needs no check.
@@ -261,6 +262,9 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 		return nil, err
 	}
 	s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(autoDeploy)})
+	if _, err := s.RemoveDeployHook(actor, app.ID); err != nil {
+		return nil, err
+	}
 	s.notify(actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
 }

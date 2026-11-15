@@ -52,7 +52,8 @@ const appSelect = `
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), 0) AS latest_number,
 		COALESCE((SELECT status FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), '') AS latest_status,
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), 0) AS live_number,
-		COALESCE((SELECT image FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), '') AS live_image
+		COALESCE((SELECT image FROM deploys WHERE app_id = a.id AND status = 'succeeded' AND (image != '' OR source_key != '' OR from_number > 0) ORDER BY number DESC LIMIT 1), '') AS live_image,
+		COALESCE((SELECT detected FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), '') AS live_detected
 	FROM apps a JOIN servers s ON s.id = a.server_id JOIN workspaces w ON w.id = a.workspace_id`
 
 func (r *Apps) Create(app *model.App) error {
@@ -423,6 +424,13 @@ func (r *Apps) BackupStatus(appID string) ([]model.BackupStatus, error) {
 	statuses := []model.BackupStatus{}
 	err := r.db.Select(&statuses, `SELECT * FROM backup_status WHERE app_id = $1 ORDER BY database`, appID)
 	return statuses, err
+}
+
+// RemoveBackupStatus forgets what the daemon said about one database of an
+// app.
+func (r *Apps) RemoveBackupStatus(appID, database string) error {
+	_, err := r.db.Exec(`DELETE FROM backup_status WHERE app_id = $1 AND database = $2`, appID, database)
+	return err
 }
 
 func (r *Apps) SetBackupStatus(status model.BackupStatus) error {

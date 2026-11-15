@@ -1790,7 +1790,7 @@ paths:
       tags: [Apps]
       operationId: rotateDeployHook
       summary: Create a deploy hook
-      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs from its repo, gets `422` `validation_failed` on `image`. The hook reuses the compose file of the live deploy.'
+      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. One thing brings new versions: it unlinks the app's GitHub repo. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs from its repo, gets `422` `validation_failed` on `image`. The hook reuses the compose file of the live deploy.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3366,7 +3366,7 @@ paths:
       tags: [GitHub]
       operationId: setAppRepo
       summary: Link a repo
-      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`.
+      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`. One thing brings new versions, so it turns the app's deploy hook off.
       requestBody:
         required: true
         content:
@@ -5290,6 +5290,7 @@ components:
           description: The newest successful deploy, which is running. 0 before the first.
         domains:
           type: array
+          description: The domains the app answers on. The ones x-moin.domains in compose.yml sets, else the ones saved in moin.
           items:
             type: string
         canonical:
@@ -5334,6 +5335,10 @@ components:
         hook:
           type: boolean
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
+        deploy_from:
+          type: string
+          enum: [folder, github, ci]
+          description: Where new versions come from, one at a time. `folder` deploys with `moin deploy`, `github` every push to the linked branch, `ci` through the deploy hook. Linking a repo or making a deploy hook switches it; unlinking or turning the hook off goes back to `folder`.
         hook_image:
           type: string
           description: The image the deploy hook deploys new tags of, the one running now, without its tag. Empty while the app runs from its repo; the hook then deploys nothing until an image is deployed by hand.

@@ -1,24 +1,36 @@
 package pages
 
 import (
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 )
 
-// New hook asks first only when it replaces a hook, and sits in the
-// part that re-renders, so it knows after the first hook.
+// New hook asks first only when it replaces a hook or unlinks the repo, and
+// sits in the card that re-renders, so it knows after the first hook.
 func TestNewHookAsksOnlyToReplace(t *testing.T) {
-	for _, on := range []bool{false, true} {
+	hash := "hash"
+	for _, test := range []struct {
+		app  model.App
+		asks string
+	}{
+		{model.App{Name: "shop"}, ""},
+		{model.App{Name: "shop", DeployHookHash: &hash}, "The old URL stops working"},
+		{model.App{Name: "shop", Repo: "me/shop"}, "It unlinks me/shop"},
+	} {
 		var html strings.Builder
-		if err := AppHook("shop", "shop-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b", "", "docker.io/me/shop", on).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		if err := appCI(RepoView{App: test.app}).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 			t.Fatal(err)
 		}
 		page := html.String()
 		if !strings.Contains(page, "data-new-hook") {
-			t.Fatalf("hook %v: no New hook button: %s", on, page)
+			t.Fatalf("%+v: no New hook button: %s", test.app, page)
 		}
-		if asks := strings.Contains(page, "The old URL stops working"); asks != on {
-			t.Errorf("hook %v: asks %v", on, asks)
+		if asks := strings.Contains(page, "hx-confirm"); asks != (test.asks != "") || !strings.Contains(page, test.asks) {
+			t.Errorf("%+v: asks %v: %s", test.app, asks, page)
 		}
 	}
 }
@@ -27,17 +39,61 @@ func TestNewHookAsksOnlyToReplace(t *testing.T) {
 // that it waits for one; a new hook's URL comes with the note to keep it
 // secret and guesses no registry or CI.
 func TestHookShowsItsImage(t *testing.T) {
+	hash := "hash"
 	for image, want := range map[string]string{
-		"docker.io/me/shop": `New tags of <code class="moin-mono moin-foreground">docker.io/me/shop</code>`,
-		"":                  "Waits for an image",
+		"docker.io/me/shop:v1": `placeholder="docker.io/me/shop:v1"`,
+		"":                     `placeholder="ghcr.io/me/shop:3f2a9c1"`,
 	} {
 		var html strings.Builder
-		if err := AppHook("shop", "shop-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b", "https://moin.example.com/webhooks/deploy/dph_x", image, true).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		app := model.App{Name: "shop", LiveImage: image, DeployHookHash: &hash}
+		if err := appCI(RepoView{App: app, HookURL: "https://moin.example.com/webhooks/deploy/dph_x"}).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 			t.Fatal(err)
 		}
 		page := html.String()
-		if !strings.Contains(page, want) || !strings.Contains(page, "Keep it secret, like a password.") || strings.Contains(page, "ghcr.io") || strings.Contains(page, "GITHUB") {
+		if !strings.Contains(page, want) || !strings.Contains(page, "Keep it secret, like a password.") || strings.Contains(page, "GITHUB") {
 			t.Errorf("image %q: %s", image, page)
+		}
+	}
+}
+
+// Who brings new versions is one answer: the one the app has now is
+// picked. The link form picks no repo before you do, and asks first when
+// linking turns the deploy hook off.
+func TestSourceIsOneAnswer(t *testing.T) {
+	hash := "hash"
+	current := regexp.MustCompile(`aria-current="page"(?: data-live)? data-source="(\w+)"`)
+	repos := []service.GitHubRepoOf{{GitHubRepo: service.GitHubRepo{FullName: "me/shop"}}}
+	for want, app := range map[string]model.App{
+		"folder": {Name: "shop"},
+		"github": {Name: "shop", Repo: "me/shop", Branch: "main"},
+		"ci":     {Name: "shop", DeployHookHash: &hash},
+	} {
+		// The tab in use opens by itself and says so; another tab shows
+		// only its own part, without "In use".
+		for _, show := range []string{"", "folder", "github", "ci"} {
+			var html strings.Builder
+			if err := AppSource(RepoView{App: app, Enabled: true, Connected: true, Repos: repos, Show: show}).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/deploys"), &html); err != nil {
+				t.Fatal(err)
+			}
+			page := html.String()
+			shown := show
+			if shown == "" {
+				shown = want
+			}
+			if found := current.FindAllStringSubmatch(page, -1); len(found) != 1 || found[0][1] != shown {
+				t.Errorf("%s, show %q: open tab %v", want, show, found)
+			}
+			if live := regexp.MustCompile(`data-live data-source="(\w+)"`).FindAllStringSubmatch(page, -1); len(live) != 1 || live[0][1] != want {
+				t.Errorf("%s, show %q: in use %v", want, show, live)
+			}
+			if shown == "github" && app.Repo == "" && !strings.Contains(page, "Pick a repo") {
+				t.Errorf("%s: the link form picked a repo: %s", want, page)
+			}
+			if shown == "github" {
+				if asks := strings.Contains(page, "Link a repo? The deploy hook turns off."); asks != (want == "ci") {
+					t.Errorf("%s: link asks %v", want, asks)
+				}
+			}
 		}
 	}
 }

@@ -92,8 +92,8 @@ func github(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // link makes an app follow a GitHub repo and branch.
-func link(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("link", "link owner/name [--branch main] [--auto=false] [app]").withApp()
+func link(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("link", "link owner/name [--branch main] [--auto=false] [app] [--yes]").withApp().withYes()
 	branch := flags.String("branch", "", "branch to follow; default the repo's default branch")
 	auto := flags.Bool("auto", true, "deploy every push to the branch")
 	if err := flags.parse(args); err != nil {
@@ -112,6 +112,17 @@ func link(ctx context.Context, args []string, stdout io.Writer) error {
 	api, err := apiClient()
 	if err != nil {
 		return err
+	}
+	// One thing brings new versions: linking turns the deploy hook off.
+	detail, err := api.App(ctx, name)
+	if err != nil {
+		return err
+	}
+	if detail.App.Hook {
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Link %s to %s? Its deploy hook turns off. CI can no longer deploy it.", name, flags.Arg(0)))
+		if err != nil {
+			return err
+		}
 	}
 	app, err := api.LinkRepo(ctx, name, flags.Arg(0), *branch, *auto)
 	var apiErr *client.Error

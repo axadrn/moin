@@ -135,7 +135,8 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `t` | Team: invite people and change roles |
 | `g` | Connect GitHub |
 | `k` | Bucket: where backups and uploads go |
+| `r` | Registries: logins for private images |
 | `n` | Alerts: Slack, Discord, Telegram and webhooks |
 | `d` | Data: browse and edit the rows of the open app's databases |
-| `s` | Settings: your account, API tokens, registry logins |
+| `s` | Settings: your account and API tokens |
 | `b` | Billing, on moin.run |

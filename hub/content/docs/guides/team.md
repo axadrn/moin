@@ -93,6 +93,8 @@ API: PATCH /api/v1/workspaces/{slug}/name
 MCP: rename_workspace
 ```
 
+The workspace's ID is at the end of **Team**, with a copy button. Its folder in your bucket is named by it.
+
 ## Change a role
 
 Only an owner makes someone an owner or changes an owner's role.

@@ -134,6 +134,7 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 			renderError(w, "load github installations failed", err)
 			return
 		}
+		repo.Show = r.URL.Query().Get("source")
 		view.Repo = &repo
 	case "logs":
 		// The page comes with the logs, unless the daemon is slow: then the
@@ -292,7 +293,11 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy hook not created", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(before.Name, before.Link(), url, before.HookImage(), true))
+	h.renderSourceWith(w, r, false, url)
+	if before.Repo != "" {
+		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once. "+before.Repo+" is unlinked.")
+		return
+	}
 	if before.DeployHookHash == nil {
 		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once.")
 		return
@@ -310,14 +315,19 @@ func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy hook not turned off", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(app.Name, app.Link(), "", app.HookImage(), false))
+	h.renderSourceWith(w, r, false, "")
 	answerDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+app.Name+".")
+}
+
+// Registries is the workspace's registry logins, under Settings.
+func (h *AppsHandler) Registries(w http.ResponseWriter, r *http.Request) {
+	h.renderRegistries(w, r)
 }
 
 // registryFields are the fields of the registry form, by API field name.
 var registryFields = map[string]string{"host": "registry-host", "password": "registry-password"}
 
-// SetRegistry saves a registry login from the settings form.
+// SetRegistry saves a registry login from the form on Registries.
 func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 	host := strings.TrimSpace(r.FormValue("host"))
 	err := h.apps.SetRegistry(actor(r), host, r.FormValue("username"), r.FormValue("password"))
@@ -346,7 +356,7 @@ func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "list registries failed", err)
 		return
 	}
-	render(w, r, pages.SettingsRegistriesSection(logins))
+	render(w, r, pages.Registries(logins))
 }
 
 // logLines is how many of the last lines of an app's containers the Logs

@@ -17,7 +17,7 @@ Rename `my-app` to `blog` and its link becomes `/app/acme/apps/blog`. Every link
 
 ## The ID
 
-Everything also has an ID of 32 characters that never changes. The API (`id`), the CLI, the TUI and MCP show it. Wherever you name a thing, its name or its ID works:
+Everything also has an ID of 32 characters that never changes. The API (`id`), the CLI, the TUI and MCP show it. The web shows it at the end of the settings of the workspace, an app and a server, with a copy button. Wherever you name a thing, its name or its ID works:
 
 ```text
 moin deploy my-app
@@ -42,6 +42,8 @@ Nothing is lost:
 - **Backups.** Its copies stay where they are, and restores find them.
 - **Instant address.** It stays the same.
 - **Containers.** They take the new name on the next restart or deploy. Until then the app runs as before.
+
+The app's ID is at the end of its **Settings**, with a copy button. Its folder in your bucket is named by it.
 
 Set `x-moin.app: blog` after the rename. Otherwise `moin deploy` in a folder called `my-app` offers to make a new app.
 

@@ -103,11 +103,11 @@ GitHub
   github             Where the moin GitHub App is installed, and the link to install it
   github repos       Repos moin may read, and where to give it more
   github branches    Branches of a repo: github branches owner/name
-  link               Follow a repo: link owner/name [--branch main] [--auto=false]
+  link               Follow a repo; turns the deploy hook off: link owner/name [--branch main] [--auto=false] [--yes]
   unlink             Stop following it: unlink [app] [--yes]
 
 CI
-  hook               New deploy hook URL for CI: hook [app] [--yes]
+  hook               New deploy hook URL for CI; unlinks the repo: hook [app] [--yes]
   hook off           Turn the deploy hook off; CI can no longer deploy: hook off [app] [--yes]
   registry           List registry logins for private images
   registry set       Save a login: registry set <host> <username>
@@ -288,7 +288,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "integrations":
 		return integrations(ctx, rest, stdin, stdout)
 	case "link":
-		return link(ctx, rest, stdout)
+		return link(ctx, rest, stdin, stdout)
 	case "unlink":
 		return unlink(ctx, rest, stdin, stdout)
 	case "backup":

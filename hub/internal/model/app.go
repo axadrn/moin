@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+
+	"github.com/axadrn/moin/protocol"
 )
 
 // App is a compose project on one server. The deploy fields come from its
@@ -70,9 +72,13 @@ type App struct {
 	LatestNumber  int    `db:"latest_number"`
 	LatestStatus  string `db:"latest_status"`
 	LiveNumber    int    `db:"live_number"`
-	// LiveImage is the image of the live deploy, with its tag; empty when
-	// it was built from the app's repo.
+	// LiveImage is the image that runs, with its tag: the one of the newest
+	// succeeded deploy that set what runs (a build, an image or a rollback;
+	// a restart keeps it). Empty when it was built from the app's repo.
 	LiveImage string `db:"live_image"`
+	// LiveDetected is what the daemon found in the live deploy, as JSON;
+	// empty before the first.
+	LiveDetected string `db:"live_detected"`
 }
 
 // Deploy statuses.
@@ -110,6 +116,19 @@ type Registry struct {
 	Username    string    `db:"username"`
 	Password    string    `db:"password"`
 	CreatedAt   time.Time `db:"created_at"`
+}
+
+// DeployFrom is where new versions of the app come from, one place at a
+// time: "github" when it follows a repo, "ci" when it has a deploy hook,
+// else "folder", deploys from your folder with moin deploy.
+func (a App) DeployFrom() string {
+	switch {
+	case a.Repo != "":
+		return "github"
+	case a.DeployHookHash != nil:
+		return "ci"
+	}
+	return "folder"
 }
 
 // HookImage is the image the deploy hook may deploy: the one running now,
@@ -155,6 +174,30 @@ func (a App) DomainList() []string {
 	domains := []string{}
 	_ = json.Unmarshal([]byte(a.Domains), &domains)
 	return domains
+}
+
+// ComposeDomains are the domains x-moin.domains in the live deploy's
+// compose.yml sets for the main service, and its canonical one; none when
+// it sets none for it.
+func (a App) ComposeDomains() (domains []string, canonical string) {
+	var detected protocol.Detected
+	if a.LiveDetected == "" || json.Unmarshal([]byte(a.LiveDetected), &detected) != nil || detected.Config == nil {
+		return nil, ""
+	}
+	if len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0 {
+		return nil, ""
+	}
+	return detected.Domains, detected.Canonical
+}
+
+// MainDomains are the domains the main service answers on, and its
+// canonical one: the ones compose.yml sets, else the ones saved in moin.
+// Every view shows these.
+func (a App) MainDomains() (domains []string, canonical string) {
+	if domains, canonical := a.ComposeDomains(); len(domains) > 0 {
+		return domains, canonical
+	}
+	return a.DomainList(), a.Canonical
 }
 
 // DomainsOf returns the domains of a service, the main one for "", and its

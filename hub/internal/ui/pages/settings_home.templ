@@ -42,6 +42,7 @@ templ SettingsHome(view SettingsHomeView) {
 						}
 						@components.Item(components.ItemProps{Href: base + "/alerts", Name: "Alerts"})
 						@components.Item(components.ItemProps{Href: base + "/bucket", Name: "Bucket"})
+						@components.Item(components.ItemProps{Href: base + "/registries", Name: "Registries"})
 						@components.Item(components.ItemProps{Href: base + "/activity", Name: "Activity"})
 						if member != nil && member.Can(model.WorkspacePermissionManageBilling) && cfg.Billing {
 							@components.Item(components.ItemProps{Href: base + "/billing", Name: "Billing"})

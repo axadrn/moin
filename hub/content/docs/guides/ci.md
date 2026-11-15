@@ -11,6 +11,8 @@ Deploy the repo once with `moin deploy` first. An image deploy keeps that compos
 
 Then [deploy your image once by hand](#deploy-an-image-by-hand). That picks the image. From then on the hook deploys only new tags of it.
 
+An app deploys from one place at a time: [your folder, GitHub or CI](/docs/guides/deploy#deploy-from). Turning the hook on unlinks the repo.
+
 ```text
 git push
    │
@@ -36,9 +38,9 @@ The deploy hook is a secret URL. When CI calls it, moin deploys the image. Only 
 Only for private images. For GitHub Container Registry, use a token with `read:packages`.
 
 ```surfaces
-Web: **Settings**, **Account**, **Tokens** tab, **Registries**, **Save login**
+Web: **Settings**, **Registries**, **Save login**
 CLI: moin registry set ghcr.io <username>
-TUI: opens the web: `w`, then `s`
+TUI: opens the web: `w`, then `r`
 API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
@@ -50,14 +52,14 @@ The CLI reads the token from stdin. It is stored encrypted. The daemon gets it o
 moin shows the URL once. Store it as a CI secret, for example `MOIN_DEPLOY_HOOK`. Keep it secret, like a password.
 
 ```surfaces
-Web: the app's **Deploys** tab, **Deploy from CI**, **New hook**
+Web: the app's **Deploys** tab, **Deploy from**, **CI**, **Turn on**
 CLI: moin hook <app-name>
-TUI: on the app, `W` opens **Deploy from CI** in the web
+TUI: on the app, `W` opens its Deploys tab in the web
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
 
-A new hook stops the old one, so moin asks first when there is one. `--yes` skips it.
+A new hook stops the old one and unlinks the repo, so moin asks first when that turns something off. `--yes` skips it.
 
 ### One image, new tags
 
@@ -66,7 +68,7 @@ A secret URL can leak, in a log or a screenshot. So a hook deploys only new tags
 - Another image gets `422`: "This deploy hook deploys only new tags of ghcr.io/me/app, the image running now."
 - While the app runs from its repo, the hook deploys nothing. Deploy an image by hand once.
 - To change the image, deploy the new one by hand once. The hook follows. Its URL stays.
-- **Deploy from CI** and `moin hook` show the image. The API and MCP call it `hook_image`.
+- **Deploy from**, **CI** and `moin hook` show the image. The API and MCP call it `hook_image`.
 
 ## 3. The workflow
 
@@ -120,7 +122,7 @@ With `image` it deploys that image. Without it, the repo goes through [your buck
 ## Deploy an image by hand
 
 ```surfaces
-Web: the app's **Deploys** tab, **Deploy from CI**, **By hand**, **Deploy**
+Web: the app's **Deploys** tab, **Deploy from**, **CI**, **1 Image**, **Deploy**
 CLI: moin deploy --image ghcr.io/<owner>/<image>:<tag> <app-name>
 TUI: on the app, `I`, type the image, then `enter`
 API: POST /api/v1/apps/{app}/deploys
@@ -134,9 +136,9 @@ The API takes `{"image": "ghcr.io/<owner>/<image>:<tag>"}`.
 The hook URL stops working, so CI can no longer deploy. Do it when you stop using CI or the URL leaked. You can make a new hook any time.
 
 ```surfaces
-Web: the app, **Deploy from CI**, **Deploy hook**, **Turn off**
+Web: the app's **Deploys** tab, **Deploy from**, **CI**, **Turn off**; or **Folder**, **Use folder**
 CLI: moin hook off <app-name>
-TUI: on the app, `W` opens **Deploy from CI** in the web
+TUI: on the app, `W` opens its Deploys tab in the web
 API: DELETE /api/v1/apps/{app}/hook
 MCP: remove_deploy_hook
 ```
@@ -144,10 +146,10 @@ MCP: remove_deploy_hook
 ## Registry logins
 
 ```surfaces
-Web: **Settings**, **Account**, **Tokens** tab, **Registries**; **Remove** on a login
+Web: **Settings**, **Registries**; **Remove** on a login
 CLI: moin registry
 CLI: moin registry rm ghcr.io
-TUI: opens the web: `w`, then `s`
+TUI: opens the web: `w`, then `r`
 API: GET /api/v1/registries
 API: DELETE /api/v1/registries/{host}
 MCP: list_registries

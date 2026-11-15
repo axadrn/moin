@@ -89,3 +89,15 @@ func TestDomainsShowTheCheck(t *testing.T) {
 		t.Errorf("no Check button")
 	}
 }
+
+// The overview lists the domains compose.yml sets, like the Domains page.
+func TestOverviewListsComposeDomains(t *testing.T) {
+	app := model.App{Name: "my-app", LiveNumber: 3, LiveDetected: `{"service":"web","domains":["my-app.example.com"],"config":{"domains":["my-app.example.com"]}}`}
+	var html strings.Builder
+	if err := appHomeSection(AppPageView{App: app}).Render(projectPageContext("/app/tiny-rocket-co/apps/my-app"), &html); err != nil {
+		t.Fatal(err)
+	}
+	if page := html.String(); !strings.Contains(page, `href="https://my-app.example.com"`) || strings.Contains(page, "No domain yet") {
+		t.Errorf("the overview lacks the domain from compose.yml: %s", page)
+	}
+}

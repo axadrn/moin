@@ -218,6 +218,9 @@ type Client struct {
 // UseSurface names the program that sends the requests: "cli" or "tui".
 func (c *Client) UseSurface(surface string) { c.surface = surface }
 
+// URL is the hub this client talks to, without a slash at the end.
+func (c *Client) URL() string { return c.url }
+
 // New returns a client for the config, or ErrNotLoggedIn.
 func New(config Config) (*Client, error) {
 	if config.Token == "" {

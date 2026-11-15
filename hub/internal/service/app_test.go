@@ -435,6 +435,31 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 
+	// A restart runs the same image, so the hook keeps deploying its new
+	// tags. A rollback, to the restart too, runs the image of then.
+	restart, err := apps.Restart(owner, "blog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: restart.ID, OK: true})
+	_, deploy, err = apps.DeployHook(token, "ghcr.io/me/blog:def")
+	if err != nil {
+		t.Fatalf("hook after a restart: %v", err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	back, err := apps.Rollback(owner, "blog", restart.Number)
+	if err != nil || back.Image != "ghcr.io/me/blog:abc" {
+		t.Fatalf("rollback to the restart = %+v, %v", back, err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: back.ID, OK: true})
+	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.LiveImage != "ghcr.io/me/blog:abc" {
+		t.Fatalf("after the rollback the image is %q", app.LiveImage)
+	}
+	if _, deploy, err = apps.DeployHook(token, "ghcr.io/me/blog:ghi"); err != nil {
+		t.Fatalf("hook after a rollback: %v", err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+
 	// A leaked hook URL cannot start another image, not even one with the
 	// same name on another host.
 	for _, other := range []string{"nginx:1.27", "ghcr.io/evil/blog:abc", "evil.example.com/me/blog:abc"} {

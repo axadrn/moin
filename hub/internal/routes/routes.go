@@ -264,7 +264,7 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 }
 
 // appRoutes are the pages of servers and apps: deploys, domains, data,
-// backups, uptime, metrics, buckets, env, GitHub and the catalog.
+// backups, uptime, metrics, buckets, registries, env, GitHub and the catalog.
 func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHandler) {
 	workspace := inWorkspace(app)
 	servers := handler.NewServersHandler(app.ServerService, app.UserService)
@@ -314,8 +314,9 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/unprotect", workspace(apps.Unprotect))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/instant", workspace(apps.SetInstant))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/instant-password", workspace(apps.SetInstantPassword))
-	mux.HandleFunc("POST /app/{workspaceSlug}/settings/registries", workspace(apps.SetRegistry))
-	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/registries/{host}", workspace(apps.DeleteRegistry))
+	mux.HandleFunc("GET /app/{workspaceSlug}/registries", workspace(apps.Registries))
+	mux.HandleFunc("POST /app/{workspaceSlug}/registries", workspace(apps.SetRegistry))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/registries/{host}", workspace(apps.DeleteRegistry))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/logs", workspace(apps.AppSection("logs")))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/logs/lines", workspace(apps.Logs))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/data", workspace(apps.Data))

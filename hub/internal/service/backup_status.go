@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -189,6 +190,44 @@ func (s *AppService) storeBackupStatus(app *model.App, backups protocol.Backups)
 			slog.Error("store backup status failed", "app_id", appID, "error", fmt.Sprint(err))
 		}
 	}
+	s.forgetGoneDatabases(app)
+}
+
+// forgetGoneDatabases forgets the backup status of the databases the live
+// deploy no longer has. Its Detected is the whole list: every deploy finds
+// it again, and it grows when the app makes a new database. A report can
+// hold a part only. The other databases of a Postgres service count while
+// the service is there. The copies in the bucket stay.
+func (s *AppService) forgetGoneDatabases(app *model.App) {
+	detected := s.liveDetected(app)
+	if detected == nil {
+		return
+	}
+	statuses, err := s.apps.BackupStatus(app.ID)
+	if err != nil {
+		return
+	}
+	for _, status := range statuses {
+		if hasDatabase(*detected, status.Database) {
+			continue
+		}
+		err := s.apps.RemoveBackupStatus(app.ID, status.Database)
+		if err != nil {
+			slog.Error("forget a database that is gone failed", "app_id", app.ID, "error", fmt.Sprint(err))
+		}
+	}
+}
+
+// hasDatabase says whether the live deploy has the database of a backup
+// status: one it backs up, one it cannot, or another database of its
+// Postgres service.
+func hasDatabase(detected protocol.Detected, name string) bool {
+	for _, database := range append(slices.Clone(detected.Databases), detected.NoBackup...) {
+		if database.Path == name || database.Postgres() && strings.HasPrefix(name, database.Path+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // backupChange is one action of the activity a backup status brings.
