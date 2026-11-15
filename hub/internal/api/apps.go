@@ -66,6 +66,11 @@ type App struct {
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook bool `json:"hook"`
+	// HookImage is the image the deploy hook deploys new tags of: the one
+	// running now, without its tag. Empty while the app runs from its
+	// repo; the hook then deploys nothing until an image is deployed by
+	// hand.
+	HookImage string `json:"hook_image"`
 	// Catalog is the slug of the catalog entry the app was installed
 	// from; empty for an app of your own.
 	Catalog   string    `json:"catalog"`
@@ -162,6 +167,7 @@ func NewApp(app model.App) App {
 		AutoDeploy:      app.AutoDeploy,
 		Pinned:          app.Pinned,
 		Hook:            app.DeployHookHash != nil,
+		HookImage:       app.HookImage(),
 		Bucket:          app.BucketName,
 		Catalog:         app.Catalog,
 		CreatedAt:       app.CreatedAt.UTC(),

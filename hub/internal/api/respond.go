@@ -94,6 +94,10 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &ambiguous) {
 		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"moment": strings.ToUpper(ambiguous.Error()[:1]) + ambiguous.Error()[1:] + "."}}, true
 	}
+	var hookImage *service.HookImageError
+	if errors.As(err, &hookImage) {
+		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"image": hookImage.Error()}}, true
+	}
 	var inUse *service.BucketInUseError
 	if errors.As(err, &inUse) {
 		return http.StatusConflict, ErrorDetail{Code: "bucket_in_use", Message: inUse.Error()}, true

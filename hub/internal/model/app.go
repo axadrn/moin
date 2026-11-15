@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -69,6 +70,9 @@ type App struct {
 	LatestNumber  int    `db:"latest_number"`
 	LatestStatus  string `db:"latest_status"`
 	LiveNumber    int    `db:"live_number"`
+	// LiveImage is the image of the live deploy, with its tag; empty when
+	// it was built from the app's repo.
+	LiveImage string `db:"live_image"`
 }
 
 // Deploy statuses.
@@ -106,6 +110,37 @@ type Registry struct {
 	Username    string    `db:"username"`
 	Password    string    `db:"password"`
 	CreatedAt   time.Time `db:"created_at"`
+}
+
+// HookImage is the image the deploy hook may deploy: the one running now,
+// without its tag. CI changes only the tag or digest. Empty while the app
+// runs from its repo or no deploy succeeded, so the hook deploys nothing.
+func (a App) HookImage() string {
+	return ImageName(a.LiveImage)
+}
+
+// ImageName is the image of a reference without its tag or digest, with
+// Docker Hub written out, so two ways to write one image are equal:
+// nginx:1.27 is docker.io/library/nginx, me/shop is docker.io/me/shop.
+func ImageName(ref string) string {
+	if ref == "" {
+		return ""
+	}
+	name, _, _ := strings.Cut(strings.ToLower(ref), "@")
+	if colon := strings.LastIndex(name, ":"); colon > strings.LastIndex(name, "/") {
+		name = name[:colon]
+	}
+	host, path, found := strings.Cut(name, "/")
+	if !found || (!strings.ContainsAny(host, ".:") && host != "localhost") {
+		host, path = "docker.io", name
+	}
+	if host == "index.docker.io" {
+		host = "docker.io"
+	}
+	if host == "docker.io" && !strings.Contains(path, "/") {
+		path = "library/" + path
+	}
+	return host + "/" + path
 }
 
 // ServiceDomainMap returns the domains of the app's other services.
