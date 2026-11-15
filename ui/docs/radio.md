@@ -15,6 +15,14 @@ Styles: `components/choice.css`, `components/radio.css`, `components/item.css`, 
 item-with-radio
 ```
 
+## With what it opens
+
+The item marked `data-picked` right after a pick shows only while that pick is checked. No script.
+
+```example
+radio-with-details
+```
+
 ## On its own
 
 ```example

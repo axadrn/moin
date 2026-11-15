@@ -123,7 +123,7 @@ func (h *HooksHandler) GitHubWebhook(w http.ResponseWriter, r *http.Request) {
 
 // Repo is the repository panel of an app.
 func (h *AppsHandler) Repo(w http.ResponseWriter, r *http.Request) {
-	h.renderRepo(w, r)
+	h.renderSource(w, r)
 }
 
 // RepoBranches answers the branch select of the link form for the repo it
@@ -154,14 +154,14 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 	case r.FormValue("deploy") != "":
 		// The link form deploys the branch right away.
 		deploy, err := h.apps.DeployRef(r.Context(), actor(r), app.Name, "")
-		h.renderRepo(w, r)
+		h.renderSource(w, r)
 		if err != nil {
 			answerNote(w, r, app.Repo+" linked, deploy not started", errorMessage(err))
 			return
 		}
 		answerDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+app.Branch+" at "+shortSHA(deploy.CommitSHA)+" from GitHub.")
 	default:
-		h.renderRepo(w, r)
+		h.renderSource(w, r)
 		answerDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")
 	}
 }
@@ -189,7 +189,7 @@ func (h *AppsHandler) UnlinkRepo(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Repo not unlinked", err, nil)
 		return
 	}
-	h.renderRepo(w, r)
+	h.renderSource(w, r)
 	answerDone(w, r, "Repo unlinked", "moin no longer deploys its pushes. The app keeps running.")
 }
 
@@ -201,7 +201,7 @@ func (h *AppsHandler) DeployRef(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy not started", err, map[string]string{"ref": "deploy-ref"})
 		return
 	}
-	h.renderRepo(w, r)
+	h.renderSource(w, r)
 	answerDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+shortSHA(deploy.CommitSHA)+" from GitHub.")
 }
 
@@ -212,23 +212,32 @@ func shortSHA(sha string) string {
 	return sha
 }
 
-// renderRepo renders the GitHub card. Error says why the repos could not
-// be listed: a state of the card, not of a click.
-func (h *AppsHandler) renderRepo(w http.ResponseWriter, r *http.Request) {
+// renderSource renders the "Who brings new versions?" card with the repos
+// to link. Error says why the repos could not be listed: a state of the
+// card, not of a click.
+func (h *AppsHandler) renderSource(w http.ResponseWriter, r *http.Request) {
+	h.renderSourceWith(w, r, true, "")
+}
+
+// renderSourceWith renders the card; with listRepos it asks GitHub for the
+// repos, else the GitHub part asks for itself. hookURL is a new deploy
+// hook's URL, shown once.
+func (h *AppsHandler) renderSourceWith(w http.ResponseWriter, r *http.Request, listRepos bool, hookURL string) {
 	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
 		renderError(w, "load app failed", err)
 		return
 	}
-	view, err := h.repoView(r, app, true)
+	view, err := h.repoView(r, app, listRepos)
 	if err != nil {
 		renderError(w, "load github installations failed", err)
 		return
 	}
-	render(w, r, pages.AppRepo(view))
+	view.HookURL = hookURL
+	render(w, r, pages.AppSource(view))
 }
 
-// repoView is the GitHub card of app. With listRepos it asks GitHub for the
+// repoView is the "Who brings new versions?" card of app. With listRepos it asks GitHub for the
 // repos the link form offers; without, the card renders with the page and
 // asks for them itself (Loading).
 func (h *AppsHandler) repoView(r *http.Request, app *model.App, listRepos bool) (pages.RepoView, error) {
@@ -251,9 +260,6 @@ func (h *AppsHandler) repoView(r *http.Request, app *model.App, listRepos bool) 
 	view.Repos, err = h.apps.GitHubRepos(r.Context(), workspace.ID)
 	if err != nil {
 		view.Error = errorMessage(err)
-	}
-	if len(view.Repos) > 0 {
-		view.Branches = h.branches(r, view.Repos[0].FullName)
 	}
 	return view, nil
 }

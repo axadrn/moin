@@ -266,6 +266,10 @@
      data-way="first", with no script. */
   [data-either]:not(:has(input[data-other]:checked)) [data-way="other"],
   [data-either]:has(input[data-other]:checked) [data-way="first"] { display: none; }
+
+  /* What a pick opens. In a list, the item marked data-picked right after a
+     pick item shows only while that one is picked, with no script. */
+  label.moin-item:not(:has(:checked)) + [data-picked] { display: none; }
 }
 
 /* A group of moin-columns is one box on its own line, past the display of

@@ -292,7 +292,11 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy hook not created", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(before.Name, before.Link(), url, before.HookImage(), true))
+	h.renderSourceWith(w, r, false, url)
+	if before.Repo != "" {
+		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once. "+before.Repo+" is unlinked.")
+		return
+	}
 	if before.DeployHookHash == nil {
 		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once.")
 		return
@@ -310,7 +314,7 @@ func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Deploy hook not turned off", err, nil)
 		return
 	}
-	render(w, r, pages.AppHook(app.Name, app.Link(), "", app.HookImage(), false))
+	h.renderSourceWith(w, r, false, "")
 	answerDone(w, r, "Deploy hook turned off", "CI can no longer deploy "+app.Name+".")
 }
 

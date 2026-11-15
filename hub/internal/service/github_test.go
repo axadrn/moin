@@ -217,6 +217,18 @@ func TestGitHubDeploys(t *testing.T) {
 	if err != nil || app.Repo != "axadrn/blog" || app.Branch != "main" || !app.AutoDeploy || app.InstallationID != 7 {
 		t.Fatalf("link = %+v, %v", app, err)
 	}
+	// One thing brings new versions: a deploy hook unlinks the repo, and
+	// linking a repo turns the hook off.
+	if _, err := apps.RotateDeployHook(owner, "blog"); err != nil {
+		t.Fatal(err)
+	}
+	if hooked, _ := apps.Get(owner.WorkspaceID, "blog"); hooked.Repo != "" || hooked.DeployHookHash == nil {
+		t.Fatalf("a deploy hook kept the repo: %+v", hooked)
+	}
+	app, err = apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", true)
+	if err != nil || app.Repo != "axadrn/blog" || app.DeployHookHash != nil {
+		t.Fatalf("a link kept the deploy hook: %+v, %v", app, err)
+	}
 	if _, err := apps.DeployRef(ctx, owner, "blog", "nope"); !errors.Is(err, ErrRef) {
 		t.Fatalf("deploy an unknown ref: err = %v", err)
 	}

@@ -256,18 +256,17 @@ func appDomains(app model.App) []string {
 }
 
 // appDeploysSection answers "how does code get in?": the versions, the log
-// of the one picked, GitHub and CI.
+// of the one picked, and who brings new versions.
 templ appDeploysSection(app model.App, deploys []api.Deploy, selected int, follow bool, repo *RepoView) {
 	<div class="moin-grid" data-fit style="--min:30rem">
 		@appDeploys(app, deploys, selected, follow)
 		@DeployLogPanel(app, selectedDeploy(deploys, selected), follow, false)
 	</div>
 	if repo != nil {
-		@AppRepo(*repo)
+		@AppSource(*repo)
 	} else {
-		@AppRepo(RepoView{App: app, Enabled: true, Connected: true, Loading: app.Repo == ""})
+		@AppSource(RepoView{App: app, Enabled: true, Connected: true, Loading: app.Repo == ""})
 	}
-	@appCI(app.Name, app.Link(), app.LiveImage, app.LiveNumber > 0, app.DeployHookHash != nil, app.HookImage())
 }
 
 // appDomainsSection answers "where is it reached?": the instant address

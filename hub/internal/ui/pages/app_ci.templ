@@ -4,56 +4,55 @@ import (
 	"cmp"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
-// appCI is the "Deploy from CI" card of the Deploys section. One line on
-// top says what runs; under it deploying an image by hand, and the deploy
-// hook CI calls. running is the live deploy's image, empty when it was
-// built from the repo; live says a deploy is live at all. hookImage is the
-// image the hook deploys new tags of.
-templ appCI(appName, appLink, running string, live, hook bool, hookImage string) {
-	<div data-app-ci>
-		@components.Card(components.CardProps{Title: "Deploy from CI"}) {
-			<div class="moin-stack" data-gap="6">
-				<p class="moin-text" data-running>
-					<span class="moin-muted">Running</span>
-					if running != "" {
-						<code class="moin-mono">{ running }</code>
-					} else if live {
-						built from the repo
-					} else {
-						nothing yet
+// appCI is the CI part of "Who brings new versions?". One line on top says
+// what runs; under it deploying an image by hand, and the deploy hook CI
+// calls.
+templ appCI(view RepoView) {
+	{{ app := view.App }}
+	{{ running := app.LiveImage }}
+	<div class="moin-stack moin-fill" data-gap="6" data-app-ci>
+		<p class="moin-text" data-running>
+			<span class="moin-muted">Running</span>
+			if running != "" {
+				<code class="moin-mono">{ running }</code>
+			} else if app.LiveNumber > 0 {
+				built from the repo
+			} else {
+				nothing yet
+			}
+		</p>
+		<form
+			class="moin-stack"
+			data-gap="3"
+			hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/image" }
+			hx-swap="none"
+			hx-disable="find button[type='submit']"
+		>
+			@components.CSRF()
+			<p class="moin-text moin-strong">By hand</p>
+			@components.Field(components.FieldProps{For: "image-ref"}) {
+				<div class="moin-row" data-gap="2" data-phone="stack">
+					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "aria-label": "Image", "placeholder": cmp.Or(running, "ghcr.io/me/"+app.Name+":3f2a9c1"), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+					@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-deploy-image": true}}) {
+						Deploy
 					}
-				</p>
-				<form
-					class="moin-stack"
-					data-gap="3"
-					hx-post={ ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/image" }
-					hx-swap="none"
-					hx-disable="find button[type='submit']"
-				>
-					@components.CSRF()
-					<p class="moin-text moin-strong">By hand</p>
-					@components.Field(components.FieldProps{For: "image-ref"}) {
-						<div class="moin-row" data-gap="2" data-phone="stack">
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "image-ref", "name": "image", "type": "text", "aria-label": "Image", "placeholder": cmp.Or(running, "ghcr.io/me/"+appName+":3f2a9c1"), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
-							@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-deploy-image": true}}) {
-								Deploy
-							}
-						</div>
-					}
-				</form>
-				@AppHook(appName, appLink, "", hookImage, hook)
-			</div>
-		}
+				</div>
+			}
+		</form>
+		@appHook(app, view.HookURL)
 	</div>
 }
 
-// AppHook is the deploy hook: on or off, the image it deploys new tags of,
+// appHook is the deploy hook: on or off, the image it deploys new tags of,
 // the one running now; and a new hook's URL once, in a box of its own.
-templ AppHook(appName, appLink, url, image string, on bool) {
-	<div id="app-hook" class="moin-stack" data-gap="3" data-hook-on?={ on }>
+templ appHook(app model.App, url string) {
+	{{ on := app.DeployHookHash != nil }}
+	{{ image := app.HookImage() }}
+	<div class="moin-stack" data-gap="3" data-hook-on?={ on }>
 		<div class="moin-row" data-wrap data-between data-gap="3">
 			<div class="moin-stack" data-gap="1">
 				<div class="moin-row" data-gap="2">
@@ -80,18 +79,9 @@ templ AppHook(appName, appLink, url, image string, on bool) {
 			</div>
 			<div class="moin-row" data-gap="2">
 				if on {
-					@components.Button(components.ButtonProps{Quiet: true, Attrs: templ.Attributes{
-						"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
-						"hx-target":     "#app-hook",
-						"hx-swap":       "outerHTML",
-						"hx-disable":    "this",
-						"hx-confirm":    "Turn off the deploy hook? Its URL stops working and CI can no longer deploy " + appName + ".",
-						"data-hook-off": true,
-					}}) {
-						Turn off
-					}
+					@hookOffButton(app, true)
 				}
-				@newHookButton(appLink, on)
+				@newHookButton(app)
 			</div>
 		</div>
 		if url != "" {
@@ -106,22 +96,53 @@ templ AppHook(appName, appLink, url, image string, on bool) {
 	</div>
 }
 
-// newHookButton makes a new deploy hook URL. It asks first only when it
-// replaces a hook, whose URL then stops working.
-templ newHookButton(appLink string, replaces bool) {
+// hookOffButton turns the deploy hook off, after asking. quiet is the
+// button next to New hook; else it names what it does.
+templ hookOffButton(app model.App, quiet bool) {
+	@components.Button(components.ButtonProps{Quiet: quiet, Attrs: templ.Attributes{
+		"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/hook",
+		"hx-target":     "#app-source",
+		"hx-swap":       "outerHTML",
+		"hx-disable":    "this",
+		"hx-confirm":    "Turn off the deploy hook? Its URL stops working and CI can no longer deploy " + app.Name + ".",
+		"data-hook-off": true,
+	}}) {
+		if quiet {
+			Turn off
+		} else {
+			Turn off the deploy hook
+		}
+	}
+}
+
+// newHookButton makes a new deploy hook URL. It asks first when it
+// replaces a hook, whose URL then stops working, or unlinks the repo.
+templ newHookButton(app model.App) {
 	{{
 		attributes := templ.Attributes{
-			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/hook",
-			"hx-target":     "#app-hook",
+			"hx-post":       ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/hook",
+			"hx-target":     "#app-source",
 			"hx-swap":       "outerHTML",
 			"hx-disable":    "this",
 			"data-new-hook": true,
 		}
-		if replaces {
-			attributes["hx-confirm"] = "Create a new deploy hook? The old URL stops working."
+		if question := newHookQuestion(app); question != "" {
+			attributes["hx-confirm"] = question
 		}
 	}}
 	@components.Button(components.ButtonProps{Attrs: attributes}) {
 		New hook
 	}
+}
+
+// newHookQuestion is what New hook asks first: nothing for the first hook
+// of an app without a repo.
+func newHookQuestion(app model.App) string {
+	switch {
+	case app.Repo != "":
+		return "Create a deploy hook? It unlinks " + app.Repo + ". Pushes no longer deploy " + app.Name + "."
+	case app.DeployHookHash != nil:
+		return "Create a new deploy hook? The old URL stops working."
+	}
+	return ""
 }

@@ -128,9 +128,9 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin github` | where the moin GitHub App is installed, and the link to install it |
 | `moin github repos` | the repos moin may read, and where to give it more |
 | `moin github branches <owner/name>` | the branches of a repo, the default first |
-| `moin link owner/name [--branch <branch>] [--auto=false] [app]` | follows a repo; every push to the branch deploys unless `--auto=false`. `--branch` defaults to the repo's default branch |
+| `moin link owner/name [--branch <branch>] [--auto=false] [app] [--yes]` | follows a repo; every push to the branch deploys unless `--auto=false`. `--branch` defaults to the repo's default branch. It turns the deploy hook off, so it asks first when there is one |
 | `moin unlink [app] [--yes]` | stops following it |
-| `moin hook [app] [--yes]` | asks, then prints a new deploy hook URL for CI; the old one stops working |
+| `moin hook [app] [--yes]` | prints a new deploy hook URL for CI; the old one stops working and the repo unlinks, so it asks first when that turns something off |
 | `moin hook off [app] [--yes]` | turns the deploy hook off; CI can no longer deploy |
 | `moin registry` | lists registry logins for private images |
 | `moin registry set <host> <username>` | saves a login; the password or token comes on stdin |
@@ -218,7 +218,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app my-app` is
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type my-app to confirm:` |
-| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy` of an app that exists, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
 `--yes` skips the question. For `servers rm`, `apps rm`, `buckets rm` and `restore`, `--yes` is not enough: a script passes the name as `--confirm my-app`. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`.

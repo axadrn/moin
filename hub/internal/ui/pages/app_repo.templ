@@ -7,7 +7,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
-// RepoView is the GitHub card of an app.
+// RepoView is the "Who brings new versions?" card of an app: its GitHub
+// part and its CI part.
 type RepoView struct {
 	App model.App
 	// Enabled is whether this hub has the GitHub App; Connected
@@ -15,7 +16,7 @@ type RepoView struct {
 	Enabled   bool
 	Connected bool
 	Repos     []service.GitHubRepoOf
-	// Branches are the branches of the first repo, its default first.
+	// Branches are the branches of the picked repo, its default first.
 	Branches []string
 	// Installations say where on GitHub the workspace gives moin more repos.
 	Installations []model.GitHubInstallation
@@ -25,67 +26,74 @@ type RepoView struct {
 	// page renders it without them and asks for them, so the card keeps
 	// its place.
 	Loading bool
+	// HookURL is a new deploy hook's URL, shown once.
+	HookURL string
 }
 
-// AppRepo is the GitHub card: connect GitHub, link a repo and branch,
-// deploy a ref, deploy on push.
+// AppRepo is the GitHub part: connect GitHub, link a repo and branch,
+// deploy a ref, deploy on push, unlink. Before GitHub answered it asks for
+// itself, out of the whole card.
 templ AppRepo(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	<div
 		id="app-repo"
+		class="moin-stack moin-fill"
+		data-gap="4"
 		if view.Loading {
 			hx-get={ appPath + "/repo" }
 			hx-trigger="load"
+			hx-select="#app-repo"
 			hx-swap="outerHTML"
 		}
 	>
-		@components.Card(components.CardProps{Title: "GitHub", Action: repoAction(view)}) {
-			if view.Error != "" {
-				<p class="moin-text moin-failed" data-repo-error>{ view.Error }</p>
-			}
-			if !view.Enabled {
-				<p class="moin-small moin-muted">
-					This hub has no GitHub App.
-				</p>
-				@components.Command(components.CommandProps{Text: "moin deploy " + view.App.Name})
-			} else if !view.Connected {
+		if view.Error != "" {
+			<p class="moin-text moin-failed" data-repo-error>{ view.Error }</p>
+		}
+		if !view.Enabled {
+			<p class="moin-small moin-muted">
+				This hub has no GitHub App.
+			</p>
+		} else if !view.Connected {
+			<div class="moin-row" data-wrap data-between data-gap="3">
 				<p class="moin-small moin-muted">
 					GitHub is not connected.
 				</p>
-			} else if view.App.Repo == "" {
-				@repoLink(view)
-			} else {
-				@repoLinked(view)
-			}
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath + "/deploys", Attrs: templ.Attributes{"data-connect-github": true}}) {
+					@components.Icon("git-hub")
+					Connect GitHub
+				}
+			</div>
+		} else if view.App.Repo == "" {
+			@repoLink(view)
+		} else {
+			@repoLinked(view)
 		}
 	</div>
 }
 
-// repoAction is the one button in the head of the card: Connect GitHub,
-// which comes back to the app, or Unlink once a repo is linked.
-templ repoAction(view RepoView) {
-	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
-	if view.Enabled && !view.Connected {
-		@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/github/install?next=" + appPath + "/deploys", Attrs: templ.Attributes{"data-connect-github": true}}) {
-			@components.Icon("git-hub")
-			Connect GitHub
-		}
-	} else if view.Enabled && view.App.Repo != "" {
-		@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-			"hx-post":          appPath + "/repo/unlink",
-			"hx-target":        "#app-repo",
-			"hx-swap":          "outerHTML",
-			"hx-disable":       "this",
-			"hx-confirm":       "Unlink " + view.App.Repo + "? moin stops deploying its pushes. The app keeps running.",
-			"data-unlink-repo": true,
-		}}) {
+// unlinkButton stops the app from following its repo, after asking. named
+// says the repo on the button, where nothing else around it does.
+templ unlinkButton(app model.App, named bool) {
+	@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+		"hx-post":          ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/repo/unlink",
+		"hx-target":        "#app-source",
+		"hx-swap":          "outerHTML",
+		"hx-disable":       "this",
+		"hx-confirm":       "Unlink " + app.Repo + "? Pushes no longer deploy " + app.Name + ". It keeps running.",
+		"data-unlink-repo": true,
+	}}) {
+		if named {
+			Unlink { app.Repo }
+		} else {
 			Unlink
 		}
 	}
 }
 
-// repoLink links the app to a repo and a branch and deploys it: choose the
-// repo, then one of its branches, keep or drop deploy on push, Deploy.
+// repoLink links the app to a repo and a branch and deploys it: pick the
+// repo, then one of its branches, keep or drop deploy on push. No repo is
+// picked before you pick one. Linking turns the deploy hook off, so it asks
+// first when there is one.
 templ repoLink(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	if len(view.Repos) == 0 && !view.Loading {
@@ -94,18 +102,29 @@ templ repoLink(view RepoView) {
 		</p>
 		<div class="moin-row" data-wrap data-gap="2" data-no-repos>
 			@repoAccess(view)
-			@components.Button(components.ButtonProps{Attrs: templ.Attributes{"hx-get": appPath + "/repo", "hx-target": "#app-repo", "hx-swap": "outerHTML", "hx-disable": "this", "data-refresh-repos": true}}) {
+			@components.Button(components.ButtonProps{Attrs: templ.Attributes{"hx-get": appPath + "/repo", "hx-target": "#app-source", "hx-swap": "outerHTML", "hx-disable": "this", "data-refresh-repos": true}}) {
 				Refresh
 			}
 		</div>
 	} else {
-		<form class="moin-stack" data-gap="4" hx-post={ appPath + "/repo" } hx-target="#app-repo" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-link-repo>
+		<form
+			class="moin-stack"
+			data-gap="4"
+			hx-post={ appPath + "/repo" }
+			hx-target="#app-source"
+			hx-swap="outerHTML"
+			hx-disable="find button[type='submit']"
+			if view.App.DeployHookHash != nil {
+				hx-confirm={ "Link a repo? The deploy hook turns off. CI can no longer deploy " + view.App.Name + "." }
+			}
+			data-link-repo
+		>
 			@components.CSRF()
 			<input type="hidden" name="deploy" value="1"/>
 			<div class="moin-grid">
 				<div hx-get={ appPath + "/repo/branches" } hx-trigger="change" hx-include="closest form" hx-target="#link-branch-field" hx-swap="outerHTML">
 					@components.Field(components.FieldProps{Label: "Repo", For: "link-repo"}) {
-						@components.Select(components.SelectProps{ID: "link-repo", Name: "repo", Label: "Repo", Options: repoOptions(view.Repos), Disabled: view.Loading})
+						@components.Select(components.SelectProps{ID: "link-repo", Name: "repo", Label: "Repo", Options: repoOptions(view.Repos, view.Loading), Disabled: view.Loading})
 					}
 				</div>
 				@repoBranchField(view.Branches, view.Loading)
@@ -116,7 +135,7 @@ templ repoLink(view RepoView) {
 			</label>
 			<div class="moin-row" data-wrap data-gap="2">
 				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"disabled": view.Loading}}) {
-					Deploy
+					Link and deploy
 				}
 				@repoAccess(view)
 			</div>
@@ -155,13 +174,16 @@ templ repoAccess(view RepoView) {
 	}
 }
 
-// repoLinked is a linked repo: deploy a ref, deploy on push.
+// repoLinked is a linked repo: unlink it, deploy a ref, deploy on push.
 templ repoLinked(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
-	<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="moin-link moin-truncate moin-mono moin-text" data-quiet data-linked-repo>
-		{ view.App.Repo }<span class="moin-muted">{ "@" + view.App.Branch }</span>
-	</a>
-	<form hx-post={ appPath + "/repo/deploy" } hx-target="#app-repo" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-deploy-ref>
+	<div class="moin-row" data-between data-gap="3">
+		<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="moin-link moin-truncate moin-mono moin-text" data-quiet data-linked-repo>
+			{ view.App.Repo }<span class="moin-muted">{ "@" + view.App.Branch }</span>
+		</a>
+		@unlinkButton(view.App, false)
+	</div>
+	<form hx-post={ appPath + "/repo/deploy" } hx-target="#app-source" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-deploy-ref>
 		@components.CSRF()
 		@components.Field(components.FieldProps{Label: "Deploy a branch, tag or commit", For: "deploy-ref"}) {
 			<div class="moin-row" data-gap="2" data-phone="stack">
@@ -187,11 +209,13 @@ templ AutoDeployForm(app model.App) {
 	</form>
 }
 
-func repoOptions(repos []service.GitHubRepoOf) []components.Option {
-	if len(repos) == 0 {
+// repoOptions are the repos to pick, after "Pick a repo": none is picked
+// before you pick one.
+func repoOptions(repos []service.GitHubRepoOf, loading bool) []components.Option {
+	if loading {
 		return []components.Option{{Value: "", Label: "…"}}
 	}
-	options := make([]components.Option, 0, len(repos))
+	options := []components.Option{{Value: "", Label: "Pick a repo"}}
 	for _, repo := range repos {
 		options = append(options, components.Option{Value: repo.FullName, Label: repo.FullName})
 	}

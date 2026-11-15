@@ -12,7 +12,7 @@ Connect GitHub. moin takes your code straight from it. Link a repo to an app onc
 Installs the moin GitHub App on your account or an organization. Once per workspace.
 
 ```surfaces
-Web: **Settings**, **GitHub**, **Connect GitHub**; or the app's **Deploys** tab, **GitHub**, **Connect GitHub**
+Web: **Settings**, **GitHub**, **Connect GitHub**; or the app's **Deploys** tab, **Who brings new versions?**, **GitHub**, **Connect GitHub**
 CLI: moin github
 TUI: opens the web: `w`, then `g`
 API: GET /api/v1/github
@@ -24,19 +24,21 @@ Connecting always happens on github.com. The CLI, the API and MCP give you the l
 ## Link a repo
 
 ```surfaces
-Web: the app's **Deploys** tab, **GitHub**, choose the repo and the branch, **Deploy**
+Web: the app's **Deploys** tab, **Who brings new versions?**, **GitHub**, pick the repo and the branch, **Link and deploy**
 CLI: moin link <owner>/<repo> --branch main
-TUI: on the app, `W` opens its GitHub card in the web
+TUI: on the app, `W` opens its Deploys tab in the web
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-Deploy every push is on by default. On the web, **Deploy** links and deploys in one step. Elsewhere, link first and then deploy.
+Deploy every push is on by default. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy.
+
+One thing brings new versions: you by hand, GitHub or [your CI](/docs/guides/ci). Linking a repo turns the deploy hook off, so moin asks first when there is one. `--yes` skips it. Deploying by hand always works.
 
 ## Deploy from GitHub
 
 ```surfaces
-Web: the app's **Deploys** tab, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
+Web: the app's **Deploys** tab, **Who brings new versions?**, **GitHub**, type a branch, tag or commit or leave it empty, **Deploy**
 CLI: moin deploy --ref <ref>
 TUI: on the app, `B`, type a branch, tag or commit or nothing, then `enter`
 API: POST /api/v1/apps/{app}/deploys
@@ -73,9 +75,9 @@ live ✓      the commit gets a green
 ```
 
 ```surfaces
-Web: the app's **Deploys** tab, **GitHub**, **Deploy every push**
+Web: the app's **Deploys** tab, **Who brings new versions?**, **GitHub**, **Deploy every push**
 CLI: moin link <owner>/<repo> --auto=false
-TUI: on the app, `W` opens its GitHub card in the web
+TUI: on the app, `W` opens its Deploys tab in the web
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
@@ -88,7 +90,7 @@ MCP: link_repo
 Web: the app, **GitHub**; the **Branch** select after you choose the repo
 CLI: moin github repos
 CLI: moin github branches <owner>/<repo>
-TUI: on the app, `W` opens its GitHub card in the web
+TUI: on the app, `W` opens its Deploys tab in the web
 API: GET /api/v1/github/repos
 API: GET /api/v1/github/repos/{owner}/{repo}/branches
 MCP: list_repos
@@ -104,7 +106,7 @@ The app stops following the repo and keeps running.
 ```surfaces
 Web: the app's **Deploys** tab, **GitHub**, **Unlink**
 CLI: moin unlink
-TUI: on the app, `W` opens its GitHub card in the web
+TUI: on the app, `W` opens its Deploys tab in the web
 API: DELETE /api/v1/apps/{app}/repo
 MCP: unlink_repo
 ```

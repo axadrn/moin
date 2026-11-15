@@ -670,8 +670,8 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 	return follow(ctx, api, name, started, "Redeploy", false, stdout)
 }
 
-// hook gives the app a new deploy hook URL for CI. It asks first: the old
-// URL stops working.
+// hook gives the app a new deploy hook URL for CI. It asks first when the
+// old URL stops working or the repo unlinks.
 func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("hook", "hook [app] [--yes], or hook off [app] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
@@ -700,9 +700,18 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if err != nil {
 		return err
 	}
-	// Only a hook that exists stops working; the first one asks nothing.
+	// Only a hook that exists stops working, and only a linked repo
+	// unlinks: one thing brings new versions. The first hook of an app
+	// without a repo asks nothing.
+	question := ""
 	if detail.App.Hook {
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name))
+		question = fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name)
+	}
+	if detail.App.Repo != "" {
+		question = fmt.Sprintf("Make a deploy hook for %s? It unlinks %s. Pushes no longer deploy it.", name, detail.App.Repo)
+	}
+	if question != "" {
+		err = confirm(stdin, stdout, flags.yes(), question)
 		if err != nil {
 			return err
 		}

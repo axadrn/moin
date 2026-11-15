@@ -1790,7 +1790,7 @@ paths:
       tags: [Apps]
       operationId: rotateDeployHook
       summary: Create a deploy hook
-      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs from its repo, gets `422` `validation_failed` on `image`. The hook reuses the compose file of the live deploy.'
+      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. One thing brings new versions: it unlinks the app's GitHub repo. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs from its repo, gets `422` `validation_failed` on `image`. The hook reuses the compose file of the live deploy.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3366,7 +3366,7 @@ paths:
       tags: [GitHub]
       operationId: setAppRepo
       summary: Link a repo
-      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`.
+      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`. One thing brings new versions, so it turns the app's deploy hook off.
       requestBody:
         required: true
         content:

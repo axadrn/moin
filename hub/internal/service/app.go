@@ -320,10 +320,14 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 }
 
 // RotateDeployHook gives the app a new deploy hook URL, shown once. The old
-// one stops working.
+// one stops working. One thing brings new versions: a hook unlinks the
+// app's repo.
 func (s *AppService) RotateDeployHook(actor Actor, idOrName string) (string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
+		return "", err
+	}
+	if err := s.UnlinkRepo(actor, app.ID); err != nil {
 		return "", err
 	}
 	token := deployHookMarker + randomToken()

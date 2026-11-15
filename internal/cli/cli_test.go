@@ -183,6 +183,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"env", "rm", "--app", "shop", "KEY"},
 		{"domains", "rm", "--app", "shop", "blog.example.com"},
 		{"unlink", "shop"},
+		{"link", "me/blog", "shop"},
 		{"hook", "shop"},
 		{"buckets", "rm", "client-a"},
 		{"registry", "rm", "ghcr.io"},
@@ -370,6 +371,10 @@ func TestEnvPush(t *testing.T) {
 
 func TestLinkUnreadableRepo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"app":{"name":"shop"},"deploys":[]}`))
+			return
+		}
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_, _ = w.Write([]byte(`{"error":{"code":"validation_failed","message":"Check the highlighted fields and try again.","fields":{"repo":"moin cannot read this repo. Install the moin GitHub App on its account and give it the repo."}}}`))
 	}))

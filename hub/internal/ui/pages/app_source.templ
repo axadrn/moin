@@ -1,0 +1,72 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/internal/build"
+)
+
+// AppSource is the one question of the Deploys section: who brings new
+// versions? You by hand, GitHub on every push, or your CI through the
+// deploy hook. One at a time: linking a repo turns the hook off, a hook
+// unlinks the repo. Under the picked answer only its own part shows. Every
+// action in it answers the whole card.
+templ AppSource(view RepoView) {
+	{{ app := view.App }}
+	{{ source := sourceOf(app) }}
+	<div id="app-source">
+		@components.Card(components.CardProps{Title: "Who brings new versions?"}) {
+			@components.List() {
+				@sourcePick("hand", "You, by hand", build.Name+" deploy", source)
+				@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-picked": true}}) {
+					@sourceHand(app)
+				}
+				@sourcePick("github", "GitHub", "Every push. The server builds.", source)
+				@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-picked": true}}) {
+					@AppRepo(view)
+				}
+				@sourcePick("ci", "Your CI", "CI builds. The deploy hook ships.", source)
+				@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-picked": true}}) {
+					@appCI(view)
+				}
+			}
+		}
+	</div>
+}
+
+// sourcePick is one answer. Picking it only shows its part; what it turns
+// on or off happens there.
+templ sourcePick(value, name, note, source string) {
+	@components.Item(components.ItemProps{Pick: true, Name: name, Note: note, Attrs: templ.Attributes{"name": "source", "value": value, "checked": value == source, "data-source": value}})
+}
+
+// sourceHand is the part of "You, by hand": the command, which always
+// works, and turning off what brings versions now.
+templ sourceHand(app model.App) {
+	<div class="moin-stack moin-fill" data-gap="4" data-source-hand>
+		@components.Command(components.CommandProps{Text: build.Name + " deploy " + app.Name})
+		<p class="moin-small moin-muted">It always works, next to GitHub and CI too.</p>
+		if app.Repo != "" || app.DeployHookHash != nil {
+			<div class="moin-row" data-wrap data-gap="2">
+				if app.Repo != "" {
+					@unlinkButton(app, true)
+				}
+				if app.DeployHookHash != nil {
+					@hookOffButton(app, false)
+				}
+			</div>
+		}
+	</div>
+}
+
+// sourceOf is the answer an app has now: GitHub when it follows a repo, CI
+// when it has a deploy hook, else by hand.
+func sourceOf(app model.App) string {
+	switch {
+	case app.Repo != "":
+		return "github"
+	case app.DeployHookHash != nil:
+		return "ci"
+	}
+	return "hand"
+}
