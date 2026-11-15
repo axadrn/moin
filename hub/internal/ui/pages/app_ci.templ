@@ -73,11 +73,14 @@ templ AppHook(appName, appLink, url, image string, on bool) {
 		</div>
 		if url != "" {
 			<p class="moin-small moin-muted">
-				Copy it now, it shows only once. Store it in CI as the secret <code class="moin-mono moin-foreground">MOIN_DEPLOY_HOOK</code>.
+				Copy it now, it shows only once. Store it in CI as a secret, for example <code class="moin-mono moin-foreground">MOIN_DEPLOY_HOOK</code>.
 			</p>
 			<div data-deploy-hook>
 				@components.Command(components.CommandProps{Text: url})
 			</div>
+			<p class="moin-small moin-strong" data-hook-secret>
+				Treat it like a password. Anyone with it can deploy new tags of your image. Never put it in code, a chat or a log.
+			</p>
 			<p class="moin-small moin-muted">
 				CI calls it after pushing a new tag:
 			</p>

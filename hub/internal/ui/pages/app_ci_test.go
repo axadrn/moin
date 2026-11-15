@@ -35,7 +35,7 @@ func TestHookShowsItsImage(t *testing.T) {
 			t.Fatal(err)
 		}
 		page := html.String()
-		if !strings.Contains(page, want) {
+		if !strings.Contains(page, want) || !strings.Contains(page, "Treat it like a password.") {
 			t.Errorf("image %q: %s", image, page)
 		}
 		if image != "" && !strings.Contains(page, "?image=docker.io/me/shop:$GITHUB_SHA") {

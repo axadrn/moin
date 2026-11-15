@@ -47,7 +47,7 @@ The CLI reads the token from stdin. It is stored encrypted. The daemon gets it o
 
 ## 2. Create a deploy hook
 
-moin shows the URL once. Store it as the CI secret `MOIN_DEPLOY_HOOK`.
+moin shows the URL once. Store it as a CI secret, for example `MOIN_DEPLOY_HOOK`. Treat it like a password.
 
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from CI**, **New deploy hook**

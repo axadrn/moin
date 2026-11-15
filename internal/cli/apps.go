@@ -713,6 +713,8 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	}
 	done(stdout, "New deploy hook for %s. It is shown once; the old one stops working:", name)
 	fmt.Fprintf(stdout, "\n  %s\n\n", url)
+	fmt.Fprintln(stdout, "Treat it like a password. Anyone with it can deploy new tags of your image. Never put it in code, a chat or a log.")
+	fmt.Fprintln(stdout)
 	image := detail.App.HookImage
 	if image == "" {
 		image = "ghcr.io/me/" + name
