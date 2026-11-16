@@ -55,7 +55,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | --- | --- | --- | --- | --- | --- |
 | Add a server, install command | ✓ | ✓ `servers add` | Opens the web. | ✓ | ✓ |
 | Rename, remove a server | ✓ | ✓ | Opens the web. | ✓ | ✓ |
-| Visitors, SSH, firewall: what is on the server | ✓ | ✓ `servers secure` | Shows what is on the server; `W` changes it in the web. | ✓ | ✓ |
+| Web, SSH, firewall: what is on the server | ✓ | ✓ `servers secure` | Shows what is on the server; `W` changes it in the web. | ✓ | ✓ |
 | Server rules | ✓ | ✓ `servers rules` | ✓ on the server | ✓ | ✓ |
 | Integrations: Cloudflare, Tailscale: connect, replace the key, disconnect | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
 | Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |

@@ -86,6 +86,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* A hint says what the item is about, in a sentence that wraps. */
+  .moin-item-hint {
+    display: block;
+    margin-top: var(--space-1);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+  }
   .moin-item-value {
     flex: none;
     max-width: 50%;

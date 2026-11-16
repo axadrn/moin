@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/style"
@@ -105,11 +104,7 @@ func printSecurity(w io.Writer, server client.Server) {
 		case line.Name == "ssh" && report.TailscaleIP != "":
 			value += " · " + report.TailscaleIP
 		case line.Name == "firewall" && report.Firewall:
-			open := strings.Join(report.OpenPorts, ", ")
-			if open == "" {
-				open = "nothing"
-			}
-			value += " · open to everyone: " + open
+			value += " · open to everyone: " + report.OpenText()
 		}
 		fmt.Fprintln(w, style.Muted.Render(fmt.Sprintf("  %-10s", line.Name))+value)
 	}

@@ -1,29 +1,17 @@
 ---
 title: "Security"
-description: "Who reaches your apps, who reaches SSH, and the firewall. moin keeps it that way. Rules only root can change."
+description: "Web, SSH and the firewall of a server. moin keeps them that way. Rules only root can change."
 group: "Servers and data"
 order: 2
 ---
 
-Your server has doors to the internet, called ports. A server's **Security** page says, in three lines, which doors are open. Each line shows what really is on the server, a dot and one action. The daemon keeps it that way.
+Your server has doors to the internet, called ports. A server's **Security** page has three lines. Each says what really is on the server. The daemon keeps it that way.
 
-```text
-outside                    server
-moin ◀──────────────────── daemon
-visitors ─▶ Cloudflare ◀── cloudflared
-you, SSH ─▶ tailnet ◀───── Tailscale
-                           firewall:
-                           the rest
-                           is shut
-```
-
-Each line starts on your server and calls out. With the tunnel, SSH only through Tailscale and the firewall, only 41641/udp stays open to everyone. It is Tailscale's port for direct connections.
-
-| Line | What it says | Needs |
+| Line | What it is | Choices |
 | --- | --- | --- |
-| **Visitors** | Cloudflare Tunnel, or ports 80 and 443 open | Cloudflare connected, for the tunnel |
-| **SSH** | everyone, only through Tailscale, or off | Tailscale, for only through Tailscale |
-| **Firewall** | on or off: on drops everything the other lines do not need | nothing: turn it on for every server |
+| **Web** | How visitors reach your apps: ports 80 and 443, or a Cloudflare Tunnel. | Open, Cloudflare Tunnel |
+| **SSH** | Logging in to the server: port 22. | Everyone, Only through Tailscale, Off |
+| **Firewall** | The Linux firewall (nftables) on the server. Blocks every port moin does not need. | On, Off |
 
 ```surfaces
 Web: **Servers**, **Security** on the server
@@ -33,16 +21,23 @@ API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
 ```
 
-- A green dot: locked down, as set. A quiet one: open, as set. A red one: the server differs from what is set, and the line says both, like `Everyone · set: Only through Tailscale`. Before the daemon reports, it says `Waiting for the server`.
-- SSH and the firewall always work. The tunnel needs Cloudflare, and SSH only through Tailscale needs Tailscale. Until then, the line shows a short link, **Connect Cloudflare** or **Connect Tailscale**. It opens [Integrations](#integrations).
-- Every change asks first. The CLI too; `--yes` skips it in scripts. If you do one thing, turn on the firewall.
+The dot in front of a line:
+
+- **Green**: locked down, as set.
+- **Quiet**: open, as set.
+- **Red**: the server is not as set. The line says both, like `Everyone · set: Only through Tailscale`.
+- **Waiting for the server**: the daemon has not reported yet.
+
+SSH and the firewall always work. Only the Cloudflare Tunnel needs Cloudflare, and only SSH through Tailscale needs Tailscale. Until you connect them, the line has a short link to [Integrations](#integrations).
+
+Every change asks first. The CLI too; `--yes` skips it in scripts. If you do one thing, turn on the firewall.
 
 ## moin keeps it
 
-The daemon checks its server after each start and every five minutes. What drifted, it puts back: the tunnel, the tailnet, sshd off, the firewall. Each fix is in the [activity](/docs/guides/activity), by moin: `put back the firewall on web-1`.
+The daemon looks at its server after each start and every five minutes. What drifted, it puts back: the tunnel, the tailnet, SSH off, the firewall. Each fix is in the [activity](/docs/guides/activity), by moin: `put back the firewall on web-1`.
 
-- It looks at what really is. A tailnet you joined by hand counts. An sshd that listens while SSH is off is stopped again.
-- It never opens a door by itself. If you stop sshd by hand, SSH says `Off · set: Everyone` until you pick one.
+- It looks at what really is. A tailnet you joined by hand counts.
+- It never opens a door by itself. If you stop SSH by hand, the line says `Off · set: Everyone` until you pick one.
 
 ## Integrations
 
@@ -70,28 +65,31 @@ MCP: set_integrations
 - Turn the tunnels off before you disconnect Cloudflare. Without the token moin cannot delete a tunnel (`tunnels_on`). To change the token, save a new key instead: the tunnels keep running.
 - Disconnecting Tailscale changes no server. Servers stay in your tailnet; new ones no longer join it.
 
-## Visitors
+## Web
 
-With the tunnel, visitors reach your app through Cloudflare, so the server keeps ports 80 and 443 closed.
+How visitors reach your apps.
 
-moin creates a tunnel, sends every domain of the server's apps through it, and points each domain's DNS at it. It turns on **Always Use HTTPS**. Cloudflare serves HTTPS, so the server needs no certificate. A domain you add later gets the same.
+- **Open**: ports 80 and 443 are open. moin gets the HTTPS certificates itself.
+- **Cloudflare Tunnel**: visitors come through Cloudflare. Ports 80 and 443 stay closed. Cloudflare serves HTTPS.
 
 ```bash
 moin servers secure web-1 --tunnel on
 ```
 
-- If the token cannot reach a domain's zone, a red line under the three says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit it says to turn on **Always Use HTTPS** yourself.
-- Off deletes the tunnel and the DNS records moin made. Point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
+With the tunnel, moin sends every domain of the server's apps through it and points their DNS at it. A domain you add later gets the same. It turns on **Always Use HTTPS**.
+
+- If the token cannot reach a domain's zone, a red line says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit, turn on **Always Use HTTPS** yourself.
+- Open again deletes the tunnel and the DNS records moin made. Point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
 - A server behind the tunnel has no [instant address](/docs/guides/domains#instant-address): it needs ports 80 and 443.
 
 ## SSH
 
-SSH is the door you use to log in to your server yourself.
+Logging in to the server yourself, on port 22.
 
 | SSH | Means |
 | --- | --- |
-| **Everyone** | SSH answers on every network |
-| **Only through Tailscale** | SSH answers only in your tailnet, your own private network |
+| **Everyone** | port 22 answers on every network |
+| **Only through Tailscale** | port 22 answers only in your tailnet, your own private network |
 | **Off** | the daemon stops sshd and keeps it stopped |
 
 ```bash
@@ -104,13 +102,18 @@ moin servers secure web-1 --ssh tailscale
 
 ## Firewall
 
-The firewall shuts every door the other lines do not need.
+The firewall that is built into Linux: nftables. Ubuntu, Debian and Fedora have it already.
+
+- **On**: moin adds its own table, named `moin`. It lets in what the other lines need, answers to connections the server made itself, and ping. It drops everything else. The line says what is open to everyone, like `80, 443`.
+- **Off**: moin removes its table. Rules of your own stay. With SSH only through Tailscale, the table keeps one rule: port 22 only in the tailnet.
+- Without nftables, the line shows a red problem. Install it, and moin turns the firewall on by itself within five minutes:
 
 ```bash
-moin servers secure web-1 --firewall on
+apt install nftables   # Ubuntu, Debian
+dnf install nftables   # Fedora
 ```
 
-It lets in answers to connections the server made itself, ping, and what the other lines leave open. It drops everything else. With the firewall on, the line lists what is open to everyone.
+This is the firewall on the server. Your provider may have one in front of it, like the Hetzner Cloud Firewall. moin does not touch that one.
 
 ## See what is open
 
@@ -148,7 +151,7 @@ network: locked
 | `exec: off` | [running commands](/docs/guides/exec) in containers through moin |
 | `deploy-from: <sources>` | deploys from anywhere else |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
-| `network: locked` | changes to the tunnel, SSH and the firewall: set them up first, then lock them. The daemon still puts back what drifts |
+| `network: locked` | changes to Web, SSH and the firewall: set them up first, then lock them. The daemon still puts back what drifts |
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.

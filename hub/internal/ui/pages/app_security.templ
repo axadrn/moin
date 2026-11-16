@@ -81,8 +81,8 @@ templ ServerSecurity(view SecurityView) {
 	}
 }
 
-// securityState is the three lines: who reaches the apps, who reaches
-// SSH, and the firewall. Each shows what really is on the server, with a
+// securityState is the three lines: Web (who reaches the apps), SSH
+// (who logs in) and the firewall. Each shows what really is on the server, with a
 // dot, and saves itself. It reloads when the server changes. SSH and the
 // firewall always work. The tunnel needs Cloudflare and SSH only through
 // Tailscale needs Tailscale: without them, the line links to Integrations.
@@ -93,17 +93,18 @@ templ securityState(view SecurityView, securityPath string) {
 	<div id="security-state" hx-get={ securityPath } hx-trigger="servers from:body" hx-select="#security-state" hx-swap="outerHTML">
 		@components.Card(components.CardProps{}) {
 			@components.List() {
-				{{ visitors := visitorsLine(server, report) }}
-				if view.Integrations.Cloudflare || server.Tunnel {
-					@securitySwitch(securityPath, "tunnel", visitors, server.Tunnel, ifElse(server.Tunnel,
-						"Open ports 80 and 443 again? moin deletes the tunnel and its DNS records. Point your domains back at the server.",
-						"Send visitors through Cloudflare? Ports 80 and 443 close. Cloudflare serves HTTPS."))
-				} else {
-					@components.Item(components.ItemProps{Lead: lineDot(visitors), Name: visitors.Name, Note: visitors.Note, Attrs: templ.Attributes{"data-security-line": "tunnel"}}) {
-						@connectLink("Connect Cloudflare")
-					}
-				}
-				@sshChoice(securityPath, sshLine(server, report), server, tailscale)
+				@securityChoice(securityPath, "tunnel", webLine(server, report), ifElse(server.Tunnel, "on", "off"), ifElse(view.Integrations.Cloudflare || server.Tunnel, "", "Connect Cloudflare"), ifElse(server.Tunnel,
+					"Open ports 80 and 443 again? moin deletes the tunnel and its DNS records. Point your domains back at the server.",
+					"Send visitors through Cloudflare? Ports 80 and 443 close. Cloudflare serves HTTPS."), []components.Option{
+					{Value: "off", Label: "Open", Attrs: templ.Attributes{"id": "security-tunnel-off"}},
+					{Value: "on", Label: "Cloudflare Tunnel", Attrs: templ.Attributes{"id": "security-tunnel-on", "disabled": !view.Integrations.Cloudflare && !server.Tunnel}},
+				})
+				@securityChoice(securityPath, "ssh", sshLine(server, report), server.SSH, ifElse(tailscale, "", "Connect Tailscale"),
+					"Change who reaches SSH on "+server.Name+"? Keep another way in, like your provider's console.", []components.Option{
+						{Value: protocol.SSHEveryone, Label: "Everyone", Attrs: templ.Attributes{"id": "security-ssh-everyone"}},
+						{Value: protocol.SSHTailscale, Label: "Only through Tailscale", Attrs: templ.Attributes{"id": "security-ssh-tailscale", "disabled": !tailscale && server.SSH != protocol.SSHTailscale}},
+						{Value: protocol.SSHOff, Label: "Off", Attrs: templ.Attributes{"id": "security-ssh-off"}},
+					})
 				@securitySwitch(securityPath, "firewall", firewallLine(server, report), server.Firewall, ifElse(server.Firewall,
 					"Turn off the firewall? Every port that listens is open again.",
 					"Turn on the firewall? It drops every connection the server does not need."))
@@ -119,44 +120,53 @@ templ securityState(view SecurityView, securityPath string) {
 	</div>
 }
 
-// securityLine is one line of the Security page: its name, the dot and
-// the short state of what is on the server.
+// securityLine is one line of the Security page: its name, the dot, the
+// short state of what is on the server, and a sentence of what it is.
 type securityLine struct {
 	Name  string
 	State components.State
 	Note  string
+	Hint  string
 }
 
 // truth is the line for what is (is) against what is set (want), in
 // words: green when they match and it is locked down (locked), quiet when
 // they match and it is open, red with both when they differ, waiting
 // before the daemon reported.
-func truth(name, is, want string, known, locked bool) securityLine {
+func truth(name, hint, is, want string, known, locked bool) securityLine {
 	switch {
 	case !known:
-		return securityLine{name, components.StateWaiting, "Waiting for the server"}
+		return securityLine{name, components.StateWaiting, "Waiting for the server", hint}
 	case is != want:
-		return securityLine{name, components.StateFailed, is + " · set: " + want}
+		return securityLine{name, components.StateFailed, is + " · set: " + want, hint}
 	case locked:
-		return securityLine{name, components.StateLive, is}
+		return securityLine{name, components.StateLive, is, hint}
 	}
-	return securityLine{name, components.StateIdle, is}
+	return securityLine{name, components.StateIdle, is, hint}
 }
 
-func visitorsLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
-	words := func(tunnel bool) string { return ifElse(tunnel, "Cloudflare Tunnel", "Ports 80 and 443 open") }
+// The sentence under each line: what it is, for someone who never set up
+// a server.
+const (
+	webHint      = "How visitors reach your apps: ports 80 and 443, or a Cloudflare Tunnel."
+	sshHint      = "Logging in to the server: port 22."
+	firewallHint = "The Linux firewall (nftables) on the server. Blocks every port moin does not need."
+)
+
+func webLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
+	words := func(tunnel bool) string { return ifElse(tunnel, "Cloudflare Tunnel", "Open") }
 	is := false
 	if report != nil {
 		is = report.Proxy == "tunnel"
 	}
-	return truth("Visitors", words(is), words(server.Tunnel), report != nil, is)
+	return truth("Web", webHint, words(is), words(server.Tunnel), report != nil, is)
 }
 
 func sshLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
 	if report == nil {
-		return truth("SSH", "", sshWords(server.SSH), false, false)
+		return truth("SSH", sshHint, "", sshWords(server.SSH), false, false)
 	}
-	line := truth("SSH", sshWords(report.SSH), sshWords(server.SSH), true, report.SSH != protocol.SSHEveryone)
+	line := truth("SSH", sshHint, sshWords(report.SSH), sshWords(server.SSH), true, report.SSH != protocol.SSHEveryone)
 	if report.TailscaleIP != "" && line.State != components.StateFailed {
 		line.Note += " · " + report.TailscaleIP
 	}
@@ -166,9 +176,9 @@ func sshLine(server model.Server, report *protocol.ServerConfigResult) securityL
 func firewallLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
 	words := func(on bool) string { return ifElse(on, "On", "Off") }
 	is := report != nil && report.Firewall
-	line := truth("Firewall", words(is), words(server.Firewall), report != nil, is)
+	line := truth("Firewall", firewallHint, words(is), words(server.Firewall), report != nil, is)
 	if is && line.State != components.StateFailed {
-		line.Note = "Open to everyone: " + ifElse(len(report.OpenPorts) == 0, "nothing", strings.Join(report.OpenPorts, ", "))
+		line.Note = "Open to everyone: " + report.OpenText()
 	}
 	return line
 }
@@ -195,35 +205,30 @@ templ connectLink(words string) {
 }
 
 // securitySwitch is a line with a switch that saves itself after one
-// question.
+// question: the firewall.
 templ securitySwitch(securityPath, set string, line securityLine, on bool, question string) {
 	{{ id := "security-" + set }}
 	{{ attrs := securityForm(securityPath, set, question) }}
 	{{ attrs["hx-disable"] = "find input[type='checkbox']" }}
-	@components.Item(components.ItemProps{Form: true, For: id, Lead: lineDot(line), Name: line.Name, Note: line.Note, Attrs: attrs}) {
+	@components.Item(components.ItemProps{Form: true, For: id, Lead: lineDot(line), Name: line.Name, Note: line.Note, Hint: line.Hint, Attrs: attrs}) {
 		@components.CSRF()
 		<input type="hidden" name="set" value={ set }/>
 		@components.Switch(components.SwitchProps{ID: id, Name: "on", Value: "1", Checked: on})
 	}
 }
 
-// sshChoice is the SSH line: everyone, only through Tailscale or off,
-// saved after one question. Only through Tailscale waits for Tailscale, an
-// integration key or a tailnet joined by hand; until then the line links
-// to Integrations.
-templ sshChoice(securityPath string, line securityLine, server model.Server, tailscale bool) {
-	@components.Item(components.ItemProps{Form: true, For: "security-ssh-" + server.SSH, Lead: lineDot(line), Name: line.Name, Note: line.Note, Attrs: securityForm(securityPath, "ssh",
-		"Change who reaches SSH on "+server.Name+"? Keep another way in, like your provider's console.")}) {
+// securityChoice is a line with one of a few options, saved after one
+// question: Web (open or a Cloudflare Tunnel) and SSH (everyone, only
+// through Tailscale or off). An option that needs an account first can't
+// be picked yet, and connect is the short link to Integrations for it.
+templ securityChoice(securityPath, set string, line securityLine, checked, connect, question string, options []components.Option) {
+	@components.Item(components.ItemProps{Form: true, For: "security-" + set + "-" + checked, Lead: lineDot(line), Name: line.Name, Note: line.Note, Hint: line.Hint, Attrs: securityForm(securityPath, set, question)}) {
 		@components.CSRF()
-		<input type="hidden" name="set" value="ssh"/>
-		if !tailscale {
-			@connectLink("Connect Tailscale")
+		<input type="hidden" name="set" value={ set }/>
+		if connect != "" {
+			@connectLink(connect)
 		}
-		@components.Choice(components.ChoiceProps{Name: "ssh", Label: "SSH", Checked: server.SSH, Options: []components.Option{
-			{Value: protocol.SSHEveryone, Label: "Everyone", Attrs: templ.Attributes{"id": "security-ssh-everyone"}},
-			{Value: protocol.SSHTailscale, Label: "Only through Tailscale", Attrs: templ.Attributes{"id": "security-ssh-tailscale", "disabled": !tailscale && server.SSH != protocol.SSHTailscale}},
-			{Value: protocol.SSHOff, Label: "Off", Attrs: templ.Attributes{"id": "security-ssh-off"}},
-		}})
+		@components.Choice(components.ChoiceProps{Name: set, Label: line.Name, Checked: checked, Options: options})
 	}
 }
 

@@ -21,11 +21,11 @@ func TestSecurityLinesTellTheTruth(t *testing.T) {
 		state components.State
 		note  string
 	}{
-		{visitorsLine(server, report), components.StateFailed, "Ports 80 and 443 open · set: Cloudflare Tunnel"},
+		{webLine(server, report), components.StateFailed, "Open · set: Cloudflare Tunnel"},
 		{sshLine(server, report), components.StateFailed, "Everyone · set: Off"},
-		{firewallLine(server, report), components.StateLive, "Open to everyone: 22/tcp"},
+		{firewallLine(server, report), components.StateLive, "Open to everyone: 22"},
 		{sshLine(model.Server{SSH: protocol.SSHTailscale}, &protocol.ServerConfigResult{SSH: protocol.SSHTailscale, TailscaleIP: "100.64.0.9"}), components.StateLive, "Only through Tailscale · 100.64.0.9"},
-		{visitorsLine(model.Server{}, &protocol.ServerConfigResult{Proxy: "direct"}), components.StateIdle, "Ports 80 and 443 open"},
+		{webLine(model.Server{}, &protocol.ServerConfigResult{Proxy: "direct"}), components.StateIdle, "Open"},
 		{firewallLine(model.Server{Firewall: true}, nil), components.StateWaiting, "Waiting for the server"},
 	} {
 		if test.line.State != test.state || test.line.Note != test.note {
@@ -44,7 +44,7 @@ func TestSecurityPageSendsKeysToIntegrations(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{">Connect Cloudflare</a>", ">Connect Tailscale</a>", `href="/app/tiny-rocket-co/integrations"`, `data-security-line="ssh"`, `id="security-ssh-off"`, `data-security-line="firewall"`, "Visitors", "Firewall"} {
+	for _, want := range []string{">Connect Cloudflare</a>", ">Connect Tailscale</a>", `href="/app/tiny-rocket-co/integrations"`, `data-security-line="ssh"`, `id="security-ssh-off"`, `data-security-line="firewall"`, `data-security-line="tunnel"`, `id="security-tunnel-off"`, ">Web<", webHint, sshHint, firewallHint} {
 		if !strings.Contains(page, want) {
 			t.Errorf("security page misses %q", want)
 		}
@@ -56,6 +56,9 @@ func TestSecurityPageSendsKeysToIntegrations(t *testing.T) {
 	}
 	if !strings.Contains(page, `disabled id="security-ssh-tailscale"`) {
 		t.Error("SSH only through Tailscale can be picked without Tailscale")
+	}
+	if !strings.Contains(page, `disabled id="security-tunnel-on"`) {
+		t.Error("the Cloudflare Tunnel can be picked without Cloudflare")
 	}
 
 	// With Tailscale connected the option opens and its link goes.

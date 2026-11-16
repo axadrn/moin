@@ -497,9 +497,15 @@ func sshOnTailscaleRules() string {
 	return rules.String()
 }
 
+// errNoNft is the firewall's problem on a server without nftables.
+var errNoNft = errors.New("nftables is not installed. Install the package nftables, and moin turns the firewall on by itself")
+
 // applyFirewall replaces the daemon's table in one transaction: delete and
 // add run together, so the server is never without rules in between.
 func applyFirewall(ctx context.Context, rules string) error {
+	if _, err := exec.LookPath("nft"); err != nil {
+		return errNoNft
+	}
 	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" + rules
 	command := exec.CommandContext(ctx, "nft", "-f", "-")
 	command.Stdin = strings.NewReader(script)

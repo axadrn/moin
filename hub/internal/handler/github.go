@@ -270,7 +270,7 @@ func (h *AppsHandler) ServerSecurity(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetServerSecurity changes one line of a server's Security page, the
-// one set names: tunnel or firewall with on, or ssh. The other lines keep
+// one set names: tunnel (on or off), ssh, or firewall with on. The other lines keep
 // what the server has now. It answers the page as stored, so a line that
 // could not change goes back and says why.
 func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) {
@@ -283,7 +283,7 @@ func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) 
 	input := service.SecurityInput{Tunnel: server.Tunnel, SSH: server.SSH, Firewall: server.Firewall}
 	switch r.FormValue("set") {
 	case "tunnel":
-		input.Tunnel = r.FormValue("on") == "1"
+		input.Tunnel = r.FormValue("tunnel") == "on"
 	case "ssh":
 		input.SSH = r.FormValue("ssh")
 	case "firewall":

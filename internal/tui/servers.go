@@ -135,7 +135,7 @@ func (m model) serverView(u ui, w, h int) string {
 			sec = append(sec, padR(u.muted(line.Name), 12)+value)
 		}
 		if len(s.Security.OpenPorts) > 0 {
-			sec = append(sec, padR(u.muted("open ports"), 12)+u.text(strings.Join(s.Security.OpenPorts, ", ")))
+			sec = append(sec, padR(u.muted("open ports"), 12)+u.text(s.Security.OpenText()))
 		}
 		if s.Security.TailscaleIP != "" {
 			sec = append(sec, padR(u.muted("tailnet"), 12)+u.text(s.Security.TailscaleIP))

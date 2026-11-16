@@ -190,17 +190,17 @@ type SecurityLine struct {
 	Name, Is, Set string
 }
 
-// SecurityLines are visitors, SSH and the firewall, once the daemon
-// reported; nil before.
+// SecurityLines are web, SSH and the firewall, the lines of the Security
+// page in the same words, once the daemon reported; nil before.
 func (s Server) SecurityLines() []SecurityLine {
 	if s.Security == nil {
 		return nil
 	}
-	visitors := func(tunnel bool) string {
+	web := func(tunnel bool) string {
 		if tunnel {
 			return "cloudflare tunnel"
 		}
-		return "ports 80, 443"
+		return "open"
 	}
 	ssh := func(ssh string) string {
 		switch ssh {
@@ -218,7 +218,7 @@ func (s Server) SecurityLines() []SecurityLine {
 		return "off"
 	}
 	return []SecurityLine{
-		{"visitors", visitors(s.Security.Proxy == "tunnel"), visitors(s.Tunnel)},
+		{"web", web(s.Security.Proxy == "tunnel"), web(s.Tunnel)},
 		{"ssh", ssh(s.Security.SSH), ssh(s.SSH)},
 		{"firewall", onOff(s.Security.Firewall), onOff(s.Firewall)},
 	}

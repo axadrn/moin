@@ -143,3 +143,17 @@ type ServerConfigResult struct {
 	Problems    []string `json:"problems,omitempty"`
 	Fixed       []string `json:"fixed,omitempty"`
 }
+
+// OpenText says what the firewall leaves open to everyone, the same on
+// every surface: "80, 443, 41641/udp", or "nothing". A TCP port is only
+// its number.
+func (r ServerConfigResult) OpenText() string {
+	if len(r.OpenPorts) == 0 {
+		return "nothing"
+	}
+	ports := make([]string, len(r.OpenPorts))
+	for i, port := range r.OpenPorts {
+		ports[i] = strings.TrimSuffix(port, "/tcp")
+	}
+	return strings.Join(ports, ", ")
+}

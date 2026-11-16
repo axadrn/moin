@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -145,5 +146,14 @@ esac
 	file := strings.TrimPrefix(strings.Fields(string(args))[1], "--auth-key=file:")
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Fatalf("key file %s is still there: %v", file, err)
+	}
+}
+
+// Without nft the firewall line says what to install, not an empty error.
+func TestFirewallWithoutNftSaysWhatToInstall(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	err := applyFirewall(t.Context(), firewallRules(nil, false))
+	if !errors.Is(err, errNoNft) {
+		t.Fatalf("err = %v, want errNoNft", err)
 	}
 }
