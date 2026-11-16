@@ -3,6 +3,23 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.33
+
+November 16, 2026
+
+**In short:** Changing SSH or the firewall saves right away, and a mismatch says what is wrong.
+
+### Changed
+- **Clear words when the server differs**: A red line says it, for example "SSH on the server is Off. moin says Everyone. Pick the one you want."
+- **Each line says what it is about**: SSH names port 22. Web names ports 80 and 443. The firewall names nftables.
+
+### Fixed
+- **Saving security is fast again**: Changing SSH or the firewall no longer waits on Cloudflare. It took up to 11 seconds and sometimes failed with red DNS errors.
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves.
+
 ## v1.0.0-beta.32
 
 November 16, 2026
