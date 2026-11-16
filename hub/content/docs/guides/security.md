@@ -113,7 +113,7 @@ apt install nftables   # Ubuntu, Debian
 dnf install nftables   # Fedora
 ```
 
-This is the firewall on the server. Your provider may have one in front of it, like the Hetzner Cloud Firewall. moin does not touch that one.
+This is the firewall on the server. Your provider may have a cloud firewall in front of it. moin does not touch that one.
 
 ## See what is open
 
