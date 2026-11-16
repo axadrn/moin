@@ -19,7 +19,7 @@ func TestSecureSetsSSHAndShowsWhatDiffers(t *testing.T) {
 	if !api.seen(`PUT /api/v1/servers/s1/security {"tunnel":false,"ssh":"off","firewall":true}`) {
 		t.Fatalf("requests %v", api.requests)
 	}
-	for _, want := range []string{"everyone ✗ set: off", "open to everyone: 80, 443", "sshd still listens"} {
+	for _, want := range []string{"everyone on the server ✗ moin says off", "open to everyone: 80, 443", "sshd still listens"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout %q misses %q", stdout, want)
 		}

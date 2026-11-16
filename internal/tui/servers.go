@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -130,7 +131,7 @@ func (m model) serverView(u ui, w, h int) string {
 		for _, line := range s.SecurityLines() {
 			value := u.text(line.Is)
 			if line.Is != line.Set {
-				value = u.bad(line.Is + " ✗ set: " + line.Set)
+				value = u.bad(line.Is + " on the server ✗ " + build.Name + " says " + line.Set)
 			}
 			sec = append(sec, padR(u.muted(line.Name), 12)+value)
 		}

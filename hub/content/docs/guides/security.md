@@ -9,9 +9,9 @@ Your server has doors to the internet, called ports. A server's **Security** pag
 
 | Line | What it is | Choices |
 | --- | --- | --- |
-| **Web** | How visitors reach your apps: ports 80 and 443, or a Cloudflare Tunnel. | Open, Cloudflare Tunnel |
-| **SSH** | Logging in to the server: port 22. | Everyone, Only through Tailscale, Off |
-| **Firewall** | The Linux firewall (nftables) on the server. Blocks every port moin does not need. | On, Off |
+| **Web** | How visitors reach your apps (ports 80 and 443, or a Cloudflare Tunnel). | Open, Cloudflare Tunnel |
+| **SSH** | Who can log in to the server with SSH (port 22). | Everyone, Only through Tailscale, Off |
+| **Firewall** | Blocks every port moin does not need (nftables, the firewall built into Linux). | On, Off |
 
 ```surfaces
 Web: **Servers**, **Security** on the server
@@ -25,7 +25,7 @@ The dot in front of a line:
 
 - **Green**: locked down, as set.
 - **Quiet**: open, as set.
-- **Red**: the server is not as set. The line says both, like `Everyone · set: Only through Tailscale`.
+- **Red**: the server is not as you set it. A red sentence says both, like `SSH on the server is Off. moin says Everyone. Pick the one you want.`
 - **Waiting for the server**: the daemon has not reported yet.
 
 SSH and the firewall always work. Only the Cloudflare Tunnel needs Cloudflare, and only SSH through Tailscale needs Tailscale. Until you connect them, the line has a short link to [Integrations](#integrations).
@@ -37,7 +37,7 @@ Every change asks first. The CLI too; `--yes` skips it in scripts. If you do one
 The daemon looks at its server after each start and every five minutes. What drifted, it puts back: the tunnel, the tailnet, SSH off, the firewall. Each fix is in the [activity](/docs/guides/activity), by moin: `put back the firewall on web-1`.
 
 - It looks at what really is. A tailnet you joined by hand counts.
-- It never opens a door by itself. If you stop SSH by hand, the line says `Off · set: Everyone` until you pick one.
+- It never opens a door by itself. If you stop SSH by hand, the line is red until you pick Off, or Everyone again.
 
 ## Integrations
 
@@ -84,7 +84,7 @@ With the tunnel, moin sends every domain of the server's apps through it and poi
 
 ## SSH
 
-Logging in to the server yourself, on port 22.
+Who can log in to the server with SSH, on port 22.
 
 | SSH | Means |
 | --- | --- |
