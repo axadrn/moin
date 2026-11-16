@@ -200,6 +200,10 @@ func TestServerSecurity(t *testing.T) {
 	if !secured.Tunnel || secured.TunnelID != "tun1" || !secured.Firewall || secured.SSH != protocol.SSHTailscale {
 		t.Fatalf("server = %+v", secured)
 	}
+	// The answer says the server is online, as it is.
+	if !secured.Online {
+		t.Fatal("the saved server says offline while its daemon is connected")
+	}
 	// The token stays while a tunnel needs it to be deleted.
 	none := ""
 	if err := apps.SetIntegrations(ctx, owner, &none, nil); !errors.Is(err, ErrTunnelsOn) {

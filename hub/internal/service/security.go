@@ -210,7 +210,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		s.configureServer(context.WithoutCancel(ctx), server, dnsProblems)
 	}
 	s.servers.notify(actor.WorkspaceID)
-	return s.servers.servers.ByIDOrNameForWorkspace(server.ID, actor.WorkspaceID)
+	return s.servers.Get(actor.WorkspaceID, server.ID)
 }
 
 // securityDetails are a server's settings for the activity.
