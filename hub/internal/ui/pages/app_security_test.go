@@ -11,25 +11,27 @@ import (
 )
 
 // Each line says what is on the server: green when locked down as set,
-// quiet when open as set, red with both words when it differs, waiting
-// before the daemon reported.
+// quiet when open as set, red with a sentence that says both when it
+// differs, waiting before the daemon reported.
 func TestSecurityLinesTellTheTruth(t *testing.T) {
 	server := model.Server{Tunnel: true, SSH: protocol.SSHOff, Firewall: true}
 	report := &protocol.ServerConfigResult{Proxy: "direct", SSH: protocol.SSHEveryone, Firewall: true, OpenPorts: []string{"22/tcp"}}
 	for _, test := range []struct {
-		line  securityLine
-		state components.State
-		note  string
+		line    securityLine
+		state   components.State
+		note    string
+		problem string
 	}{
-		{webLine(server, report), components.StateFailed, "Open · set: Cloudflare Tunnel"},
-		{sshLine(server, report), components.StateFailed, "Everyone · set: Off"},
-		{firewallLine(server, report), components.StateLive, "Open to everyone: 22"},
-		{sshLine(model.Server{SSH: protocol.SSHTailscale}, &protocol.ServerConfigResult{SSH: protocol.SSHTailscale, TailscaleIP: "100.64.0.9"}), components.StateLive, "Only through Tailscale · 100.64.0.9"},
-		{webLine(model.Server{}, &protocol.ServerConfigResult{Proxy: "direct"}), components.StateIdle, "Open"},
-		{firewallLine(model.Server{Firewall: true}, nil), components.StateWaiting, "Waiting for the server"},
+		{webLine(server, report), components.StateFailed, "", "Web on the server is Open. moin says Cloudflare Tunnel. Pick the one you want."},
+		{sshLine(server, report), components.StateFailed, "", "SSH on the server is Everyone. moin says Off. Pick the one you want."},
+		{firewallLine(server, report), components.StateLive, "Open to everyone: 22", ""},
+		{sshLine(model.Server{SSH: protocol.SSHTailscale}, &protocol.ServerConfigResult{SSH: protocol.SSHTailscale, TailscaleIP: "100.64.0.9"}), components.StateLive, "Tailnet address: 100.64.0.9", ""},
+		{sshLine(model.Server{SSH: protocol.SSHOff}, &protocol.ServerConfigResult{SSH: protocol.SSHOff, TailscaleIP: "100.64.0.9"}), components.StateLive, "", ""},
+		{webLine(model.Server{}, &protocol.ServerConfigResult{Proxy: "direct"}), components.StateIdle, "", ""},
+		{firewallLine(model.Server{Firewall: true}, nil), components.StateWaiting, "Waiting for the server", ""},
 	} {
-		if test.line.State != test.state || test.line.Note != test.note {
-			t.Errorf("%s: %s %q, want %s %q", test.line.Name, test.line.State, test.line.Note, test.state, test.note)
+		if test.line.State != test.state || test.line.Note != test.note || test.line.Problem != test.problem {
+			t.Errorf("%s: %s %q %q, want %s %q %q", test.line.Name, test.line.State, test.line.Note, test.line.Problem, test.state, test.note, test.problem)
 		}
 	}
 }

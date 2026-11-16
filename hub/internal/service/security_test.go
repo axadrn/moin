@@ -245,6 +245,23 @@ func TestServerSecurity(t *testing.T) {
 		t.Fatalf("problems without Zone Settings Edit = %q, %v", problems, err)
 	}
 
+	// Changing SSH or the firewall leaves Cloudflare alone, also when the
+	// browser that asked is already gone.
+	fake.mu.Lock()
+	calls := len(fake.calls)
+	fake.mu.Unlock()
+	gone, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := apps.SetServerSecurity(gone, owner, "web-1", SecurityInput{Tunnel: true, SSH: protocol.SSHOff, Firewall: true}); err != nil {
+		t.Fatal(err)
+	}
+	fake.mu.Lock()
+	later := fake.calls[calls:]
+	fake.mu.Unlock()
+	if len(later) > 0 {
+		t.Fatalf("an SSH change called Cloudflare: %v", later)
+	}
+
 	open, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{SSH: protocol.SSHEveryone})
 	if err != nil {
 		t.Fatal(err)

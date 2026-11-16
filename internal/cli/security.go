@@ -7,6 +7,7 @@ import (
 	"io"
 	"slices"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/protocol"
@@ -100,7 +101,7 @@ func printSecurity(w io.Writer, server client.Server) {
 		value := line.Is
 		switch {
 		case line.Is != line.Set:
-			value = style.Danger.Render(line.Is + " ✗ set: " + line.Set)
+			value = style.Danger.Render(line.Is + " on the server ✗ " + build.Name + " says " + line.Set)
 		case line.Name == "ssh" && report.TailscaleIP != "":
 			value += " · " + report.TailscaleIP
 		case line.Name == "firewall" && report.Firewall:

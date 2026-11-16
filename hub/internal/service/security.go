@@ -172,16 +172,24 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		return nil, ErrNoTailscale
 	}
 	before := securityDetails(server)
-	if input.Tunnel && server.TunnelID == "" {
-		if err := s.openTunnel(ctx, server); err != nil {
+	// Cloudflare work runs to its end, also when the browser gives up:
+	// a tunnel half made or half deleted helps nobody.
+	cloudflare, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer cancel()
+	// Only turning the tunnel on points the domains at it. SSH and the
+	// firewall have nothing to do with DNS, and a domain added later is
+	// pointed when it is added.
+	turnedOn := input.Tunnel && server.TunnelID == ""
+	if turnedOn {
+		if err := s.openTunnel(cloudflare, server); err != nil {
 			return nil, err
 		}
 	}
 	if !input.Tunnel && server.TunnelID != "" {
 		token, account, err := s.cloudflareToken(actor.WorkspaceID)
 		if err == nil {
-			s.unpointTunnel(ctx, server, token)
-			err = s.cloudflare.DeleteTunnel(ctx, token, account, server.TunnelID)
+			s.unpointTunnel(cloudflare, server, token)
+			err = s.cloudflare.DeleteTunnel(cloudflare, token, account, server.TunnelID)
 		}
 		if err != nil {
 			slog.Warn("delete tunnel failed", "server_id", server.ID, "error", err)
@@ -199,8 +207,8 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	}
 	s.servers.record(actor, "server.security_set", "server", server.Name, details)
 	var dnsProblems []string
-	if server.Tunnel {
-		dnsProblems, err = s.syncTunnel(ctx, server)
+	if turnedOn {
+		dnsProblems, err = s.syncTunnel(cloudflare, server)
 		if err != nil {
 			return nil, err
 		}

@@ -90,24 +90,32 @@ templ securityState(view SecurityView, securityPath string) {
 	{{ server := view.Server }}
 	{{ report := service.SecurityReport(server) }}
 	{{ tailscale := view.Integrations.Tailscale || (report != nil && report.TailscaleIP != "") }}
+	{{ web, ssh, firewall := webLine(server, report), sshLine(server, report), firewallLine(server, report) }}
 	<div id="security-state" hx-get={ securityPath } hx-trigger="servers from:body" hx-select="#security-state" hx-swap="outerHTML">
 		@components.Card(components.CardProps{}) {
 			@components.List() {
-				@securityChoice(securityPath, "tunnel", webLine(server, report), ifElse(server.Tunnel, "on", "off"), ifElse(view.Integrations.Cloudflare || server.Tunnel, "", "Connect Cloudflare"), ifElse(server.Tunnel,
+				@securityChoice(securityPath, "tunnel", web, ifElse(server.Tunnel, "on", "off"), ifElse(view.Integrations.Cloudflare || server.Tunnel, "", "Connect Cloudflare"), ifElse(server.Tunnel,
 					"Open ports 80 and 443 again? moin deletes the tunnel and its DNS records. Point your domains back at the server.",
 					"Send visitors through Cloudflare? Ports 80 and 443 close. Cloudflare serves HTTPS."), []components.Option{
 					{Value: "off", Label: "Open", Attrs: templ.Attributes{"id": "security-tunnel-off"}},
 					{Value: "on", Label: "Cloudflare Tunnel", Attrs: templ.Attributes{"id": "security-tunnel-on", "disabled": !view.Integrations.Cloudflare && !server.Tunnel}},
 				})
-				@securityChoice(securityPath, "ssh", sshLine(server, report), server.SSH, ifElse(tailscale, "", "Connect Tailscale"),
+				@securityChoice(securityPath, "ssh", ssh, server.SSH, ifElse(tailscale, "", "Connect Tailscale"),
 					"Change who reaches SSH on "+server.Name+"? Keep another way in, like your provider's console.", []components.Option{
 						{Value: protocol.SSHEveryone, Label: "Everyone", Attrs: templ.Attributes{"id": "security-ssh-everyone"}},
 						{Value: protocol.SSHTailscale, Label: "Only through Tailscale", Attrs: templ.Attributes{"id": "security-ssh-tailscale", "disabled": !tailscale && server.SSH != protocol.SSHTailscale}},
 						{Value: protocol.SSHOff, Label: "Off", Attrs: templ.Attributes{"id": "security-ssh-off"}},
 					})
-				@securitySwitch(securityPath, "firewall", firewallLine(server, report), server.Firewall, ifElse(server.Firewall,
+				@securitySwitch(securityPath, "firewall", firewall, server.Firewall, ifElse(server.Firewall,
 					"Turn off the firewall? Every port that listens is open again.",
 					"Turn on the firewall? It drops every connection the server does not need."))
+				for _, line := range []securityLine{web, ssh, firewall} {
+					if line.Problem != "" {
+						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-security-problem": true}}) {
+							<div class="moin-fill moin-text moin-failed">{ line.Problem }</div>
+						}
+					}
+				}
 				if report != nil {
 					for _, problem := range report.Problems {
 						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-security-problem": true}}) {
@@ -120,37 +128,41 @@ templ securityState(view SecurityView, securityPath string) {
 	</div>
 }
 
-// securityLine is one line of the Security page: its name, the dot, the
-// short state of what is on the server, and a sentence of what it is.
+// securityLine is one line of the Security page: its name, the dot, a
+// short note of what is on the server, the sentence of what it is, and
+// the problem when the server is not as set.
 type securityLine struct {
-	Name  string
-	State components.State
-	Note  string
-	Hint  string
+	Name    string
+	State   components.State
+	Note    string
+	Hint    string
+	Problem string
 }
 
-// truth is the line for what is (is) against what is set (want), in
-// words: green when they match and it is locked down (locked), quiet when
-// they match and it is open, red with both when they differ, waiting
-// before the daemon reported.
+// truth is the line for what is (is) against what is set (want): green
+// when they match and it is locked down (locked), quiet when they match
+// and it is open, red when they differ, with a sentence under the lines
+// that says both, waiting before the daemon reported.
 func truth(name, hint, is, want string, known, locked bool) securityLine {
+	line := securityLine{Name: name, Hint: hint, State: components.StateIdle}
 	switch {
 	case !known:
-		return securityLine{name, components.StateWaiting, "Waiting for the server", hint}
+		line.State, line.Note = components.StateWaiting, "Waiting for the server"
 	case is != want:
-		return securityLine{name, components.StateFailed, is + " · set: " + want, hint}
+		line.State = components.StateFailed
+		line.Problem = name + " on the server is " + is + ". " + build.Name + " says " + want + ". Pick the one you want."
 	case locked:
-		return securityLine{name, components.StateLive, is, hint}
+		line.State = components.StateLive
 	}
-	return securityLine{name, components.StateIdle, is, hint}
+	return line
 }
 
-// The sentence under each line: what it is, for someone who never set up
-// a server.
+// The sentence under each line: what it is in plain words, then the
+// technical part in brackets.
 const (
-	webHint      = "How visitors reach your apps: ports 80 and 443, or a Cloudflare Tunnel."
-	sshHint      = "Logging in to the server: port 22."
-	firewallHint = "The Linux firewall (nftables) on the server. Blocks every port moin does not need."
+	webHint      = "How visitors reach your apps (ports 80 and 443, or a Cloudflare Tunnel)."
+	sshHint      = "Who can log in to the server with SSH (port 22)."
+	firewallHint = "Blocks every port " + build.Name + " does not need (nftables, the firewall built into Linux)."
 )
 
 func webLine(server model.Server, report *protocol.ServerConfigResult) securityLine {
@@ -167,8 +179,8 @@ func sshLine(server model.Server, report *protocol.ServerConfigResult) securityL
 		return truth("SSH", sshHint, "", sshWords(server.SSH), false, false)
 	}
 	line := truth("SSH", sshHint, sshWords(report.SSH), sshWords(server.SSH), true, report.SSH != protocol.SSHEveryone)
-	if report.TailscaleIP != "" && line.State != components.StateFailed {
-		line.Note += " · " + report.TailscaleIP
+	if report.SSH == protocol.SSHTailscale && line.Problem == "" {
+		line.Note = "Tailnet address: " + report.TailscaleIP
 	}
 	return line
 }
@@ -177,7 +189,7 @@ func firewallLine(server model.Server, report *protocol.ServerConfigResult) secu
 	words := func(on bool) string { return ifElse(on, "On", "Off") }
 	is := report != nil && report.Firewall
 	line := truth("Firewall", firewallHint, words(is), words(server.Firewall), report != nil, is)
-	if is && line.State != components.StateFailed {
+	if is && line.Problem == "" {
 		line.Note = "Open to everyone: " + report.OpenText()
 	}
 	return line
