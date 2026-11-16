@@ -223,7 +223,15 @@ var serverSummaries = map[string]summarize{
 		return "could not update the daemon of " + target + " from " + d["from"] + " to " + d["to"] + stopped + ", so daemons of this workspace no longer update by themselves until one is updated by hand: " + d["error"]
 	},
 	"server.security_set": func(target string, d map[string]string) string {
-		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", SSH on Tailscale " + d["ssh_tailscale"] + ", firewall " + d["firewall"]
+		// Events from before ssh had ssh_tailscale.
+		ssh := sshWords(d["ssh"])
+		if d["ssh"] == "" {
+			ssh = "SSH on Tailscale " + d["ssh_tailscale"]
+		}
+		return "changed how " + target + " is reached: tunnel " + d["tunnel"] + ", " + ssh + ", firewall " + d["firewall"]
+	},
+	"server.security_fixed": func(target string, d map[string]string) string {
+		return "put back " + d["fixed"] + " on " + target + ": it had drifted from what is set"
 	},
 	"server.reinstalled": func(target string, d map[string]string) string {
 		return "installed the daemon of " + target + " again, and the old daemon's token stopped working: " + daemonFacts(d)
@@ -478,4 +486,15 @@ func nonEmpty(values ...string) []string {
 		}
 	}
 	return kept
+}
+
+// sshWords says who SSH answers, as the Security page does.
+func sshWords(ssh string) string {
+	switch ssh {
+	case "tailscale":
+		return "SSH only through Tailscale"
+	case "off":
+		return "SSH off"
+	}
+	return "SSH for everyone"
 }

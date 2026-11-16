@@ -269,9 +269,10 @@ func (h *AppsHandler) ServerSecurity(w http.ResponseWriter, r *http.Request) {
 	h.renderSecurity(w, r)
 }
 
-// SetServerSecurity applies the switches. The form also sends what the page
-// showed (was_*): a switch nobody flipped keeps the server's setting as it is
-// now, so a page opened before a change elsewhere does not undo it.
+// SetServerSecurity changes one line of a server's Security page, the
+// one set names: tunnel (on or off), ssh, or firewall with on. The other lines keep
+// what the server has now. It answers the page as stored, so a line that
+// could not change goes back and says why.
 func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	server, err := h.servers.Get(workspace.ID, r.PathValue("id"))
@@ -279,63 +280,20 @@ func (h *AppsHandler) SetServerSecurity(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
-	_, err = h.apps.SetServerSecurity(r.Context(), actor(r), server.ID, service.SecurityInput{
-		Tunnel:       flipped(r, "tunnel", server.Tunnel),
-		SSHTailscale: flipped(r, "ssh_tailscale", server.SSHTailscale),
-		Firewall:     flipped(r, "firewall", server.Firewall),
-	})
-	if err != nil {
-		failed(w, r, "Security not applied", err, nil)
-		return
+	input := service.SecurityInput{Tunnel: server.Tunnel, SSH: server.SSH, Firewall: server.Firewall}
+	switch r.FormValue("set") {
+	case "tunnel":
+		input.Tunnel = r.FormValue("tunnel") == "on"
+	case "ssh":
+		input.SSH = r.FormValue("ssh")
+	case "firewall":
+		input.Firewall = r.FormValue("on") == "1"
 	}
+	_, err = h.apps.SetServerSecurity(r.Context(), actor(r), server.ID, input)
 	h.renderSecurity(w, r)
-	answerDone(w, r, "Security applied", "The daemon changes "+server.Name+" now.")
-}
-
-// flipped is the switch's new value when the form flipped it, else now.
-func flipped(r *http.Request, name string, now bool) bool {
-	on := r.FormValue(name) == "1"
-	was := r.FormValue("was_" + name)
-	if was != "" && on == (was == "1") {
-		return now
-	}
-	return on
-}
-
-// SetIntegrations stores the keys; an empty field keeps its key. remove
-// names a key to take away instead.
-func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
-	var cloudflare, tailscale *string
-	cloudflareToken, tailscaleKey := r.FormValue("cloudflare_token"), r.FormValue("tailscale_key")
-	done, notDone := "Keys saved", "Keys not saved"
-	switch r.FormValue("remove") {
-	case "cloudflare":
-		cloudflareToken, tailscaleKey = "", ""
-		done, notDone = "Cloudflare API token removed", "Cloudflare API token not removed"
-		cloudflare = &cloudflareToken
-	case "tailscale":
-		cloudflareToken, tailscaleKey = "", ""
-		done, notDone = "Tailscale auth key removed", "Tailscale auth key not removed"
-		tailscale = &tailscaleKey
-	}
-	if cloudflareToken != "" {
-		cloudflare = &cloudflareToken
-	}
-	if tailscaleKey != "" {
-		tailscale = &tailscaleKey
-	}
-	err := h.apps.SetIntegrations(r.Context(), actor(r), cloudflare, tailscale)
-	r.SetPathValue("id", r.FormValue("server"))
-	if errors.Is(err, service.ErrCloudflareToken) {
-		fieldRefused(w, r, notDone, "cloudflare-token", errorMessage(err))
-		return
-	}
 	if err != nil {
-		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key"})
-		return
+		answerError(w, r, "Security not changed", errorMessage(err))
 	}
-	h.renderSecurity(w, r)
-	answerDone(w, r, done, "")
 }
 
 // RenameServer gives the server a new name and answers its page with it.

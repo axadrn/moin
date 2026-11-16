@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/dbbackup"
 	"github.com/axadrn/moin/hub/internal/markdown"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
@@ -79,6 +80,9 @@ type UpdateService struct {
 	activity   *repository.Activity
 	client     *http.Client
 	now        func() time.Time
+
+	// hubBackup is the backup of the hub's own database, nil when off.
+	hubBackup *dbbackup.Backup
 
 	mu        sync.Mutex
 	release   *model.Release
@@ -202,14 +206,44 @@ func releaseSummary(notes string) string {
 	return ""
 }
 
-// CanUpdate reports whether user runs this hub: on a self-hosted
-// one, an admin of ADMIN_EMAILS with a verified address.
-func (s *UpdateService) CanUpdate(user *model.User) bool {
-	if !s.selfHosted || user == nil || user.EmailVerifiedAt == nil {
+// UseHubBackup shows how the backup of the hub's own database stands. It
+// is set before the hub serves; without it the backup is off.
+func (s *UpdateService) UseHubBackup(backup *dbbackup.Backup) {
+	s.hubBackup = backup
+}
+
+// HubBackup is how the backup of the hub's own database stands: off, on,
+// or late when the bucket took no copy for model.HubBackupLateAfter.
+func (s *UpdateService) HubBackup() model.HubBackup {
+	if s.hubBackup == nil {
+		return model.HubBackup{State: model.HubBackupOff}
+	}
+	backup := model.HubBackup{State: model.HubBackupOn, Bucket: s.hubBackup.Bucket}
+	since := s.hubBackup.Started
+	if last := s.hubBackup.LastCopy(); !last.IsZero() {
+		last = last.UTC()
+		backup.LastCopy, since = &last, last
+	}
+	if s.now().Sub(since) > model.HubBackupLateAfter {
+		backup.State = model.HubBackupLate
+	}
+	return backup
+}
+
+// hubAdmin reports whether user runs this hub, hosted or self-hosted:
+// an address of ADMIN_EMAILS, verified.
+func (s *UpdateService) hubAdmin(user *model.User) bool {
+	if user == nil || user.EmailVerifiedAt == nil {
 		return false
 	}
 	_, ok := s.admins[strings.ToLower(user.Email)]
 	return ok
+}
+
+// CanUpdate reports whether user runs this hub: on a self-hosted
+// one, an admin of ADMIN_EMAILS with a verified address.
+func (s *UpdateService) CanUpdate(user *model.User) bool {
+	return s.selfHosted && s.hubAdmin(user)
 }
 
 // Info is what user may know about the version: the running one for
@@ -217,6 +251,10 @@ func (s *UpdateService) CanUpdate(user *model.User) bool {
 // update and how the last update went.
 func (s *UpdateService) Info(user *model.User) model.VersionInfo {
 	info := model.VersionInfo{Version: s.version, SelfHosted: s.selfHosted}
+	if s.hubAdmin(user) {
+		backup := s.HubBackup()
+		info.HubBackup = &backup
+	}
 	if !s.selfHosted {
 		return info
 	}

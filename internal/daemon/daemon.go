@@ -177,6 +177,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	go daemon.backups.loop(ctx)
 	go daemon.apps.cleanups(ctx)
 	go daemon.metrics(ctx)
+	go daemon.keepSecurity(ctx)
 	wait := minReconnect
 	for {
 		connected, err := daemon.session(ctx)
@@ -307,6 +308,8 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 	for _, done := range pending {
 		r.send(protocol.TypeDeployDone, "", done)
 	}
+	// The hub learns at once what is on the server and what was put back.
+	go r.reportSecurity(r.security.keep(ctx))
 
 	// Reading also answers the hub's pings.
 	for {

@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	ErrNoCloudflare    = errors.New("add a Cloudflare API token first")
-	ErrNoTailscale     = errors.New("add a Tailscale auth key first")
+	ErrNoCloudflare    = errors.New("connect Cloudflare in Settings, Integrations first")
+	ErrNoTailscale     = errors.New("connect Tailscale in Settings, Integrations first, or join the server to your tailnet by hand")
+	ErrSSH             = errors.New("SSH is tailscale, everyone or off")
 	ErrCloudflareToken = errors.New("Cloudflare does not accept this token: it needs Account Cloudflare Tunnel Edit and Zone DNS Edit")
 	ErrTailscaleKey    = errors.New("a Tailscale auth key starts with tskey-")
 	// ErrTunnelsOn keeps the Cloudflare API token while a server has a
@@ -96,14 +97,14 @@ func (s *AppService) SetIntegrations(ctx context.Context, actor Actor, cloudflar
 }
 
 // noTunnels refuses with ErrTunnelsOn while a server of the workspace has
-// a tunnel in Cloudflare.
+// a tunnel in Cloudflare, or should get one.
 func (s *AppService) noTunnels(workspaceID string) error {
 	servers, err := s.servers.servers.ListByWorkspaceID(workspaceID)
 	if err != nil {
 		return err
 	}
 	for _, server := range servers {
-		if server.TunnelID != "" {
+		if server.TunnelID != "" || server.Tunnel {
 			return ErrTunnelsOn
 		}
 	}
@@ -122,14 +123,17 @@ func (s *AppService) cloudflareToken(workspaceID string) (token, account string,
 	return token, stored.CloudflareAccount, err
 }
 
-// SecurityInput is how a server should be reached and locked down.
+// SecurityInput is how a server should be reached and locked down. SSH is
+// protocol.SSHTailscale, SSHEveryone or SSHOff.
 type SecurityInput struct {
-	Tunnel       bool
-	SSHTailscale bool
-	Firewall     bool
+	Tunnel   bool
+	SSH      string
+	Firewall bool
 }
 
-// SecurityReport is what the daemon set up last.
+// SecurityReport is what the daemon last saw on the server. A daemon from
+// before it reported SSH told it only through its tailnet IP: SSH is filled
+// in from that, so every surface reads one word.
 func SecurityReport(server model.Server) *protocol.ServerConfigResult {
 	if server.Security == "" {
 		return nil
@@ -138,13 +142,23 @@ func SecurityReport(server model.Server) *protocol.ServerConfigResult {
 	if json.Unmarshal([]byte(server.Security), &report) != nil {
 		return nil
 	}
+	if report.SSH == "" {
+		report.SSH = protocol.SSHEveryone
+		if server.SSH == protocol.SSHTailscale && report.TailscaleIP != "" && !slices.ContainsFunc(report.Problems, func(problem string) bool { return strings.HasPrefix(problem, "SSH stays open") }) {
+			report.SSH = protocol.SSHTailscale
+		}
+	}
 	return &report
 }
 
 // SetServerSecurity creates or removes the server's tunnel, stores the
 // settings and has the daemon apply them. It returns what the daemon set up;
-// an offline server applies them when it connects.
+// an offline server applies them when it connects. SSH only through
+// Tailscale needs the Tailscale key, or a tailnet the server joined by hand.
 func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrName string, input SecurityInput) (*model.Server, error) {
+	if !protocol.ValidSSH(input.SSH) {
+		return nil, ErrSSH
+	}
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -153,20 +167,15 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	if err != nil {
 		return nil, err
 	}
-	if input.SSHTailscale && stored.TailscaleKey == "" {
+	report := SecurityReport(*server)
+	if input.SSH == protocol.SSHTailscale && server.SSH != protocol.SSHTailscale && stored.TailscaleKey == "" && (report == nil || report.TailscaleIP == "") {
 		return nil, ErrNoTailscale
 	}
-	before := map[string]string{"tunnel": strconv.FormatBool(server.Tunnel), "ssh_tailscale": strconv.FormatBool(server.SSHTailscale), "firewall": strconv.FormatBool(server.Firewall)}
+	before := securityDetails(server)
 	if input.Tunnel && server.TunnelID == "" {
-		token, account, err := s.cloudflareToken(actor.WorkspaceID)
-		if err != nil {
+		if err := s.openTunnel(ctx, server); err != nil {
 			return nil, err
 		}
-		tunnelID, tunnelToken, err := s.cloudflare.CreateTunnel(ctx, token, account, build.Name+"-"+server.Name+"-"+server.ID[:8])
-		if err != nil {
-			return nil, fmt.Errorf("create the tunnel: %w", err)
-		}
-		server.TunnelID, server.TunnelToken = tunnelID, s.box.Seal(tunnelToken, server.ID+"/tunnel")
 	}
 	if !input.Tunnel && server.TunnelID != "" {
 		token, account, err := s.cloudflareToken(actor.WorkspaceID)
@@ -179,15 +188,16 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		}
 		server.TunnelID, server.TunnelToken = "", ""
 	}
-	server.Tunnel, server.SSHTailscale, server.Firewall = input.Tunnel, input.SSHTailscale, input.Firewall
+	server.Tunnel, server.SSH, server.Firewall = input.Tunnel, input.SSH, input.Firewall
 	err = s.servers.servers.SetSecurity(*server)
 	if err != nil {
 		return nil, err
 	}
-	s.servers.record(actor, "server.security_set", "server", server.Name, map[string]string{
-		"tunnel": strconv.FormatBool(server.Tunnel), "ssh_tailscale": strconv.FormatBool(server.SSHTailscale), "firewall": strconv.FormatBool(server.Firewall),
-		"tunnel_before": before["tunnel"], "ssh_tailscale_before": before["ssh_tailscale"], "firewall_before": before["firewall"],
-	})
+	details := securityDetails(server)
+	for key, value := range before {
+		details[key+"_before"] = value
+	}
+	s.servers.record(actor, "server.security_set", "server", server.Name, details)
 	var dnsProblems []string
 	if server.Tunnel {
 		dnsProblems, err = s.syncTunnel(ctx, server)
@@ -200,12 +210,67 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		s.configureServer(context.WithoutCancel(ctx), server, dnsProblems)
 	}
 	s.servers.notify(actor.WorkspaceID)
-	return s.servers.servers.ByIDOrNameForWorkspace(server.ID, actor.WorkspaceID)
+	return s.servers.Get(actor.WorkspaceID, server.ID)
+}
+
+// securityDetails are a server's settings for the activity.
+func securityDetails(server *model.Server) map[string]string {
+	return map[string]string{"tunnel": onOff(server.Tunnel), "ssh": server.SSH, "firewall": onOff(server.Firewall)}
+}
+
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
+}
+
+// openTunnel creates the server's tunnel in Cloudflare with the
+// workspace's token and keeps its token, sealed, on the server.
+func (s *AppService) openTunnel(ctx context.Context, server *model.Server) error {
+	token, account, err := s.cloudflareToken(server.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	tunnelID, tunnelToken, err := s.cloudflare.CreateTunnel(ctx, token, account, build.Name+"-"+server.Name+"-"+server.ID[:8])
+	if err != nil {
+		return fmt.Errorf("create the tunnel: %w", err)
+	}
+	server.TunnelID, server.TunnelToken = tunnelID, s.box.Seal(tunnelToken, server.ID+"/tunnel")
+	return nil
+}
+
+// receiveSecurity keeps what a daemon reports by itself, after a start and
+// on its schedule: what really is on the server, and what it put back,
+// which goes into the activity as moin.
+func (s *AppService) receiveSecurity(serverID string, report protocol.ServerConfigResult) {
+	workspaceID, ok := s.servers.UserOf(serverID)
+	if !ok {
+		return
+	}
+	server, err := s.servers.servers.ByIDOrNameForWorkspace(serverID, workspaceID)
+	if err != nil {
+		return
+	}
+	for _, fixed := range report.Fixed {
+		s.servers.record(System(server.WorkspaceID), "server.security_fixed", "server", server.Name, map[string]string{"fixed": fixed})
+	}
+	report.Fixed = nil
+	body, _ := json.Marshal(report)
+	if string(body) == server.Security {
+		return
+	}
+	err = s.servers.servers.SetSecurityReport(server.ID, string(body))
+	if err != nil {
+		slog.Error("store security report failed", "server_id", server.ID, "error", err)
+		return
+	}
+	s.servers.notify(server.WorkspaceID)
 }
 
 // serverConfig is what the daemon of a server gets.
 func (s *AppService) serverConfig(server *model.Server) protocol.ServerConfig {
-	config := protocol.ServerConfig{SSHOnTailscale: server.SSHTailscale, Firewall: server.Firewall}
+	config := protocol.ServerConfig{SSH: server.SSH, SSHOnTailscale: server.SSH == protocol.SSHTailscale, Firewall: server.Firewall}
 	if server.Tunnel && server.TunnelToken != "" {
 		token, err := s.box.Open(server.TunnelToken, server.ID+"/tunnel")
 		if err == nil {
@@ -213,7 +278,7 @@ func (s *AppService) serverConfig(server *model.Server) protocol.ServerConfig {
 		}
 	}
 	stored, err := s.servers.servers.Integrations(server.WorkspaceID)
-	if err == nil && stored.TailscaleKey != "" && server.SSHTailscale {
+	if err == nil && stored.TailscaleKey != "" && server.SSH == protocol.SSHTailscale {
 		key, err := s.box.Open(stored.TailscaleKey, server.WorkspaceID+"/tailscale")
 		if err == nil {
 			config.TailscaleKey = key
@@ -242,8 +307,10 @@ func (s *AppService) configureServer(ctx context.Context, server *model.Server, 
 
 // configureServerOnConnect sends the config to a daemon that just
 // connected, when the server has one, or when the daemon last reported a
-// firewall, tunnel or SSH on the tailnet the server no longer has, such as
-// one turned off while the daemon was offline.
+// firewall, tunnel or SSH only through Tailscale the server no longer has,
+// such as one turned off while the daemon was offline. A server that
+// should have a tunnel and has none yet, like a new one added while
+// Cloudflare is connected, gets it first.
 func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(serverID, workspaceID)
 	if err != nil {
@@ -251,10 +318,24 @@ func (s *AppService) configureServerOnConnect(serverID, workspaceID string) {
 	}
 	report := SecurityReport(*server)
 	first := s.proxyOnFirstConnect && report == nil
-	if !first && !server.Tunnel && !server.Firewall && !server.SSHTailscale && !leftOver(report) {
+	if !first && !server.Tunnel && !server.Firewall && server.SSH == protocol.SSHEveryone && !leftOver(report) {
 		return
 	}
-	s.configureServer(context.Background(), server, nil)
+	ctx := context.Background()
+	var problems []string
+	if server.Tunnel && server.TunnelID == "" {
+		err = s.openTunnel(ctx, server)
+		if err == nil {
+			err = s.servers.servers.SetSecurity(*server)
+		}
+		if err == nil {
+			problems, err = s.syncTunnel(ctx, server)
+		}
+		if err != nil {
+			problems = append(problems, "Cloudflare Tunnel: "+err.Error())
+		}
+	}
+	s.configureServer(ctx, server, problems)
 	s.servers.notify(workspaceID)
 }
 
@@ -265,10 +346,10 @@ func (s *AppService) ProxyOnFirstConnect() {
 	s.proxyOnFirstConnect = true
 }
 
-// leftOver says whether the daemon last set up a firewall, a tunnel or SSH
-// on the tailnet. Only SSH on the tailnet reports a tailnet address.
+// leftOver says whether the daemon last saw a firewall, a tunnel or SSH
+// only through Tailscale or off, which a server set to none of them must lose.
 func leftOver(report *protocol.ServerConfigResult) bool {
-	return report != nil && (report.Firewall || report.Proxy == "tunnel" || report.TailscaleIP != "")
+	return report != nil && (report.Firewall || report.Proxy == "tunnel" || report.SSH == protocol.SSHTailscale || report.SSH == protocol.SSHOff)
 }
 
 // tunnelHosts are the domains of every app on a server: the ones set

@@ -44,6 +44,9 @@
     box-shadow: var(--shadow-low);
   }
   .moin-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  /* One that cannot be picked yet. */
+  .moin-choice > label:has(:disabled) { opacity: 0.4; cursor: not-allowed; }
+  .moin-choice > label:has(:disabled):hover { color: var(--muted-foreground); }
   /* The one in use: a green dot after the label. */
   .moin-tab[data-live]::after {
     content: "";

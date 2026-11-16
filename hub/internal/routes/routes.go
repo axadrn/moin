@@ -246,7 +246,7 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 // the overview, settings, the account, billing, the team and alerts.
 func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations limiter) {
 	workspace := inWorkspace(app)
-	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService)
+	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService, app.UpdateService)
 	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
@@ -263,7 +263,8 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	mux.HandleFunc("GET /app/{workspaceSlug}/search", workspace(handler.NewCommandHandler(app.AppService, app.ServerService, app.DocsService, app.CatalogService).Search))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings", workspace(settings.Home))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/account", workspace(settings.SettingsPage))
-	mux.HandleFunc("GET /app/{workspaceSlug}/settings/github", workspace(settings.GitHub))
+	mux.HandleFunc("GET /app/{workspaceSlug}/integrations", workspace(settings.Integrations))
+	mux.HandleFunc("POST /app/{workspaceSlug}/integrations", workspace(settings.SetIntegrations))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
@@ -365,7 +366,6 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/{id}/security", workspace(apps.ServerSecurity))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/security", workspace(apps.SetServerSecurity))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/name", workspace(apps.RenameServer))
-	mux.HandleFunc("POST /app/{workspaceSlug}/integrations", workspace(apps.SetIntegrations))
 	mux.HandleFunc("GET /app/{workspaceSlug}/github/install", workspace(apps.GitHubInstall))
 	mux.HandleFunc("GET /app/github/setup", middleware.RequireAuth(apps.GitHubSetup))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.Repo))

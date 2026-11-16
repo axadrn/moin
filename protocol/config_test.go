@@ -57,3 +57,20 @@ func TestConfigBackupsSchedule(t *testing.T) {
 		t.Error("an unknown keep passed")
 	}
 }
+
+// TestWantSSH: a config from a hub before SSH still says who SSH answers.
+func TestWantSSH(t *testing.T) {
+	for _, test := range []struct {
+		config ServerConfig
+		want   string
+	}{
+		{ServerConfig{SSH: SSHOff}, SSHOff},
+		{ServerConfig{SSHOnTailscale: true}, SSHTailscale},
+		{ServerConfig{}, SSHEveryone},
+		{ServerConfig{SSH: "nobody"}, SSHEveryone},
+	} {
+		if got := test.config.WantSSH(); got != test.want {
+			t.Errorf("%+v.WantSSH() = %q, want %q", test.config, got, test.want)
+		}
+	}
+}

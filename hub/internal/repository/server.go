@@ -45,9 +45,9 @@ func NewServers(db *sqlx.DB) *Servers {
 
 func (r *Servers) Create(server *model.Server) error {
 	_, err := r.db.Exec(`
-		INSERT INTO servers (id, workspace_id, name, install_token_hash, install_expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, server.ID, server.WorkspaceID, server.Name, server.InstallTokenHash, server.InstallExpiresAt, server.CreatedAt)
+		INSERT INTO servers (id, workspace_id, name, install_token_hash, install_expires_at, tunnel, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, server.ID, server.WorkspaceID, server.Name, server.InstallTokenHash, server.InstallExpiresAt, server.Tunnel, server.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: servers.workspace_id, servers.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateServer
 	}
@@ -195,8 +195,8 @@ func (r *Servers) SetInstallToken(id, workspaceID, hash string, expiresAt time.T
 }
 
 func (r *Servers) SetSecurity(server model.Server) error {
-	_, err := r.db.Exec(`UPDATE servers SET tunnel = $1, tunnel_id = $2, tunnel_token = $3, ssh_tailscale = $4, firewall = $5 WHERE id = $6`,
-		server.Tunnel, server.TunnelID, server.TunnelToken, server.SSHTailscale, server.Firewall, server.ID)
+	_, err := r.db.Exec(`UPDATE servers SET tunnel = $1, tunnel_id = $2, tunnel_token = $3, ssh = $4, firewall = $5 WHERE id = $6`,
+		server.Tunnel, server.TunnelID, server.TunnelToken, server.SSH, server.Firewall, server.ID)
 	return err
 }
 

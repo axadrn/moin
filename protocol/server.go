@@ -1,6 +1,9 @@
 package protocol
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // Hello describes the daemon and its server.
 type Hello struct {
@@ -78,26 +81,79 @@ type RegisterResponse struct {
 	DaemonToken string `json:"daemon_token"`
 }
 
+// Who SSH answers on a server: only through Tailscale, everyone, or
+// nobody, with sshd stopped.
+const (
+	SSHTailscale = "tailscale"
+	SSHEveryone  = "everyone"
+	SSHOff       = "off"
+)
+
+// ValidSSH says whether ssh is one of SSHTailscale, SSHEveryone and SSHOff.
+func ValidSSH(ssh string) bool {
+	return ssh == SSHTailscale || ssh == SSHEveryone || ssh == SSHOff
+}
+
+// SecurityEvery is how often the daemon checks that its server still has
+// the security of its ServerConfig, puts back what drifted and sends
+// TypeServerSecurity. It checks after each start too.
+const SecurityEvery = 5 * time.Minute
+
 // ServerConfig is how a server is reached and locked down.
 //
 // TunnelToken runs cloudflared, which carries all app traffic from
 // Cloudflare to Traefik; the proxy then opens no port. Without it Traefik
-// takes 80 and 443. TailscaleKey joins the server to the user's tailnet;
-// SSHOnTailscale then answers SSH only there. Firewall drops every other
-// inbound connection.
+// takes 80 and 443. TailscaleKey joins the server to the user's tailnet.
+// SSH says who SSH answers: SSHTailscale only through Tailscale, SSHEveryone, or SSHOff
+// with sshd stopped. Firewall drops every other inbound connection.
+//
+// SSHOnTailscale is SSH == SSHTailscale for daemons before SSH: the hub sends
+// both, and a daemon without SSH reads SSHOnTailscale.
 type ServerConfig struct {
 	TunnelToken    string `json:"tunnel_token,omitempty"`
 	TailscaleKey   string `json:"tailscale_key,omitempty"`
+	SSH            string `json:"ssh,omitempty"`
 	SSHOnTailscale bool   `json:"ssh_on_tailscale,omitempty"`
 	Firewall       bool   `json:"firewall,omitempty"`
 }
 
-// ServerConfigResult is what the daemon set up. Problems are the parts it
-// could not, in words; the rest stands.
+// WantSSH is who SSH should answer, also for a config from before SSH.
+func (c ServerConfig) WantSSH() string {
+	switch {
+	case ValidSSH(c.SSH):
+		return c.SSH
+	case c.SSHOnTailscale:
+		return SSHTailscale
+	}
+	return SSHEveryone
+}
+
+// ServerConfigResult is what the daemon set up and what really is on the
+// server. Problems are the parts it could not, in words; the rest stands.
+// TailscaleIP is the server's address in a tailnet, also one joined by
+// hand. SSH is who SSH answers now; daemons before it leave it empty.
+// Fixed is what the daemon put back since its last report, in words, for
+// the activity.
 type ServerConfigResult struct {
 	Proxy       string   `json:"proxy"`
 	TailscaleIP string   `json:"tailscale_ip,omitempty"`
+	SSH         string   `json:"ssh,omitempty"`
 	Firewall    bool     `json:"firewall"`
 	OpenPorts   []string `json:"open_ports"`
 	Problems    []string `json:"problems,omitempty"`
+	Fixed       []string `json:"fixed,omitempty"`
+}
+
+// OpenText says what the firewall leaves open to everyone, the same on
+// every surface: "80, 443, 41641/udp", or "nothing". A TCP port is only
+// its number.
+func (r ServerConfigResult) OpenText() string {
+	if len(r.OpenPorts) == 0 {
+		return "nothing"
+	}
+	ports := make([]string, len(r.OpenPorts))
+	for i, port := range r.OpenPorts {
+		ports[i] = strings.TrimSuffix(port, "/tcp")
+	}
+	return strings.Join(ports, ", ")
 }

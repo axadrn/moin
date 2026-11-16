@@ -41,7 +41,6 @@ func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	buckets, _ := h.apps.Buckets(workspace.ID)
 	member := ctxkeys.WorkspaceMember(r.Context())
-	_, gitHubErr := h.apps.GitHubInstallURL(actor(r))
 	input := pages.SearchInput{
 		Base:      ctxkeys.AppBasePath(r.Context()),
 		Here:      r.URL.Query().Get("here"),
@@ -50,7 +49,6 @@ func (h *CommandHandler) Search(w http.ResponseWriter, r *http.Request) {
 		Buckets:   buckets,
 		CanChange: h.servers.RequireChanges(workspace.ID) == nil,
 		IsOwner:   member != nil && member.Can(model.WorkspacePermissionManageBilling) && ctxkeys.RenderConfig(r.Context()).Billing,
-		GitHub:    gitHubErr == nil,
 	}
 	if h.docs != nil {
 		for _, page := range h.docs.FlatDocsList() {

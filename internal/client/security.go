@@ -12,11 +12,12 @@ type Integrations struct {
 	Tailscale         bool   `json:"tailscale"`
 }
 
-// Security is how a server should be reached and locked down.
+// Security is how a server should be reached and locked down. SSH is
+// tailscale, everyone or off.
 type Security struct {
-	Tunnel       bool `json:"tunnel"`
-	SSHTailscale bool `json:"ssh_tailscale"`
-	Firewall     bool `json:"firewall"`
+	Tunnel   bool   `json:"tunnel"`
+	SSH      string `json:"ssh"`
+	Firewall bool   `json:"firewall"`
 }
 
 // SetSecurity applies the settings and returns the server with what its

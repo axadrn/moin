@@ -138,12 +138,13 @@ type Server struct {
 	Arch          string     `json:"arch"`
 	DaemonVersion string     `json:"daemon_version"`
 	LastSeenAt    *time.Time `json:"last_seen_at"`
-	// Tunnel, SSHTailscale and Firewall say how the server is reached and
-	// locked down; Security is what its daemon set up.
-	Tunnel       bool                         `json:"tunnel"`
-	SSHTailscale bool                         `json:"ssh_tailscale"`
-	Firewall     bool                         `json:"firewall"`
-	Security     *protocol.ServerConfigResult `json:"security"`
+	// Tunnel, SSH and Firewall say how the server should be reached and
+	// locked down; SSH is tailscale, everyone or off. Security is what its
+	// daemon last saw on it.
+	Tunnel   bool                         `json:"tunnel"`
+	SSH      string                       `json:"ssh"`
+	Firewall bool                         `json:"firewall"`
+	Security *protocol.ServerConfigResult `json:"security"`
 	// Rules are what the owner allows moin to do on the server, from
 	// /etc/moin/rules there. Nil without rules.
 	Rules     *protocol.Rules `json:"rules"`
@@ -177,10 +178,50 @@ func (s Server) Access() string {
 	if s.Firewall {
 		parts = append(parts, "firewall")
 	}
-	if s.SSHTailscale {
-		parts = append(parts, "ssh on tailnet")
+	if s.SSH != "" && s.SSH != protocol.SSHEveryone {
+		parts = append(parts, "ssh "+s.SSH)
 	}
 	return strings.Join(parts, ", ")
+}
+
+// SecurityLine is one line of how a server is reached: what is on the
+// server (Is) and what is set (Set), the lines of its Security page.
+type SecurityLine struct {
+	Name, Is, Set string
+}
+
+// SecurityLines are web, SSH and the firewall, the lines of the Security
+// page in the same words, once the daemon reported; nil before.
+func (s Server) SecurityLines() []SecurityLine {
+	if s.Security == nil {
+		return nil
+	}
+	web := func(tunnel bool) string {
+		if tunnel {
+			return "cloudflare tunnel"
+		}
+		return "open"
+	}
+	ssh := func(ssh string) string {
+		switch ssh {
+		case protocol.SSHTailscale:
+			return "only through tailscale"
+		case protocol.SSHOff:
+			return "off"
+		}
+		return "everyone"
+	}
+	onOff := func(on bool) string {
+		if on {
+			return "on"
+		}
+		return "off"
+	}
+	return []SecurityLine{
+		{"web", web(s.Security.Proxy == "tunnel"), web(s.Tunnel)},
+		{"ssh", ssh(s.Security.SSH), ssh(s.SSH)},
+		{"firewall", onOff(s.Security.Firewall), onOff(s.Firewall)},
+	}
 }
 
 // NewServer is a server that waits for its daemon.

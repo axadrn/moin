@@ -74,11 +74,12 @@ func run(cfg *config.Config) error {
 		return fmt.Errorf("initialize app: %w", err)
 	}
 	if backup {
-		stopBackup, err := dbbackup.Start(context.Background(), bucket, file)
+		hubBackup, err := dbbackup.Start(context.Background(), bucket, file)
 		if err != nil {
 			return err
 		}
-		defer stopBackup()
+		defer hubBackup.Stop()
+		application.UpdateService.UseHubBackup(hubBackup)
 	}
 	telemetry, stopTelemetry := context.WithCancel(context.Background())
 	defer stopTelemetry()

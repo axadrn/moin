@@ -30,7 +30,8 @@ func joinAttrs(attrs []templ.Attributes) templ.Attributes {
 //   - none of them: it only tells.
 //
 // Lead stands in front of the words: a face, an initial. Name and Note are
-// the words, Value a quiet value at the end. Children come after the words:
+// the words, Hint a sentence under them that wraps: what the item is about.
+// Value is a quiet value at the end. Children come after the words:
 // a status, a button, the control.
 type ItemProps struct {
 	Href     string
@@ -42,6 +43,7 @@ type ItemProps struct {
 	Form     bool
 	Name     string
 	Note     string
+	Hint     string
 	Value    string
 	Lead     templ.Component
 	Attrs    templ.Attributes
@@ -107,6 +109,9 @@ templ itemText(p ItemProps) {
 			if p.Note != "" {
 				<div class="moin-item-note">{ p.Note }</div>
 			}
+			if p.Hint != "" {
+				<div class="moin-item-hint">{ p.Hint }</div>
+			}
 		</div>
 	}
 	if p.Value != "" {
@@ -115,11 +120,19 @@ templ itemText(p ItemProps) {
 }
 
 templ itemLabel(p ItemProps) {
+	if p.Lead != nil {
+		<span data-lead>
+			@p.Lead
+		</span>
+	}
 	if p.Name != "" {
 		<label for={ p.For } class="moin-item-text">
 			<span class="moin-item-name">{ p.Name }</span>
 			if p.Note != "" {
 				<span class="moin-item-note">{ p.Note }</span>
+			}
+			if p.Hint != "" {
+				<span class="moin-item-hint">{ p.Hint }</span>
 			}
 		</label>
 	}

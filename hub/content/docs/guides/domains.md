@@ -41,7 +41,7 @@ Then, where you bought the domain, add an **A record**: the domain as the name, 
 
 moin says whether the domain already points at the server. **Check** asks again later. Once DNS points at the server, the domain gets HTTPS by itself.
 
-Behind a [Cloudflare Tunnel](/docs/guides/security#cloudflare-tunnel), moin sets the DNS for you when the domain is in your Cloudflare account.
+Behind a [Cloudflare Tunnel](/docs/guides/security#web), moin sets the DNS for you when the domain is in your Cloudflare account.
 
 A change to the domains, the password or the instant address waits for the next restart, start or deploy.
 

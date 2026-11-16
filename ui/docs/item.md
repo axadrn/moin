@@ -56,6 +56,8 @@ item-with-radio
 
 ## With a switch
 
+`moin-item-hint` under the name says what the line is about, in a sentence that wraps.
+
 ```example
 item-with-switch
 ```

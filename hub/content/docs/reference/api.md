@@ -79,7 +79,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `GET /api/v1/activity` | read | who did what, newest first, with `next_cursor`; `app`, `server` and `user` filter it. The actor by name; `actor_email` only for admins and owners |
 | `GET /api/v1/workspaces/{slug}/activity` | read | the same, for the workspace in the path |
 | `GET /api/v1/workspaces/{slug}/billing` | read | the plan and the subscription, where billing is on |
-| `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | session | a checkout link; the billing portal (owner) |
+| `POST /api/v1/workspaces/{slug}/billing/checkout` · `GET /billing/manage` | session | a checkout link, with `"business": true` to confirm you subscribe as a business (`business_only` without it); the billing portal (owner) |
 
 ## Servers
 
@@ -94,8 +94,8 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | `POST /api/v1/servers/{id}/update` | write | updates the daemon to the hub's version |
 | `GET` · `PUT /api/v1/daemon-updates` | read · write | whether daemons update by themselves, `{"auto": true}`; on by default |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | read | CPU, memory, disk, network and load now and over `1h`, `24h`, `7d` or `30d`, and its apps now, the most memory first |
-| `PUT /api/v1/servers/{id}/security` | write | Cloudflare Tunnel, SSH on Tailscale, firewall ([Security](/docs/guides/security)) |
-| `GET` · `PUT /api/v1/integrations` | read · write | the Cloudflare API token and the Tailscale auth key; an empty key removes it |
+| `PUT /api/v1/servers/{id}/security` | write | `tunnel`, `ssh` (`everyone`, `tailscale` or `off`) and `firewall` ([Security](/docs/guides/security)) |
+| `GET` · `PUT /api/v1/integrations` | read · write | connect Cloudflare and Tailscale with their keys; an empty key disconnects ([Integrations](/docs/guides/security#integrations)) |
 
 ## Apps
 

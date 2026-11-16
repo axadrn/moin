@@ -55,9 +55,9 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | --- | --- | --- | --- | --- | --- |
 | Add a server, install command | ✓ | ✓ `servers add` | Opens the web. | ✓ | ✓ |
 | Rename, remove a server | ✓ | ✓ | Opens the web. | ✓ | ✓ |
-| Tunnel, SSH on Tailscale, firewall | ✓ | ✓ `servers secure` | Shows what the daemon set up; `W` changes it in the web. | ✓ | ✓ |
+| Web, SSH, firewall: what is on the server | ✓ | ✓ `servers secure` | Shows what is on the server; `W` changes it in the web. | ✓ | ✓ |
 | Server rules | ✓ | ✓ `servers rules` | ✓ on the server | ✓ | ✓ |
-| Cloudflare token, Tailscale key | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
+| Integrations: Cloudflare, Tailscale: connect, replace the key, disconnect | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
 | Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
 | Uninstall the daemon | Runs on the server. | ✓ `daemon uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
 | Create, remove an app | ✓ | ✓ `apps add`, `deploy` asks first | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
@@ -77,6 +77,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Team and invitations | ✓ | ✓ `team` | Opens the web. | ✓ | ✓ |
 | Rename the workspace | ✓ | ✓ `team rename` | Opens the web. | ✓ | ✓ |
 | Update a self-hosted hub | ✓ | ✓ `update` | Opens the web. | ✓ | ✓ |
+| Hub backup, for the admins of the hub | ✓ Settings | ✓ `version` | Opens the web. | ✓ `GET /api/v1/version` | ✓ `get_version` |
 
 ## Account, roles and money
 
@@ -91,5 +92,5 @@ These stay in the web on purpose: they move money or decide who is in charge, so
 | Change roles, remove someone, leave, delete the workspace | ✓ | Who is in charge is decided with a password. | Web only. | ✓ with a session | Web only. |
 | Create a workspace, accept an invitation | ✓ | It starts with a signed-in browser. | Web only. | ✓ with a session | Web only. |
 | Plan and trial | ✓ | Web only. | Web only. | ✓ | ✓ `get_billing` |
-| Checkout, card, invoices | ✓ | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | AI agents never move money. |
+| Checkout, card, invoices | ✓, as a business | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | AI agents never move money. |
 | Delete your account | ✓ | Web only, with your password. | Web only. | ✓ with a session | AI agents never delete accounts. |

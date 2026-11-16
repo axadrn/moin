@@ -12,7 +12,7 @@ Connect GitHub. moin takes your code straight from it. Link a repo to an app onc
 Installs the moin GitHub App on your account or an organization. Once per workspace.
 
 ```surfaces
-Web: **Settings**, **GitHub**, **Connect GitHub**; or the app's **Deploys** tab, **Deploy from**, **GitHub**, **Connect GitHub**
+Web: **Settings**, **Integrations**, **Connect GitHub**; or the app's **Deploys** tab, **Deploy from**, **GitHub**, **Connect GitHub**
 CLI: moin github
 TUI: opens the web: `w`, then `g`
 API: GET /api/v1/github

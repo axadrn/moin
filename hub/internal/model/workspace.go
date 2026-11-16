@@ -40,4 +40,8 @@ type Workspace struct {
 	// AutoUpdateDaemons has the hub update the daemons of the
 	// workspace to its own version by itself.
 	AutoUpdateDaemons bool `db:"auto_update_daemons"`
+	// BusinessConfirmedBy is the user who confirmed, before a checkout,
+	// that the workspace subscribes as a business, at BusinessConfirmedAt.
+	BusinessConfirmedBy *string    `db:"business_confirmed_by"`
+	BusinessConfirmedAt *time.Time `db:"business_confirmed_at"`
 }

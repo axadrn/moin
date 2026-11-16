@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 
 	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/style"
+	"github.com/axadrn/moin/protocol"
 )
 
 // secure sets how a server is reached; flags it does not get keep their
 // value.
 func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|open] [--firewall on|off] [--yes]").withYes()
-	tunnel := flags.String("tunnel", "", "on: app traffic through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
-	ssh := flags.String("ssh", "", "tailscale: SSH only on the tailnet; open: everywhere")
+	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]").withYes()
+	tunnel := flags.String("tunnel", "", "on: visitors come through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
+	ssh := flags.String("ssh", "", "tailscale: SSH only through Tailscale; everyone; off: the daemon stops sshd")
 	firewall := flags.String("firewall", "", "on: drop every other inbound connection")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -38,33 +38,39 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return fmt.Errorf("no server %s", flags.Arg(0))
 	}
 	server := servers[index]
-	security := client.Security{Tunnel: server.Tunnel, SSHTailscale: server.SSHTailscale, Firewall: server.Firewall}
+	now := client.Security{Tunnel: server.Tunnel, SSH: server.SSH, Firewall: server.Firewall}
+	security := now
 	for _, setting := range []struct {
 		value     string
-		on, off   string
 		target    *bool
 		flagLabel string
 	}{
-		{*tunnel, "on", "off", &security.Tunnel, "--tunnel"},
-		{*ssh, "tailscale", "open", &security.SSHTailscale, "--ssh"},
-		{*firewall, "on", "off", &security.Firewall, "--firewall"},
+		{*tunnel, &security.Tunnel, "--tunnel"},
+		{*firewall, &security.Firewall, "--firewall"},
 	} {
 		switch setting.value {
 		case "":
-		case setting.on:
+		case "on":
 			*setting.target = true
-		case setting.off:
+		case "off":
 			*setting.target = false
 		default:
-			return fmt.Errorf("%s is %s or %s", setting.flagLabel, setting.on, setting.off)
+			return fmt.Errorf("%s is on or off", setting.flagLabel)
 		}
 	}
-	if security != (client.Security{Tunnel: server.Tunnel, SSHTailscale: server.SSHTailscale, Firewall: server.Firewall}) {
+	switch *ssh {
+	case "":
+	case protocol.SSHTailscale, protocol.SSHEveryone, protocol.SSHOff:
+		security.SSH = *ssh
+	default:
+		return errors.New("--ssh is tailscale, everyone or off")
+	}
+	if security != now {
 		next := server
-		next.Tunnel, next.SSHTailscale, next.Firewall = security.Tunnel, security.SSHTailscale, security.Firewall
+		next.Tunnel, next.SSH, next.Firewall = security.Tunnel, security.SSH, security.Firewall
 		question := fmt.Sprintf("Change how %s is reached from %s to %s?", server.Name, server.Access(), next.Access())
-		if security.SSHTailscale && !server.SSHTailscale {
-			question += " Port 22 closes once Tailscale is up; keep another way in."
+		if security.SSH != now.SSH && security.SSH != protocol.SSHEveryone {
+			question += " Keep another way in, like your provider's console."
 		}
 		err = confirm(stdin, stdout, flags.yes(), question)
 		if err != nil {
@@ -80,23 +86,27 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	return nil
 }
 
+// printSecurity says what is on the server, line by line; a line that is
+// not as set says both.
 func printSecurity(w io.Writer, server client.Server) {
-	report := server.Security
-	if report == nil {
+	lines := server.SecurityLines()
+	if lines == nil {
 		done(w, "%s: %s. Its daemon applies it when it connects.", server.Name, server.Access())
 		return
 	}
 	done(w, "%s: %s", server.Name, server.Access())
-	open := "no firewall"
-	if report.Firewall {
-		open = strings.Join(report.OpenPorts, ", ")
-		if open == "" {
-			open = "nothing"
+	report := server.Security
+	for _, line := range lines {
+		value := line.Is
+		switch {
+		case line.Is != line.Set:
+			value = style.Danger.Render(line.Is + " ✗ set: " + line.Set)
+		case line.Name == "ssh" && report.TailscaleIP != "":
+			value += " · " + report.TailscaleIP
+		case line.Name == "firewall" && report.Firewall:
+			value += " · open to everyone: " + report.OpenText()
 		}
-	}
-	fmt.Fprintln(w, style.Muted.Render("  open to everyone: ")+open)
-	if report.TailscaleIP != "" {
-		fmt.Fprintln(w, style.Muted.Render("  tailnet: ")+report.TailscaleIP)
+		fmt.Fprintln(w, style.Muted.Render(fmt.Sprintf("  %-10s", line.Name))+value)
 	}
 	for _, problem := range report.Problems {
 		fmt.Fprintln(w, "  "+style.Warning.Render("! "+problem))

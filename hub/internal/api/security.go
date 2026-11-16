@@ -24,9 +24,9 @@ type IntegrationsRequest struct {
 
 // SecurityRequest is the body of PUT /api/v1/servers/{id}/security.
 type SecurityRequest struct {
-	Tunnel       bool `json:"tunnel"`
-	SSHTailscale bool `json:"ssh_tailscale"`
-	Firewall     bool `json:"firewall"`
+	Tunnel   bool   `json:"tunnel"`
+	SSH      string `json:"ssh"`
+	Firewall bool   `json:"firewall"`
 }
 
 // GetIntegrations says which keys are stored.

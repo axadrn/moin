@@ -16,39 +16,68 @@ type SettingsHandler struct {
 	authService *service.AuthService
 	apiTokens   *service.APITokenService
 	apps        *service.AppService
+	updates     *service.UpdateService
 }
 
-func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService, apps *service.AppService) *SettingsHandler {
-	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps}
+func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService, apps *service.AppService, updates *service.UpdateService) *SettingsHandler {
+	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps, updates: updates}
 }
 
 // Home is Settings: you, your workspaces, this workspace, moin, sign out.
 func (h *SettingsHandler) Home(w http.ResponseWriter, r *http.Request) {
-	var view pages.SettingsHomeView
-	installations, enabled, err := h.gitHub(r)
-	if err != nil {
-		renderError(w, "load github installations failed", err)
-		return
-	}
-	view.GitHub = enabled
-	for _, installation := range installations {
-		view.GitHubAccounts = append(view.GitHubAccounts, installation.Account)
-	}
+	// The admins of the hub see its backup here, on every hub.
+	view := pages.SettingsHomeView{HubBackup: h.updates.Info(ctxkeys.User(r.Context())).HubBackup}
 	render(w, r, pages.SettingsHome(view))
 }
 
-// GitHub is the GitHub connection of the workspace, for every app.
-func (h *SettingsHandler) GitHub(w http.ResponseWriter, r *http.Request) {
+// Integrations are the accounts the workspace connects once: GitHub,
+// Cloudflare and Tailscale.
+func (h *SettingsHandler) Integrations(w http.ResponseWriter, r *http.Request) {
 	installations, enabled, err := h.gitHub(r)
 	if err != nil {
 		renderError(w, "load github installations failed", err)
 		return
 	}
-	if !enabled {
-		http.NotFound(w, r)
+	keys, err := h.apps.Integrations(ctxkeys.Workspace(r.Context()).ID)
+	if err != nil {
+		renderError(w, "load integrations failed", err)
 		return
 	}
-	render(w, r, pages.SettingsGitHub(installations))
+	render(w, r, pages.Integrations(pages.IntegrationsView{GitHub: enabled, GitHubAccounts: installations, Keys: keys}))
+}
+
+// SetIntegrations connects Cloudflare or Tailscale with the key in the
+// form, replaces the key of a connected one, or disconnects the one remove
+// names, and answers the page.
+func (h *SettingsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
+	var cloudflare, tailscale *string
+	cloudflareToken, tailscaleKey := r.FormValue("cloudflare_token"), r.FormValue("tailscale_key")
+	notDone := "Key not saved"
+	switch r.FormValue("remove") {
+	case "cloudflare":
+		cloudflareToken, notDone = "", "Cloudflare not disconnected"
+		cloudflare = &cloudflareToken
+	case "tailscale":
+		tailscaleKey, notDone = "", "Tailscale not disconnected"
+		tailscale = &tailscaleKey
+	default:
+		if cloudflareToken != "" {
+			cloudflare = &cloudflareToken
+		}
+		if tailscaleKey != "" {
+			tailscale = &tailscaleKey
+		}
+	}
+	err := h.apps.SetIntegrations(r.Context(), actor(r), cloudflare, tailscale)
+	if errors.Is(err, service.ErrCloudflareToken) {
+		fieldRefused(w, r, notDone, "cloudflare-token", errorMessage(err))
+		return
+	}
+	if err != nil {
+		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key"})
+		return
+	}
+	h.Integrations(w, r)
 }
 
 // gitHub is the accounts the workspace connected, and whether this hub

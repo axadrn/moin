@@ -9,6 +9,7 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -37,8 +38,28 @@ func version(ctx context.Context, args []string, stdout io.Writer) error {
 		return nil
 	}
 	fmt.Fprintln(stdout, "hub", info.Version, style.Muted.Render(config.URL))
+	if info.HubBackup != nil {
+		fmt.Fprintln(stdout, "hub backup", hubBackupLine(*info.HubBackup, time.Now()))
+	}
 	printUpdate(stdout, info)
 	return nil
+}
+
+// hubBackupLine is how the backup of the hub's own database stands, like
+// "● on · bucket acme-hub · last copy just now", red when off or late.
+func hubBackupLine(backup client.HubBackup, now time.Time) string {
+	status := style.StatusLive
+	if backup.State != "on" {
+		status = style.StatusFailed
+	}
+	line := backup.State
+	if backup.Bucket != "" {
+		line += " · bucket " + backup.Bucket
+	}
+	if backup.LastCopy != nil {
+		line += " · last copy " + human.Ago(*backup.LastCopy, now)
+	}
+	return style.Badge(status, line)
 }
 
 // printUpdate says how a self-hosted hub gets the newest release.

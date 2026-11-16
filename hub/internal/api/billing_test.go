@@ -92,7 +92,7 @@ func TestWorkspaceBillingCheckout(t *testing.T) {
 	seeded := seedBillingWorkspace(t, environment)
 	path := "/api/v1/workspaces/" + seeded.workspace.Slug + "/billing/checkout"
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","interval":"yearly"}`, bearer: seeded.owner})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","interval":"yearly","business":true}`, bearer: seeded.owner})
 	expectStatus(t, recorder, http.StatusOK)
 	if decodeBody[api.URLResponse](t, recorder).URL != "https://checkout.example.com/session" {
 		t.Fatalf("body = %s", recorder.Body.String())
@@ -107,6 +107,14 @@ func TestWorkspaceBillingCheckout(t *testing.T) {
 	if err != nil || events != 1 {
 		t.Fatalf("checkout activity events = %d, error = %v", events, err)
 	}
+	var confirmed struct {
+		By *string    `db:"business_confirmed_by"`
+		At *time.Time `db:"business_confirmed_at"`
+	}
+	err = environment.database.Get(&confirmed, `SELECT business_confirmed_by, business_confirmed_at FROM workspaces WHERE id = $1`, seeded.workspace.ID)
+	if err != nil || confirmed.By == nil || *confirmed.By == "" || confirmed.At == nil {
+		t.Fatalf("business confirmed by %v at %v, error = %v", confirmed.By, confirmed.At, err)
+	}
 
 	for _, test := range []struct {
 		body string
@@ -114,16 +122,17 @@ func TestWorkspaceBillingCheckout(t *testing.T) {
 	}{
 		{body: `{"plan_id":"free"}`, code: "invalid_plan"},
 		{body: `{"plan_id":"pro","interval":"weekly"}`, code: "invalid_interval"},
+		{body: `{"plan_id":"pro"}`, code: "business_only"},
 	} {
 		rejected := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: test.body, bearer: seeded.owner})
 		expectError(t, rejected, http.StatusUnprocessableEntity, test.code)
 	}
 
 	environment.payments.checkoutErr = repository.ErrCheckoutPending
-	pending := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro"}`, bearer: seeded.owner})
+	pending := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","business":true}`, bearer: seeded.owner})
 	expectError(t, pending, http.StatusConflict, "checkout_pending")
 	environment.payments.checkoutErr = repository.ErrSubscriptionAlreadyPaid
-	paid := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro"}`, bearer: seeded.owner})
+	paid := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","business":true}`, bearer: seeded.owner})
 	expectError(t, paid, http.StatusConflict, "already_paid")
 }
 

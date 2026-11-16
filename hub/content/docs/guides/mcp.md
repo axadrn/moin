@@ -52,7 +52,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `rename_server` | renames a server | write |
 | `update_daemon` | puts the hub's daemon version on a server | write |
 | `set_daemon_updates` | turns automatic daemon updates on or off | write |
-| `get_version` | the hub's version, the newest version of moin and whether daemons update by themselves | read |
+| `get_version` | the hub's version, the newest version of moin and whether daemons update by themselves; for the admins of the hub also the hub backup | read |
 | `update_hub` | updates a self-hosted hub to the newest version, for its admins: first it returns the release notes, then it updates with `confirm` | write |
 | `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
@@ -109,9 +109,9 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `link_repo` | follows a repo and branch; the deploy hook turns off | write, destructive |
 | `unlink_repo` | stops following it | write, destructive |
 | `deploy_ref` | deploys a branch, tag or commit from GitHub | write |
-| `get_integrations` | whether the Cloudflare token and Tailscale key are stored | read |
+| `get_integrations` | whether Cloudflare and Tailscale are connected | read |
 | `set_integrations` | stores them | write |
-| `set_server_security` | Cloudflare Tunnel, SSH on Tailscale, firewall | write, destructive |
+| `set_server_security` | visitors through a Cloudflare Tunnel, SSH for everyone, only through Tailscale or off, the firewall | write, destructive |
 | `get_billing` | the subscription; on a self-hosted hub it says billing is off | read |
 | `list_workspaces` · `get_workspace` | the token's workspace with its team | read |
 | `list_activity` | who did what, newest first, to the second; filter by `app`, `server` or `user` | read |

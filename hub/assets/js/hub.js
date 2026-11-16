@@ -378,7 +378,7 @@ document.addEventListener("click", (event) => {
     const field = part("input");
     field.value = "";
     accept.disabled = name !== "";
-    pending = { name, accepted: false, ctx, issue: issueRequest, drop: dropRequest };
+    pending = { name, accepted: false, ctx, issue: issueRequest, drop: dropRequest, source: event.target };
     popup().showModal();
     if (name) field.focus();
     else accept.focus();
@@ -402,11 +402,14 @@ document.addEventListener("click", (event) => {
     }
   });
   // The dialog closed: by the button, Cancel, Escape or a click outside.
-  // Only the button lets the request go.
+  // Only the button lets the request go. A control that saves itself and
+  // asked first goes back to what the page showed when the answer is no.
   document.addEventListener("close", (event) => {
     if (!pending || event.target !== popup()) return;
     const done = pending;
     pending = null;
-    done.accepted ? done.issue() : done.drop();
+    if (done.accepted) return done.issue();
+    done.drop();
+    if (done.source.matches?.('form[hx-trigger="change"]')) done.source.reset();
   }, true);
 }

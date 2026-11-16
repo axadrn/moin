@@ -40,7 +40,8 @@ func registerUpdateTools(server *mcpsdk.Server, services Services) {
 		Title: "Get the version",
 		Description: "Returns the hub's version, the one daemons update to, and whether the daemons of the workspace update by themselves (auto_update_daemons). " +
 			"A self-hosted hub (self_hosted) also returns the newest release (latest, update_available, summary, notes, notes_url) and the update under way or of the past day (update.state: requested, updating, done, rolled_back or failed, with a reason). " +
-			"can_update is true for an admin of a self-hosted hub when update_hub would work. The hosted hub updates itself with every release. Needs the read scope.",
+			"can_update is true for an admin of a self-hosted hub when update_hub would work. The hosted hub updates itself with every release. " +
+			"An admin of the hub, hosted or self-hosted, also gets hub_backup: how the backup of the hub's own database stands (state on, off or late when no copy reached the bucket for two minutes, the bucket and last_copy); null for everyone else. Needs the read scope.",
 		Annotations: readOnly("Get the version"),
 	}, Read(member(services, tools.getVersion)))
 	mcpsdk.AddTool(server, &mcpsdk.Tool{

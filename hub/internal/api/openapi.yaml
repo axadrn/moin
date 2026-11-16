@@ -145,7 +145,7 @@ paths:
       tags: [Meta]
       operationId: getVersion
       summary: Get the version and the newest release
-      description: The hub's version for everyone. A self-hosted hub (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted hub updates with every release and leaves these fields empty.
+      description: The hub's version for everyone. A self-hosted hub (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted hub updates with every release and leaves these fields empty. `hub_backup` is how the backup of the hub's own database stands, for an admin in `ADMIN_EMAILS` on every hub.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3441,18 +3441,20 @@ paths:
       tags: [Servers]
       operationId: setServerSecurity
       summary: Lock down a server
-      description: 'How the server is reached: `tunnel` creates a Cloudflare Tunnel with the stored Cloudflare token, routes every app domain through it, points their DNS at it and closes 80 and 443. `ssh_tailscale` joins the tailnet with the stored Tailscale key and answers SSH only there, once Tailscale is up. `firewall` drops every other inbound connection. The daemon applies it at once, or when it connects; `security` in the answer says what it set up.'
+      description: 'How the server is reached, all three at once: `tunnel` creates a Cloudflare Tunnel with the workspace''s Cloudflare token, routes every app domain through it, points their DNS at it and closes 80 and 443. `ssh` is `tailscale` (SSH answers only through Tailscale, once the server is in it: with the workspace''s Tailscale key or joined by hand), `everyone`, or `off` (the daemon stops sshd). `firewall` drops every other inbound connection. The daemon applies it at once, or when it connects, and keeps it: it puts back what drifts and the activity says so as moin. `security` in the answer is what it saw on the server.'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required: [ssh]
               properties:
                 tunnel:
                   type: boolean
-                ssh_tailscale:
-                  type: boolean
+                ssh:
+                  type: string
+                  enum: [tailscale, everyone, off]
                 firewall:
                   type: boolean
       security:
@@ -3475,7 +3477,10 @@ paths:
           description: '`not_found`. No server with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`no_cloudflare` or `no_tailscale` when the key is missing.'
+          description: '`no_cloudflare` or `no_tailscale` when the account is not connected under Settings, Integrations.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` on `ssh` for anything but tailscale, everyone or off.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4691,7 +4696,7 @@ components:
           schema:
             $ref: '#/components/schemas/URLResponse'
     InvalidCheckout:
-      description: '`invalid_plan` for an unknown or unpurchasable plan, `invalid_interval` for an interval other than monthly or yearly.'
+      description: '`invalid_plan` for an unknown or unpurchasable plan, `invalid_interval` for an interval other than monthly or yearly, `business_only` without `business`.'
       content:
         application/json:
           schema:
@@ -4852,6 +4857,22 @@ components:
             at:
               type: string
               format: date-time
+        hub_backup:
+          type: [object, 'null']
+          description: How the backup of the hub's own database stands, for an admin in `ADMIN_EMAILS` on every hub; null for everyone else. Read only, its settings are `S3_*` and `BACKUP_DATABASE`.
+          required: [state, bucket, last_copy]
+          properties:
+            state:
+              type: string
+              enum: [on, off, late]
+              description: '`late` when no copy reached the bucket for two minutes.'
+            bucket:
+              type: string
+              description: The bucket's name; empty when off.
+            last_copy:
+              type: [string, 'null']
+              format: date-time
+              description: When the bucket last took every change.
     DaemonUpdates:
       type: object
       required: [auto]
@@ -5156,22 +5177,28 @@ components:
           description: The last connect or disconnect. Null before the daemon first connected.
         tunnel:
           type: boolean
-          description: App traffic comes through a Cloudflare Tunnel; no port is open.
-        ssh_tailscale:
-          type: boolean
-          description: SSH answers only on the user's tailnet.
+          description: Set to bring visitors through a Cloudflare Tunnel; no port is open.
+        ssh:
+          type: string
+          enum: [tailscale, everyone, off]
+          description: Who SSH should answer.
         firewall:
           type: boolean
-          description: Every other inbound connection is dropped.
+          description: Set to drop every other inbound connection.
         security:
           type: [object, 'null']
-          description: What the daemon set up last.
+          description: What the daemon last saw on the server, after each start, every five minutes and after each change. Compare it with the settings above to see what differs.
           properties:
             proxy:
               type: string
               enum: [direct, tunnel]
             tailscale_ip:
               type: string
+              description: The server's address in a tailnet, also one joined by hand.
+            ssh:
+              type: string
+              enum: [tailscale, everyone, off]
+              description: Who reaches SSH now.
             firewall:
               type: boolean
             open_ports:
@@ -6985,6 +7012,10 @@ components:
           type: string
           enum: [monthly, yearly]
           default: monthly
+        business:
+          type: boolean
+          default: false
+          description: Confirms that the workspace subscribes as a business, not as a consumer. Hosted plans are for businesses only; without it the checkout is refused with `business_only`.
     URLResponse:
       type: object
       required: [url]

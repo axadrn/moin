@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -98,15 +99,16 @@ func TestCloudflareAccountFromZones(t *testing.T) {
 	}
 }
 
-// SSH kept on the tailnet without the firewall is a leftover too: a daemon
-// that comes back after SSH on Tailscale was turned off must open it again.
+// SSH kept to Tailscale or off without the firewall is a leftover too: a
+// daemon that comes back after it was set to everyone must open it again.
+// A tailnet alone is none: it may be joined by hand.
 func TestLeftOver(t *testing.T) {
-	for _, report := range []protocol.ServerConfigResult{{Proxy: "direct", Firewall: true}, {Proxy: "tunnel"}, {Proxy: "direct", TailscaleIP: "100.64.0.9"}} {
+	for _, report := range []protocol.ServerConfigResult{{Proxy: "direct", Firewall: true}, {Proxy: "tunnel"}, {Proxy: "direct", SSH: protocol.SSHTailscale}, {Proxy: "direct", SSH: protocol.SSHOff}} {
 		if !leftOver(&report) {
 			t.Errorf("leftOver(%+v) = false", report)
 		}
 	}
-	if leftOver(nil) || leftOver(&protocol.ServerConfigResult{Proxy: "direct"}) {
+	if leftOver(nil) || leftOver(&protocol.ServerConfigResult{Proxy: "direct", SSH: protocol.SSHEveryone, TailscaleIP: "100.64.0.9"}) {
 		t.Error("nothing set up is no leftover")
 	}
 }
@@ -119,13 +121,17 @@ func TestServerSecurity(t *testing.T) {
 	apps.SetCloudflare(NewCloudflare(cloudflare.URL))
 	ctx := context.Background()
 
-	_, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{Tunnel: true})
+	_, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{Tunnel: true, SSH: protocol.SSHEveryone})
 	if !errors.Is(err, ErrNoCloudflare) {
 		t.Fatalf("tunnel without a token: err = %v", err)
 	}
-	_, err = apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{SSHTailscale: true})
+	_, err = apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{SSH: protocol.SSHTailscale})
 	if !errors.Is(err, ErrNoTailscale) {
 		t.Fatalf("SSH on Tailscale without a key: err = %v", err)
+	}
+	_, err = apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{SSH: "nobody"})
+	if !errors.Is(err, ErrSSH) {
+		t.Fatalf("SSH for nobody: err = %v", err)
 	}
 	bad := "cf-bad"
 	if err := apps.SetIntegrations(ctx, owner, &bad, nil); !errors.Is(err, ErrCloudflareToken) {
@@ -187,12 +193,16 @@ func TestServerSecurity(t *testing.T) {
 			}
 		}
 	}()
-	secured, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{Tunnel: true, SSHTailscale: true, Firewall: true})
+	secured, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{Tunnel: true, SSH: protocol.SSHTailscale, Firewall: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !secured.Tunnel || secured.TunnelID != "tun1" || !secured.Firewall || !secured.SSHTailscale {
+	if !secured.Tunnel || secured.TunnelID != "tun1" || !secured.Firewall || secured.SSH != protocol.SSHTailscale {
 		t.Fatalf("server = %+v", secured)
+	}
+	// The answer says the server is online, as it is.
+	if !secured.Online {
+		t.Fatal("the saved server says offline while its daemon is connected")
 	}
 	// The token stays while a tunnel needs it to be deleted.
 	none := ""
@@ -205,7 +215,7 @@ func TestServerSecurity(t *testing.T) {
 	}
 	var config protocol.ServerConfig
 	daemon.last(t, protocol.TypeServerConfig, &config)
-	if config.TunnelToken != "tunnel-token-123456" || config.TailscaleKey != "tskey-auth-abc" || !config.SSHOnTailscale || !config.Firewall {
+	if config.TunnelToken != "tunnel-token-123456" || config.TailscaleKey != "tskey-auth-abc" || config.SSH != protocol.SSHTailscale || !config.SSHOnTailscale || !config.Firewall {
 		t.Fatalf("daemon config = %+v", config)
 	}
 	for _, call := range []string{"POST /accounts/acc1/cfd_tunnel", "PUT /accounts/acc1/cfd_tunnel/tun1/configurations", "POST /zones/zone1/dns_records", "PATCH /zones/zone1/settings/always_use_https"} {
@@ -235,7 +245,7 @@ func TestServerSecurity(t *testing.T) {
 		t.Fatalf("problems without Zone Settings Edit = %q, %v", problems, err)
 	}
 
-	open, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{})
+	open, err := apps.SetServerSecurity(ctx, owner, "web-1", SecurityInput{SSH: protocol.SSHEveryone})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,5 +260,55 @@ func TestServerSecurity(t *testing.T) {
 	}
 	if integrations, _ := apps.Integrations(owner.WorkspaceID); integrations.Cloudflare {
 		t.Fatalf("the token is still there: %+v", integrations)
+	}
+}
+
+// A daemon reports by itself what really is and what it put back: the
+// report is kept, each fix is in the activity as moin, and a tailnet joined
+// by hand lets SSH go only there without a Tailscale key.
+func TestDaemonReportsSecurity(t *testing.T) {
+	apps, _, server, _ := newAppService(t)
+	report := protocol.ServerConfigResult{Proxy: "direct", TailscaleIP: "100.64.0.7", SSH: protocol.SSHEveryone, OpenPorts: []string{}, Fixed: []string{"the firewall"}}
+	message, _ := protocol.NewMessage(protocol.TypeServerSecurity, report)
+	apps.servers.Receive(server.ID, message)
+	stored, err := apps.servers.servers.ByIDOrNameForWorkspace(server.ID, owner.WorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := SecurityReport(*stored)
+	if seen == nil || seen.TailscaleIP != "100.64.0.7" || len(seen.Fixed) != 0 {
+		t.Fatalf("stored report = %+v", seen)
+	}
+	events, err := apps.servers.activity.ListPage(owner.WorkspaceID, model.ActivityFilter{}, "", 200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed := 0
+	for _, event := range events {
+		if event.Action == "server.security_fixed" && event.ActorUserID == nil {
+			fixed++
+		}
+	}
+	if fixed != 1 {
+		t.Fatalf("fixes in the activity as moin = %d", fixed)
+	}
+	if _, err := apps.SetServerSecurity(context.Background(), owner, server.ID, SecurityInput{SSH: protocol.SSHTailscale}); err != nil {
+		t.Fatalf("SSH only through a tailnet joined by hand: %v", err)
+	}
+}
+
+// A daemon from before it reported SSH said it only through its tailnet IP.
+func TestSecurityReportOfAnOldDaemon(t *testing.T) {
+	for _, test := range []struct {
+		ssh, report, want string
+	}{
+		{protocol.SSHTailscale, `{"proxy":"direct","tailscale_ip":"100.64.0.9","firewall":false,"open_ports":[]}`, protocol.SSHTailscale},
+		{protocol.SSHTailscale, `{"proxy":"direct","firewall":false,"open_ports":[],"problems":["SSH stays open: Tailscale is not up"]}`, protocol.SSHEveryone},
+		{protocol.SSHOff, `{"proxy":"direct","firewall":false,"open_ports":[]}`, protocol.SSHEveryone},
+	} {
+		got := SecurityReport(model.Server{SSH: test.ssh, Security: test.report})
+		if got == nil || got.SSH != test.want {
+			t.Errorf("set %s, report %s: ssh = %+v, want %s", test.ssh, test.report, got, test.want)
+		}
 	}
 }

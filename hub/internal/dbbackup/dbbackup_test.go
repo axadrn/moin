@@ -52,7 +52,7 @@ func TestBackupAndRestore(t *testing.T) {
 	if _, err := db.Exec(`CREATE TABLE users (email TEXT); INSERT INTO users VALUES ('ada@example.com')`); err != nil {
 		t.Fatal(err)
 	}
-	stop, err := Start(ctx, bucket, file)
+	backup, err := Start(ctx, bucket, file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,9 +76,13 @@ func TestBackupAndRestore(t *testing.T) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	stop()
+	lastCopy := backup.LastCopy()
+	backup.Stop()
 	db.Close()
 	if count != 2 {
 		t.Fatalf("restored %d users, want 2", count)
+	}
+	if lastCopy.IsZero() || lastCopy.Before(backup.Started) {
+		t.Fatalf("last copy %v, want one after the start %v", lastCopy, backup.Started)
 	}
 }

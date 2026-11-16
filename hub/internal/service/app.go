@@ -1049,6 +1049,11 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 		if message.Decode(&sample) == nil {
 			s.receiveMetrics(serverID, sample)
 		}
+	case protocol.TypeServerSecurity:
+		var report protocol.ServerConfigResult
+		if message.Decode(&report) == nil {
+			s.receiveSecurity(serverID, report)
+		}
 	case protocol.TypeBackupStatus:
 		var backups protocol.Backups
 		if message.Decode(&backups) == nil {

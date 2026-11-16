@@ -52,6 +52,9 @@ func TestAdminOverviewListsUsersThatOpenTheirPage(t *testing.T) {
 	if strings.Contains(html, "/impersonate") || strings.Contains(html, "/sessions/revoke") {
 		t.Error("the list carries actions; they belong on the user's page")
 	}
+	if strings.Contains(html, "Hub backup") {
+		t.Error("the hub backup is in Settings, not in Admin")
+	}
 }
 
 func TestAdminUserPageHasItsActions(t *testing.T) {

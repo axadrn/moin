@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/model"
@@ -15,6 +16,9 @@ var (
 	ErrBillingPermission = errors.New("workspace billing permission required")
 	ErrPlan              = errors.New("choose an available paid plan")
 	ErrInterval          = errors.New("choose monthly or yearly billing")
+	// ErrNotBusiness refuses a checkout nobody confirmed as a business:
+	// hosted plans are for businesses only.
+	ErrNotBusiness = errors.New("hosted plans are for businesses only: confirm that you subscribe as a business, not as a consumer")
 	// ErrNoBillingAccount: the provider knows no customer for the
 	// workspace yet, so there is no billing to manage.
 	ErrNoBillingAccount = errors.New("start a paid plan before managing billing")
@@ -35,9 +39,12 @@ func ManageBilling(member *model.WorkspaceMember) error {
 
 // Checkout starts the checkout of a paid plan for the member's workspace
 // with start, the CreateCheckoutURL of the payment provider, and returns
-// its URL. interval is monthly, the default, or yearly. A checkout that is
-// open already is a repository error such as ErrCheckoutPending.
-func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *model.Workspace, user *model.User, planID, interval string, source Source, start func(workspaceID, workspaceLink, planID, interval, customerEmail, customerName string) (string, error)) (string, error) {
+// its URL. interval is monthly, the default, or yearly. business is the
+// confirmation that the workspace subscribes as a business, not as a
+// consumer: without it the checkout is refused with ErrNotBusiness, and with
+// it moin keeps who confirmed and when. A checkout that is open already is a
+// repository error such as ErrCheckoutPending.
+func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *model.Workspace, user *model.User, planID, interval string, business bool, source Source, start func(workspaceID, workspaceLink, planID, interval, customerEmail, customerName string) (string, error)) (string, error) {
 	if err := ManageBilling(member); err != nil {
 		return "", err
 	}
@@ -50,6 +57,12 @@ func (s *WorkspaceService) Checkout(member *model.WorkspaceMember, workspace *mo
 	}
 	if interval != model.SubscriptionIntervalMonthly && interval != model.SubscriptionIntervalYearly {
 		return "", ErrInterval
+	}
+	if !business {
+		return "", ErrNotBusiness
+	}
+	if err := s.workspaces.ConfirmBusiness(workspace.ID, user.ID, time.Now().UTC()); err != nil {
+		return "", err
 	}
 	checkoutURL, err := start(workspace.ID, workspace.Link(), planID, interval, user.Email, workspace.Name)
 	if errors.Is(err, repository.ErrCheckoutPending) || errors.Is(err, repository.ErrCheckoutSelection) || errors.Is(err, repository.ErrSubscriptionAlreadyPaid) {

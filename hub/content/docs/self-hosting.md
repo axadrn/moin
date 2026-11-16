@@ -187,7 +187,7 @@ With the client ID and secret, moin connects an installation only for someone wh
 - **Your team.** Invite teammates; they sign up with the invited address.
 - **Nobody else.** If `ADMIN_EMAILS` is empty nobody can create the first account, and the log says so when the hub starts.
 
-`/admin` is only for the addresses in `ADMIN_EMAILS`: users, sessions, operator activity and **Update now**.
+A self-hosted hub has no Admin. Its admins, the addresses in `ADMIN_EMAILS`, get the note with **Update now** at the top of the web ([Updates](#updates)) and see the hub backup in **Settings** ([Database backup](#database-backup)). Your team is in **Settings**, **Team**.
 
 ## Updates
 
@@ -209,6 +209,8 @@ Before every update moin shows the whole release notes, under one line: "Read th
 
 The hub's own SQLite database goes to its bucket with Litestream, every change within a second (`S3_BUCKET`, folder `hub/litestream`). On by default in production once `S3_BUCKET` is set; `BACKUP_DATABASE=false` turns it off.
 
+The admins of the hub (`ADMIN_EMAILS`) see how it stands in **Settings**, **Hub backup**, in `moin version`, in `GET /api/v1/version` and in `get_version`: `● on · bucket <name> · last copy just now`, red when it is off or no copy reached the bucket for two minutes.
+
 | File | What is in it | Backup |
 | --- | --- | --- |
 | `app.db` (the name in `DB_CONNECTION`) | users, apps, deploys, settings, the uptime state of each domain and every outage | every change, within a second |
@@ -218,7 +220,7 @@ A hub that starts without a database restores the newest one from the bucket by 
 
 ## A new domain
 
-Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old domain goes on to the same page on the new one, daemons and the CLI move by themselves, and webhooks and API calls there keep working. **Admin**, **Old domain** (or `GET /api/v1/admin/old-domain`) shows what still arrives, by day and kind; after 14 quiet days it can go.
+Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old domain goes on to the same page on the new one, daemons and the CLI move by themselves, and webhooks and API calls there keep working. A self-hosted hub does not show what still arrives there. Keep the old domain until your webhooks, CI and scripts call the new one, then it can go.
 
 ## What it sends us
 
