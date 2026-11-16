@@ -3,6 +3,34 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.32
+
+November 16, 2026
+
+**In short:** Security that tells the truth and keeps itself. Your keys in one place.
+
+### New
+- **Integrations in Settings**: GitHub, Cloudflare and Tailscale on one page. A new key replaces the old one, without disconnecting. (#81)
+- **Security that tells the truth**: Each line shows what really is on the server. When it differs from what you set, it says both. (#82)
+- **moin keeps it**: The daemon looks every five minutes and puts back what drifted. Each fix is in the activity. (#82)
+- **SSH off**: A third choice next to Everyone and Only through Tailscale. Port 22 closes.
+- **Hub backup in Settings**: Admins see whether the hub's own database is backed up, and when the last copy landed. (#84)
+
+### Changed
+- **Web, SSH and Firewall in plain words**: Each line says in one sentence what it is. Visitors is now Web.
+- **SSH and the firewall always work**: Without Cloudflare or Tailscale too. Only the tunnel and SSH through Tailscale need them.
+- **Hosted moin is for businesses**: Subscribe asks you to confirm you subscribe as a business. (#83)
+- **Settings, GitHub is now Settings, Integrations**: Same place, with Cloudflare and Tailscale next to it.
+- **API: `ssh` replaces `ssh_tailscale`**: It takes `everyone`, `tailscale` or `off`.
+- **CLI: `--ssh everyone` replaces `--ssh open`**: And `--ssh off` is new.
+
+### Fixed
+- **The firewall says when nftables is missing**: The line names the package to install. moin turns the firewall on by itself once it is there.
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves. Scripts send `ssh` instead of `ssh_tailscale`, and `--ssh everyone` instead of `--ssh open`.
+
 ## v1.0.0-beta.31
 
 November 15, 2026
