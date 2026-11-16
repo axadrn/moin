@@ -111,7 +111,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `deploy_ref` | deploys a branch, tag or commit from GitHub | write |
 | `get_integrations` | whether Cloudflare and Tailscale are connected | read |
 | `set_integrations` | stores them | write |
-| `set_server_security` | visitors through a Cloudflare Tunnel, SSH only in the tailnet, for everyone or off, the firewall | write, destructive |
+| `set_server_security` | visitors through a Cloudflare Tunnel, SSH for everyone, only through Tailscale or off, the firewall | write, destructive |
 | `get_billing` | the subscription; on a self-hosted hub it says billing is off | read |
 | `list_workspaces` · `get_workspace` | the token's workspace with its team | read |
 | `list_activity` | who did what, newest first, to the second; filter by `app`, `server` or `user` | read |

@@ -63,16 +63,16 @@ func TestDriftedNamesWhatACheckPutBack(t *testing.T) {
 // TestSSHNow: who reaches SSH, from sshd and the rules in front of it.
 func TestSSHNow(t *testing.T) {
 	for _, test := range []struct {
-		sshd, tailnetOnly, closed bool
-		want                      string
+		sshd, tailscaleOnly, closed bool
+		want                        string
 	}{
 		{false, false, false, protocol.SSHOff},
 		{true, false, true, protocol.SSHOff},
-		{true, true, false, protocol.SSHTailnet},
+		{true, true, false, protocol.SSHTailscale},
 		{true, false, false, protocol.SSHEveryone},
 	} {
-		if got := sshNow(test.sshd, test.tailnetOnly, test.closed); got != test.want {
-			t.Errorf("sshNow(%v, %v, %v) = %q, want %q", test.sshd, test.tailnetOnly, test.closed, got, test.want)
+		if got := sshNow(test.sshd, test.tailscaleOnly, test.closed); got != test.want {
+			t.Errorf("sshNow(%v, %v, %v) = %q, want %q", test.sshd, test.tailscaleOnly, test.closed, got, test.want)
 		}
 	}
 }

@@ -21,7 +21,7 @@ type Server struct {
 	Addresses  string     `db:"addresses"`
 	LastSeenAt *time.Time `db:"last_seen_at"`
 	// Tunnel carries app traffic through a Cloudflare Tunnel; TunnelToken
-	// is sealed. SSH is who SSH answers: protocol.SSHTailnet,
+	// is sealed. SSH is who SSH answers: protocol.SSHTailscale,
 	// SSHEveryone or SSHOff. Firewall drops every other inbound
 	// connection. Security is the daemon's last report, as JSON.
 	Tunnel      bool   `db:"tunnel"`

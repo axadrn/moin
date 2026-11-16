@@ -65,7 +65,7 @@ func TestWantSSH(t *testing.T) {
 		want   string
 	}{
 		{ServerConfig{SSH: SSHOff}, SSHOff},
-		{ServerConfig{SSHOnTailscale: true}, SSHTailnet},
+		{ServerConfig{SSHOnTailscale: true}, SSHTailscale},
 		{ServerConfig{}, SSHEveryone},
 		{ServerConfig{SSH: "nobody"}, SSHEveryone},
 	} {

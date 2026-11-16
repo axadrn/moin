@@ -401,7 +401,7 @@ func adminRoutes(mux *http.ServeMux, app *app.App) {
 	if !app.Cfg.Billing {
 		return
 	}
-	admin := handler.NewAdminHandler(app.AdminService, app.UpdateService)
+	admin := handler.NewAdminHandler(app.AdminService)
 	adminRoute := func(next http.HandlerFunc) http.HandlerFunc {
 		return middleware.RequireAuth(middleware.RequireAdmin(next))
 	}

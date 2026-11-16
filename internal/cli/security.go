@@ -16,9 +16,9 @@ import (
 // secure sets how a server is reached; flags it does not get keep their
 // value.
 func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailnet|everyone|off] [--firewall on|off] [--yes]").withYes()
+	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]").withYes()
 	tunnel := flags.String("tunnel", "", "on: visitors come through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
-	ssh := flags.String("ssh", "", "tailnet: SSH only in the tailnet; everyone; off: the daemon stops sshd")
+	ssh := flags.String("ssh", "", "tailscale: SSH only through Tailscale; everyone; off: the daemon stops sshd")
 	firewall := flags.String("firewall", "", "on: drop every other inbound connection")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -61,10 +61,10 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	switch *ssh {
 	case "":
-	case protocol.SSHTailnet, protocol.SSHEveryone, protocol.SSHOff:
+	case protocol.SSHTailscale, protocol.SSHEveryone, protocol.SSHOff:
 		security.SSH = *ssh
 	default:
-		return errors.New("--ssh is tailnet, everyone or off")
+		return errors.New("--ssh is tailscale, everyone or off")
 	}
 	if security != now {
 		next := server

@@ -24,7 +24,7 @@ func TestSecureSetsSSHAndShowsWhatDiffers(t *testing.T) {
 			t.Errorf("stdout %q misses %q", stdout, want)
 		}
 	}
-	if code, _, _ := runCLI(t, api, "servers", "secure", "web-1", "--ssh", "tailscale", "--yes"); code == 0 {
-		t.Error("--ssh tailscale passed")
+	if code, _, _ := runCLI(t, api, "servers", "secure", "web-1", "--ssh", "open", "--yes"); code == 0 {
+		t.Error("--ssh open passed")
 	}
 }

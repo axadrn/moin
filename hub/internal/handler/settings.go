@@ -25,11 +25,8 @@ func NewSettingsHandler(authService *service.AuthService, apiTokens *service.API
 
 // Home is Settings: you, your workspaces, this workspace, moin, sign out.
 func (h *SettingsHandler) Home(w http.ResponseWriter, r *http.Request) {
-	var view pages.SettingsHomeView
-	// A self-hosted hub has no Admin: its admins see the hub backup here.
-	if !ctxkeys.RenderConfig(r.Context()).Billing {
-		view.HubBackup = h.updates.Info(ctxkeys.User(r.Context())).HubBackup
-	}
+	// The admins of the hub see its backup here, on every hub.
+	view := pages.SettingsHomeView{HubBackup: h.updates.Info(ctxkeys.User(r.Context())).HubBackup}
 	render(w, r, pages.SettingsHome(view))
 }
 
@@ -50,11 +47,12 @@ func (h *SettingsHandler) Integrations(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetIntegrations connects Cloudflare or Tailscale with the key in the
-// form, or disconnects the one remove names, and answers the page.
+// form, replaces the key of a connected one, or disconnects the one remove
+// names, and answers the page.
 func (h *SettingsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 	var cloudflare, tailscale *string
 	cloudflareToken, tailscaleKey := r.FormValue("cloudflare_token"), r.FormValue("tailscale_key")
-	notDone := "Not connected"
+	notDone := "Key not saved"
 	switch r.FormValue("remove") {
 	case "cloudflare":
 		cloudflareToken, notDone = "", "Cloudflare not disconnected"

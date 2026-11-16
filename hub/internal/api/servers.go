@@ -38,7 +38,7 @@ type Server struct {
 	DaemonVersion string     `json:"daemon_version"`
 	LastSeenAt    *time.Time `json:"last_seen_at"`
 	// Tunnel carries app traffic through a Cloudflare Tunnel, with no open
-	// port. SSH is who SSH answers: tailnet, everyone or off. Firewall
+	// port. SSH is who SSH answers: tailscale, everyone or off. Firewall
 	// drops every other inbound connection. They are what is set; Security
 	// is what the daemon last saw on the server.
 	Tunnel   bool                         `json:"tunnel"`

@@ -57,16 +57,16 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its daemon there |
 | `moin servers update [name]` | updates the daemon to the hub's version now; without a name, every online server whose daemon differs. See [Daemon updates](#daemon-updates) |
 | `moin servers auto-update [on\|off]` | shows or sets whether daemons update by themselves; on by default |
-| `moin servers secure <server> [--tunnel on\|off] [--ssh tailnet\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached; prints what is on it, line by line. See [Security](/docs/guides/security) |
+| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached; prints what is on it, line by line. See [Security](/docs/guides/security) |
 | `moin servers rules <name>` | the server's own rules for moin, from `/etc/moin/rules` on it ([Rules](/docs/guides/security#rules)) |
 | `moin integrations` | whether Cloudflare and Tailscale are connected, never the keys |
-| `moin integrations cloudflare` · `moin integrations tailscale` | stores the Cloudflare API token or the Tailscale auth key; the key comes on stdin |
+| `moin integrations cloudflare` · `moin integrations tailscale` | stores the Cloudflare API token or the Tailscale auth key, or replaces it; the key comes on stdin |
 | `moin integrations rm cloudflare\|tailscale [--yes]` | removes a key |
 
 | Flag of `servers secure` | Does |
 | --- | --- |
 | `--tunnel on` · `off` | visitors through a Cloudflare Tunnel, no open web port · ports 80 and 443 |
-| `--ssh tailnet` · `everyone` · `off` | SSH only in the tailnet · SSH for everyone · sshd stopped |
+| `--ssh tailscale` · `everyone` · `off` | SSH only through Tailscale · SSH for everyone · sshd stopped |
 | `--firewall on` · `off` | drops every other inbound connection · no firewall |
 
 ## Apps

@@ -17,24 +17,24 @@ you, SSH ─▶ tailnet ◀───── Tailscale
                            is shut
 ```
 
-Each line starts on your server and calls out. With the tunnel, SSH only in the tailnet and the firewall, only 41641/udp stays open to everyone. It is Tailscale's port for direct connections.
+Each line starts on your server and calls out. With the tunnel, SSH only through Tailscale and the firewall, only 41641/udp stays open to everyone. It is Tailscale's port for direct connections.
 
 | Line | What it says | Needs |
 | --- | --- | --- |
 | **Visitors** | Cloudflare Tunnel, or ports 80 and 443 open | Cloudflare connected, for the tunnel |
-| **SSH** | only in the tailnet, everyone, or off | a tailnet, for only in the tailnet |
+| **SSH** | everyone, only through Tailscale, or off | Tailscale, for only through Tailscale |
 | **Firewall** | on or off: on drops everything the other lines do not need | nothing: turn it on for every server |
 
 ```surfaces
 Web: **Servers**, **Security** on the server
-CLI: moin servers secure web-1 --tunnel on --ssh tailnet --firewall on
+CLI: moin servers secure web-1 --tunnel on --ssh tailscale --firewall on
 TUI: on the server, `W` opens its security page in the web
 API: PUT /api/v1/servers/{id}/security
 MCP: set_server_security
 ```
 
-- A green dot: locked down, as set. A quiet one: open, as set. A red one: the server differs from what is set, and the line says both, like `Everyone · set: Only in the tailnet`.
-- A line that needs an account says so: **Connect Cloudflare in Settings, Integrations first**. It opens [Integrations](#integrations).
+- A green dot: locked down, as set. A quiet one: open, as set. A red one: the server differs from what is set, and the line says both, like `Everyone · set: Only through Tailscale`. Before the daemon reports, it says `Waiting for the server`.
+- SSH and the firewall always work. The tunnel needs Cloudflare, and SSH only through Tailscale needs Tailscale. Until then, the line shows a short link, **Connect Cloudflare** or **Connect Tailscale**. It opens [Integrations](#integrations).
 - Every change asks first. The CLI too; `--yes` skips it in scripts. If you do one thing, turn on the firewall.
 
 ## moin keeps it
@@ -46,7 +46,7 @@ The daemon checks its server after each start and every five minutes. What drift
 
 ## Integrations
 
-The accounts a workspace connects once, for every app and server: GitHub, Cloudflare and Tailscale. Each says whether it is connected. Disconnect sits at the end.
+The accounts a workspace connects once, for every app and server: GitHub, Cloudflare and Tailscale. Each says whether it is connected. A connected one has **New key**: save a new key there and it replaces the old one, without disconnecting. Disconnect sits at the end.
 
 ```surfaces
 Web: **Settings**, **Integrations**
@@ -62,12 +62,12 @@ MCP: get_integrations
 MCP: set_integrations
 ```
 
-`moin integrations` shows what is connected, never the keys. The CLI reads a key from stdin, so it never lands in your shell history. The API and MCP disconnect when you send a key empty. Keys are stored encrypted.
+`moin integrations` shows what is connected, never the keys. The CLI reads a key from stdin, so it never lands in your shell history. A new key replaces the old one, on every surface. The API and MCP disconnect when you send a key empty. Keys are stored encrypted.
 
 - **Cloudflare**: an API token. In Cloudflare, **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit** for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it moin turns on **Always Use HTTPS**, without it you do that in Cloudflare. moin checks the token before it stores it.
 - **Tailscale**: an auth key. In the Tailscale admin console, **Settings**, **Keys**. Make it reusable.
 - With Cloudflare connected, every new server gets the tunnel. Turn it off on its Security page.
-- Turn the tunnels off before you disconnect Cloudflare. Without the token moin cannot delete a tunnel (`tunnels_on`).
+- Turn the tunnels off before you disconnect Cloudflare. Without the token moin cannot delete a tunnel (`tunnels_on`). To change the token, save a new key instead: the tunnels keep running.
 - Disconnecting Tailscale changes no server. Servers stay in your tailnet; new ones no longer join it.
 
 ## Visitors
@@ -90,15 +90,15 @@ SSH is the door you use to log in to your server yourself.
 
 | SSH | Means |
 | --- | --- |
-| **Tailnet** | SSH answers only in your tailnet, your own private network |
 | **Everyone** | SSH answers on every network |
+| **Only through Tailscale** | SSH answers only in your tailnet, your own private network |
 | **Off** | the daemon stops sshd and keeps it stopped |
 
 ```bash
-moin servers secure web-1 --ssh tailnet
+moin servers secure web-1 --ssh tailscale
 ```
 
-- Tailnet needs the server in a tailnet: joined by hand, or with Tailscale connected. Then the daemon installs Tailscale if it is missing and joins. Port 22 closes to everyone else only once Tailscale is up.
+- Only through Tailscale needs the server in a tailnet: joined by hand, or with Tailscale connected. Then the daemon installs Tailscale if it is missing and joins. Port 22 closes to everyone else only once Tailscale is up.
 - Off is for a server you reach with Tailscale SSH or your provider's console. Going back from off starts sshd again.
 - Before you close SSH, keep a second way in, such as your provider's web console.
 

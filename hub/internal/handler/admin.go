@@ -14,12 +14,11 @@ import (
 )
 
 type AdminHandler struct {
-	admin   *service.AdminService
-	updates *service.UpdateService
+	admin *service.AdminService
 }
 
-func NewAdminHandler(admin *service.AdminService, updates *service.UpdateService) *AdminHandler {
-	return &AdminHandler{admin: admin, updates: updates}
+func NewAdminHandler(admin *service.AdminService) *AdminHandler {
+	return &AdminHandler{admin: admin}
 }
 
 func (h *AdminHandler) Overview(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +33,7 @@ func (h *AdminHandler) Overview(w http.ResponseWriter, r *http.Request) {
 		h.handleError(w, r, err)
 		return
 	}
-	render(w, r, pages.AdminOverview(overview, h.updates.HubBackup()))
+	render(w, r, pages.AdminOverview(overview))
 }
 
 // OldDomain shows what still arrives on the old domains.

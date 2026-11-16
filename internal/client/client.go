@@ -139,7 +139,7 @@ type Server struct {
 	DaemonVersion string     `json:"daemon_version"`
 	LastSeenAt    *time.Time `json:"last_seen_at"`
 	// Tunnel, SSH and Firewall say how the server should be reached and
-	// locked down; SSH is tailnet, everyone or off. Security is what its
+	// locked down; SSH is tailscale, everyone or off. Security is what its
 	// daemon last saw on it.
 	Tunnel   bool                         `json:"tunnel"`
 	SSH      string                       `json:"ssh"`
@@ -204,8 +204,8 @@ func (s Server) SecurityLines() []SecurityLine {
 	}
 	ssh := func(ssh string) string {
 		switch ssh {
-		case protocol.SSHTailnet:
-			return "only in the tailnet"
+		case protocol.SSHTailscale:
+			return "only through tailscale"
 		case protocol.SSHOff:
 			return "off"
 		}

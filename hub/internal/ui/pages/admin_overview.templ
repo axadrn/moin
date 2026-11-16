@@ -5,18 +5,16 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
-	"github.com/axadrn/moin/internal/human"
 )
 
 // AdminOverview is Admin, for whoever runs moin: the numbers at a glance,
 // the way to offers, activity and the old domain, and the users, each a row
 // that opens its own page with what an operator can do to it.
-templ AdminOverview(data *model.AdminOverview, backup model.HubBackup) {
+templ AdminOverview(data *model.AdminOverview) {
 	@layouts.Admin("Admin") {
 		@panelPage() {
 			@components.Header(components.HeaderProps{Title: "Admin"})
@@ -40,11 +38,6 @@ templ AdminOverview(data *model.AdminOverview, backup model.HubBackup) {
 						{"Self-hosted", n.SelfHosted},
 					})
 				</section>
-			}
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					@hubBackupItem(backup)
-				}
 			}
 			@components.Card(components.CardProps{}) {
 				@components.List() {
@@ -240,27 +233,4 @@ func adminPlanLabel(user model.AdminUser) string {
 		return ""
 	}
 	return strings.ToUpper(user.Plan[:1]) + user.Plan[1:]
-}
-
-// hubBackupItem is how the backup of the hub's own database stands, in one
-// line: "● on · bucket acme-hub · last copy just now", red when it is off
-// or late. Read only: its settings are S3_* and BACKUP_DATABASE.
-templ hubBackupItem(backup model.HubBackup) {
-	@components.Item(components.ItemProps{Name: "Hub backup", Attrs: templ.Attributes{"data-hub-backup": backup.State}}) {
-		@components.Status(components.StatusProps{State: components.State(ifElse(backup.State == model.HubBackupOn, string(components.StateLive), string(components.StateFailed)))}) {
-			{ hubBackupLine(backup) }
-		}
-	}
-}
-
-// hubBackupLine is the state, the bucket and the last copy.
-func hubBackupLine(backup model.HubBackup) string {
-	line := backup.State
-	if backup.Bucket != "" {
-		line += " · bucket " + backup.Bucket
-	}
-	if backup.LastCopy != nil {
-		line += " · last copy " + human.Ago(*backup.LastCopy, time.Now())
-	}
-	return line
 }

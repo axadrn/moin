@@ -83,28 +83,27 @@ templ ServerSecurity(view SecurityView) {
 
 // securityState is the three lines: who reaches the apps, who reaches
 // SSH, and the firewall. Each shows what really is on the server, with a
-// dot, and saves itself. It reloads when the server changes.
+// dot, and saves itself. It reloads when the server changes. SSH and the
+// firewall always work. The tunnel needs Cloudflare and SSH only through
+// Tailscale needs Tailscale: without them, the line links to Integrations.
 templ securityState(view SecurityView, securityPath string) {
 	{{ server := view.Server }}
 	{{ report := service.SecurityReport(server) }}
-	{{ tailnet := report != nil && report.TailscaleIP != "" }}
+	{{ tailscale := view.Integrations.Tailscale || (report != nil && report.TailscaleIP != "") }}
 	<div id="security-state" hx-get={ securityPath } hx-trigger="servers from:body" hx-select="#security-state" hx-swap="outerHTML">
 		@components.Card(components.CardProps{}) {
 			@components.List() {
 				{{ visitors := visitorsLine(server, report) }}
-				if !view.Integrations.Cloudflare && !server.Tunnel {
-					@needsKey(visitors, "Connect Cloudflare in Settings, Integrations first")
-				} else {
+				if view.Integrations.Cloudflare || server.Tunnel {
 					@securitySwitch(securityPath, "tunnel", visitors, server.Tunnel, ifElse(server.Tunnel,
 						"Open ports 80 and 443 again? moin deletes the tunnel and its DNS records. Point your domains back at the server.",
 						"Send visitors through Cloudflare? Ports 80 and 443 close. Cloudflare serves HTTPS."))
-				}
-				{{ ssh := sshLine(server, report) }}
-				if !view.Integrations.Tailscale && !tailnet && server.SSH == protocol.SSHEveryone {
-					@needsKey(ssh, "Connect Tailscale in Settings, Integrations first")
 				} else {
-					@sshChoice(securityPath, ssh, server, view.Integrations.Tailscale || tailnet)
+					@components.Item(components.ItemProps{Lead: lineDot(visitors), Name: visitors.Name, Note: visitors.Note, Attrs: templ.Attributes{"data-security-line": "tunnel"}}) {
+						@connectLink("Connect Cloudflare")
+					}
 				}
+				@sshChoice(securityPath, sshLine(server, report), server, tailscale)
 				@securitySwitch(securityPath, "firewall", firewallLine(server, report), server.Firewall, ifElse(server.Firewall,
 					"Turn off the firewall? Every port that listens is open again.",
 					"Turn on the firewall? It drops every connection the server does not need."))
@@ -135,7 +134,7 @@ type securityLine struct {
 func truth(name, is, want string, known, locked bool) securityLine {
 	switch {
 	case !known:
-		return securityLine{name, components.StateWaiting, want + ", once the daemon reports"}
+		return securityLine{name, components.StateWaiting, "Waiting for the server"}
 	case is != want:
 		return securityLine{name, components.StateFailed, is + " · set: " + want}
 	case locked:
@@ -177,8 +176,8 @@ func firewallLine(server model.Server, report *protocol.ServerConfigResult) secu
 // sshWords says who SSH answers.
 func sshWords(ssh string) string {
 	switch ssh {
-	case protocol.SSHTailnet:
-		return "Only in the tailnet"
+	case protocol.SSHTailscale:
+		return "Only through Tailscale"
 	case protocol.SSHOff:
 		return "Off"
 	}
@@ -189,10 +188,10 @@ func lineDot(line securityLine) templ.Component {
 	return components.Dot(components.DotProps{State: line.State})
 }
 
-// needsKey is a line whose action needs an account first: it opens
-// Integrations.
-templ needsKey(line securityLine, connect string) {
-	@components.Item(components.ItemProps{Href: ctxkeys.AppBasePath(ctx) + "/integrations", Lead: lineDot(line), Name: line.Name, Note: line.Note + ". " + connect, Attrs: templ.Attributes{"data-security-line": strings.ToLower(line.Name)}})
+// connectLink is the short link of a line whose option needs an account
+// first: it opens Settings, Integrations.
+templ connectLink(words string) {
+	<a href={ templ.SafeURL(ctxkeys.AppBasePath(ctx) + "/integrations") } class="moin-link moin-small" data-connect>{ words }</a>
 }
 
 // securitySwitch is a line with a switch that saves itself after one
@@ -208,16 +207,21 @@ templ securitySwitch(securityPath, set string, line securityLine, on bool, quest
 	}
 }
 
-// sshChoice is the SSH line: tailnet, everyone or off, saved after one
-// question. Tailnet waits for Tailscale or a tailnet joined by hand.
-templ sshChoice(securityPath string, line securityLine, server model.Server, tailnet bool) {
+// sshChoice is the SSH line: everyone, only through Tailscale or off,
+// saved after one question. Only through Tailscale waits for Tailscale, an
+// integration key or a tailnet joined by hand; until then the line links
+// to Integrations.
+templ sshChoice(securityPath string, line securityLine, server model.Server, tailscale bool) {
 	@components.Item(components.ItemProps{Form: true, For: "security-ssh-" + server.SSH, Lead: lineDot(line), Name: line.Name, Note: line.Note, Attrs: securityForm(securityPath, "ssh",
 		"Change who reaches SSH on "+server.Name+"? Keep another way in, like your provider's console.")}) {
 		@components.CSRF()
 		<input type="hidden" name="set" value="ssh"/>
+		if !tailscale {
+			@connectLink("Connect Tailscale")
+		}
 		@components.Choice(components.ChoiceProps{Name: "ssh", Label: "SSH", Checked: server.SSH, Options: []components.Option{
-			{Value: protocol.SSHTailnet, Label: "Tailnet", Attrs: templ.Attributes{"id": "security-ssh-tailnet", "disabled": !tailnet && server.SSH != protocol.SSHTailnet}},
 			{Value: protocol.SSHEveryone, Label: "Everyone", Attrs: templ.Attributes{"id": "security-ssh-everyone"}},
+			{Value: protocol.SSHTailscale, Label: "Only through Tailscale", Attrs: templ.Attributes{"id": "security-ssh-tailscale", "disabled": !tailscale && server.SSH != protocol.SSHTailscale}},
 			{Value: protocol.SSHOff, Label: "Off", Attrs: templ.Attributes{"id": "security-ssh-off"}},
 		}})
 	}

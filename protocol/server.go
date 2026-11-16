@@ -81,17 +81,17 @@ type RegisterResponse struct {
 	DaemonToken string `json:"daemon_token"`
 }
 
-// Who SSH answers on a server: only in the tailnet, everyone, or nobody,
-// with sshd stopped.
+// Who SSH answers on a server: only through Tailscale, everyone, or
+// nobody, with sshd stopped.
 const (
-	SSHTailnet  = "tailnet"
-	SSHEveryone = "everyone"
-	SSHOff      = "off"
+	SSHTailscale = "tailscale"
+	SSHEveryone  = "everyone"
+	SSHOff       = "off"
 )
 
-// ValidSSH says whether ssh is one of SSHTailnet, SSHEveryone and SSHOff.
+// ValidSSH says whether ssh is one of SSHTailscale, SSHEveryone and SSHOff.
 func ValidSSH(ssh string) bool {
-	return ssh == SSHTailnet || ssh == SSHEveryone || ssh == SSHOff
+	return ssh == SSHTailscale || ssh == SSHEveryone || ssh == SSHOff
 }
 
 // SecurityEvery is how often the daemon checks that its server still has
@@ -104,10 +104,10 @@ const SecurityEvery = 5 * time.Minute
 // TunnelToken runs cloudflared, which carries all app traffic from
 // Cloudflare to Traefik; the proxy then opens no port. Without it Traefik
 // takes 80 and 443. TailscaleKey joins the server to the user's tailnet.
-// SSH says who SSH answers: SSHTailnet only there, SSHEveryone, or SSHOff
+// SSH says who SSH answers: SSHTailscale only through Tailscale, SSHEveryone, or SSHOff
 // with sshd stopped. Firewall drops every other inbound connection.
 //
-// SSHOnTailscale is SSH == SSHTailnet for daemons before SSH: the hub sends
+// SSHOnTailscale is SSH == SSHTailscale for daemons before SSH: the hub sends
 // both, and a daemon without SSH reads SSHOnTailscale.
 type ServerConfig struct {
 	TunnelToken    string `json:"tunnel_token,omitempty"`
@@ -123,7 +123,7 @@ func (c ServerConfig) WantSSH() string {
 	case ValidSSH(c.SSH):
 		return c.SSH
 	case c.SSHOnTailscale:
-		return SSHTailnet
+		return SSHTailscale
 	}
 	return SSHEveryone
 }

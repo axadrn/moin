@@ -13,7 +13,7 @@ type Integrations struct {
 }
 
 // Security is how a server should be reached and locked down. SSH is
-// tailnet, everyone or off.
+// tailscale, everyone or off.
 type Security struct {
 	Tunnel   bool   `json:"tunnel"`
 	SSH      string `json:"ssh"`

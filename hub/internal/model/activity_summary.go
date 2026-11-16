@@ -491,8 +491,8 @@ func nonEmpty(values ...string) []string {
 // sshWords says who SSH answers, as the Security page does.
 func sshWords(ssh string) string {
 	switch ssh {
-	case "tailnet":
-		return "SSH only in the tailnet"
+	case "tailscale":
+		return "SSH only through Tailscale"
 	case "off":
 		return "SSH off"
 	}

@@ -337,5 +337,5 @@ var serviceErrors = []serviceError{
 	{err: service.ErrUpdaterMissing, status: http.StatusConflict, code: "no_updater", message: "The updater does not run next to this hub. Update it on the server with sh update.sh, which also starts the updater."},
 	{err: service.ErrUpdateRunning, status: http.StatusConflict, code: "update_running", message: "An update is already under way."},
 	{err: service.ErrTailscaleKey, field: "tailscale_key", message: "A Tailscale auth key starts with tskey-."},
-	{err: service.ErrSSH, field: "ssh", message: "SSH is tailnet, everyone or off."},
+	{err: service.ErrSSH, field: "ssh", message: "SSH is tailscale, everyone or off."},
 }

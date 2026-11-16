@@ -207,8 +207,8 @@ func drifted(config protocol.ServerConfig, before, after seen) []string {
 		switch {
 		case config.Firewall:
 			fixed = append(fixed, "the firewall")
-		case config.WantSSH() == protocol.SSHTailnet:
-			fixed = append(fixed, "SSH only in the tailnet")
+		case config.WantSSH() == protocol.SSHTailscale:
+			fixed = append(fixed, "SSH only through Tailscale")
 		default:
 			fixed = append(fixed, "the firewall off")
 		}
@@ -244,8 +244,8 @@ func (s *security) set(ctx context.Context, config protocol.ServerConfig) protoc
 			problem("Tailscale: %s", err)
 		}
 	}
-	sshOnTailscale := ssh == protocol.SSHTailnet && result.TailscaleIP != ""
-	if ssh == protocol.SSHTailnet && !sshOnTailscale {
+	sshOnTailscale := ssh == protocol.SSHTailscale && result.TailscaleIP != ""
+	if ssh == protocol.SSHTailscale && !sshOnTailscale {
 		problem("SSH stays open to everyone: the server is in no tailnet")
 	}
 	if ssh == protocol.SSHOff {
@@ -254,9 +254,9 @@ func (s *security) set(ctx context.Context, config protocol.ServerConfig) protoc
 			problem("SSH: %s", err)
 		}
 	}
-	sshOpen := ssh == protocol.SSHEveryone || (ssh == protocol.SSHTailnet && !sshOnTailscale)
+	sshOpen := ssh == protocol.SSHEveryone || (ssh == protocol.SSHTailscale && !sshOnTailscale)
 
-	tailnetOnly := false
+	tailscaleOnly := false
 	switch {
 	case config.Firewall:
 		ports := openPorts(result.Proxy, sshOpen, result.TailscaleIP != "")
@@ -267,7 +267,7 @@ func (s *security) set(ctx context.Context, config protocol.ServerConfig) protoc
 		} else {
 			result.Firewall = true
 			result.OpenPorts = ports
-			tailnetOnly = sshOnTailscale
+			tailscaleOnly = sshOnTailscale
 		}
 	case sshOnTailscale:
 		err = applyFirewall(ctx, sshOnTailscaleRules())
@@ -275,24 +275,24 @@ func (s *security) set(ctx context.Context, config protocol.ServerConfig) protoc
 			problem("SSH stays open to everyone: %s", err)
 			sshOpen = true
 		} else {
-			tailnetOnly = true
+			tailscaleOnly = true
 		}
 	default:
 		_ = removeFirewall(ctx)
 		sshOpen = true
 	}
-	result.SSH = sshNow(listening(22), tailnetOnly, !sshOpen && !tailnetOnly)
+	result.SSH = sshNow(listening(22), tailscaleOnly, !sshOpen && !tailscaleOnly)
 	return result
 }
 
 // sshNow is who reaches SSH: nobody when sshd does not listen or the
-// firewall drops port 22, the tailnet when only it passes, else everyone.
-func sshNow(sshd, tailnetOnly, closed bool) string {
+// firewall drops port 22, Tailscale when only it passes, else everyone.
+func sshNow(sshd, tailscaleOnly, closed bool) string {
 	switch {
 	case !sshd || closed:
 		return protocol.SSHOff
-	case tailnetOnly:
-		return protocol.SSHTailnet
+	case tailscaleOnly:
+		return protocol.SSHTailscale
 	}
 	return protocol.SSHEveryone
 }

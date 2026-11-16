@@ -43,8 +43,8 @@ func TestAdminOverviewListsUsersThatOpenTheirPage(t *testing.T) {
 			TotalPages: 1,
 			TotalUsers: 2,
 		},
-	}, model.HubBackup{State: model.HubBackupOn, Bucket: "acme-hub", LastCopy: &now}))
-	for _, want := range []string{"Hub backup", `data-hub-backup="on"`, "on · bucket acme-hub · last copy just now", "noindex, nofollow", ">Admin</h1>", "target@example.com", `href="/admin/users/target"`, `href="/admin/activity"`, `href="/admin/old-domain"`, "Operator", "2 users"} {
+	}))
+	for _, want := range []string{"noindex, nofollow", ">Admin</h1>", "target@example.com", `href="/admin/users/target"`, `href="/admin/activity"`, `href="/admin/old-domain"`, "Operator", "2 users"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("admin overview missing %q", want)
 		}
@@ -52,12 +52,8 @@ func TestAdminOverviewListsUsersThatOpenTheirPage(t *testing.T) {
 	if strings.Contains(html, "/impersonate") || strings.Contains(html, "/sessions/revoke") {
 		t.Error("the list carries actions; they belong on the user's page")
 	}
-}
-
-func TestAdminOverviewShowsALateHubBackupInRed(t *testing.T) {
-	html := renderAdmin(t, AdminOverview(&model.AdminOverview{}, model.HubBackup{State: model.HubBackupOff}))
-	if !strings.Contains(html, `data-state="failed"`) || !strings.Contains(html, ">off<") {
-		t.Errorf("an off hub backup is not red: %s", html)
+	if strings.Contains(html, "Hub backup") {
+		t.Error("the hub backup is in Settings, not in Admin")
 	}
 }
 

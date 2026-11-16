@@ -40,7 +40,7 @@ func registerServerTools(server *mcpsdk.Server, services Services) {
 		"Connects Cloudflare with an API token (checked first) and Tailscale with an auth key, stored encrypted. A missing field keeps its key, an empty one disconnects it. With Cloudflare connected, every new server gets a tunnel. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setIntegrations)))
 	mcpsdk.AddTool(server, newTool("set_server_security", "Lock down a server",
-		"Sets how a server is reached, all three at once: tunnel routes visitors through a Cloudflare Tunnel and closes 80 and 443 (needs Cloudflare connected, no_cloudflare otherwise), ssh is tailnet (SSH only in the tailnet; needs Tailscale connected or a tailnet joined by hand, no_tailscale otherwise), everyone, or off (the daemon stops sshd), firewall drops every other inbound connection. The daemon keeps it: it puts back what drifts and the activity says so. Returns the server with security, what the daemon last saw: proxy, ssh, firewall, open_ports, tailscale_ip and problems. Ask the user first. Needs a token with read and write access.",
+		"Sets how a server is reached, all three at once: tunnel routes visitors through a Cloudflare Tunnel and closes 80 and 443 (needs Cloudflare connected, no_cloudflare otherwise), ssh is tailscale (SSH only through Tailscale; needs Tailscale connected or a tailnet joined by hand, no_tailscale otherwise), everyone, or off (the daemon stops sshd), firewall drops every other inbound connection. The daemon keeps it: it puts back what drifts and the activity says so. Returns the server with security, what the daemon last saw: proxy, ssh, firewall, open_ports, tailscale_ip and problems. Ask the user first. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.setServerSecurity)))
 }
 
@@ -81,7 +81,7 @@ type IntegrationsInput struct {
 type SecurityInput struct {
 	Server   string `json:"server" jsonschema:"the server name or ID"`
 	Tunnel   bool   `json:"tunnel" jsonschema:"route app traffic through a Cloudflare Tunnel; closes 80 and 443"`
-	SSH      string `json:"ssh" jsonschema:"who SSH answers: tailnet (only there), everyone, or off (sshd stopped)"`
+	SSH      string `json:"ssh" jsonschema:"who SSH answers: tailscale (only through Tailscale), everyone, or off (sshd stopped)"`
 	Firewall bool   `json:"firewall" jsonschema:"drop every other inbound connection"`
 }
 

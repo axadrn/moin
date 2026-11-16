@@ -18,9 +18,9 @@ type IntegrationsView struct {
 
 // Integrations are the accounts a workspace connects once, for every app
 // and server: GitHub for repos, Cloudflare for tunnels, Tailscale for the
-// tailnet. Each says whether it is connected and has one action;
-// disconnecting sits at the end. Connecting or disconnecting answers the
-// whole page.
+// tailnet. Each says whether it is connected. A connected one takes a new
+// key, which replaces the old one; disconnecting sits at the end.
+// Connecting, replacing or disconnecting answers the whole page.
 templ Integrations(view IntegrationsView) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Integrations") {
@@ -46,17 +46,19 @@ templ Integrations(view IntegrationsView) {
 						@components.List(templ.Attributes{"data-integration": "cloudflare"}) {
 							@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected", Note: "Account " + view.Keys.CloudflareAccount})
 						}
+						@keyForm("cloudflare-token", "cloudflare_token", "New key", "Replaces the API token. Tunnels keep running.", "Save")
 					} else {
-						@keyForm("cloudflare-token", "cloudflare_token", "API token", "Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit turns on Always Use HTTPS.")
+						@keyForm("cloudflare-token", "cloudflare_token", "API token", "Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit turns on Always Use HTTPS.", "Connect")
 					}
 				}
 				@components.Card(components.CardProps{Title: "Tailscale"}) {
 					if view.Keys.Tailscale {
 						@components.List(templ.Attributes{"data-integration": "tailscale"}) {
-							@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected", Note: "A server joins your tailnet for SSH only there"})
+							@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected", Note: "A server joins your tailnet for SSH only through Tailscale"})
 						}
+						@keyForm("tailscale-key", "tailscale_key", "New key", "Replaces the auth key. Servers stay in your tailnet.", "Save")
 					} else {
-						@keyForm("tailscale-key", "tailscale_key", "Auth key", "A reusable auth key, tskey-auth-…")
+						@keyForm("tailscale-key", "tailscale_key", "Auth key", "A reusable auth key, tskey-auth-…", "Connect")
 					}
 				}
 				if view.Keys.Cloudflare || view.Keys.Tailscale {
@@ -81,9 +83,9 @@ templ connectedDot(on bool) {
 	@components.Dot(components.DotProps{State: components.State(ifElse(on, string(components.StateLive), string(components.StateIdle)))})
 }
 
-// keyForm connects an account with its key: the field and Connect in one
-// row, what the key needs under it.
-templ keyForm(id, name, label, hint string) {
+// keyForm connects an account with its key, or replaces the key of a
+// connected one: the field and the button in one row, a hint under it.
+templ keyForm(id, name, label, hint, button string) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	<form hx-post={ base + "/integrations" } hx-target="#integrations" hx-select="#integrations" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-integration-form={ name }>
 		@components.CSRF()
@@ -91,7 +93,7 @@ templ keyForm(id, name, label, hint string) {
 			<div class="moin-row" data-gap="2" data-phone="stack">
 				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "aria-describedby": id + "-hint", "name": name, "type": "password", "autocomplete": "off", "required": true}})
 				@components.Button(components.ButtonProps{Type: "submit"}) {
-					Connect
+					{ button }
 				}
 			</div>
 		}
