@@ -140,7 +140,7 @@ func overviewHeadline(view OverviewView) string {
 // what moin does for you.
 func overviewSummary(view OverviewView) string {
 	if len(view.Servers) == 0 {
-		return "Your apps on your server. Every change backed up. Every restore tested."
+		return "Your apps on your server. Backed up every hour. Checked every day."
 	}
 	s := view.Status
 	parts := []string{plural(s.Apps, "app", "apps"), plural(s.Servers, "server", "servers")}
