@@ -221,20 +221,36 @@ templ overviewStart(basePath string) {
 	@components.Card(components.CardProps{}) {
 		@components.List() {
 			@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server", Note: "Any Linux box you own. One command. No open port.", Lead: overviewStep("server", true)})
-			@components.Item(components.ItemProps{Name: "Deploy your app", Note: build.Name + " deploy in its folder. Or pick one from the catalog.", Lead: overviewStep("deploy", false)})
+			@components.Item(components.ItemProps{Name: "Deploy your app", Href: "/docs/guides/deploy#deploy-from", Note: "Push to GitHub. " + build.Name + " deploy in a folder. An image from your CI. Or an app from the catalog.", Lead: overviewStep("deploy", false)})
 			@components.Item(components.ItemProps{Name: build.Name + " keeps it safe", Note: "HTTPS. Backups. A restore check every day. Alerts.", Lead: overviewStep("shield", false)})
 		}
 	}
 	<section class="moin-section">
 		<div class="moin-section-head">
-			<h2>No server yet?</h2>
+			<h2>No server yet? Rent one.</h2>
 		</div>
 		@components.Card(components.CardProps{}) {
 			@components.List() {
-				@components.Item(components.ItemProps{Href: "/docs/guides/servers#no-server-yet", Name: "Get one at Hetzner", Note: "A few euros a month. Ready in a minute.", Lead: overviewStep("globe", false)})
+				for _, provider := range serverProviders {
+					@components.Item(components.ItemProps{Href: provider.URL, External: true, Name: provider.Name, Note: provider.Note})
+				}
+				@components.Item(components.ItemProps{Href: "/docs/guides/servers#no-server-yet", Name: "How to rent one", Note: "Step by step. Any provider works."})
 			}
 		}
 	</section>
+}
+
+// serverProviders are places to rent a server, the cheapest start first.
+// The servers guide lists the same ones.
+var serverProviders = []struct{ Name, Note, URL string }{
+	{"Hetzner", "Our pick. Cheap and fast. Europe, US and Singapore.", "https://www.hetzner.com/cloud"},
+	{"DigitalOcean", "Simple. Worldwide.", "https://www.digitalocean.com/products/droplets"},
+	{"Vultr", "Worldwide.", "https://www.vultr.com"},
+	{"Akamai (Linode)", "Worldwide.", "https://www.linode.com"},
+	{"UpCloud", "From Finland. Worldwide.", "https://upcloud.com"},
+	{"OVHcloud", "From France. Worldwide.", "https://www.ovhcloud.com/en/vps/"},
+	{"Scaleway", "From France. Europe.", "https://www.scaleway.com/en/"},
+	{"AWS Lightsail", "Amazon's simple servers.", "https://aws.amazon.com/lightsail/"},
 }
 
 // overviewStep is the icon in front of a step: dark for the one to do now.
