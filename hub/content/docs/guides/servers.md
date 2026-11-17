@@ -35,6 +35,8 @@ Any other provider works the same way: a Linux server with Ubuntu or Debian, the
 | Provider | Where |
 | --- | --- |
 | [Hetzner](https://www.hetzner.com/cloud) | Europe, US and Singapore. Our pick: cheap and fast. |
+| [netcup](https://www.netcup.com/en/server/vps) | From Germany, Europe and US. Cheap. |
+| [IONOS](https://www.ionos.com/servers/vps) | From Germany, Europe and US |
 | [DigitalOcean](https://www.digitalocean.com/products/droplets) | Worldwide |
 | [Vultr](https://www.vultr.com) | Worldwide |
 | [Akamai (Linode)](https://www.linode.com) | Worldwide |
