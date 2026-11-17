@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/build"
 )
 
 // OverviewView is the workspace at a glance: what needs you, your pinned
@@ -30,7 +31,7 @@ templ Overview(view OverviewView) {
 	{{ now := time.Now() }}
 	@layouts.App("Overview") {
 		@panelPage() {
-			@components.Header(components.HeaderProps{Title: overviewHeadline(view), Line: overviewLine(overviewSummary(view.Status))})
+			@components.Header(components.HeaderProps{Title: overviewHeadline(view), Line: overviewLine(overviewSummary(view))})
 			if len(view.Servers) == 0 {
 				@overviewStart(basePath)
 			} else {
@@ -135,8 +136,13 @@ func overviewHeadline(view OverviewView) string {
 	return strconv.Itoa(len(view.Status.Issues)) + " things need you."
 }
 
-// overviewSummary is the one line under it.
-func overviewSummary(s service.WorkspaceStatus) string {
+// overviewSummary is the one line under it. On the first visit it says
+// what moin does for you.
+func overviewSummary(view OverviewView) string {
+	if len(view.Servers) == 0 {
+		return "Your apps on your server. Every change backed up. Every restore tested."
+	}
+	s := view.Status
 	parts := []string{plural(s.Apps, "app", "apps"), plural(s.Servers, "server", "servers")}
 	switch {
 	case s.Databases == 0:
@@ -208,19 +214,33 @@ templ overviewNewApp(basePath string) {
 	}
 }
 
-// overviewStart is the first visit: no server yet.
+// overviewStart is the first visit: no server yet. The three steps to a
+// live app, the first one to do now, and a way to a server for those
+// without one.
 templ overviewStart(basePath string) {
 	@components.Card(components.CardProps{}) {
 		@components.List() {
-			@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect your first server", Note: "Any Linux box you own. One command, no open port.", Lead: overviewStartLead()})
+			@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server", Note: "Any Linux box you own. One command. No open port.", Lead: overviewStep("server", true)})
+			@components.Item(components.ItemProps{Name: "Deploy your app", Note: build.Name + " deploy in its folder. Or pick one from the catalog.", Lead: overviewStep("deploy", false)})
+			@components.Item(components.ItemProps{Name: build.Name + " keeps it safe", Note: "HTTPS. Backups. A restore check every day. Alerts.", Lead: overviewStep("shield", false)})
 		}
 	}
+	<section class="moin-section">
+		<div class="moin-section-head">
+			<h2>No server yet?</h2>
+		</div>
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Href: "/docs/guides/servers#no-server-yet", Name: "Get one at Hetzner", Note: "A few euros a month. Ready in a minute.", Lead: overviewStep("globe", false)})
+			}
+		}
+	</section>
 }
 
-// overviewStartLead is the icon in front of the first server.
-templ overviewStartLead() {
-	<span class="moin-bubble" data-ink aria-hidden="true">
-		@components.Icon("server")
+// overviewStep is the icon in front of a step: dark for the one to do now.
+templ overviewStep(icon string, now bool) {
+	<span class="moin-bubble" data-ink?={ now } data-tile?={ !now } aria-hidden="true">
+		@components.Icon(icon)
 	</span>
 }
 

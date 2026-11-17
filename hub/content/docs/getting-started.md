@@ -27,7 +27,7 @@ No account yet? The same page signs you up, with GitHub or your email.
 
 ## 2. Add a server
 
-A server is your computer on the internet. Any Linux server works, amd64 or arm64, at any provider. You need to log in to it as root.
+A server is your computer on the internet. Any Linux server works, amd64 or arm64, at any provider. You need to log in to it as root. No server yet? [Rent one in a minute](/docs/guides/servers#no-server-yet).
 
 ```surfaces
 Web: **Servers**, **Add server**

@@ -21,6 +21,8 @@ MCP: get_status
 moin status || echo "moin needs you"
 ```
 
+On your first visit, with no server yet, it shows the three steps to a live app: connect a server, deploy your app, and moin keeps it safe. [No server yet?](/docs/guides/servers#no-server-yet)
+
 ## What needs you
 
 The most urgent first:

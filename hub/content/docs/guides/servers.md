@@ -18,6 +18,18 @@ Any Linux server with systemd works, amd64 or arm64, at any provider. Ubuntu and
   ─▶ web-1 is online
 ```
 
+## No server yet?
+
+Rent one. A small one costs a few euros a month and is enough for many apps. Hetzner is a good start:
+
+1. Sign up at [hetzner.com/cloud](https://www.hetzner.com/cloud).
+2. In the Console, make a project. Then **Add Server**.
+3. Pick a location near your users, **Ubuntu**, and the smallest **Shared vCPU** type.
+4. Add your SSH key. Then **Create & Buy now**.
+5. Copy its IP address and log in: `ssh root@<ip>`.
+
+Now [add it to moin](#add-a-server). Any other provider works the same way: a Linux server and root.
+
 ## Add a server
 
 You get one install command. Run it on the server as root within one hour.
