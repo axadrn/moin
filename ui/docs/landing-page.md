@@ -13,4 +13,4 @@ Styles: `layout.css`, `components/text.css`.
 landing-page
 ```
 
-`moin-hero` fills the screen under a floating bar. Its first child is the words in the middle. Its last child is what shows them. `moin-band` is a statement with room above it. The type is on the [Text](/ui/text) page.
+`moin-hero` fills the screen under a floating bar. Its first child is the words in the middle. Its last child is what shows them. `moin-band` is a statement with room above it; a `video` in it is as wide as the page. The type is on the [Text](/ui/text) page.

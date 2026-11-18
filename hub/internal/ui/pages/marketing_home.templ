@@ -12,7 +12,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// Home is the landing page: the promise over the container wall, how to
+// Home is the landing page: the promise over the container wall, the
+// overview video, how to
 // start, what it does, backups, security, how it compares,
 // open source, the prices, the questions people ask and the way in. Short: every row
 // links to the docs for the rest. open is what the changelog says about how
@@ -26,6 +27,9 @@ templ Home(network model.Network, open HomeOpen) {
 		<main>
 			@HomeHero()
 			<div class="moin-page">
+				<section class="moin-band">
+					@homeVideo()
+				</section>
 				if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 					@HomeLive(network)
 				}
@@ -88,6 +92,21 @@ templ HomeHero() {
 		</div>
 	</section>
 }
+
+// ---------------------------------------------------------------- video
+// homeVideo is the overview film, 83 s: a DELETE at 3 AM and the way back,
+// then everything moin does, all of it the real moin. It plays without
+// sound and starts over; its controls turn the sound on. Square on a phone,
+// wide everywhere else. The files live in the media bucket, not here; a new
+// cut gets a new date in its name.
+templ homeVideo() {
+	<video autoplay muted loop playsinline controls preload="metadata" poster={ homeVideoURL + "-poster.jpg" } aria-label="moin in 83 seconds">
+		<source src={ homeVideoURL + "-1x1.mp4" } type="video/mp4" media="(max-width: 40rem)"/>
+		<source src={ homeVideoURL + "-16x9.mp4" } type="video/mp4"/>
+	</video>
+}
+
+const homeVideoURL = "https://media.moin.run/overview-2026-11-18"
 
 // HomeNext says what grows next to deploys, and where to read more.
 templ HomeNext() {

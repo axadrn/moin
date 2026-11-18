@@ -220,6 +220,14 @@
     padding-block-start: var(--band);
   }
   .moin-band:last-child { padding-block-end: var(--band); }
+  /* A video in a band: as wide as the page, whole. */
+  .moin-band > video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-lg);
+    background: #000;
+  }
   @media (min-width: 40rem) {
     .moin-band { --band: 9rem; }
   }

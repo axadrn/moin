@@ -38,6 +38,10 @@ in iOS and macOS), not a website and not a dashboard template.
   `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`: 20-foot
   containers from the side, staggered, only your-app and two others pulled
   out, the whole wall resting on the foot of the first screen.
+- **The overview video.** Right under the hero the landing page plays the
+  overview film (`homeVideo` in `internal/ui/pages/marketing_home.templ`):
+  real moin only, recorded on throwaway servers. It plays without sound
+  and loops; its controls turn the sound on.
 
 Never: an accent color, gradients, glows or blurred blobs, glassmorphism,
 emoji, sparkles, rocket icons, three generic icon cards in a row, small
