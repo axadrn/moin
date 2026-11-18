@@ -1,9 +1,36 @@
 ---
 title: "Security"
-description: "Web, SSH and the firewall of a server. moin keeps them that way. Rules only root can change."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Web, SSH, firewall, rules and signed updates."
 group: "Servers and data"
 order: 2
 ---
+
+How moin keeps your servers safe. First in pictures, then the facts.
+
+## How moin keeps you safe
+
+moin has two parts. The **hub** is where you click and type: the web, the CLI, the TUI. The **daemon** runs on each of your servers and does the work. Think of the hub as a messenger. It brings your server letters, like "start this app".
+
+**Nobody can ring your server's bell.** Your server calls the messenger, never the other way round.
+
+- The daemon opens one outbound WebSocket to the hub, over HTTPS on port 443. moin listens on no port of your server.
+- With the [firewall](#firewall) on, only 80 and 443 for your apps are open, and SSH as you set it.
+
+**moin has no key to your house.** Other tools keep the root SSH key of every server, so whoever breaks into them is root on all your servers. moin keeps none.
+
+- The daemon runs on the server and acts there. The hub holds no SSH key, password or token that opens your server.
+
+**You write the house rules.** A note on your door says what the messenger may do. Only you can write it, on the server. The messenger cannot change it.
+
+- `/etc/moin/rules`, readable by root. The daemon checks every request against it. [Rules](#rules)
+
+**New versions carry a seal.** A messenger cannot slip your server a fake daemon.
+
+- Every release is signed with Ed25519. The daemon takes it from GitHub, not from the hub, and checks the seal first. [Updates](#updates)
+
+**What stays honest.** A messenger that someone bought can still bring letters your rules allow. Strict rules leave it nothing that hurts.
+
+## Ports, SSH and the firewall
 
 Your server has doors to the internet, called ports. A server's **Security** page has three lines. Each says what really is on the server. The daemon keeps it that way.
 
@@ -157,7 +184,7 @@ network: locked
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
 - No file: moin may do everything. A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
-- A server with rules never updates its daemon from moin ([Updates](/docs/guides/servers#updates)).
+- A server with rules never updates its daemon from moin. You update it on the server ([Updates](/docs/guides/servers#updates)).
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.
 
 ### See the rules of a server
@@ -171,3 +198,26 @@ MCP: list_servers
 ```
 
 `moin servers` shows them in its RULES column; the API in the `rules` field.
+
+## Updates
+
+A daemon only runs a release we signed. Think of a stamp: we stamp every release, and every daemon carries a photo of the stamp. It compares the two before it installs anything. The photo cannot stamp, so it can be public.
+
+1. The hub tells the daemon: update to `v1.2.3`. It names the version and nothing else.
+2. The daemon downloads `SHA256SUMS` and `SHA256SUMS.sig` of that release from GitHub, `github.com/axadrn/moin/releases`.
+3. It checks the signature against the public keys built into it. A wrong signature stops the update.
+4. It downloads its binary from the same release and checks it against the signed SHA-256.
+5. It runs the new binary once, which has to say `moin v1.2.3`, and only then swaps itself.
+
+- It never goes back to an older release, and never installs a build that is not a release.
+- The signing key never touches the hub. Someone who takes over the hub cannot sign, so they cannot hand your server a daemon.
+- There are two keys: one signs every release, a spare stays offline. If the first ever leaks, a release signed with the spare drops it, and every daemon stops trusting it.
+- The keys are Ed25519, in `releaseKeys` in `internal/daemon/update.go`. Forging a signature without the private key is not possible with today's computers. What matters is that nobody steals the key.
+- Your servers need to reach `github.com` to update. Your apps do not.
+- Check a download by hand against its checksums:
+
+```
+curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/moin-linux-amd64
+curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```
