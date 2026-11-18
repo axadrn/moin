@@ -205,6 +205,19 @@
     width: 100%;
     height: 42svh;
   }
+  /* A video as the picture: as wide as the page and whole, so it may reach
+     below the first screen. A thin border shows its edge on a dark ground. */
+  .moin-hero > :last-child:has(> video) {
+    height: auto;
+  }
+  .moin-hero > :last-child > video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: #000;
+  }
   @media (min-width: 40rem) {
     .moin-hero { --bar: 4.75rem; }
     .moin-hero > :first-child { padding-block: calc(var(--bar) + 2.5rem) 2.5rem; }
@@ -220,14 +233,6 @@
     padding-block-start: var(--band);
   }
   .moin-band:last-child { padding-block-end: var(--band); }
-  /* A video in a band: as wide as the page, whole. */
-  .moin-band > video {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: var(--radius-lg);
-    background: #000;
-  }
   @media (min-width: 40rem) {
     .moin-band { --band: 9rem; }
   }

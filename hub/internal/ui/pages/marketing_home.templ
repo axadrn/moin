@@ -12,8 +12,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// Home is the landing page: the promise over the container wall, the
-// overview video, how to
+// Home is the landing page: the promise over the overview video, how to
 // start, what it does, backups, security, how it compares,
 // open source, the prices, the questions people ask and the way in. Short: every row
 // links to the docs for the rest. open is what the changelog says about how
@@ -27,9 +26,6 @@ templ Home(network model.Network, open HomeOpen) {
 		<main>
 			@HomeHero()
 			<div class="moin-page">
-				<section class="moin-band">
-					@homeVideo()
-				</section>
 				if ctxkeys.RenderConfig(ctx).Billing && network.Deploys >= liveShowsAt {
 					@HomeLive(network)
 				}
@@ -42,6 +38,9 @@ templ Home(network model.Network, open HomeOpen) {
 				}
 				@HomeQuestions()
 				@HomeEnd()
+			</div>
+			<div class="hub-harbor-foot-of-page">
+				@homeHarbor()
 			</div>
 		</main>
 	}
@@ -67,8 +66,7 @@ func homeStartLabel(ctx context.Context) string {
 // ---------------------------------------------------------------- hero
 // HomeHero is the whole first screen, up behind the floating navbar, whose
 // height its top padding adds back: the promise and the two buttons on
-// top, and the wall of containers across the full width below, every
-// container an app.
+// top, and the overview video below.
 templ HomeHero() {
 	<section class="moin-hero">
 		<div class="moin-page">
@@ -87,8 +85,8 @@ templ HomeHero() {
 				}
 			</div>
 		</div>
-		<div>
-			@homeHarbor()
+		<div class="moin-page">
+			@homeVideo()
 		</div>
 	</section>
 }

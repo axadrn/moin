@@ -88,7 +88,11 @@ header + [data-said] {
 }
 
 
-/* The wall of containers on the home page. */
+/* The wall of containers at the foot of the home page. light-dark() takes
+   colors only, so every shade is a whole color with its alpha. */
+.hub-harbor-foot-of-page {
+  height: 42svh;
+}
 .hub-harbor {
   display: block;
   width: 100%;
@@ -96,14 +100,14 @@ header + [data-said] {
   font-family: var(--font-sans);
   user-select: none;
 }
-.hub-harbor-shade { stop-opacity: light-dark(0.26, 0.6); }
+.hub-harbor-shade { stop-color: light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.6)); }
 .hub-harbor-card { fill: var(--card); }
 .hub-harbor-muted { fill: var(--muted); }
 .hub-harbor-ink { fill: var(--foreground); }
 .hub-harbor-tint-5 { fill: color-mix(in oklab, var(--foreground) 5%, transparent); }
 .hub-harbor-tint-9 { fill: color-mix(in oklab, var(--foreground) 9%, transparent); }
-.hub-harbor-side { fill: rgb(0 0 0 / light-dark(20%, 50%)); }
-.hub-harbor-foot { fill: rgb(0 0 0 / light-dark(35%, 65%)); }
+.hub-harbor-side { fill: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.5)); }
+.hub-harbor-foot { fill: light-dark(rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.65)); }
 .hub-harbor-on-ink { fill: var(--background); }
 .hub-harbor-on-steel { fill: var(--foreground); }
 .hub-harbor-owner { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; }
