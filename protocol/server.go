@@ -39,6 +39,10 @@ type Rules struct {
 	NetworkLocked bool `json:"network_locked,omitempty"`
 	// ExecOff refuses running commands in containers.
 	ExecOff bool `json:"exec_off,omitempty"`
+	// ServerAccess allows containers that reach into the server, such as
+	// privileged ones or ones that mount the Docker socket. Without it the
+	// daemon refuses them, with or without a rules file.
+	ServerAccess bool `json:"server_access,omitempty"`
 }
 
 // Lines are the rules as written in the rules file, for every surface to
@@ -65,6 +69,9 @@ func (r *Rules) Lines() []string {
 	}
 	if r.ExecOff {
 		lines = append(lines, "exec: off")
+	}
+	if r.ServerAccess {
+		lines = append(lines, "server-access: on")
 	}
 	return lines
 }

@@ -81,7 +81,7 @@ func TestRenameDocker(t *testing.T) {
 	})
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
-		a.deploy(ctx, start)
+		a.deploy(ctx, start, nil)
 		mu.Lock()
 		defer mu.Unlock()
 		if last := done[len(done)-1]; !last.OK {

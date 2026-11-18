@@ -66,6 +66,11 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			default:
 				rules.ExecOff = value == "off"
 			}
+		case "server-access":
+			if value != "on" && value != "off" {
+				return nil, wrong("server-access is on or off")
+			}
+			rules.ServerAccess = value == "on"
 		case "network":
 			if value != "open" && value != "locked" {
 				return nil, wrong("network is open or locked")
@@ -86,7 +91,7 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			}
 			rules.BackupsTo = value
 		default:
-			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to and network")
+			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to, network and server-access")
 		}
 	}
 	return rules, nil

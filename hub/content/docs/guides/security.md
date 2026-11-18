@@ -152,13 +152,30 @@ network: locked
 | `deploy-from: <sources>` | deploys from anywhere else |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
 | `network: locked` | changes to Web, SSH and the firewall: set them up first, then lock them. The daemon still puts back what drifts |
+| `server-access: on` | nothing: it allows [containers that reach into the server](#containers-that-reach-into-the-server), which moin refuses without it |
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
-- No file: moin may do everything. A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
+- No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
 - A server with rules never updates its daemon from moin ([Updates](/docs/guides/servers#updates)).
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.
+
+### Containers that reach into the server
+
+Some compose settings hand a container the whole server. Whoever deploys one is root on your server. So a deploy refuses them, with or without a rules file, and says which one: `service web: privileged: true, which reaches into the server. moin refuses it unless /etc/moin/rules has server-access: on`.
+
+| Refused | Why |
+| --- | --- |
+| `privileged: true`, `cap_add`, `devices` | the container gets the kernel's powers or the server's hardware |
+| `network_mode`, `pid`, `ipc`, `userns_mode` or `cgroup` set to `host` | the container shares the server's network, processes or users |
+| `security_opt` with `unconfined` or `disable` | the container loses the walls Docker puts around it |
+| a mount of a folder outside the app, like `/`, `/etc` or `/var/run/docker.sock` | the container reads or writes the server, or starts containers of its own |
+| a volume with `o: bind` | the same, through a named volume |
+| `build` with `privileged: true` or `network: host` | the same, while the image builds |
+
+- Allowed: the app's own folders (`./data:/data`), named volumes, and `/etc/localtime` and `/etc/timezone` read-only (`:ro`).
+- Need one, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot.
 
 ### See the rules of a server
 
