@@ -37,7 +37,11 @@ func (m model) overview(u ui, w, h int) string {
 			frac(c.BackupsChecked, c.Databases) + " " + u.muted("backups checked"),
 		}
 		if n := m.updateCount(); n > 0 {
-			parts = append(parts, u.bold(u.p.Warn, fmt.Sprint(n))+" "+u.muted("updates"))
+			word := "updates"
+			if n == 1 {
+				word = "update"
+			}
+			parts = append(parts, u.bold(u.p.Warn, fmt.Sprint(n))+" "+u.muted(word))
 		}
 		out = append(out, truncate(strings.Join(parts, u.faint("  ·  ")), w))
 	}
