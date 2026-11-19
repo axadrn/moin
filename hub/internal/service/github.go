@@ -289,6 +289,29 @@ func (g *GitHub) Commit(ctx context.Context, installationID int64, repo, ref str
 	return GitHubCommit{SHA: answer.SHA, Message: message}, nil
 }
 
+// OnBranch reports whether commit sha is on branch of repo: the branch's
+// head or one of its ancestors. GitHub also serves a fork's commits through
+// the repo they forked, so a bare SHA alone proves nothing.
+func (g *GitHub) OnBranch(ctx context.Context, installationID int64, repo, branch, sha string) (bool, error) {
+	token, err := g.token(ctx, installationID)
+	if err != nil {
+		return false, err
+	}
+	var answer struct {
+		Status string `json:"status"`
+	}
+	err = g.call(ctx, http.MethodGet, "/repos/"+repo+"/compare/"+url.PathEscape(branch)+"..."+url.PathEscape(sha), "token "+token, nil, &answer)
+	var githubErr *GitHubError
+	if errors.As(err, &githubErr) && (githubErr.Status == 404 || githubErr.Status == 422) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	// The commit is behind the branch, or is its head.
+	return answer.Status == "behind" || answer.Status == "identical", nil
+}
+
 // Tarball is where the daemon downloads a commit itself, with the
 // authorization to send: the code goes from GitHub to the server and never
 // through moin. The token only reads this one repo and expires within the

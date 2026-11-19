@@ -90,6 +90,15 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			json.NewEncoder(w).Encode([]map[string]string{{"name": "main"}, {"name": "dev"}})
 		case r.URL.Path == "/repos/axadrn/blog/commits/main" || r.URL.Path == "/repos/axadrn/blog/commits/abc123":
 			json.NewEncoder(w).Encode(map[string]any{"sha": "abc123", "commit": map[string]string{"message": "Fix the footer\n\nLonger text"}})
+		// c0ffee1 is on main; f0f0f0f is a fork's commit GitHub serves
+		// through the repo, and not on main.
+		case r.URL.Path == "/repos/axadrn/blog/commits/c0ffee1" || r.URL.Path == "/repos/axadrn/blog/commits/f0f0f0f":
+			sha := strings.TrimPrefix(r.URL.Path, "/repos/axadrn/blog/commits/")
+			json.NewEncoder(w).Encode(map[string]any{"sha": sha, "commit": map[string]string{"message": "A commit"}})
+		case r.URL.Path == "/repos/axadrn/blog/compare/main...c0ffee1":
+			json.NewEncoder(w).Encode(map[string]string{"status": "behind"})
+		case r.URL.Path == "/repos/axadrn/blog/compare/main...f0f0f0f":
+			json.NewEncoder(w).Encode(map[string]string{"status": "diverged"})
 		case strings.HasPrefix(r.URL.Path, "/repos/axadrn/blog/commits/"):
 			http.Error(w, "No commit found", http.StatusUnprocessableEntity)
 		case r.URL.Path == "/repos/axadrn/blog/tarball/abc123":
@@ -233,6 +242,13 @@ func TestGitHubDeploys(t *testing.T) {
 	if _, err := apps.DeployRef(ctx, owner, "blog", "nope"); !errors.Is(err, ErrRef) {
 		t.Fatalf("deploy an unknown ref: err = %v", err)
 	}
+	if _, err := apps.DeployRef(ctx, owner, "blog", "f0f0f0f"); !errors.Is(err, ErrNotOnBranch) {
+		t.Fatalf("deploy a fork's commit: err = %v", err)
+	}
+	if deploy, err := apps.DeployRef(ctx, owner, "blog", "c0ffee1"); err != nil || deploy.CommitSHA != "c0ffee1" {
+		t.Fatalf("deploy a commit on the branch: %+v, %v", deploy, err)
+	}
+	finishDeploys(t, apps, app.ID)
 
 	deploy, err := apps.DeployRef(ctx, owner, "blog", "")
 	if err != nil {
@@ -265,7 +281,7 @@ func TestGitHubDeploys(t *testing.T) {
 	apps.GitHubPush(ctx, 7, "axadrn/blog", "other-branch", "abc123")
 	apps.GitHubPush(ctx, 7, "axadrn/blog", "main", "abc123")
 	_, deploys, err := apps.Deploys(owner.WorkspaceID, "blog", 10)
-	if err != nil || len(deploys) != 2 || deploys[0].CommitSHA != "abc123" {
+	if err != nil || len(deploys) != 3 || deploys[0].CommitSHA != "abc123" {
 		t.Fatalf("after the push: %d deploys, %v", len(deploys), err)
 	}
 	// A push deploy names the branch, not the commit twice.
