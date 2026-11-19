@@ -230,7 +230,7 @@ Everything else is refused. Some that come up:
 | a data folder inside one a container can write, like `./data` and `./data/db` together | the container could swap `db` for a link to `/` while the deploy starts. Side by side is fine: `./data/db` and `./data/uploads` |
 | named volumes with a `driver`, `driver_opts` or another name, networks of other apps | another disk, or another app's data |
 | `configs` and `secrets` from a `file`, an `env_file` outside the source | files of the server, read into the app |
-| `include`, and `extends` of another file | they read other compose files, which could be anywhere on the server. Put the services in one compose file |
+| `include`, `extends` of another file, `label_file` | they read other files, which could be anywhere on the server. Put the services and labels in one compose file |
 | a network with its own `ipam` subnet | the subnet could cover the server's own network and take its traffic; Docker picks a free one |
 | `build` from outside the source, `additional_contexts`, `ssh`, `privileged`, `network` or `tags` | the same, while the image builds. A tag like `traefik:v3.6` would replace moin's own proxy |
 | hooks like `post_start` | they can run with all powers |

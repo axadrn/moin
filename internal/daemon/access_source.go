@@ -16,9 +16,9 @@ import (
 // checkSourceFiles refuses a compose file that would read files of the
 // server into the app before the server sees what runs.
 //
-//   - include and extends with a file read other compose files, which could
-//     be anywhere on the server, so they are refused. Put the services in
-//     one compose file.
+//   - include, extends with a file and label_file read other files, which
+//     could be anywhere on the server, so they are refused. Put the services
+//     in one compose file.
 //   - env_file is read into the compose file, so its path must be in the
 //     source. compose itself says where it points: after ~, ${VAR} and the
 //     project folder, which a second guess here would get wrong.
@@ -53,8 +53,8 @@ func (a *apps) checkSourceFiles(ctx context.Context, app, src string, envFiles [
 	return nil
 }
 
-// refuseIncludes refuses include, and extends with a file, in any document
-// of the compose file.
+// refuseIncludes refuses include, extends with a file and label_file, in any
+// document of the compose file.
 func refuseIncludes(file string) error {
 	reader, err := os.Open(file)
 	if err != nil {
@@ -66,7 +66,8 @@ func refuseIncludes(file string) error {
 		var document struct {
 			Include  any `yaml:"include"`
 			Services map[string]struct {
-				Extends any `yaml:"extends"`
+				Extends   any `yaml:"extends"`
+				LabelFile any `yaml:"label_file"`
 			} `yaml:"services"`
 		}
 		err := decoder.Decode(&document)
@@ -82,6 +83,9 @@ func refuseIncludes(file string) error {
 		for name, service := range document.Services {
 			if extends, ok := service.Extends.(map[string]any); ok && extends["file"] != nil {
 				return fmt.Errorf("compose.yml: service %s extends another file, so the server refuses it: extend a service of the same file", name)
+			}
+			if service.LabelFile != nil {
+				return fmt.Errorf("compose.yml: service %s has a label_file, so the server refuses it: write the labels in the compose file", name)
 			}
 		}
 	}

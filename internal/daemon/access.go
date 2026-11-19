@@ -142,16 +142,16 @@ func (a *apps) checkCompose(release *release) error {
 	if err != nil {
 		return err
 	}
-	room := a.appRoom(release, config)
+	room := a.roomOf(release, config)
 	if reason := room.check(config); reason != "" {
 		return fmt.Errorf("%s: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in %s", reason, RulesFile())
 	}
 	return nil
 }
 
-// appRoom is what release may reach: the app's folders and volumes, the
+// roomOf is what release may reach: the app's folders and volumes, the
 // folders its rules allow, and the folders its containers write now.
-func (a *apps) appRoom(release *release, config map[string]any) appRoom {
+func (a *apps) roomOf(release *release, config map[string]any) appRoom {
 	app := release.start.App
 	room := appRoom{
 		dataDir:     resolved(filepath.Join(a.appDir(app), "volumes")),
@@ -430,7 +430,8 @@ func sortedKeys(settings map[string]any) []string {
 }
 
 // resolved is path through its links, such as a state folder that is a
-// link to another disk, or path when it is not there.
+// link to another disk, or path itself when it is not there yet. A mount
+// uses filepath.EvalSymlinks instead: a mount that is not there is refused.
 func resolved(path string) string {
 	if target, err := filepath.EvalSymlinks(path); err == nil {
 		return target

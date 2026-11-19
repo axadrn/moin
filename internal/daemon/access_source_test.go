@@ -20,6 +20,7 @@ func TestRefuseIncludes(t *testing.T) {
 		{"include long", "include:\n  - path: /opt/other/compose.yml\n", "include is not allowed"},
 		{"extends another file", "services:\n  web:\n    extends:\n      file: /var/lib/moin/apps/shop/releases/1/compose.json\n      service: web\n", "extends another file"},
 		{"second document", "services:\n  web:\n    image: nginx\n---\ninclude: [/etc/x.yml]\n", "include is not allowed"},
+		{"label file", "services:\n  web:\n    image: nginx\n    label_file: /etc/shadow\n", "label_file"},
 		{"through an anchor", "x-base: &base\n  file: /etc/x.yml\n  service: web\nservices:\n  web:\n    extends: *base\n", "extends another file"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
