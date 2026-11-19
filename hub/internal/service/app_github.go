@@ -18,11 +18,14 @@ import (
 )
 
 var (
-	ErrGitHubState    = errors.New("the GitHub install link expired or belongs to another account: connect again")
-	ErrRepo           = errors.New("moin cannot read this repo: install the moin GitHub App on its account and give it the repo")
-	ErrRepoName       = errors.New("name the repo as owner/name")
-	ErrNoRepo         = errors.New("the app follows no repo: link one first")
-	ErrRef            = errors.New("GitHub knows no branch, tag or commit by this name")
+	ErrGitHubState = errors.New("the GitHub install link expired or belongs to another account: connect again")
+	ErrRepo        = errors.New("moin cannot read this repo: install the moin GitHub App on its account and give it the repo")
+	ErrRepoName    = errors.New("name the repo as owner/name")
+	ErrNoRepo      = errors.New("the app follows no repo: link one first")
+	ErrRef         = errors.New("GitHub knows no branch, tag or commit by this name")
+	ErrNotOnBranch = errors.New("this commit is not on the app's branch: push it there, or deploy a branch or tag by name")
+	// commitPattern is a commit named by its SHA, which could be a fork's.
+	commitPattern     = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 	ErrRefName        = errors.New("this is not a valid branch, tag or commit name")
 	ErrBranch         = errors.New("the repo on GitHub has no branch by this name")
 	repoPattern       = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)
@@ -354,6 +357,18 @@ func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.A
 	}
 	if err != nil {
 		return nil, err
+	}
+	// A branch or tag is the repo's own. A bare SHA could be a fork's
+	// commit, which GitHub serves through this repo too: it must be on the
+	// app's branch.
+	if commitPattern.MatchString(at) {
+		on, err := s.github.OnBranch(ctx, app.InstallationID, app.Repo, app.Branch, commit.SHA)
+		if err != nil {
+			return nil, err
+		}
+		if !on {
+			return nil, ErrNotOnBranch
+		}
 	}
 	url, authorization, err := s.github.Tarball(ctx, app.InstallationID, app.Repo, commit.SHA)
 	if err != nil {

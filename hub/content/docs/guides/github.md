@@ -53,7 +53,7 @@ moin deploy --ref v1.4.0    # a tag
 moin deploy --ref 3f2a9c1   # a commit
 ```
 
-Empty means the linked branch. The API takes `{"ref": "v1.4.0"}`.
+Empty means the linked branch. The API takes `{"ref": "v1.4.0"}`. A commit named by its SHA, here or from CI, must be on the linked branch: GitHub also serves a fork's commits through the repo they forked, and moin never deploys one of those.
 
 Your server downloads the commit straight from GitHub, with a short-lived token. The code never passes through moin.
 
