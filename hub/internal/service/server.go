@@ -692,6 +692,13 @@ func rulesJSON(rules *protocol.Rules) string {
 		}
 		clipped.DeployFrom = append(clipped.DeployFrom, clip(source))
 	}
+	clipped.Mounts = nil
+	for _, folder := range rules.Mounts {
+		if len(clipped.Mounts) == 50 {
+			break
+		}
+		clipped.Mounts = append(clipped.Mounts, clip(folder))
+	}
 	body, _ := json.Marshal(clipped)
 	return string(body)
 }

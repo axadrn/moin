@@ -72,17 +72,13 @@ func newUpdater(url string) *updater {
 }
 
 // daemonUpdate installs the release the hub names (DaemonUpdate) and
-// restarts, unless the server has rules or a deploy runs.
-func (r *runner) daemonUpdate(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
+// restarts, unless a deploy runs. Servers with rules update too: a release
+// carries our signature, so the hub cannot hand them a daemon that drops
+// their rules.
+func (r *runner) daemonUpdate(ctx context.Context, message protocol.Message) {
 	var update protocol.DaemonUpdate
 	if err := message.Decode(&update); err != nil {
 		r.fail(message, err)
-		return
-	}
-	// A new binary could allow what the rules stop, so with rules only
-	// the owner updates it, on the server.
-	if rules != nil {
-		r.fail(message, fmt.Errorf("this server has rules in %s, so only its owner updates the daemon, on the server: %s", r.rulesFile, protocol.UpdateCommand(r.url(), build.Name, runtime.GOARCH)))
 		return
 	}
 	if !r.beginUpdate() {

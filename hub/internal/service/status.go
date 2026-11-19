@@ -96,7 +96,7 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 		if full, err := s.servers.servers.DiskFull(server.ID); err == nil && full {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDiskFull, Target: server.Name, Detail: "disk over 90% full", Path: "/servers/" + server.Link() + "/metrics"})
 		}
-		if server.Online && server.Rules == "" && DaemonBehind(s.release, server.DaemonVersion) {
+		if server.Online && DaemonBehind(s.release, server.DaemonVersion) {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDaemonBehind, Target: server.Name, Detail: "daemon " + server.DaemonVersion + ", update pending", Path: "/servers"})
 		}
 	}
