@@ -35,7 +35,13 @@ func TestIsRelease(t *testing.T) {
 	for version, want := range map[string]bool{
 		"v1.0.0":         true,
 		"v1.0.0-beta.33": true,
+		"v1.0.0+build.7": true,
 		"dev":            false,
+		// A version goes into a download URL, so only semver characters.
+		"v1.0.0-a/../b":  false,
+		"v1.0.0-%2e%2e":  false,
+		"v1.0.0+/../x":   false,
+		"v1.0.0-beta..1": false,
 		"main-b4be272":   false,
 		"1.0.0":          false,
 		"":               false,

@@ -156,6 +156,10 @@ func (u *updater) install(ctx context.Context, update protocol.DaemonUpdate) err
 	defer os.Remove(temp)
 	hash := sha256.New()
 	written, err := io.Copy(io.MultiWriter(file, hash), io.LimitReader(body, maxBinarySize+1))
+	if err == nil {
+		// On disk before the rename, so a power cut never leaves an empty binary.
+		err = file.Sync()
+	}
 	closeErr := file.Close()
 	if err != nil {
 		return fmt.Errorf("download %s: %w", base+asset, err)
@@ -179,7 +183,8 @@ func (u *updater) install(ctx context.Context, update protocol.DaemonUpdate) err
 	if err != nil {
 		return fmt.Errorf("the new binary does not run here: %w", err)
 	}
-	if got := strings.TrimSpace(string(output)); got != build.Name+" "+update.Version {
+	// The first line is the binary's own version; more may follow.
+	if got, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n"); got != build.Name+" "+update.Version {
 		return fmt.Errorf("the new binary says %q, not %s %s", got, build.Name, update.Version)
 	}
 	return os.Rename(temp, u.executable)

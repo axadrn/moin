@@ -33,8 +33,14 @@ func parseVersion(value string) *semver {
 	if !ok {
 		return nil
 	}
-	value, _, _ = strings.Cut(value, "+")
+	value, metadata, hasMetadata := strings.Cut(value, "+")
+	if hasMetadata && !identifiers(metadata) {
+		return nil
+	}
 	core, prerelease, hasPrerelease := strings.Cut(value, "-")
+	if hasPrerelease && !identifiers(prerelease) {
+		return nil
+	}
 	parts := strings.Split(core, ".")
 	if len(parts) != 3 {
 		return nil
@@ -49,13 +55,20 @@ func parseVersion(value string) *semver {
 	}
 	if hasPrerelease {
 		version.prerelease = strings.Split(prerelease, ".")
-		for _, identifier := range version.prerelease {
-			if identifier == "" {
-				return nil
-			}
-		}
 	}
 	return &version
+}
+
+// identifiers reports whether value is dot-separated semver identifiers:
+// ASCII letters, digits and hyphens, none empty. A daemon puts the version
+// in a download URL, so nothing else may pass.
+func identifiers(value string) bool {
+	for identifier := range strings.SplitSeq(value, ".") {
+		if identifier == "" || strings.Trim(identifier, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-") != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func compareVersions(a, b *semver) int {
