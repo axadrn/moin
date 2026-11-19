@@ -194,7 +194,7 @@ network: locked
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
 - No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
-- A server with rules never updates its daemon from moin. You update it on the server ([Updates](/docs/guides/servers#updates)).
+- A server with rules updates its daemon like any other ([Updates](#updates)). Each release carries our signature, so a new daemon cannot drop the rules.
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.
 
 ### Containers that reach into the server
@@ -266,7 +266,7 @@ A daemon only runs a release we signed. Think of a stamp: we stamp every release
 
 - It never goes back to an older release, and never installs a build that is not a release.
 - The signing key never touches the hub. Someone who takes over the hub cannot sign, so they cannot hand your server a daemon.
-- Not yet for a server with rules, or one without systemd: it does not update itself, and the command it shows downloads from the hub. Check that download against the release's checksums first (below).
+- A daemon without systemd cannot restart itself, so it does not update itself. Update it by hand from the release, and check the download against its checksums first (below).
 - There are two keys: one signs every release, a spare stays offline. If the first ever leaks, a release signed with the spare drops it, and every daemon stops trusting it.
 - The keys are Ed25519, in `releaseKeys` in `internal/daemon/update.go`. Forging a signature without the private key is not possible with today's computers. What matters is that nobody steals the key.
 - Your servers need to reach `github.com` and `release-assets.githubusercontent.com`, where GitHub sends the downloads, to update. Your apps do not.

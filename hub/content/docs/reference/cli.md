@@ -227,7 +227,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app my-app` is
 
 Daemons update themselves to the hub's version, unless `moin servers auto-update off`. `moin servers` shows each daemon's version and marks one that differs.
 
-`moin servers update` has the daemon download the `moin` binary the hub serves, check its SHA-256, swap it in and restart through systemd; it waits until the new daemon is back. The daemon refuses while a deploy runs, and on a server with rules in `/etc/moin/rules`, since a new binary could allow what they stop. There, and for daemons older than the update, update it on the server as root (the refused update prints this command for that server):
+`moin servers update` has the daemon download the release of the hub's version from GitHub, check its signature and its SHA-256, swap it in and restart through systemd; it waits until the new daemon is back. Servers with rules update the same way. The daemon refuses while a deploy runs. A daemon from before signed updates, or one without systemd, is updated on the server as root (the refused update prints this command for that server):
 
 ```bash
 curl -fsSL https://moin.example.com/download/moin-linux-amd64 -o /usr/local/bin/moin.new && chmod 755 /usr/local/bin/moin.new && mv /usr/local/bin/moin.new /usr/local/bin/moin && systemctl restart moin-daemon

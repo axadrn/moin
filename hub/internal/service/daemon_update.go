@@ -201,7 +201,7 @@ func (s *ServerService) autoUpdate(workspaceID string) {
 		}
 		var next *model.Server
 		for index, server := range servers {
-			if server.Online && server.Rules == "" && !tried[server.ID] && DaemonBehind(version, server.DaemonVersion) {
+			if server.Online && !tried[server.ID] && DaemonBehind(version, server.DaemonVersion) {
 				next = &servers[index]
 				break
 			}
