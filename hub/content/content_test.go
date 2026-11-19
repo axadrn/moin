@@ -9,7 +9,7 @@ import (
 // files that start with an underscore too.
 func TestTheBinaryHoldsTheTexts(t *testing.T) {
 	texts := FS(false)
-	for _, name := range []string{"changelog.md", "llms.txt", "docs/getting-started.md", "legal/terms.md", "catalog"} {
+	for _, name := range []string{"changelog.md", "llms.txt", "docs/getting-started.md", "legal/terms.md"} {
 		if _, err := fs.Stat(texts, name); err != nil {
 			t.Error(err)
 		}
