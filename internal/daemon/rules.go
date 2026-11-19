@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
@@ -84,6 +85,14 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 				}
 				rules.DeployFrom = append(rules.DeployFrom, source)
 			}
+		case "mounts":
+			for _, folder := range strings.Split(value, ",") {
+				folder = strings.TrimSpace(folder)
+				if !filepath.IsAbs(folder) || filepath.Clean(folder) != folder {
+					return nil, wrong("mounts lists folders of the server like /mnt/media, /srv/photos")
+				}
+				rules.Mounts = append(rules.Mounts, folder)
+			}
 		case "backups-to":
 			host, bucket, ok := strings.Cut(value, "/")
 			if !ok || host == "" || bucket == "" || strings.Contains(bucket, "/") {
@@ -91,7 +100,7 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			}
 			rules.BackupsTo = value
 		default:
-			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to, network and server-access")
+			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to, network, mounts and server-access")
 		}
 	}
 	return rules, nil

@@ -18,7 +18,7 @@ addresses, personal details.
 - The license is explained once, in the FAQ of the docs. `LICENSE` and `ui/LICENSE` are the texts; everywhere else says "open source" without a license name.
 - The product name lives only in `internal/build.Name`. One exception: moin UI in `ui/`, whose `moin-` classes and `moin.css` and `moin.js` have no Go to ask.
 - Words: one thing, one word, in every layer, from the list in `hub/DESIGN.md` (Words): hub, daemon, server, app, deploy, backup, check, uptime, AI agent. Not "node", "host" or "control plane".
-- Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`. Add one only when the standard library does not solve it well.
+- Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`, and `yaml.v3`, with which the daemon reads a compose file before Docker does. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
 - Formatted (`cd hub && task fmt`, a test checks it), `go vet ./...` clean.
 - How a change ships, from the pull request to the release, is in `hub/content/docs/reference/shipping.md`, the one source for it. Change how moin ships and change that page in the same pull request.
@@ -26,7 +26,7 @@ addresses, personal details.
 - Pull request titles and commits follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, with an optional scope like `feat(cli):`. A short first line, then a sentence or two of why when it helps. Plain text: `-` lists and backticks, no bold, headings or tables, because the description becomes the commit.
 - Commits and pull requests carry no AI attribution: no `Co-Authored-By` for a tool, no "Generated with" line.
 - An issue is closed by writing `Fixes #N` once, in the pull request's description. Commits on the branch may mention `#N` without "Fixes".
-- Ship as the shipping page says. Deploy: Actions, Deploy, Run workflow. Release: its notes in the changelog, then the tag `v…`. The Deploy workflow runs the tests, builds the box, for a tag makes the GitHub release from `hub/content/changelog.md`, then updates the hosted hub through Tailscale.
+- Ship as the shipping page says. Deploy: Actions, Deploy, Run workflow. Release: its notes in the changelog, then the tag `v…`. The Deploy workflow runs the tests, builds the box, for a tag makes the GitHub release from `hub/content/changelog.md` with the signed binaries, then updates the hosted hub through Tailscale.
 - Small releases: one finished thing is one tag. `main` is always releasable; only unfinished work stays on a branch.
 - Release notes follow one format, the same in moin, goilerplate and shadcn-templ, so the eye finds things fast. The same text is the GitHub release and the newest section of `hub/content/changelog.md` (`## v…`, the date like `November 3, 2026`, then the notes), which `/changelog` shows and a test checks:
   - First line: `**In short:**` and one sentence, what is new and why to update.

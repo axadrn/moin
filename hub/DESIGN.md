@@ -34,10 +34,14 @@ in iOS and macOS), not a website and not a dashboard template.
   draw the scene, the user's app in ink; color stays status
   and long flat shadows give depth. `moin` appears only in the logo, never
   on a ship or a container. Light enough to read on both grounds, simple
-  shapes, still. The hero is a wall of containers under the headline:
+  shapes, still. The home page's last card, the way in, ends on a wall of containers:
   `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`: 20-foot
   containers from the side, staggered, only your-app and two others pulled
-  out, the whole wall resting on the foot of the first screen.
+  out, the whole wall resting on the card's bottom edge.
+- **The overview video.** Under the headline, in the first screen, the
+  landing page plays the overview film (`homeVideo` in `internal/ui/pages/marketing_home.templ`):
+  real moin only, recorded on throwaway servers. It plays without sound
+  and loops; its controls turn the sound on.
 
 Never: an accent color, gradients, glows or blurred blobs, glassmorphism,
 emoji, sparkles, rocket icons, three generic icon cards in a row, small

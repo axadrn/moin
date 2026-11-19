@@ -69,16 +69,19 @@ func (a *apps) generateCompose(ctx context.Context, app, src string, env map[str
 }
 
 // readComposeConfig has docker compose read the compose file of a source.
+// The app's env fills ${VAR} through an env file next to src.
 func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[string]string) (map[string]any, error) {
-	vars := make([]string, 0, len(env))
-	for key, value := range env {
-		vars = append(vars, key+"="+value)
-	}
-	err := a.checkEnvFiles(ctx, app, src, vars)
+	// Before compose reads any file the compose file names.
+	err := checkSourceFiles(src)
 	if err != nil {
 		return nil, err
 	}
-	raw, err := a.outputEnv(ctx, vars, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
+	envFiles, err := writeEnvFile(filepath.Dir(src), env)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]string{"compose", "-p", project(app), "--project-directory", src, "-f", composePath(src)}, envFiles...)
+	raw, err := a.output(ctx, "docker", append(args, "config", "--format", "json")...)
 	if err != nil {
 		return nil, fmt.Errorf("compose.yml: %w", err)
 	}
@@ -90,34 +93,34 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[s
 	return config, nil
 }
 
-// checkEnvFiles refuses an env_file outside the source before compose reads
-// it: compose writes its values into the compose file, so one like
-// /root/.aws/credentials would hand the server's secrets to the app.
-func (a *apps) checkEnvFiles(ctx context.Context, app, src string, vars []string) error {
-	raw, err := a.outputEnv(ctx, vars, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json", "--no-env-resolution")
-	if err != nil {
-		return fmt.Errorf("compose.yml: %w", err)
-	}
-	var config struct {
-		Services map[string]struct {
-			EnvFile []struct {
-				Path string `json:"path"`
-			} `json:"env_file"`
-		} `json:"services"`
-	}
-	err = json.Unmarshal([]byte(raw), &config)
-	if err != nil {
-		return fmt.Errorf("compose config: %w", err)
-	}
-	for _, name := range slices.Sorted(maps.Keys(config.Services)) {
-		for _, file := range config.Services[name].EnvFile {
-			if !within(src, file.Path) {
-				return fmt.Errorf("service %s: env_file %s is not in the app's source, so the server refuses it", name, file.Path)
-			}
+// writeEnvFile writes the app's env to app.env in dir, for docker compose,
+// and returns the --env-file arguments that read it: the source's own .env
+// first, when it has one, then app.env, whose values win.
+//
+// The env goes to compose in a file, never in docker's own environment:
+// docker reads variables like DOCKER_CONFIG and DOCKER_HOST itself, so an
+// env var of the app could make it run another program, as root.
+func writeEnvFile(dir string, env map[string]string) ([]string, error) {
+	var lines strings.Builder
+	for _, name := range slices.Sorted(maps.Keys(env)) {
+		if envNamePattern.MatchString(name) {
+			lines.WriteString(name + `="` + quoteEnv(env[name]) + "\"\n")
 		}
 	}
-	return nil
+	file := filepath.Join(dir, "app.env")
+	if err := os.WriteFile(file, []byte(lines.String()), 0o600); err != nil {
+		return nil, err
+	}
+	var args []string
+	if dotEnv := filepath.Join(dir, "src", ".env"); exists(dotEnv) {
+		args = append(args, "--env-file", dotEnv)
+	}
+	return append(args, "--env-file", file), nil
 }
+
+// quoteEnv escapes value for the double quotes of an env file, so compose
+// reads it back exactly: with its newlines, quotes and dollar signs.
+var quoteEnv = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`, "\r", `\r`).Replace
 
 // readConfigBlock reads the x-moin block of a compose file, nil when there
 // is none. What it could read comes back with an error too.

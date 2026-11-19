@@ -357,12 +357,13 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	}
 	logf("building")
 	// A Railpack build reads the app's env as BuildKit secrets, from the
-	// environment of compose, never from its arguments.
-	var environment []string
-	if detected.Kind == "railpack" {
-		environment = buildEnv(start.Env)
+	// env file, never from docker's own environment or its arguments.
+	envFiles, err := writeEnvFile(release.dir, start.Env)
+	if err != nil {
+		return err
 	}
-	err := a.run(ctx, logf, environment, "compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--progress", "plain", "build")
+	args := append([]string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile}, envFiles...)
+	err = a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
@@ -409,7 +410,11 @@ func (a *apps) copyDataBefore(ctx context.Context, release *release) {
 // failed with startErr. It returns what the deploy failed with.
 func (a *apps) startPreviousAgain(ctx context.Context, release *release, previous int, startErr error) error {
 	start := release.start
+	// A release that did not come up stops all its containers, so none of
+	// them keeps writing while the next deploy checks its mounts.
+	stop := func() { _ = a.compose(ctx, start.App, release.composeFile, release.logf, "stop") }
 	if previous <= 0 || previous == start.Number {
+		stop()
 		return startErr
 	}
 	release.logf("starting v%d again", previous)
@@ -417,6 +422,7 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 	_ = a.pinFile(ctx, start, previousFile)
 	rollbackErr := a.compose(ctx, start.App, previousFile, release.logf, "up", "-d", "--remove-orphans")
 	if rollbackErr != nil {
+		stop()
 		return startErr
 	}
 	return fmt.Errorf("%w; v%d is running again", startErr, previous)

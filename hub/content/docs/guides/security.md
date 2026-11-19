@@ -1,9 +1,40 @@
 ---
 title: "Security"
-description: "Web, SSH and the firewall of a server. moin keeps them that way. Rules only root can change."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Web, SSH, firewall, rules and signed updates."
 group: "Servers and data"
 order: 2
 ---
+
+How moin keeps your servers safe. First in pictures, then the facts.
+
+## How moin keeps you safe
+
+moin has two parts. The **hub** is where you click and type: the web, the CLI, the TUI. The **daemon** runs on each of your servers and does the work. Think of the hub as a messenger. It brings your server letters, like "start this app".
+
+**Nobody can ring your server's bell.** Your server calls the messenger, never the other way round.
+
+- The daemon opens one outbound WebSocket to the hub, over HTTPS on port 443. moin listens on no port of your server.
+- With the [firewall](#firewall) on, only 80 and 443 for your apps are open, and SSH as you set it.
+
+**moin has no key to your house.** Other tools keep the root SSH key of every server, so whoever breaks into them is root on all your servers. moin keeps none.
+
+- The daemon runs on the server and acts there. The hub holds no SSH key, password or token that opens your server.
+
+**You write the house rules.** A note on your door says what the messenger may do. Only you can write it, on the server. The messenger cannot change it.
+
+- `/etc/moin/rules`, readable by root. The daemon checks every request against it. [Rules](#rules)
+
+**New versions carry a seal.** A messenger cannot slip your server a fake daemon.
+
+- Every release is signed with Ed25519. The daemon takes it from GitHub, not from the hub, and checks the seal first. [Updates](#updates)
+
+**Every guest stays in its room.** An app gets its own folders and nothing else of the house. A container that asks for the master key is turned away at the door.
+
+- The server checks every compose file against a list of what a normal app needs, before anything builds or starts. [Containers](#containers-that-reach-into-the-server)
+
+**What stays honest.** A messenger that someone bought can still bring letters your rules allow. Strict rules leave it nothing that hurts.
+
+## Ports, SSH and the firewall
 
 Your server has doors to the internet, called ports. A server's **Security** page has three lines. Each says what really is on the server. The daemon keeps it that way.
 
@@ -128,6 +159,10 @@ MCP: list_servers
 
 The CLI shows it in the ACCESS column, and `servers secure` line by line. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
 
+## Env of your apps
+
+Your app's env vars reach your app and nothing else. The daemon writes them to `app.env` in the release's folder on the server, readable by root only, and hands that file to Docker Compose with `--env-file`. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
+
 ## Rules
 
 A file on your server, `/etc/moin/rules`, says what moin may do there. Only you, as root on the server, can change it. The daemon checks every request against it.
@@ -152,13 +187,14 @@ network: locked
 | `deploy-from: <sources>` | deploys from anywhere else |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
 | `network: locked` | changes to Web, SSH and the firewall: set them up first, then lock them. The daemon still puts back what drifts |
+| `mounts: <folders>` | nothing: it lets apps mount these folders of the server, like `/mnt/media`, which moin refuses without it |
 | `server-access: on` | nothing: it allows [containers that reach beyond the app](#containers-that-reach-into-the-server), which moin refuses without it |
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
 - No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
-- A server with rules never updates its daemon from moin ([Updates](/docs/guides/servers#updates)).
+- A server with rules never updates its daemon from moin. You update it on the server ([Updates](/docs/guides/servers#updates)).
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.
 
 ### Containers that reach into the server
@@ -174,12 +210,13 @@ The server checks the compose file as it will run, before anything builds or sta
 | `image`, `build` from the app's source | what runs |
 | `command`, `entrypoint`, `environment`, `env_file` from the app's source, `working_dir`, `user` | how it runs |
 | `ports`, `expose`, `networks` of the app, `links`, `hostname`, `extra_hosts`, `dns` | how it is reached |
-| `volumes`: the app's data folders (`./data:/data`), files of its source, its named volumes, `tmpfs`, and `/etc/localtime` and `/etc/timezone` read-only | its data |
+| `volumes`: the app's data folders (`./data:/data`), files of its source read-only (`./nginx.conf:/etc/nginx/nginx.conf:ro`), its named volumes, `tmpfs`, `/etc/localtime` and `/etc/timezone` read-only, and the folders of `mounts:` | its data |
 | `configs` and `secrets` written in the file or from env | its settings |
 | `healthcheck`, `depends_on`, `restart`, `init`, `stop_signal`, `stop_grace_period` | how it starts, stops and is checked |
 | limits: `mem_limit`, `cpus`, `pids_limit`, `ulimits`, `shm_size`, `deploy` resources and replicas | how much it may use |
 | `cap_drop`, `read_only`, `security_opt: no-new-privileges`, `sysctls` starting with `net.` | fewer powers, never more |
 | `labels`, `tty`, `stdin_open`, `platform`, `pull_policy`, `scale`, and `x-` extensions | the rest a normal app uses |
+| `include` and `extends` of files in the app's source | a compose file split into parts |
 
 Everything else is refused. Some that come up:
 
@@ -188,15 +225,20 @@ Everything else is refused. Some that come up:
 | `privileged`, `cap_add`, `devices`, `device_cgroup_rules`, GPUs | the kernel's powers or the server's hardware |
 | `network_mode`, `pid`, `ipc`, `userns_mode`, `cgroup` | the server's network, processes or users, or another container's |
 | `volumes_from` | the mounts of another container, like the proxy's Docker socket |
-| a mount outside the app's data folders and source, like `/`, `/etc` or `/var/run/docker.sock`, or the app's own folder, which holds the compose files moin runs | the container reads or writes the server |
-| a mount inside a folder a container can write | the container could swap it for a link to `/` while the deploy starts |
+| a mount of a folder of the server, like `/`, `/etc`, `/srv/data` or `/var/run/docker.sock`, unless `mounts:` lists it, or of the app's own folder, which holds the compose files moin runs | the container reads or writes the server |
+| the app's source writable, like `.:/app` | a container could leave a link to `/` there for the next build or mount to follow. Mount it read-only (`.:/app:ro`) and keep data in `./data` |
+| a data folder inside one a container can write, like `./data` and `./data/db` together | the container could swap `db` for a link to `/` while the deploy starts. Side by side is fine: `./data/db` and `./data/uploads` |
 | named volumes with a `driver`, `driver_opts` or another name, networks of other apps | another disk, or another app's data |
-| `configs` and `secrets` from a `file`, `env_file` outside the source | files of the server |
+| `configs` and `secrets` from a `file`; `env_file`, `include` and `extends` of files outside the source, or with a `$` in the path | files of the server, read into the app |
+| a network with its own `ipam` subnet | the subnet could cover the server's own network and take its traffic; Docker picks a free one |
 | `build` from outside the source, `additional_contexts`, `ssh`, `privileged` or `network` | the same, while the image builds |
 | hooks like `post_start` | they can run with all powers |
 
 - The list is one place in the code: `serviceKeys` and the lists after it in `internal/daemon/access.go`, every line with what it is for. The catalog uses none of the refused settings.
-- Need one, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot. Then the list does not apply on that server at all, so put such a tool on a server of its own.
+- Your data stays where it is: `./data` is a folder of the app on the server, `/var/lib/moin/apps/<app>/volumes/data`, so you see it with `ls`.
+- A folder of the server, like a disk with your films for Jellyfin? Write `mounts: /mnt/media` in `/etc/moin/rules`. Apps may then mount exactly these folders, and nothing next to them.
+- Need more, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot. Then the list does not apply on that server at all, so put such a tool on a server of its own.
+- A deploy that does not come up stops its containers, so none of them keeps running half-started.
 - What it does not stop: a deploy of a normal app still runs that app's code, with its data and env. Against code from somewhere else, set [`deploy-from`](#rules).
 
 ### See the rules of a server
@@ -210,3 +252,27 @@ MCP: list_servers
 ```
 
 `moin servers` shows them in its RULES column; the API in the `rules` field.
+
+## Updates
+
+A daemon only runs a release we signed. Think of a stamp: we stamp every release, and every daemon carries a photo of the stamp. It compares the two before it installs anything. The photo cannot stamp, so it can be public.
+
+1. The hub tells the daemon: update to `v1.2.3`. It names the version and nothing else.
+2. The daemon downloads `SHA256SUMS` and `SHA256SUMS.sig` of that release from GitHub, `github.com/axadrn/moin/releases`.
+3. It checks the signature against the public keys built into it. A wrong signature stops the update.
+4. It downloads its binary from the same release and checks it against the signed SHA-256.
+5. It runs the new binary once, which has to say `moin v1.2.3`, and only then swaps itself.
+
+- It never goes back to an older release, and never installs a build that is not a release.
+- The signing key never touches the hub. Someone who takes over the hub cannot sign, so they cannot hand your server a daemon.
+- Not yet for a server with rules, or one without systemd: it does not update itself, and the command it shows downloads from the hub. Check that download against the release's checksums first (below).
+- There are two keys: one signs every release, a spare stays offline. If the first ever leaks, a release signed with the spare drops it, and every daemon stops trusting it.
+- The keys are Ed25519, in `releaseKeys` in `internal/daemon/update.go`. Forging a signature without the private key is not possible with today's computers. What matters is that nobody steals the key.
+- Your servers need to reach `github.com` and `release-assets.githubusercontent.com`, where GitHub sends the downloads, to update. Your apps do not.
+- Check a download by hand against its checksums:
+
+```
+curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/moin-linux-amd64
+curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```

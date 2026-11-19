@@ -14,6 +14,9 @@ const (
 	// SupportEmail is where people write about moin, on every install;
 	// SUPPORT_EMAIL overrides it.
 	SupportEmail = "hello@moin.run"
+	// Media is where the site's videos live: a public bucket of their own,
+	// so a page may load them (Content-Security-Policy, media-src).
+	Media = "https://media.moin.run"
 	// Description is Promise with a few words for search engines, at most
 	// 160 characters: the description of the home page.
 	Description = Promise + " Open source. SQLite and Postgres. Web, CLI, terminal UI and MCP."

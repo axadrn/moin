@@ -6,8 +6,8 @@ import (
 )
 
 // DownloadPath is where the hub serves the binaries, as
-// <name>-<os>-<arch>: the install script and daemon updates take them from
-// there.
+// <name>-<os>-<arch>: the install script and the update command take them
+// from there, and daemons from before signed releases.
 const DownloadPath = "/download/"
 
 // DaemonURL is the address of the hub a daemon should dial.
@@ -15,9 +15,12 @@ type DaemonURL struct {
 	URL string `json:"url"`
 }
 
-// DaemonUpdate is the binary the daemon should run: the hub's
-// version and the SHA-256 of the binary it serves for the daemon's OS and
-// CPU. The daemon downloads it from its own hub URL.
+// DaemonUpdate is the release the daemon should run, the hub's version.
+// The daemon takes the binary from the release on GitHub and installs it
+// only when a release key signed its checksums, so the hub names the
+// version and never the binary. SHA256 is the binary the hub serves under
+// DownloadPath, for daemons from before signed releases, which download it
+// from the hub.
 type DaemonUpdate struct {
 	Version string `json:"version"`
 	SHA256  string `json:"sha256"`

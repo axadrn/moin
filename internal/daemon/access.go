@@ -120,9 +120,12 @@ type appRoom struct {
 	volumes []string
 	// project names the app's networks: <project>_<network>.
 	project string
+	// mounts are the folders of the server its rules allow, with mounts:.
+	mounts []string
 	// writable are the folders a running container can write, of this
-	// release and of the one running now. A mount inside one of them could
-	// be swapped for a link to anywhere while the deploy starts.
+	// release and of the one running now, through their links. A mount
+	// inside one of them could be swapped for a link to anywhere while the
+	// deploy starts.
 	writable []string
 }
 
@@ -138,6 +141,16 @@ func (a *apps) checkCompose(release *release) error {
 	if err != nil {
 		return err
 	}
+	box := a.room(release, config)
+	if reason := box.check(config); reason != "" {
+		return fmt.Errorf("%s: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in %s", reason, RulesFile())
+	}
+	return nil
+}
+
+// room is what release may reach: the app's folders and volumes, the
+// folders its rules allow, and the folders its containers write now.
+func (a *apps) room(release *release, config map[string]any) appRoom {
 	app := release.start.App
 	box := appRoom{
 		dataDir:     resolved(filepath.Join(a.appDir(app), "volumes")),
@@ -145,15 +158,17 @@ func (a *apps) checkCompose(release *release) error {
 		volumes:     a.volumeNames(app),
 		project:     nameOf(release.start),
 	}
+	if release.rules != nil {
+		for _, folder := range release.rules.Mounts {
+			box.mounts = append(box.mounts, resolved(folder))
+		}
+	}
 	if current := a.current(app); current > 0 && current != release.start.Number {
 		running, _ := readJSON(filepath.Join(a.releaseDir(app, current), "compose.json"))
 		box.writable = writableFolders(running)
 	}
 	box.writable = append(box.writable, writableFolders(config)...)
-	if reason := box.check(config); reason != "" {
-		return fmt.Errorf("%s: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in %s", reason, RulesFile())
-	}
-	return nil
+	return box
 }
 
 // check names the first setting of config outside the room, "" when
@@ -164,8 +179,26 @@ func (r appRoom) check(config map[string]any) string {
 			return key + " is not allowed"
 		}
 	}
-	if reason := r.checkTop(config); reason != "" {
-		return reason
+	networks, _ := config["networks"].(map[string]any)
+	for _, key := range sortedKeys(networks) {
+		if reason := r.checkNetwork(key, networks[key]); reason != "" {
+			return "network " + key + ": " + reason
+		}
+	}
+	volumes, _ := config["volumes"].(map[string]any)
+	for _, key := range sortedKeys(volumes) {
+		if reason := r.checkVolume(volumes[key]); reason != "" {
+			return "volume " + key + ": " + reason
+		}
+	}
+	for _, kind := range []string{"configs", "secrets"} {
+		items, _ := config[kind].(map[string]any)
+		for _, key := range sortedKeys(items) {
+			// From the compose file or from env, never from a file.
+			if reason := onlyKeys(items[key], "name", "content", "environment", "labels"); reason != "" {
+				return kind + " " + key + ": " + reason
+			}
+		}
 	}
 	services, _ := config["services"].(map[string]any)
 	for _, name := range sortedKeys(services) {
@@ -177,42 +210,39 @@ func (r appRoom) check(config map[string]any) string {
 	return ""
 }
 
-// checkTop checks the app's networks, named volumes, configs and secrets.
-func (r appRoom) checkTop(config map[string]any) string {
-	networks, _ := config["networks"].(map[string]any)
-	for _, key := range sortedKeys(networks) {
-		network, _ := networks[key].(map[string]any)
-		name, _ := network["name"].(string)
-		if reason := onlyKeys(network, "name", "external", "driver", "internal", "attachable", "labels", "enable_ipv6", "ipam"); reason != "" {
-			return "network " + key + ": " + reason
-		}
-		switch {
-		case network["external"] == true && name != proxyNetwork:
-			return "network " + key + ": joins " + name + ", which is not the app's"
-		case network["external"] != true && name != r.project+"_"+key:
-			return "network " + key + ": the name " + name + " is not the app's"
-		case network["driver"] != nil && network["driver"] != "bridge":
-			return fmt.Sprintf("network %s: driver %v", key, network["driver"])
-		}
+// checkNetwork allows the app's own networks, named as moin names them, and
+// the proxy's.
+func (r appRoom) checkNetwork(key string, value any) string {
+	network, _ := value.(map[string]any)
+	name, _ := network["name"].(string)
+	if reason := onlyKeys(network, "name", "external", "driver", "internal", "attachable", "labels", "enable_ipv6", "ipam"); reason != "" {
+		return reason
 	}
-	volumes, _ := config["volumes"].(map[string]any)
-	for _, key := range sortedKeys(volumes) {
-		volume, _ := volumes[key].(map[string]any)
-		if reason := onlyKeys(volume, "name", "labels"); reason != "" {
-			return "volume " + key + ": " + reason
-		}
-		if name, _ := volume["name"].(string); !slices.Contains(r.volumes, name) {
-			return "volume " + key + ": the name " + name + " is not the app's"
-		}
+	// compose writes an empty ipam. A subnet of the app's own could cover
+	// the server's network and take its traffic; Docker picks a free one.
+	if ipam, _ := network["ipam"].(map[string]any); len(ipam) > 0 {
+		return "ipam is not allowed"
 	}
-	for _, kind := range []string{"configs", "secrets"} {
-		items, _ := config[kind].(map[string]any)
-		for _, key := range sortedKeys(items) {
-			item, _ := items[key].(map[string]any)
-			if reason := onlyKeys(item, "name", "content", "environment", "labels"); reason != "" {
-				return kind + " " + key + ": " + reason
-			}
-		}
+	switch {
+	case network["external"] == true && name != proxyNetwork:
+		return "joins " + name + ", which is not the app's"
+	case network["external"] != true && name != r.project+"_"+key:
+		return "the name " + name + " is not the app's"
+	case network["driver"] != nil && network["driver"] != "bridge":
+		return fmt.Sprintf("driver %v", network["driver"])
+	}
+	return ""
+}
+
+// checkVolume allows the app's own named volumes, with no driver: a driver
+// option could mount a disk or a folder of the server.
+func (r appRoom) checkVolume(value any) string {
+	volume, _ := value.(map[string]any)
+	if reason := onlyKeys(volume, "name", "labels"); reason != "" {
+		return reason
+	}
+	if name, _ := volume["name"].(string); !slices.Contains(r.volumes, name) {
+		return "the name " + name + " is not the app's"
 	}
 	return ""
 }
@@ -284,8 +314,9 @@ func (r appRoom) checkBuild(build map[string]any) string {
 	return ""
 }
 
-// checkMount allows the app's data folders, files of its source, its named
-// volumes and folders in memory.
+// checkMount allows the app's data folders, files of its source read-only,
+// the folders the rules allow with mounts:, its named volumes and folders in
+// memory. Data folders are never inside a folder a container can write.
 func (r appRoom) checkMount(mount map[string]any) string {
 	for _, key := range sortedKeys(mount) {
 		if _, ok := mountKeys[key]; !ok {
@@ -313,11 +344,21 @@ func (r appRoom) checkMount(mount map[string]any) string {
 	if err != nil {
 		return "mounts " + source + ", which is not there"
 	}
-	if !r.inData(target) && !r.inSource(target) {
-		return "mounts " + source + " of the server"
+	switch {
+	case r.inSource(target):
+		// Code and config of the repo. Written, a container could leave a
+		// link there for the next build or mount to follow.
+		if mount["read_only"] != true {
+			return "mounts " + source + " of the source writable: mount it read-only, like ./config:/config:ro, and keep data in ./data"
+		}
+		return ""
+	case r.inData(target):
+	case slices.ContainsFunc(r.mounts, func(folder string) bool { return within(folder, target) }):
+	default:
+		return "mounts " + source + ", which is not a folder of the app. Allow a folder of the server with mounts: <folder> in " + RulesFile()
 	}
 	for _, folder := range r.writable {
-		if source != folder && within(folder, source) {
+		if target != folder && within(folder, target) {
 			return "mounts " + source + " inside " + folder + ", which a container can write"
 		}
 	}
@@ -342,7 +383,8 @@ func (r appRoom) inSource(path string) bool {
 	return len(parts) >= 2 && parts[1] == "src"
 }
 
-// writableFolders are the folders the services of config mount writable.
+// writableFolders are the folders the services of config mount writable,
+// through their links.
 func writableFolders(config map[string]any) []string {
 	var folders []string
 	services, _ := config["services"].(map[string]any)
@@ -352,7 +394,7 @@ func writableFolders(config map[string]any) []string {
 		for _, item := range mounts {
 			mount, _ := item.(map[string]any)
 			if source, _ := mount["source"].(string); mount["type"] == "bind" && mount["read_only"] != true {
-				folders = append(folders, source)
+				folders = append(folders, resolved(source))
 			}
 		}
 	}

@@ -86,13 +86,14 @@ func TestAppRoom(t *testing.T) {
 		{"unknown top key", map[string]any{"include": []any{"x"}}, "include is not allowed"},
 
 		// Refused: mounts out of the room.
-		{"docker socket", bind("/var/run/docker.sock", false), "mounts /var/run/docker.sock"},
-		{"root", bind("/", true), "mounts / of the server"},
-		{"time zone writable", bind("/etc/localtime", false), "mounts /etc/localtime"},
-		{"the app folder", bind(appDir, false), "of the server"},
-		{"all data folders", bind(filepath.Join(appDir, "volumes"), false), "of the server"},
-		{"a release with its compose file", bind(filepath.Join(appDir, "releases", "2"), false), "of the server"},
-		{"link to the disk", bind(filepath.Join(data, "link"), false), "of the server"},
+		{"docker socket", bind("/var/run/docker.sock", false), "mounts /var/run/docker.sock, which is not a folder of the app"},
+		{"root", bind("/", true), "mounts /, which is not a folder of the app"},
+		{"time zone writable", bind("/etc/localtime", false), "mounts /etc/localtime, which is not a folder"},
+		{"the app folder", bind(appDir, false), "which is not a folder of the app"},
+		{"all data folders", bind(filepath.Join(appDir, "volumes"), false), "which is not a folder of the app"},
+		{"a release with its compose file", bind(filepath.Join(appDir, "releases", "2"), false), "which is not a folder of the app"},
+		{"link to the disk", bind(filepath.Join(data, "link"), false), "which is not a folder of the app"},
+		{"source writable", bind(filepath.Join(src, "nginx.conf"), false), "of the source writable"},
 		{"bind propagation", service(map[string]any{"volumes": []any{
 			map[string]any{"type": "bind", "source": data, "target": "/x", "bind": map[string]any{"propagation": "rshared"}},
 		}}), "propagation is not allowed"},
@@ -104,6 +105,7 @@ func TestAppRoom(t *testing.T) {
 		{"external volume", map[string]any{"volumes": map[string]any{"cache": map[string]any{"name": "moin-web_cache", "external": true}}}, "external is not allowed"},
 		{"another app's network", map[string]any{"networks": map[string]any{"db": map[string]any{"name": "shop_default", "external": true}}}, "joins shop_default"},
 		{"network named like another", map[string]any{"networks": map[string]any{"default": map[string]any{"name": "shop_default"}}}, "not the app's"},
+		{"own subnet", map[string]any{"networks": map[string]any{"default": map[string]any{"name": "web_default", "ipam": map[string]any{"config": []any{map[string]any{"subnet": "10.0.0.0/8"}}}}}}, "ipam is not allowed"},
 		{"macvlan", map[string]any{"networks": map[string]any{"default": map[string]any{"name": "web_default", "driver": "macvlan"}}}, "driver macvlan"},
 		{"secret from a file", map[string]any{"secrets": map[string]any{"s": map[string]any{"file": "/var/run/docker.sock"}}}, "file is not allowed"},
 		{"config from a file", map[string]any{"configs": map[string]any{"c": map[string]any{"file": "/etc/shadow"}}}, "file is not allowed"},
@@ -119,6 +121,24 @@ func TestAppRoom(t *testing.T) {
 				t.Fatalf("reason = %q, want %q", reason, test.want)
 			}
 		})
+	}
+}
+
+// TestAppRoomMounts allows the folders of the server the rules list, and
+// nothing next to them.
+func TestAppRoomMounts(t *testing.T) {
+	media := t.TempDir()
+	box := appRoom{dataDir: t.TempDir(), releasesDir: t.TempDir(), mounts: []string{media}}
+	bind := func(source string) map[string]any {
+		return map[string]any{"services": map[string]any{"web": map[string]any{"volumes": []any{
+			map[string]any{"type": "bind", "source": source, "target": "/media", "read_only": true},
+		}}}}
+	}
+	if reason := box.check(bind(media)); reason != "" {
+		t.Fatalf("refused a folder of mounts: %s", reason)
+	}
+	if reason := box.check(bind(filepath.Dir(media))); !strings.Contains(reason, "mounts: <folder>") {
+		t.Fatalf("reason = %q", reason)
 	}
 }
 
@@ -159,5 +179,14 @@ func TestServerAccessRule(t *testing.T) {
 	}
 	if _, err := parseRules("server-access: yes\n", "rules"); err == nil {
 		t.Fatal("took server-access: yes")
+	}
+	rules, err = parseRules("mounts: /mnt/media, /srv/photos\n", "rules")
+	if err != nil || strings.Join(rules.Mounts, " ") != "/mnt/media /srv/photos" || rules.Lines()[0] != "mounts: /mnt/media, /srv/photos" {
+		t.Fatalf("rules = %+v, %v", rules, err)
+	}
+	for _, wrong := range []string{"mounts: media\n", "mounts: /mnt/../etc\n", "mounts: /mnt/\n"} {
+		if _, err := parseRules(wrong, "rules"); err == nil {
+			t.Errorf("took %q", wrong)
+		}
 	}
 }

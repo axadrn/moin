@@ -107,10 +107,9 @@ const (
 	// hub that does not know it drops it.
 	TypeServerSecurity MessageType = "server.security"
 
-	// TypeDaemonUpdate has the daemon replace its binary with the one the
-	// hub serves under DownloadPath, check it against SHA256 and
-	// restart (DaemonUpdate). The daemon answers with TypeOK before it
-	// restarts, or with TypeError and changes nothing.
+	// TypeDaemonUpdate has the daemon replace its binary with the signed
+	// release of Version and restart (DaemonUpdate). The daemon answers
+	// with TypeOK before it restarts, or with TypeError and changes nothing.
 	TypeDaemonUpdate MessageType = "daemon.update"
 
 	// TypeDaemonURL tells the daemon the hub's address when it

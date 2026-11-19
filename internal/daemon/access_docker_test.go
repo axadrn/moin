@@ -86,8 +86,10 @@ func TestAppRoomRefused(t *testing.T) {
 		{name: "unconfined", service: "    security_opt: [seccomp=unconfined]\n", want: "security_opt seccomp=unconfined"},
 		{name: "hook", service: "    post_start:\n      - command: id\n        privileged: true\n", want: "post_start is not allowed"},
 		{name: "docker socket", service: "    volumes: [/var/run/docker.sock:/var/run/docker.sock]\n", want: "mounts /var/run/docker.sock"},
-		{name: "root folder", service: "    volumes: [/:/host:ro]\n", want: "mounts / of the server"},
-		{name: "the app folder", service: "    volumes: [../../..:/app]\n", want: "of the server"},
+		{name: "root folder", service: "    volumes: [/:/host:ro]\n", want: "mounts /, which is not a folder of the app"},
+		{name: "the app folder", service: "    volumes: [../../..:/app]\n", want: "which is not a folder of the app"},
+		{name: "source writable", service: "    volumes: [.:/app]\n", want: "of the source writable"},
+		{name: "own subnet", service: "    networks: [inner]\n", top: "networks:\n  inner:\n    ipam:\n      config: [{subnet: 10.0.0.0/8}]\n", want: "ipam is not allowed"},
 		{name: "time zone writable", service: "    volumes: [/etc/localtime:/etc/localtime]\n", want: "mounts /etc/localtime"},
 		{name: "bind volume", service: "    volumes: [root:/x]\n", top: "volumes:\n  root:\n    driver_opts:\n      type: none\n      o: rbind\n      device: /\n", want: "driver_opts is not allowed"},
 		{name: "disk volume", service: "    volumes: [disk:/x]\n", top: "volumes:\n  disk:\n    driver_opts:\n      type: ext4\n      device: /dev/sda1\n", want: "driver_opts is not allowed"},
@@ -113,11 +115,19 @@ func TestAppRoomRefused(t *testing.T) {
 	}
 }
 
+// TestSourceReadOnly lets a service see its source read-only.
+func TestSourceReadOnly(t *testing.T) {
+	reason, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    volumes: [.:/app:ro, ./data:/data]\n", nil)
+	if err != nil || reason != "" {
+		t.Fatalf("refused the source read-only: %v %s", err, reason)
+	}
+}
+
 // TestEnvFileOutsideSource refuses an env file of the server before compose
 // reads it into the compose file.
 func TestEnvFileOutsideSource(t *testing.T) {
 	_, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: /etc/hostname\n", nil)
-	if err == nil || !strings.Contains(err.Error(), "env_file /etc/hostname is not in the app's source") {
+	if err == nil || !strings.Contains(err.Error(), "/etc/hostname is not in the app's source") {
 		t.Fatalf("err = %v", err)
 	}
 	reason, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: [{path: app.env, required: false}]\n", nil)

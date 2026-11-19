@@ -77,7 +77,12 @@ func TestRailpackDocker(t *testing.T) {
 			}
 			var log strings.Builder
 			logf := func(format string, args ...any) { fmt.Fprintf(&log, format+"\n", args...) }
-			err = a.run(ctx, logf, buildEnv(env), "compose", "-p", project(app), "-f", composeFile, "--progress", "plain", "build")
+			envFiles, err := writeEnvFile(releaseDir, env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := append([]string{"compose", "-p", project(app), "-f", composeFile}, envFiles...)
+			err = a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 			if err != nil {
 				t.Fatalf("build: %v\n%s", err, tail(log.String(), 40))
 			}

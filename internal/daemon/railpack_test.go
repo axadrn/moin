@@ -3,6 +3,7 @@ package daemon
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -34,7 +35,7 @@ func TestRailpackPrepareArgs(t *testing.T) {
 }
 
 // TestRailpackSecrets: the build gets each env name as a secret read from
-// the environment, and a hash that changes with the values; no value lands
+// the env file, and a hash that changes with the values; no value lands
 // in the compose file.
 func TestRailpackSecrets(t *testing.T) {
 	build := func(env map[string]string) (map[string]any, string) {
@@ -65,9 +66,6 @@ func TestRailpackSecrets(t *testing.T) {
 	railpackSecrets(config, service, map[string]string{"A": "b"})
 	if len(config) != 0 || service["build"] != nil {
 		t.Errorf("a service not built gets no secrets: %v %v", config, service)
-	}
-	if env := buildEnv(map[string]string{"B": "2", "A": "1", "x y": "3"}); strings.Join(env, ",") != "A=1,B=2" {
-		t.Errorf("buildEnv = %v", env)
 	}
 }
 
@@ -115,5 +113,33 @@ func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 		if !strings.Contains(string(body), `"TOKEN": "abc"`) {
 			t.Errorf("%s: the container lacks its env:\n%s", kind, body)
 		}
+	}
+}
+
+// TestWriteEnvFile writes values compose reads back exactly, and only
+// names a shell and compose take.
+func TestWriteEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	args, err := writeEnvFile(dir, map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "x y": "3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(args, " ") != "--env-file "+filepath.Join(dir, "app.env") {
+		t.Fatalf("args = %v", args)
+	}
+	body, _ := os.ReadFile(filepath.Join(dir, "app.env"))
+	want := "A=\"1\"\nB=\"it's \\\"q\\\" \\\\ \\$HOME \\${X}\\nline\\r\"\n"
+	if string(body) != want {
+		t.Fatalf("app.env = %q, want %q", body, want)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", ".env"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	args, _ = writeEnvFile(dir, nil)
+	if len(args) != 4 || args[1] != filepath.Join(dir, "src", ".env") {
+		t.Fatalf("the source's .env goes first: %v", args)
 	}
 }

@@ -1,9 +1,9 @@
 package pages
 
-// homeHarbor is the still wall of containers under the headline: every
-// container is an app, your-app among them in ink. A few stand out of the
-// wall; light from the top right gives them shaded sides and a short
-// shadow down to the left. Its foot is the foot of the first screen.
+// homeHarbor is the still wall of containers in the home page's last card:
+// every container is an app, your-app among them in ink. A few stand out of
+// the wall; light from the top right gives them shaded sides and a short
+// shadow down to the left. Its foot is the card's bottom edge.
 templ homeHarbor() {
 	<svg
 		viewBox={ harborN(harborLeftX) + " " + harborN(harborTopY) + " " + harborN(harborW) + " " + harborN(harborH-harborTopY) }
@@ -97,4 +97,14 @@ templ harborContainer(x, y int, b harborCrate) {
 		<rect x={ harborN(x) } y={ harborN(y) } width="4" height={ harborN(harborBoxH) }></rect>
 		<rect x={ harborN(x + harborBoxW - 4) } y={ harborN(y) } width="4" height={ harborN(harborBoxH) }></rect>
 	</g>
+}
+
+// homeGulls are three gulls over the wall, far and small: a curve for each
+// wing. Hamburg is its port, and the port is its gulls.
+templ homeGulls() {
+	<svg viewBox="0 0 120 40" class="hub-gulls" aria-hidden="true">
+		<path d="M4 18 C8 12 13 11 16 16 C19 11 24 12 28 18"></path>
+		<path d="M48 8 C51 4 54 4 56 7 C58 4 61 4 64 8"></path>
+		<path d="M86 28 C89 23 93 23 95 27 C97 23 101 23 104 28"></path>
+	</svg>
 }
