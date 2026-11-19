@@ -297,7 +297,7 @@ func (m model) stopApp(app string) tea.Cmd {
 }
 
 func (m model) deployImage(app, image string) tea.Cmd {
-	return m.started(app, "deploy", func() (client.Deploy, error) { return m.api.DeployImage(m.ctx, app, image) })
+	return m.started(app, "deploy", func() (client.Deploy, error) { return m.api.DeployImage(m.ctx, app, image, "") })
 }
 
 func (m model) deployRef(app, ref string) tea.Cmd {

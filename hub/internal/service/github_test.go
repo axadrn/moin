@@ -217,17 +217,18 @@ func TestGitHubDeploys(t *testing.T) {
 	if err != nil || app.Repo != "axadrn/blog" || app.Branch != "main" || !app.AutoDeploy || app.InstallationID != 7 {
 		t.Fatalf("link = %+v, %v", app, err)
 	}
-	// One thing brings new versions: a deploy hook unlinks the repo, and
-	// linking a repo turns the hook off.
+	// One thing brings new versions: a deploy hook turns deploy on push
+	// off and keeps the repo for the compose file; turning deploy on push
+	// on turns the hook off.
 	if _, err := apps.RotateDeployHook(owner, "blog"); err != nil {
 		t.Fatal(err)
 	}
-	if hooked, _ := apps.Get(owner.WorkspaceID, "blog"); hooked.Repo != "" || hooked.DeployHookHash == nil {
-		t.Fatalf("a deploy hook kept the repo: %+v", hooked)
+	if hooked, _ := apps.Get(owner.WorkspaceID, "blog"); hooked.Repo != "axadrn/blog" || hooked.AutoDeploy || hooked.DeployHookHash == nil || hooked.DeployFrom() != "ci" {
+		t.Fatalf("a deploy hook: %+v", hooked)
 	}
 	app, err = apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", true)
-	if err != nil || app.Repo != "axadrn/blog" || app.DeployHookHash != nil {
-		t.Fatalf("a link kept the deploy hook: %+v, %v", app, err)
+	if err != nil || app.Repo != "axadrn/blog" || !app.AutoDeploy || app.DeployHookHash != nil || app.DeployFrom() != "github" {
+		t.Fatalf("deploy on push kept the deploy hook: %+v, %v", app, err)
 	}
 	if _, err := apps.DeployRef(ctx, owner, "blog", "nope"); !errors.Is(err, ErrRef) {
 		t.Fatalf("deploy an unknown ref: err = %v", err)
@@ -376,5 +377,102 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 	}
 	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
 		t.Fatalf("other workspace installations = %+v", installations)
+	}
+}
+
+// TestImageDeploysTakeTheCommit: an image deploy of an app that follows a
+// repo takes the compose file of a commit there, the one CI sends to the
+// hook or names by hand, else the head of the branch. Turning the hook
+// off leaves the link as it is.
+func TestImageDeploysTakeTheCommit(t *testing.T) {
+	apps, servers, server, daemon := newAppService(t)
+	githubServer := (&fakeGitHub{}).serve(t)
+	defer githubServer.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	github, err := NewGitHub("123", "moin-test", string(keyPEM), "hook-secret", "", "", githubServer.URL, githubServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apps.SetGitHub(github)
+	ctx := context.Background()
+	link, _ := apps.GitHubInstallURL(owner)
+	parsed, _ := url.Parse(link)
+	if _, err := apps.ConnectGitHub(ctx, owner, 7, parsed.Query().Get("state"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", true); err != nil {
+		t.Fatal(err)
+	}
+	hook, err := apps.RotateDeployHook(owner, "blog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := hook[strings.LastIndex(hook, "/")+1:]
+	deployed := func(deploy *model.Deploy, image, ref string) {
+		t.Helper()
+		var start protocol.DeployStart
+		daemon.last(t, protocol.TypeDeployStart, &start)
+		if start.Image != image || !strings.HasSuffix(start.SourceURL, "/repos/axadrn/blog/tarball/abc123") || !start.SourceStripTop {
+			t.Fatalf("deploy.start = %+v", start)
+		}
+		if deploy.Image != image || deploy.Ref != ref || deploy.CommitSHA != "abc123" || deploy.CommitMessage != "Fix the footer" {
+			t.Fatalf("deploy = %+v", deploy)
+		}
+		daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	}
+
+	// By hand: the head of the branch, or the ref named.
+	first, err := apps.Deploy(ctx, owner, "blog", "ghcr.io/me/blog:v1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deployed(first, "ghcr.io/me/blog:v1", "main")
+	second, err := apps.Deploy(ctx, owner, "blog", "ghcr.io/me/blog:v2", "abc123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deployed(second, "ghcr.io/me/blog:v2", "abc123")
+
+	// The hook: the commit CI sends, else the head of the branch.
+	_, deploy, err := apps.DeployHook(ctx, token, "ghcr.io/me/blog:abc", "abc123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deployed(deploy, "ghcr.io/me/blog:abc", "abc123")
+	if _, deploy, err = apps.DeployHook(ctx, token, "ghcr.io/me/blog:def", ""); err != nil {
+		t.Fatal(err)
+	}
+	deployed(deploy, "ghcr.io/me/blog:def", "main")
+	if _, _, err := apps.DeployHook(ctx, token, "ghcr.io/me/blog:ghi", "--upload-pack=x"); !errors.Is(err, ErrRefName) {
+		t.Fatalf("a commit that is no name: err = %v", err)
+	}
+	if _, _, err := apps.DeployHook(ctx, token, "ghcr.io/me/blog:ghi", "def456"); !errors.Is(err, ErrRef) {
+		t.Fatalf("a commit GitHub does not know: err = %v", err)
+	}
+	var refused *HookImageError
+	if _, _, err := apps.DeployHook(ctx, token, "nginx:1.27", "abc123"); !errors.As(err, &refused) {
+		t.Fatalf("hook deployed another image: err = %v", err)
+	}
+
+	// Turning the hook off leaves the link; pushes still do not deploy.
+	if _, err := apps.RemoveDeployHook(owner, "blog"); err != nil {
+		t.Fatal(err)
+	}
+	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.Repo != "axadrn/blog" || app.AutoDeploy || app.DeployFrom() != "github" {
+		t.Fatalf("after the hook: %+v", app)
+	}
+	// Deploy on push turns a hook off.
+	if _, err := apps.RotateDeployHook(owner, "blog"); err != nil {
+		t.Fatal(err)
+	}
+	if app, err := apps.SetAutoDeploy(owner, "blog", true); err != nil || !app.AutoDeploy || app.DeployHookHash != nil {
+		t.Fatalf("deploy on push = %+v, %v", app, err)
 	}
 }

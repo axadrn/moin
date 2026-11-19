@@ -1517,7 +1517,7 @@ paths:
       tags: [Apps]
       operationId: createDeploy
       summary: Deploy
-      description: 'Starts a deploy. `{"image": "..."}` deploys an image built elsewhere with the compose file of the live deploy. `{"ref": "main"}` has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
+      description: 'Starts a deploy. `{"image": "..."}` deploys an image built elsewhere as the main service. For an app that follows a GitHub repo, the compose file comes from `ref` there, a branch, tag or commit, the linked branch without one; an app without a repo keeps the compose file of the live deploy and answers `no_repo` to a `ref`. `{"ref": "main"}` alone has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1553,7 +1553,7 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, `deploy_running` while another deploy of the app runs, `no_repo` for a ref without a linked repo.'
+          description: '`server_offline`, `deploy_running` while another deploy of the app runs, `no_repo` for a ref without a linked repo, `github_off` when this hub has no GitHub App.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
@@ -1748,7 +1748,7 @@ paths:
       tags: [Apps]
       operationId: rotateDeployHook
       summary: Create a deploy hook
-      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. One thing brings new versions: it unlinks the app's GitHub repo. CI calls `POST <url>` with `{"image": "ghcr.io/me/app:tag"}` or `?image=` after pushing an image. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs from its repo, gets `422` `validation_failed` on `image`. The hook reuses the compose file of the live deploy.'
+      description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. One thing brings new versions: it turns deploy on push off and keeps the linked GitHub repo, whose compose file each hook deploy takes. CI calls `POST <url>` after pushing an image, with `{"image": "ghcr.io/me/app:tag", "commit": "<sha>"}` or `?image=&commit=`, the commit the image was built from; without a commit, the head of the linked branch. An app without a repo keeps the compose file of the live deploy and refuses a commit with `409` `no_repo`. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs a build of its repo, gets `422` `validation_failed` on `image`. A commit that is no name or that GitHub does not know gets `422` on `commit`.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -3324,7 +3324,7 @@ paths:
       tags: [GitHub]
       operationId: setAppRepo
       summary: Link a repo
-      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`. One thing brings new versions, so it turns the app's deploy hook off.
+      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`; it turns the deploy hook off. One thing brings new versions, so it turns the app's deploy hook off.
       requestBody:
         required: true
         content:
@@ -5323,10 +5323,10 @@ components:
         deploy_from:
           type: string
           enum: ['', github, ci]
-          description: Where new versions come from, one at a time. `github` is the linked repo, `ci` the deploy hook, empty neither yet. Linking a repo or making a deploy hook switches it; unlinking or turning the hook off leaves it empty.
+          description: Where new versions come from, one at a time. `ci` is the deploy hook, which takes the compose file from the linked repo if there is one; `github` the linked repo; empty neither yet. Making a deploy hook or turning deploy on push on switches it; turning the hook off leaves `github` while a repo is linked; unlinking leaves it empty.
         hook_image:
           type: string
-          description: The image the deploy hook deploys new tags of, the one running now, without its tag. Empty while the app runs from its repo; the hook then deploys nothing until an image is deployed by hand.
+          description: The image the deploy hook deploys new tags of, the one running now, without its tag. Empty while the app runs a build of its repo; the hook then deploys nothing until an image is deployed by hand.
           example: ghcr.io/me/blog
         bucket:
           type: string

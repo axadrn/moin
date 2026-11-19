@@ -33,7 +33,9 @@ MCP: link_repo
 
 Deploy every push is on by default. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy. Or run [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) in the pushed repo: it links the app and deploys, without deploys on push.
 
-An app deploys from one place at a time: [GitHub or CI](/docs/guides/deploy#deploy-from). Linking a repo turns the deploy hook off, so moin asks first. `--yes` skips it.
+An app deploys from one place at a time: [GitHub or CI](/docs/guides/deploy#deploy-from). Deploy every push turns the deploy hook off, so moin asks first. `--yes` skips it.
+
+An app with a deploy hook links without deploy on push. Then CI keeps deploying, and each image deploy takes `compose.yml` from the repo: [Build in CI](/docs/guides/ci).
 
 ## Deploy from GitHub
 
@@ -83,6 +85,8 @@ MCP: link_repo
 ```
 
 `--auto=false` turns it off. `moin link <owner>/<repo>` turns it on again. The API and MCP call it `auto_deploy`. A push while a deploy runs is skipped. The next push, or **Deploy**, takes the newest commit.
+
+Turning it on turns the [deploy hook](/docs/guides/ci) off. Turning the hook on turns it off. While the hook is on, the web shows no switch: turn the hook off first.
 
 ## See the repos and branches
 

@@ -12,7 +12,8 @@ import (
 // AppSource is the "Deploy from" card of the Deploys section: one tab per
 // place new versions come from, GitHub or your CI, each with an icon; a
 // green dot marks the one in use, none while neither is set up. One at a
-// time: linking a repo turns the deploy hook off, a hook unlinks the repo.
+// time: a hook turns deploy on push off and keeps the repo linked, whose
+// compose file CI deploys take; deploy on push turns the hook off.
 // Under a tab only its own part, almost no words; the docs explain. Every
 // action in it answers the whole card.
 templ AppSource(view RepoView) {

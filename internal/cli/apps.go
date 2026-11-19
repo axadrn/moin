@@ -239,6 +239,9 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 		if app.HookImage != "" {
 			from += ": new tags of " + app.HookImage
 		}
+		if app.Repo != "" {
+			from += ", compose.yml from " + app.Repo
+		}
 	}
 	password := "off"
 	if app.Protected {
@@ -291,8 +294,8 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	flags := newFlags("deploy", "deploy [--server <server>] [--image <image>] [--ref <ref>] [--detach] [--yes] [app]").withApp().withYes()
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
-	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service; needs one deploy of the repo before, whose compose file it reuses")
-	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo")
+	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service, with the compose file of --ref in the linked GitHub repo")
+	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo; default its branch")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -310,14 +313,16 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if *ref != "" && !protocol.ValidRefName(*ref) {
 		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
-	if *image != "" && *ref == "" {
-		// The server keeps the compose file of the live deploy and pulls
-		// the image.
+	if *image != "" {
+		// The server takes the compose file of the ref from GitHub, or
+		// keeps the one of the live deploy for an app without a repo, and
+		// pulls the image.
 		step(stdout, "Deploying %s", *image)
-		started, err := api.DeployImage(ctx, name, *image)
+		started, err := api.DeployImage(ctx, name, *image, *ref)
 		if err != nil {
 			return err
 		}
+		printCommit(stdout, started)
 		return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 	}
 	from, commit := *ref, *ref
@@ -338,10 +343,15 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
+	printCommit(stdout, started)
+	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
+}
+
+// printCommit names the GitHub commit a deploy came from, if any.
+func printCommit(stdout io.Writer, started client.Deploy) {
 	if started.Commit != "" {
 		step(stdout, "commit %s %s", started.Commit[:min(7, len(started.Commit))], style.Muted.Render(started.CommitMessage))
 	}
-	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 }
 
 // followRepo makes the app follow repo before moin deploy deploys a commit
@@ -365,11 +375,6 @@ func followRepo(ctx context.Context, api *client.Client, name, server, repo stri
 		return nil
 	case detail.App.Repo != "":
 		return fmt.Errorf("%s follows %s, and this folder is %s: link it with %s link %s %s, then deploy again", name, detail.App.Repo, repo, build.Name, repo, name)
-	case detail.App.Hook:
-		err = confirm(stdin, stdout, yes, fmt.Sprintf("Link %s to %s? Its deploy hook turns off. CI can no longer deploy it.", name, repo))
-		if err != nil {
-			return err
-		}
 	}
 	app, err := linkRepo(ctx, api, name, repo, "", false)
 	if err != nil {
@@ -688,7 +693,7 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // hook gives the app a new deploy hook URL for CI. It asks first when the
-// old URL stops working or the repo unlinks.
+// old URL stops working or pushes stop deploying.
 func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("hook", "hook [app] [--yes], or hook off [app] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
@@ -717,15 +722,16 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if err != nil {
 		return err
 	}
-	// Only a hook that exists stops working, and only a linked repo
-	// unlinks: one thing brings new versions. The first hook of an app
-	// without a repo asks nothing.
+	// Only a hook that exists stops working, and only deploy on push
+	// turns off: one thing brings new versions. The repo stays linked for
+	// the compose file. The first hook of an app without deploy on push
+	// asks nothing.
 	question := ""
 	if detail.App.Hook {
 		question = fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name)
 	}
-	if detail.App.Repo != "" {
-		question = fmt.Sprintf("Make a deploy hook for %s? It unlinks %s. Pushes no longer deploy it.", name, detail.App.Repo)
+	if detail.App.AutoDeploy {
+		question = fmt.Sprintf("Make a deploy hook for %s? Pushes to %s no longer deploy it; CI does.", name, detail.App.Repo)
 	}
 	if question != "" {
 		err = confirm(stdin, stdout, flags.yes(), question)

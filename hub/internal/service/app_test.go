@@ -396,7 +396,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.Deploy(owner, "blog", "not an image"); !errors.Is(err, ErrImage) {
+	if _, err := apps.Deploy(context.Background(), owner, "blog", "not an image", ""); !errors.Is(err, ErrImage) {
 		t.Fatalf("bad image: err = %v", err)
 	}
 	if err := apps.SetRegistry(owner, "https://ghcr.io", "me", "x"); !errors.Is(err, ErrRegistryHost) {
@@ -418,17 +418,25 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	}
 	token := url[strings.LastIndex(url, "/")+1:]
 	var refused *HookImageError
-	if _, _, err := apps.DeployHook(token, "ghcr.io/me/blog:abc"); !errors.As(err, &refused) || refused.Image != "" {
+	if _, _, err := apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:abc", ""); !errors.As(err, &refused) || refused.Image != "" {
 		t.Fatalf("hook before an image runs: err = %v", err)
 	}
-	first, err := apps.Deploy(owner, "blog", "ghcr.io/me/blog:v1")
+	// An app without a repo keeps the compose file it runs: a commit
+	// means nothing there.
+	if _, err := apps.Deploy(context.Background(), owner, "blog", "ghcr.io/me/blog:v1", "main"); !errors.Is(err, ErrNoRepo) {
+		t.Fatalf("a ref without a repo: err = %v", err)
+	}
+	if _, err := apps.Deploy(context.Background(), owner, "blog", "ghcr.io/me/blog:v1", "--upload-pack=x"); !errors.Is(err, ErrRefName) {
+		t.Fatalf("a ref that is no name: err = %v", err)
+	}
+	first, err := apps.Deploy(context.Background(), owner, "blog", "ghcr.io/me/blog:v1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
 
 	// Then the hook deploys a new tag and hands the daemon the matching login.
-	_, deploy, err := apps.DeployHook(token, "ghcr.io/me/blog:abc")
+	_, deploy, err := apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:abc", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,6 +446,9 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatalf("deploy.start = %+v", start)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	if _, _, err := apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:abc", "abc123"); !errors.Is(err, ErrNoRepo) {
+		t.Fatalf("hook with a commit without a repo: err = %v", err)
+	}
 
 	// A restart runs the same image, so the hook keeps deploying its new
 	// tags. A rollback, to the restart too, runs the image of then.
@@ -446,7 +457,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		t.Fatal(err)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: restart.ID, OK: true})
-	_, deploy, err = apps.DeployHook(token, "ghcr.io/me/blog:def")
+	_, deploy, err = apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:def", "")
 	if err != nil {
 		t.Fatalf("hook after a restart: %v", err)
 	}
@@ -459,7 +470,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.LiveImage != "ghcr.io/me/blog:abc" {
 		t.Fatalf("after the rollback the image is %q", app.LiveImage)
 	}
-	if _, deploy, err = apps.DeployHook(token, "ghcr.io/me/blog:ghi"); err != nil {
+	if _, deploy, err = apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:ghi", ""); err != nil {
 		t.Fatalf("hook after a rollback: %v", err)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
@@ -467,13 +478,13 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	// A leaked hook URL cannot start another image, not even one with the
 	// same name on another host.
 	for _, other := range []string{"nginx:1.27", "ghcr.io/evil/blog:abc", "evil.example.com/me/blog:abc"} {
-		if _, _, err := apps.DeployHook(token, other); !errors.As(err, &refused) || refused.Image != "ghcr.io/me/blog" {
+		if _, _, err := apps.DeployHook(context.Background(), token, other, ""); !errors.As(err, &refused) || refused.Image != "ghcr.io/me/blog" {
 			t.Fatalf("hook deployed %s: err = %v", other, err)
 		}
 	}
 
 	// A Docker Hub image gets no ghcr.io login; a redeploy pulls the image again.
-	deploy, err = apps.Deploy(owner, "blog", "nginx:1.27")
+	deploy, err = apps.Deploy(context.Background(), owner, "blog", "nginx:1.27", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +500,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	}
 
 	// A person changed the image by hand, so the hook follows it.
-	if _, _, err := apps.DeployHook(token, "ghcr.io/me/blog:abc"); !errors.As(err, &refused) || refused.Image != "docker.io/library/nginx" {
+	if _, _, err := apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:abc", ""); !errors.As(err, &refused) || refused.Image != "docker.io/library/nginx" {
 		t.Fatalf("hook after nginx by hand: err = %v", err)
 	}
 
@@ -497,7 +508,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	if _, err := apps.RotateDeployHook(owner, "blog"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := apps.DeployHook(token, "nginx:1.27"); !errors.Is(err, ErrDeployHook) {
+	if _, _, err := apps.DeployHook(context.Background(), token, "nginx:1.27", ""); !errors.Is(err, ErrDeployHook) {
 		t.Fatalf("old hook: err = %v", err)
 	}
 	if err := apps.RemoveRegistry(owner, "ghcr.io"); err != nil {

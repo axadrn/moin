@@ -16,6 +16,10 @@ inputs:
   image:
     description: Deploy this image, built and pushed earlier in the job, instead of the repo.
     required: false
+  commit:
+    description: The commit whose compose.yml an image deploy takes. Default the commit of the run; empty for an app that follows no repo.
+    required: false
+    default: ${{ github.sha }}
 runs:
   using: composite
   steps:
@@ -32,8 +36,10 @@ runs:
         MOIN_TOKEN: ${{ inputs.token }}
         APP: ${{ inputs.app }}
         IMAGE: ${{ inputs.image }}
+        COMMIT: ${{ inputs.commit }}
       run: |
         args=(deploy --yes)
         [ -n "$IMAGE" ] && args+=(--image "$IMAGE")
+        [ -n "$IMAGE" ] && [ -n "$COMMIT" ] && args+=(--ref "$COMMIT")
         [ -n "$APP" ] && args+=("$APP")
         "$RUNNER_TEMP/moin" "${args[@]}"

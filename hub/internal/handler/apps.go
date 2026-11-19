@@ -250,7 +250,7 @@ func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 
 // DeployImage deploys an image built elsewhere. The page follows the new deploy.
 func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
-	deploy, err := h.apps.Deploy(actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")))
+	deploy, err := h.apps.Deploy(r.Context(), actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")), "")
 	if err != nil {
 		failed(w, r, "Image not deployed", err, map[string]string{"image": "image-ref"})
 		return
@@ -294,8 +294,8 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderSourceWith(w, r, false, url)
-	if before.Repo != "" {
-		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once. "+before.Repo+" is unlinked.")
+	if before.AutoDeploy {
+		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once. Pushes to "+before.Repo+" no longer deploy.")
 		return
 	}
 	if before.DeployHookHash == nil {

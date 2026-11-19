@@ -67,7 +67,7 @@ Apps
 
 Deploys
   deploy             Deploy the pushed commit of this repo from GitHub: deploy [--server <server>] [--detach] [--yes] [app]; a new app asks first
-  deploy --image     Deploy a CI image with the compose file of an earlier deploy: deploy --image <image> [app]
+  deploy --image     Deploy a CI image with the compose file of a commit: deploy --image <image> [--ref <commit>] [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Build the newest source or pull the image again, with the current env
   restart            Start the live deploy again with the current env and domains: restart [app]
@@ -103,11 +103,11 @@ GitHub
   github             Where the moin GitHub App is installed, and the link to install it
   github repos       Repos moin may read, and where to give it more
   github branches    Branches of a repo: github branches owner/name
-  link               Follow a repo; turns the deploy hook off: link owner/name [--branch main] [--auto=false] [--yes]
+  link               Follow a repo; deploy on push turns the deploy hook off: link owner/name [--branch main] [--auto=false] [--yes]
   unlink             Stop following it: unlink [app] [--yes]
 
 CI
-  hook               New deploy hook URL for CI; unlinks the repo: hook [app] [--yes]
+  hook               New deploy hook URL for CI; pushes no longer deploy: hook [app] [--yes]
   hook off           Turn the deploy hook off; CI can no longer deploy: hook off [app] [--yes]
   registry           List registry logins for private images
   registry set       Save a login: registry set <host> <username>

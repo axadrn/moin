@@ -116,18 +116,18 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `POST /api/v1/apps/{app}/deploys` | write | deploys an image built in CI `{"image": "…"}`, or a branch, tag or commit of the linked GitHub repo `{"ref": "main"}` |
+| `POST /api/v1/apps/{app}/deploys` | write | deploys an image built in CI `{"image": "…"}`, with the compose file of `"ref"` in the linked repo, its branch by default; or a branch, tag or commit of the linked GitHub repo `{"ref": "main"}` |
 | `GET /api/v1/apps/{app}/deploys/{number}` | read | one deploy with its log |
 | `GET /api/v1/apps/{app}/deploys/{number}/events` | read | one deploy as server-sent events |
 | `POST /api/v1/apps/{app}/redeploy` | write | builds the newest source again, or runs the newest image again |
 | `POST /api/v1/apps/{app}/rollback` | write | starts an earlier deploy again |
-| `POST /api/v1/apps/{app}/hook` · `DELETE /apps/{app}/hook` | write | a new deploy hook URL, shown once, which unlinks the repo; turns the hook off |
-| `POST /webhooks/deploy/{token}` | the hook | what CI calls, with `?image=` or the body `{"image": "…"}`. Only a new tag of the app's `hook_image`, the image running now; another gets `422` |
+| `POST /api/v1/apps/{app}/hook` · `DELETE /apps/{app}/hook` | write | a new deploy hook URL, shown once, which turns deploy on push off and keeps the repo; turns the hook off |
+| `POST /webhooks/deploy/{token}` | the hook | what CI calls, with `?image=&commit=` or the body `{"image": "…", "commit": "…"}`. The commit's compose file comes from the linked repo, its branch without one; an app without a repo refuses a commit. Only a new tag of the app's `hook_image`, the image running now; another gets `422` |
 | `GET /api/v1/registries` | read | registry logins for private images |
 | `PUT` · `DELETE /api/v1/registries/{host}` | write | saves a login for a host like `ghcr.io`, `{"username", "password"}`, stored encrypted; removes it |
 | `GET /api/v1/github` · `GET /api/v1/github/repos` | read | GitHub installations with their `settings_url` and the install link; the repos moin may read |
 | `GET /api/v1/github/repos/{owner}/{repo}/branches` | read | the branches of a repo, the default first |
-| `PUT` · `DELETE /api/v1/apps/{app}/repo` | write | links a GitHub repo and branch, which turns the deploy hook off; unlinks it |
+| `PUT` · `DELETE /api/v1/apps/{app}/repo` | write | links a GitHub repo and branch; `auto_deploy` turns the deploy hook off; unlinks it |
 
 ## Catalog
 
