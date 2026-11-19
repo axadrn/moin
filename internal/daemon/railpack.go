@@ -282,8 +282,8 @@ func (a *apps) railpackPrepare(ctx context.Context, src, release string, env map
 }
 
 // railpackSecrets hands the app's env to the Railpack build of service as
-// BuildKit secrets: names in the compose file, values only in the
-// environment of docker compose build. secrets-hash rebuilds the steps that
+// BuildKit secrets: names in the compose file, values only in the env file
+// of docker compose build (writeEnvFile). secrets-hash rebuilds the steps that
 // use them when a value changes.
 func railpackSecrets(config, service map[string]any, env map[string]string) {
 	build, _ := service["build"].(map[string]any)
@@ -316,17 +316,4 @@ func railpackSecrets(config, service map[string]any, env map[string]string) {
 	}
 	args["secrets-hash"] = hex.EncodeToString(hash.Sum(nil))
 	build["args"] = args
-}
-
-// buildEnv is the environment of docker compose build: the app's env, for
-// the secrets a Railpack build reads.
-func buildEnv(env map[string]string) []string {
-	environment := make([]string, 0, len(env))
-	for name, value := range env {
-		if envNamePattern.MatchString(name) {
-			environment = append(environment, name+"="+value)
-		}
-	}
-	slices.Sort(environment)
-	return environment
 }

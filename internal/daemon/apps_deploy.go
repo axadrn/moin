@@ -344,12 +344,13 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	}
 	logf("building")
 	// A Railpack build reads the app's env as BuildKit secrets, from the
-	// environment of compose, never from its arguments.
-	var environment []string
-	if detected.Kind == "railpack" {
-		environment = buildEnv(start.Env)
+	// env file, never from docker's own environment or its arguments.
+	envFiles, err := writeEnvFile(release.dir, start.Env)
+	if err != nil {
+		return err
 	}
-	err := a.run(ctx, logf, environment, "compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--progress", "plain", "build")
+	args := append([]string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile}, envFiles...)
+	err = a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
 	}

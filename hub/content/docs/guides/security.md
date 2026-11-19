@@ -128,6 +128,10 @@ MCP: list_servers
 
 The CLI shows it in the ACCESS column, and `servers secure` line by line. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
 
+## Env of your apps
+
+Your app's env vars reach your app and nothing else. The daemon writes them to `app.env` in the release's folder on the server, readable by root only, and hands that file to Docker Compose with `--env-file`. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
+
 ## Rules
 
 A file on your server, `/etc/moin/rules`, says what moin may do there. Only you, as root on the server, can change it. The daemon checks every request against it.
