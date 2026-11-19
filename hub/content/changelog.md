@@ -3,6 +3,25 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.34
+
+November 19, 2026
+
+**In short:** A safer moin. Daemons install only signed releases, and an app's env vars reach only the app.
+
+### New
+- **The way to a live app**: Your first visit shows the steps from a server to an app that answers. (#91)
+
+### Changed
+- **Signed daemon updates**: Your daemons take each update straight from the GitHub release and check its signature first. Someone who takes over a hub cannot hand them anything else. Your servers need to reach `github.com` to update. (#94)
+
+### Fixed
+- **An app's env cannot steer Docker**: Env vars reach your app and nothing else. Before, one like `DOCKER_CONFIG` could make Docker run a program from the app's code. (#98)
+
+### Upgrade
+
+Self-hosted: **Update now**, or `sh update.sh`. CLI: `curl -fsSL https://moin.run/cli.sh | sh`. Your daemons update by themselves.
+
 ## v1.0.0-beta.33
 
 November 16, 2026
