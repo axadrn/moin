@@ -86,23 +86,28 @@ func openDatabase(ctx context.Context, path string, write bool) (conn *sql.Conn,
 // matchOwner gives the -wal and -shm files of a database the owner of the
 // database file. The daemon runs as root; an app that runs as another user
 // could not open files root created.
-func matchOwner(path string) {
-	info, err := os.Stat(path)
+func matchOwner(database protocol.Database) {
+	root, name, err := databaseFolder(database)
 	if err != nil {
 		return
 	}
-	matchOwnerOf(path, info)
+	defer root.Close()
+	info, err := root.Lstat(name)
+	if err != nil {
+		return
+	}
+	matchOwnerOf(root, name, info)
 }
 
-// matchOwnerOf gives the database at path and its -wal and -shm files the
-// owner in info.
-func matchOwnerOf(path string, info os.FileInfo) {
+// matchOwnerOf gives the database name in root and its -wal and -shm files
+// the owner in info.
+func matchOwnerOf(root *os.Root, name string, info os.FileInfo) {
 	owner, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return
 	}
 	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
-		_ = os.Lchown(path+suffix, int(owner.Uid), int(owner.Gid))
+		_ = root.Lchown(name+suffix, int(owner.Uid), int(owner.Gid))
 	}
 }
 
@@ -138,6 +143,9 @@ func (a *apps) tables(ctx context.Context, request protocol.DBRequest) (protocol
 	defer cancel()
 	if database.Postgres() {
 		return a.pgTables(ctx, request.App, database)
+	}
+	if err := plainDatabase(database); err != nil {
+		return protocol.DBTables{}, err
 	}
 	db, closeDB, err := openDatabase(ctx, database.HostPath, false)
 	if err != nil {
@@ -284,6 +292,9 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 	if database.Postgres() {
 		return a.pgQuery(ctx, request, database, before)
 	}
+	if err := plainDatabase(database); err != nil {
+		return protocol.DBResult{}, err
+	}
 	db, closeDB, err := openDatabase(ctx, database.HostPath, request.Write)
 	if err != nil {
 		return protocol.DBResult{}, err
@@ -293,7 +304,7 @@ func (a *apps) query(ctx context.Context, request protocol.DBQuery) (protocol.DB
 
 	if request.Write {
 		result.Before = before
-		defer matchOwner(database.HostPath)
+		defer matchOwner(database)
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return result, err

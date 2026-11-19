@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -299,7 +300,11 @@ func TestBackupSQLite(t *testing.T) {
 		t.Fatal("the copy carries no note of its size")
 	}
 	downloaded := filepath.Join(t.TempDir(), "copy.db")
-	if err := (&sqliteEngine{}).build(test.ctx, from, downloaded); err != nil {
+	out, err := os.Create(downloaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		t.Fatal(err)
 	}
 	body.Close()
@@ -526,14 +531,22 @@ func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) pr
 	test.t.Helper()
 	live, built := test.database.HostPath, test.database.HostPath+".moin-restore"
 	from := mustCopy(test.t, test, copy)
-	engine := &sqliteEngine{b: test.b, app: test.app, database: test.database}
-	if err := engine.build(test.ctx, from, built); err != nil {
+	root, name, err := databaseFolder(test.database)
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	defer root.Close()
+	out, err := os.Create(built)
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		test.t.Fatal(err)
 	}
 	if _, err := test.b.apps.stopServices(test.ctx, test.app); err != nil {
 		test.t.Fatal(err)
 	}
-	if err := checkpoint(test.ctx, live); err != nil {
+	if err := checkpoint(test.ctx, root, name); err != nil {
 		test.t.Fatal(err)
 	}
 	mark := test.killed()

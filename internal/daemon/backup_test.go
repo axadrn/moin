@@ -205,7 +205,12 @@ func TestLateAndSweep(t *testing.T) {
 		t.Fatalf("late: %+v", status)
 	}
 	os.MkdirAll(filepath.Join(dir, ".moin-copy-123"), 0o700)
-	sweepTemp(database.HostPath)
+	root, name, err := databaseFolder(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	sweepTemp(root, name)
 	if exists(filepath.Join(dir, ".moin-copy-123")) {
 		t.Fatal("the stray copy stayed")
 	}

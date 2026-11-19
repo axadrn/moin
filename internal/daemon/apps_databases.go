@@ -84,7 +84,7 @@ func addSQLiteFiles(databases []protocol.Database, folder, target string) []prot
 			continue
 		}
 		relative, _ := filepath.Rel(folder, file)
-		databases = append(databases, protocol.Database{Path: filepath.Join(target, relative), HostPath: file})
+		databases = append(databases, protocol.Database{Path: filepath.Join(target, relative), HostPath: file, HostFolder: folder})
 	}
 	return databases
 }

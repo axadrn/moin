@@ -71,6 +71,10 @@ func (a *apps) lock(app string) func() {
 
 func (a *apps) appDir(app string) string { return filepath.Join(a.dir, app) }
 
+// tempDir is the daemon's own folder for copies and checks, which no app
+// mounts: an app name never starts with a dot.
+func (a *apps) tempDir() string { return filepath.Join(a.dir, ".tmp") }
+
 func (a *apps) releaseDir(app string, number int) string {
 	return filepath.Join(a.appDir(app), "releases", strconv.Itoa(number))
 }

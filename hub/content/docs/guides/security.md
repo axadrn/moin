@@ -240,6 +240,7 @@ Everything else is refused. Some that come up:
 - A folder of the server, like a disk with your films for Jellyfin? Write `mounts: /mnt/media` in `/etc/moin/rules`. Apps may then mount exactly these folders, and nothing next to them.
 - Need more, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot. Then the list does not apply on that server at all, so put such a tool on a server of its own.
 - A deploy that does not come up stops its containers, so none of them keeps running half-started.
+- Backups, restores and the data browser touch an app's SQLite files only inside the folder they were found in, through Go's `os.Root`. A link the app leaves there never leads the daemon, which runs as root, out of it. Copies and checks are made in the daemon's own folder, which no app can reach.
 - What it does not stop: a deploy of a normal app still runs that app's code, with its data and env. Against code from somewhere else, set [`deploy-from`](#rules).
 
 ### See the rules of a server
