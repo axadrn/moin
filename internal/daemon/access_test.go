@@ -190,3 +190,31 @@ func TestServerAccessRule(t *testing.T) {
 		}
 	}
 }
+
+// TestDataFolderThroughLink makes no folder, as root, through a link a
+// container left in the data folders.
+func TestDataFolderThroughLink(t *testing.T) {
+	appDir := t.TempDir()
+	outside := t.TempDir()
+	volumesDir := filepath.Join(appDir, "volumes")
+	src := filepath.Join(appDir, "releases", "2", "src")
+	for _, dir := range []string{filepath.Join(volumesDir, "a"), src} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(outside, filepath.Join(volumesDir, "a", "l")); err != nil {
+		t.Fatal(err)
+	}
+	mount := map[string]any{"type": "bind", "source": filepath.Join(src, "a", "l", "x")}
+	if err := moveDataMount(mount, src, volumesDir); err == nil || !strings.Contains(err.Error(), "leads out of the app") {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "x")); err == nil {
+		t.Fatal("made a folder through the link")
+	}
+	fresh := map[string]any{"type": "bind", "source": filepath.Join(src, "data")}
+	if err := moveDataMount(fresh, src, filepath.Join(t.TempDir(), "volumes")); err != nil {
+		t.Fatalf("a first data folder: %v", err)
+	}
+}

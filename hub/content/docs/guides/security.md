@@ -216,7 +216,7 @@ The server checks the compose file as it will run, before anything builds or sta
 | limits: `mem_limit`, `cpus`, `pids_limit`, `ulimits`, `shm_size`, `deploy` resources and replicas | how much it may use |
 | `cap_drop`, `read_only`, `security_opt: no-new-privileges`, `sysctls` starting with `net.` | fewer powers, never more |
 | `labels`, `tty`, `stdin_open`, `platform`, `pull_policy`, `scale`, and `x-` extensions | the rest a normal app uses |
-| `include` and `extends` of files in the app's source | a compose file split into parts |
+| `extends` of a service in the same file | services that share settings |
 
 Everything else is refused. Some that come up:
 
@@ -229,9 +229,10 @@ Everything else is refused. Some that come up:
 | the app's source writable, like `.:/app` | a container could leave a link to `/` there for the next build or mount to follow. Mount it read-only (`.:/app:ro`) and keep data in `./data` |
 | a data folder inside one a container can write, like `./data` and `./data/db` together | the container could swap `db` for a link to `/` while the deploy starts. Side by side is fine: `./data/db` and `./data/uploads` |
 | named volumes with a `driver`, `driver_opts` or another name, networks of other apps | another disk, or another app's data |
-| `configs` and `secrets` from a `file`; `env_file`, `include` and `extends` of files outside the source, or with a `$` in the path | files of the server, read into the app |
+| `configs` and `secrets` from a `file`, an `env_file` outside the source | files of the server, read into the app |
+| `include`, and `extends` of another file | they read other compose files, which could be anywhere on the server. Put the services in one compose file |
 | a network with its own `ipam` subnet | the subnet could cover the server's own network and take its traffic; Docker picks a free one |
-| `build` from outside the source, `additional_contexts`, `ssh`, `privileged` or `network` | the same, while the image builds |
+| `build` from outside the source, `additional_contexts`, `ssh`, `privileged`, `network` or `tags` | the same, while the image builds. A tag like `traefik:v3.6` would replace moin's own proxy |
 | hooks like `post_start` | they can run with all powers |
 
 - The list is one place in the code: `serviceKeys` and the lists after it in `internal/daemon/access.go`, every line with what it is for. The catalog uses none of the refused settings.

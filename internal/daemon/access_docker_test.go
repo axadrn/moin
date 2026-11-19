@@ -124,14 +124,37 @@ func TestSourceReadOnly(t *testing.T) {
 }
 
 // TestEnvFileOutsideSource refuses an env file of the server before compose
-// reads it into the compose file.
+// reads it into the compose file, wherever compose would find it.
 func TestEnvFileOutsideSource(t *testing.T) {
-	_, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: /etc/hostname\n", nil)
-	if err == nil || !strings.Contains(err.Error(), "/etc/hostname is not in the app's source") {
-		t.Fatalf("err = %v", err)
+	for _, test := range []struct{ name, envFile string }{
+		{"absolute", "/etc/hostname"},
+		{"above the source", "../../../../../../../../etc/hostname"},
+		{"home", "~/.bashrc"},
+		{"through env", "${DIR}/hostname"},
+		{"second document", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			compose := "services:\n  web:\n    image: nginx:1\n    env_file: [{path: '" + test.envFile + "', required: false}]\n"
+			if test.envFile == "" {
+				compose = "services:\n  web:\n    image: nginx:1\n---\nservices:\n  web:\n    env_file: [{path: /etc/hostname, required: false}]\n"
+			}
+			_, err := checkResolved(t, compose, map[string]string{"DIR": "/etc"})
+			if err == nil || !strings.Contains(err.Error(), "is not in the app's source") {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	}
 	reason, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: [{path: app.env, required: false}]\n", nil)
 	if err != nil || reason != "" {
 		t.Fatalf("refused an env file of the source: %v %s", err, reason)
+	}
+}
+
+// TestBuildTagsRefused: a build may not name its image like another one,
+// such as the proxy's, which holds the Docker socket.
+func TestBuildTagsRefused(t *testing.T) {
+	reason, err := checkResolved(t, "services:\n  web:\n    build:\n      context: .\n      tags: ['traefik:v3.6']\n", nil)
+	if err != nil || !strings.Contains(reason, "tags is not allowed") {
+		t.Fatalf("reason = %q, err = %v", reason, err)
 	}
 }

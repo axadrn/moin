@@ -1,97 +1,88 @@
 package daemon
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"os"
-	"path/filepath"
-	"strings"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
 
-// checkSourceFiles refuses a compose file that names a file outside the
-// app's source, before docker compose reads it. include, extends and
-// env_file pull another file into the compose file, so /root/.aws/credentials
-// would reach the app before the server could check what runs. A path with
-// $ is refused too: the app's env, which the hub sets, would choose it.
-func checkSourceFiles(src string) error {
-	return checkFilesOf(resolved(src), composePath(src), 0)
-}
-
-func checkFilesOf(src, file string, depth int) error {
-	if depth > 8 {
-		return errors.New("compose files include each other too deep")
+// checkSourceFiles refuses a compose file that would read files of the
+// server into the app before the server sees what runs.
+//
+//   - include and extends with a file read other compose files, which could
+//     be anywhere on the server, so they are refused. Put the services in
+//     one compose file.
+//   - env_file is read into the compose file, so its path must be in the
+//     source. compose itself says where it points: after ~, ${VAR} and the
+//     project folder, which a second guess here would get wrong.
+//
+// envFiles are the --env-file arguments the deploy reads the file with.
+func (a *apps) checkSourceFiles(ctx context.Context, app, src string, envFiles []string) error {
+	if err := refuseIncludes(composePath(src)); err != nil {
+		return err
 	}
-	body, err := os.ReadFile(file)
+	args := append([]string{"compose", "-p", project(app), "--project-directory", src, "-f", composePath(src)}, envFiles...)
+	raw, err := a.output(ctx, "docker", append(args, "config", "--format", "json", "--no-env-resolution")...)
 	if err != nil {
 		return fmt.Errorf("compose.yml: %w", err)
 	}
 	var config struct {
-		Include  []any `yaml:"include"`
 		Services map[string]struct {
-			Extends any `yaml:"extends"`
-			EnvFile any `yaml:"env_file"`
-		} `yaml:"services"`
+			EnvFile []struct {
+				Path string `json:"path"`
+			} `json:"env_file"`
+		} `json:"services"`
 	}
-	if err := yaml.Unmarshal(body, &config); err != nil {
-		return fmt.Errorf("%s: %w", filepath.Base(file), err)
+	if err := json.Unmarshal([]byte(raw), &config); err != nil {
+		return fmt.Errorf("compose config: %w", err)
 	}
-	dir := filepath.Dir(file)
-	var included, named []string
-	for _, item := range config.Include {
-		if entry, ok := item.(map[string]any); ok {
-			included = append(included, paths(entry["path"])...)
-			named = append(named, paths(entry["env_file"])...)
-			named = append(named, paths(entry["project_directory"])...)
-			continue
-		}
-		included = append(included, paths(item)...)
-	}
-	for _, service := range config.Services {
-		if extends, ok := service.Extends.(map[string]any); ok {
-			included = append(included, paths(extends["file"])...)
-		}
-		named = append(named, paths(service.EnvFile)...)
-	}
-	for _, path := range append(named, included...) {
-		if strings.Contains(path, "$") {
-			return fmt.Errorf("%s: the path %s has a variable, so the server refuses it", filepath.Base(file), path)
-		}
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(dir, path)
-		}
-		if !within(src, resolved(path)) && resolved(path) != src {
-			return fmt.Errorf("%s: %s is not in the app's source, so the server refuses it", filepath.Base(file), path)
-		}
-	}
-	for _, path := range included {
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(dir, path)
-		}
-		if err := checkFilesOf(src, path, depth+1); err != nil {
-			return err
+	for _, name := range slices.Sorted(maps.Keys(config.Services)) {
+		for _, file := range config.Services[name].EnvFile {
+			if !within(resolved(src), resolved(file.Path)) {
+				return fmt.Errorf("service %s: env_file %s is not in the app's source, so the server refuses it", name, file.Path)
+			}
 		}
 	}
 	return nil
 }
 
-// paths are the file paths of a compose setting: one path, a list of them,
-// or a list of {path: ...}.
-func paths(value any) []string {
-	switch value := value.(type) {
-	case string:
-		return []string{value}
-	case []any:
-		var list []string
-		for _, item := range value {
-			if entry, ok := item.(map[string]any); ok {
-				list = append(list, paths(entry["path"])...)
-				continue
-			}
-			list = append(list, paths(item)...)
-		}
-		return list
+// refuseIncludes refuses include, and extends with a file, in any document
+// of the compose file.
+func refuseIncludes(file string) error {
+	reader, err := os.Open(file)
+	if err != nil {
+		return fmt.Errorf("compose.yml: %w", err)
 	}
-	return nil
+	defer reader.Close()
+	decoder := yaml.NewDecoder(reader)
+	for {
+		var document struct {
+			Include  any `yaml:"include"`
+			Services map[string]struct {
+				Extends any `yaml:"extends"`
+			} `yaml:"services"`
+		}
+		err := decoder.Decode(&document)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("compose.yml: %w", err)
+		}
+		if document.Include != nil {
+			return errors.New("compose.yml: include is not allowed, so the server refuses it: put the services in one compose file")
+		}
+		for name, service := range document.Services {
+			if extends, ok := service.Extends.(map[string]any); ok && extends["file"] != nil {
+				return fmt.Errorf("compose.yml: service %s extends another file, so the server refuses it: extend a service of the same file", name)
+			}
+		}
+	}
 }

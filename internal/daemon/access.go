@@ -66,7 +66,9 @@ var serviceKeys = map[string]string{
 	"scale":             "how many containers",
 }
 
-// buildKeys are the settings a build may use.
+// buildKeys are the settings a build may use. Not tags: a tag like
+// traefik:v3.6 would replace the image of moin's own proxy, which holds the
+// Docker socket.
 var buildKeys = map[string]string{
 	"context":           "checked: a folder of the release's source",
 	"dockerfile":        "checked: a file of the release, such as Railpack's plan",
@@ -74,7 +76,6 @@ var buildKeys = map[string]string{
 	"args":              "build arguments",
 	"target":            "the stage to build",
 	"secrets":           "the app's secrets, for the build",
-	"tags":              "more names for the image",
 	"labels":            "labels of the image",
 	"platforms":         "which CPUs to build for",
 	"shm_size":          "the size of /dev/shm",
@@ -95,8 +96,8 @@ var mountKeys = map[string]string{
 	"consistency": "a hint for Docker Desktop",
 }
 
-// topKeys are the settings of the compose file itself. Each of networks,
-// volumes, configs and secrets is checked in checkTop.
+// topKeys are the settings of the compose file itself. check checks each of
+// networks, volumes, configs and secrets.
 var topKeys = map[string]string{
 	"name":     "the project's name",
 	"services": "the services",
@@ -141,18 +142,18 @@ func (a *apps) checkCompose(release *release) error {
 	if err != nil {
 		return err
 	}
-	box := a.room(release, config)
-	if reason := box.check(config); reason != "" {
+	room := a.appRoom(release, config)
+	if reason := room.check(config); reason != "" {
 		return fmt.Errorf("%s: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in %s", reason, RulesFile())
 	}
 	return nil
 }
 
-// room is what release may reach: the app's folders and volumes, the
+// appRoom is what release may reach: the app's folders and volumes, the
 // folders its rules allow, and the folders its containers write now.
-func (a *apps) room(release *release, config map[string]any) appRoom {
+func (a *apps) appRoom(release *release, config map[string]any) appRoom {
 	app := release.start.App
-	box := appRoom{
+	room := appRoom{
 		dataDir:     resolved(filepath.Join(a.appDir(app), "volumes")),
 		releasesDir: resolved(filepath.Join(a.appDir(app), "releases")),
 		volumes:     a.volumeNames(app),
@@ -160,15 +161,15 @@ func (a *apps) room(release *release, config map[string]any) appRoom {
 	}
 	if release.rules != nil {
 		for _, folder := range release.rules.Mounts {
-			box.mounts = append(box.mounts, resolved(folder))
+			room.mounts = append(room.mounts, resolved(folder))
 		}
 	}
 	if current := a.current(app); current > 0 && current != release.start.Number {
 		running, _ := readJSON(filepath.Join(a.releaseDir(app, current), "compose.json"))
-		box.writable = writableFolders(running)
+		room.writable = writableFolders(running)
 	}
-	box.writable = append(box.writable, writableFolders(config)...)
-	return box
+	room.writable = append(room.writable, writableFolders(config)...)
+	return room
 }
 
 // check names the first setting of config outside the room, "" when
@@ -223,13 +224,18 @@ func (r appRoom) checkNetwork(key string, value any) string {
 	if ipam, _ := network["ipam"].(map[string]any); len(ipam) > 0 {
 		return "ipam is not allowed"
 	}
-	switch {
-	case network["external"] == true && name != proxyNetwork:
-		return "joins " + name + ", which is not the app's"
-	case network["external"] != true && name != r.project+"_"+key:
-		return "the name " + name + " is not the app's"
-	case network["driver"] != nil && network["driver"] != "bridge":
+	if network["driver"] != nil && network["driver"] != "bridge" {
 		return fmt.Sprintf("driver %v", network["driver"])
+	}
+	// The only network of another project an app joins is the proxy's.
+	if network["external"] == true {
+		if name != proxyNetwork {
+			return "joins " + name + ", which is not the app's"
+		}
+		return ""
+	}
+	if name != r.project+"_"+key {
+		return "the name " + name + " is not the app's"
 	}
 	return ""
 }
@@ -299,15 +305,16 @@ func (r appRoom) checkBuild(build map[string]any) string {
 			return key + " is not allowed"
 		}
 	}
+	// Through links, as a mount: the build reads what they point at.
 	context, _ := build["context"].(string)
-	if !r.inSource(context) {
+	if !r.inSource(resolved(context)) {
 		return "the context " + context + " is not in the app's source"
 	}
 	if dockerfile, _ := build["dockerfile"].(string); dockerfile != "" {
 		if !filepath.IsAbs(dockerfile) {
 			dockerfile = filepath.Join(context, dockerfile)
 		}
-		if !within(r.releasesDir, dockerfile) {
+		if !within(r.releasesDir, resolved(dockerfile)) {
 			return "the Dockerfile " + dockerfile + " is not in the app's release"
 		}
 	}
@@ -323,20 +330,20 @@ func (r appRoom) checkMount(mount map[string]any) string {
 			return "mount option " + key + " is not allowed"
 		}
 	}
-	source, _ := mount["source"].(string)
-	switch mount["type"] {
-	case "volume", "tmpfs":
-		// compose config only lets a volume name one of the file's own,
-		// which checkTop checks.
+	if mount["type"] == "volume" || mount["type"] == "tmpfs" {
+		// compose lets a volume name only one of the file's own, which
+		// check checks.
 		return ""
-	case "bind":
-	default:
+	}
+	if mount["type"] != "bind" {
 		return fmt.Sprintf("a mount of type %v is not allowed", mount["type"])
 	}
 	if reason := onlyKeys(mount["bind"], "create_host_path", "selinux"); reason != "" {
 		return "bind: " + reason
 	}
-	if slices.Contains(timeFiles, source) && mount["read_only"] == true {
+	source, _ := mount["source"].(string)
+	readOnly := mount["read_only"] == true
+	if slices.Contains(timeFiles, source) && readOnly {
 		return ""
 	}
 	// What the path points at now, through any link a container made.
@@ -344,17 +351,15 @@ func (r appRoom) checkMount(mount map[string]any) string {
 	if err != nil {
 		return "mounts " + source + ", which is not there"
 	}
-	switch {
-	case r.inSource(target):
+	if r.inSource(target) {
 		// Code and config of the repo. Written, a container could leave a
 		// link there for the next build or mount to follow.
-		if mount["read_only"] != true {
+		if !readOnly {
 			return "mounts " + source + " of the source writable: mount it read-only, like ./config:/config:ro, and keep data in ./data"
 		}
 		return ""
-	case r.inData(target):
-	case slices.ContainsFunc(r.mounts, func(folder string) bool { return within(folder, target) }):
-	default:
+	}
+	if !r.inData(target) && !r.inMounts(target) {
 		return "mounts " + source + ", which is not a folder of the app. Allow a folder of the server with mounts: <folder> in " + RulesFile()
 	}
 	for _, folder := range r.writable {
@@ -371,16 +376,23 @@ func (r appRoom) inData(path string) bool {
 	return path != r.dataDir && within(r.dataDir, path)
 }
 
+// inMounts reports whether path is in a folder of the server the rules
+// allow with mounts:.
+func (r appRoom) inMounts(path string) bool {
+	return slices.ContainsFunc(r.mounts, func(folder string) bool { return within(folder, path) })
+}
+
 // inSource reports whether path is in the source of one of the app's
 // releases, releases/<n>/src, and not in the rest of a release, which holds
 // the compose file moin runs.
 func (r appRoom) inSource(path string) bool {
-	if !within(r.releasesDir, path) {
+	relative, err := filepath.Rel(r.releasesDir, path)
+	if err != nil || !within(r.releasesDir, path) {
 		return false
 	}
-	relative, _ := filepath.Rel(r.releasesDir, path)
-	parts := strings.Split(relative, string(filepath.Separator))
-	return len(parts) >= 2 && parts[1] == "src"
+	// <n>/src/...
+	release, rest, _ := strings.Cut(relative, string(filepath.Separator))
+	return release != "" && (rest == "src" || strings.HasPrefix(rest, "src"+string(filepath.Separator)))
 }
 
 // writableFolders are the folders the services of config mount writable,
