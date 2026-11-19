@@ -152,7 +152,7 @@ network: locked
 | `deploy-from: <sources>` | deploys from anywhere else |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
 | `network: locked` | changes to Web, SSH and the firewall: set them up first, then lock them. The daemon still puts back what drifts |
-| `server-access: on` | nothing: it allows [containers that reach into the server](#containers-that-reach-into-the-server), which moin refuses without it |
+| `server-access: on` | nothing: it allows [containers that reach beyond the app](#containers-that-reach-into-the-server), which moin refuses without it |
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
@@ -165,19 +165,39 @@ network: locked
 
 An app is a guest in your house. It gets its own room and stays there. Some containers ask for the master key instead: with it, they can open every door of the server. moin turns them away at the door, unless you say yes on the server.
 
-Some compose settings hand a container the whole server. Whoever deploys one is root on your server. So a deploy refuses them, with or without a rules file, and says which one: `service web: privileged: true, which reaches into the server. moin refuses it unless /etc/moin/rules has server-access: on`.
+So moin does not list what is forbidden. It lists what a normal app needs, and refuses everything else, with or without a rules file. A setting Docker adds tomorrow is refused too, until it is on the list.
+
+The server checks the compose file as it will run, before anything builds or starts. That holds for every deploy: new code, a new image, new env and a rollback. A refused deploy says which setting: `service web: privileged is not allowed: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in /etc/moin/rules`.
+
+| Allowed | What for |
+| --- | --- |
+| `image`, `build` from the app's source | what runs |
+| `command`, `entrypoint`, `environment`, `env_file` from the app's source, `working_dir`, `user` | how it runs |
+| `ports`, `expose`, `networks` of the app, `links`, `hostname`, `extra_hosts`, `dns` | how it is reached |
+| `volumes`: the app's data folders (`./data:/data`), files of its source, its named volumes, `tmpfs`, and `/etc/localtime` and `/etc/timezone` read-only | its data |
+| `configs` and `secrets` written in the file or from env | its settings |
+| `healthcheck`, `depends_on`, `restart`, `init`, `stop_signal`, `stop_grace_period` | how it starts, stops and is checked |
+| limits: `mem_limit`, `cpus`, `pids_limit`, `ulimits`, `shm_size`, `deploy` resources and replicas | how much it may use |
+| `cap_drop`, `read_only`, `security_opt: no-new-privileges`, `sysctls` starting with `net.` | fewer powers, never more |
+| `labels`, `tty`, `stdin_open`, `platform`, `pull_policy`, `scale`, and `x-` extensions | the rest a normal app uses |
+
+Everything else is refused. Some that come up:
 
 | Refused | Why |
 | --- | --- |
-| `privileged: true`, `cap_add`, `devices` | the container gets the kernel's powers or the server's hardware |
-| `network_mode`, `pid`, `ipc`, `userns_mode` or `cgroup` set to `host` | the container shares the server's network, processes or users |
-| `security_opt` with `unconfined` or `disable` | the container loses the walls Docker puts around it |
-| a mount of a folder outside the app, like `/`, `/etc` or `/var/run/docker.sock` | the container reads or writes the server, or starts containers of its own |
-| a volume with `o: bind` | the same, through a named volume |
-| `build` with `privileged: true` or `network: host` | the same, while the image builds |
+| `privileged`, `cap_add`, `devices`, `device_cgroup_rules`, GPUs | the kernel's powers or the server's hardware |
+| `network_mode`, `pid`, `ipc`, `userns_mode`, `cgroup` | the server's network, processes or users, or another container's |
+| `volumes_from` | the mounts of another container, like the proxy's Docker socket |
+| a mount outside the app's data folders and source, like `/`, `/etc` or `/var/run/docker.sock`, or the app's own folder, which holds the compose files moin runs | the container reads or writes the server |
+| a mount inside a folder a container can write | the container could swap it for a link to `/` while the deploy starts |
+| named volumes with a `driver`, `driver_opts` or another name, networks of other apps | another disk, or another app's data |
+| `configs` and `secrets` from a `file`, `env_file` outside the source | files of the server |
+| `build` from outside the source, `additional_contexts`, `ssh`, `privileged` or `network` | the same, while the image builds |
+| hooks like `post_start` | they can run with all powers |
 
-- Allowed: the app's own folders (`./data:/data`), named volumes, and `/etc/localtime` and `/etc/timezone` read-only (`:ro`).
-- Need one, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot.
+- The list is one place in the code: `serviceKeys` and the lists after it in `internal/daemon/access.go`, every line with what it is for. The catalog uses none of the refused settings.
+- Need one, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot. Then the list does not apply on that server at all, so put such a tool on a server of its own.
+- What it does not stop: a deploy of a normal app still runs that app's code, with its data and env. Against code from somewhere else, set [`deploy-from`](#rules).
 
 ### See the rules of a server
 

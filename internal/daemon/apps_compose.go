@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -73,6 +74,10 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[s
 	for key, value := range env {
 		vars = append(vars, key+"="+value)
 	}
+	err := a.checkEnvFiles(ctx, app, src, vars)
+	if err != nil {
+		return nil, err
+	}
 	raw, err := a.outputEnv(ctx, vars, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json")
 	if err != nil {
 		return nil, fmt.Errorf("compose.yml: %w", err)
@@ -83,6 +88,35 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[s
 		return nil, fmt.Errorf("compose config: %w", err)
 	}
 	return config, nil
+}
+
+// checkEnvFiles refuses an env_file outside the source before compose reads
+// it: compose writes its values into the compose file, so one like
+// /root/.aws/credentials would hand the server's secrets to the app.
+func (a *apps) checkEnvFiles(ctx context.Context, app, src string, vars []string) error {
+	raw, err := a.outputEnv(ctx, vars, "docker", "compose", "-p", project(app), "--project-directory", src, "-f", composePath(src), "config", "--format", "json", "--no-env-resolution")
+	if err != nil {
+		return fmt.Errorf("compose.yml: %w", err)
+	}
+	var config struct {
+		Services map[string]struct {
+			EnvFile []struct {
+				Path string `json:"path"`
+			} `json:"env_file"`
+		} `json:"services"`
+	}
+	err = json.Unmarshal([]byte(raw), &config)
+	if err != nil {
+		return fmt.Errorf("compose config: %w", err)
+	}
+	for _, name := range slices.Sorted(maps.Keys(config.Services)) {
+		for _, file := range config.Services[name].EnvFile {
+			if !within(src, file.Path) {
+				return fmt.Errorf("service %s: env_file %s is not in the app's source, so the server refuses it", name, file.Path)
+			}
+		}
+	}
+	return nil
 }
 
 // readConfigBlock reads the x-moin block of a compose file, nil when there

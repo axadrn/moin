@@ -251,4 +251,4 @@ You type the app's name to confirm, and the hub checks it. A script passes it as
 - Commands on an app take its name as the last word. Without it, moin uses the app of your folder: `app` in [x-moin](/docs/guides/config), or the folder's name.
 - moin never stores your code. The archive passes through your bucket and is gone once the server has it.
 - Your data survives every deploy: [how](/docs/concepts/how-moin-works#your-data-survives-every-deploy).
-- A deploy refuses containers that reach into the server, like `privileged: true` or a mount of `/var/run/docker.sock`. [Containers that reach into the server](/docs/guides/security#containers-that-reach-into-the-server)
+- A deploy refuses settings that reach beyond the app, like `privileged: true` or a mount of `/var/run/docker.sock`. A normal app needs none of them. [Containers that reach into the server](/docs/guides/security#containers-that-reach-into-the-server)

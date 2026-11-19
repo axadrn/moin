@@ -220,7 +220,13 @@ func (a *apps) rollBack(ctx context.Context, release *release) error {
 	if err == nil {
 		_ = os.WriteFile(filepath.Join(release.dir, "base.json"), base, 0o600)
 	}
-	return a.pinFile(ctx, release.start, release.composeFile)
+	err = a.pinFile(ctx, release.start, release.composeFile)
+	if err != nil {
+		return err
+	}
+	// An old release may come from before a rule, or its files may have
+	// changed since: check it as a new one.
+	return a.checkCompose(release)
 }
 
 // prepareRelease fetches the source, routes the app, writes compose.json and
@@ -269,10 +275,7 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 		return err
 	}
 	release.config, release.detected, err = a.resolve(ctx, start.App, src, start.Env)
-	if err != nil {
-		return err
-	}
-	return checkServerAccess(release.rules, a.appDir(start.App), release.config)
+	return err
 }
 
 // reuseRunningRelease keeps the compose file of the running release and its
@@ -306,6 +309,11 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 		return err
 	}
 	err = a.pinFile(ctx, release.start, release.composeFile)
+	if err != nil {
+		return err
+	}
+	// Before anything builds or starts: the file as it will run.
+	err = a.checkCompose(release)
 	if err != nil {
 		return err
 	}

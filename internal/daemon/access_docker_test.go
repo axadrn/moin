@@ -6,64 +6,122 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestServerAccessRefused reads each compose file through docker compose,
-// as a deploy does, so the check sees what compose really writes.
-func TestServerAccessRefused(t *testing.T) {
-	for _, test := range []struct {
-		name, service, want string
-	}{
-		{name: "privileged", service: "    privileged: true\n", want: "privileged: true"},
-		{name: "cap_add", service: "    cap_add: [SYS_ADMIN]\n", want: "cap_add"},
-		{name: "device", service: "    devices: [/dev/sda:/dev/sda]\n", want: "devices"},
-		{name: "host network", service: "    network_mode: host\n", want: "network_mode: host"},
-		{name: "host pid", service: "    pid: host\n", want: "pid: host"},
-		{name: "host ipc", service: "    ipc: host\n", want: "ipc: host"},
-		{name: "host userns", service: "    userns_mode: host\n", want: "userns_mode: host"},
-		{name: "unconfined", service: "    security_opt: [seccomp=unconfined]\n", want: "security_opt"},
-		{name: "apparmor off", service: "    security_opt: [\"apparmor:unconfined\"]\n", want: "security_opt"},
-		{name: "docker socket", service: "    volumes: [/var/run/docker.sock:/var/run/docker.sock]\n", want: "mounts /var/run/docker.sock"},
-		{name: "root folder", service: "    volumes: [/:/host:ro]\n", want: "mounts / "},
-		{name: "folder above the app", service: "    volumes: [../../../../etc:/x]\n", want: "mounts "},
-		{name: "time zone writable", service: "    volumes: [/etc/localtime:/etc/localtime]\n", want: "mounts /etc/localtime"},
-		{name: "privileged build", service: "    build:\n      context: .\n      privileged: true\n", want: "build: privileged"},
-		{name: "host build network", service: "    build:\n      context: .\n      network: host\n", want: "build: network: host"},
-		{name: "bind volume", service: "    volumes: [root:/x]\nvolumes:\n  root:\n    driver_opts:\n      type: none\n      o: bind\n      device: /\n", want: "volume root"},
-		{name: "plain app", service: "    volumes: [./data:/data, cache:/cache, /etc/localtime:/etc/localtime:ro]\n    cap_drop: [ALL]\n    security_opt: [no-new-privileges:true]\nvolumes:\n  cache: {}\n", want: ""},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			dir := t.TempDir()
-			a := newApps(dir, func(protocol.MessageType, string, any) {})
-			src := filepath.Join(a.appDir("access"), "releases", "1", "src")
-			if err := os.MkdirAll(src, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			compose := "services:\n  web:\n    image: nginx:1\n" + test.service
-			if err := os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			config, _, err := a.resolve(context.Background(), "access", src, nil)
+// checkResolved reads compose through docker compose, as a deploy does, and
+// checks it against the app's room, so the check sees what compose writes.
+func checkResolved(t *testing.T, compose string, env map[string]string) (string, error) {
+	t.Helper()
+	ctx := context.Background()
+	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	src := filepath.Join(a.appDir("web"), "releases", "1", "src")
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config, _, err := a.resolve(ctx, "web", src, env)
+	if err != nil {
+		return "", err
+	}
+	pinNames(config, "web", "web", func(volume string) string { return a.volumeName(ctx, "web", "", volume) })
+	box := appRoom{
+		dataDir:     resolved(filepath.Join(a.appDir("web"), "volumes")),
+		releasesDir: resolved(filepath.Join(a.appDir("web"), "releases")),
+		volumes:     a.volumeNames("web"),
+		project:     "web",
+		writable:    writableFolders(config),
+	}
+	return box.check(config), nil
+}
+
+// TestAppRoomCatalog passes every app of the catalog: they all stay in
+// their room.
+func TestAppRoomCatalog(t *testing.T) {
+	files, _ := filepath.Glob("../../hub/content/catalog/*/compose.yml")
+	if len(files) == 0 {
+		t.Fatal("no catalog")
+	}
+	vars := regexp.MustCompile(`\$\{([A-Z0-9_]+)`)
+	for _, file := range files {
+		t.Run(filepath.Base(filepath.Dir(file)), func(t *testing.T) {
+			body, err := os.ReadFile(file)
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = checkServerAccess(nil, a.appDir("access"), config)
-			if test.want == "" {
-				if err != nil {
-					t.Fatalf("refused a plain app: %v", err)
-				}
-				return
+			env := map[string]string{}
+			for _, match := range vars.FindAllStringSubmatch(string(body), -1) {
+				env[match[1]] = "1"
 			}
-			if err == nil || !strings.Contains(err.Error(), test.want) || !strings.Contains(err.Error(), "server-access: on") {
-				t.Fatalf("err = %v, want %q", err, test.want)
+			reason, err := checkResolved(t, string(body), env)
+			if err != nil {
+				t.Fatal(err)
 			}
-			if err := checkServerAccess(&protocol.Rules{ServerAccess: true}, a.appDir("access"), config); err != nil {
-				t.Fatalf("server-access: on still refused: %v", err)
+			if reason != "" {
+				t.Fatalf("refused: %s", reason)
 			}
 		})
+	}
+}
+
+// TestAppRoomRefused refuses compose files that reach into the server, in
+// the shape compose writes them.
+func TestAppRoomRefused(t *testing.T) {
+	for _, test := range []struct {
+		name, service, top, want string
+	}{
+		{name: "privileged", service: "    privileged: true\n", want: "privileged is not allowed"},
+		{name: "cap_add", service: "    cap_add: [SYS_ADMIN]\n", want: "cap_add is not allowed"},
+		{name: "device", service: "    devices: [/dev/sda:/dev/sda]\n", want: "devices is not allowed"},
+		{name: "device rules", service: "    device_cgroup_rules: ['b *:* rwm']\n", want: "device_cgroup_rules is not allowed"},
+		{name: "host network", service: "    network_mode: host\n", want: "network_mode is not allowed"},
+		{name: "host pid", service: "    pid: host\n", want: "pid is not allowed"},
+		{name: "proxy's mounts", service: "    volumes_from: ['container:moin-traefik']\n", want: "volumes_from is not allowed"},
+		{name: "unconfined", service: "    security_opt: [seccomp=unconfined]\n", want: "security_opt seccomp=unconfined"},
+		{name: "hook", service: "    post_start:\n      - command: id\n        privileged: true\n", want: "post_start is not allowed"},
+		{name: "docker socket", service: "    volumes: [/var/run/docker.sock:/var/run/docker.sock]\n", want: "mounts /var/run/docker.sock"},
+		{name: "root folder", service: "    volumes: [/:/host:ro]\n", want: "mounts / of the server"},
+		{name: "the app folder", service: "    volumes: [../../..:/app]\n", want: "of the server"},
+		{name: "time zone writable", service: "    volumes: [/etc/localtime:/etc/localtime]\n", want: "mounts /etc/localtime"},
+		{name: "bind volume", service: "    volumes: [root:/x]\n", top: "volumes:\n  root:\n    driver_opts:\n      type: none\n      o: rbind\n      device: /\n", want: "driver_opts is not allowed"},
+		{name: "disk volume", service: "    volumes: [disk:/x]\n", top: "volumes:\n  disk:\n    driver_opts:\n      type: ext4\n      device: /dev/sda1\n", want: "driver_opts is not allowed"},
+		{name: "another app's volume", service: "    volumes: [data:/x]\n", top: "volumes:\n  data:\n    name: moin-shop_data\n", want: "not the app's"},
+		{name: "another app's network", service: "    networks: [db]\n", top: "networks:\n  db:\n    name: shop_default\n    external: true\n", want: "joins shop_default"},
+		{name: "secret file", service: "    secrets: [s]\n", top: "secrets:\n  s:\n    file: /var/run/docker.sock\n", want: "file is not allowed"},
+		{name: "config file", service: "    configs: [c]\n", top: "configs:\n  c:\n    file: /etc/shadow\n", want: "file is not allowed"},
+		{name: "build context", service: "    build:\n      context: /root\n", want: "context /root"},
+		{name: "build contexts", service: "    build:\n      context: .\n      additional_contexts:\n        root: /\n", want: "additional_contexts is not allowed"},
+		{name: "privileged build", service: "    build:\n      context: .\n      privileged: true\n", want: "privileged is not allowed"},
+		{name: "host build network", service: "    build:\n      context: .\n      network: host\n", want: "network is not allowed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			compose := "services:\n  web:\n    image: nginx:1\n" + test.service + test.top
+			reason, err := checkResolved(t, compose, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(reason, test.want) {
+				t.Fatalf("reason = %q, want %q", reason, test.want)
+			}
+		})
+	}
+}
+
+// TestEnvFileOutsideSource refuses an env file of the server before compose
+// reads it into the compose file.
+func TestEnvFileOutsideSource(t *testing.T) {
+	_, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: /etc/hostname\n", nil)
+	if err == nil || !strings.Contains(err.Error(), "env_file /etc/hostname is not in the app's source") {
+		t.Fatalf("err = %v", err)
+	}
+	reason, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: [{path: app.env, required: false}]\n", nil)
+	if err != nil || reason != "" {
+		t.Fatalf("refused an env file of the source: %v %s", err, reason)
 	}
 }
