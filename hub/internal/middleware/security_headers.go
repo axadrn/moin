@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 	"strings"
+
+	"github.com/axadrn/moin/hub/internal/brand"
 )
 
 type SecurityHeadersConfig struct {
@@ -47,6 +49,7 @@ func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
 		"script-src 'self' 'nonce-" + nonce + "'" + frontendScriptPolicy + " https://" + umamiHost + " https://" + plausibleHost + " https://www.googletagmanager.com",
 		"style-src 'self' 'unsafe-inline'",
 		imageSources(cfg),
+		"media-src 'self' " + brand.Media,
 		"font-src 'self' data:",
 		"connect-src 'self' " + umamiConnect + " https://" + plausibleHost + " https://*.google-analytics.com https://analytics.google.com",
 		"frame-ancestors 'none'",
