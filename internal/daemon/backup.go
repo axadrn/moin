@@ -814,8 +814,12 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 func (b *backups) sweepTemp() {
 	for _, databases := range b.running() {
 		for _, database := range databases {
-			if !database.Postgres() {
-				sweepTemp(database.HostPath)
+			if database.Postgres() {
+				continue
+			}
+			if root, name, err := databaseFolder(database); err == nil {
+				sweepTemp(root, name)
+				root.Close()
 			}
 		}
 	}

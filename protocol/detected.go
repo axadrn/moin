@@ -53,9 +53,13 @@ func (d Detected) Built() string {
 type Database struct {
 	Path     string `json:"path"`
 	HostPath string `json:"host_path"`
-	Kind     string `json:"kind,omitempty"`
-	Service  string `json:"service,omitempty"`
-	Name     string `json:"name,omitempty"`
+	// HostFolder is the folder of the server HostPath was found in: the
+	// mount of the app. The daemon touches the file only through it, so a
+	// link the app leaves there never leads out of it.
+	HostFolder string `json:"host_folder,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Service    string `json:"service,omitempty"`
+	Name       string `json:"name,omitempty"`
 }
 
 // DatabasePostgres is the Kind of a Postgres service.
