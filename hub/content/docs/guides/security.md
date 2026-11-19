@@ -163,6 +163,8 @@ network: locked
 
 ### Containers that reach into the server
 
+An app is a guest in your house. It gets its own room and stays there. Some containers ask for the master key instead: with it, they can open every door of the server. moin turns them away at the door, unless you say yes on the server.
+
 Some compose settings hand a container the whole server. Whoever deploys one is root on your server. So a deploy refuses them, with or without a rules file, and says which one: `service web: privileged: true, which reaches into the server. moin refuses it unless /etc/moin/rules has server-access: on`.
 
 | Refused | Why |
