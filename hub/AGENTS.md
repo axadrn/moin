@@ -127,7 +127,7 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `internal/service/mailer` contains the selected mail adapter.
 - `internal/service/workspace.go` owns workspaces, roles, invitations, seats, and the activity.
 - `internal/storage` and `internal/service/file.go` own file storage.
-- `content/` is embedded in the binary (`content.FS`), read from disk in development. `content/docs` and `internal/service/docs.go` contain the Docs module.
+- `content/` is embedded in the binary (`content.FS`), read from disk in development. The catalog is `catalog/` at the root of the repo, built into the hub and the daemon. `content/docs` and `internal/service/docs.go` contain the Docs module.
 - `/ui` is the website of moin UI: `ui/docs` and `ui/blocks` at the repo root, `internal/handler/ui.go`, `internal/ui/pages/ui.templ`.
 
 ## Included product surface

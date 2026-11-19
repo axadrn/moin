@@ -21,7 +21,7 @@ func newServerService(t *testing.T) *ServerService {
 	return NewServerService(repository.NewServers(database), repository.NewActivity(database), "https://moin.example.com/")
 }
 
-var testHello = protocol.Hello{ProtocolVersion: protocol.Version, DaemonVersion: "v0.1.0", Hostname: "box", OS: "linux", Arch: "arm64"}
+var testHello = protocol.Hello{ProtocolVersion: protocol.Version, DaemonVersion: "v1.0.0-beta.35", Hostname: "box", OS: "linux", Arch: "arm64"}
 
 func TestInstallTokenWorksOnce(t *testing.T) {
 	servers := newServerService(t)

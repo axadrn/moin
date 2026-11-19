@@ -38,13 +38,17 @@ type DeployStart struct {
 	SourceDeleteURL     string `json:"source_delete_url,omitempty"`
 	// SourceNumber builds the source the server kept of release n again,
 	// for a redeploy; nothing is downloaded.
-	SourceNumber int               `json:"source_number,omitempty"`
-	SHA256       string            `json:"sha256,omitempty"`
-	FromNumber   int               `json:"from_number,omitempty"`
-	Image        string            `json:"image,omitempty"`
-	Registry     *Registry         `json:"registry,omitempty"`
-	Env          map[string]string `json:"env,omitempty"`
-	Domains      *Domains          `json:"routing,omitempty"`
+	SourceNumber int `json:"source_number,omitempty"`
+	// Catalog deploys the catalog app of this name, such as umami: the
+	// daemon takes its compose file from the catalog built into it, never
+	// from the hub. Daemons before v1.0.0-beta.35 do not know it.
+	Catalog    string            `json:"catalog,omitempty"`
+	SHA256     string            `json:"sha256,omitempty"`
+	FromNumber int               `json:"from_number,omitempty"`
+	Image      string            `json:"image,omitempty"`
+	Registry   *Registry         `json:"registry,omitempty"`
+	Env        map[string]string `json:"env,omitempty"`
+	Domains    *Domains          `json:"routing,omitempty"`
 }
 
 // Domains is how visitors reach the main service, as set in web, CLI, TUI

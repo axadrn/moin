@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-// TestEntries: every entry in content/catalog loads and is valid, so a
+// TestEntries: every entry in catalog/ loads and is valid, so a
 // broken one fails here, not on a customer's install.
 func TestEntries(t *testing.T) {
-	entries, err := Load(os.DirFS(filepath.Join("..", "..", "content")))
+	entries, err := Load(os.DirFS(filepath.Join("..", "..", "..", "catalog")))
 	if err != nil {
 		t.Fatal(err)
 	}

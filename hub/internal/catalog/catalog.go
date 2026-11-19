@@ -1,5 +1,5 @@
 // Package catalog is the list of open source apps moin installs in one
-// click. Each entry is a folder in content/catalog: app.md with what the
+// click. Each entry is a folder in catalog/ at the root of the repo: app.md with what the
 // app is, compose.yml with how it runs, and an optional logo.svg. They ship
 // with moin, so a self-hosted hub has the same catalog. Versions
 // come from the image's registry, asked by every hub itself.
@@ -87,9 +87,9 @@ func (e Entry) NeedsURL() bool {
 	return strings.Contains(string(e.Compose), "${"+URLVar+"}") || strings.Contains(string(e.Compose), "${"+DomainVar+"}")
 }
 
-// Load reads every entry under catalog/, sorted by name.
+// Load reads every entry of files, a folder each, sorted by name.
 func Load(files fs.FS) ([]Entry, error) {
-	folders, err := fs.ReadDir(files, "catalog")
+	folders, err := fs.ReadDir(files, ".")
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func Load(files fs.FS) ([]Entry, error) {
 		if !folder.IsDir() {
 			continue
 		}
-		entry, err := loadEntry(parser, files, path.Join("catalog", folder.Name()), folder.Name())
+		entry, err := loadEntry(parser, files, folder.Name(), folder.Name())
 		if err != nil {
 			return nil, fmt.Errorf("catalog %s: %w", folder.Name(), err)
 		}

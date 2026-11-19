@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -133,7 +134,7 @@ type release struct {
 
 // hasSource reports whether a deploy brings source code to build.
 func hasSource(start protocol.DeployStart) bool {
-	return start.SourceURL != "" || start.SourceNumber > 0
+	return start.SourceURL != "" || start.SourceNumber > 0 || start.Catalog != ""
 }
 
 // runDeploy runs the steps of one deploy in order: make the release, take
@@ -264,10 +265,14 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	start := release.start
 	src := filepath.Join(release.dir, "src")
 	var err error
-	if start.SourceURL != "" {
+	switch {
+	case start.Catalog != "":
+		release.logf("taking %s from the catalog", start.Catalog)
+		err = catalogSource(start.Catalog, src)
+	case start.SourceURL != "":
 		release.logf("downloading the source")
 		err = download(ctx, start, src)
-	} else {
+	default:
 		release.logf("building the source of v%d again", start.SourceNumber)
 		err = a.copySource(ctx, start.App, start.SourceNumber, src)
 	}
@@ -276,6 +281,19 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	}
 	release.config, release.detected, err = a.resolve(ctx, start.App, src, start.Env)
 	return err
+}
+
+// catalogSource writes the compose file of the catalog app into src, from
+// the catalog built into this daemon.
+func catalogSource(app, src string) error {
+	compose, ok := catalog.Compose(app)
+	if !ok {
+		return fmt.Errorf("the catalog of this daemon has no %s: update the daemon", app)
+	}
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(src, "compose.yml"), compose, 0o644)
 }
 
 // reuseRunningRelease keeps the compose file of the running release and its

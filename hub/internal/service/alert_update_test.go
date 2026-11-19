@@ -64,7 +64,7 @@ func updateActions(t *testing.T, catalogs *CatalogService) []string {
 // check and a restart send nothing, the next release alerts again, and an
 // app on the newest release gets nothing.
 func TestCheckUpdatesOncePerRelease(t *testing.T) {
-	catalogs, apps, _, _ := newCatalogService(t)
+	catalogs, apps, _ := newCatalogService(t)
 	app, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.4.0"})
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func TestCheckUpdatesOncePerRelease(t *testing.T) {
 // history.db after a restart, without asking a registry.
 func TestCatalogCacheServesARestart(t *testing.T) {
 	cache := newTestCatalogCache(t)
-	entries, err := catalog.Load(os.DirFS(filepath.Join("..", "..", "content")))
+	entries, err := catalog.Load(os.DirFS(filepath.Join("..", "..", "..", "catalog")))
 	if err != nil {
 		t.Fatal(err)
 	}
