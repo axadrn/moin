@@ -12,7 +12,8 @@ name: Deploy
 # Only main and tags ship: run by hand on another branch, it does nothing.
 # Forks only build: the deploy runs in axadrn/moin alone, with the
 # repository variables DEPLOY_HOST and TS_CLIENT_ID. The one secret is
-# RELEASE_SIGNING_KEY, which signs releases and never reaches the hub.
+# RELEASE_SIGNING_KEY in the environment release, which signs releases,
+# waits for a maintainer's approval and never reaches the hub.
 # Each job gets only the rights it needs.
 on:
   push:
@@ -77,6 +78,10 @@ jobs:
     needs: box
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
+    # RELEASE_SIGNING_KEY lives only in the environment release, which runs
+    # for v* tags and waits for a maintainer to approve. Another workflow,
+    # or an action someone slipped in, cannot reach the key.
+    environment: release
     permissions:
       contents: write
     steps:
