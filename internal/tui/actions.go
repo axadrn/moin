@@ -62,7 +62,7 @@ func (m model) appActions(name string) []action {
 		}})
 	}
 	if m.dir != "" && m.dirApp() == name {
-		out = append(out, action{"D", "deploy this dir", func(m model) (tea.Model, tea.Cmd) { return m.confirmDeployDir() }})
+		out = append(out, action{"D", "deploy this dir's commit", func(m model) (tea.Model, tea.Cmd) { return m.confirmDeployDir() }})
 	}
 	if a.Catalog != "" {
 		out = append(out, action{"U", "update release", func(m model) (tea.Model, tea.Cmd) {
@@ -98,7 +98,7 @@ func (m model) webPages() []page {
 		{"c", "Catalog", "Pick an app and fill in its form once.", "/catalog"},
 		{"t", "Team", "Invite people and change roles.", "/workspace"},
 		{"g", "Connect GitHub", "GitHub asks for a browser to install the app.", "/github/install"},
-		{"k", "Buckets", "Where backups and uploads go.", "/bucket"},
+		{"k", "Buckets", "Where backups go.", "/bucket"},
 		{"r", "Registries", "Logins for private images.", "/registries"},
 		{"n", "Alerts", "Slack, Discord, Telegram and webhooks.", "/alerts"},
 		data,

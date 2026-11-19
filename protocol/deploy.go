@@ -26,16 +26,15 @@ type DeployStart struct {
 	// AppID is the app's ID in the hub. Its backups live under
 	// it, so an app removed and created again with the same name starts
 	// with an empty backup folder.
-	AppID     string `json:"app_id,omitempty"`
-	Number    int    `json:"number"`
-	SourceURL string `json:"source_url,omitempty"`
-	// SourceAuthorization is sent with the download, such as a GitHub
+	AppID  string `json:"app_id,omitempty"`
+	Number int    `json:"number"`
+	// SourceURL is a GitHub tarball of one commit; the daemon downloads
+	// nothing else. SourceAuthorization is sent with the download, a GitHub
 	// token; SourceStripTop drops the one folder GitHub wraps a repo in.
-	// SourceDeleteURL deletes the source from the user's bucket once it is
-	// downloaded. The hub never holds the source itself.
+	// The hub never holds the source itself.
+	SourceURL           string `json:"source_url,omitempty"`
 	SourceAuthorization string `json:"source_authorization,omitempty"`
 	SourceStripTop      bool   `json:"source_strip_top,omitempty"`
-	SourceDeleteURL     string `json:"source_delete_url,omitempty"`
 	// SourceNumber builds the source the server kept of release n again,
 	// for a redeploy; nothing is downloaded.
 	SourceNumber int `json:"source_number,omitempty"`
@@ -43,7 +42,6 @@ type DeployStart struct {
 	// daemon takes its compose file from the catalog built into it, never
 	// from the hub. Daemons before v1.0.0-beta.35 do not know it.
 	Catalog    string            `json:"catalog,omitempty"`
-	SHA256     string            `json:"sha256,omitempty"`
 	FromNumber int               `json:"from_number,omitempty"`
 	Image      string            `json:"image,omitempty"`
 	Registry   *Registry         `json:"registry,omitempty"`

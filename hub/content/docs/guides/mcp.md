@@ -87,7 +87,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `edit_bucket` | changes a bucket; an empty `secret_key` keeps the stored one | write |
 | `set_default_bucket` | makes a bucket the default | write |
 | `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
-| `set_app_bucket` | moves an app's uploads and backups to a bucket; the copies start again there | write |
+| `set_app_bucket` | moves an app's backups to a bucket; the copies start again there | write |
 | `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
 | `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the last visit and the last outages | read |
 | `set_uptime` | the path uptime visits on a domain, or pauses and resumes it | write |

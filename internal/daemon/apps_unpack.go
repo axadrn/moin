@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -19,8 +17,12 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// download fetches the source tarball, checks its SHA-256 and unpacks it into dir.
+// download fetches the GitHub tarball of a commit and unpacks it into dir.
+// A source from anywhere else is refused.
 func download(ctx context.Context, start protocol.DeployStart, dir string) error {
+	if _, err := sourceName(start.SourceURL); err != nil {
+		return err
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, start.SourceURL, nil)
 	if err != nil {
 		return err
@@ -43,25 +45,7 @@ func download(ctx context.Context, start protocol.DeployStart, dir string) error
 	if len(body) > maxSourceSize {
 		return errors.New("download: the source is larger than 200 MB")
 	}
-	got := sha256.Sum256(body)
-	if start.SHA256 != "" && hex.EncodeToString(got[:]) != start.SHA256 {
-		return errors.New("download: the source does not match its SHA-256")
-	}
-	err = unpack(bytes.NewReader(body), dir, start.SourceStripTop)
-	if err != nil {
-		return err
-	}
-	if start.SourceDeleteURL != "" {
-		// The server keeps the source now; the bucket does not need it.
-		deletion, err := http.NewRequestWithContext(ctx, http.MethodDelete, start.SourceDeleteURL, nil)
-		if err == nil {
-			response, err := http.DefaultClient.Do(deletion)
-			if err == nil {
-				response.Body.Close()
-			}
-		}
-	}
-	return nil
+	return unpack(bytes.NewReader(body), dir, start.SourceStripTop)
 }
 
 // unpack extracts a gzipped tar of regular files and directories into dir.

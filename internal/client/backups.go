@@ -140,7 +140,7 @@ func (c *Client) RemoveBucket(ctx context.Context, name, confirm string) error {
 	return c.do(ctx, http.MethodDelete, "/api/v1/buckets/"+url.PathEscape(name)+"?confirm="+url.QueryEscape(confirm), nil, nil)
 }
 
-// SetAppBucket moves an app's uploads and new backups to a bucket; empty
+// SetAppBucket moves an app's new backups to a bucket; empty
 // follows the workspace's default.
 func (c *Client) SetAppBucket(ctx context.Context, app, bucket string) (App, error) {
 	var answer App

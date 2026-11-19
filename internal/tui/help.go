@@ -34,7 +34,7 @@ func (m model) helpGroups() []keyGroup {
 	case vOverview:
 		ks := []kb{{"enter", "open the selected one"}, {"tab", "next panel"}, {"shift+tab", "panel before"}, {"s", "servers"}, {"a", "activity"}, {"w", "web app"}}
 		if _, ok := m.findApp(m.dirApp()); ok && m.dir != "" {
-			ks = append(ks, kb{"D", "deploy this directory"})
+			ks = append(ks, kb{"D", "deploy the pushed commit of this directory"})
 		}
 		return []keyGroup{{"Overview", ks}}
 	case vApp:

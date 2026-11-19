@@ -60,7 +60,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `tab` · `shift+tab` | the next panel: apps, servers, what needs you; the one before |
 | `enter` | opens the selected app, server or issue |
 | `s` · `a` · `w` | the servers, the activity, the web app |
-| `D` | deploys the directory `moin` started in to its app, after `y`; `moin deploy` creates a new app |
+| `D` | deploys the commit the directory `moin` started in has on GitHub, to its app, after `y`; `moin deploy` creates and links a new app |
 
 ## App
 
@@ -74,7 +74,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `P` | rolls back to the deploy before the live one, after `y` |
 | `I` | deploys an image built in CI: type it, then `enter` |
 | `B` | deploys a branch, tag or commit of the linked GitHub repo; empty deploys the linked branch |
-| `D` | deploys the directory `moin` started in, when it is this app, after `y` |
+| `D` | deploys the commit the directory `moin` started in has on GitHub, when it is this app, after `y` |
 | `U` | updates a catalog app to its newest version, after `y` |
 | `N` | backs up the app's databases now |
 | `*` | pins the app, or unpins it: pinned apps stay above the others that run fine |
@@ -134,7 +134,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `c` | Catalog |
 | `t` | Team: invite people and change roles |
 | `g` | Connect GitHub |
-| `k` | Bucket: where backups and uploads go |
+| `k` | Bucket: where backups go |
 | `r` | Registries: logins for private images |
 | `n` | Alerts: Slack, Discord, Telegram and webhooks |
 | `d` | Data: browse and edit the rows of the open app's databases |

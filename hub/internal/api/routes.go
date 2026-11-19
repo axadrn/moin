@@ -147,7 +147,6 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PATCH /api/v1/apps/{app}", m.InWorkspace(h.Apps.Rename), TokenWrite},
 		{"DELETE /api/v1/apps/{app}", m.InWorkspace(h.Apps.Delete), TokenWrite},
 		{"POST /api/v1/apps/{app}/deploys", m.InWorkspace(h.Apps.CreateDeploy), TokenWrite},
-		{"POST /api/v1/apps/{app}/uploads", m.InWorkspace(h.Apps.CreateUpload), TokenWrite},
 		{"GET /api/v1/apps/{app}/deploys/{number}", m.InWorkspace(h.Apps.GetDeploy), TokenRead},
 		{"GET /api/v1/apps/{app}/deploys/{number}/events", m.InWorkspace(streams.wrap(h.Apps.DeployEvents)), TokenRead},
 		{"POST /api/v1/apps/{app}/rollback", m.InWorkspace(h.Apps.Rollback), TokenWrite},

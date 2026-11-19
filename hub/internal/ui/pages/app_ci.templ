@@ -37,7 +37,7 @@ templ appCI(view RepoView) {
 			<p class="moin-text" data-hook-image><span class="moin-muted">2</span> Hook</p>
 			<div class="moin-row" data-gap="2">
 				if on {
-					@hookOffButton(app, true, "Turn off")
+					@hookOffButton(app)
 					@newHookButton(app, "New hook")
 				} else {
 					@newHookButton(app, "Turn on")
@@ -56,10 +56,9 @@ templ appCI(view RepoView) {
 	</div>
 }
 
-// hookOffButton turns the deploy hook off, after asking. quiet is the
-// button next to New hook; else it names what it does.
-templ hookOffButton(app model.App, quiet bool, label string) {
-	@components.Button(components.ButtonProps{Quiet: quiet, Attrs: templ.Attributes{
+// hookOffButton turns the deploy hook off, after asking.
+templ hookOffButton(app model.App) {
+	@components.Button(components.ButtonProps{Quiet: true, Attrs: templ.Attributes{
 		"hx-delete":     ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/hook",
 		"hx-target":     "#app-source",
 		"hx-swap":       "outerHTML",
@@ -67,7 +66,7 @@ templ hookOffButton(app model.App, quiet bool, label string) {
 		"hx-confirm":    "Turn off the deploy hook? Its URL stops working and CI can no longer deploy " + app.Name + ".",
 		"data-hook-off": true,
 	}}) {
-		{ label }
+		Turn off
 	}
 }
 

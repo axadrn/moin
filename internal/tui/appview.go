@@ -143,7 +143,7 @@ func (m model) deploysTab(u ui, w, h int, a client.App) string {
 	}
 	deploys := m.app.detail.Deploys
 	if len(deploys) == 0 {
-		return u.panel("Deploys", "", []string{"", u.muted("No deploys yet. ") + u.text("D") + u.muted(" deploys this directory, ") + u.text("I") + u.muted(" an image.")}, w, h, true)
+		return u.panel("Deploys", "", []string{"", u.muted("No deploys yet. ") + u.text("D") + u.muted(" deploys the pushed commit of this directory, ") + u.text("I") + u.muted(" an image.")}, w, h, true)
 	}
 	wide := w >= 110
 	lw := w
@@ -233,7 +233,8 @@ func deployState(d client.Deploy, live int) (string, string) {
 	return d.Status, d.Status
 }
 
-// source says in a few words what a deploy shipped.
+// source says in a few words what a deploy shipped; nothing for a restart
+// or a catalog deploy.
 func source(d client.Deploy) string {
 	switch {
 	case d.CommitMessage != "":
@@ -246,7 +247,7 @@ func source(d client.Deploy) string {
 	case d.Ref != "":
 		return d.Ref
 	}
-	return "upload"
+	return ""
 }
 
 func short(sha string) string { return sha[:min(7, len(sha))] }

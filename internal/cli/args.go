@@ -105,11 +105,6 @@ func (f *flagSet) confirmed() string {
 // x-moin.app in compose.yml, then the directory name. A not found error
 // names it and where it came from.
 func (f *flagSet) app(argument string) (string, error) {
-	return f.appIn(argument, ".")
-}
-
-// appIn is app for the repo in dir.
-func (f *flagSet) appIn(argument, dir string) (string, error) {
 	flagValue := ""
 	if f.appFlag != nil {
 		flagValue = *f.appFlag
@@ -121,7 +116,7 @@ func (f *flagSet) appIn(argument, dir string) (string, error) {
 	if flagValue == "" {
 		flagValue, from = argument, "the argument"
 	}
-	name, source := client.PickApp(flagValue, dir)
+	name, source := client.PickApp(flagValue, ".")
 	if flagValue == "" {
 		from = source
 	}

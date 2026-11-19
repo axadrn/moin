@@ -7,11 +7,11 @@ order: 5
 
 CI is a computer elsewhere that builds your app. GitHub Actions, for example. It packs the app into an image, a box ready to run. It puts the image on a registry, a shelf for images. Your server only downloads and starts it.
 
-Deploy the repo once with `moin deploy` first. An image deploy keeps that compose file and swaps only the image of the main service.
+Deploy the repo once from GitHub first: push it, then run `moin deploy` in it. An image deploy keeps that compose file and swaps only the image of the main service.
 
 Then [deploy your image once by hand](#deploy-an-image-by-hand). That picks the image. From then on the hook deploys only new tags of it.
 
-An app deploys from one place at a time: [your folder, GitHub or CI](/docs/guides/deploy#deploy-from). Turning the hook on unlinks the repo.
+An app deploys from one place at a time: [GitHub or CI](/docs/guides/deploy#deploy-from). Turning the hook on unlinks the repo.
 
 ```text
 git push
@@ -109,7 +109,7 @@ Build for the arch of your server. `moin servers` shows it. The hook answers `20
 
 The action installs `moin` from your hub and runs `moin deploy --yes`. It needs an [API token](/docs/guides/account#create-an-api-token) with **Read and write**, saved in the repo as `MOIN_TOKEN`.
 
-With `image` it deploys that image. Without it, the repo goes through [your bucket](/docs/guides/bucket) and your server builds it. The job fails when the deploy fails.
+With `image` it deploys that image. Without it, your server builds the commit of the job from GitHub, as [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) does. The job fails when the deploy fails.
 
 ```yaml
       - uses: axadrn/moin@main
@@ -136,7 +136,7 @@ The API takes `{"image": "ghcr.io/<owner>/<image>:<tag>"}`.
 The hook URL stops working, so CI can no longer deploy. Do it when you stop using CI or the URL leaked. You can make a new hook any time.
 
 ```surfaces
-Web: the app's **Deploys** tab, **Deploy from**, **CI**, **Turn off**; or **Folder**, **Use folder**
+Web: the app's **Deploys** tab, **Deploy from**, **CI**, **Turn off**
 CLI: moin hook off <app-name>
 TUI: on the app, `W` opens its Deploys tab in the web
 API: DELETE /api/v1/apps/{app}/hook

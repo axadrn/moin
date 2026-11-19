@@ -1278,7 +1278,7 @@ paths:
           description: '`not_found`. No such catalog app or server.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, or `no_bucket` when the workspace has no bucket to put the source in.'
+          description: '`server_offline`, or `daemon_too_old` when the daemon of the server has no catalog yet.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
@@ -1517,7 +1517,7 @@ paths:
       tags: [Apps]
       operationId: createDeploy
       summary: Deploy
-      description: 'Starts a deploy. `{"upload": "...", "sha256": "..."}` deploys a source the CLI put into your bucket through createUpload; the server downloads it, checks the SHA-256 and deletes it from the bucket. `{"image": "..."}` deploys an image built elsewhere with the compose file of the live deploy. `{"ref": "main"}` has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
+      description: 'Starts a deploy. `{"image": "..."}` deploys an image built elsewhere with the compose file of the live deploy. `{"ref": "main"}` has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1529,11 +1529,6 @@ paths:
             schema:
               type: object
               properties:
-                upload:
-                  type: string
-                  example: up_9x2k4m...
-                sha256:
-                  type: string
                 image:
                   type: string
                   example: ghcr.io/me/blog:3f2a9c1
@@ -1547,6 +1542,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Deploy'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -1556,51 +1553,12 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`server_offline`, `deploy_running` while another deploy of the app runs, `no_bucket` for an upload without a bucket, `no_repo` for a ref without a linked repo.'
+          description: '`server_offline`, `deploy_running` while another deploy of the app runs, `no_repo` for a ref without a linked repo.'
         '415':
-          $ref: '#/components/responses/Conflict'
-          description: '`update_ops`: a gzipped body from an old CLI; sources go to your bucket now.'
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.upload`, `fields.image` or `fields.ref`.'
-        '500':
-          $ref: '#/components/responses/Internal'
-
-  /api/v1/apps/{app}/uploads:
-    parameters:
-      - $ref: '#/components/parameters/AppName'
-    post:
-      tags: [Apps]
-      operationId: createUpload
-      summary: Sign an upload
-      description: A link valid for 15 minutes that takes a gzipped tar of the source with a PUT, straight into your own bucket. moin signs it with your bucket's key and never sees the code. Deploy it with createDeploy and the upload ID.
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-        - apiTokenAuth: [write]
-      responses:
-        '201':
-          description: The upload.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [upload, url]
-                properties:
-                  upload:
-                    type: string
-                  url:
-                    type: string
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-          description: '`not_found`. No app with this ID or name belongs to the account.'
-        '409':
-          $ref: '#/components/responses/Conflict'
-          description: '`no_bucket` when no bucket is set up.'
+          description: '`validation_failed` with `fields.image` or `fields.ref`.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -1742,7 +1700,7 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`not_from_catalog`, `server_offline`, `deploy_running` or `no_bucket`.'
+          description: '`not_from_catalog`, `server_offline`, `deploy_running` or `daemon_too_old`.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
@@ -3066,7 +3024,7 @@ paths:
       tags: [Backups]
       operationId: setAppBucket
       summary: Choose the app's bucket
-      description: Moves the app's uploads and new backups to a bucket of the workspace; an empty `bucket` follows the default. Its copies start again in the new bucket; what is in the old bucket stays there.
+      description: Moves the app's new backups to a bucket of the workspace; an empty `bucket` follows the default. Its copies start again in the new bucket; what is in the old bucket stays there.
       requestBody:
         required: true
         content:
@@ -5364,15 +5322,15 @@ components:
           description: The app has a deploy hook URL. The URL itself is shown only once, when it is made.
         deploy_from:
           type: string
-          enum: [folder, github, ci]
-          description: Where new versions come from, one at a time. `folder` deploys with `moin deploy`, `github` every push to the linked branch, `ci` through the deploy hook. Linking a repo or making a deploy hook switches it; unlinking or turning the hook off goes back to `folder`.
+          enum: ['', github, ci]
+          description: Where new versions come from, one at a time. `github` is the linked repo, `ci` the deploy hook, empty neither yet. Linking a repo or making a deploy hook switches it; unlinking or turning the hook off leaves it empty.
         hook_image:
           type: string
           description: The image the deploy hook deploys new tags of, the one running now, without its tag. Empty while the app runs from its repo; the hook then deploys nothing until an image is deployed by hand.
           example: ghcr.io/me/blog
         bucket:
           type: string
-          description: The bucket the app uploads and backs up to, by name. Empty follows the workspace's default bucket.
+          description: The bucket the app backs up to, by name. Empty follows the workspace's default bucket.
         catalog:
           type: string
           description: The slug of the catalog entry the app was installed from, such as umami. Empty for an app of your own.
@@ -6091,7 +6049,7 @@ components:
           type: string
         apps:
           type: array
-          description: The apps that upload and back up there now.
+          description: The apps that back up there now.
           items:
             type: string
         older_backups:

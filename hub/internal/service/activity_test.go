@@ -34,7 +34,7 @@ func TestActivityNeverHoldsSecrets(t *testing.T) {
 	}
 	secrets = append(secrets, hook[strings.LastIndex(hook, "/")+1:])
 
-	deploy, err := deployUpload(apps)
+	deploy, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}

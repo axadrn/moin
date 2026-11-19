@@ -116,8 +116,7 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `POST /api/v1/apps/{app}/uploads` | write | a link that takes the source straight into your bucket |
-| `POST /api/v1/apps/{app}/deploys` | write | deploys an upload `{"upload": "…", "sha256": "…"}`, an image built in CI `{"image": "…"}`, or a GitHub ref `{"ref": "main"}` |
+| `POST /api/v1/apps/{app}/deploys` | write | deploys an image built in CI `{"image": "…"}`, or a branch, tag or commit of the linked GitHub repo `{"ref": "main"}` |
 | `GET /api/v1/apps/{app}/deploys/{number}` | read | one deploy with its log |
 | `GET /api/v1/apps/{app}/deploys/{number}/events` | read | one deploy as server-sent events |
 | `POST /api/v1/apps/{app}/redeploy` | write | builds the newest source again, or runs the newest image again |

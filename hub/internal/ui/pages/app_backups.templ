@@ -105,7 +105,7 @@ templ AppBucketForm(view BackupsView) {
 		hx-select="#data-backups"
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
-		hx-confirm={ "Move the uploads and backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
+		hx-confirm={ "Move the backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
 		data-confirm-action="Move"
 	>
 		@components.CSRF()

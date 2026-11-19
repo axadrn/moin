@@ -17,7 +17,7 @@ import (
 
 // A workspace keeps a list of named buckets. One is its default: apps
 // without a bucket of their own use it. Each app may pick another one; its
-// uploads and new backups go there. The bucket it left keeps its older
+// new backups go there. The bucket it left keeps its older
 // backups, and restores of those read from there.
 
 // ErrBucketName refuses a bucket name that is not a short slug.
@@ -27,7 +27,7 @@ var ErrBucketName = errors.New("a bucket's name is 1 to 63 lowercase letters, di
 // older backups of an app.
 type BucketInUseError struct {
 	Bucket string
-	// Apps upload and back up there now; Older left it and keep their
+	// Apps back up there now; Older left it and keep their
 	// older backups there.
 	Apps, Older []string
 }
@@ -35,7 +35,7 @@ type BucketInUseError struct {
 func (e *BucketInUseError) Error() string {
 	var reasons []string
 	if len(e.Apps) > 0 {
-		reasons = append(reasons, "the uploads and backups of "+strings.Join(e.Apps, ", ")+" go there; move them to another bucket first")
+		reasons = append(reasons, "the backups of "+strings.Join(e.Apps, ", ")+" go there; move them to another bucket first")
 	}
 	if len(e.Older) > 0 {
 		reasons = append(reasons, "it keeps what "+strings.Join(e.Older, ", ")+" left there")
@@ -61,7 +61,7 @@ type Bucket struct {
 	Older     []string
 }
 
-// AppFolder is where an app's uploads and backups go in the bucket:
+// AppFolder is where an app's backups go in the bucket:
 // <path>/<workspace ID>/<app>/<app ID>/.
 func (b Bucket) AppFolder(app *model.App) string {
 	return b.Folder + app.Folder + "/" + app.ID + "/"
@@ -330,7 +330,7 @@ func (s *AppService) RemoveBucket(actor Actor, name, confirm string) error {
 	return nil
 }
 
-// SetAppBucket moves an app's uploads and new backups to a bucket of the
+// SetAppBucket moves an app's new backups to a bucket of the
 // workspace; an empty name follows the workspace's default. Its older
 // backups stay where they are, and restores of them read from there.
 func (s *AppService) SetAppBucket(actor Actor, idOrName, name string) (*model.App, error) {

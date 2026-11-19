@@ -9,7 +9,6 @@ import (
 // Bucket is an S3-compatible bucket. Everything of a workspace
 // goes under <Path>/<Workspace>/, each app under <app>/<app ID>/:
 //
-//	<app>/<app ID>/uploads/                  sources of moin deploy, a day
 //	<app>/<app ID>/<database>/copies/        the copies, as long as the app keeps them
 //
 // Workspace is the workspace's ID, which never changes, so workspaces

@@ -1,5 +1,5 @@
 name: moin deploy
-description: Deploy with moin from GitHub Actions, the repo or an image built in CI.
+description: Deploy with moin from GitHub Actions, the pushed commit or an image built in CI.
 branding:
   icon: upload-cloud
   color: gray-dark
@@ -16,10 +16,6 @@ inputs:
   image:
     description: Deploy this image, built and pushed earlier in the job, instead of the repo.
     required: false
-  dir:
-    description: The directory to deploy.
-    required: false
-    default: .
 runs:
   using: composite
   steps:
@@ -36,9 +32,8 @@ runs:
         MOIN_TOKEN: ${{ inputs.token }}
         APP: ${{ inputs.app }}
         IMAGE: ${{ inputs.image }}
-        DIR: ${{ inputs.dir }}
       run: |
-        args=(deploy --yes --dir "$DIR")
+        args=(deploy --yes)
         [ -n "$IMAGE" ] && args+=(--image "$IMAGE")
         [ -n "$APP" ] && args+=("$APP")
         "$RUNNER_TEMP/moin" "${args[@]}"

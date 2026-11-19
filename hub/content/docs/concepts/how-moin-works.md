@@ -113,25 +113,24 @@ Keep your database in a mounted folder. If it is not in `/data`, mount its folde
 
 Builds run on **your** server.
 
-- `moin deploy` packs the files git knows, with uncommitted changes and new files that are not ignored. Outside a git repo, everything but `.git`.
-- A deploy from [GitHub](/docs/guides/github) goes from GitHub straight to your server, with a short-lived token. It needs no bucket.
+- A deploy from [GitHub](/docs/guides/github) goes from GitHub straight to your server, with a short-lived token. `moin deploy` in your repo deploys the commit you pushed this way.
 - A deploy from [CI](/docs/guides/ci) builds the image elsewhere. The server only pulls it.
+- A [catalog](/docs/guides/catalog) app comes with the daemon. The hub only names it.
 
 The hub only passes messages. It never stores or runs your code.
 
 ```text
-1 computer  moin deploy packs your
-     │      folder and puts it into
-     ▼      your bucket
-2 bucket    keeps it for a moment
+1 computer  git push, then
+     │      moin deploy
+     ▼
+2 GitHub    keeps the commit
      │
      ▼
-3 server    the daemon downloads it,
-            checks it, deletes it
-            from the bucket, builds it
+3 server    the daemon downloads
+            that commit, builds it
 ```
 
-moin only signs the links. Your code never passes through moin.
+The daemon downloads code from GitHub only. Your code never passes through moin.
 
 ### How moin builds a repo
 
@@ -146,7 +145,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 
 ### What a deploy does
 
-1. Gets the code from your bucket or GitHub, checks it and keeps it with the deploy.
+1. Gets the code from GitHub, or the compose file of a catalog app, and keeps it with the deploy.
 2. Reads the compose file and the [x-moin block](/docs/guides/config).
 3. Tags the built images, sets the env vars and `restart: unless-stopped`.
 4. Builds.

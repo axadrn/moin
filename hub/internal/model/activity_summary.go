@@ -87,7 +87,7 @@ var appSummaries = map[string]summarize{
 		if d["bucket"] != "" {
 			to = "the bucket " + d["bucket"]
 		}
-		return "moved the uploads and backups of " + target + " to " + to
+		return "moved the backups of " + target + " to " + to
 	},
 	"app.deleted": func(target string, d map[string]string) string {
 		if d["server"] != "" {

@@ -100,7 +100,6 @@ So "backed up" means "copied, then restored and read". The check needs room for 
    └─ <workspace>/
       └─ <app>/
          └─ <app-id>/
-            ├─ uploads/
             └─ <database>/
                └─ copies/
 ```
@@ -111,7 +110,6 @@ So "backed up" means "copied, then restored and read". The check needs room for 
 | `<workspace>/` | your workspace's ID, so two workspaces can share a bucket |
 | `<app>/` | the name the app was created with; it stays when you rename the app |
 | `<app-id>/` | a new app with the same name gets a new one, so copies never mix |
-| `uploads/` | your code on its way to the server |
 | `<database>/` | one per database: `data~app.db` for `/data/app.db`, `postgres-db` for the service `db`, `postgres-db~analytics` for another database in it |
 | `copies/` | the copies, named by their time in UTC |
 
@@ -119,7 +117,6 @@ So "backed up" means "copied, then restored and read". The check needs room for 
 
 - **Copies**: as long as the app keeps copies (**Keep**). The newest copy always stays.
 - **The undo of a restore**: as long as the app keeps copies.
-- **Uploads**: until the server has them, a day at most.
 
 moin never deletes the rest:
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -603,12 +604,61 @@ func TestStartRunningApp(t *testing.T) {
 	}
 }
 
+// inPushedRepo changes into a repo whose one commit is on GitHub, as git
+// push leaves it, and returns the commit.
+func inPushedRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "compose.yml"), []byte("services: {}\n"), 0o644)
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"remote", "add", "origin", "https://github.com/me/shop.git"},
+		{"add", "."},
+		{"-c", "user.name=Ada", "-c", "user.email=ada@example.com", "commit", "-q", "-m", "first"},
+		{"update-ref", "refs/remotes/origin/main", "HEAD"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Skipf("git %v: %v %s", args, err, out)
+		}
+	}
+	commit, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	return strings.TrimSpace(string(commit))
+}
+
 // A deploy to an app that does not exist asks first: a script without
 // --yes changes nothing, so a typo makes no new app.
 func TestDeployAsksBeforeCreatingAnApp(t *testing.T) {
+	inPushedRepo(t)
 	api := &fakeAPI{answers: map[string]string{}}
-	code, _, stderr := runCLI(t, api, "deploy", "--dir", t.TempDir(), "my-apps")
-	if code == 0 || !strings.Contains(stderr, "my-apps does not exist") || api.seen("POST") {
+	code, _, stderr := runCLI(t, api, "deploy", "my-apps")
+	if code == 0 || !strings.Contains(stderr, "my-apps does not exist") || api.seen("POST") || api.seen("PUT") {
 		t.Errorf("code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}
+
+// moin deploy in a folder deploys its pushed commit from GitHub: an app
+// that follows no repo yet is linked to it first, without deploys on push.
+func TestDeployDeploysThePushedCommit(t *testing.T) {
+	commit := inPushedRepo(t)
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps/shop":                  `{"app":{"name":"shop"},"deploys":[]}`,
+		"PUT /api/v1/apps/shop/repo":             `{"name":"shop","repo":"me/shop","branch":"main"}`,
+		"POST /api/v1/apps/shop/deploys":         `{"number":1,"status":"running","commit":"` + commit + `","commit_message":"first"}`,
+		"GET /api/v1/apps/shop/deploys/1/events": "event: done\ndata: {\"number\":1,\"status\":\"succeeded\"}\n\n",
+	}}
+	code, stdout, stderr := runCLI(t, api, "deploy", "--detach", "shop")
+	if code != 0 || !strings.Contains(stdout, "shop follows me/shop@main") || !api.seen(`PUT /api/v1/apps/shop/repo {"auto_deploy":false,"branch":"","repo":"me/shop"}`) || !api.seen(`POST /api/v1/apps/shop/deploys {"ref":"`+commit+`"}`) {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+
+	// An app that follows another repo deploys nothing from this one.
+	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","repo":"me/other","branch":"main"},"deploys":[]}`}}
+	code, _, stderr = runCLI(t, api, "deploy", "shop")
+	if code == 0 || !strings.Contains(stderr, "follows me/other, and this folder is me/shop") || api.seen("POST") || api.seen("PUT") {
+		t.Errorf("another repo: code %d, stderr %q, requests %v", code, stderr, api.requests)
 	}
 }

@@ -69,7 +69,7 @@ templ bucketPanel(bucket service.Bucket) {
 							"hx-select":         "#bucket",
 							"hx-swap":           "outerHTML",
 							"hx-disable":        "this",
-							"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own upload and back up there from now on; their copies start again there.",
+							"hx-confirm":        "Make " + bucket.Name + " the default bucket? Apps without a bucket of their own back up there from now on; their copies start again there.",
 							"data-make-default": bucket.Name,
 						}})
 					}
@@ -114,7 +114,7 @@ templ bucketAdd(first bool) {
 		if first {
 			@components.Card(components.CardProps{Title: "Add your bucket"}) {
 				<p class="moin-small moin-muted">
-					Deploys from your terminal and backups go there. Its keys need read and write access to this one bucket.
+					Backups go there. Its keys need read and write access to this one bucket.
 				</p>
 				@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{Name: "default"}, true)
 			}
@@ -174,7 +174,7 @@ templ bucketBadge(isDefault bool) {
 	}
 }
 
-// bucketUsedBy says which apps upload and back up to a bucket.
+// bucketUsedBy says which apps back up to a bucket.
 func bucketUsedBy(bucket service.Bucket) string {
 	switch {
 	case len(bucket.Apps) > 0 && bucket.Default:

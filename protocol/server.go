@@ -30,7 +30,7 @@ type Rules struct {
 	// LogsOff refuses container logs.
 	LogsOff bool `json:"logs_off,omitempty"`
 	// DeployFrom lists where deploys may come from, such as
-	// "github.com/acme/*", "ghcr.io/acme/*" or "upload". Empty allows all.
+	// "github.com/acme/*", "ghcr.io/acme/*" or "catalog". Empty allows all.
 	DeployFrom []string `json:"deploy_from,omitempty"`
 	// BackupsTo is the only bucket backups may go to and come from, as
 	// "<endpoint host>/<bucket>". Empty allows any.

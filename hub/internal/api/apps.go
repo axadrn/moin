@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -60,15 +59,15 @@ type App struct {
 	AutoDeploy bool   `json:"auto_deploy"`
 	// Pinned keeps the app above the others that run fine, in every list.
 	Pinned bool `json:"pinned"`
-	// Bucket is the bucket the app uploads and backs up to; empty uses
-	// the workspace's default bucket.
+	// Bucket is the bucket the app backs up to; empty uses the
+	// workspace's default bucket.
 	Bucket string `json:"bucket"`
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook bool `json:"hook"`
-	// DeployFrom is where new versions come from, one at a time: folder
-	// (moin deploy), github (every push to the linked branch) or ci (the
-	// deploy hook). Linking a repo or making a hook switches it.
+	// DeployFrom is where new versions come from, one at a time: github
+	// (the linked repo) or ci (the deploy hook); empty while neither is set
+	// up. Linking a repo or making a hook switches it.
 	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the deploy hook deploys new tags of: the one
 	// running now, without its tag. Empty while the app runs from its
@@ -129,14 +128,12 @@ type createAppRequest struct {
 	Server string `json:"server"`
 }
 
-// deployRequest is the body of a deploy: a source the CLI uploaded to the
-// user's bucket with its SHA-256, an image built elsewhere, or a ref of the
-// GitHub repo the app follows. An empty body deploys the linked branch.
+// deployRequest is the body of a deploy: an image built elsewhere, or a
+// ref of the GitHub repo the app follows. An empty body deploys the linked
+// branch.
 type deployRequest struct {
-	Upload string `json:"upload"`
-	SHA256 string `json:"sha256"`
-	Image  string `json:"image"`
-	Ref    string `json:"ref"`
+	Image string `json:"image"`
+	Ref   string `json:"ref"`
 }
 
 type rollbackRequest struct {
@@ -316,14 +313,10 @@ func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// CreateDeploy starts a deploy. A gzipped source tarball as the body builds
-// on the server, optionally with ?image= for the main service; a JSON body
-// {"image": "..."} deploys an image built elsewhere.
+// CreateDeploy starts a deploy: {"image": "..."} deploys an image built
+// elsewhere, {"ref": "..."} a branch, tag or commit of the linked repo,
+// built on the server.
 func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		Error(w, http.StatusUnsupportedMediaType, "update_ops", "This moin is too old: sources go to your own bucket now. Update it with curl -fsSL <hub>/cli.sh | sh.")
-		return
-	}
 	var request deployRequest
 	if !Decode(w, r, &request) {
 		return
@@ -331,8 +324,6 @@ func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 	var deploy *model.Deploy
 	var err error
 	switch {
-	case request.Upload != "":
-		deploy, err = h.apps.DeployUpload(r.Context(), actor(r), r.PathValue("app"), request.Upload, request.SHA256)
 	case request.Image != "":
 		deploy, err = h.apps.Deploy(actor(r), r.PathValue("app"), request.Image)
 	default:
@@ -343,24 +334,6 @@ func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusAccepted, NewDeploy(*deploy))
-}
-
-// UploadResponse is the answer of POST /api/v1/apps/{app}/uploads.
-type UploadResponse struct {
-	Upload string `json:"upload"`
-	URL    string `json:"url"`
-}
-
-// CreateUpload signs a link the CLI uploads a source to, in the user's own
-// bucket. moin never sees the code.
-func (h *AppsHandler) CreateUpload(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	upload, err := h.apps.Upload(r.Context(), workspace.ID, r.PathValue("app"))
-	if err != nil {
-		ServiceError(w, err)
-		return
-	}
-	JSON(w, http.StatusCreated, UploadResponse{Upload: upload.ID, URL: upload.URL})
 }
 
 // Redeploy builds the newest source again with the env as it is now.

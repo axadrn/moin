@@ -94,7 +94,7 @@ func TestBuckets(t *testing.T) {
 		t.Fatalf("add a bad name: err = %v", err)
 	}
 
-	// blog moves: uploads and backups go to client-a, shop stays on the
+	// blog moves: its backups go to client-a, shop stays on the
 	// default, and the daemon still gets the default as Bucket.
 	moved, err := apps.SetAppBucket(owner, "blog", "client-a")
 	if err != nil || moved.BucketName != "client-a" {
@@ -110,12 +110,8 @@ func TestBuckets(t *testing.T) {
 	if _, ok := config.AppBuckets["shop"]; ok {
 		t.Fatal("shop got a bucket of its own")
 	}
-	upload, err := apps.Upload(ctx, owner.WorkspaceID, "blog")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := endpoint + "/client/" + owner.WorkspaceID + "/blog/" + blog.ID + "/uploads/"; len(upload.URL) < len(want) || upload.URL[:len(want)] != want {
-		t.Fatalf("blog uploads to %s, want %s…", upload.URL, want)
+	if shown, err := apps.Bucket(owner.WorkspaceID, "client-a"); err != nil || shown.AppFolder(blog) != owner.WorkspaceID+"/blog/"+blog.ID+"/" {
+		t.Fatalf("blog's folder in client-a = %+v, %v", shown, err)
 	}
 	older, err := apps.OlderBuckets(moved)
 	if err != nil || len(older) != 1 || older[0].Name != "default" {

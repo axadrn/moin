@@ -30,7 +30,7 @@ templ Apps(apps []model.App, servers []model.Server) {
 			if len(apps) == 0 {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
-						@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from your folder, GitHub or the catalog."})
+						@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from GitHub, an image or the catalog."})
 					}
 				}
 			} else {
@@ -40,8 +40,8 @@ templ Apps(apps []model.App, servers []model.Server) {
 	}
 }
 
-// NewApp is where an app starts: from your folder, from GitHub, or from
-// the catalog. Each is one card; the overview lists the apps.
+// NewApp is where an app starts: from GitHub, or from the catalog. Each is
+// one card; the overview lists the apps.
 templ NewApp(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("New app") {
@@ -54,15 +54,13 @@ templ NewApp(servers []model.Server) {
 					}
 				}
 			} else {
-				@components.Card(components.CardProps{Title: "From your folder"}) {
-					<p class="moin-small moin-muted">
-						Run this in the folder of your app. It finds compose.yml, a Dockerfile or a Go module and builds on your server.
-					</p>
-					@components.Command(components.CommandProps{Text: "moin deploy"})
-				}
 				@components.Card(components.CardProps{Title: "From GitHub"}) {
 					<p class="moin-small moin-muted">
-						Name it and pick its server. Then link its repo, and every push deploys.
+						Push your app to GitHub. Run this in its folder. Your server builds the pushed commit.
+					</p>
+					@components.Command(components.CommandProps{Text: "moin deploy"})
+					<p class="moin-small moin-muted">
+						Or name it here and pick its server. Then link its repo, and every push deploys.
 					</p>
 					@AppAddForm(servers)
 				}

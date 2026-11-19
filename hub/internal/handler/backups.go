@@ -56,7 +56,7 @@ func (h *AppsHandler) BackupSchedule(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// SetAppBucket moves the app's uploads and new backups to another bucket.
+// SetAppBucket moves the app's new backups to another bucket.
 func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("bucket")
 	if name == "-default" {
@@ -72,7 +72,7 @@ func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	if app.BucketName != "" {
 		bucket = app.BucketName
 	}
-	answerDone(w, r, "Uploads and backups go to "+bucket, "Its copies start again there.")
+	answerDone(w, r, "Backups go to "+bucket, "Its copies start again there.")
 }
 
 // Bucket is the buckets page.
@@ -106,7 +106,7 @@ func (h *AppsHandler) AddBucket(w http.ResponseWriter, r *http.Request) {
 	}
 	h.renderBucket(w, r)
 	if bucket.Default {
-		answerDone(w, r, "Bucket added", "Backups and moin deploy of every app use it now.")
+		answerDone(w, r, "Bucket added", "Backups of every app go there now.")
 		return
 	}
 	answerDone(w, r, "Bucket added", "Pick it for an app under Data.")
@@ -120,7 +120,7 @@ func (h *AppsHandler) EditBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderBucket(w, r)
-	answerDone(w, r, "Bucket saved", "Its apps upload and back up there now.")
+	answerDone(w, r, "Bucket saved", "Its apps back up there now.")
 }
 
 // DefaultBucket makes a bucket the workspace's default.

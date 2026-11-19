@@ -73,9 +73,8 @@ templ AppRepo(view RepoView) {
 	</div>
 }
 
-// unlinkButton stops the app from following its repo, after asking. named
-// says the repo on the button, where nothing else around it does.
-templ unlinkButton(app model.App, label string) {
+// unlinkButton stops the app from following its repo, after asking.
+templ unlinkButton(app model.App) {
 	@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 		"hx-post":          ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/repo/unlink",
 		"hx-target":        "#app-source",
@@ -84,7 +83,7 @@ templ unlinkButton(app model.App, label string) {
 		"hx-confirm":       "Unlink " + app.Repo + "? Pushes no longer deploy " + app.Name + ". It keeps running.",
 		"data-unlink-repo": true,
 	}}) {
-		{ label }
+		Unlink
 	}
 }
 
@@ -179,7 +178,7 @@ templ repoLinked(view RepoView) {
 		<a href={ templ.SafeURL("https://github.com/" + view.App.Repo) } target="_blank" rel="noopener" class="moin-link moin-truncate moin-mono moin-text" data-quiet data-linked-repo>
 			{ view.App.Repo }<span class="moin-muted">{ "@" + view.App.Branch }</span>
 		</a>
-		@unlinkButton(view.App, "Unlink")
+		@unlinkButton(view.App)
 	</div>
 	<form hx-post={ appPath + "/repo/deploy" } hx-target="#app-source" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-deploy-ref>
 		@components.CSRF()

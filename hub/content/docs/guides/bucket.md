@@ -1,11 +1,11 @@
 ---
 title: "Bucket"
-description: "Your code and your backups in your own S3-compatible bucket. Never with us."
+description: "Your backups in your own S3-compatible bucket. Never with us."
 group: "Servers and data"
 order: 5
 ---
 
-Your bucket is your own box on the internet. Your backups and uploads go there. Only there. Never to us. moin only signs short-lived links into it.
+Your bucket is your own box on the internet. Your backups go there. Only there. Never to us. moin only signs short-lived links into it.
 
 Any S3-compatible bucket works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner Object Storage, Exoscale or MinIO. One bucket serves every app.
 
@@ -39,11 +39,10 @@ moin writes and deletes a test file first, so a wrong key fails at once. The sec
 
 | | Needs the bucket |
 | --- | --- |
-| `moin deploy` from your folder, the TUI or the moin GitHub Action | yes |
-| [Catalog](/docs/guides/catalog) apps | yes |
 | Backups, restores and **Download a copy** | yes |
-| Deploys from [GitHub](/docs/guides/github) | no: the server downloads the commit itself |
+| Deploys from [GitHub](/docs/guides/github), also `moin deploy` | no: the server downloads the commit itself |
 | Image deploys from [CI](/docs/guides/ci) | no: the server pulls the image |
+| [Catalog](/docs/guides/catalog) apps | no: the daemon brings their compose files |
 
 ## See your buckets
 
@@ -61,7 +60,7 @@ Add another bucket the same way, with another name. Every app without a bucket o
 
 ### Choose the bucket of an app
 
-Moves the uploads and backups of one app to another bucket. Its copies start again there. What is in the old bucket stays.
+Moves the backups of one app to another bucket. Its copies start again there. What is in the old bucket stays.
 
 ```surfaces
 Web: the app, **Data**, **Use another bucket**, then **Move**

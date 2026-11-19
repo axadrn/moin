@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"cmp"
 	"regexp"
 	"strings"
 	"testing"
@@ -57,33 +58,30 @@ func TestHookShowsItsImage(t *testing.T) {
 }
 
 // Who brings new versions is one answer: the one the app has now is
-// picked. The link form picks no repo before you do, and asks first when
+// picked, GitHub while it has none. The link form picks no repo before you do, and asks first when
 // linking turns the deploy hook off.
 func TestSourceIsOneAnswer(t *testing.T) {
 	hash := "hash"
 	current := regexp.MustCompile(`aria-current="page"(?: data-live)? data-source="(\w+)"`)
 	repos := []service.GitHubRepoOf{{GitHubRepo: service.GitHubRepo{FullName: "me/shop"}}}
 	for want, app := range map[string]model.App{
-		"folder": {Name: "shop"},
+		"":       {Name: "shop"},
 		"github": {Name: "shop", Repo: "me/shop", Branch: "main"},
 		"ci":     {Name: "shop", DeployHookHash: &hash},
 	} {
 		// The tab in use opens by itself and says so; another tab shows
 		// only its own part, without "In use".
-		for _, show := range []string{"", "folder", "github", "ci"} {
+		for _, show := range []string{"", "github", "ci"} {
 			var html strings.Builder
 			if err := AppSource(RepoView{App: app, Enabled: true, Connected: true, Repos: repos, Show: show}).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/deploys"), &html); err != nil {
 				t.Fatal(err)
 			}
 			page := html.String()
-			shown := show
-			if shown == "" {
-				shown = want
-			}
+			shown := cmp.Or(show, want, "github")
 			if found := current.FindAllStringSubmatch(page, -1); len(found) != 1 || found[0][1] != shown {
 				t.Errorf("%s, show %q: open tab %v", want, show, found)
 			}
-			if live := regexp.MustCompile(`data-live data-source="(\w+)"`).FindAllStringSubmatch(page, -1); len(live) != 1 || live[0][1] != want {
+			if live := regexp.MustCompile(`data-live data-source="(\w+)"`).FindAllStringSubmatch(page, -1); (want == "" && len(live) != 0) || (want != "" && (len(live) != 1 || live[0][1] != want)) {
 				t.Errorf("%s, show %q: in use %v", want, show, live)
 			}
 			if shown == "github" && app.Repo == "" && !strings.Contains(page, "Pick a repo") {

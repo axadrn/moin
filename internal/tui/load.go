@@ -5,14 +5,12 @@ package tui
 // through the inbox.
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
 )
 
@@ -315,23 +313,6 @@ func (m model) updateCatalogApp(app string) tea.Cmd {
 
 // dirApp is the app the directory the TUI started in deploys to.
 func (m model) dirApp() string { return client.AppName("", m.dir) }
-
-// deployDir packs the directory the TUI started in and deploys it to its
-// app, which must exist; `moin deploy` creates new ones.
-func (m model) deployDir() tea.Cmd {
-	app := m.dirApp()
-	return m.started(app, "deploy", func() (client.Deploy, error) {
-		var source bytes.Buffer
-		if _, err := client.Pack(m.dir, &source); err != nil {
-			return client.Deploy{}, err
-		}
-		d, err := m.api.Deploy(m.ctx, app, source.Bytes())
-		if client.IsNotFound(err) {
-			return d, fmt.Errorf("no app %s yet: run `%s deploy` in %s once", app, build.Name, m.dir)
-		}
-		return d, err
-	})
-}
 
 func (m model) restoreCmd(app, database, moment string, at *time.Time) tea.Cmd {
 	api, ctx := m.api, m.ctx
