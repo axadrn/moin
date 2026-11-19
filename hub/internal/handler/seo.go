@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -28,7 +29,7 @@ func NewSEOHandler(
 ) *SEOHandler {
 	sitemap := service.NewSitemapService(docsService, baseURL, legal)
 	sitemap.AddUI(uiDocs, uiFiles)
-	if entries, err := catalog.Load(files); err == nil {
+	if entries, err := catalog.Load(catalogfiles.Files); err == nil {
 		slugs := make([]string, 0, len(entries))
 		for _, entry := range entries {
 			slugs = append(slugs, entry.Slug)

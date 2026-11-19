@@ -81,7 +81,7 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			for _, source := range strings.Split(value, ",") {
 				source = strings.TrimSpace(source)
 				if _, err := path.Match(source, ""); err != nil || source == "" {
-					return nil, wrong("deploy-from lists sources like github.com/acme/*, ghcr.io/acme/* or upload")
+					return nil, wrong("deploy-from lists sources like github.com/acme/*, ghcr.io/acme/*, catalog or upload")
 				}
 				rules.DeployFrom = append(rules.DeployFrom, source)
 			}
@@ -120,6 +120,9 @@ func checkDeploy(rules *protocol.Rules, file string, start protocol.DeployStart)
 	var sources []string
 	if start.Image != "" {
 		sources = append(sources, imageName(start.Image))
+	}
+	if start.Catalog != "" {
+		sources = append(sources, "catalog")
 	}
 	if start.SourceURL != "" {
 		source, err := sourceName(start.SourceURL, rules.BackupsTo)

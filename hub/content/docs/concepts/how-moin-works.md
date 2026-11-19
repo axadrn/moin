@@ -175,4 +175,4 @@ The [data browser](/docs/guides/data) reads the live database on the server. Not
 
 ### The catalog
 
-Each [catalog](/docs/guides/catalog) app is a folder in the moin repo, `hub/content/catalog/<app>`. moin reads the image registry of each app once an hour. A self-hosted hub ships the same catalog and asks the registries itself. Nothing goes through us.
+Each [catalog](/docs/guides/catalog) app is a folder in the moin repo, `catalog/<app>`, built into the hub and into every daemon. To install one, the hub names the app and its version; the daemon runs the compose file of its own signed release, never one the hub sends. moin reads the image registry of each app once an hour. A self-hosted hub ships the same catalog and asks the registries itself. Nothing goes through us.

@@ -44,7 +44,7 @@ func checkResolved(t *testing.T, compose string, env map[string]string) (string,
 // TestAppRoomCatalog passes every app of the catalog: they all stay in
 // their room.
 func TestAppRoomCatalog(t *testing.T) {
-	files, _ := filepath.Glob("../../hub/content/catalog/*/compose.yml")
+	files, _ := filepath.Glob("../../catalog/*/compose.yml")
 	if len(files) == 0 {
 		t.Fatal("no catalog")
 	}

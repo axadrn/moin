@@ -1,5 +1,6 @@
-// Package content holds the texts of the site: docs, legal pages, the catalog,
-// the changelog and llms.txt.
+// Package content holds the texts of the site: docs, legal pages, the
+// changelog and llms.txt. The catalog is its own package, catalog/ at the
+// root, which the daemon has built in too.
 package content
 
 import (
@@ -8,7 +9,7 @@ import (
 	"os"
 )
 
-//go:embed all:catalog all:docs all:legal changelog.md llms.txt
+//go:embed all:docs all:legal changelog.md llms.txt
 var files embed.FS
 
 // FS is the texts: from disk in development, so an edit shows on reload, else

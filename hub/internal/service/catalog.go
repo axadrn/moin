@@ -14,6 +14,8 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/protocol"
 )
 
 var (
@@ -21,6 +23,7 @@ var (
 	ErrCatalogVersion = errors.New("this version is not a release of the app: pick one from its list")
 	ErrNotCatalog     = errors.New("this app was not installed from the catalog")
 	ErrCatalogDomain  = errors.New("this app needs a domain: its links and sign-in point to it")
+	ErrCatalogDaemon  = errors.New("the daemon of this server is too old for the catalog: update it")
 	// versionPattern is what an image tag may be.
 	versionPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
 )
@@ -133,8 +136,8 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	if !s.apps.servers.Online(server.ID) {
 		return nil, nil, ErrServerOffline
 	}
-	if _, err := s.apps.apps.DefaultBucket(actor.WorkspaceID); err != nil {
-		return nil, nil, ErrUploadBucket
+	if catalogTooOld(server.DaemonVersion) {
+		return nil, nil, ErrCatalogDaemon
 	}
 	app, err := s.apps.Create(actor, name, server.ID)
 	if err != nil {
@@ -213,12 +216,36 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 // deploy sends the entry's compose.yml to the app's server and records
 // action with the version.
 func (s *CatalogService) deploy(ctx context.Context, actor Actor, action string, app *model.App, entry catalog.Entry, version string) (*model.Deploy, error) {
-	deploy, err := s.apps.DeployFiles(ctx, actor, "", app.ID, map[string][]byte{"compose.yml": entry.Compose})
+	// As it is now, with the env and domains the install just gave it.
+	app, err := s.apps.ready(actor.WorkspaceID, app.ID)
+	if err != nil {
+		return nil, err
+	}
+	server, err := s.apps.servers.Get(actor.WorkspaceID, app.ServerID)
+	if err != nil {
+		return nil, err
+	}
+	if catalogTooOld(server.DaemonVersion) {
+		return nil, ErrCatalogDaemon
+	}
+	// The hub names the app; the daemon takes its compose file from the
+	// catalog of its own signed release.
+	deploy := s.apps.newDeploy(app)
+	deploy.SourceKey = "server"
+	deploy, err = s.apps.start(actor, "", app, deploy, protocol.DeployStart{Catalog: entry.Slug})
 	if err != nil {
 		return nil, err
 	}
 	s.apps.servers.record(actor, action, "app", app.Name, map[string]string{"catalog": entry.Name, "version": version, "number": strconv.Itoa(deploy.Number)})
 	return deploy, nil
+}
+
+// catalogDaemon is the first daemon with the catalog built in. A daemon
+// built from a commit, not a release, is taken to have it.
+const catalogDaemon = "v1.0.0-beta.35"
+
+func catalogTooOld(daemon string) bool {
+	return build.IsRelease(daemon) && build.NewerVersion(catalogDaemon, daemon)
 }
 
 // version is the release to run: wanted, or the newest when empty. Before

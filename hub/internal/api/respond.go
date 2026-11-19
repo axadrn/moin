@@ -294,6 +294,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrUploadBucket, status: http.StatusConflict, code: "no_bucket", message: "moin deploy uploads your code to your own bucket. Add one under Bucket first."},
 	{err: service.ErrCatalogApp, status: http.StatusNotFound, code: "not_found", message: "The catalog has no such app. List them with moin catalog."},
 	{err: service.ErrCatalogVersion, field: "version", message: "This version is not a release of the app. Pick one from moin catalog <app>."},
+	{err: service.ErrCatalogDaemon, status: http.StatusConflict, code: "daemon_too_old", message: "The daemon of this server is too old for the catalog. Update it with moin servers update."},
 	{err: service.ErrCatalogDomain, field: "domain", message: "This app needs a domain: its links and sign-in point to it. Give it one."},
 	{err: service.ErrNotCatalog, status: http.StatusConflict, code: "not_from_catalog", message: "This app was not installed from the catalog. Deploy it with moin deploy."},
 	{err: service.ErrUpload, field: "upload", message: "The upload is unknown or expired. Run moin deploy again."},

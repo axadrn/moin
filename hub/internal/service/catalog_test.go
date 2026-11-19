@@ -1,70 +1,34 @@
 package service
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync"
 	"testing"
 
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/protocol"
 )
 
-// putBucket is an S3 endpoint that keeps what is put into it.
-type putBucket struct {
-	mu      sync.Mutex
-	objects map[string][]byte
-}
-
-func (b *putBucket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		http.Error(w, "only put", http.StatusMethodNotAllowed)
-		return
-	}
-	body, _ := io.ReadAll(r.Body)
-	b.mu.Lock()
-	b.objects[r.URL.Path] = body
-	b.mu.Unlock()
-	w.WriteHeader(http.StatusOK)
-}
-
-func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeDaemon, *putBucket) {
+func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeDaemon) {
 	t.Helper()
 	apps, _, _, daemon := newAppService(t)
-	bucket := &putBucket{objects: map[string][]byte{}}
-	server := httptest.NewServer(bucket)
-	t.Cleanup(server.Close)
-	stored, err := apps.apps.DefaultBucket(owner.WorkspaceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stored.Endpoint = server.URL
-	if err := apps.apps.UpdateBucket(*stored); err != nil {
-		t.Fatal(err)
-	}
-	entries, err := catalog.Load(os.DirFS(filepath.Join("..", "..", "content")))
+	entries, err := catalog.Load(os.DirFS(filepath.Join("..", "..", "..", "catalog")))
 	if err != nil {
 		t.Fatal(err)
 	}
 	store := catalog.NewStore(entries, catalog.Registry{})
 	store.Set("umami", []catalog.Version{{Tag: "3.4.1"}, {Tag: "3.4.0"}, {Tag: "3.3.1"}})
-	return NewCatalogService(store, apps), apps, daemon, bucket
+	return NewCatalogService(store, apps), apps, daemon
 }
 
 // TestCatalogInstall: an install creates the app, gives it VERSION and a
-// fresh secret for every ${NAME} of its compose.yml, puts the compose file
-// into the bucket and starts a deploy from there.
+// fresh secret for every ${NAME} of its compose.yml, and has the daemon
+// deploy the app by name, from its own catalog: no bucket, no compose file
+// from the hub.
 func TestCatalogInstall(t *testing.T) {
-	catalogs, apps, daemon, bucket := newCatalogService(t)
+	catalogs, apps, daemon := newCatalogService(t)
 	app, deploy, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Domain: "stats.example.com"})
 	if err != nil {
 		t.Fatal(err)
@@ -81,20 +45,8 @@ func TestCatalogInstall(t *testing.T) {
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.SourceURL == "" || start.SHA256 == "" || start.Env["VERSION"] != "3.4.1" || start.Domains == nil || len(start.Domains.Domains) != 1 {
+	if start.Catalog != "umami" || start.SourceURL != "" || start.Env["VERSION"] != "3.4.1" || start.Domains == nil || len(start.Domains.Domains) != 1 {
 		t.Errorf("deploy start = %+v", start)
-	}
-	if len(bucket.objects) != 1 {
-		t.Fatalf("bucket has %d objects", len(bucket.objects))
-	}
-	for key, body := range bucket.objects {
-		if !strings.Contains(key, "/uploads/up_") {
-			t.Errorf("key %s", key)
-		}
-		files := untar(t, body)
-		if !strings.Contains(files["compose.yml"], "ghcr.io/umami-software/umami:${VERSION}") || len(files) != 1 {
-			t.Errorf("source files = %v", files)
-		}
 	}
 	listed, _ := apps.Get(owner.WorkspaceID, "umami")
 	info, ok := catalogs.Info(owner.WorkspaceID, listed)
@@ -104,7 +56,7 @@ func TestCatalogInstall(t *testing.T) {
 }
 
 func TestCatalogInstallRefuses(t *testing.T) {
-	catalogs, apps, _, _ := newCatalogService(t)
+	catalogs, apps, _ := newCatalogService(t)
 	for name, input := range map[string]CatalogInstall{
 		"unknown app":     {Slug: "wordpress", Server: "web-1"},
 		"no such version": {Slug: "umami", Server: "web-1", Version: "9.9.9"},
@@ -124,7 +76,7 @@ func TestCatalogInstallRefuses(t *testing.T) {
 // TestCatalogUpdate: an update sets VERSION, keeps the secrets, and an app
 // of your own refuses it.
 func TestCatalogUpdate(t *testing.T) {
-	catalogs, apps, daemon, _ := newCatalogService(t)
+	catalogs, apps, daemon := newCatalogService(t)
 	app, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.3.1"})
 	if err != nil {
 		t.Fatal(err)
@@ -166,26 +118,5 @@ func finishDeploys(t *testing.T, apps *AppService, appID string) {
 	}
 	for _, deploy := range deploys {
 		apps.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID})
-	}
-}
-
-func untar(t *testing.T, body []byte) map[string]string {
-	t.Helper()
-	zipped, err := gzip.NewReader(bytes.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	archive := tar.NewReader(zipped)
-	files := map[string]string{}
-	for {
-		header, err := archive.Next()
-		if err == io.EOF {
-			return files
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		content, _ := io.ReadAll(archive)
-		files[header.Name] = string(content)
 	}
 }

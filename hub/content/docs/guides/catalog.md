@@ -53,7 +53,7 @@ An older version may not undo the database changes of a newer one. Then [go back
 
 ## Add an app
 
-Missing one? Open an [issue](https://github.com/axadrn/moin/issues), or send a pull request: one folder, `hub/content/catalog/<app>`, two files.
+Missing one? Open an [issue](https://github.com/axadrn/moin/issues), or send a pull request: one folder, `catalog/<app>`, two files.
 
 `app.md` says what the app is:
 
@@ -120,5 +120,6 @@ Install it once on a server of your own with `moin catalog install` before you o
 
 ## Good to know
 
-- The workspace needs a [bucket](/docs/guides/bucket).
+- No bucket needed: the hub names the app and its version, and the server takes its compose file from the catalog built into its signed daemon. A server's daemon needs v1.0.0-beta.35 or newer.
+- A server with [`deploy-from`](/docs/guides/security#rules) rules installs catalog apps once its rules list `catalog`.
 - A catalog app is an ordinary app: logs, metrics, uptime, domains, rollback and backups all work.

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/content"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
@@ -152,11 +153,11 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServers(database), activity, cfg.AppURL)
 	appService := service.NewAppService(repository.NewApps(database, history), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
-	// The catalog ships in content/catalog; its releases come from the
-	// registries, asked by this hub itself.
+	// The catalog ships in catalog/ at the root, built into the hub and the
+	// daemon; its releases come from the registries, asked by this hub itself.
 	texts := content.FS(cfg.IsDevelopment())
 	uiFiles := moin.UI(cfg.IsDevelopment())
-	entries, err := catalog.Load(texts)
+	entries, err := catalog.Load(catalogfiles.Files)
 	if err != nil {
 		return nil, fmt.Errorf("load the catalog: %w", err)
 	}
