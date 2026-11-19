@@ -52,7 +52,7 @@ A daemon always runs the version of its hub. When the hub gets a new release:
 
 - One server at a time, never during a deploy. A server that is busy gets its turn later.
 - If a daemon does not come back, moin stops there and says so in the activity.
-- A server with [rules](/docs/guides/security#rules) never updates its daemon from moin. You update it on the server.
+- A server with [rules](/docs/guides/security#rules) updates like any other: the release carries our signature, so a new daemon cannot drop its rules.
 - Turn the automatic updates off, or update one server by hand: [Servers](/docs/guides/servers#updates).
 
 **Some updates need a step first**, like stopping the apps that use SQLite while the old daemon exits. moin does it for you: it stops them, updates the daemon and starts them again. You never do a step by hand.

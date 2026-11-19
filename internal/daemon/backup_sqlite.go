@@ -20,9 +20,14 @@ import (
 // own clean copy while the app writes, into a temp file next to the
 // database, gzipped into the bucket, the temp file deleted at once.
 //
-// What moin puts next to app.db all starts with app.db.moin- or .moin-:
-// app.db.moin-restore (being built), app.db.moin-before-<id> (an undo),
-// .moin-copy-* and .moin-check-* (a copy or a check being made).
+// What moin puts next to app.db all starts with app.db.moin-:
+// app.db.moin-restore (being built), app.db.moin-before-<id> (an undo).
+// Copies and checks are made in the daemon's own folder, which no app can
+// reach.
+//
+// The folder of app.db belongs to the app, which can leave links there.
+// So every file the daemon writes, renames or removes next to app.db goes
+// through an os.Root of that folder: a link never leads it out, as root.
 type sqliteEngine struct {
 	b        *backups
 	app      string
@@ -30,6 +35,9 @@ type sqliteEngine struct {
 }
 
 func (e *sqliteEngine) Copy(ctx context.Context, w io.Writer) error {
+	if err := e.isFile(); err != nil {
+		return err
+	}
 	dir, err := e.tempDir("copy", fileSize(e.database.HostPath))
 	if err != nil {
 		return err
@@ -55,14 +63,69 @@ func (e *sqliteEngine) Copy(ctx context.Context, w io.Writer) error {
 	return errors.Join(err, zipped.Close())
 }
 
-// tempDir is a folder next to the database for a copy or a check, once
-// the disk has room for need bytes.
+// tempDir is a folder for a copy or a check in the daemon's own folder,
+// once the disk has room for need bytes.
 func (e *sqliteEngine) tempDir(what string, need int64) (string, error) {
-	dir := filepath.Dir(e.database.HostPath)
+	dir := e.b.apps.tempDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
 	if err := room(dir, need); err != nil {
 		return "", err
 	}
-	return os.MkdirTemp(dir, "."+tempName(what+"-*"))
+	return os.MkdirTemp(dir, tempName(what+"-*"))
+}
+
+// folder opens the folder the database was found in, and names the
+// database in it.
+func (e *sqliteEngine) folder() (*os.Root, string, error) { return databaseFolder(e.database) }
+
+// isFile refuses a database that is no longer a plain file in its folder.
+func (e *sqliteEngine) isFile() error { return plainDatabase(e.database) }
+
+// databaseFolder opens the folder a SQLite database was found in as an
+// os.Root, and names the database in it.
+func databaseFolder(database protocol.Database) (*os.Root, string, error) {
+	folder := database.HostFolder
+	if folder == "" {
+		// Found before moin kept the folder.
+		folder = filepath.Dir(database.HostPath)
+	}
+	name, err := filepath.Rel(folder, database.HostPath)
+	if err != nil || !within(folder, database.HostPath) {
+		return nil, "", fmt.Errorf("%s is not in %s", database.HostPath, folder)
+	}
+	root, err := os.OpenRoot(folder)
+	return root, name, err
+}
+
+// plainDatabase refuses a database that is no longer a plain file in its
+// folder, such as a link the app put in its place, before SQLite opens it
+// by name as root.
+func plainDatabase(database protocol.Database) error {
+	root, name, err := databaseFolder(database)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	info, err := root.Lstat(name)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a plain file any more, so moin leaves it alone", database.Path)
+	}
+	return nil
+}
+
+// syncIn writes the file or folder name in root to disk.
+func syncIn(root *os.Root, name string) error {
+	file, err := root.Open(name)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return file.Sync()
 }
 
 // Size is how many bytes the database file takes.
@@ -100,59 +163,70 @@ func fileSize(name string) int64 {
 // and renames the built file over it: one atomic step, the old file
 // before it, the new one after, never none.
 func (e *sqliteEngine) Restore(ctx context.Context, from source, id string) error {
-	live := e.database.HostPath
+	root, live, err := e.folder()
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 	aside, built := undoFile(live, id), live+".moin-restore"
 	if from.undo != "" {
 		built = undoFile(live, from.undo)
-		if !exists(built) {
+		if _, err := root.Lstat(built); err != nil {
 			return fmt.Errorf("there is no state before the restore %s: it is older than the app keeps", from.undo)
 		}
 	} else {
-		defer removeDatabase(built)
-		if err := e.buildChecked(ctx, from, built); err != nil {
+		defer removeDatabase(root, built)
+		if err := e.buildChecked(ctx, root, from, built); err != nil {
 			return err
 		}
 	}
-	info, err := os.Stat(live)
-	if err != nil || exists(aside) {
-		return errors.New("the live file is missing or an undo has its name; nothing changed")
+	info, err := root.Lstat(live)
+	if _, asideErr := root.Lstat(aside); err != nil || !info.Mode().IsRegular() || asideErr == nil {
+		return errors.New("the live file is missing, is not a plain file, or an undo has its name; nothing changed")
 	}
-	if err := errors.Join(os.Chmod(built, info.Mode().Perm()), syncFile(built)); err != nil {
+	if err := errors.Join(root.Chmod(built, info.Mode().Perm()), syncIn(root, built)); err != nil {
 		return err
 	}
-	matchOwnerOf(built, info)
+	matchOwnerOf(root, built, info)
 	start, err := e.b.apps.stopServices(ctx, e.app)
 	if err != nil {
 		return err
 	}
-	if err := checkpoint(ctx, live); err != nil {
+	// The app is stopped: nothing changes the folder while SQLite folds the
+	// log in by name.
+	if err := checkpoint(ctx, root, live); err != nil {
 		return errors.Join(fmt.Errorf("fold the log into the database: %w; nothing changed", err), start())
 	}
-	if err := errors.Join(os.Link(live, aside), syncFile(filepath.Dir(live))); err != nil {
-		os.Remove(aside)
+	if err := errors.Join(root.Link(live, aside), syncIn(root, filepath.Dir(live))); err != nil {
+		root.Remove(aside)
 		return errors.Join(fmt.Errorf("keep the undo: %w; nothing changed", err), start())
 	}
-	if err := os.Rename(built, live); err != nil {
-		os.Remove(aside)
+	if err := root.Rename(built, live); err != nil {
+		root.Remove(aside)
 		return errors.Join(fmt.Errorf("switch: %w; nothing changed", err), start())
 	}
-	_ = syncFile(filepath.Dir(live))
+	_ = syncIn(root, filepath.Dir(live))
 	if err := start(); err != nil {
 		return fmt.Errorf("the restored data is in place, but %w", err)
 	}
 	return nil
 }
 
-// buildChecked builds the restored database into built and checks it.
-func (e *sqliteEngine) buildChecked(ctx context.Context, from source, built string) error {
-	if err := room(filepath.Dir(e.database.HostPath), from.size); err != nil {
+// buildChecked builds the restored database into built in root, without
+// following a link out of it, and checks it.
+func (e *sqliteEngine) buildChecked(ctx context.Context, root *os.Root, from source, built string) error {
+	if err := room(root.Name(), from.size); err != nil {
 		return fmt.Errorf("%w; nothing changed", err)
 	}
-	removeDatabase(built)
-	if err := e.build(ctx, from, built); err != nil {
+	removeDatabase(root, built)
+	out, err := root.OpenFile(built, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
 		return fmt.Errorf("%w; nothing changed", err)
 	}
-	if err := integrityCheck(ctx, built); err != nil {
+	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
+		return fmt.Errorf("%w; nothing changed", err)
+	}
+	if err := integrityCheck(ctx, filepath.Join(root.Name(), built)); err != nil {
 		return fmt.Errorf("what came back failed the integrity check, nothing changed: %w", err)
 	}
 	return nil
@@ -160,49 +234,49 @@ func (e *sqliteEngine) buildChecked(ctx context.Context, from source, built stri
 
 func undoFile(live, id string) string { return live + ".moin-before-" + id }
 
-// build unpacks a copy into target.
-func (e *sqliteEngine) build(ctx context.Context, from source, target string) error {
+// gunzipCopy writes the gzipped copy of from to out.
+func gunzipCopy(from source, out io.Writer) error {
 	unzipped, err := gzip.NewReader(from.copy)
 	if err != nil {
 		return fmt.Errorf("the copy is not gzipped: %w", err)
 	}
-	out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
 	_, err = io.Copy(out, unzipped)
-	return errors.Join(err, out.Close())
+	return err
 }
 
 // Recover tells from the undo whether the switch happened. It also
 // removes what was half built.
 func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, error) {
-	live := e.database.HostPath
+	root, live, err := e.folder()
+	if err != nil {
+		return false, err
+	}
+	defer root.Close()
 	aside := undoFile(live, mark.Undo)
 	if mark.From == "" {
-		defer removeDatabase(live + ".moin-restore")
+		defer removeDatabase(root, live+".moin-restore")
 	}
-	asideInfo, err := os.Stat(aside)
+	asideInfo, err := root.Lstat(aside)
 	if err != nil {
 		// No undo: the switch never began.
 		return false, nil
 	}
-	liveInfo, err := os.Stat(live)
+	liveInfo, err := root.Lstat(live)
 	if err != nil {
 		// No live file: the undo is the only one, it goes back.
-		return false, os.Rename(aside, live)
+		return false, root.Rename(aside, live)
 	}
 	if os.SameFile(liveInfo, asideInfo) {
 		// A second name of the live file: the switch never happened.
-		os.Remove(aside)
+		root.Remove(aside)
 		return false, nil
 	}
 	// Another file: the switch happened.
 	return true, nil
 }
 
-// Check unpacks a copy next to the database and runs SQLite's integrity
-// check, which reads every page.
+// Check unpacks a copy in the daemon's own folder and runs SQLite's
+// integrity check, which reads every page.
 func (e *sqliteEngine) Check(ctx context.Context, from source) error {
 	dir, err := e.tempDir("check", from.size)
 	if err != nil {
@@ -210,19 +284,29 @@ func (e *sqliteEngine) Check(ctx context.Context, from source) error {
 	}
 	defer os.RemoveAll(dir)
 	file := filepath.Join(dir, "check.db")
-	if err := e.build(ctx, from, file); err != nil {
+	out, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		return err
 	}
 	return integrityCheck(ctx, file)
 }
 
 func (e *sqliteEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {
-	files, err := filepath.Glob(undoFile(e.database.HostPath, "*"))
+	root, live, err := e.folder()
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	files, err := filepath.Glob(filepath.Join(root.Name(), undoFile(live, "*")))
 	undos := []protocol.Copy{}
 	for index := len(files) - 1; index >= 0; index-- {
-		id := strings.TrimPrefix(files[index], undoFile(e.database.HostPath, ""))
+		name, _ := filepath.Rel(root.Name(), files[index])
+		id := strings.TrimPrefix(name, undoFile(live, ""))
 		at, ok := protocol.CopyTime(id)
-		if info, statErr := os.Stat(files[index]); ok && statErr == nil {
+		if info, statErr := root.Lstat(name); ok && statErr == nil && info.Mode().IsRegular() {
 			undos = append(undos, protocol.Copy{ID: id, At: at, Size: info.Size()})
 		}
 	}
@@ -230,26 +314,34 @@ func (e *sqliteEngine) Undos(ctx context.Context) ([]protocol.Copy, error) {
 }
 
 func (e *sqliteEngine) Drop(ctx context.Context, id string) error {
-	removeDatabase(undoFile(e.database.HostPath, id))
+	root, live, err := e.folder()
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	removeDatabase(root, undoFile(live, id))
 	return nil
 }
 
-// sweepTemp removes the copies and checks a stopped daemon left next to
-// a database, and the folder older versions of moin kept there for
-// Litestream.
-func sweepTemp(live string) {
-	_ = os.RemoveAll(filepath.Join(filepath.Dir(live), "."+filepath.Base(live)+"-litestream"))
+// sweepTemp removes what older versions of moin left next to the database
+// live in root: copies, checks and the folder they kept for Litestream.
+func sweepTemp(root *os.Root, live string) {
+	dir := filepath.Dir(live)
+	_ = root.RemoveAll(filepath.Join(dir, "."+filepath.Base(live)+"-litestream"))
 	for _, what := range []string{"copy", "check"} {
-		left, _ := filepath.Glob(filepath.Join(filepath.Dir(live), "."+tempName(what+"-*")))
-		for _, dir := range left {
-			_ = os.RemoveAll(dir)
+		left, _ := filepath.Glob(filepath.Join(root.Name(), dir, "."+tempName(what+"-*")))
+		for _, path := range left {
+			if name, err := filepath.Rel(root.Name(), path); err == nil {
+				_ = root.RemoveAll(name)
+			}
 		}
 	}
 }
 
-// checkpoint folds the log of a SQLite file into it and removes the log.
-func checkpoint(ctx context.Context, live string) error {
-	db, err := sql.Open("sqlite", "file:"+live+"?_pragma=busy_timeout(5000)")
+// checkpoint folds the log of the SQLite file live in root into it and
+// removes the log.
+func checkpoint(ctx context.Context, root *os.Root, live string) error {
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(root.Name(), live)+"?_pragma=busy_timeout(5000)")
 	if err != nil {
 		return err
 	}
@@ -261,7 +353,7 @@ func checkpoint(ctx context.Context, live string) error {
 	}
 	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
 		if err == nil {
-			if err = os.Remove(live + suffix); errors.Is(err, os.ErrNotExist) {
+			if err = root.Remove(live + suffix); errors.Is(err, os.ErrNotExist) {
 				err = nil
 			}
 		}
@@ -272,9 +364,10 @@ func checkpoint(ctx context.Context, live string) error {
 // backupFile says a name is one moin leaves next to a database.
 func backupFile(name string) bool { return strings.Contains(name, "."+tempName("")) }
 
-func removeDatabase(name string) {
+// removeDatabase removes the SQLite file name in root and its log files.
+func removeDatabase(root *os.Root, name string) {
 	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
-		_ = os.Remove(name + suffix)
+		_ = root.Remove(name + suffix)
 	}
 }
 

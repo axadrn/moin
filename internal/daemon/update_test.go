@@ -187,7 +187,7 @@ func TestUpdateWaitsForARestore(t *testing.T) {
 		t.Fatal("a restore did not start")
 	}
 	message, _ := protocol.NewMessage(protocol.TypeDaemonUpdate, protocol.DaemonUpdate{Version: "v9"})
-	r.daemonUpdate(context.Background(), message, nil)
+	r.daemonUpdate(context.Background(), message)
 	if r.updating {
 		t.Fatal("an update started while a restore runs")
 	}

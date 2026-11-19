@@ -376,7 +376,7 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	case protocol.TypeDaemonURL:
 		r.daemonURL(ctx, message)
 	case protocol.TypeDaemonUpdate:
-		r.daemonUpdate(ctx, message, rules)
+		r.daemonUpdate(ctx, message)
 	default:
 		if message.RequestID != "" {
 			r.fail(message, fmt.Errorf("this daemon does not know %q: update it", message.Type))
