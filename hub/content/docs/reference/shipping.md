@@ -33,6 +33,8 @@ Merging ships nothing. The change only lands on `main`. [Contributing](https://g
 
 A release has a version, like `v1.0.0-beta.28`, and its notes in the [changelog](/changelog). A deploy has neither.
 
+A release also carries the `moin` binaries, their `SHA256SUMS` and its signature, `SHA256SUMS.sig`. The Deploy workflow signs with the repository secret `RELEASE_SIGNING_KEY`, which never reaches a hub. Daemons update from there. [Updates](/docs/guides/security#updates)
+
 ## What runs where
 
 - **moin.run** runs the last deploy or release.
@@ -44,7 +46,7 @@ A release has a version, like `v1.0.0-beta.28`, and its notes in the [changelog]
 A daemon always runs the version of its hub. When the hub gets a new release:
 
 1. The hub tells the daemon: update to this version.
-2. The daemon downloads the new `moin` from the hub and checks it.
+2. The daemon downloads the new `moin` from the GitHub release and checks our signature. [Updates](/docs/guides/security#updates)
 3. It swaps itself and restarts. Your apps keep running, unless the update needs them stopped (below).
 4. It calls the hub again, now on the new version.
 

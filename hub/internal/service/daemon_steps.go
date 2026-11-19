@@ -92,7 +92,7 @@ var startStoppedApps = step{Name: "start the stopped apps again", Run: func(ctx 
 func plan(version string) []step {
 	var before, after []step
 	for _, entry := range daemonSteps {
-		if parseVersion(version) != nil && !NewerVersion(entry.Before, version) {
+		if build.IsRelease(version) && !build.NewerVersion(entry.Before, version) {
 			continue
 		}
 		i := slices.IndexFunc(entry.Steps, isUpdateDaemon)

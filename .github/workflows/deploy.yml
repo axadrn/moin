@@ -6,13 +6,14 @@ name: Deploy
 #   2. box: build the hub image, ghcr.io/axadrn/moin, which
 #      the hosted hub and every self-hoster runs.
 #   3. release: for a tag, the GitHub release with its notes from
-#      hub/content/changelog.md.
+#      hub/content/changelog.md and the signed binaries.
 #   4. deploy: through Tailscale, the hosted hub gets the deploy
 #      files of this commit and runs update.sh with the new box.
 # Only main and tags ship: run by hand on another branch, it does nothing.
 # Forks only build: the deploy runs in axadrn/moin alone, with the
-# repository variables DEPLOY_HOST and TS_CLIENT_ID. No secret passes
-# through GitHub. Each job gets only the rights it needs.
+# repository variables DEPLOY_HOST and TS_CLIENT_ID. The one secret is
+# RELEASE_SIGNING_KEY, which signs releases and never reaches the hub.
+# Each job gets only the rights it needs.
 on:
   push:
     tags: ["v*"]
@@ -80,6 +81,26 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # The binaries of the box, the ones under /download, and SHA256SUMS
+      # signed with the release key. Daemons update from here and check
+      # the signature: hub/content/docs/guides/security.md#updates
+      - name: Sign the binaries
+        env:
+          IMAGE: ${{ needs.box.outputs.image }}
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -z "$RELEASE_SIGNING_KEY" ]; then
+            echo "set the secret RELEASE_SIGNING_KEY (Settings, Secrets and variables, Actions, Secrets)" >&2
+            exit 1
+          fi
+          public=$(printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkey -pubout -outform DER | tail -c 32 | base64)
+          if ! grep -q "\"$public\"" internal/daemon/update.go; then
+            echo "RELEASE_SIGNING_KEY is not one of the release keys in internal/daemon/update.go" >&2
+            exit 1
+          fi
+          docker create --name box "$IMAGE" >/dev/null
+          docker cp box:/app/downloads downloads
+          printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkeyutl -sign -rawin -inkey /dev/stdin -in downloads/SHA256SUMS -out downloads/SHA256SUMS.sig
       # The notes are the tag's section of the changelog, without its date.
       - name: Release
         env:
@@ -92,10 +113,13 @@ jobs:
             exit 1
           fi
           gh release view "$TAG" >/dev/null 2>&1 && gh release edit "$TAG" --notes-file notes.md || gh release create "$TAG" --title "$TAG" --notes-file notes.md --latest
+          gh release upload "$TAG" downloads/* --clobber
 
+  # After the release: the hub tells the daemons to update to it, and they
+  # take it from there.
   deploy:
-    needs: box
-    if: github.repository == 'axadrn/moin'
+    needs: [box, release]
+    if: github.repository == 'axadrn/moin' && !cancelled() && needs.box.result == 'success' && needs.release.result != 'failure'
     runs-on: ubuntu-24.04
     permissions:
       contents: read

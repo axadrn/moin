@@ -19,35 +19,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
 
-func TestNewerVersion(t *testing.T) {
-	for _, test := range []struct {
-		candidate, current string
-		newer              bool
-	}{
-		{"v0.3.0", "v0.2.9", true},
-		{"v0.2.9", "v0.3.0", false},
-		{"v0.3.0", "v0.3.0", false},
-		{"v0.10.0", "v0.9.0", true},
-		{"v1.0.0", "v1.0.0-beta.3", true},
-		{"v1.0.0-beta.3", "v1.0.0", false},
-		{"v1.0.0-beta.11", "v1.0.0-beta.3", true},
-		{"v1.0.0-beta.3", "v1.0.0-alpha.9", true},
-		{"v1.0.0-beta", "v1.0.0-beta.1", false},
-		{"v1.0.0-rc.1", "v1.0.0-1", true},
-		{"v1.0.1+build.5", "v1.0.0", true},
-		{"v1.0.0", "dev", false},
-		{"dev", "v1.0.0", false},
-		{"v1.0", "v0.9.0", false},
-		{"1.2.3", "v0.9.0", false},
-		{"v01.2.3", "v0.9.0", false},
-		{"v1.0.0", "main-abc1234", false},
-	} {
-		if got := NewerVersion(test.candidate, test.current); got != test.newer {
-			t.Errorf("NewerVersion(%q, %q) = %v, want %v", test.candidate, test.current, got, test.newer)
-		}
-	}
-}
-
 const testReleaseBody = `{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z",
 "body":"**In short:** One-click updates for self-hosters.\n\n### New\n\n- **Update now**: one click.\n"}`
 

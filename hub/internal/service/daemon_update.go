@@ -165,10 +165,10 @@ func (s *ServerService) UpdateDaemonsTo(version string) {
 // release: it runs an older release, or a build without one, such as a
 // commit like b4be272, which would otherwise never update.
 func DaemonBehind(release, daemon string) bool {
-	if parseVersion(release) == nil {
+	if !build.IsRelease(release) {
 		return false
 	}
-	return parseVersion(daemon) == nil || NewerVersion(release, daemon)
+	return !build.IsRelease(daemon) || build.NewerVersion(release, daemon)
 }
 
 // autoUpdate updates the daemons of a workspace that are behind, one at a
@@ -178,7 +178,7 @@ func DaemonBehind(release, daemon string) bool {
 func (s *ServerService) autoUpdate(workspaceID string) {
 	s.mu.Lock()
 	version := s.autoVersion
-	if parseVersion(version) == nil || s.autoRunning[workspaceID] || s.autoHalted[workspaceID] {
+	if !build.IsRelease(version) || s.autoRunning[workspaceID] || s.autoHalted[workspaceID] {
 		s.mu.Unlock()
 		return
 	}

@@ -20,10 +20,12 @@ WORKDIR /app/hub
 # Generate Go files from .templ files.
 RUN go tool templ generate
 
-# The moin binary that install.sh, cli.sh, CI and daemon updates download
-# from /download, built from the same commit as the hub, with
-# SHA256SUMS for checking a download by hand. It is the same in both boxes,
-# so it comes before anything of the target and is built once.
+# The moin binary that install.sh, cli.sh and CI download from /download,
+# built from the same commit as the hub, with SHA256SUMS for checking a
+# download by hand. For a tag, the Deploy workflow signs these files and
+# puts them on the GitHub release, where daemons update from. It is the
+# same in both boxes, so it comes before anything of the target and is
+# built once.
 ARG VERSION=dev
 RUN mkdir -p downloads && \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
