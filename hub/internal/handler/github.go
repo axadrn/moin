@@ -160,6 +160,9 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		answerDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+app.Branch+" at "+shortSHA(deploy.CommitSHA)+" from GitHub.")
+	case app.DeployHookHash != nil:
+		h.renderSource(w, r)
+		answerDone(w, r, app.Repo+" linked", "CI deploys take its compose.yml now.")
 	default:
 		h.renderSource(w, r)
 		answerDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")

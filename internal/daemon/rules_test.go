@@ -61,6 +61,10 @@ func TestDeployFrom(t *testing.T) {
 		{protocol.DeployStart{Image: "ghcr.io/evil/blog:v3"}, false},
 		{protocol.DeployStart{SourceNumber: 4}, true},
 		{protocol.DeployStart{FromNumber: 4}, true},
+		// An image with the compose file of a commit brings both sources.
+		{protocol.DeployStart{SourceURL: "https://api.github.com/repos/acme/blog/tarball/abc123", Image: "ghcr.io/acme/blog:v3"}, true},
+		{protocol.DeployStart{SourceURL: "https://api.github.com/repos/acme/blog/tarball/abc123", Image: "ghcr.io/evil/blog:v3"}, false},
+		{protocol.DeployStart{SourceURL: "https://api.github.com/repos/evil/blog/tarball/abc123", Image: "ghcr.io/acme/blog:v3"}, false},
 	}
 	for _, c := range cases {
 		err := checkDeploy(rules, "rules", c.start)

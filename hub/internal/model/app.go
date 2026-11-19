@@ -118,14 +118,15 @@ type Registry struct {
 }
 
 // DeployFrom is where new versions of the app come from, one place at a
-// time: "github" when it follows a repo, "ci" when it has a deploy hook,
-// else "", neither yet.
+// time: "ci" when it has a deploy hook, which takes the compose file from
+// the repo the app follows, if any; "github" when it follows a repo
+// without one; else "", neither yet.
 func (a App) DeployFrom() string {
 	switch {
-	case a.Repo != "":
-		return "github"
 	case a.DeployHookHash != nil:
 		return "ci"
+	case a.Repo != "":
+		return "github"
 	}
 	return ""
 }

@@ -306,7 +306,7 @@ func loadBase(release *release, dir string) error {
 		err = json.Unmarshal(body, &config)
 	}
 	if err != nil {
-		return errors.New("the running release has no compose file to reuse: deploy the repo once with moin deploy")
+		return errors.New("the running release has no compose file to reuse: link the app's repo, then deploy the image again")
 	}
 	var detected protocol.Detected
 	body, _ = os.ReadFile(filepath.Join(dir, "detected.json"))

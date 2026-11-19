@@ -302,7 +302,7 @@ func catalogSource(app, src string) error {
 func (a *apps) reuseRunningRelease(ctx context.Context, release *release) error {
 	current := a.current(release.start.App)
 	if current == 0 {
-		return errors.New("no release to take the compose file from: deploy the repo once with moin deploy")
+		return errors.New("no release to take the compose file from: link the app's repo, then deploy the image again")
 	}
 	err := loadBase(release, a.releaseDir(release.start.App, current))
 	if err != nil {

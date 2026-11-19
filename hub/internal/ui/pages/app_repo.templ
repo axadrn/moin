@@ -89,10 +89,12 @@ templ unlinkButton(app model.App) {
 
 // repoLink links the app to a repo and a branch and deploys it: pick the
 // repo, then one of its branches, keep or drop deploy on push. No repo is
-// picked before you pick one. Linking turns the deploy hook off, so it asks
-// first when there is one.
+// picked before you pick one. While CI deploys with the deploy hook, it
+// only links: CI deploys take the repo's compose file, and pushes do not
+// deploy.
 templ repoLink(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
+	{{ hook := view.App.DeployHookHash != nil }}
 	if len(view.Repos) == 0 && !view.Loading {
 		<p class="moin-small moin-muted">
 			moin can read no repo yet.
@@ -111,13 +113,12 @@ templ repoLink(view RepoView) {
 			hx-target="#app-source"
 			hx-swap="outerHTML"
 			hx-disable="find button[type='submit']"
-			if view.App.DeployHookHash != nil {
-				hx-confirm={ "Link a repo? The deploy hook turns off. CI can no longer deploy " + view.App.Name + "." }
-			}
 			data-link-repo
 		>
 			@components.CSRF()
-			<input type="hidden" name="deploy" value="1"/>
+			if !hook {
+				<input type="hidden" name="deploy" value="1"/>
+			}
 			<div class="moin-grid">
 				<div hx-get={ appPath + "/repo/branches" } hx-trigger="change" hx-include="closest form" hx-target="#link-branch-field" hx-swap="outerHTML">
 					@components.Field(components.FieldProps{Label: "Repo", For: "link-repo"}) {
@@ -126,13 +127,21 @@ templ repoLink(view RepoView) {
 				</div>
 				@repoBranchField(view.Branches, view.Loading)
 			</div>
-			<label class="moin-row" data-between data-gap="3">
-				<span class="moin-text moin-strong">Deploy every push</span>
-				@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "link-auto-deploy", "name": "auto_deploy", "value": "1", "checked": true}})
-			</label>
+			if hook {
+				<p class="moin-small moin-muted" data-hook-deploys>CI deploys with the deploy hook, with compose.yml from the repo.</p>
+			} else {
+				<label class="moin-row" data-between data-gap="3">
+					<span class="moin-text moin-strong">Deploy every push</span>
+					@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "link-auto-deploy", "name": "auto_deploy", "value": "1", "checked": true}})
+				</label>
+			}
 			<div class="moin-row" data-wrap data-gap="2">
 				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"disabled": view.Loading}}) {
-					Link and deploy
+					if hook {
+						Link
+					} else {
+						Link and deploy
+					}
 				}
 				@repoAccess(view)
 			</div>
@@ -172,6 +181,8 @@ templ repoAccess(view RepoView) {
 }
 
 // repoLinked is a linked repo: unlink it, deploy a ref, deploy on push.
+// While CI deploys with the deploy hook, pushes do not deploy, and it says
+// so instead of the switch.
 templ repoLinked(view RepoView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() }}
 	<div class="moin-row" data-between data-gap="3">
@@ -191,7 +202,11 @@ templ repoLinked(view RepoView) {
 			</div>
 		}
 	</form>
-	@AutoDeployForm(view.App)
+	if view.App.DeployHookHash != nil {
+		<p class="moin-small moin-muted" data-hook-deploys>CI deploys with the deploy hook, with compose.yml from { view.App.Branch } or the commit it sends. Turn the hook off to deploy every push.</p>
+	} else {
+		@AutoDeployForm(view.App)
+	}
 }
 
 // AutoDeployForm is the switch for deploy on push. It saves only that, so

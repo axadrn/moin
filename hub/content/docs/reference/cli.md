@@ -85,7 +85,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin deploy [--server <server>] [--detach] [--yes] [app]` | in the top folder of a GitHub repo, [deploys the commit you pushed](/docs/guides/deploy#deploy-what-you-pushed); refuses changes that are not committed or pushed. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts). An app that follows no repo is linked to this one. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
-| `moin deploy --image <image> [app]` | deploys an image built in CI as the main service, with the compose file of an earlier deploy of the repo |
+| `moin deploy --image <image> [--ref <ref>] [app]` | deploys an image built in CI as the main service, with the compose file of `--ref` in the linked repo, its branch by default. An app without a repo keeps the compose file it runs |
 | `moin deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `moin redeploy [app]` | builds the newest source again, or pulls the image again, with the current env |
 | `moin restart [app]` | starts the live deploy again with the current env and domains |
@@ -128,9 +128,9 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin github` | where the moin GitHub App is installed, and the link to install it |
 | `moin github repos` | the repos moin may read, and where to give it more |
 | `moin github branches <owner/name>` | the branches of a repo, the default first |
-| `moin link owner/name [--branch <branch>] [--auto=false] [app] [--yes]` | follows a repo; every push to the branch deploys unless `--auto=false`. `--branch` defaults to the repo's default branch. It turns the deploy hook off, so it asks first when there is one |
+| `moin link owner/name [--branch <branch>] [--auto=false] [app] [--yes]` | follows a repo; every push to the branch deploys unless `--auto=false`. `--branch` defaults to the repo's default branch. Deploy on push turns the deploy hook off, so it asks first when there is one |
 | `moin unlink [app] [--yes]` | stops following it |
-| `moin hook [app] [--yes]` | prints a new deploy hook URL for CI; the old one stops working and the repo unlinks, so it asks first when that turns something off |
+| `moin hook [app] [--yes]` | prints a new deploy hook URL for CI; the old one stops working and pushes no longer deploy, so it asks first when that turns something off. The repo stays linked for the compose file |
 | `moin hook off [app] [--yes]` | turns the deploy hook off; CI can no longer deploy |
 | `moin registry` | lists registry logins for private images |
 | `moin registry set <host> <username>` | saves a login; the password or token comes on stdin |

@@ -65,9 +65,10 @@ type App struct {
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook bool `json:"hook"`
-	// DeployFrom is where new versions come from, one at a time: github
-	// (the linked repo) or ci (the deploy hook); empty while neither is set
-	// up. Linking a repo or making a hook switches it.
+	// DeployFrom is where new versions come from, one at a time: ci (the
+	// deploy hook, with the compose file from the linked repo when there
+	// is one) or github (the linked repo); empty while neither is set up.
+	// Making a hook or turning deploy on push on switches it.
 	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the deploy hook deploys new tags of: the one
 	// running now, without its tag. Empty while the app runs from its
@@ -128,9 +129,9 @@ type createAppRequest struct {
 	Server string `json:"server"`
 }
 
-// deployRequest is the body of a deploy: an image built elsewhere, or a
-// ref of the GitHub repo the app follows. An empty body deploys the linked
-// branch.
+// deployRequest is the body of a deploy: an image built elsewhere, a ref
+// of the GitHub repo the app follows, or both: the image with the compose
+// file of the ref. An empty body deploys the linked branch.
 type deployRequest struct {
 	Image string `json:"image"`
 	Ref   string `json:"ref"`
@@ -314,8 +315,9 @@ func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateDeploy starts a deploy: {"image": "..."} deploys an image built
-// elsewhere, {"ref": "..."} a branch, tag or commit of the linked repo,
-// built on the server.
+// elsewhere, with the compose file of "ref" in the linked repo, its branch
+// by default; {"ref": "..."} alone a branch, tag or commit of the linked
+// repo, built on the server.
 func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 	var request deployRequest
 	if !Decode(w, r, &request) {
@@ -325,7 +327,7 @@ func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch {
 	case request.Image != "":
-		deploy, err = h.apps.Deploy(actor(r), r.PathValue("app"), request.Image)
+		deploy, err = h.apps.Deploy(r.Context(), actor(r), r.PathValue("app"), request.Image, request.Ref)
 	default:
 		deploy, err = h.apps.DeployRef(r.Context(), actor(r), r.PathValue("app"), request.Ref)
 	}

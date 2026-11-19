@@ -24,10 +24,10 @@ func registerDeployTools(server *mcpsdk.Server, services Services) {
 		"Builds the source of the newest deploy again on the app's server, with the env as it is now. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.redeploy)))
 	mcpsdk.AddTool(server, newTool("deploy_image", "Deploy an image",
-		"Deploys an image built elsewhere, such as in CI, as the app's main service. It reuses the compose file of the live deploy and pulls with the registry login for the image's host. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
+		"Deploys an image built elsewhere, such as in CI, as the app's main service, and pulls it with the registry login for the image's host. An app that follows a GitHub repo takes the compose file of ref there, the linked branch by default; an app without a repo keeps the compose file of the live deploy and takes no ref. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.deployImage)))
 	mcpsdk.AddTool(server, newTool("create_deploy_hook", "Create a deploy hook",
-		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. An app deploys from one place at a time (deploy_from in get_app: github, ci, or empty for neither yet): it unlinks the app's GitHub repo, so pushes no longer deploy; ask the user first when get_app says repo. CI calls POST <url> with {\"image\": \"...\"}. The hook deploys only new tags of the image running now, hook_image in get_app; another image is refused, and while the app runs from its repo, everything. deploy_image picks the image. Needs a token with read and write access.",
+		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): the hook turns deploy on push off and keeps the GitHub repo linked, whose compose file each deploy takes; ask the user first when get_app says auto_deploy. CI calls POST <url> with {\"image\": \"...\", \"commit\": \"<sha>\"}, the commit the image was built from; without one, the head of the linked branch. The hook deploys only new tags of the image running now, hook_image in get_app; another image is refused, and while no image runs, everything. deploy_image picks the image. Needs a token with read and write access.",
 		change(true, false)), Write(changes(services, tools.createDeployHook)))
 	mcpsdk.AddTool(server, newTool("remove_deploy_hook", "Turn the deploy hook off",
 		"Turns off the deploy hook of an app: its URL stops working and CI can no longer deploy. get_app says in hook whether there is one; create_deploy_hook makes a new one. Works while the plan allows no changes. Needs a token with read and write access.",
@@ -110,10 +110,11 @@ func (t moinTools) redeploy(_ context.Context, caller Caller, input AppInput) (D
 type ImageInput struct {
 	App   string `json:"app" jsonschema:"the app name or ID"`
 	Image string `json:"image" jsonschema:"the image reference, like ghcr.io/me/app:tag"`
+	Ref   string `json:"ref,omitempty" jsonschema:"for an app that follows a GitHub repo: the branch, tag or commit whose compose file the deploy takes, best the commit the image was built from; default the linked branch"`
 }
 
-func (t moinTools) deployImage(_ context.Context, caller Caller, input ImageInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Deploy(caller.actor(), input.App, input.Image)
+func (t moinTools) deployImage(ctx context.Context, caller Caller, input ImageInput) (Deploy, error) {
+	deploy, err := t.services.Apps.Deploy(ctx, caller.actor(), input.App, input.Image, input.Ref)
 	if err != nil {
 		return Deploy{}, err
 	}

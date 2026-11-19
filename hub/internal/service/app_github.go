@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -222,8 +223,8 @@ func (s *AppService) gitHubRepo(ctx context.Context, workspaceID, repo string) (
 }
 
 // LinkRepo makes an app follow a repo and branch. An empty branch is the
-// repo's default branch. One thing brings new versions: linking turns the
-// deploy hook off.
+// repo's default branch. One thing brings new versions: deploy on push
+// turns the deploy hook off.
 func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, branch string, autoDeploy bool) (*model.App, error) {
 	// The branch goes into GitHub URLs and the push matching; git's rules
 	// keep it a plain name. GitHub's default branch needs no check.
@@ -262,16 +263,19 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 		return nil, err
 	}
 	s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(autoDeploy)})
-	if _, err := s.RemoveDeployHook(actor, app.ID); err != nil {
-		return nil, err
+	if autoDeploy {
+		if _, err := s.RemoveDeployHook(actor, app.ID); err != nil {
+			return nil, err
+		}
 	}
 	s.notify(actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
 }
 
 // SetAutoDeploy turns deploy on push on or off for an app that follows a
-// repo. It changes nothing else and asks GitHub nothing, so a switch on the
-// page saves even while GitHub is slow or down.
+// repo. It asks GitHub nothing, so a switch on the page saves even while
+// GitHub is slow or down. One thing brings new versions: turning it on
+// turns the deploy hook off.
 func (s *AppService) SetAutoDeploy(actor Actor, idOrName string, on bool) (*model.App, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
@@ -288,6 +292,11 @@ func (s *AppService) SetAutoDeploy(actor Actor, idOrName string, on bool) (*mode
 		return nil, err
 	}
 	s.servers.record(actor, "repo.auto_deploy", "app", app.Name, map[string]string{"repo": app.Repo, "branch": app.Branch, "on": strconv.FormatBool(on)})
+	if on {
+		if _, err := s.RemoveDeployHook(actor, app.ID); err != nil {
+			return nil, err
+		}
+	}
 	s.notify(actor.WorkspaceID)
 	return s.apps.ByID(app.ID)
 }
@@ -329,17 +338,15 @@ func (s *AppService) DeployRef(ctx context.Context, actor Actor, idOrName, ref s
 	if app.Repo == "" {
 		return nil, ErrNoRepo
 	}
-	ref = strings.TrimSpace(ref)
-	if ref == "" {
-		ref = app.Branch
-	}
-	return s.deployCommit(ctx, actor, app, ref, ref)
+	ref = cmp.Or(ref, app.Branch)
+	return s.deployCommit(ctx, actor, app, ref, ref, "")
 }
 
 // deployCommit deploys the commit that at points to and records it under
 // ref: a push names the branch and pins its exact commit, so a newer push
-// in between can't change what this deploy builds.
-func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.App, ref, at string) (*model.Deploy, error) {
+// in between can't change what this deploy builds. With an image, the
+// main service runs it instead of a build, with the commit's compose file.
+func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.App, ref, at, image string) (*model.Deploy, error) {
 	commit, err := s.github.Commit(ctx, app.InstallationID, app.Repo, at)
 	var githubErr *GitHubError
 	if errors.As(err, &githubErr) && (githubErr.Status == 404 || githubErr.Status == 422) {
@@ -353,8 +360,8 @@ func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.A
 		return nil, err
 	}
 	deploy := s.newDeploy(app)
-	deploy.SourceKey, deploy.Ref, deploy.CommitSHA, deploy.CommitMessage = "server", ref, commit.SHA, clipText(commit.Message, 200)
-	deploy, err = s.start(actor, "app.deployed", app, deploy, protocol.DeployStart{SourceURL: url, SourceAuthorization: authorization, SourceStripTop: true})
+	deploy.SourceKey, deploy.Ref, deploy.CommitSHA, deploy.CommitMessage, deploy.Image = "server", ref, commit.SHA, clipText(commit.Message, 200), image
+	deploy, err = s.start(actor, "app.deployed", app, deploy, protocol.DeployStart{SourceURL: url, SourceAuthorization: authorization, SourceStripTop: true, Image: image})
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +388,7 @@ func (s *AppService) GitHubPush(ctx context.Context, installationID int64, repo,
 			slog.Warn("auto deploy failed", "app_id", app.ID, "repo", repo, "sha", sha, "error", err)
 			continue
 		}
-		deploy, err := s.deployCommit(ctx, actor, ready, branch, sha)
+		deploy, err := s.deployCommit(ctx, actor, ready, branch, sha, "")
 		if err != nil {
 			slog.Warn("auto deploy failed", "app_id", app.ID, "repo", repo, "sha", sha, "error", err)
 			continue

@@ -42,7 +42,7 @@ type App struct {
 	Pinned     bool   `json:"pinned"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`
-	// DeployFrom is github or ci, where new versions come from; empty
+	// DeployFrom is ci or github, where new versions come from; empty
 	// while neither is set up.
 	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the hook deploys new tags of, the one running
@@ -243,9 +243,11 @@ func (a App) Status() string {
 }
 
 // DeployImage deploys an image built elsewhere as the app's main service.
-func (c *Client) DeployImage(ctx context.Context, app, image string) (Deploy, error) {
+// An app that follows a GitHub repo takes the compose file of ref there;
+// an empty ref is the linked branch.
+func (c *Client) DeployImage(ctx context.Context, app, image, ref string) (Deploy, error) {
 	var response Deploy
-	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"image": image}, &response)
+	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"image": image, "ref": ref}, &response)
 	return response, err
 }
 

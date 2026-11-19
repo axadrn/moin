@@ -113,13 +113,14 @@ func link(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if err != nil {
 		return err
 	}
-	// One thing brings new versions: linking turns the deploy hook off.
+	// One thing brings new versions: deploy on push turns the deploy hook
+	// off. Without it, CI keeps deploying, with the repo's compose file.
 	detail, err := api.App(ctx, name)
 	if err != nil {
 		return err
 	}
-	if detail.App.Hook {
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Link %s to %s? Its deploy hook turns off. CI can no longer deploy it.", name, flags.Arg(0)))
+	if detail.App.Hook && *auto {
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Link %s to %s and deploy every push? Its deploy hook turns off. CI can no longer deploy it.", name, flags.Arg(0)))
 		if err != nil {
 			return err
 		}

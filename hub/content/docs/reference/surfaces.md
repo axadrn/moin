@@ -18,7 +18,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Apps, live | ✓ | ✓ `apps` | ✓ | ✓ | ✓ |
 | Pin an app | ✓ | ✓ `apps pin` | ✓ `*` | ✓ | ✓ `pin_app` |
 | Deploy the pushed commit of this repo | ✓ `Deploy` with the commit | ✓ `deploy` | ✓ `D`, for an app that follows the repo | ✓ | ✓ `deploy_ref` with the commit |
-| Deploy an image from CI | ✓ | ✓ `deploy --image` | ✓ `I` | ✓ | ✓ |
+| Deploy an image from CI, with the compose file of a commit | ✓ the branch | ✓ `deploy --image --ref` | ✓ `I`, the branch | ✓ | ✓ |
 | Deploy a branch, tag or commit | ✓ | ✓ `deploy --ref` | ✓ `B` | ✓ | ✓ |
 | Redeploy | ✓ | ✓ `redeploy` | ✓ `R` | ✓ | ✓ |
 | Follow a deploy live | ✓ | ✓ | ✓ | ✓ event stream | Polls `get_deploy`: a tool answers once, it does not stream. |
@@ -65,7 +65,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Catalog: browse and install | ✓ | ✓ `catalog` | A form wants a page: opens the web. | ✓ | ✓ |
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |
 | Link or unlink a repo | ✓ | ✓ `link`, `unlink` | Opens the web. | ✓ | ✓ |
-| Deploy hook for CI | ✓ | ✓ `hook` | Opens the web. | ✓ | ✓ |
+| Deploy hook for CI, with image and commit | ✓ | ✓ `hook` | Opens the web. | ✓ | ✓ |
 | Registry logins | ✓ | ✓ `registry` | Opens the web. | ✓ | ✓ |
 | Instant address: provider, open | ✓ | ✓ `instant` | Shows it; change it in the web. | ✓ | ✓ |
 | Buckets | ✓ | ✓ `buckets` | Opens the web. | ✓ | ✓ |

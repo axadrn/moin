@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -272,14 +273,32 @@ func (s *AppService) Deploys(workspaceID, idOrName string, limit int) (*model.Ap
 }
 
 // Deploy deploys an image built elsewhere, such as in CI, as the main
-// service; the server keeps the compose file of the live deploy.
-func (s *AppService) Deploy(actor Actor, idOrName, image string) (*model.Deploy, error) {
+// service. An app that follows a repo takes the compose file of ref there,
+// the linked branch when ref is empty, so code and compose file match. An
+// app without a repo keeps the compose file of the live deploy; a ref
+// means nothing there and is refused.
+func (s *AppService) Deploy(ctx context.Context, actor Actor, idOrName, image, ref string) (*model.Deploy, error) {
 	if !imagePattern.MatchString(image) {
 		return nil, ErrImage
+	}
+	// The ref goes into a GitHub URL.
+	ref = strings.TrimSpace(ref)
+	if ref != "" && !protocol.ValidRefName(ref) {
+		return nil, ErrRefName
 	}
 	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
 		return nil, err
+	}
+	if app.Repo != "" {
+		if s.github == nil {
+			return nil, ErrGitHubOff
+		}
+		ref = cmp.Or(ref, app.Branch)
+		return s.deployCommit(ctx, actor, app, ref, ref, image)
+	}
+	if ref != "" {
+		return nil, ErrNoRepo
 	}
 	deploy := s.newDeploy(app)
 	deploy.Image = image
@@ -293,8 +312,9 @@ func (s *AppService) newDeploy(app *model.App) *model.Deploy {
 
 // DeployHook deploys an image for the app whose deploy hook token this is.
 // CI calls it after pushing the image: a new tag or digest of the image
-// running now, never another image.
-func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy, error) {
+// running now, never another image. commit is the commit CI built the
+// image from, whose compose file the deploy takes; see Deploy.
+func (s *AppService) DeployHook(ctx context.Context, token, image, commit string) (*model.App, *model.Deploy, error) {
 	if !strings.HasPrefix(token, deployHookMarker) {
 		return nil, nil, ErrDeployHook
 	}
@@ -315,20 +335,22 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 	if app.HookImage() == "" || model.ImageName(image) != app.HookImage() {
 		return app, nil, &HookImageError{Image: app.HookImage()}
 	}
-	deploy, err := s.Deploy(Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaHook}}, app.ID, image)
+	deploy, err := s.Deploy(ctx, Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaHook}}, app.ID, image, commit)
 	return app, deploy, err
 }
 
 // RotateDeployHook gives the app a new deploy hook URL, shown once. The old
-// one stops working. One thing brings new versions: a hook unlinks the
-// app's repo.
+// one stops working. CI deploys from then on: pushes to the app's repo no
+// longer do, and the repo stays linked for the compose file.
 func (s *AppService) RotateDeployHook(actor Actor, idOrName string) (string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return "", err
 	}
-	if err := s.UnlinkRepo(actor, app.ID); err != nil {
-		return "", err
+	if app.Repo != "" {
+		if _, err := s.SetAutoDeploy(actor, app.ID, false); err != nil {
+			return "", err
+		}
 	}
 	token := deployHookMarker + randomToken()
 	err = s.apps.SetDeployHookHash(app.ID, hashToken(token))

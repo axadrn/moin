@@ -39,14 +39,16 @@ Code never comes from your computer. Your server builds what is on GitHub. So wh
 
 An app deploys from one place at a time: GitHub or CI. The app's **Deploys** tab shows it as **Deploy from**, with a green dot on the one in use. Pick another to switch. moin asks first, because the old one stops.
 
+CI still uses the repo. Each image deploy takes `compose.yml` from the commit the image was built from. So the repo stays linked while CI deploys. Only its pushes no longer deploy.
+
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from**
 CLI: moin apps <app-name>, the line deploy from
-API: GET /api/v1/apps/{app}, the field deploy_from: github, ci, or empty for neither yet
+API: GET /api/v1/apps/{app}, the field deploy_from: ci, github, or empty for neither yet
 MCP: get_app, deploy_from
 ```
 
-Switch with what turns one on: [link a repo](/docs/guides/github), [turn on the deploy hook](/docs/guides/ci). Unlinking or turning the hook off leaves neither. `moin deploy` in the repo links it again.
+Switch with what turns one on: [deploy every push](/docs/guides/github#deploy-every-push), [turn on the deploy hook](/docs/guides/ci). Turning the hook off leaves the repo linked, without deploys on push. Unlinking leaves neither. `moin deploy` in the repo links it again.
 
 Settings: [who decides](/docs/guides/config#who-decides).
 
