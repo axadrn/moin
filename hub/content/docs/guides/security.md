@@ -28,6 +28,10 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 
 - Every release is signed with Ed25519. The daemon takes it from GitHub, not from the hub, and checks the seal first. [Updates](#updates)
 
+**Every guest stays in its room.** An app gets its own folders and nothing else of the house. A container that asks for the master key is turned away at the door.
+
+- The server checks every compose file against a list of what a normal app needs, before anything builds or starts. [Containers](#containers-that-reach-into-the-server)
+
 **What stays honest.** A messenger that someone bought can still bring letters your rules allow. Strict rules leave it nothing that hurts.
 
 ## Ports, SSH and the firewall
@@ -183,13 +187,60 @@ network: locked
 | `deploy-from: <sources>` | deploys from anywhere else |
 | `backups-to: <host>/<bucket>` | backups to and restores from any other bucket, also an app's own bucket or an older one |
 | `network: locked` | changes to Web, SSH and the firewall: set them up first, then lock them. The daemon still puts back what drifts |
+| `mounts: <folders>` | nothing: it lets apps mount these folders of the server, like `/mnt/media`, which moin refuses without it |
+| `server-access: on` | nothing: it allows [containers that reach beyond the app](#containers-that-reach-into-the-server), which moin refuses without it |
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
-- No file: moin may do everything. A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
+- No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
 - A server with rules never updates its daemon from moin. You update it on the server ([Updates](/docs/guides/servers#updates)).
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.
+
+### Containers that reach into the server
+
+An app is a guest in your house. It gets its own room and stays there. Some containers ask for the master key instead: with it, they can open every door of the server. moin turns them away at the door, unless you say yes on the server.
+
+So moin does not list what is forbidden. It lists what a normal app needs, and refuses everything else, with or without a rules file. A setting Docker adds tomorrow is refused too, until it is on the list.
+
+The server checks the compose file as it will run, before anything builds or starts. That holds for every deploy: new code, a new image, new env and a rollback. A refused deploy says which setting: `service web: privileged is not allowed: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in /etc/moin/rules`.
+
+| Allowed | What for |
+| --- | --- |
+| `image`, `build` from the app's source | what runs |
+| `command`, `entrypoint`, `environment`, `env_file` from the app's source, `working_dir`, `user` | how it runs |
+| `ports`, `expose`, `networks` of the app, `links`, `hostname`, `extra_hosts`, `dns` | how it is reached |
+| `volumes`: the app's data folders (`./data:/data`), files of its source read-only (`./nginx.conf:/etc/nginx/nginx.conf:ro`), its named volumes, `tmpfs`, `/etc/localtime` and `/etc/timezone` read-only, and the folders of `mounts:` | its data |
+| `configs` and `secrets` written in the file or from env | its settings |
+| `healthcheck`, `depends_on`, `restart`, `init`, `stop_signal`, `stop_grace_period` | how it starts, stops and is checked |
+| limits: `mem_limit`, `cpus`, `pids_limit`, `ulimits`, `shm_size`, `deploy` resources and replicas | how much it may use |
+| `cap_drop`, `read_only`, `security_opt: no-new-privileges`, `sysctls` starting with `net.` | fewer powers, never more |
+| `labels`, `tty`, `stdin_open`, `platform`, `pull_policy`, `scale`, and `x-` extensions | the rest a normal app uses |
+| `extends` of a service in the same file | services that share settings |
+
+Everything else is refused. Some that come up:
+
+| Refused | Why |
+| --- | --- |
+| `privileged`, `cap_add`, `devices`, `device_cgroup_rules`, GPUs | the kernel's powers or the server's hardware |
+| `network_mode`, `pid`, `ipc`, `userns_mode`, `cgroup` | the server's network, processes or users, or another container's |
+| `volumes_from` | the mounts of another container, like the proxy's Docker socket |
+| a mount of a folder of the server, like `/`, `/etc`, `/srv/data` or `/var/run/docker.sock`, unless `mounts:` lists it, or of the app's own folder, which holds the compose files moin runs | the container reads or writes the server |
+| the app's source writable, like `.:/app` | a container could leave a link to `/` there for the next build or mount to follow. Mount it read-only (`.:/app:ro`) and keep data in `./data` |
+| a data folder inside one a container can write, like `./data` and `./data/db` together | the container could swap `db` for a link to `/` while the deploy starts. Side by side is fine: `./data/db` and `./data/uploads` |
+| named volumes with a `driver`, `driver_opts` or another name, networks of other apps | another disk, or another app's data |
+| `configs` and `secrets` from a `file`, an `env_file` outside the source | files of the server, read into the app |
+| `include`, `extends` of another file, `label_file` | they read other files, which could be anywhere on the server. Put the services and labels in one compose file |
+| a network with its own `ipam` subnet | the subnet could cover the server's own network and take its traffic; Docker picks a free one |
+| `build` from outside the source, `additional_contexts`, `ssh`, `privileged`, `network` or `tags` | the same, while the image builds. A tag like `traefik:v3.6` would replace moin's own proxy |
+| hooks like `post_start` | they can run with all powers |
+
+- The list is one place in the code: `serviceKeys` and the lists after it in `internal/daemon/access.go`, every line with what it is for. The catalog uses none of the refused settings.
+- Your data stays where it is: `./data` is a folder of the app on the server, `/var/lib/moin/apps/<app>/volumes/data`, so you see it with `ls`.
+- A folder of the server, like a disk with your films for Jellyfin? Write `mounts: /mnt/media` in `/etc/moin/rules`. Apps may then mount exactly these folders, and nothing next to them.
+- Need more, like a monitoring tool that reads the Docker socket? Write `server-access: on` in `/etc/moin/rules`. Only you can, as root on the server, so someone who breaks into moin cannot. Then the list does not apply on that server at all, so put such a tool on a server of its own.
+- A deploy that does not come up stops its containers, so none of them keeps running half-started.
+- What it does not stop: a deploy of a normal app still runs that app's code, with its data and env. Against code from somewhere else, set [`deploy-from`](#rules).
 
 ### See the rules of a server
 

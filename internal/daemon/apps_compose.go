@@ -75,6 +75,11 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[s
 	if err != nil {
 		return nil, err
 	}
+	// Before compose reads any file the compose file names into it.
+	err = a.checkSourceFiles(ctx, app, src, envFiles)
+	if err != nil {
+		return nil, err
+	}
 	args := append([]string{"compose", "-p", project(app), "--project-directory", src, "-f", composePath(src)}, envFiles...)
 	raw, err := a.output(ctx, "docker", append(args, "config", "--format", "json")...)
 	if err != nil {
@@ -175,12 +180,32 @@ func moveDataMount(mount map[string]any, src, volumesDir string) error {
 	}
 	relative, _ := filepath.Rel(src, source)
 	stable := filepath.Join(volumesDir, relative)
+	// A container may have left a link in the data folders: make nothing
+	// through it, as root, outside them.
+	err = os.MkdirAll(volumesDir, 0o755)
+	if err != nil {
+		return err
+	}
+	parent := resolved(existingParent(stable))
+	if parent != resolved(volumesDir) && !within(resolved(volumesDir), parent) {
+		return fmt.Errorf("the data folder %s leads out of the app, so the server refuses it", relative)
+	}
 	err = os.MkdirAll(stable, 0o755)
 	if err != nil {
 		return err
 	}
 	mount["source"] = stable
 	return nil
+}
+
+// existingParent is path, or the nearest folder above it that is there.
+func existingParent(path string) string {
+	for {
+		if _, err := os.Lstat(path); err == nil || path == filepath.Dir(path) {
+			return path
+		}
+		path = filepath.Dir(path)
+	}
 }
 
 // ownVolumes hands the data directories moin made for an app to the user

@@ -38,16 +38,16 @@ func (r *runner) deployStart(ctx context.Context, message protocol.Message, rule
 		return
 	}
 	defer r.endWork()
-	r.apps.deploy(ctx, start)
+	r.apps.deploy(ctx, start, rules)
 }
 
 // deploy runs one deploy and always ends with deploy.done.
-func (a *apps) deploy(ctx context.Context, start protocol.DeployStart) {
+func (a *apps) deploy(ctx context.Context, start protocol.DeployStart, rules *protocol.Rules) {
 	logf := func(format string, args ...any) {
 		a.send(protocol.TypeDeployLog, "", protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
 	}
 	done := protocol.DeployDone{DeployID: start.DeployID}
-	detected, err := a.runDeploy(ctx, start, logf)
+	detected, err := a.runDeploy(ctx, start, rules, logf)
 	done.Detected = detected
 	a.mu.Lock()
 	if before, ok := a.befores[start.DeployID]; ok {
@@ -114,6 +114,8 @@ type release struct {
 	// start is what the hub asked for. A deploy without source takes the
 	// image of the running release into start.Image.
 	start protocol.DeployStart
+	// rules are the rules of the server when the deploy started.
+	rules *protocol.Rules
 	// dir is the folder of this release.
 	dir string
 	// composeFile is the compose.json moin runs for this release.
@@ -137,7 +139,7 @@ func hasSource(start protocol.DeployStart) bool {
 // runDeploy runs the steps of one deploy in order: make the release, take
 // the compose file of an older release or fetch and build a new one, start
 // it, then follow its databases and clean up.
-func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
+func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, rules *protocol.Rules, logf func(string, ...any)) (protocol.Detected, error) {
 	if !protocol.ValidAppName(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
 		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
 	}
@@ -147,7 +149,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 		return protocol.Detected{}, fmt.Errorf("write the deploy down: %w", err)
 	}
 	defer os.Remove(note)
-	release, err := a.newRelease(start, logf)
+	release, err := a.newRelease(start, rules, logf)
 	if err != nil {
 		return protocol.Detected{}, err
 	}
@@ -171,7 +173,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf f
 
 // newRelease keeps the app's ID and makes an empty folder for the release,
 // with its kind for prune.
-func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any)) (*release, error) {
+func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, logf func(string, ...any)) (*release, error) {
 	if start.AppID != "" {
 		err := os.MkdirAll(a.appDir(start.App), 0o700)
 		if err == nil {
@@ -195,7 +197,7 @@ func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any))
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, dir: dir, composeFile: filepath.Join(dir, "compose.json"), logf: logf}, nil
+	return &release{start: start, rules: rules, dir: dir, composeFile: filepath.Join(dir, "compose.json"), logf: logf}, nil
 }
 
 // rollBack copies the compose file of an older release into this one: the
@@ -218,7 +220,13 @@ func (a *apps) rollBack(ctx context.Context, release *release) error {
 	if err == nil {
 		_ = os.WriteFile(filepath.Join(release.dir, "base.json"), base, 0o600)
 	}
-	return a.pinFile(ctx, release.start, release.composeFile)
+	err = a.pinFile(ctx, release.start, release.composeFile)
+	if err != nil {
+		return err
+	}
+	// An old release may come from before a rule, or its files may have
+	// changed since: check it as a new one.
+	return a.checkCompose(release)
 }
 
 // prepareRelease fetches the source, routes the app, writes compose.json and
@@ -301,6 +309,11 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 		return err
 	}
 	err = a.pinFile(ctx, release.start, release.composeFile)
+	if err != nil {
+		return err
+	}
+	// Before anything builds or starts: the file as it will run.
+	err = a.checkCompose(release)
 	if err != nil {
 		return err
 	}
@@ -397,7 +410,11 @@ func (a *apps) copyDataBefore(ctx context.Context, release *release) {
 // failed with startErr. It returns what the deploy failed with.
 func (a *apps) startPreviousAgain(ctx context.Context, release *release, previous int, startErr error) error {
 	start := release.start
+	// A release that did not come up stops all its containers, so none of
+	// them keeps writing while the next deploy checks its mounts.
+	stop := func() { _ = a.compose(ctx, start.App, release.composeFile, release.logf, "stop") }
 	if previous <= 0 || previous == start.Number {
+		stop()
 		return startErr
 	}
 	release.logf("starting v%d again", previous)
@@ -405,6 +422,7 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 	_ = a.pinFile(ctx, start, previousFile)
 	rollbackErr := a.compose(ctx, start.App, previousFile, release.logf, "up", "-d", "--remove-orphans")
 	if rollbackErr != nil {
+		stop()
 		return startErr
 	}
 	return fmt.Errorf("%w; v%d is running again", startErr, previous)

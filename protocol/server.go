@@ -39,6 +39,13 @@ type Rules struct {
 	NetworkLocked bool `json:"network_locked,omitempty"`
 	// ExecOff refuses running commands in containers.
 	ExecOff bool `json:"exec_off,omitempty"`
+	// Mounts are folders of the server an app may mount, such as
+	// "/mnt/media". Without them an app mounts only its own folders.
+	Mounts []string `json:"mounts,omitempty"`
+	// ServerAccess allows compose settings that reach beyond the app, such
+	// as privileged containers or a mount of the Docker socket. Without it
+	// the daemon refuses them, with or without a rules file.
+	ServerAccess bool `json:"server_access,omitempty"`
 }
 
 // Lines are the rules as written in the rules file, for every surface to
@@ -65,6 +72,12 @@ func (r *Rules) Lines() []string {
 	}
 	if r.ExecOff {
 		lines = append(lines, "exec: off")
+	}
+	if len(r.Mounts) > 0 {
+		lines = append(lines, "mounts: "+strings.Join(r.Mounts, ", "))
+	}
+	if r.ServerAccess {
+		lines = append(lines, "server-access: on")
 	}
 	return lines
 }
