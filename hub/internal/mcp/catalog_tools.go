@@ -23,7 +23,7 @@ func registerCatalogTools(server *mcpsdk.Server, services Services) {
 	install := change(false, false)
 	install.Title = "Install a catalog app"
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "install_catalog_app", Title: install.Title, Annotations: install,
-		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. The workspace needs a bucket. Needs a token with read and write access.",
+		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. Needs a token with read and write access.",
 	}, Write(changes(services, tools.install)))
 	update := change(false, false)
 	update.Title = "Update a catalog app"

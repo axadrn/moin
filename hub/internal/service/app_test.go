@@ -23,12 +23,16 @@ var (
 	other = Actor{WorkspaceID: "workspace-other", UserID: "other", Source: Source{Via: ViaWeb}}
 )
 
-// testUpload is an upload ID and SHA-256 as the CLI sends them.
-var testUpload, testSum = "up_" + strings.Repeat("a", 24), strings.Repeat("0", 64)
-
-// deployUpload deploys a source uploaded to the owner's bucket.
-func deployUpload(apps *AppService) (*model.Deploy, error) {
-	return apps.DeployUpload(context.Background(), owner, "blog", testUpload, testSum)
+// deploySource deploys a commit of blog's repo as DeployRef does, without
+// asking GitHub: the daemon gets the address of its tarball.
+func deploySource(apps *AppService) (*model.Deploy, error) {
+	app, err := apps.ready(owner.WorkspaceID, "blog")
+	if err != nil {
+		return nil, err
+	}
+	deploy := apps.newDeploy(app)
+	deploy.SourceKey = "server"
+	return apps.start(owner, "app.deployed", app, deploy, protocol.DeployStart{SourceURL: "https://api.github.com/repos/me/blog/tarball/abc123", SourceStripTop: true})
 }
 
 // fakeDaemon is an online server whose daemon records what it gets.
@@ -79,7 +83,7 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 		t.Fatal(err)
 	}
 	apps := NewAppService(repository.NewApps(database, database), servers, box)
-	// A bucket for uploads and backups, stored without the check.
+	// A bucket for backups, stored without the check.
 	err = apps.apps.CreateBucket(model.Bucket{ID: "bucket-owner", WorkspaceID: owner.WorkspaceID, Name: "default", IsDefault: true, Endpoint: "https://s3.example.com", Region: "auto", Bucket: "owner", AccessKey: "key", SecretKey: box.Seal("secret", owner.WorkspaceID+"/backups")})
 	if err != nil {
 		t.Fatal(err)
@@ -156,17 +160,17 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("removed = %v, %v; want OLD", removed, err)
 	}
 
-	// v1: the daemon gets the source URL, its sum and the env.
-	first, err := deployUpload(apps)
+	// v1: the daemon gets the source URL and the env.
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Number != 1 || start.App != "blog" || start.SourceURL == "" || start.SHA256 == "" || start.Env["SECRET"] != "a$b" {
+	if start.Number != 1 || start.App != "blog" || start.SourceURL == "" || start.Env["SECRET"] != "a$b" {
 		t.Fatalf("deploy.start = %+v", start)
 	}
-	if _, err := deployUpload(apps); !errors.Is(err, ErrDeployRunning) {
+	if _, err := deploySource(apps); !errors.Is(err, ErrDeployRunning) {
 		t.Fatalf("second deploy while one runs: err = %v", err)
 	}
 
@@ -195,7 +199,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	}
 
 	// v2 fails; v1 stays live.
-	second, err := deployUpload(apps)
+	second, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +219,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	}
 
 	// v3 succeeds, then a rollback to v1 starts its release without env.
-	third, err := deployUpload(apps)
+	third, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +268,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 
 	// Three more builds make v1 the sixth newest build: its release is gone.
 	for range 3 {
-		deploy, err := deployUpload(apps)
+		deploy, err := deploySource(apps)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -520,7 +524,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, "other.example.org"); !errors.Is(err, ErrCanonical) {
 		t.Fatalf("bad canonical: err = %v", err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -614,7 +618,7 @@ func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +672,7 @@ func TestStopStartAndRestart(t *testing.T) {
 	if _, err := apps.Restart(owner, "blog"); !errors.Is(err, ErrNotLive) {
 		t.Fatalf("restart before a deploy: err = %v", err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}

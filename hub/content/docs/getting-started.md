@@ -47,7 +47,7 @@ It installs Docker if it is missing. It starts the daemon, the little helper tha
 
 ## 3. Add your bucket
 
-Your bucket is your own box on the internet. Your backups and uploads go there, never to us.
+Your bucket is your own box on the internet. Your backups go there, never to us.
 
 Any S3-compatible one works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner or Exoscale. Make a bucket, and a key that may read, write and delete.
 
@@ -66,7 +66,9 @@ The CLI asks for the secret key. For AWS S3, leave the endpoint out and set the 
 
 ## 4. Deploy
 
-A deploy puts a new version of your app live. Go to the folder of your app and type:
+A deploy puts a new version of your app live. Your server builds what you pushed to GitHub. So connect GitHub once: `moin github` prints the link. [GitHub](/docs/guides/github#connect-github) has the details.
+
+Push your app to GitHub. Then go to its folder and type:
 
 ```bash
 moin deploy
@@ -77,7 +79,9 @@ The app does not exist yet, so moin asks first. Answer `y`.
 ```text
 ? App my-app does not exist. Create it? [y/N] y
 Created app my-app on web-1
-Uploading 42 files to your bucket (18.3 KB)
+my-app follows me/my-app@main
+Deploying me/my-app from GitHub
+commit 3f2a9c1 First version
 Deploy v1 of my-app started
   detected go, service web on port 8080
   v1 is live
@@ -88,7 +92,7 @@ You need no Dockerfile. moin builds Node, Bun, Python, Ruby, PHP, Go and more. I
 
 The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password. `moin instant --show` prints both.
 
-This page deploys from your folder. You can also deploy from GitHub or from CI. It all comes down to [three questions](/docs/guides/deploy#three-questions).
+This page deploys what you pushed. You can also deploy every push, or an image from CI. It all comes down to [three questions](/docs/guides/deploy#three-questions).
 
 ## Good to know
 

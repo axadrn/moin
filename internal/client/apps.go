@@ -1,12 +1,8 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -46,12 +42,13 @@ type App struct {
 	Pinned     bool   `json:"pinned"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`
-	// DeployFrom is folder, github or ci: where new versions come from.
+	// DeployFrom is github or ci, where new versions come from; empty
+	// while neither is set up.
 	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the hook deploys new tags of, the one running
 	// now; empty while the app runs from its repo.
 	HookImage string `json:"hook_image"`
-	// Bucket is the bucket the app uploads and backs up to; empty follows
+	// Bucket is the bucket the app backs up to; empty follows
 	// the workspace's default.
 	Bucket string `json:"bucket"`
 	// Catalog is the catalog entry the app was installed from; empty for
@@ -125,37 +122,6 @@ func (c *Client) AddApp(ctx context.Context, name, server string) (App, error) {
 // confirm is the app's name, typed out; the hub checks it.
 func (c *Client) RemoveApp(ctx context.Context, app, confirm string) error {
 	return c.do(ctx, http.MethodDelete, appPath(app)+"?confirm="+url.QueryEscape(confirm), nil, nil)
-}
-
-// Deploy uploads a gzipped source tarball and starts a deploy.
-func (c *Client) Deploy(ctx context.Context, app string, source []byte) (Deploy, error) {
-	var upload struct {
-		Upload string `json:"upload"`
-		URL    string `json:"url"`
-	}
-	err := c.do(ctx, http.MethodPost, appPath(app, "uploads"), map[string]any{}, &upload)
-	if err != nil {
-		return Deploy{}, err
-	}
-	// The source goes straight into the user's bucket; moin only signed the
-	// link.
-	request, err := http.NewRequestWithContext(ctx, http.MethodPut, upload.URL, bytes.NewReader(source))
-	if err != nil {
-		return Deploy{}, err
-	}
-	request.ContentLength = int64(len(source))
-	response, err := c.http.Do(request)
-	if err != nil {
-		return Deploy{}, fmt.Errorf("cannot reach your bucket: %v", errors.Unwrap(err))
-	}
-	response.Body.Close()
-	if response.StatusCode >= 300 {
-		return Deploy{}, fmt.Errorf("upload to your bucket: %s", response.Status)
-	}
-	sum := sha256.Sum256(source)
-	var deploy Deploy
-	err = c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"upload": upload.Upload, "sha256": hex.EncodeToString(sum[:])}, &deploy)
-	return deploy, err
 }
 
 // Rollback starts an earlier successful release again. Number 0 is the one

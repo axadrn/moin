@@ -84,7 +84,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin deploy [--dir .] [--server <server>] [--detach] [--yes] [app]` | deploys a directory. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts). `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
+| `moin deploy [--server <server>] [--detach] [--yes] [app]` | in the top folder of a GitHub repo, [deploys the commit you pushed](/docs/guides/deploy#deploy-what-you-pushed); refuses changes that are not committed or pushed. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts). An app that follows no repo is linked to this one. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
 | `moin deploy --image <image> [app]` | deploys an image built in CI as the main service, with the compose file of an earlier deploy of the repo |
 | `moin deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `moin redeploy [app]` | builds the newest source again, or pulls the image again, with the current env |
@@ -186,7 +186,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the stored one stays |
 | `moin buckets default <name>` | makes a bucket the default for apps without one of their own |
 | `moin buckets rm <name> [--confirm <name>]` | asks you to type its name and removes a bucket from moin; refused while apps use it or apps left it. What is in it stays |
-| `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's uploads and backups to a bucket, or back to the default; the copies start again there |
+| `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's backups to a bucket, or back to the default; the copies start again there |
 
 | Flag | Takes |
 | --- | --- |

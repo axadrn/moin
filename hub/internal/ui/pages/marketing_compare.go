@@ -88,7 +88,7 @@ var CompareRows = []CompareRow{
 	{"Your data", "Restore tested every day", yes("Yes", "A real restore into a throwaway database, every day.", "")},
 	{"Your data", "Browse and edit live data", yes("Yes", "SQLite and Postgres. Read, edit, run SQL.", "")},
 	{"Every day", "Uptime checks", yes("Every minute", "Built in, with alerts.", "")},
-	{"Every day", "Deploy from", yes("Folder, GitHub, image", "Your folder, a GitHub push or a CI image.", "")},
+	{"Every day", "Deploy from", yes("GitHub, image, catalog", "A GitHub push, a CI image or an app from the catalog.", "")},
 	{"Every day", "Ways in", yes("All five", "Web, CLI, terminal UI, API and MCP.", "")},
 	{"Every day", "Activity log", yes("Yes", "Who did what, when, in every workspace.", "")},
 	{"Price", "Host it yourself, free", yes("Yes", "All of it.", "")},

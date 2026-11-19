@@ -19,6 +19,7 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 **moin has no key to your house.** Other tools keep the root SSH key of every server, so whoever breaks into them is root on all your servers. moin keeps none.
 
 - The daemon runs on the server and acts there. The hub holds no SSH key, password or token that opens your server.
+- The hub never holds your code. Code comes only from a GitHub repo, an image or the catalog. The daemon downloads nothing else, so `deploy-from` decides every source.
 
 **You write the house rules.** A note on your door says what the messenger may do. Only you can write it, on the server. The messenger cannot change it.
 
@@ -190,7 +191,7 @@ network: locked
 | `mounts: <folders>` | nothing: it lets apps mount these folders of the server, like `/mnt/media`, which moin refuses without it |
 | `server-access: on` | nothing: it allows [containers that reach beyond the app](#containers-that-reach-into-the-server), which moin refuses without it |
 
-- A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, `catalog` for the apps of the [catalog](/docs/guides/catalog), whose compose files come with the signed daemon, or `upload` for `moin deploy` from your computer (with `backups-to` set, an upload must come from that bucket too). `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
+- A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `catalog` for the apps of the [catalog](/docs/guides/catalog), whose compose files come with the signed daemon. `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
 - No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.

@@ -353,9 +353,8 @@ func (b *backups) prune(ctx context.Context, app string, database protocol.Datab
 }
 
 // loop starts the work of the backups: the copies every minute, the daily
-// checks, and every hour the sweep of the uploads and the search for new
-// databases. Each runs on its own, so a copy that takes hours holds up
-// nothing else.
+// checks, and every hour the search for new databases. Each runs on its
+// own, so a copy that takes hours holds up nothing else.
 func (b *backups) loop(ctx context.Context) {
 	minute := time.NewTicker(time.Minute)
 	defer minute.Stop()
@@ -368,7 +367,6 @@ func (b *backups) loop(ctx context.Context) {
 		case <-minute.C:
 			go b.tick(ctx)
 		case <-hourly.C:
-			go b.sweepUploads(ctx)
 			go b.searchDatabases(ctx)
 			hourly.Reset(time.Hour)
 		case <-daily.C:

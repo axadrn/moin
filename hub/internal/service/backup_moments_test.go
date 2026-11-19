@@ -371,7 +371,7 @@ func TestRememberedMoments(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -641,7 +641,7 @@ func TestScheduleInFileAndDatabaseFoundLater(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -674,7 +674,7 @@ func TestGoneDatabaseIsForgotten(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -698,7 +698,7 @@ func TestGoneDatabaseIsForgotten(t *testing.T) {
 		t.Fatalf("a part of the list forgot something: %s", got)
 	}
 
-	second, err := deployUpload(apps)
+	second, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -719,7 +719,7 @@ func TestFileLocksInstantAndPassword(t *testing.T) {
 	if _, err := apps.SetProtection(owner, "blog", "moin", "a-long-password"); err != nil {
 		t.Fatal(err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}

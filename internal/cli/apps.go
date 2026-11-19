@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -286,12 +285,10 @@ func PrintApps(stdout io.Writer, list []client.App) {
 	table(stdout, []string{"NAME", "SERVER", "STATUS"}, rows)
 }
 
-// deploy packs the directory, uploads it and follows the deploy. An app that
-// does not exist yet is created after a question, so a typo makes no new
-// app: on the server x-moin or --server names, or on the only server.
+// deploy starts a deploy and follows it: the pushed commit of the GitHub
+// repo of this folder, a --ref of it, or an --image built elsewhere.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [--detach] [--yes] [app]").withApp().withYes()
-	dir := flags.String("dir", ".", "directory to deploy")
+	flags := newFlags("deploy", "deploy [--server <server>] [--image <image>] [--ref <ref>] [--detach] [--yes] [app]").withApp().withYes()
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
 	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service; needs one deploy of the repo before, whose compose file it reuses")
@@ -302,7 +299,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if flags.NArg() > 1 {
 		return flags.wrong()
 	}
-	name, err := flags.appIn(flags.Arg(0), *dir)
+	name, err := flags.app(flags.Arg(0))
 	if err != nil {
 		return err
 	}
@@ -313,22 +310,9 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if *ref != "" && !protocol.ValidRefName(*ref) {
 		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
-	if *ref != "" {
-		// The hub downloads the commit from GitHub; nothing is
-		// uploaded.
-		step(stdout, "Deploying %s from GitHub", *ref)
-		started, err := api.DeployRef(ctx, name, *ref)
-		if err != nil {
-			return err
-		}
-		if started.Commit != "" {
-			step(stdout, "commit %s %s", started.Commit[:min(7, len(started.Commit))], style.Muted.Render(started.CommitMessage))
-		}
-		return follow(ctx, api, name, started, "Deploy", *detach, stdout)
-	}
-	if *image != "" {
+	if *image != "" && *ref == "" {
 		// The server keeps the compose file of the live deploy and pulls
-		// the image; nothing is uploaded.
+		// the image.
 		step(stdout, "Deploying %s", *image)
 		started, err := api.DeployImage(ctx, name, *image)
 		if err != nil {
@@ -336,41 +320,68 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		}
 		return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 	}
-	_, err = api.App(ctx, name)
+	from, commit := *ref, *ref
+	if commit == "" {
+		// This folder deploys what it has on GitHub, the commit it is at.
+		from, commit, err = client.PushedCommit(".")
+		if err != nil {
+			return err
+		}
+		err = followRepo(ctx, api, name, *server, from, flags.yes(), stdin, stdout)
+		if err != nil {
+			return err
+		}
+	}
+	// The server downloads the commit from GitHub and builds it.
+	step(stdout, "Deploying %s from GitHub", from)
+	started, err := api.DeployRef(ctx, name, commit)
+	if err != nil {
+		return err
+	}
+	if started.Commit != "" {
+		step(stdout, "commit %s %s", started.Commit[:min(7, len(started.Commit))], style.Muted.Render(started.CommitMessage))
+	}
+	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
+}
+
+// followRepo makes the app follow repo before moin deploy deploys a commit
+// of it. An app that does not exist yet is created after a question, so a
+// typo makes no new app: on the server x-moin or --server names, or on the
+// only server. An app that follows no repo is linked to this one, without
+// deploys on push.
+func followRepo(ctx context.Context, api *client.Client, name, server, repo string, yes bool, stdin io.Reader, stdout io.Writer) error {
+	detail, err := api.App(ctx, name)
 	if client.IsNotFound(err) {
-		err = confirm(stdin, stdout, flags.yes(), "App "+name+" does not exist. Create it?")
+		err = confirm(stdin, stdout, yes, "App "+name+" does not exist. Create it?")
 		if err == nil {
-			err = createApp(ctx, api, name, *server, *dir, stdout)
+			err = createApp(ctx, api, name, server, stdout)
 		}
 	}
 	if err != nil {
 		return err
 	}
-
-	var source bytes.Buffer
-	files, err := client.Pack(*dir, &source)
-	if err != nil {
-		return fmt.Errorf("pack %s: %w", *dir, err)
+	switch {
+	case strings.EqualFold(detail.App.Repo, repo):
+		return nil
+	case detail.App.Repo != "":
+		return fmt.Errorf("%s follows %s, and this folder is %s: link it with %s link %s %s, then deploy again", name, detail.App.Repo, repo, build.Name, repo, name)
+	case detail.App.Hook:
+		err = confirm(stdin, stdout, yes, fmt.Sprintf("Link %s to %s? Its deploy hook turns off. CI can no longer deploy it.", name, repo))
+		if err != nil {
+			return err
+		}
 	}
-	noun := "files"
-	if files == 1 {
-		noun = "file"
-	}
-	step(stdout, "Uploading %d %s to your bucket %s", files, noun, style.Muted.Render("("+human.Size(float64(source.Len()))+")"))
-	started, err := api.Deploy(ctx, name, source.Bytes())
-	var apiErr *client.Error
-	if errors.As(err, &apiErr) && apiErr.Code == "no_bucket" {
-		return fmt.Errorf("%s deploy puts your code into your own bucket, never on ours: add one with %s buckets add, or deploy from GitHub with %s deploy --ref main", build.Name, build.Name, build.Name)
-	}
+	app, err := linkRepo(ctx, api, name, repo, "", false)
 	if err != nil {
 		return err
 	}
-	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
+	done(stdout, "%s follows %s@%s", app.Name, app.Repo, app.Branch)
+	return nil
 }
 
-func createApp(ctx context.Context, api *client.Client, name, server, dir string, stdout io.Writer) error {
+func createApp(ctx context.Context, api *client.Client, name, server string, stdout io.Writer) error {
 	if server == "" {
-		server = client.ReadLocalConfig(dir).Server
+		server = client.ReadLocalConfig(".").Server
 	}
 	if server == "" {
 		servers, err := api.Servers(ctx)

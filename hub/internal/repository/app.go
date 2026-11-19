@@ -142,10 +142,10 @@ func (r *Apps) DeleteForWorkspace(id, workspaceID string) error {
 // CreateDeploy numbers the deploy after the newest one of its app.
 func (r *Apps) CreateDeploy(deploy *model.Deploy) error {
 	return r.db.QueryRow(`
-		INSERT INTO deploys (id, app_id, number, status, source_key, source_sha256, from_number, image, ref, commit_sha, commit_message, created_at)
-		VALUES ($1, $2, (SELECT COALESCE(MAX(number), 0) + 1 FROM deploys WHERE app_id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO deploys (id, app_id, number, status, source_key, from_number, image, ref, commit_sha, commit_message, created_at)
+		VALUES ($1, $2, (SELECT COALESCE(MAX(number), 0) + 1 FROM deploys WHERE app_id = $2), $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING number
-	`, deploy.ID, deploy.AppID, deploy.Status, deploy.SourceKey, deploy.SourceSHA256, deploy.FromNumber, deploy.Image, deploy.Ref, deploy.CommitSHA, deploy.CommitMessage, deploy.CreatedAt).Scan(&deploy.Number)
+	`, deploy.ID, deploy.AppID, deploy.Status, deploy.SourceKey, deploy.FromNumber, deploy.Image, deploy.Ref, deploy.CommitSHA, deploy.CommitMessage, deploy.CreatedAt).Scan(&deploy.Number)
 }
 
 func (r *Apps) getDeploy(query string, args ...any) (*model.Deploy, error) {
@@ -160,19 +160,23 @@ func (r *Apps) getDeploy(query string, args ...any) (*model.Deploy, error) {
 	return deploy, nil
 }
 
+// deployColumns are the columns of a deploy with its log. The table keeps
+// source_sha256 of the removed folder uploads, unused.
+const deployColumns = `id, app_id, number, status, source_key, from_number, image, ref, commit_sha, commit_message, error, log, detected, created_at, finished_at`
+
 func (r *Apps) Deploy(appID string, number int) (*model.Deploy, error) {
-	return r.getDeploy(`SELECT * FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
+	return r.getDeploy(`SELECT `+deployColumns+` FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
 }
 
 func (r *Apps) DeployByID(id string) (*model.Deploy, error) {
-	return r.getDeploy(`SELECT * FROM deploys WHERE id = $1`, id)
+	return r.getDeploy(`SELECT `+deployColumns+` FROM deploys WHERE id = $1`, id)
 }
 
 // ListDeploys returns the newest deploys first, without their logs.
 func (r *Apps) ListDeploys(appID string, limit int) ([]model.Deploy, error) {
 	deploys := []model.Deploy{}
 	err := r.db.Select(&deploys, `
-		SELECT id, app_id, number, status, source_key, source_sha256, from_number, image, ref, commit_sha, commit_message, error, '' AS log, detected, created_at, finished_at
+		SELECT id, app_id, number, status, source_key, from_number, image, ref, commit_sha, commit_message, error, '' AS log, detected, created_at, finished_at
 		FROM deploys WHERE app_id = $1 ORDER BY number DESC LIMIT $2
 	`, appID, limit)
 	return deploys, err

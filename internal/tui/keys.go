@@ -634,13 +634,26 @@ func (m model) confirmRollback(app string, d client.Deploy) (tea.Model, tea.Cmd)
 	return m.ask1(fmt.Sprintf("Roll back %s to v%d?", app, d.Number), "Its images start again with today's env and domains.", "roll back", false, m.rollback(app, d.Number)), nil
 }
 
+// confirmDeployDir deploys the commit the directory the TUI started in has
+// on GitHub, to its app, which must follow that repo already: `moin deploy`
+// creates and links it.
 func (m model) confirmDeployDir() (tea.Model, tea.Cmd) {
 	app := m.dirApp()
-	if _, ok := m.findApp(app); !ok {
+	a, ok := m.findApp(app)
+	if !ok {
 		m.say("No app " + app + " for this directory yet: run `moin deploy` here once")
 		return m, nil
 	}
-	return m.ask1("Deploy "+m.dir+" to "+app+"?", "moin packs the directory, builds it on the server and swaps when it is healthy.", "deploy", false, m.deployDir()), nil
+	repo, commit, err := client.PushedCommit(m.dir)
+	if err != nil {
+		m.say(err.Error())
+		return m, nil
+	}
+	if !strings.EqualFold(a.Repo, repo) {
+		m.say(app + " does not follow " + repo + " yet: run `moin deploy` here once")
+		return m, nil
+	}
+	return m.ask1("Deploy "+short(commit)+" to "+app+"?", "The server builds this commit from GitHub and swaps when it is healthy.", "deploy", false, m.deployRef(app, commit)), nil
 }
 
 func (m model) execKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {

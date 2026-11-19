@@ -8,27 +8,27 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// registerBucketTools registers the tools of the buckets uploads and
-// backups go to.
+// registerBucketTools registers the tools of the buckets backups go
+// to.
 func registerBucketTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, newTool("list_buckets", "List buckets",
-		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that upload and back up there now) and older_backups (apps that moved to another bucket and left what they had there). Needs the read scope.",
+		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that back up there now) and older_backups (apps that moved to another bucket and left what they had there). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listBuckets)))
 	mcpsdk.AddTool(server, newTool("add_bucket", "Add a bucket",
-		"Checks and stores a new S3-compatible bucket under a name (lowercase letters, digits, dashes). The first bucket is the default; default true makes this one the default, so every app without a bucket of its own uploads and backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
+		"Checks and stores a new S3-compatible bucket under a name (lowercase letters, digits, dashes). The first bucket is the default; default true makes this one the default, so every app without a bucket of its own backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.addBucket)))
 	mcpsdk.AddTool(server, newTool("edit_bucket", "Change a bucket",
 		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, an empty secret_key keeps the stored one, default true makes it the default. A new place starts with a full copy; the old place keeps what it has. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.editBucket)))
 	mcpsdk.AddTool(server, newTool("set_default_bucket", "Make a bucket the default",
-		"Makes a bucket the workspace's default: apps without a bucket of their own upload and back up there from now on; their copies start again there; what is in the old default stays. Needs a token with read and write access.",
+		"Makes a bucket the workspace's default: apps without a bucket of their own back up there from now on; their copies start again there; what is in the old default stays. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDefaultBucket)))
 	mcpsdk.AddTool(server, newTool("remove_bucket", "Remove a bucket",
 		"Removes a bucket from moin; what is in it stays. A bucket that apps use, or that apps left their copies in, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeBucket)))
 	mcpsdk.AddTool(server, newTool("set_app_bucket", "Choose an app's bucket",
-		"Moves an app's uploads and backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its copies start again in the new bucket; what is in the old one stays. Needs a token with read and write access.",
+		"Moves an app's backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its copies start again in the new bucket; what is in the old one stays. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setAppBucket)))
 }
 

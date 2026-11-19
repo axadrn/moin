@@ -25,7 +25,7 @@ func TestRenameApp(t *testing.T) {
 	if app.Folder != "blog" {
 		t.Fatalf("folder = %q, want the name", app.Folder)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}

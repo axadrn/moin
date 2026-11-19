@@ -4,10 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"path"
 	"slices"
-	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -16,8 +13,8 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// The user's bucket holds what moin deploy uploads and the backups (see
-// backup.go), each app in <path>/<workspace>/<app>/<app ID>/.
+// The user's bucket holds the backups (see backup.go), each app in
+// <path>/<workspace>/<app>/<app ID>/.
 
 func s3Client(bucket *protocol.Bucket) *s3.Client {
 	region, endpoint := bucket.Region, bucket.Endpoint
@@ -52,43 +49,4 @@ func (r *runner) backupConfig(message protocol.Message, rules *protocol.Rules) {
 	r.backups.configure(config)
 	go r.backups.tick(context.Background())
 	r.send(protocol.TypeOK, message.RequestID, nil)
-}
-
-// sweepUploads deletes what moin deploy left in <app>/<app ID>/uploads/
-// after a day.
-func (b *backups) sweepUploads(ctx context.Context) {
-	b.mu.Lock()
-	buckets := slices.Collect(maps.Values(b.buckets))
-	if b.bucket != nil {
-		buckets = append(buckets, b.bucket)
-	}
-	b.mu.Unlock()
-	for _, bucket := range buckets {
-		client := s3Client(bucket)
-		for _, app := range folders(ctx, client, bucket.Bucket, strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace)+"/", "/")) {
-			for _, id := range folders(ctx, client, bucket.Bucket, app) {
-				list, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket.Bucket), Prefix: aws.String(id + "uploads/")})
-				if err != nil {
-					continue
-				}
-				for _, object := range list.Contents {
-					if object.LastModified != nil && time.Since(*object.LastModified) > day {
-						_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: object.Key})
-					}
-				}
-			}
-		}
-	}
-}
-
-func folders(ctx context.Context, client *s3.Client, bucket, prefix string) []string {
-	list, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(prefix), Delimiter: aws.String("/")})
-	if err != nil {
-		return nil
-	}
-	found := []string{}
-	for _, folder := range list.CommonPrefixes {
-		found = append(found, aws.ToString(folder.Prefix))
-	}
-	return found
 }

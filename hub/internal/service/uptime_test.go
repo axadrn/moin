@@ -94,7 +94,7 @@ func TestUptimeEveryDomainAndRecordsOutages(t *testing.T) {
 	if err != nil || uptime.State != model.UptimePending || len(uptime.Domains) != 2 {
 		t.Fatalf("uptime before a deploy = %+v, %v", uptime, err)
 	}
-	deploy, err := deployUpload(apps)
+	deploy, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestUptimeVisitSettings(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
-	deploy, err := deployUpload(apps)
+	deploy, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestRunUptimeAtTheOffsetAndStops(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
-	deploy, err := deployUpload(apps)
+	deploy, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}

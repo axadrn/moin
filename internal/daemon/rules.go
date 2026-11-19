@@ -81,7 +81,7 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			for _, source := range strings.Split(value, ",") {
 				source = strings.TrimSpace(source)
 				if _, err := path.Match(source, ""); err != nil || source == "" {
-					return nil, wrong("deploy-from lists sources like github.com/acme/*, ghcr.io/acme/*, catalog or upload")
+					return nil, wrong("deploy-from lists sources like github.com/acme/*, ghcr.io/acme/* or catalog")
 				}
 				rules.DeployFrom = append(rules.DeployFrom, source)
 			}
@@ -125,7 +125,7 @@ func checkDeploy(rules *protocol.Rules, file string, start protocol.DeployStart)
 		sources = append(sources, "catalog")
 	}
 	if start.SourceURL != "" {
-		source, err := sourceName(start.SourceURL, rules.BackupsTo)
+		source, err := sourceName(start.SourceURL)
 		if err != nil {
 			return refused(file, err.Error())
 		}
@@ -158,10 +158,10 @@ func imageName(image string) string {
 	return image
 }
 
-// sourceName names where a source download comes from: a GitHub repo as
-// github.com/<owner>/<repo>, anything else as upload. With backups-to set,
-// an upload must come from that bucket.
-func sourceName(raw, backupsTo string) (string, error) {
+// sourceName names the GitHub repo a source download comes from, as
+// github.com/<owner>/<repo>. A source is only ever the tarball of a commit:
+// anything else is refused.
+func sourceName(raw string) (string, error) {
 	link, err := url.Parse(raw)
 	if err != nil {
 		return "", fmt.Errorf("the source address %q is not a URL", raw)
@@ -174,20 +174,7 @@ func sourceName(raw, backupsTo string) (string, error) {
 		}
 		return host + "/" + parts[1] + "/" + parts[2], nil
 	}
-	if backupsTo != "" && !inBucket(link, backupsTo) {
-		return "", fmt.Errorf("an upload from %s is not in the bucket of backups-to", link.Host)
-	}
-	return "upload", nil
-}
-
-// inBucket reports whether a link points into "<endpoint host>/<bucket>",
-// in path style or virtual-host style.
-func inBucket(link *url.URL, hostBucket string) bool {
-	host, bucket, _ := strings.Cut(hostBucket, "/")
-	if link.Host == host {
-		return strings.HasPrefix(link.Path, "/"+bucket+"/")
-	}
-	return link.Host == bucket+"."+host
+	return "", fmt.Errorf("a source comes only from a GitHub repo, not from %s", link.Host)
 }
 
 // checkBucket allows a bucket the rules allow.

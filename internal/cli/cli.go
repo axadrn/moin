@@ -66,7 +66,7 @@ Apps
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
 
 Deploys
-  deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [--yes] [app]; a new app asks first
+  deploy             Deploy the pushed commit of this repo from GitHub: deploy [--server <server>] [--detach] [--yes] [app]; a new app asks first
   deploy --image     Deploy a CI image with the compose file of an earlier deploy: deploy --image <image> [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Build the newest source or pull the image again, with the current env
@@ -136,7 +136,7 @@ Buckets
   buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret]
   buckets default    Make one the default for apps without their own: buckets default <name>
   buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--confirm <name>]
-  buckets use        Move an app's uploads and backups: buckets use <bucket> [app], or --default
+  buckets use        Move an app's backups: buckets use <bucket> [app], or --default
 
 Env
   env                List env vars: env [--show] [app]

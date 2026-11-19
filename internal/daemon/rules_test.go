@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,13 +16,13 @@ func TestRulesReadEveryRule(t *testing.T) {
 data: off
 logs: off   # no logs through moin
 network: locked
-deploy-from: github.com/acme/*, ghcr.io/acme/*, upload
+deploy-from: github.com/acme/*, ghcr.io/acme/*, catalog
 backups-to: s3.eu-central-1.amazonaws.com/acme-backups
 `, "rules")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := protocol.Rules{DataOff: true, LogsOff: true, NetworkLocked: true, DeployFrom: []string{"github.com/acme/*", "ghcr.io/acme/*", "upload"}, BackupsTo: "s3.eu-central-1.amazonaws.com/acme-backups"}
+	want := protocol.Rules{DataOff: true, LogsOff: true, NetworkLocked: true, DeployFrom: []string{"github.com/acme/*", "ghcr.io/acme/*", "catalog"}, BackupsTo: "s3.eu-central-1.amazonaws.com/acme-backups"}
 	if strings.Join(rules.DeployFrom, ",") != strings.Join(want.DeployFrom, ",") || rules.DataOff != want.DataOff || rules.LogsOff != want.LogsOff || rules.NetworkLocked != want.NetworkLocked || rules.BackupsTo != want.BackupsTo {
 		t.Fatalf("rules = %+v", rules)
 	}
@@ -69,17 +70,19 @@ func TestDeployFrom(t *testing.T) {
 	}
 }
 
-func TestUploadsComeFromTheBucketOfBackupsTo(t *testing.T) {
-	rules := &protocol.Rules{DeployFrom: []string{"upload"}, BackupsTo: "s3.example.com/acme"}
-	for raw, ok := range map[string]bool{
-		"https://s3.example.com/acme/uploads/x.tar.gz?X-Amz-Signature=1": true,
-		"https://acme.s3.example.com/uploads/x.tar.gz":                   true,
-		"https://s3.example.com/other/uploads/x.tar.gz":                  false,
-		"https://evil.example/acme/uploads/x.tar.gz":                     false,
-	} {
-		err := checkDeploy(rules, "rules", protocol.DeployStart{SourceURL: raw})
-		if (err == nil) != ok {
+// A source is the GitHub tarball of a commit, with rules or without:
+// the daemon downloads nothing else.
+func TestSourcesComeOnlyFromGitHub(t *testing.T) {
+	if name, err := sourceName("https://api.github.com/repos/acme/blog/tarball/abc123"); err != nil || name != "github.com/acme/blog" {
+		t.Fatalf("the GitHub tarball = %q, %v", name, err)
+	}
+	for _, raw := range []string{"https://bucket.example/acme/uploads/x.tar.gz", "https://api.github.com/repos/acme/blog/zipball/abc123"} {
+		err := download(context.Background(), protocol.DeployStart{SourceURL: raw}, t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "only from a GitHub repo") {
 			t.Errorf("%s: err = %v", raw, err)
+		}
+		if checkDeploy(&protocol.Rules{DeployFrom: []string{"*"}}, "rules", protocol.DeployStart{SourceURL: raw}) == nil {
+			t.Errorf("%s: the rules allow it", raw)
 		}
 	}
 }

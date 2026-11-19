@@ -120,7 +120,7 @@ func bucketsAdd(ctx context.Context, args []string, stdin io.Reader, stdout io.W
 		return err
 	}
 	if added.Default {
-		done(stdout, "Added %s, the default bucket: uploads and backups of every app without a bucket of its own go there.", added.Name)
+		done(stdout, "Added %s, the default bucket: backups of every app without a bucket of its own go there.", added.Name)
 		return nil
 	}
 	done(stdout, "Added %s. Move an app there with %s buckets use %s <app>.", added.Name, build.Name, added.Name)
@@ -210,7 +210,7 @@ func bucketsDefault(ctx context.Context, args []string, stdout io.Writer) error 
 	if err != nil {
 		return err
 	}
-	done(stdout, "%s is the default bucket now. Apps without a bucket of their own upload and back up there; their copies start again there.", changed.Name)
+	done(stdout, "%s is the default bucket now. Apps without a bucket of their own back up there; their copies start again there.", changed.Name)
 	return nil
 }
 
@@ -241,7 +241,7 @@ func bucketsRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	return nil
 }
 
-// bucketsUse moves the uploads and new backups of an app to a bucket, or
+// bucketsUse moves the new backups of an app to a bucket, or
 // with --default back to the workspace's default bucket.
 func bucketsUse(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("buckets use", "buckets use <bucket> [app], or buckets use --default [app]").withApp()
@@ -274,7 +274,7 @@ func bucketsUse(ctx context.Context, args []string, stdout io.Writer) error {
 	if to == "" {
 		to = "the default bucket"
 	}
-	done(stdout, "Uploads and backups of %s go to %s now.", app.Name, to)
+	done(stdout, "Backups of %s go to %s now.", app.Name, to)
 	fmt.Fprintf(stdout, "  The copies start again in the new bucket; what is in the old one stays there.\n")
 	return nil
 }

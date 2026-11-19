@@ -41,7 +41,7 @@ Like a photo of your desk, every hour: you can always put it back the way it was
 
 ## Bucket
 
-Your bucket is your own box on the internet. Your backups and uploads go there. It is yours, not ours.
+Your bucket is your own box on the internet. Your backups go there. It is yours, not ours.
 
 Like a locker you rent yourself: moin puts things in, but only you hold the key.
 

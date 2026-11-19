@@ -221,7 +221,7 @@ templ overviewStart(basePath string) {
 	@components.Card(components.CardProps{}) {
 		@components.List() {
 			@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server", Note: "Any Linux box you own. One command. No open port.", Lead: overviewStep("server", true)})
-			@components.Item(components.ItemProps{Name: "Deploy your app", Href: "/docs/guides/deploy#deploy-from", Note: "Push to GitHub. " + build.Name + " deploy in a folder. An image from your CI. Or an app from the catalog.", Lead: overviewStep("deploy", false)})
+			@components.Item(components.ItemProps{Name: "Deploy your app", Href: "/docs/guides/deploy#deploy-from", Note: "Push to GitHub. An image from your CI. Or an app from the catalog.", Lead: overviewStep("deploy", false)})
 			@components.Item(components.ItemProps{Name: build.Name + " keeps it safe", Note: "HTTPS. Backups. A restore check every day. Alerts.", Lead: overviewStep("shield", false)})
 		}
 	}

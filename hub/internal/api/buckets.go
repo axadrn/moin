@@ -11,7 +11,7 @@ import (
 
 // Bucket is one bucket of the workspace, without its secret key. Folder is
 // where this workspace's files go in it: path, then the workspace ID. Apps
-// upload and back up there now; OlderBackups are the apps that moved away
+// back up there now; OlderBackups are the apps that moved away
 // and keep their older backups there.
 type Bucket struct {
 	ID           string    `json:"id"`
@@ -134,7 +134,7 @@ func (h *AppsHandler) DeleteBucket(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// SetAppBucket moves an app's uploads and new backups to a bucket.
+// SetAppBucket moves an app's new backups to a bucket.
 func (h *AppsHandler) SetAppBucket(w http.ResponseWriter, r *http.Request) {
 	var request AppBucketRequest
 	if !Decode(w, r, &request) {

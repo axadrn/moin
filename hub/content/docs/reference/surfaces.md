@@ -17,7 +17,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Update a daemon | ✓ | ✓ `servers update` | ✓ `u` | ✓ | ✓ |
 | Apps, live | ✓ | ✓ `apps` | ✓ | ✓ | ✓ |
 | Pin an app | ✓ | ✓ `apps pin` | ✓ `*` | ✓ | ✓ `pin_app` |
-| Deploy this directory | Your files are on your computer, not in the browser. | ✓ `deploy` | ✓ `D`, for an app that exists | ✓ | An AI agent has no directory to upload: use the CLI. |
+| Deploy the pushed commit of this repo | ✓ `Deploy` with the commit | ✓ `deploy` | ✓ `D`, for an app that follows the repo | ✓ | ✓ `deploy_ref` with the commit |
 | Deploy an image from CI | ✓ | ✓ `deploy --image` | ✓ `I` | ✓ | ✓ |
 | Deploy a branch, tag or commit | ✓ | ✓ `deploy --ref` | ✓ `B` | ✓ | ✓ |
 | Redeploy | ✓ | ✓ `redeploy` | ✓ `R` | ✓ | ✓ |

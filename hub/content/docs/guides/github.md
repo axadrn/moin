@@ -31,9 +31,9 @@ API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-Deploy every push is on by default. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy.
+Deploy every push is on by default. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy. Or run [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) in the pushed repo: it links the app and deploys, without deploys on push.
 
-An app deploys from one place at a time: [your folder, GitHub or CI](/docs/guides/deploy#deploy-from). Linking a repo turns the deploy hook off, so moin asks first. `--yes` skips it.
+An app deploys from one place at a time: [GitHub or CI](/docs/guides/deploy#deploy-from). Linking a repo turns the deploy hook off, so moin asks first. `--yes` skips it.
 
 ## Deploy from GitHub
 

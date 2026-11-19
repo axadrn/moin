@@ -457,13 +457,12 @@ func (s *AppService) Redeploy(actor Actor, idOrName string) (*model.Deploy, erro
 			continue
 		}
 		deploy := &model.Deploy{
-			ID:           uuid.New().String(),
-			AppID:        app.ID,
-			Status:       model.DeployRunning,
-			SourceKey:    previous.SourceKey,
-			SourceSHA256: previous.SourceSHA256,
-			Image:        previous.Image,
-			CreatedAt:    s.now().UTC(),
+			ID:        uuid.New().String(),
+			AppID:     app.ID,
+			Status:    model.DeployRunning,
+			SourceKey: previous.SourceKey,
+			Image:     previous.Image,
+			CreatedAt: s.now().UTC(),
 		}
 		// The server builds the source it kept of that deploy again.
 		start := protocol.DeployStart{Image: deploy.Image}

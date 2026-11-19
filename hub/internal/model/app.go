@@ -59,8 +59,8 @@ type App struct {
 	// CatalogNotified is the newest release an update.available alert
 	// went out for.
 	CatalogNotified string `db:"catalog_notified"`
-	// BucketID is the bucket the app's uploads and backups go to; nil
-	// uses the workspace's default bucket. BucketName is its name.
+	// BucketID is the bucket the app's backups go to; nil uses the
+	// workspace's default bucket. BucketName is its name.
 	BucketID *string `db:"bucket_id"`
 	// BackupEvery is how often the daemon copies the app's databases, in
 	// minutes; BackupKeep how many days it keeps each copy.
@@ -90,14 +90,13 @@ const (
 
 // Deploy is one version of an app, v12.
 type Deploy struct {
-	ID           string `db:"id"`
-	AppID        string `db:"app_id"`
-	Number       int    `db:"number"`
-	Status       string `db:"status"`
-	SourceKey    string `db:"source_key"`
-	SourceSHA256 string `db:"source_sha256"`
-	FromNumber   int    `db:"from_number"`
-	Image        string `db:"image"`
+	ID         string `db:"id"`
+	AppID      string `db:"app_id"`
+	Number     int    `db:"number"`
+	Status     string `db:"status"`
+	SourceKey  string `db:"source_key"`
+	FromNumber int    `db:"from_number"`
+	Image      string `db:"image"`
 	// Ref and CommitSHA name the GitHub commit a deploy came from.
 	Ref           string     `db:"ref"`
 	CommitSHA     string     `db:"commit_sha"`
@@ -120,7 +119,7 @@ type Registry struct {
 
 // DeployFrom is where new versions of the app come from, one place at a
 // time: "github" when it follows a repo, "ci" when it has a deploy hook,
-// else "folder", deploys from your folder with moin deploy.
+// else "", neither yet.
 func (a App) DeployFrom() string {
 	switch {
 	case a.Repo != "":
@@ -128,7 +127,7 @@ func (a App) DeployFrom() string {
 	case a.DeployHookHash != nil:
 		return "ci"
 	}
-	return "folder"
+	return ""
 }
 
 // HookImage is the image the deploy hook may deploy: the one running now,
@@ -209,8 +208,8 @@ func (a App) DomainsOf(service string) (domains []string, canonical string) {
 	return a.ServiceDomainMap()[service], ""
 }
 
-// Bucket is one of a workspace's S3-compatible buckets, where the uploads
-// and backups of its apps go. SecretKey is sealed. One bucket of a
+// Bucket is one of a workspace's S3-compatible buckets, where the backups
+// of its apps go. SecretKey is sealed. One bucket of a
 // workspace is its default: apps without a bucket of their own use it.
 type Bucket struct {
 	ID          string    `db:"id"`
