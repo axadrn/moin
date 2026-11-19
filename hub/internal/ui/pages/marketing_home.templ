@@ -39,9 +39,6 @@ templ Home(network model.Network, open HomeOpen) {
 				@HomeQuestions()
 				@HomeEnd()
 			</div>
-			<div class="hub-harbor-foot-of-page">
-				@homeHarbor()
-			</div>
 		</main>
 	}
 }
@@ -415,6 +412,10 @@ templ HomeEnd() {
 					Free and open source.
 				}
 			</p>
+			@homeGulls()
+			<div class="moin-bleed hub-harbor-in-card">
+				@homeHarbor()
+			</div>
 		}
 	</section>
 }

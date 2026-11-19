@@ -88,10 +88,26 @@ header + [data-said] {
 }
 
 
-/* The wall of containers at the foot of the home page. light-dark() takes
-   colors only, so every shade is a whole color with its alpha. */
-.hub-harbor-foot-of-page {
-  height: 42svh;
+/* The wall of containers at the bottom of the home page's last card, out to
+   its edges and round with its corners. light-dark() takes colors only, so
+   every shade is a whole color with its alpha. */
+.hub-harbor-in-card {
+  height: clamp(9rem, 24vw, 18rem);
+  margin-bottom: calc(-1 * var(--pad));
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+/* Gulls over the wall, on its right, just above it. */
+.hub-gulls {
+  align-self: flex-end;
+  width: clamp(5rem, 12vw, 8rem);
+  margin: 0 8% calc(-1 * var(--space-4)) 0;
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
 }
 .hub-harbor {
   display: block;
