@@ -267,6 +267,7 @@ A daemon only runs a release we signed. Think of a stamp: we stamp every release
 
 - It never goes back to an older release, and never installs a build that is not a release.
 - The signing key never touches the hub. Someone who takes over the hub cannot sign, so they cannot hand your server a daemon.
+- In GitHub the key sits in a protected environment. Only a release tag reaches it, and only after a maintainer approves. A workflow or an action someone slipped in cannot sign.
 - A daemon without systemd cannot restart itself, so it does not update itself. Update it by hand from the release, and check the download against its checksums first (below).
 - There are two keys: one signs every release, a spare stays offline. If the first ever leaks, a release signed with the spare drops it, and every daemon stops trusting it.
 - The keys are Ed25519, in `releaseKeys` in `internal/daemon/update.go`. Forging a signature without the private key is not possible with today's computers. What matters is that nobody steals the key.

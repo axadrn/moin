@@ -33,7 +33,7 @@ Merging ships nothing. The change only lands on `main`. [Contributing](https://g
 
 A release has a version, like `v1.0.0-beta.28`, and its notes in the [changelog](/changelog). A deploy has neither.
 
-A release also carries the `moin` binaries, their `SHA256SUMS` and its signature, `SHA256SUMS.sig`. The Deploy workflow signs with the repository secret `RELEASE_SIGNING_KEY`, which never reaches a hub. Daemons update from there. [Updates](/docs/guides/security#updates)
+A release also carries the `moin` binaries, their `SHA256SUMS` and its signature, `SHA256SUMS.sig`. The Deploy workflow signs with `RELEASE_SIGNING_KEY`, a secret of the GitHub environment `release`: only a `v*` tag reaches it, and only after a maintainer approves the run. It never reaches a hub. Daemons update from there. [Updates](/docs/guides/security#updates)
 
 ## What runs where
 
