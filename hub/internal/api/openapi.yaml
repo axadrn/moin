@@ -71,7 +71,7 @@ tags:
   - name: Backups
     description: The backup of every SQLite and Postgres database, in your own S3-compatible bucket only, never through the hub. moin copies each database on the app's schedule, every 15 minutes, hourly or daily, and before each deploy; a restore goes back to a copy and can be undone; every day moin checks that the newest copy restores; a full copy downloads with a short-lived link into your bucket.
   - name: Uptime
-    description: The hub visits every domain of every live app once a minute, like a visitor, and keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
+    description: The hub visits every domain that serves something of every live app once a minute, like a visitor, not one that only redirects to the main domain. A domain is down after 3 failed visits in a row and back up after 3 answers in a row. It keeps uptime for 24 hours, 7 and 30 days and the last outages. Down and back up again go to the activity.
   - name: Alerts
     description: Where the alerts of a workspace go besides email, when a site goes down or comes back, a server goes offline or comes back, or a deploy fails. Slack and Discord incoming webhooks, a Telegram bot, or a webhook of your own, signed with HMAC-SHA256. Every member sees them; owners and admins add, test and remove them.
   - name: Metrics

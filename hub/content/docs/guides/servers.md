@@ -85,7 +85,7 @@ MCP: list_servers
 | **online** | the daemon is connected |
 | **offline** | the connection dropped: the daemon cannot reach moin |
 
-A server offline for two minutes sends an [alert](/docs/guides/alerts). So does a server that comes back. The API streams changes from `GET /api/v1/servers/events`.
+A server offline for 3 minutes sends an [alert](/docs/guides/alerts). So does a server that comes back. The API streams changes from `GET /api/v1/servers/events`.
 
 ## A new install command
 

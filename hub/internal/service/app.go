@@ -748,6 +748,15 @@ func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
 	return set
 }
 
+// otherServiceDomains are the domains of the app's other services, by
+// service: compose.yml's where it sets them, else moin's.
+func (s *AppService) otherServiceDomains(app *model.App) map[string][]string {
+	services := app.ServiceDomains()
+	maps.Copy(services, s.composeServiceDomains(app))
+	delete(services, s.mainService(app))
+	return services
+}
+
 // ServerAddresses are the IPv4 and IPv6 of a server: the address its daemon
 // connects from and the ones it reports.
 func ServerAddresses(server model.Server) (ipv4, ipv6 string) {
@@ -861,16 +870,10 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 	for _, domain := range domains {
 		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
 	}
-	// Then the domains of the other services, by service: compose.yml's
-	// where it sets them, else moin'.
-	services := app.ServiceDomains()
+	// Then the domains of the other services, by service.
+	services := s.otherServiceDomains(app)
 	fromComposeServices := s.composeServiceDomains(app)
-	maps.Copy(services, fromComposeServices)
-	main := s.mainService(app)
 	for _, service := range slices.Sorted(maps.Keys(services)) {
-		if service == main {
-			continue
-		}
 		for _, domain := range services[service] {
 			checks = append(checks, check(DomainCheck{Domain: domain, Service: service, FromCompose: len(fromComposeServices[service]) > 0}))
 		}
