@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -271,8 +270,8 @@ func (s *AppService) storePlannedUptime(gone, reset []model.DomainUptime, now ti
 // uptimeDomains are the domains of an app and its health path, if its
 // live deploy has one: the domains the release answers on win over the
 // ones set in moin, like for the tunnel.
-func uptimeDomains(domainsJSON, detectedJSON string) (domains []string, health string) {
-	_ = json.Unmarshal([]byte(domainsJSON), &domains)
+func uptimeDomains(saved []string, detectedJSON string) (domains []string, health string) {
+	domains = saved
 	if detected := Detected(model.Deploy{Detected: detectedJSON}); detected != nil {
 		if len(detected.Domains) > 0 {
 			domains = detected.Domains

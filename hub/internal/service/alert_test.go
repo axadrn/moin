@@ -43,7 +43,7 @@ func TestAlertsGoToOwnersAndAdminsWhoWantThem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.Create(&model.App{ID: "app-shop", WorkspaceID: owner.WorkspaceID, ServerID: server.ID, Name: "shop", Domains: "[]", CreatedAt: time.Now()}); err != nil {
+	if err := apps.Create(&model.App{ID: "app-shop", WorkspaceID: owner.WorkspaceID, ServerID: server.ID, Name: "shop", CreatedAt: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 

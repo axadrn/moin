@@ -2,9 +2,7 @@ package service
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"errors"
-	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -19,7 +17,6 @@ var (
 	ErrService          = errors.New("a service name is lowercase letters, digits, dashes, dots or underscores")
 	ErrMainService      = errors.New("this is the app's main service: set its domains without --service")
 	ErrServiceCanonical = errors.New("canonical is for the main service only")
-	ErrDomainTaken      = errors.New("a domain reaches one service of an app")
 	ErrInstantProvider  = errors.New("the instant address provider is sslip.io, nip.io or off")
 )
 
@@ -51,33 +48,15 @@ func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, do
 	if err != nil {
 		return false, err
 	}
-	all := app.ServiceDomainMap()
-	taken := slices.Clone(app.DomainList())
-	for other, list := range all {
-		if other != service {
-			taken = append(taken, list...)
-		}
-	}
-	for _, domain := range clean {
-		if slices.Contains(taken, domain) {
-			return false, ErrDomainTaken
-		}
-	}
-	if slices.Equal(clean, all[service]) {
+	saved, _ := app.DomainsOf(service)
+	if sameDomains(clean, saved) {
 		return false, nil
 	}
-	before := strings.Join(all[service], ", ")
-	if len(clean) == 0 {
-		delete(all, service)
-	} else {
-		all[service] = clean
-	}
-	body, _ := json.Marshal(all)
-	err = s.apps.SetServiceDomains(app.ID, string(body))
+	before := strings.Join(saved, ", ")
+	err = s.apps.SetDomains(app.ID, service, clean, "")
 	if err != nil {
 		return false, err
 	}
-	app.ServiceDomains = string(body)
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"service": service, "from": before, "domains": strings.Join(clean, ", ")})
 	s.notify(actor.WorkspaceID)
 	return true, nil
@@ -98,6 +77,12 @@ func cleanDomains(domains []string) ([]string, error) {
 		clean = append(clean, domain)
 	}
 	return clean, nil
+}
+
+// sameDomains says two lists hold the same domains, in any order: the
+// order of the domains of a service means nothing.
+func sameDomains(a, b []string) bool {
+	return slices.Equal(slices.Sorted(slices.Values(a)), slices.Sorted(slices.Values(b)))
 }
 
 // mainService is the service that gets the traffic in the live deploy, ""
@@ -299,9 +284,9 @@ func (s *AppService) newInstantPassword(app *model.App) (string, error) {
 
 // serviceDomains is the domains of the app's other services for a deploy.
 func serviceDomains(app *model.App) map[string][]string {
-	services := app.ServiceDomainMap()
+	services := app.ServiceDomains()
 	if len(services) == 0 {
 		return nil
 	}
-	return maps.Clone(services)
+	return services
 }

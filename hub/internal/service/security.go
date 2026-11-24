@@ -387,7 +387,7 @@ func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 		if app.ServerID != server.ID {
 			continue
 		}
-		domains := app.DomainList()
+		domains, _ := app.DomainsOf("")
 		if app.LiveNumber > 0 {
 			deploy, err := s.apps.Deploy(app.ID, app.LiveNumber)
 			if err == nil {

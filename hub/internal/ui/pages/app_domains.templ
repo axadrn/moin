@@ -41,7 +41,7 @@ templ AppDomains(view DomainsView) {
 						@domainRow(check, view.App.Name, domainsPath)
 					}
 					if options := canonicalOptions(view.Checks); len(options) > 2 && !fromCompose(view.Checks) {
-						@canonicalRow(options, view.App.Canonical, domainsPath)
+						@canonicalRow(options, canonicalDomain(view.Checks), domainsPath)
 					}
 					if fromCompose(view.Checks) {
 						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-domains-from-compose": true}}) {
@@ -320,6 +320,17 @@ func canonicalOptions(checks []service.DomainCheck) []components.Option {
 		}
 	}
 	return options
+}
+
+// canonicalDomain is the domain of the main service the others redirect
+// to, "" for none.
+func canonicalDomain(checks []service.DomainCheck) string {
+	for _, check := range checks {
+		if check.Canonical && check.Service == "" {
+			return check.Domain
+		}
+	}
+	return ""
 }
 
 // fromCompose says x-moin.domains in compose.yml sets the domains of the

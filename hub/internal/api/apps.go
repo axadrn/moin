@@ -175,7 +175,7 @@ func NewApp(app model.App) App {
 		Domains:         domains,
 		Canonical:       canonical,
 		Protected:       app.Protect != "",
-		ServiceDomains:  app.ServiceDomainMap(),
+		ServiceDomains:  app.ServiceDomains(),
 		Instant:         instantURL(app.InstantHost),
 		InstantProvider: app.Instant,
 		InstantOpen:     app.InstantOpen,
