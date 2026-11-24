@@ -19,8 +19,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-const testPassword = "correct horse battery staple"
-
 // testSupportEmail is the support address GET /api/v1/meta answers.
 const testSupportEmail = "support@example.com"
 
@@ -77,9 +75,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		false,
 		7*24*time.Hour,
 		24*time.Hour,
-		time.Hour,
 		24*time.Hour,
-		10*time.Minute,
 	)
 	environment.storage = testutil.NewMemoryStorage()
 	files := service.NewFileService(repository.NewFiles(database), environment.storage)
@@ -128,8 +124,6 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	routeMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
 		RequireOnboarded:      middleware.RequireOnboardedAPI,
-		RateLimitAuth:         middleware.RateLimitAuth(clientIPs),
-		RateLimitAuthEmail:    middleware.RateLimitAuthEmail(clientIPs),
 		RateLimitEmailChanges: middleware.RateLimitUserEmailChanges(),
 		RequireAdmin:          middleware.RequireAdminAPI,
 		Workspace: func(next http.HandlerFunc) http.HandlerFunc {
@@ -160,8 +154,9 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	return environment
 }
 
-// apiRequest describes one call. Bearer sends an Authorization header,
-// Cookie sends a session cookie together with a valid CSRF token.
+// apiRequest describes one call. Bearer sends an Authorization header, such
+// as a personal API token; Cookie sends a session cookie together with a
+// valid CSRF token.
 type apiRequest struct {
 	method string
 	path   string
@@ -212,7 +207,7 @@ func (e *apiEnvironment) sendWithCookieOnly(t *testing.T, request apiRequest, se
 // signIn creates a session for userID and returns its raw token.
 func (e *apiEnvironment) signIn(t *testing.T, userID string) string {
 	t.Helper()
-	_, token, err := e.auth.CreateSession(httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", nil), userID)
+	_, token, err := e.auth.CreateSession(httptest.NewRequest(http.MethodGet, "/auth/github/callback", nil), userID)
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}

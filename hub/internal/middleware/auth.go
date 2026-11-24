@@ -18,28 +18,10 @@ func AuthMiddleware(authService *service.AuthService, userService *service.UserS
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if hasBearerAuthorization(r) {
-				// A bearer request never falls back to cookies. An invalid token
-				// continues unauthenticated, so CSRFProtection may skip it safely.
-				session, token, err := authenticateBearer(r, authService)
-				if err != nil {
-					next.ServeHTTP(w, r)
-					return
-				}
-				if session.IsImpersonating() {
-					next.ServeHTTP(w, r)
-					return
-				}
-				user, err := userService.ByID(session.UserID)
-				if err != nil {
-					next.ServeHTTP(w, r)
-					return
-				}
-				user.PasswordSet = user.HasPassword()
-				user.PasswordHash = nil
-				ctx := ctxkeys.WithUser(r.Context(), user)
-				ctx = ctxkeys.WithSession(ctx, session)
-				ctx = ctxkeys.WithBearer(ctx, token)
-				next.ServeHTTP(w, r.WithContext(ctx))
+				// A bearer request never falls back to cookies: APITokenAuth
+				// handles a personal API token, and anything else continues
+				// unauthenticated, so CSRFProtection may skip it safely.
+				next.ServeHTTP(w, r)
 				return
 			}
 			for _, cookieName := range []string{"impersonation_token", "session_token"} {
@@ -62,8 +44,6 @@ func AuthMiddleware(authService *service.AuthService, userService *service.UserS
 					authService.ClearCookie(w, cookieName)
 					continue
 				}
-				user.PasswordSet = user.HasPassword()
-				user.PasswordHash = nil
 				ctx := ctxkeys.WithUser(r.Context(), user)
 				ctx = ctxkeys.WithSession(ctx, session)
 				next.ServeHTTP(w, r.WithContext(ctx))

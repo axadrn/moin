@@ -150,7 +150,7 @@ func TestANewWorkspaceClaimsTheOfferOfItsCreator(t *testing.T) {
 	addOffer(t, environment.database, "ada@example.com", nil)
 
 	// GitHub has verified the address.
-	user, err := environment.auth.AuthenticateOAuth("Ada@Example.com", "github")
+	user, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 1, Login: "ada", Email: "Ada@Example.com"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestAdminAppliesAnOfferOfAnotherAddress(t *testing.T) {
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "operator", Email: "operator@example.com", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "target", Email: "other@example.com", Verified: true})
 	addOffer(t, database, "bought@example.com", nil)
-	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
 	admin := NewAdminService(repository.NewAdmin(database), repository.NewUsers(database), auth, []string{"operator@example.com"})
 	admin.UseOffers(newOffers(database))
@@ -291,7 +291,7 @@ func TestAdminAppliesAnOfferOfAnotherAddress(t *testing.T) {
 func TestWithoutOffersAWorkspaceIsAsBefore(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
 	addOffer(t, environment.database, "ada@example.com", nil)
-	user, err := environment.auth.AuthenticateOAuth("ada@example.com", "github")
+	user, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 1, Login: "ada", Email: "ada@example.com"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

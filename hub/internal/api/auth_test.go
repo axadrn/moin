@@ -1,17 +1,12 @@
 package api_test
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
 
@@ -21,198 +16,37 @@ func seedVerifiedUser(t *testing.T, environment *apiEnvironment, id, name string
 		ID:       id,
 		Email:    id + "@example.com",
 		Name:     name,
-		Password: testPassword,
 		Verified: true,
 	}).User
 }
 
-func expectSession(t *testing.T, recorder *httptest.ResponseRecorder, session api.SessionToken, userID string) {
-	t.Helper()
-	if session.Token == "" || len(session.Token) != 64 {
-		t.Fatalf("token = %q", session.Token)
-	}
-	if session.ExpiresAt.Location() != time.UTC || !session.ExpiresAt.After(time.Now()) {
-		t.Fatalf("expires_at = %v", session.ExpiresAt)
-	}
-	if session.User.ID != userID {
-		t.Fatalf("user = %#v, want %s", session.User, userID)
-	}
-	for _, cookie := range recorder.Result().Cookies() {
-		if cookie.Name == "session_token" {
-			t.Fatalf("sign-in set a session cookie %#v", cookie)
-		}
-	}
-}
-
-func TestPasswordAuth(t *testing.T) {
-	tests := []struct {
-		name   string
-		body   string
-		status int
-		code   string
-		field  string
-	}{
-		{name: "valid", body: `{"email":" Ada@Example.com ","password":"` + testPassword + `"}`, status: http.StatusOK},
-		{name: "wrong password", body: `{"email":"ada@example.com","password":"wrong password here"}`, status: http.StatusUnauthorized, code: "invalid_credentials"},
-		{name: "unknown email", body: `{"email":"nobody@example.com","password":"` + testPassword + `"}`, status: http.StatusUnauthorized, code: "invalid_credentials"},
-		{name: "invalid email", body: `{"email":"ada","password":"` + testPassword + `"}`, status: http.StatusUnprocessableEntity, code: "validation_failed", field: "email"},
-		{name: "missing password", body: `{"email":"ada@example.com"}`, status: http.StatusUnprocessableEntity, code: "validation_failed", field: "password"},
-		{name: "unknown field", body: `{"email":"ada@example.com","password":"x","remember":true}`, status: http.StatusBadRequest, code: "invalid_body"},
-		{name: "malformed", body: `{"email":`, status: http.StatusBadRequest, code: "invalid_body"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			environment := newAPIEnvironment(t)
-			testutil.SeedUser(t, environment.database, testutil.UserOptions{
-				ID: "ada", Email: "ada@example.com", Name: "Ada", Password: testPassword, Verified: true,
-			})
-
-			recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/password", body: test.body})
-
-			if test.code == "" {
-				expectStatus(t, recorder, test.status)
-				if strings.Contains(recorder.Body.String(), "password_hash") {
-					t.Fatalf("response exposes the password hash: %s", recorder.Body.String())
-				}
-				session := decodeBody[api.SessionToken](t, recorder)
-				expectSession(t, recorder, session, "ada")
-				if !session.User.PasswordSet || session.User.Email != "ada@example.com" || session.User.Name != "Ada" {
-					t.Fatalf("user = %#v", session.User)
-				}
-				account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: session.Token})
-				expectStatus(t, account, http.StatusOK)
-				return
-			}
-			detail := expectError(t, recorder, test.status, test.code)
-			if test.field != "" && detail.Fields[test.field] == "" {
-				t.Fatalf("fields = %#v, want %s", detail.Fields, test.field)
-			}
-		})
-	}
-}
-
-func TestPasswordAuthIsRateLimited(t *testing.T) {
-	environment := newAPIEnvironment(t)
-	for attempt := 0; attempt < 5; attempt++ {
-		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"ada@example.com","password":"wrong password here"}`})
-		expectStatus(t, recorder, http.StatusUnauthorized)
-	}
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"ada@example.com","password":"wrong password here"}`})
-	expectError(t, recorder, http.StatusTooManyRequests, "rate_limited")
-}
-
-func TestMagicLinkSignsUpAndSignsIn(t *testing.T) {
-	environment := newAPIEnvironment(t)
-
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link", body: `{"email":"new@example.com"}`})
-	expectStatus(t, recorder, http.StatusAccepted)
-	if recorder.Body.Len() != 0 {
-		t.Fatalf("body = %q, want empty", recorder.Body.String())
-	}
-	token := environment.mailedToken(t, "/auth/magic-link/")
-
-	recorder = environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link/verify", body: `{"token":"` + token + `"}`})
-	expectStatus(t, recorder, http.StatusOK)
-	session := decodeBody[api.SessionToken](t, recorder)
-	if session.User.Email != "new@example.com" || session.User.Name != "" || session.User.PasswordSet {
-		t.Fatalf("user = %#v", session.User)
-	}
-	expectSession(t, recorder, session, session.User.ID)
-
-	reused := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link/verify", body: `{"token":"` + token + `"}`})
-	expectError(t, reused, http.StatusBadRequest, "invalid_token")
-}
-
-func TestMagicLinkValidationAndRecipientLimit(t *testing.T) {
-	environment := newAPIEnvironment(t)
-
-	invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link", body: `{"email":""}`})
-	detail := expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
-	if detail.Fields["email"] != "Email address is required." {
-		t.Fatalf("fields = %#v", detail.Fields)
-	}
-
-	for attempt := 0; attempt < 3; attempt++ {
-		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link", body: `{"email":"limit@example.com"}`})
-		expectStatus(t, recorder, http.StatusAccepted)
-	}
-	limited := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link", body: `{"email":" LIMIT@example.com"}`})
-	expectError(t, limited, http.StatusTooManyRequests, "rate_limited")
-}
-
-func TestMagicLinkVerifyRejectsExpiredToken(t *testing.T) {
-	environment := newAPIEnvironment(t)
-	user := seedVerifiedUser(t, environment, "expired", "Expired")
-	raw := strings.Repeat("ab", 32)
-	hash := sha256.Sum256([]byte(raw))
-	err := repository.NewTokens(environment.database).Create(&model.Token{
-		UserID:    user.ID,
-		Type:      model.TokenTypeMagicLink,
-		TokenHash: hex.EncodeToString(hash[:]),
-		ExpiresAt: time.Now().Add(-time.Minute),
-	})
-	if err != nil {
-		t.Fatalf("create token: %v", err)
-	}
-
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link/verify", body: `{"token":"` + raw + `"}`})
-	expectError(t, recorder, http.StatusBadRequest, "invalid_token")
-}
-
-func TestForgotPasswordRemovesPasswordAndReplacesSessions(t *testing.T) {
-	environment := newAPIEnvironment(t)
-	user := seedVerifiedUser(t, environment, "forgot", "Forgot")
-	oldToken := environment.signIn(t, user.ID)
-
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/forgot-password", body: `{"email":"forgot@example.com"}`})
-	expectStatus(t, recorder, http.StatusAccepted)
-	unknown := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/forgot-password", body: `{"email":"unknown@example.com"}`})
-	expectStatus(t, unknown, http.StatusAccepted)
-	token := environment.mailedToken(t, "/auth/forgot-password/")
-
-	recorder = environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/forgot-password/verify", body: `{"token":"` + token + `"}`})
-	expectStatus(t, recorder, http.StatusOK)
-	session := decodeBody[api.SessionToken](t, recorder)
-	expectSession(t, recorder, session, user.ID)
-	if session.User.PasswordSet {
-		t.Fatalf("password is still set: %#v", session.User)
-	}
-
-	old := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: oldToken})
-	expectError(t, old, http.StatusUnauthorized, "unauthenticated")
-	current := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: session.Token})
-	expectStatus(t, current, http.StatusOK)
-
-	invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/forgot-password/verify", body: `{"token":"` + token + `"}`})
-	expectError(t, invalid, http.StatusBadRequest, "invalid_token")
-}
-
+// TestEmailChangeVerify: like the link on the web, verifying the new
+// address ends every session; a cookie caller gets a new one.
 func TestEmailChangeVerify(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	user := seedVerifiedUser(t, environment, "mover", "Mover")
-	err := environment.auth.RequestEmailChange(user.ID, "moved@example.com")
-	if err != nil {
+	if err := environment.auth.RequestEmailChange(user.ID, "moved@example.com"); err != nil {
 		t.Fatalf("RequestEmailChange() error = %v", err)
 	}
 	token := environment.mailedToken(t, "/auth/verify-email-change/")
-	oldBearer := environment.signIn(t, user.ID)
-	oldCookie := environment.signIn(t, user.ID)
+	other := environment.signIn(t, user.ID)
+	caller := environment.signIn(t, user.ID)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + token + `"}`, cookie: oldCookie})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + token + `"}`, cookie: caller})
 	expectStatus(t, recorder, http.StatusOK)
-	response := decodeBody[api.SessionToken](t, recorder)
-	if response.User.ID != user.ID || response.User.Email != "moved@example.com" || response.Token == "" || response.ExpiresAt.IsZero() {
+	response := decodeBody[api.UserResponse](t, recorder)
+	if response.User.ID != user.ID || response.User.Email != "moved@example.com" {
 		t.Fatalf("response = %#v", response)
 	}
-	if cookieValue(recorder, "session_token") != response.Token {
-		t.Fatalf("cookie caller did not get the new session cookie: %v", recorder.Result().Cookies())
+	fresh := cookieValue(recorder, "session_token")
+	if fresh == "" || fresh == caller {
+		t.Fatalf("the cookie caller got no new session: %v", recorder.Result().Cookies())
 	}
-	for _, old := range []string{oldBearer, oldCookie} {
-		stale := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: old})
+	for _, old := range []string{other, caller} {
+		stale := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: old})
 		expectError(t, stale, http.StatusUnauthorized, "unauthenticated")
 	}
-	fresh := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: response.Token})
-	expectStatus(t, fresh, http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: fresh}), http.StatusOK)
 
 	reused := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + token + `"}`})
 	expectError(t, reused, http.StatusBadRequest, "invalid_token")
@@ -223,7 +57,7 @@ func TestOnboardingGate(t *testing.T) {
 	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "fresh", Email: "fresh@example.com", Verified: true}).User
 	token := environment.signIn(t, user.ID)
 
-	account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token})
 	expectStatus(t, account, http.StatusOK)
 	if !decodeBody[struct {
 		OnboardingRequired bool `json:"onboarding_required"`
@@ -231,16 +65,16 @@ func TestOnboardingGate(t *testing.T) {
 		t.Fatalf("onboarding_required is false: %s", account.Body.String())
 	}
 
-	gated := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", bearer: token})
+	gated := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", cookie: token})
 	expectError(t, gated, http.StatusForbidden, "onboarding_required")
 
-	invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", bearer: token, body: `{"name":"   "}`})
+	invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", cookie: token, body: `{"name":"   "}`})
 	detail := expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
 	if detail.Fields["name"] == "" {
 		t.Fatalf("fields = %#v", detail.Fields)
 	}
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", bearer: token, body: `{"name":" Grace Hopper "}`})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", cookie: token, body: `{"name":" Grace Hopper "}`})
 	expectStatus(t, recorder, http.StatusOK)
 	response := decodeBody[struct {
 		User      api.User       `json:"user"`
@@ -253,7 +87,7 @@ func TestOnboardingGate(t *testing.T) {
 		t.Fatalf("workspace = %#v, want the default workspace", response.Workspace)
 	}
 
-	open := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", bearer: token})
+	open := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", cookie: token})
 	expectStatus(t, open, http.StatusOK)
 }
 
@@ -272,13 +106,13 @@ func TestOnboardingNamesTheWorkspace(t *testing.T) {
 		}
 		token := environment.signIn(t, seeded.User.ID)
 		if test.id == "named" {
-			invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", bearer: token, body: `{"name":"Grace Hopper","workspace_name":"x"}`})
+			invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", cookie: token, body: `{"name":"Grace Hopper","workspace_name":"x"}`})
 			detail := expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
 			if detail.Fields["workspace_name"] == "" {
 				t.Fatalf("fields = %#v", detail.Fields)
 			}
 		}
-		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", bearer: token, body: test.body})
+		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", cookie: token, body: test.body})
 		expectStatus(t, recorder, http.StatusOK)
 		response := decodeBody[struct {
 			Workspace *api.Workspace `json:"workspace"`
@@ -293,25 +127,6 @@ func TestOnboardingRequiresSession(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Nobody"}`})
 	expectError(t, recorder, http.StatusUnauthorized, "unauthenticated")
-}
-
-func TestLogoutRevokesBearerSession(t *testing.T) {
-	environment := newAPIEnvironment(t)
-	user := seedVerifiedUser(t, environment, "leaver", "Leaver")
-	token := environment.signIn(t, user.ID)
-	other := environment.signIn(t, user.ID)
-
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/logout", bearer: token})
-	expectStatus(t, recorder, http.StatusNoContent)
-
-	_, err := environment.auth.AuthenticateSession(token)
-	if err == nil {
-		t.Fatal("logout kept the session row")
-	}
-	again := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
-	expectError(t, again, http.StatusUnauthorized, "unauthenticated")
-	still := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: other})
-	expectStatus(t, still, http.StatusOK)
 }
 
 func TestLogoutRevokesCookieSession(t *testing.T) {

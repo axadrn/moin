@@ -4,55 +4,106 @@ import (
 	"context"
 
 	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// Auth is the way in: GitHub first where it is set up, else a link by
-// email, and a password for those who set one.
-templ Auth(errorMsg string) {
-	@authPage(errorMsg, "")
-}
-
-// AuthGitHubFailed is the way in after a GitHub sign-in did not work. The
-// email field had nothing to do with it, so the message stands on its own.
-templ AuthGitHubFailed(message string) {
-	@authPage("", message)
-}
-
-templ authPage(errorMsg, githubError string) {
-	{{ github := ctxkeys.RenderConfig(ctx).GitHubLogin }}
+// Auth is the way in: GitHub where the GitHub App is set up, else the
+// recovery key from the terminal, which signs in the first admin.
+templ Auth(githubError string) {
 	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {
-		if ctxkeys.RenderConfig(ctx).Billing {
-			@authLine() {
-				30 days free. No card.
+		if ctxkeys.RenderConfig(ctx).GitHubLogin {
+			if ctxkeys.RenderConfig(ctx).Billing {
+				@authLine() {
+					30 days free. No card.
+				}
+			}
+			if githubError != "" {
+				<p class="moin-text moin-failed moin-center" role="alert">{ githubError }</p>
+			}
+			@authStack() {
+				@continueWithGitHub()
+			}
+			@authTerms()
+		} else {
+			@authStack() {
+				@AuthKeyForm("")
 			}
 		}
-		if githubError != "" {
-			<p class="moin-text moin-failed moin-center" role="alert">{ githubError }</p>
-		}
+	}
+}
+
+// AuthGitHubFailed is the way in after a GitHub sign-in did not work, with
+// what went wrong.
+templ AuthGitHubFailed(message string) {
+	@Auth(message)
+}
+
+// continueWithGitHub is the one button that signs in.
+templ continueWithGitHub() {
+	@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth/github"}) {
+		@components.Icon("git-hub")
+		Continue with GitHub
+	}
+}
+
+// AuthKey takes a recovery key from the terminal.
+templ AuthKey(errorMsg string) {
+	@authScreen(layouts.SEOProps{Title: "Sign in with a key", Description: "Sign in with a recovery key"}, "Sign in with a key") {
 		@authStack() {
-			if github {
-				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth/github"}) {
-					@components.Icon("git-hub")
-					Continue with GitHub
-				}
-				@authOr()
-			}
-			@AuthMagicLinkForm(errorMsg)
-			if config.GoogleOAuthEnabled {
-				@components.Button(components.ButtonProps{Href: "/auth/google"}) {
-					@components.Icon("google")
-					Continue with Google
-				}
-			}
-			@authLink("/auth/password") {
-				Sign in with a password
-			}
+			@AuthKeyForm(errorMsg)
 		}
-		@authTerms()
+	}
+}
+
+// AuthKeyForm is the one field of a recovery key. The operator makes the
+// key with the server command recovery-key; it works once, for an hour.
+templ AuthKeyForm(errorMsg string) {
+	<form
+		id="key-form"
+		action="/auth/key"
+		method="POST"
+		class="moin-stack"
+		data-gap="4"
+		hx-post="/auth/key"
+		hx-target="#key-form"
+		hx-swap="outerHTML"
+		hx-disable="find button[type='submit']"
+	>
+		@components.CSRF()
+		@formField("Key from the terminal", "key", "From recovery-key on the server. It works once, for an hour.", errorMsg) {
+			@components.Input(components.InputProps{Attrs: templ.Attributes{
+				"id":               "key",
+				"name":             "key",
+				"type":             "text",
+				"aria-invalid":     ariaInvalid(errorMsg),
+				"aria-describedby": "key-hint",
+				"autocomplete":     "off",
+				"autocapitalize":   "characters",
+				"spellcheck":       "false",
+				"autofocus":        true,
+				"required":         true,
+			}})
+		}
+		@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+			Sign in
+		}
+	</form>
+}
+
+// AuthPrivate is what a new account sees while sign-up is closed: only
+// admins and invited people get in.
+templ AuthPrivate() {
+	@authScreen(layouts.SEOProps{Title: "This " + brand.Name + " is private", Description: "Ask its admin for an invitation"}, "This "+brand.Name+" is private") {
+		@authLine() {
+			Ask its admin for an invitation.
+		}
+		<div data-private>
+			@authLink("/auth") {
+				Back to sign in
+			}
+		</div>
 	}
 }
 

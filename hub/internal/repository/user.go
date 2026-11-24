@@ -13,6 +13,9 @@ import (
 var (
 	ErrUserNotFound   = errors.New("user not found")
 	ErrDuplicateEmail = errors.New("email already exists")
+	// ErrGitHubTaken says another user signs in with this GitHub account,
+	// or the user has one already.
+	ErrGitHubTaken = errors.New("github account already connected")
 )
 
 // Users stores the user accounts.
@@ -31,13 +34,15 @@ func (r *Users) Create(user *model.User) error {
 	if user.UpdatedAt.IsZero() {
 		user.UpdatedAt = user.CreatedAt
 	}
-	query := `INSERT INTO users (id, email, password_hash, email_verified_at, name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	query := `INSERT INTO users (id, email, email_verified_at, name, github_id, github_login, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 
-	_, err := r.db.Exec(query, user.ID, user.Email, user.PasswordHash, user.EmailVerifiedAt, user.Name, user.CreatedAt, user.UpdatedAt)
+	_, err := r.db.Exec(query, user.ID, user.Email, user.EmailVerifiedAt, user.Name, user.GitHubID, user.GitHubLogin, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
-		// Check for unique constraint violation (works for both SQLite and PostgreSQL)
 		errStr := err.Error()
-		if strings.Contains(errStr, "UNIQUE constraint failed") || strings.Contains(errStr, "duplicate key value") {
+		if strings.Contains(errStr, "UNIQUE constraint failed: users.github_id") {
+			return ErrGitHubTaken
+		}
+		if strings.Contains(errStr, "UNIQUE constraint failed") {
 			return ErrDuplicateEmail
 		}
 		return err
@@ -70,12 +75,71 @@ func (r *Users) ByEmail(email string) (*model.User, error) {
 	return user, err
 }
 
+// ByGitHubID is the user who signs in with the GitHub account id.
+func (r *Users) ByGitHubID(id int64) (*model.User, error) {
+	user := &model.User{}
+	err := r.db.Get(user, `SELECT * FROM users WHERE github_id = $1`, id)
+	if err == sql.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+	return user, err
+}
+
 func (r *Users) Update(user *model.User) error {
-	query := `UPDATE users SET email = $1, password_hash = $2, pending_email = $3, email_verified_at = $4, name = $5, updated_at = $6 WHERE id = $7`
+	query := `UPDATE users SET email = $1, pending_email = $2, email_verified_at = $3, name = $4, updated_at = $5 WHERE id = $6`
 
 	user.UpdatedAt = time.Now()
-	_, err := r.db.Exec(query, user.Email, user.PasswordHash, user.PendingEmail, user.EmailVerifiedAt, user.Name, user.UpdatedAt, user.ID)
+	_, err := r.db.Exec(query, user.Email, user.PendingEmail, user.EmailVerifiedAt, user.Name, user.UpdatedAt, user.ID)
 	return err
+}
+
+// ConnectGitHub stores the GitHub account of a user who has none yet. It
+// is ErrGitHubTaken when the user has one already or another user signs in
+// with this one.
+func (r *Users) ConnectGitHub(userID string, githubID int64, login string) error {
+	result, err := r.db.Exec(`UPDATE users SET github_id = $1, github_login = $2, updated_at = $3 WHERE id = $4 AND github_id IS NULL`, githubID, login, time.Now(), userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return ErrGitHubTaken
+		}
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return ErrGitHubTaken
+	}
+	return nil
+}
+
+// SetGitHubLogin keeps the name of the user's GitHub account fresh: it may
+// change on GitHub, the id never does.
+func (r *Users) SetGitHubLogin(userID, login string) error {
+	_, err := r.db.Exec(`UPDATE users SET github_login = $1 WHERE id = $2`, login, userID)
+	return err
+}
+
+// SetRecoveryKey stores the hash of a new recovery key of the user, in
+// place of one the user had.
+func (r *Users) SetRecoveryKey(userID, hash string, expiresAt time.Time) error {
+	result, err := r.db.Exec(`UPDATE users SET recovery_key_hash = $1, recovery_key_expires_at = $2 WHERE id = $3`, hash, expiresAt, userID)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// UseRecoveryKey clears the recovery key with this hash, if it has not
+// expired at now, and returns the id of its user. One statement, so a key
+// works only once.
+func (r *Users) UseRecoveryKey(hash string, now time.Time) (string, error) {
+	var userID string
+	err := r.db.Get(&userID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
+	if err == sql.ErrNoRows {
+		return "", ErrUserNotFound
+	}
+	return userID, err
 }
 
 func (r *Users) UpdateName(userID, name string, updatedAt time.Time) error {

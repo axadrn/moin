@@ -29,7 +29,6 @@ func seedTokenOwner(t *testing.T, environment *apiEnvironment, id string) tokenO
 		ID:       id,
 		Email:    id + "@example.com",
 		Name:     strings.ToUpper(id[:1]) + id[1:],
-		Password: testPassword,
 		Verified: true,
 	})
 	return tokenOwner{
@@ -50,7 +49,7 @@ func tokenBody(owner tokenOwner, fields string) string {
 
 func createAPIToken(t *testing.T, environment *apiEnvironment, owner tokenOwner, fields string) api.CreatedAPIToken {
 	t.Helper()
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, fields), bearer: owner.session})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, fields), cookie: owner.session})
 	expectStatus(t, recorder, http.StatusCreated)
 	return decodeBody[api.CreatedAPIToken](t, recorder)
 }
@@ -79,7 +78,7 @@ func TestCreateAPITokenRevealsItOnce(t *testing.T) {
 		t.Fatalf("default token = %#v", readOnly.APIToken)
 	}
 
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", cookie: owner.session})
 	expectStatus(t, recorder, http.StatusOK)
 	for _, hidden := range []string{created.Token, created.Token[4:], readOnly.Token, "token_hash", "hash"} {
 		if strings.Contains(recorder.Body.String(), hidden) {
@@ -107,13 +106,13 @@ func TestCreateAPITokenValidates(t *testing.T) {
 		{body: `{"name":"CI"}`, field: "workspace_id"},
 		{body: `{"name":"CI","workspace_id":"someone-else"}`, field: "workspace_id"},
 	} {
-		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: test.body, bearer: owner.session})
+		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: test.body, cookie: owner.session})
 		detail := expectError(t, recorder, http.StatusUnprocessableEntity, "validation_failed")
 		if detail.Fields[test.field] == "" {
 			t.Fatalf("%s: fields = %#v", test.body, detail.Fields)
 		}
 	}
-	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: `{"name":"CI","owner":"x"}`, bearer: owner.session}), http.StatusBadRequest, "invalid_body")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: `{"name":"CI","owner":"x"}`, cookie: owner.session}), http.StatusBadRequest, "invalid_body")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens"}), http.StatusUnauthorized, "unauthenticated")
 }
 
@@ -123,7 +122,7 @@ func TestAPITokenLimit(t *testing.T) {
 	for index := range 50 {
 		createAPIToken(t, environment, owner, fmt.Sprintf(`"name":"Token %d"`, index))
 	}
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, `"name":"One more"`), bearer: owner.session})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/tokens", body: tokenBody(owner, `"name":"One more"`), cookie: owner.session})
 	expectError(t, recorder, http.StatusConflict, "token_limit")
 }
 
@@ -137,7 +136,7 @@ func TestAPITokenAuthenticatesAndRecordsUse(t *testing.T) {
 	if !strings.Contains(recorder.Body.String(), `"id":"`+owner.id+`"`) {
 		t.Fatalf("account = %s", recorder.Body.String())
 	}
-	list := decodeBody[api.APITokenList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session}))
+	list := decodeBody[api.APITokenList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", cookie: owner.session}))
 	if list.Items[0].LastUsedAt == nil {
 		t.Fatalf("last_used_at was not recorded: %#v", list.Items[0])
 	}
@@ -157,7 +156,7 @@ func TestExpiredAPITokenIsUnauthenticated(t *testing.T) {
 	}
 
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusUnauthorized, "unauthenticated")
-	list := decodeBody[api.APITokenList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session}))
+	list := decodeBody[api.APITokenList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", cookie: owner.session}))
 	if len(list.Items) != 1 || !list.Items[0].Expired {
 		t.Fatalf("items = %#v", list.Items)
 	}
@@ -170,12 +169,12 @@ func TestRevokeAPIToken(t *testing.T) {
 	created := createAPIToken(t, environment, owner, `"name":"Old"`)
 	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusOK)
 
-	foreign := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, bearer: other.session})
+	foreign := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, cookie: other.session})
 	expectError(t, foreign, http.StatusNotFound, "not_found")
 
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, bearer: owner.session}), http.StatusNoContent)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, cookie: owner.session}), http.StatusNoContent)
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusUnauthorized, "unauthenticated")
-	expectError(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, bearer: owner.session}), http.StatusNotFound, "not_found")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/tokens/" + created.APIToken.ID, cookie: owner.session}), http.StatusNotFound, "not_found")
 }
 
 func TestReadTokenCannotWrite(t *testing.T) {
@@ -203,10 +202,8 @@ func TestTokensCannotReachSessionOnlyRoutes(t *testing.T) {
 		{method: http.MethodGet, path: "/api/v1/account/sessions"},
 		{method: http.MethodDelete, path: "/api/v1/account/sessions"},
 		{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"new@example.com"}`},
-		{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"another long password"}`},
 		{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"claude@example.com"}`},
 		{method: http.MethodPost, path: "/api/v1/auth/logout"},
-		{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"claude@example.com","password":"` + testPassword + `"}`},
 		{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"Side project"}`},
 		{method: http.MethodDelete, path: "/api/v1/workspaces/" + owner.workspaceSlug},
 		{method: http.MethodPost, path: "/api/v1/workspaces/" + owner.workspaceSlug + "/leave"},
@@ -223,7 +220,7 @@ func TestTokensCannotReachSessionOnlyRoutes(t *testing.T) {
 		}
 	}
 	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusOK)
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session}), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", cookie: owner.session}), http.StatusOK)
 }
 
 func TestAdminTokenCannotReachAdminRoutes(t *testing.T) {
@@ -235,7 +232,7 @@ func TestAdminTokenCannotReachAdminRoutes(t *testing.T) {
 		t.Fatalf("operator workspaces = %v, %v", memberships, err)
 	}
 	operator.workspaceID = memberships[0].ID
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: operator.session}), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", cookie: operator.session}), http.StatusOK)
 	created := createAPIToken(t, environment, operator, `"name":"Ops","scopes":["write"]`)
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: created.Token}), http.StatusForbidden, "forbidden")
 }
@@ -255,9 +252,9 @@ func TestAPITokensNeverManageMembers(t *testing.T) {
 		expectError(t, environment.send(t, request), http.StatusForbidden, "forbidden")
 	}
 
-	role.bearer = seeded.owner
+	role.cookie = seeded.owner
 	expectStatus(t, environment.send(t, role), http.StatusOK)
-	removal.bearer = seeded.owner
+	removal.cookie = seeded.owner
 	expectStatus(t, environment.send(t, removal), http.StatusNoContent)
 }
 
@@ -274,7 +271,7 @@ func TestAPITokenIsBoundToOneWorkspace(t *testing.T) {
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug, bearer: created.Token}), http.StatusNotFound, "not_found")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/workspaces/" + second.Slug + "/name", body: `{"name":"Taken over"}`, bearer: created.Token}), http.StatusNotFound, "not_found")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug + "/activity", bearer: created.Token}), http.StatusNotFound, "not_found")
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug, bearer: owner.session}), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/" + second.Slug, cookie: owner.session}), http.StatusOK)
 
 	list := decodeBody[struct {
 		Items []api.Membership `json:"items"`
@@ -284,7 +281,7 @@ func TestAPITokenIsBoundToOneWorkspace(t *testing.T) {
 	}
 	all := decodeBody[struct {
 		Items []api.Membership `json:"items"`
-	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: owner.session}))
+	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", cookie: owner.session}))
 	if len(all.Items) != 2 {
 		t.Fatalf("session workspaces = %#v", all.Items)
 	}

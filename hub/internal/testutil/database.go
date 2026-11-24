@@ -9,14 +9,12 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserOptions struct {
 	ID       string
 	Email    string
 	Name     string
-	Password string
 	Verified bool
 }
 
@@ -37,15 +35,6 @@ func SeedUser(t testing.TB, database *sqlx.DB, options UserOptions) UserFixture 
 		options.Email = options.ID + "@example.com"
 	}
 
-	var passwordHash *string
-	if options.Password != "" {
-		hash, err := bcrypt.GenerateFromPassword([]byte(options.Password), bcrypt.MinCost)
-		if err != nil {
-			t.Fatalf("hash fixture password: %v", err)
-		}
-		value := string(hash)
-		passwordHash = &value
-	}
 	var verifiedAt *time.Time
 	if options.Verified {
 		verifiedAt = &now
@@ -54,7 +43,6 @@ func SeedUser(t testing.TB, database *sqlx.DB, options UserOptions) UserFixture 
 	user := &model.User{
 		ID:              options.ID,
 		Email:           options.Email,
-		PasswordHash:    passwordHash,
 		EmailVerifiedAt: verifiedAt,
 		Name:            options.Name,
 		CreatedAt:       now,

@@ -18,7 +18,7 @@ import (
 func adminWithOffers(t *testing.T, database *sqlx.DB) (*AdminService, *model.User, *model.Session) {
 	t.Helper()
 	operator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "operator", Email: "operator@example.com", Verified: true})
-	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
 	admin := NewAdminService(repository.NewAdmin(database), repository.NewUsers(database), auth, []string{"operator@example.com"})
 	admin.UseOffers(newOffers(database))

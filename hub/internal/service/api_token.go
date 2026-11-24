@@ -215,8 +215,8 @@ func (s *APITokenService) Revoke(userID, tokenID string, source Source) error {
 	return nil
 }
 
-// RevokeAllForUser deletes every token of the user. Account recovery, password
-// changes and the admin kill switch call it through AuthService.
+// RevokeAllForUser deletes every token of the user. The admin kill switch
+// calls it through AuthService.
 func (s *APITokenService) RevokeAllForUser(userID string) error {
 	tokens, err := s.tokens.ListByUserID(userID)
 	if err != nil {

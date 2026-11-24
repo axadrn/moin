@@ -17,6 +17,7 @@ type AdminUser struct {
 	Email              string     `db:"email"`
 	Name               string     `db:"name"`
 	EmailVerifiedAt    *time.Time `db:"email_verified_at"`
+	GitHubLogin        string     `db:"github_login"`
 	CreatedAt          time.Time  `db:"created_at"`
 	WorkspaceCount     int        `db:"workspace_count"`
 	ActiveSessionCount int        `db:"active_session_count"`

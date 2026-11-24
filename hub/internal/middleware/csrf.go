@@ -36,15 +36,11 @@ func CSRFProtection(isProduction bool, clientIPs ClientIPResolver) func(http.Han
 				return
 			}
 
-			// A sign-in with ?session=cookie sets the session cookie, so it always
-			// needs the CSRF token, whatever else the request carries.
-			cookieSignIn := requestsCookieSession(r)
-
 			// Skip CSRF check for requests with an Authorization: Bearer header.
 			// They carry no ambient credential, and AuthMiddleware never falls back
 			// to cookies for them. Other schemes keep the check, because their
 			// cookies still authenticate.
-			if hasBearerAuthorization(r) && !cookieSignIn {
+			if hasBearerAuthorization(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -57,9 +53,8 @@ func CSRFProtection(isProduction bool, clientIPs ClientIPResolver) func(http.Han
 			}
 
 			// Skip CSRF check for API requests without a session cookie. They carry
-			// no ambient credential, and API sign-in returns the token in the body
-			// instead of setting a cookie, unless it asks for a cookie session.
-			if strings.HasPrefix(r.URL.Path, "/api/") && !hasSessionCookie(r) && !cookieSignIn {
+			// no ambient credential.
+			if strings.HasPrefix(r.URL.Path, "/api/") && !hasSessionCookie(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -148,10 +143,4 @@ func hasSessionCookie(r *http.Request) bool {
 		}
 	}
 	return false
-}
-
-// requestsCookieSession reports whether an API request asks for its session
-// as a cookie instead of a bearer token in the body.
-func requestsCookieSession(r *http.Request) bool {
-	return strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Query().Get("session") == "cookie"
 }

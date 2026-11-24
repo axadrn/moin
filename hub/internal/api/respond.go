@@ -170,15 +170,10 @@ type serviceError struct {
 }
 
 var serviceErrors = []serviceError{
-	{err: service.ErrInvalidCredentials, status: http.StatusUnauthorized, code: "invalid_credentials", message: "Invalid email or password."},
-	{err: service.ErrEmailNotVerified, status: http.StatusForbidden, code: "email_not_verified", message: "Verify your email address before signing in with a password."},
 	{err: service.ErrEmailAlreadyExists, status: http.StatusConflict, code: "email_taken", message: "An account with this email address already exists."},
 	{err: repository.ErrDuplicateEmail, status: http.StatusConflict, code: "email_taken", message: "An account with this email address already exists."},
 	{err: service.ErrInvalidEmail, field: "email", message: "Enter a valid email address."},
-	{err: service.ErrWeakPassword, field: "password", message: "Password must be at least 12 characters."},
-	{err: service.ErrCommonPassword, field: "password", message: "Password is too common. Choose a stronger one."},
 	{err: service.ErrNameRequired, field: "name", message: "Enter your name."},
-	{err: service.ErrInvalidCurrentPassword, field: "current_password", message: "Current password is incorrect."},
 	{err: repository.ErrTokenNotFound, status: http.StatusBadRequest, code: "invalid_token", message: "This link is invalid or has expired."},
 	{err: repository.ErrTokenExpired, status: http.StatusBadRequest, code: "invalid_token", message: "This link is invalid or has expired."},
 	{err: repository.ErrTokenUsed, status: http.StatusBadRequest, code: "invalid_token", message: "This link is invalid or has expired."},

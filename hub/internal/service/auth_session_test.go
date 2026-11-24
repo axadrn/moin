@@ -29,9 +29,7 @@ func TestDatabaseSessionLifecycle(t *testing.T) {
 		true,
 		7*24*time.Hour,
 		24*time.Hour,
-		time.Hour,
 		24*time.Hour,
-		10*time.Minute,
 	)
 
 	request := httptest.NewRequest("GET", "https://example.com/auth", nil)
@@ -85,7 +83,7 @@ func TestStartSessionTruncatesUserAgent(t *testing.T) {
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
 		nil, nil, repository.NewSessions(database), nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	request := httptest.NewRequest("GET", "http://example.com/auth", nil)
@@ -104,7 +102,7 @@ func TestStartSessionRotatesExistingBrowserSession(t *testing.T) {
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
 		nil, nil, repository.NewSessions(database), nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	firstRecorder := httptest.NewRecorder()
@@ -136,7 +134,7 @@ func TestStartFreshSessionRevokesEveryExistingSession(t *testing.T) {
 	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	firstRecorder := httptest.NewRecorder()
@@ -180,7 +178,7 @@ func TestCreateSessionReturnsTokenWithoutCookie(t *testing.T) {
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
 		nil, nil, repository.NewSessions(database), nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	existingRecorder := httptest.NewRecorder()
@@ -190,7 +188,7 @@ func TestCreateSessionReturnsTokenWithoutCookie(t *testing.T) {
 	}
 	existingCookie := existingRecorder.Result().Cookies()[0]
 
-	request := httptest.NewRequest("POST", "http://example.com/api/v1/auth/password", nil)
+	request := httptest.NewRequest("POST", "http://example.com/auth/github/callback", nil)
 	request.AddCookie(existingCookie)
 	created, token, err := authService.CreateSession(request, "user-1")
 	if err != nil {
@@ -219,10 +217,10 @@ func TestCreateFreshSessionRevokesEveryExistingSession(t *testing.T) {
 	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
-	request := httptest.NewRequest("POST", "http://example.com/api/v1/auth/forgot-password/verify", nil)
+	request := httptest.NewRequest("POST", "http://example.com/auth/verify-email-change/token", nil)
 	_, oldToken, err := authService.CreateSession(request, "user-1")
 	if err != nil {
 		t.Fatalf("create old session: %v", err)
@@ -252,48 +250,12 @@ func TestCreateFreshSessionRevokesEveryExistingSession(t *testing.T) {
 	}
 }
 
-func TestRevokeSessionByTokenDeletesOnlyThatSession(t *testing.T) {
-	database := sessionTestDatabase(t)
-	seedSessionTestUser(t, database, "user-1")
-	authService := NewAuthService(
-		nil, nil, repository.NewSessions(database), nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
-	)
-
-	request := httptest.NewRequest("POST", "http://example.com/api/v1/auth/password", nil)
-	_, revokedToken, err := authService.CreateSession(request, "user-1")
-	if err != nil {
-		t.Fatalf("create revoked session: %v", err)
-	}
-	_, keptToken, err := authService.CreateSession(request, "user-1")
-	if err != nil {
-		t.Fatalf("create kept session: %v", err)
-	}
-
-	err = authService.RevokeSessionByToken(revokedToken)
-	if err != nil {
-		t.Fatalf("RevokeSessionByToken() error = %v", err)
-	}
-	_, err = authService.AuthenticateSession(revokedToken)
-	if !errors.Is(err, repository.ErrSessionNotFound) {
-		t.Fatalf("revoked session error = %v, want ErrSessionNotFound", err)
-	}
-	_, err = authService.AuthenticateSession(keptToken)
-	if err != nil {
-		t.Fatalf("other session was revoked: %v", err)
-	}
-	err = authService.RevokeSessionByToken("")
-	if !errors.Is(err, repository.ErrSessionNotFound) {
-		t.Fatalf("empty token error = %v, want ErrSessionNotFound", err)
-	}
-}
-
 func TestRevokeOtherSessionsKeepsCurrentSession(t *testing.T) {
 	database := sessionTestDatabase(t)
 	seedSessionTestUser(t, database, "user-1")
 	authService := NewAuthService(
 		nil, nil, repository.NewSessions(database), nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	currentRecorder := httptest.NewRecorder()
@@ -323,7 +285,7 @@ func TestSessionRevocationIsScopedToUser(t *testing.T) {
 	seedSessionTestUser(t, database, "user-2")
 	authService := NewAuthService(
 		nil, nil, repository.NewSessions(database), nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	request := httptest.NewRequest("GET", "http://example.com/auth", nil)
@@ -361,7 +323,7 @@ func TestExpiredSessionIsRejectedAndRemoved(t *testing.T) {
 	sessionRepository := repository.NewSessions(database)
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
-		false, -time.Minute, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, -time.Minute, time.Hour, time.Hour,
 	)
 
 	recorder := httptest.NewRecorder()
@@ -398,7 +360,7 @@ func TestAuthenticationCleansExpiredSessionsForDormantUsers(t *testing.T) {
 	}
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 	recorder := httptest.NewRecorder()
 	if _, err := authService.StartSession(recorder, httptest.NewRequest("GET", "http://example.com/auth", nil), "active-user"); err != nil {
@@ -436,7 +398,7 @@ func TestActivityUpdateFailureDoesNotInvalidateSession(t *testing.T) {
 	}
 	authService := NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 
 	session, err := authService.AuthenticateSession("valid-token")

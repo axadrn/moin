@@ -1,87 +1,80 @@
 package handler
 
 import (
-	"context"
+	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/axadrn/moin/hub/internal/service"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 	"github.com/axadrn/moin/hub/internal/validation"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/github"
 )
 
-func (h *authHandler) githubOAuthConfig() *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     h.cfg.GitHubClientID,
-		ClientSecret: h.cfg.GitHubClientSecret,
-		RedirectURL:  h.cfg.APIURL + "/auth/github/callback",
-		Scopes:       []string{"user:email"},
-		Endpoint:     h.githubEndpoint(),
-	}
-}
+// githubStateCookie holds the state of a trip to GitHub, so only this
+// browser can finish it. For "Connect GitHub" in the settings it also
+// names the user the GitHub account is for.
+const githubStateCookie = "oauth_state"
 
-// githubEndpoint is github.com, or GITHUB_URL when set, like the GitHub
-// App uses.
-func (h *authHandler) githubEndpoint() oauth2.Endpoint {
-	base := strings.TrimRight(h.cfg.GitHubURL, "/")
-	if base == "" || base == "https://github.com" {
-		return github.Endpoint
-	}
-	return oauth2.Endpoint{AuthURL: base + "/login/oauth/authorize", TokenURL: base + "/login/oauth/access_token"}
-}
-
-// githubAPI is api.github.com, or GITHUB_API_URL when set.
-func (h *authHandler) githubAPI() string {
-	if base := strings.TrimRight(h.cfg.GitHubAPIURL, "/"); base != "" {
-		return base
-	}
-	return "https://api.github.com"
-}
-
-// GitHubAuth redirects user to GitHub OAuth consent screen
+// GitHubAuth sends a guest to GitHub to sign in.
 func (h *authHandler) GitHubAuth(w http.ResponseWriter, r *http.Request) {
-	if h.cfg.GitHubClientID == "" || h.cfg.GitHubClientSecret == "" {
+	h.startGitHub(w, r, "")
+}
+
+// ConnectGitHub sends a signed-in user without a GitHub account to GitHub,
+// to connect the account they will sign in with.
+func (h *authHandler) ConnectGitHub(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	if session := ctxkeys.Session(r.Context()); session == nil || session.IsImpersonating() || user.GitHubID != nil {
+		redirect(w, r, "/app", http.StatusSeeOther)
+		return
+	}
+	h.startGitHub(w, r, user.ID)
+}
+
+func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID string) {
+	if !h.cfg.GitHubLogin() {
 		redirect(w, r, "/auth", http.StatusSeeOther)
 		return
 	}
-	// Generate secure state token for CSRF protection
-	state := generateOAuthState()
-
-	// Get config from context to determine if we're in production
-	cfg := ctxkeys.RenderConfig(r.Context())
-	isProduction := cfg.IsProduction()
-
-	// Store state in secure cookie
+	random := make([]byte, 32)
+	if _, err := rand.Read(random); err != nil {
+		panic("generate the GitHub state: " + err.Error())
+	}
+	state := base64.RawURLEncoding.EncodeToString(random)
 	http.SetCookie(w, &http.Cookie{
-		Name:     "oauth_state",
-		Value:    state,
+		Name:     githubStateCookie,
+		Value:    state + "." + userID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProduction, // Secure flag based on APP_ENV (safer than r.TLS behind load balancers)
+		Secure:   h.cfg.IsProduction(),
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   600, // 10 minutes
+		MaxAge:   600,
 	})
-
-	url := h.githubOAuthConfig().AuthCodeURL(state, oauth2.AccessTypeOffline)
-	redirect(w, r, url, http.StatusTemporaryRedirect)
+	redirect(w, r, h.github.AuthorizeURL(state, h.githubCallbackURL()), http.StatusTemporaryRedirect)
 }
 
-// GitHubCallback handles the OAuth callback from GitHub
+// githubCallbackURL is where GitHub sends people back, one of the app's
+// callback URLs.
+func (h *authHandler) githubCallbackURL() string {
+	return strings.TrimRight(h.cfg.AppURL, "/") + "/auth/github/callback"
+}
+
+// GitHubCallback takes people back from GitHub: it signs them in, or
+// connects the GitHub account to the signed-in user who asked for it.
 func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
-	// Validate state parameter for CSRF protection
 	state := r.URL.Query().Get("state")
-	cookie, err := r.Cookie("oauth_state")
-	if err != nil || cookie.Value != state || state == "" {
-		slog.Warn("github oauth state validation failed", "error", err)
+	cookie, err := r.Cookie(githubStateCookie)
+	var expected, userID string
+	if err == nil {
+		expected, userID, _ = strings.Cut(cookie.Value, ".")
+	}
+	if !h.cfg.GitHubLogin() || state == "" || expected != state {
+		slog.Warn("github sign-in state does not match", "error", err)
 		// A sign-in that came back after another one finished, from a
 		// second tab or the back button: this browser is signed in already.
 		if ctxkeys.User(r.Context()) != nil {
@@ -91,160 +84,94 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.AuthGitHubFailed("This GitHub sign-in is no longer valid. Please try again."))
 		return
 	}
+	http.SetCookie(w, &http.Cookie{Name: githubStateCookie, Value: "", Path: "/", MaxAge: -1})
 
-	// Clear state cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:   "oauth_state",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
-	})
-
-	code := r.URL.Query().Get("code")
-	if code == "" {
-		slog.Warn("github oauth callback missing code")
-		render(w, r, pages.AuthGitHubFailed("OAuth authentication failed. Please try again."))
-		return
-	}
-
-	// Exchange code for token
-	token, err := h.githubOAuthConfig().Exchange(context.Background(), code)
+	account, err := h.github.Account(r.Context(), r.URL.Query().Get("code"), h.githubCallbackURL())
 	if err != nil {
-		slog.Error("github oauth token exchange failed", "error", err)
-		render(w, r, pages.AuthGitHubFailed("OAuth authentication failed. Please try again."))
+		slog.Error("github sign-in failed", "error", err)
+		render(w, r, pages.AuthGitHubFailed("GitHub did not sign you in. Please try again."))
+		return
+	}
+	if userID != "" {
+		h.connectGitHub(w, r, userID, account)
 		return
 	}
 
-	client := h.githubOAuthConfig().Client(context.Background(), token)
-	emails, name, err := githubAccount(client, h.githubAPI())
-	if errors.Is(err, errOAuthEmailMissing) || errors.Is(err, errOAuthEmailUnverified) {
-		slog.Warn("github oauth: no verified email", "error", err)
-		render(w, r, pages.AuthGitHubFailed("GitHub did not share a verified email address. Verify your email on GitHub and try again."))
-		return
-	}
-	if err != nil {
-		slog.Error("failed to get github user info", "error", err)
-		render(w, r, pages.AuthGitHubFailed("OAuth authentication failed. Please try again."))
-		return
-	}
-
-	// Authenticate or create user
-	user, err := h.authService.AuthenticateOAuth(emails[0], "github", emails[1:]...)
-	if errors.Is(err, service.ErrPrivate) {
+	user, err := h.authService.SignInWithGitHub(account, pendingInvitation(r))
+	switch {
+	case errors.Is(err, service.ErrPrivate):
 		render(w, r, pages.AuthPrivate())
 		return
-	}
-	if err != nil {
-		slog.Error("oauth authentication failed", "error", err)
-		render(w, r, pages.AuthGitHubFailed("Authentication failed. Please try again."))
+	case errors.Is(err, service.ErrGitHubEmailTaken):
+		render(w, r, pages.AuthGitHubFailed("Your GitHub email belongs to another account. Sign in to it with its GitHub account, or ask your admin for a recovery key."))
+		return
+	case errors.Is(err, service.ErrGitHubNoEmail):
+		render(w, r, pages.AuthGitHubFailed("GitHub shared no verified primary email. Verify your email on GitHub and try again."))
+		return
+	case err != nil:
+		slog.Error("github sign-in failed", "error", err)
+		render(w, r, pages.AuthGitHubFailed("Something went wrong. Please try again."))
 		return
 	}
 
-	_, err = h.authService.StartSession(w, r, user.ID)
-	if err != nil {
+	if _, err := h.authService.StartSession(w, r, user.ID); err != nil {
 		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		render(w, r, pages.AuthGitHubFailed("An error occurred. Please try again."))
+		render(w, r, pages.AuthGitHubFailed("Something went wrong. Please try again."))
 		return
 	}
-
-	slog.Info("user logged in with github oauth", "user_id", user.ID)
-
-	// Check if user needs onboarding
-	needsOnboarding, err := h.authService.NeedsOnboarding(user.ID)
-	if err != nil {
-		slog.Warn("failed to check onboarding status", "error", err, "user_id", user.ID)
-	}
-
-	if needsOnboarding {
-		setGitHubNameCookie(w, r, user.ID, name)
+	slog.Info("user signed in with github", "user_id", user.ID)
+	if user.Name == "" {
+		setGitHubNameCookie(w, r, user.ID, githubDisplayName(account))
 		redirect(w, r, "/auth/onboarding", http.StatusSeeOther)
-	} else {
-		h.redirectAfterAuth(w, r, user)
+		return
 	}
+	h.redirectAfterAuth(w, r, user)
 }
 
-// githubAccount returns the verified emails and the name of the GitHub
-// account: the profile name, or the login without one.
-func githubAccount(client *http.Client, api string) ([]string, string, error) {
-	var userInfo struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
-		Login string `json:"login"`
+// connectGitHub gives the signed-in user who asked for it the GitHub
+// account, and takes them back to the security settings.
+func (h *authHandler) connectGitHub(w http.ResponseWriter, r *http.Request, userID string, account service.GitHubAccount) {
+	user := ctxkeys.User(r.Context())
+	if user == nil || user.ID != userID {
+		render(w, r, pages.AuthGitHubFailed("This GitHub sign-in is no longer valid. Please try again."))
+		return
 	}
-	err := getOAuthJSON(client, api+"/user", &userInfo)
+	err := h.authService.ConnectGitHub(user.ID, account)
+	if errors.Is(err, service.ErrGitHubTaken) {
+		w.WriteHeader(http.StatusConflict)
+		render(w, r, pages.ErrorPage(http.StatusConflict, "GitHub not connected", "This GitHub account is connected to another account."))
+		return
+	}
 	if err != nil {
-		return nil, "", err
+		renderError(w, "connect github failed", err)
+		return
 	}
-	emails, err := githubEmails(client, api, userInfo.Email)
-	if err != nil {
-		return nil, "", err
+	slog.Info("github connected", "user_id", user.ID)
+	members, err := h.workspaceService.ListForUser(user.ID)
+	if err != nil || len(members) == 0 {
+		redirect(w, r, "/app", http.StatusSeeOther)
+		return
 	}
-	name := strings.TrimSpace(userInfo.Name)
-	if name == "" || validation.ValidateName(name) != nil {
-		name = strings.TrimSpace(userInfo.Login)
-	}
-	return emails, name, nil
+	redirect(w, r, members[0].Path()+"/settings/account?tab=security", http.StatusSeeOther)
 }
 
-// githubEmails returns the verified addresses of the account, first the
-// public email, or the primary address when the public one is private. Each
-// must be verified on GitHub, so nobody signs in to an account by adding its
-// address to GitHub without proving it.
-func githubEmails(client *http.Client, api, public string) ([]string, error) {
-	var emails []struct {
-		Email    string `json:"email"`
-		Primary  bool   `json:"primary"`
-		Verified bool   `json:"verified"`
-	}
-	err := getOAuthJSON(client, api+"/user/emails", &emails)
+// pendingInvitation is the token of the invitation this browser opened
+// before it signed in, or "".
+func pendingInvitation(r *http.Request) string {
+	cookie, err := r.Cookie("pending_invitation")
 	if err != nil {
-		return nil, err
+		return ""
 	}
-	first, primary := "", ""
-	var others []string
-	for _, email := range emails {
-		if !email.Verified || email.Email == "" {
-			continue
-		}
-		switch {
-		case public != "" && strings.EqualFold(email.Email, public):
-			first = email.Email
-		case email.Primary:
-			primary = email.Email
-		default:
-			others = append(others, email.Email)
-		}
-	}
-	if first == "" {
-		first, primary = primary, ""
-	}
-	if first == "" {
-		if len(emails) == 0 && public == "" {
-			return nil, errOAuthEmailMissing
-		}
-		return nil, errOAuthEmailUnverified
-	}
-	if primary != "" {
-		others = append([]string{primary}, others...)
-	}
-	return append([]string{first}, others...), nil
+	return cookie.Value
 }
 
-func getOAuthJSON(client *http.Client, url string, value any) error {
-	response, err := client.Get(url)
-	if err != nil {
-		return err
+// githubDisplayName is the profile name of a GitHub account, or its login
+// without one.
+func githubDisplayName(account service.GitHubAccount) string {
+	if account.Name != "" && validation.ValidateName(account.Name) == nil {
+		return account.Name
 	}
-	defer func() {
-		closeErr := response.Body.Close()
-		if closeErr != nil {
-			slog.Error("failed to close response body", "error", closeErr)
-		}
-	}()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s answered %d", url, response.StatusCode)
-	}
-	return json.NewDecoder(response.Body).Decode(value)
+	return account.Login
 }
 
 // githubNameCookie carries the GitHub name from the sign-in to the first

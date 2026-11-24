@@ -18,7 +18,7 @@ func TestLogoutPreservesCookieWhenRevocationFails(t *testing.T) {
 	_ = database.Close()
 	authService := service.NewAuthService(
 		nil, nil, sessionRepository, nil, nil,
-		false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour,
+		false, time.Hour, time.Hour, time.Hour,
 	)
 	handler := &authHandler{authService: authService}
 	request := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)

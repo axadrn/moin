@@ -44,7 +44,7 @@ func TestCORSExposesRetryAfterOnRateLimitedAnswers(t *testing.T) {
 		w.Header().Set("Retry-After", "60")
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/magic-link", nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/device", nil)
 	request.Header.Set("Origin", testAllowedOrigin)
 	recorder := httptest.NewRecorder()
 

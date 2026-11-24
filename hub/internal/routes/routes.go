@@ -29,7 +29,6 @@ type limiter = func(http.HandlerFunc) http.HandlerFunc
 func SetupRoutes(app *app.App) http.Handler {
 	clientIPs := middleware.NewClientIPResolver(app.Cfg.TrustedProxyCIDRs)
 	rateLimiter := middleware.RateLimitAuth(clientIPs)
-	authEmailRateLimiter := middleware.RateLimitAuthEmail(clientIPs)
 	deviceLimiter := middleware.RateLimitDeviceLogin(clientIPs)
 	emailChanges := middleware.RateLimitUserEmailChanges()
 	// Web, API and MCP invitations share one budget.
@@ -39,12 +38,12 @@ func SetupRoutes(app *app.App) http.Handler {
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux := http.NewServeMux()
 	siteRoutes(mux, app, home, catalogPages)
-	authRoutes(mux, app, rateLimiter, authEmailRateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs))
+	authRoutes(mux, app, rateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs))
 	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter))
 	appRoutes(mux, app, catalogPages)
 	adminRoutes(mux, app)
 	daemonRoutes(mux, app, clientIPs)
-	apiRoutes(mux, app, clientIPs, rateLimiter, authEmailRateLimiter, deviceLimiter, emailChanges, invitationLimiter)
+	apiRoutes(mux, app, clientIPs, deviceLimiter, emailChanges, invitationLimiter)
 	mcpRoutes(mux, app, invitationLimiter)
 	mux.HandleFunc("/api/", middleware.APINotFound)
 	mux.HandleFunc("/{path...}", home.NotFoundPage)
@@ -203,24 +202,18 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 
 // authRoutes sign people in and out, start a workspace, take an invitation
 // and approve moin login in the browser.
-func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimiter, deviceLimiter, githubLimiter limiter) {
-	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, app.Cfg)
+func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, githubLimiter limiter) {
+	auth := handler.NewAuthHandler(app.AuthService, app.WorkspaceService, app.GitHub, app.Cfg)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
 	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
 	mux.HandleFunc("GET /auth", middleware.RequireGuest(auth.AuthPage))
-	mux.HandleFunc("GET /auth/password", middleware.RequireGuest(auth.PasswordPage))
-	mux.HandleFunc("GET /auth/forgot-password", middleware.RequireGuest(auth.ForgotPasswordPage))
-	mux.HandleFunc("GET /auth/forgot-password-sent", middleware.RequireGuest(auth.ForgotPasswordSentPage))
-	mux.HandleFunc("GET /auth/magic-link-sent", middleware.RequireGuest(auth.MagicLinkSentPage))
+	mux.HandleFunc("GET /auth/key", middleware.RequireGuest(auth.KeyPage))
+	mux.HandleFunc("POST /auth/key", rateLimiter(middleware.RequireGuest(auth.SignInWithKey)))
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
 	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
+	mux.HandleFunc("GET /auth/github/connect", githubLimiter(middleware.RequireAuth(auth.ConnectGitHub)))
 	mux.HandleFunc("GET /auth/github/callback", githubLimiter(auth.GitHubCallback))
-	mux.HandleFunc("GET /auth/magic-link/{token}", auth.VerifyMagicLink)
-	mux.HandleFunc("GET /auth/forgot-password/{token}", auth.VerifyForgotPassword)
 	mux.HandleFunc("GET /auth/verify-email-change/{token}", auth.VerifyEmailChange)
-	mux.HandleFunc("POST /auth/magic-link", authEmailRateLimiter(middleware.RequireGuest(auth.SendMagicLink)))
-	mux.HandleFunc("POST /auth/password", rateLimiter(middleware.RequireGuest(auth.PasswordAuth)))
-	mux.HandleFunc("POST /auth/forgot-password", authEmailRateLimiter(middleware.RequireGuest(auth.ForgotPassword)))
 	mux.HandleFunc("POST /auth/onboarding", middleware.RequireAuth(auth.CompleteOnboarding))
 	mux.HandleFunc("GET /workspaces/new", middleware.RequireAuth(workspaceHandler.NewPage))
 	mux.HandleFunc("POST /workspaces/new", middleware.RequireAuth(workspaceHandler.Create))
@@ -272,11 +265,8 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/profile/name", workspace(profile.UpdateName))
 	mux.HandleFunc("POST /app/{workspaceSlug}/profile/email-alerts", workspace(profile.EmailAlerts))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/account/email", workspace(emailChanges(account.ChangeEmail)))
-	mux.HandleFunc("POST /app/{workspaceSlug}/account/password", workspace(account.ChangePassword))
 	mux.HandleFunc("POST /app/{workspaceSlug}/account/avatar", workspace(account.UploadAvatar))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/account/avatar", workspace(account.DeleteAvatar))
-	mux.HandleFunc("POST /app/{workspaceSlug}/account/password/set", workspace(account.SetPassword))
-	mux.HandleFunc("DELETE /app/{workspaceSlug}/account/password", workspace(account.RemovePassword))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/account", workspace(account.DeleteAccount))
 	if app.Cfg.Billing {
 		billing := handler.NewBillingHandler(app.PaymentService, app.WorkspaceService)
@@ -447,7 +437,7 @@ func daemonRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientI
 }
 
 // apiRoutes are the JSON API: every route comes from api.Routes.
-func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPResolver, rateLimiter, authEmailRateLimiter, deviceLimiter, emailChanges limiter, invitationLimiter *middleware.RateLimiter) {
+func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPResolver, deviceLimiter, emailChanges limiter, invitationLimiter *middleware.RateLimiter) {
 	var apiBilling *api.BillingHandler
 	if app.Cfg.Billing {
 		apiBilling = api.NewBillingHandler(app.PaymentService, app.WorkspaceService)
@@ -473,8 +463,6 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
 		RequireOnboarded:      middleware.RequireOnboardedAPI,
-		RateLimitAuth:         rateLimiter,
-		RateLimitAuthEmail:    authEmailRateLimiter,
 		RateLimitEmailChanges: emailChanges,
 		RequireAdmin:          middleware.RequireAdminAPI,
 		Workspace: func(next http.HandlerFunc) http.HandlerFunc {

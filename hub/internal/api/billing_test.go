@@ -53,7 +53,7 @@ func TestWorkspaceBillingPermissions(t *testing.T) {
 	seeded := seedBillingWorkspace(t, environment)
 	base := "/api/v1/workspaces/" + seeded.workspace.Slug + "/billing"
 
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: base, bearer: seeded.owner})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: base, cookie: seeded.owner})
 	expectStatus(t, recorder, http.StatusOK)
 	billing := decodeBody[api.Billing](t, recorder)
 	if billing.Subscription == nil || billing.Access == nil || billing.Access.PlanID != model.SubscriptionPlanFree {
@@ -67,23 +67,23 @@ func TestWorkspaceBillingPermissions(t *testing.T) {
 		{method: http.MethodGet, path: base + "/manage"},
 	} {
 		for name, token := range map[string]string{"admin": seeded.admin, "member": seeded.member} {
-			request.bearer = token
+			request.cookie = token
 			denied := environment.send(t, request)
 			if denied.Code != http.StatusForbidden {
 				t.Fatalf("%s %s %s: status %d", name, request.method, request.path, denied.Code)
 			}
 			expectError(t, denied, http.StatusForbidden, "forbidden")
 		}
-		request.bearer = seeded.outsider
+		request.cookie = seeded.outsider
 		expectError(t, environment.send(t, request), http.StatusNotFound, "not_found")
-		request.bearer = ""
+		request.cookie = ""
 		expectError(t, environment.send(t, request), http.StatusUnauthorized, "unauthenticated")
 	}
 	if len(environment.payments.checkoutCalls()) != 0 {
 		t.Fatal("a denied checkout reached the provider")
 	}
 
-	unknown := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/missing/billing", bearer: seeded.owner})
+	unknown := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces/missing/billing", cookie: seeded.owner})
 	expectError(t, unknown, http.StatusNotFound, "not_found")
 }
 
@@ -92,7 +92,7 @@ func TestWorkspaceBillingCheckout(t *testing.T) {
 	seeded := seedBillingWorkspace(t, environment)
 	path := "/api/v1/workspaces/" + seeded.workspace.Slug + "/billing/checkout"
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","interval":"yearly","business":true}`, bearer: seeded.owner})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","interval":"yearly","business":true}`, cookie: seeded.owner})
 	expectStatus(t, recorder, http.StatusOK)
 	if decodeBody[api.URLResponse](t, recorder).URL != "https://checkout.example.com/session" {
 		t.Fatalf("body = %s", recorder.Body.String())
@@ -124,15 +124,15 @@ func TestWorkspaceBillingCheckout(t *testing.T) {
 		{body: `{"plan_id":"pro","interval":"weekly"}`, code: "invalid_interval"},
 		{body: `{"plan_id":"pro"}`, code: "business_only"},
 	} {
-		rejected := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: test.body, bearer: seeded.owner})
+		rejected := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: test.body, cookie: seeded.owner})
 		expectError(t, rejected, http.StatusUnprocessableEntity, test.code)
 	}
 
 	environment.payments.checkoutErr = repository.ErrCheckoutPending
-	pending := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","business":true}`, bearer: seeded.owner})
+	pending := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","business":true}`, cookie: seeded.owner})
 	expectError(t, pending, http.StatusConflict, "checkout_pending")
 	environment.payments.checkoutErr = repository.ErrSubscriptionAlreadyPaid
-	paid := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","business":true}`, bearer: seeded.owner})
+	paid := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"plan_id":"pro","business":true}`, cookie: seeded.owner})
 	expectError(t, paid, http.StatusConflict, "already_paid")
 }
 
@@ -141,14 +141,14 @@ func TestWorkspaceBillingManagement(t *testing.T) {
 	seeded := seedBillingWorkspace(t, environment)
 	path := "/api/v1/workspaces/" + seeded.workspace.Slug + "/billing/manage"
 
-	free := environment.send(t, apiRequest{method: http.MethodGet, path: path, bearer: seeded.owner})
+	free := environment.send(t, apiRequest{method: http.MethodGet, path: path, cookie: seeded.owner})
 	expectError(t, free, http.StatusConflict, "no_billing_account")
 
 	_, err := environment.database.Exec(`UPDATE subscriptions SET provider_customer_id = $1 WHERE workspace_id = $2`, "customer-1", seeded.workspace.ID)
 	if err != nil {
 		t.Fatalf("set provider customer: %v", err)
 	}
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: path, bearer: seeded.owner})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: path, cookie: seeded.owner})
 	expectStatus(t, recorder, http.StatusOK)
 	if decodeBody[api.URLResponse](t, recorder).URL != "https://billing.example.com/portal" {
 		t.Fatalf("body = %s", recorder.Body.String())

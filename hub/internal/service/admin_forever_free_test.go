@@ -34,7 +34,7 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 		}
 	}
 
-	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour)
 	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{"operator@example.com"})
 	admin.UsePlans(subscriptions, repository.NewActivity(database))

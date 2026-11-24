@@ -35,6 +35,7 @@ type AdminUser struct {
 	Email              string     `json:"email"`
 	Name               string     `json:"name"`
 	EmailVerifiedAt    *time.Time `json:"email_verified_at"`
+	GitHubLogin        string     `json:"github_login"`
 	CreatedAt          time.Time  `json:"created_at"`
 	WorkspaceCount     int        `json:"workspace_count"`
 	ActiveSessionCount int        `json:"active_session_count"`
@@ -90,6 +91,7 @@ func NewAdminOverview(overview *model.AdminOverview) AdminOverview {
 			Email:              user.Email,
 			Name:               user.Name,
 			EmailVerifiedAt:    utcTime(user.EmailVerifiedAt),
+			GitHubLogin:        user.GitHubLogin,
 			CreatedAt:          user.CreatedAt.UTC(),
 			WorkspaceCount:     user.WorkspaceCount,
 			ActiveSessionCount: user.ActiveSessionCount,

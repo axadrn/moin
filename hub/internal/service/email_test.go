@@ -8,12 +8,12 @@ import (
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
 
-func TestEmailServiceBuildsMagicLinkMessage(t *testing.T) {
+func TestEmailServiceBuildsInvitationMessage(t *testing.T) {
 	provider := testutil.NewMemoryMailer()
 	service := NewEmailService(provider, "https://app.example.com", "Example App")
 
-	if err := service.SendMagicLinkEmail("reader@example.com", "secret-token", "Reader"); err != nil {
-		t.Fatalf("SendMagicLinkEmail() error = %v", err)
+	if err := service.SendWorkspaceInvitationEmail("reader@example.com", "secret-token", "Example Team", "Owner"); err != nil {
+		t.Fatalf("SendWorkspaceInvitationEmail() error = %v", err)
 	}
 	messages := provider.Messages()
 	if len(messages) != 1 {
@@ -23,14 +23,11 @@ func TestEmailServiceBuildsMagicLinkMessage(t *testing.T) {
 	if message.To != "reader@example.com" {
 		t.Fatalf("recipient = %q", message.To)
 	}
-	if !strings.Contains(message.Text, "https://app.example.com/auth/magic-link/secret-token") {
-		t.Fatalf("plain text message does not contain magic link: %q", message.Text)
+	if !strings.Contains(message.Text, "https://app.example.com/workspaces/invitations/secret-token") {
+		t.Fatalf("plain text message does not contain the invitation link: %q", message.Text)
 	}
-	if !strings.Contains(message.HTML, `href="https://app.example.com/auth/magic-link/secret-token"`) {
-		t.Fatalf("HTML message does not contain clickable magic link: %q", message.HTML)
-	}
-	if !strings.Contains(message.HTML, ">Sign in</a>") {
-		t.Fatalf("HTML message does not contain sign-in action: %q", message.HTML)
+	if !strings.Contains(message.HTML, `href="https://app.example.com/workspaces/invitations/secret-token"`) {
+		t.Fatalf("HTML message does not contain the clickable invitation link: %q", message.HTML)
 	}
 }
 
@@ -62,8 +59,6 @@ func TestActionEmailTemplatesRenderClickableLinks(t *testing.T) {
 		name    string
 		content emailContent
 	}{
-		{name: "Forgot password", content: forgotPasswordEmailTemplate(actionURL, "Example App")},
-		{name: "Magic link", content: magicLinkEmailTemplate(actionURL, "Example App")},
 		{name: "Welcome", content: welcomeEmailTemplate("Reader", actionURL, "Example App")},
 		{name: "Workspace invitation", content: workspaceInvitationEmailTemplate(actionURL, "Example Team", "Owner", "Example App")},
 		{name: "Email change verification", content: emailChangeVerificationTemplate("Reader", actionURL, "Example App")},

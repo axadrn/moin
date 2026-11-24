@@ -67,6 +67,7 @@ templ AdminUserFacts(user *model.AdminUser) {
 			@components.List() {
 				@adminFact("Email", user.Email)
 				@adminFact("Verified", adminYesNo(user.EmailVerifiedAt != nil))
+				@adminFact("GitHub", ifElse(user.GitHubLogin == "", "Not connected", user.GitHubLogin))
 				if user.IsAdmin {
 					@adminFact("Role", "Operator")
 				}

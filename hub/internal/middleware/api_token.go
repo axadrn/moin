@@ -35,8 +35,6 @@ func APITokenAuth(tokens *service.APITokenService, userService *service.UserServ
 				next.ServeHTTP(w, r)
 				return
 			}
-			user.PasswordSet = user.HasPassword()
-			user.PasswordHash = nil
 			ctx := ctxkeys.WithUser(r.Context(), user)
 			ctx = ctxkeys.WithAPIToken(ctx, token)
 			next.ServeHTTP(w, r.WithContext(ctx))

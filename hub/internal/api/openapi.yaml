@@ -11,23 +11,19 @@ info:
     the form links carry. A path or a field that names one takes its name, its ID with or
     without dashes, or a link part like `my-app-<id>`, whose last 32 characters count.
 
-    Authentication: sign in with one of the `/api/v1/auth` endpoints and send the returned
-    token as `Authorization: Bearer <token>`. A browser frontend on the same site may use
-    the `session_token` cookie instead. Cookie requests that change state need the
-    `X-CSRF-Token` header with the token from `GET /api/v1/csrf`. Requests with an
-    `Authorization: Bearer` header never use cookies and need no CSRF token. Other
-    schemes, such as Basic auth added by a proxy, keep the cookie and its CSRF check.
-
-    Cookie sign-in: a browser app on the same origin adds `?session=cookie` to a sign-in
-    endpoint. The answer then sets the HttpOnly `session_token` cookie and carries no token,
-    so scripts never see it. These sign-ins always need the `X-CSRF-Token` header.
+    Authentication: people sign in in the browser, with GitHub at `/auth/github`, and get
+    the `session_token` cookie. Cookie requests that change state need the `X-CSRF-Token`
+    header with the token from `GET /api/v1/csrf`. Scripts, the CLI and AI agents use a
+    personal API token instead. Requests with an `Authorization: Bearer` header never use
+    cookies and need no CSRF token. Other schemes, such as Basic auth added by a proxy,
+    keep the cookie and its CSRF check.
 
     Personal API tokens: a signed-in user creates them with `POST /api/v1/account/tokens`,
     or a CLI gets one by logging in through the browser (`POST /api/v1/auth/device`), and sends one as `Authorization: Bearer pat_...` from scripts, integrations and AI agents.
     A token acts for its user on the operations that list `apiTokenAuth`, with the scope the
     operation names: `read` for reads, `write` for changes. A token without that scope gets
     403 `insufficient_scope`, and a token on any other operation gets 403 `forbidden`.
-    Tokens never manage sessions, tokens, email, password, billing, admin or deletions.
+    Tokens never manage sessions, tokens, email, billing, admin or deletions.
     Tokens never change member roles or remove members.
     Each token is bound to one workspace: other workspaces answer 404 and are left out of
     lists.
@@ -44,19 +40,18 @@ info:
 servers:
   - url: /
 security:
-  - bearerAuth: []
   - cookieAuth: []
 tags:
   - name: Meta
     description: The API description, the product name and support address, and the CSRF token for cookie sessions.
   - name: Auth
-    description: Sign-in, onboarding and logout. Sign-in answers carry a bearer token and set no cookie, unless they ask for a cookie session with `session=cookie`.
+    description: Onboarding, logout, an email change and `moin login`. People sign in in the browser, see OAuth.
   - name: Account
     description: The signed-in account.
   - name: Sessions
     description: Active sessions of the signed-in account.
   - name: API tokens
-    description: Personal API tokens of the signed-in account. Only a signed-in session manages them. Recovering the account with a forgot password link, changing, setting or removing the password, and an admin signing the user out everywhere revoke every token. Signing out other sessions keeps them.
+    description: Personal API tokens of the signed-in account. Only a signed-in session manages them. An admin signing the user out everywhere revokes every token. Signing out other sessions keeps them.
   - name: Workspaces
     description: Workspaces, the team, invitations and activity.
   - name: Invitations
@@ -147,7 +142,6 @@ paths:
       summary: Get the version and the newest release
       description: The hub's version for everyone. A self-hosted hub (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted hub updates with every release and leaves these fields empty. `hub_backup` is how the backup of the hub's own database stands, for an admin in `ADMIN_EMAILS` on every hub.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -169,7 +163,6 @@ paths:
       summary: Update the hub to the newest release
       description: For an admin of a self-hosted hub. The updater next to it pulls the new image and restarts the hub, which copies its database and migrates it. If the new version does not answer within two minutes, the updater starts the old one again. Follow `update.state` with `GET /api/v1/version`: `requested`, `updating`, then `done`, `rolled_back` or `failed` with a `reason`. The activity of the workspace notes the start and the end.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -190,163 +183,6 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/auth/password:
-    post:
-      tags: [Auth]
-      operationId: signInWithPassword
-      summary: Sign in with email and password
-      security: []
-      parameters:
-        - $ref: '#/components/parameters/SessionMode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PasswordSignInRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/Session'
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '401':
-          description: '`invalid_credentials`. Wrong email or password, an unverified address, or an account without a password.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.email` or `fields.password`.'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-        '500':
-          $ref: '#/components/responses/Internal'
-
-  /api/v1/auth/magic-link:
-    post:
-      tags: [Auth]
-      operationId: sendMagicLink
-      summary: Email a sign-in link
-      description: |
-        Emails a link to `APP_URL/auth/magic-link/{token}` and creates the account when the
-        address is new. The answer is the same whether or not an account exists. The page at
-        that link calls `POST /api/v1/auth/magic-link/verify` with the token. While sign-up is
-        closed (`SIGNUPS_OPEN=false`, the default of a self-hosted hub), a new address
-        gets 403 `private`; admins and invited addresses still get a link.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EmailRequest'
-      responses:
-        '202':
-          description: The link is on its way when the address can receive one.
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-          description: '`private`: sign-up is closed; ask its admin for an invitation.'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.email`.'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-          description: '`rate_limited`. Too many links for this client IP or this address.'
-
-  /api/v1/auth/magic-link/verify:
-    post:
-      tags: [Auth]
-      operationId: verifyMagicLink
-      summary: Sign in with a magic link token
-      security: []
-      parameters:
-        - $ref: '#/components/parameters/SessionMode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/Session'
-        '400':
-          $ref: '#/components/responses/InvalidToken'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '500':
-          $ref: '#/components/responses/Internal'
-
-  /api/v1/auth/forgot-password:
-    post:
-      tags: [Auth]
-      operationId: sendForgotPasswordLink
-      summary: Email a password reset link
-      description: |
-        Emails a link to `APP_URL/auth/forgot-password/{token}`. The answer is the same whether
-        or not an account exists. The page at that link calls
-        `POST /api/v1/auth/forgot-password/verify` with the token.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EmailRequest'
-      responses:
-        '202':
-          description: The link is on its way when an account exists.
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.email`.'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-          description: '`rate_limited`. Too many links for this client IP or this address.'
-
-  /api/v1/auth/forgot-password/verify:
-    post:
-      tags: [Auth]
-      operationId: verifyForgotPassword
-      summary: Sign in with a password reset token
-      description: Removes the password, signs out every other session, revokes every personal API token, and returns a new session. Set a new password with `POST /api/v1/account/password/set`.
-      security: []
-      parameters:
-        - $ref: '#/components/parameters/SessionMode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/Session'
-        '400':
-          $ref: '#/components/responses/InvalidToken'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '500':
-          $ref: '#/components/responses/Internal'
-
   /api/v1/auth/email-change/verify:
     post:
       tags: [Auth]
@@ -354,11 +190,9 @@ paths:
       summary: Confirm an email change
       description: |
         Moves the pending address to the account, signs out every session of the account, and
-        returns a new session. A cookie caller also gets the new session cookie. The link in the
-        email points to `APP_URL/auth/verify-email-change/{token}`.
+        returns the user. A cookie caller gets a new session cookie. The link in the email
+        points to `APP_URL/auth/verify-email-change/{token}`.
       security: []
-      parameters:
-        - $ref: '#/components/parameters/SessionMode'
       requestBody:
         required: true
         content:
@@ -367,7 +201,16 @@ paths:
               $ref: '#/components/schemas/TokenRequest'
       responses:
         '200':
-          $ref: '#/components/responses/Session'
+          description: The address is changed.
+          headers:
+            Set-Cookie:
+              description: The new `session_token` cookie, for a cookie caller.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
         '400':
           $ref: '#/components/responses/InvalidToken'
         '403':
@@ -501,7 +344,7 @@ paths:
       tags: [Auth]
       operationId: signOut
       summary: Sign out
-      description: Revokes the session of the bearer token, or the cookie session and its cookie.
+      description: Revokes the cookie session and clears its cookie.
       responses:
         '204':
           description: The session is revoked.
@@ -520,7 +363,6 @@ paths:
       summary: Get the signed-in account
       description: Works before onboarding and reports `onboarding_required`.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -571,7 +413,6 @@ paths:
       operationId: updateAccountName
       summary: Change the display name
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -608,7 +449,6 @@ paths:
       summary: Turn email alerts on or off
       description: With `on`, the signed-in user gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; `email_alerts` in `GET /api/v1/account` says how it is set.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -672,87 +512,6 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
           description: '`rate_limited`. Too many email changes for this account or this address.'
-        '500':
-          $ref: '#/components/responses/Internal'
-
-  /api/v1/account/password:
-    post:
-      tags: [Account]
-      operationId: changePassword
-      summary: Change the password
-      description: Replaces the password, signs out every other session, and revokes every personal API token.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChangePasswordRequest'
-      responses:
-        '204':
-          description: The password is changed.
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-          description: '`password_not_set`. The account has no password, set one first.'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.current_password` or `fields.new_password`.'
-        '500':
-          $ref: '#/components/responses/Internal'
-    delete:
-      tags: [Account]
-      operationId: removePassword
-      summary: Remove the password
-      description: Makes the account passwordless, signs out every other session, and revokes every personal API token.
-      responses:
-        '204':
-          description: The password is removed.
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-          description: '`password_not_set`. The account has no password.'
-        '500':
-          $ref: '#/components/responses/Internal'
-
-  /api/v1/account/password/set:
-    post:
-      tags: [Account]
-      operationId: setPassword
-      summary: Add a password
-      description: Adds a password to a passwordless account, signs out every other session, and revokes every personal API token.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SetPasswordRequest'
-      responses:
-        '204':
-          description: The password is set.
-        '400':
-          $ref: '#/components/responses/InvalidBody'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-          description: '`password_already_set`. Change the password instead.'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.password`.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -895,7 +654,6 @@ paths:
       summary: Upload an avatar
       description: Replaces the avatar. The request is `multipart/form-data` with the image in the field `file`, at most 10 MB.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -934,7 +692,6 @@ paths:
       operationId: deleteAvatar
       summary: Remove the avatar
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -954,7 +711,6 @@ paths:
       summary: List servers
       description: By name.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -976,7 +732,6 @@ paths:
       summary: Add a server
       description: Answers the install command once. Its install token connects one daemon within an hour. An empty name gets the next free web-1, web-2 …
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1013,7 +768,6 @@ paths:
       summary: Stream servers
       description: 'Server-sent events. Each `servers` event carries the full `ServerList`: once on connect and again after every change. Comment lines keep the stream open.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1045,7 +799,6 @@ paths:
             schema:
               $ref: '#/components/schemas/RenameServerRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1073,7 +826,6 @@ paths:
       summary: Remove a server
       description: Disconnects its daemon. The daemon token stops working. The daemon stays installed on the server until you run `uninstall_command` there; it is empty when no daemon ever connected. `confirm` is the server's name.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       parameters:
@@ -1110,7 +862,6 @@ paths:
       summary: New install command
       description: A new install token and command for the server, shown this once, for one hour; moin stores only a fingerprint of it. The old install command stops working. A daemon that registers with it takes over the server, and the daemon token of the old one stops working.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1139,7 +890,6 @@ paths:
       summary: Update the daemon of a server
       description: The daemon downloads the binary this hub serves for its OS and CPU, from the hub URL it is registered with, checks it against the SHA-256 the hub sends, swaps it in and restarts through systemd. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs, without systemd, and when its server has rules in `/etc/moin/rules`; daemons older than the update say so with the command that updates them on the server.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1172,7 +922,6 @@ paths:
       summary: Is everything OK?
       description: What needs you, most urgent first, each with the path of the web page to fix it under the workspace; catalog apps a newer release is out for; and counts of what runs well. `ok` is false when an issue needs you; updates never make it false.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1196,7 +945,6 @@ paths:
       summary: List the catalog
       description: Every app of the catalog with its newest release. `latest` is null until the image registry answered.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1222,7 +970,6 @@ paths:
       summary: A catalog app
       description: One app of the catalog with every release, newest first. A release from GHCR has no date.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1251,7 +998,6 @@ paths:
       summary: Install a catalog app
       description: Creates the app on the server, generates every secret its compose.yml needs as an env var, sets VERSION and deploys it from the app's bucket. An empty version takes the newest release, an empty name the slug.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1294,7 +1040,6 @@ paths:
       summary: List apps
       description: What needs you first (a failed deploy, an offline server), then what deploys, then pinned apps, then the rest by name, with the newest and the live deploy of each.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1316,7 +1061,6 @@ paths:
       summary: Add an app
       description: The name is also the compose project on the server.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1356,7 +1100,6 @@ paths:
       summary: Pin or unpin an app
       description: With `pinned` true, every list of the workspace shows the app above the others that run fine, on every surface. The activity records it.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       parameters:
@@ -1400,7 +1143,6 @@ paths:
       summary: Stream apps
       description: 'Server-sent events. Each `apps` event carries the full `AppList`: once on connect and again after every change. Comment lines keep the stream open.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1426,7 +1168,6 @@ paths:
       summary: Get an app
       description: The app and its 20 newest deploys, without logs.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1457,7 +1198,6 @@ paths:
             schema:
               $ref: '#/components/schemas/RenameAppRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1485,7 +1225,6 @@ paths:
       summary: Remove an app
       description: The daemon stops the app and removes its containers and images. Volumes and data stay on the server. `confirm` is the app's name.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       parameters:
@@ -1519,7 +1258,6 @@ paths:
       summary: Deploy
       description: 'Starts a deploy. `{"image": "..."}` deploys an image built elsewhere as the main service. For an app that follows a GitHub repo, the compose file comes from `ref` there, a branch, tag or commit, the linked branch without one; an app without a repo keeps the compose file of the live deploy and answers `no_repo` to a `ref`. `{"ref": "main"}` alone has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1572,7 +1310,6 @@ paths:
       summary: Get a deploy
       description: With its log so far.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1602,7 +1339,6 @@ paths:
       summary: Stream a deploy
       description: 'Server-sent events. A `line` event `{"line": "..."}` per log line, then one `done` event with the `Deploy`. A finished deploy streams its whole log, then `done`.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1631,7 +1367,6 @@ paths:
       summary: Roll back
       description: Starts the images of an earlier successful deploy again, with the env it had. Number 0 or none means the one before the live deploy. The server keeps the last 5 deploys.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1673,7 +1408,6 @@ paths:
       summary: Update a catalog app
       description: Sets VERSION to the version, the newest release when empty, and deploys the app's compose.yml from the catalog. moin remembers the moment before, so a restore can go back to it. An older version goes too, but its migrations may not go back.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1718,7 +1452,6 @@ paths:
       summary: Redeploy
       description: Builds the source of the newest deploy that had one again, with the env as it is now.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1750,7 +1483,6 @@ paths:
       summary: Create a deploy hook
       description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. One thing brings new versions: it turns deploy on push off and keeps the linked GitHub repo, whose compose file each hook deploy takes. CI calls `POST <url>` after pushing an image, with `{"image": "ghcr.io/me/app:tag", "commit": "<sha>"}` or `?image=&commit=`, the commit the image was built from; without a commit, the head of the linked branch. An app without a repo keeps the compose file of the live deploy and refuses a commit with `409` `no_repo`. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs a build of its repo, gets `422` `validation_failed` on `image`. A commit that is no name or that GitHub does not know gets `422` on `commit`.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1775,7 +1507,6 @@ paths:
       summary: Turn the deploy hook off
       description: The hook URL stops working and CI can no longer deploy the app. A new hook can be made again later. Answers 204 also when the app had no hook. Works while the plan allows no changes.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1798,7 +1529,6 @@ paths:
       summary: List registry logins
       description: The logins daemons use to pull private images, without passwords.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -1829,7 +1559,6 @@ paths:
       summary: Set a registry login
       description: Stores the login sealed with AES-256-GCM. Image deploys from this host pull with it.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -1863,7 +1592,6 @@ paths:
       operationId: deleteRegistry
       summary: Remove a registry login
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1888,7 +1616,6 @@ paths:
       summary: Restart an app
       description: Starts the live deploy again with the env vars, domains and protection as they are now, without a build. A stopped app runs again.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1920,7 +1647,6 @@ paths:
       summary: Start an app
       description: Runs a stopped app again. Like a restart, it takes the env vars, domains and protection as they are now.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1952,7 +1678,6 @@ paths:
       summary: Stop an app
       description: Stops the containers of the app. They stay stopped, also after a reboot of the server, until a deploy, a restart or a start. Data and settings stay. Changes to domains and protection wait for the start.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -1982,7 +1707,6 @@ paths:
       summary: Check domains
       description: Looks up every domain of the app and says whether it points at the address its server's daemon connects from.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2007,7 +1731,6 @@ paths:
       summary: Set domains
       description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-moin` block of compose.yml wins for every field it sets.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -2052,7 +1775,6 @@ paths:
       summary: Get the instant address
       description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one moin made, shown with `show=true`, which needs a token with read and write access.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       parameters:
@@ -2085,7 +1807,6 @@ paths:
       summary: Set the instant address
       description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it. The change waits for the next restart. Empty `provider` keeps it; no `open` keeps the password as it is. `x-moin.instant` in compose.yml wins.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -2127,7 +1848,6 @@ paths:
       summary: Protect with a password
       description: Puts basic auth in front of the app. Only a bcrypt hash is stored.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -2164,7 +1884,6 @@ paths:
       operationId: deleteProtection
       summary: Remove the password
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2201,7 +1920,6 @@ paths:
             minimum: 1
             maximum: 1000
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2247,7 +1965,6 @@ paths:
         app's env values masked, and the exit code, never the output. A
         server with `exec: off` in its rules refuses it.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -2314,7 +2031,6 @@ paths:
       summary: List databases
       description: The databases of the live deploy, SQLite files the daemon found on its volumes and services that run Postgres.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2349,7 +2065,6 @@ paths:
           schema:
             type: string
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2406,7 +2121,6 @@ paths:
             minimum: 1
             maximum: 500
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2442,7 +2156,6 @@ paths:
             schema:
               $ref: '#/components/schemas/InsertRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2477,7 +2190,6 @@ paths:
             schema:
               $ref: '#/components/schemas/RowRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2512,7 +2224,6 @@ paths:
             schema:
               $ref: '#/components/schemas/RowRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2551,7 +2262,6 @@ paths:
             schema:
               $ref: '#/components/schemas/QueryRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2588,7 +2298,6 @@ paths:
       summary: List backups
       description: How the app is backed up (how often, how long) and for every database its copies in your bucket, the states before restores, the newest daily check and the moments a restore can go back to. The copies and the undos come newest first; a copy moin took before a deploy, a data edit or a catalog update is named after it, like "Before v12". Read from the server and the bucket.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2625,7 +2334,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BackupSchedule'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2662,7 +2370,6 @@ paths:
             schema:
               $ref: '#/components/schemas/DownloadRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2696,7 +2403,6 @@ paths:
       summary: Get uptime
       description: The state of the app as a whole and, per domain, the path uptime visits, its state, the last visit with the HTTP status, response time and certificate expiry, uptime over 24 hours, 7 and 30 days, the average response time and the last outages.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2737,7 +2443,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UptimeRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2770,7 +2475,6 @@ paths:
       summary: Get app metrics
       description: 'CPU, memory and network of the app''s running containers added up: the newest sample, the points over the range, and the deploys that went live in it, to mark on a chart. CPU is the app''s share of the whole server in percent. `now` is null when the daemon sent nothing for two minutes, such as for a stopped app or a daemon before metrics.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2808,7 +2512,6 @@ paths:
             schema:
               $ref: '#/components/schemas/RestoreRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2851,7 +2554,6 @@ paths:
       summary: Get a restore
       description: How a restore stands, `running` (or `unknown` while its server is offline), then `done` or `failed` with `error`. moin keeps it a week, also across restarts of the hub.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2878,7 +2580,6 @@ paths:
       summary: List buckets
       description: The workspace's buckets, the default first, without their secret keys, each with the apps that use it.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2906,7 +2607,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BucketRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2935,7 +2635,6 @@ paths:
       summary: Get a bucket
       description: One bucket, without its secret key.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -2966,7 +2665,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BucketRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -2994,7 +2692,6 @@ paths:
       summary: Remove a bucket
       description: Forgets a bucket. A bucket that apps use, or that keeps older backups of an app, is refused. What is in the bucket stays. `confirm` is the bucket's name.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       parameters:
@@ -3032,7 +2729,6 @@ paths:
             schema:
               $ref: '#/components/schemas/AppBucketRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3062,7 +2758,6 @@ paths:
       summary: List alert destinations
       description: Every alert destination of the workspace, without its URL, bot token or signing secret. `hint` shows the host and the last characters. `failing` says sends to it fail since `failing_since`, with `last_error`. Every member may list them.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3090,7 +2785,6 @@ paths:
             schema:
               $ref: '#/components/schemas/AlertDestinationRequest'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3127,7 +2821,6 @@ paths:
       summary: Remove an alert destination
       description: Only owners and admins.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3153,7 +2846,6 @@ paths:
       summary: Send a test alert
       description: Sends a test alert to the destination and waits up to 10 seconds for it to take it. A webhook gets `"event":"test"`. Only owners and admins.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3187,7 +2879,6 @@ paths:
       summary: GitHub connection
       description: Where the moin GitHub App is installed, the link that connects GitHub, and the link that installs it on another account or organization.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3234,7 +2925,6 @@ paths:
       summary: List repos
       description: Every repo the user's installations of the moin GitHub App may read.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3288,7 +2978,6 @@ paths:
       summary: List branches
       description: The branches of a repo moin may read, the default branch first.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3341,7 +3030,6 @@ paths:
                 auto_deploy:
                   type: boolean
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3371,7 +3059,6 @@ paths:
       operationId: deleteAppRepo
       summary: Unlink the repo
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3416,7 +3103,6 @@ paths:
                 firewall:
                   type: boolean
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3457,7 +3143,6 @@ paths:
       summary: Get server metrics
       description: 'CPU, memory, the disk that holds the apps'' data, network and load of a server: the newest sample, the points over the range, and every app on it with its newest sample, the one with the most memory first. `now` is null when the daemon sent nothing for two minutes.'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3487,7 +3172,6 @@ paths:
       summary: Get integrations
       description: Whether a Cloudflare API token and a Tailscale auth key are stored. The keys never come back.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3520,7 +3204,6 @@ paths:
                 tailscale_key:
                   type: string
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3550,7 +3233,6 @@ paths:
       summary: Get automatic daemon updates
       description: Whether the daemons of the workspace update to the hub's version by themselves. On by default.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3578,7 +3260,6 @@ paths:
             schema:
               $ref: '#/components/schemas/DaemonUpdates'
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3607,7 +3288,6 @@ paths:
       summary: Get env vars
       description: In plain text. Tokens need the write scope, because reading secrets is as strong as writing them.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3632,7 +3312,6 @@ paths:
       summary: Set env vars
       description: Sets and removes env vars. They are stored encrypted and take effect with the next deploy. A rollback keeps the env of its deploy.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -3670,7 +3349,6 @@ paths:
       summary: Replace all env vars
       description: Makes the sent env vars the app's, all at once, like one .env file. What is new or changed is set, keys not sent are removed. Answers what changed. They take effect with the next deploy.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -3709,7 +3387,6 @@ paths:
       operationId: listWorkspaces
       summary: List workspaces
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3765,7 +3442,6 @@ paths:
       summary: Get a workspace
       description: The workspace, the role and permissions of the caller, members, pending invitations for members who may manage them, and seats.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -3816,7 +3492,6 @@ paths:
       summary: Rename a workspace
       description: The slug, the name in the workspace's links, follows the name. Links count the ID, so old ones keep working.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -3857,7 +3532,6 @@ paths:
       summary: Invite a member
       description: Emails an invitation link to `APP_URL/workspaces/invitations/{token}`. The invitation appears in `GET /api/v1/workspaces/{workspaceSlug}`.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       requestBody:
@@ -3899,7 +3573,6 @@ paths:
       operationId: revokeInvitation
       summary: Revoke an invitation
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -3925,7 +3598,6 @@ paths:
       summary: Resend an invitation
       description: Revokes the invitation and sends a new one, so the invitation ID changes.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [write]
       responses:
@@ -4073,7 +3745,6 @@ paths:
           schema:
             type: string
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -4137,7 +3808,6 @@ paths:
           schema:
             type: string
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -4174,7 +3844,6 @@ paths:
       summary: Get the workspace subscription and plans
       description: Only members who may manage billing.
       security:
-        - bearerAuth: []
         - cookieAuth: []
         - apiTokenAuth: [read]
       responses:
@@ -4388,7 +4057,7 @@ paths:
       tags: [OAuth]
       operationId: startGitHubSignIn
       summary: Start GitHub sign-in
-      description: Open in a browser, not with fetch. Redirects to GitHub, which returns to `API_URL/auth/github/callback`. `API_URL` defaults to `APP_URL`.
+      description: Open in a browser, not with fetch. Redirects to the GitHub App's sign-in, which returns to `APP_URL/auth/github/callback`. Only with the GitHub App set up; else it goes to `/auth`.
       security: []
       responses:
         '307':
@@ -4403,7 +4072,7 @@ paths:
       tags: [OAuth]
       operationId: finishGitHubSignIn
       summary: Finish GitHub sign-in
-      description: GitHub redirects the browser here. On success the browser gets the `session_token` cookie and goes to the app or to onboarding.
+      description: GitHub redirects the browser here. The GitHub account signs in by its id; the first time, by its verified primary email, to an account with that verified address and no GitHub account yet. A new account needs open sign-up or the invitation this browser opened. On success the browser gets a new `session_token` cookie and goes to the app or to onboarding. After `/auth/github/connect` it connects the GitHub account to the signed-in user instead.
       security: []
       parameters:
         - $ref: '#/components/parameters/OAuthCode'
@@ -4425,12 +4094,54 @@ paths:
         '429':
           description: Too many attempts from this client IP.
 
+  /auth/github/connect:
+    get:
+      tags: [OAuth]
+      operationId: connectGitHub
+      summary: Connect GitHub to the signed-in account
+      description: Open in a browser, not with fetch. For an account without a GitHub account, such as after a recovery key. Redirects to GitHub, which returns to `APP_URL/auth/github/callback`, and the GitHub account then signs in to this account. A GitHub account that signs in to another account is refused.
+      security:
+        - cookieAuth: []
+      responses:
+        '307':
+          description: Redirect to GitHub.
+        '303':
+          description: Not possible for this session, such as during impersonation or with GitHub connected already. Redirect to the app.
+        '429':
+          description: Too many attempts from this client IP.
+
+  /auth/key:
+    post:
+      tags: [OAuth]
+      operationId: signInWithRecoveryKey
+      summary: Sign in with a recovery key
+      description: 'A form post from the page `GET /auth/key`, not JSON. The key comes from the server command `recovery-key <email>`: it works once, for an hour. On success the browser gets a new `session_token` cookie and goes to the security settings, to connect GitHub.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                  description: The key, in any case, with or without its dashes.
+      responses:
+        '303':
+          description: Signed in. Redirect to the security settings, or to onboarding.
+        '200':
+          description: The key is wrong, used or expired. The page with the error.
+          content:
+            text/html:
+              schema:
+                type: string
+        '429':
+          description: Too many attempts from this client IP.
+
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      description: The `token` from a sign-in endpoint. It is the session and expires with it.
     cookieAuth:
       type: apiKey
       in: cookie
@@ -4465,14 +4176,6 @@ components:
       schema:
         type: string
         enum: ['1h', '24h', '7d', '30d']
-    SessionMode:
-      name: session
-      in: query
-      required: false
-      description: '`cookie` sets the HttpOnly `session_token` cookie and answers without the token. A session the browser already had in that cookie is revoked. Such a request always needs the `X-CSRF-Token` header. Leave it out for a bearer token.'
-      schema:
-        type: string
-        enum: [cookie]
     SessionID:
       name: id
       in: path
@@ -4574,19 +4277,6 @@ components:
         type: string
 
   responses:
-    Session:
-      description: 'A new session. Send `token` as `Authorization: Bearer <token>`. With `session=cookie` the answer is a `CookieSession` and the token is only in the cookie.'
-      headers:
-        Set-Cookie:
-          description: The HttpOnly `session_token` cookie, only with `session=cookie`.
-          schema:
-            type: string
-      content:
-        application/json:
-          schema:
-            oneOf:
-              - $ref: '#/components/schemas/SessionToken'
-              - $ref: '#/components/schemas/CookieSession'
     InvalidBody:
       description: '`invalid_body`. The body is empty, not valid JSON, has unknown fields, or is larger than 1 MiB.'
       content:
@@ -4881,40 +4571,6 @@ components:
         invitation_token:
           type: string
           description: The token of the workspace invitation the person arrived with. An unknown, used, revoked, expired or foreign invitation is ignored and the default workspace is created.
-    PasswordSignInRequest:
-      type: object
-      additionalProperties: false
-      required: [email, password]
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
-    ChangePasswordRequest:
-      type: object
-      additionalProperties: false
-      required: [current_password, new_password]
-      properties:
-        current_password:
-          type: string
-          format: password
-        new_password:
-          type: string
-          format: password
-          minLength: 12
-          description: 12 to 72 bytes, not a common password.
-    SetPasswordRequest:
-      type: object
-      additionalProperties: false
-      required: [password]
-      properties:
-        password:
-          type: string
-          format: password
-          minLength: 12
-          description: 12 to 72 bytes, not a common password.
     DeleteAccountRequest:
       type: object
       additionalProperties: false
@@ -4925,7 +4581,7 @@ components:
           description: The account email address, compared without case.
     User:
       type: object
-      required: [id, email, name, password_set, email_alerts, created_at]
+      required: [id, email, name, github_login, email_alerts, created_at]
       properties:
         id:
           type: string
@@ -4935,8 +4591,9 @@ components:
         name:
           type: string
           description: Empty until onboarding.
-        password_set:
-          type: boolean
+        github_login:
+          type: string
+          description: The GitHub account the user signs in with, like `octocat`. Empty until one is connected.
         email_alerts:
           type: boolean
           description: Mails when a site or a server goes down or comes back, or a deploy fails, in the workspaces the user owns or runs as admin. Set it with `PUT /api/v1/account/email-alerts`.
@@ -4947,29 +4604,6 @@ components:
       type: object
       required: [user]
       properties:
-        user:
-          $ref: '#/components/schemas/User'
-    CookieSession:
-      type: object
-      additionalProperties: false
-      required: [expires_at, user]
-      description: A sign-in with `session=cookie`. The token is only in the HttpOnly `session_token` cookie.
-      properties:
-        expires_at:
-          type: string
-          format: date-time
-        user:
-          $ref: '#/components/schemas/User'
-    SessionToken:
-      type: object
-      required: [token, expires_at, user]
-      properties:
-        token:
-          type: string
-          description: The bearer token. It is shown once.
-        expires_at:
-          type: string
-          format: date-time
         user:
           $ref: '#/components/schemas/User'
     Account:
@@ -6997,7 +6631,7 @@ components:
           type: integer
     AdminUser:
       type: object
-      required: [id, email, name, email_verified_at, created_at, workspace_count, active_session_count, is_admin]
+      required: [id, email, name, email_verified_at, github_login, created_at, workspace_count, active_session_count, is_admin]
       properties:
         id:
           type: string
@@ -7009,6 +6643,9 @@ components:
         email_verified_at:
           type: [string, 'null']
           format: date-time
+        github_login:
+          type: string
+          description: The GitHub account the user signs in with. Empty until one is connected.
         created_at:
           type: string
           format: date-time

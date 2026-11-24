@@ -24,7 +24,7 @@ func TestOldDomain(t *testing.T) {
 		{"GET", "old.example.com", "/daemon/session", http.StatusTeapot, "", "https://moin.example.com"},
 		{"GET", "old.example.com", "/download/moin-linux-arm64", http.StatusTeapot, "", "https://moin.example.com"},
 		{"POST", "old.example.com", "/webhooks/github", http.StatusTeapot, "", "https://moin.example.com"},
-		{"POST", "old.example.com", "/auth/magic-link", http.StatusTeapot, "", "https://moin.example.com"},
+		{"POST", "old.example.com", "/auth/key", http.StatusTeapot, "", "https://moin.example.com"},
 		{"GET", "moin.example.com", "/app/acme", http.StatusTeapot, "", ""},
 	} {
 		request := httptest.NewRequest(test.method, "http://"+test.host+test.path, nil)

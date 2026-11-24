@@ -9,13 +9,15 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-// User is the public JSON shape of an account. It never carries the password
-// hash or any token.
+// User is the public JSON shape of an account. It never carries a key or
+// any token.
 type User struct {
-	ID          string `json:"id"`
-	Email       string `json:"email"`
-	Name        string `json:"name"`
-	PasswordSet bool   `json:"password_set"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	// GitHubLogin is the GitHub account the user signs in with, like
+	// octocat, or "" before one is connected.
+	GitHubLogin string `json:"github_login"`
 	// EmailAlerts mails the user when a site or a server goes down or
 	// comes back, or a deploy fails, in the workspaces they own or run as
 	// admin.
@@ -29,25 +31,10 @@ func NewUser(user *model.User) User {
 		ID:          user.ID,
 		Email:       user.Email,
 		Name:        user.Name,
-		PasswordSet: user.HasPassword(),
+		GitHubLogin: user.GitHubLogin,
 		EmailAlerts: user.EmailAlerts,
 		CreatedAt:   user.CreatedAt.UTC(),
 	}
-}
-
-// SessionToken is the answer of every sign-in endpoint. The token is the
-// bearer credential for the Authorization header.
-type SessionToken struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
-	User      User      `json:"user"`
-}
-
-// CookieSession is the answer of a sign-in with ?session=cookie. The token
-// is only in the HttpOnly session cookie, never in the body.
-type CookieSession struct {
-	ExpiresAt time.Time `json:"expires_at"`
-	User      User      `json:"user"`
 }
 
 // UserResponse wraps a user for endpoints that answer {"user": ...}.

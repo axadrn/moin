@@ -16,7 +16,7 @@ func TestVersionOnTheHostedHub(t *testing.T) {
 	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: testAdminEmail, Name: "Ada", Verified: true})
 	token := environment.signIn(t, user.User.ID)
 
-	response := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/version", bearer: token})
+	response := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/version", cookie: token})
 	if response.Code != http.StatusOK {
 		t.Fatalf("GET version = %d %s", response.Code, response.Body)
 	}
@@ -27,20 +27,20 @@ func TestVersionOnTheHostedHub(t *testing.T) {
 	if version["version"] != "v0.2.0" || version["self_hosted"] != false || version["update_available"] != false || version["can_update"] != false || version["update"] != nil {
 		t.Fatalf("version = %v", version)
 	}
-	update := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/version/update", bearer: token})
+	update := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/version/update", cookie: token})
 	if update.Code != http.StatusConflict || !json.Valid(update.Body.Bytes()) {
 		t.Fatalf("POST update = %d %s", update.Code, update.Body)
 	}
 
-	auto := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/daemon-updates", bearer: token})
+	auto := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/daemon-updates", cookie: token})
 	if auto.Code != http.StatusOK || auto.Body.String() != "{\"auto\":true}\n" {
 		t.Fatalf("GET daemon-updates = %d %s", auto.Code, auto.Body)
 	}
-	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/daemon-updates", body: `{"auto":false}`, bearer: token})
+	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/daemon-updates", body: `{"auto":false}`, cookie: token})
 	if off.Code != http.StatusOK || off.Body.String() != "{\"auto\":false}\n" {
 		t.Fatalf("PUT daemon-updates = %d %s", off.Code, off.Body)
 	}
-	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/daemon-updates", body: `{}`, bearer: token})
+	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/daemon-updates", body: `{}`, cookie: token})
 	if invalid.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("PUT daemon-updates {} = %d %s", invalid.Code, invalid.Body)
 	}
