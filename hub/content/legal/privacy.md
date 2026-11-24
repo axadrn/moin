@@ -38,7 +38,7 @@ Your light or dark theme and a few view choices stay in your browser's local sto
 
 ## Your account
 
-For your account we store your email address and, if you add them, your name and avatar. You sign in with GitHub: we ask GitHub for your account's ID, its username and its verified primary email address, and store the ID and the username with your account. If you add a passkey, we store its public key, a name such as the password manager that keeps it, and when you added and last used it; the secret half never leaves your device. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and recovery keys are stored only as cryptographic hashes.
+For your account we store your email address and, if you add them, your name and avatar. You sign in with GitHub: we ask GitHub for your account's ID, its username and its verified primary email address, and store the ID and the username with your account. If you add a passkey, we store its public key and when you added and last used it; the secret half never leaves your device. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and recovery keys are stored only as cryptographic hashes.
 
 We send only emails that belong to the service: invitations, changes to your account, and important changes to moin. No newsletters or marketing emails.
 

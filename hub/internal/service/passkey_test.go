@@ -395,13 +395,3 @@ func TestPasskeysNeedADomain(t *testing.T) {
 		t.Fatalf("BeginAdd() error = %v, want ErrPasskeysOff", err)
 	}
 }
-
-func TestPasskeyName(t *testing.T) {
-	icloud := []byte{0xfb, 0xfc, 0x30, 0x07, 0x15, 0x4e, 0x4e, 0xcc, 0x8c, 0x0b, 0x6e, 0x02, 0x05, 0x57, 0xd7, 0xbd}
-	if name := passkeyName(icloud); name != "iCloud Keychain" {
-		t.Fatalf("passkeyName(iCloud) = %q", name)
-	}
-	if name := passkeyName(make([]byte, 16)); name != "Passkey" {
-		t.Fatalf("passkeyName(zero) = %q", name)
-	}
-}

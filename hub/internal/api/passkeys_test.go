@@ -14,7 +14,7 @@ import (
 func TestPasskeysListAndRemove(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	owner := seedTokenOwner(t, environment, "keeper")
-	environment.database.MustExec(`INSERT INTO passkeys (id, user_id, credential_id, credential, name) VALUES ('p1', $1, x'01', '{"secret":"credential"}', 'iCloud Keychain')`, owner.id)
+	environment.database.MustExec(`INSERT INTO passkeys (id, user_id, credential_id, credential, name) VALUES ('p1', $1, x'01', '{"secret":"credential"}', 'Passkey')`, owner.id)
 
 	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/passkeys", cookie: owner.session})
 	expectStatus(t, recorder, http.StatusOK)
@@ -22,7 +22,7 @@ func TestPasskeysListAndRemove(t *testing.T) {
 		t.Fatalf("the list shows the credential: %s", recorder.Body.String())
 	}
 	list := decodeBody[api.PasskeyList](t, recorder)
-	if len(list.Items) != 1 || list.Items[0].ID != "p1" || list.Items[0].Name != "iCloud Keychain" || list.Items[0].LastUsedAt != nil {
+	if len(list.Items) != 1 || list.Items[0].ID != "p1" || list.Items[0].Name != "Passkey" || list.Items[0].LastUsedAt != nil {
 		t.Fatalf("items = %#v", list.Items)
 	}
 

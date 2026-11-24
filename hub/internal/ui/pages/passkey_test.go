@@ -49,11 +49,11 @@ func TestSettingsListsPasskeys(t *testing.T) {
 	ctx = ctxkeys.WithRenderConfig(ctx, config.RenderConfig{Passkeys: true})
 	used := time.Now().Add(-2 * time.Hour)
 	passkeys := []model.Passkey{
-		{ID: "p1", Name: "iCloud Keychain", CreatedAt: time.Now().Add(-72 * time.Hour), LastUsedAt: &used},
+		{ID: "p1", Name: "Passkey", CreatedAt: time.Now().Add(-72 * time.Hour), LastUsedAt: &used},
 		{ID: "p2", Name: "Passkey", CreatedAt: time.Now()},
 	}
 	page := renderPage(t, ctx, Settings(nil, "", passkeys, "security"))
-	for _, want := range []string{"Passkeys", "iCloud Keychain", "Added 3d ago, last used 2h ago", "Added just now, never used", `hx-delete="/app/tiny-rocket-co/settings/passkeys/p1"`, "Add passkey", `data-passkey="add"`, `data-passkey-url="/app/tiny-rocket-co/settings/passkeys"`, "js/passkey.js"} {
+	for _, want := range []string{"Passkeys", "Added 3d ago, last used 2h ago", "Added just now, never used", `hx-delete="/app/tiny-rocket-co/settings/passkeys/p1"`, "Add passkey", `data-passkey="add"`, `data-passkey-url="/app/tiny-rocket-co/settings/passkeys"`, "js/passkey.js"} {
 		if !strings.Contains(page, want) {
 			t.Fatalf("the security tab lacks %s", want)
 		}

@@ -43,8 +43,8 @@ func (s *EmailService) SendEmailChangeNotification(oldEmail, newEmail, userName 
 }
 
 // SendPasskeyAdded tells the user a passkey was added to their account, at.
-func (s *EmailService) SendPasskeyAdded(email, name, passkeyName string, at time.Time) error {
-	return s.send("passkey_added", email, passkeyAddedTemplate(name, passkeyName, at, s.appName))
+func (s *EmailService) SendPasskeyAdded(email, name string, at time.Time) error {
+	return s.send("passkey_added", email, passkeyAddedTemplate(name, at, s.appName))
 }
 
 func (s *EmailService) SendAccountDeletedEmail(email, name string) error {

@@ -69,7 +69,7 @@ func emailChangeNotificationTemplate(name, newEmail, appName string) emailConten
 
 // passkeyAddedTemplate tells a user a passkey was added to their account,
 // so one nobody expected does not go unseen.
-func passkeyAddedTemplate(name, passkeyName string, at time.Time, appName string) emailContent {
+func passkeyAddedTemplate(name string, at time.Time, appName string) emailContent {
 	greeting := "Hi,"
 	if name != "" {
 		greeting = fmt.Sprintf("Hi %s,", name)
@@ -80,7 +80,7 @@ func passkeyAddedTemplate(name, passkeyName string, at time.Time, appName string
 		Heading:   "A passkey was added",
 		Greeting:  greeting,
 		Intro: []string{
-			fmt.Sprintf("A passkey (%s) was added to your %s account on %s.", passkeyName, appName, at.UTC().Format("January 2, 2006 at 15:04 UTC")),
+			fmt.Sprintf("A passkey was added to your %s account on %s.", appName, at.UTC().Format("January 2, 2006 at 15:04 UTC")),
 			"It signs in to your account from now on.",
 		},
 		Outro:   []string{"If this was not you, sign in, remove the passkey under Settings, Account, Security, and use Sign out everywhere."},

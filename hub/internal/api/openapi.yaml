@@ -4714,7 +4714,7 @@ components:
           type: string
         name:
           type: string
-          description: The provider of the passkey when it is a known one, like "iCloud Keychain", else "Passkey".
+          description: Always "Passkey"; `created_at` and `last_used_at` tell passkeys apart.
         created_at:
           type: string
           format: date-time
