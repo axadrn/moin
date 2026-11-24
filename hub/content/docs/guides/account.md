@@ -1,6 +1,6 @@
 ---
 title: "Account and tokens"
-description: "Your name, email, GitHub sign-in, sessions, the CLI login and API tokens"
+description: "Your name, email, GitHub and passkey sign-in, sessions, the CLI login and API tokens"
 group: "Team"
 order: 3
 ---
@@ -65,10 +65,12 @@ A token cannot be renamed or get more rights: make a new one and revoke the old 
 
 ## Sign up and sign in
 
-With GitHub. No passwords, no links by email. The first sign-in asks for your name and your first workspace's name. Someone invited gives only a name.
+You sign up with GitHub. No passwords, no links by email. The first sign-in asks for your name and your first workspace's name. Someone invited gives only a name.
+
+Then you sign in with GitHub or with a [passkey](#add-a-passkey).
 
 ```surfaces
-Web: the sign-in page, **Continue with GitHub**
+Web: the sign-in page, **Continue with GitHub** or **Sign in with a passkey**
 API: POST /api/v1/auth/onboarding
 ```
 
@@ -76,6 +78,30 @@ API: POST /api/v1/auth/onboarding
 - An account from before GitHub finds yours by GitHub's verified primary email, once.
 - An invitation lets you in with any GitHub account. [Team](/docs/guides/team#invite-someone)
 - How it stays safe: [Security](/docs/guides/security#sign-in).
+
+## Add a passkey
+
+A passkey is a second way in, next to GitHub. It lives on your phone, laptop or password manager, and you unlock it with your face, finger or screen lock. Add one. Everyone should: nobody can phish it, and it lets you in when GitHub is down or lost. [Why](/docs/guides/security#add-a-passkey-everyone-should)
+
+```surfaces
+Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Add passkey**
+```
+
+- Your browser asks where to keep it. Pick your password manager to have it on every device.
+- moin emails you when a passkey is added, so one you did not add does not go unseen.
+- Until you have one, every page asks: **Secure your account: add a passkey.**
+- On the sign-in page, **Sign in with a passkey**. No email to type: the passkey knows your account.
+
+## See and remove passkeys
+
+The card lists each passkey, when you added it and when it last signed you in. **Remove** ends one.
+
+```surfaces
+Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Remove**
+API: GET /api/v1/account/passkeys
+```
+
+`DELETE /api/v1/account/passkeys/{id}` removes one. Your last way in stays: without GitHub, moin keeps your last passkey. Add another first.
 
 ## Connect GitHub
 
@@ -87,11 +113,11 @@ Web: **Settings**, **Account**, **Security** tab, **GitHub**, **Connect GitHub**
 
 The card shows **Connected as** and your GitHub login once it is done. `github_login` in `GET /api/v1/account` says the same.
 
-## Lost your GitHub account
+## Lost your GitHub account or passkey
 
-Ask the admin of your hub for a recovery key. They run `./main recovery-key <email>` on the server. Enter the key at `/auth/key`. It works once, for an hour.
+Sign in the other way, if you have one. Else ask the admin of your hub for a recovery key. They run `./main recovery-key <email>` on the server. Enter the key at `/auth/key`. It works once, for an hour.
 
-The key signs you out everywhere and disconnects GitHub, so the old GitHub account no longer gets in. Then connect your GitHub again under **Settings**, **Account**, **Security**. [Recovery key](/docs/self-hosting#recovery-key)
+The key resets every way in. It signs you out everywhere, disconnects GitHub and deletes your passkeys, so a lost GitHub account or device no longer gets in. Then connect your GitHub and add a passkey again under **Settings**, **Account**, **Security**. [Recovery key](/docs/self-hosting#recovery-key)
 
 ```surfaces
 Web: `/auth/key`, **Key from the terminal**, **Sign in**
@@ -116,7 +142,7 @@ API: POST /api/v1/account/avatar
 
 ## Change your email
 
-Links and notices go to the new address once you click the link moin sends there. The link signs you out everywhere. A browser signed in to this account stays in; anywhere else, sign in again with GitHub. The link never signs anyone in.
+Links and notices go to the new address once you click the link moin sends there. The link signs you out everywhere. A browser signed in to this account stays in; anywhere else, sign in again with GitHub or a passkey. The link never signs anyone in.
 
 ```surfaces
 Web: **Settings**, **Account**, **Profile** tab, **Email**, **Save**
@@ -140,7 +166,7 @@ A mail when something breaks in the workspaces you own or run as admin, on by de
 
 ## Delete your account
 
-Removes your account, sessions and API tokens, and takes you out of every workspace. You type `DELETE` first. It cannot be undone. Servers, apps and env vars belong to the workspace and stay for your team. As the last owner, hand it on or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first.
+Removes your account, passkeys, sessions and API tokens, and takes you out of every workspace. You type `DELETE` first. It cannot be undone. Servers, apps and env vars belong to the workspace and stay for your team. As the last owner, hand it on or [delete the workspace](/docs/guides/team#leave-or-delete-a-workspace) first.
 
 ```surfaces
 Web: **Settings**, **Account**, **Security** tab, **Delete account**
@@ -161,4 +187,4 @@ Only the owner sees the plan and pays. A self-hosted hub has no billing.
 
 ## Good to know
 
-- A token with write access can change your name, picture and email alerts. It can never change your email, how you sign in, sessions or tokens, or delete the account. So a leaked token never takes over your account.
+- A token with write access can change your name, picture and email alerts. It can never change your email, how you sign in, passkeys, sessions or tokens, or delete the account. So a leaked token never takes over your account.

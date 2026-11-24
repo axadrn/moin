@@ -32,12 +32,13 @@ moin sets only cookies it needs to work, so there is no cookie banner:
 - **csrf_token** protects forms against forged requests.
 - **oauth_state** and **github_next** remember a step for at most an hour while you sign in or connect GitHub.
 - **pending_invitation** remembers an invitation you opened, for up to 7 days.
+- **passkey_ceremony** remembers a passkey sign-in or a passkey you add, for at most five minutes.
 
 Your light or dark theme and a few view choices stay in your browser's local storage and are never sent to us.
 
 ## Your account
 
-For your account we store your email address and, if you add them, your name and avatar. You sign in with GitHub: we ask GitHub for your account's ID, its username and its verified primary email address, and store the ID and the username with your account. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and recovery keys are stored only as cryptographic hashes.
+For your account we store your email address and, if you add them, your name and avatar. You sign in with GitHub: we ask GitHub for your account's ID, its username and its verified primary email address, and store the ID and the username with your account. If you add a passkey, we store its public key, a name such as the password manager that keeps it, and when you added and last used it; the secret half never leaves your device. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and recovery keys are stored only as cryptographic hashes.
 
 We send only emails that belong to the service: invitations, changes to your account, and important changes to moin. No newsletters or marketing emails.
 

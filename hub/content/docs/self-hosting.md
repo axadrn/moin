@@ -15,7 +15,7 @@ Point a domain at the server with an A record, then run this as root on a fresh 
 curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/hub/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
-It installs Docker, writes the settings to `/etc/moin-hub/env`, starts the hub with your account and this server in it, and serves it on your domain with HTTPS. At the end it prints a recovery key: open the hub, enter the key, and you are in. Then [set up your GitHub App](#your-own-github-app), so you and your team sign in with GitHub.
+It installs Docker, writes the settings to `/etc/moin-hub/env`, starts the hub with your account and this server in it, and serves it on your domain with HTTPS. At the end it prints a recovery key: open the hub, enter the key, and you are in. Then add a passkey under **Settings**, **Account**, **Security**, and [set up your GitHub App](#your-own-github-app), so you and your team sign in with GitHub.
 
 Then point the CLI at it:
 
@@ -121,7 +121,7 @@ The files are in the repo, in `hub/deploy/`:
 
 | Setting | What it does |
 | --- | --- |
-| `APP_URL` | the address of the hub |
+| `APP_URL` | the address of the hub; [passkeys](#who-signs-in) belong to its domain |
 | `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up with GitHub without an invitation |
 | `SECRETS_KEY` | seals the secrets of your apps; keep a copy |
 | `BILLING` | `false` turns off prices, checkout and the billing page |
@@ -187,21 +187,22 @@ A hub that had a separate OAuth app for sign-in: `GITHUB_CLIENT_ID`, `GITHUB_CLI
 
 ## Who signs in
 
-Everyone signs in with GitHub. No passwords, no links by email.
+Everyone signs up with GitHub, then signs in with GitHub or a [passkey](/docs/guides/account#add-a-passkey). No passwords, no links by email.
 
 - **You, first.** The install made your account. Sign in with the [recovery key](#recovery-key) it printed, then **Connect GitHub** under **Settings**, **Account**, **Security**. Or, once the GitHub App is set up, sign in with a GitHub account whose verified primary email is your address in `ADMIN_EMAILS`.
 - **Your team.** Invite teammates. The invitation link lets them in with any GitHub account, under the invited address.
 - **Nobody else.** If `ADMIN_EMAILS` is empty nobody can create the first account, and the log says so when the hub starts.
+- **Passkeys need a domain with HTTPS.** A passkey belongs to the domain in `APP_URL`, and browsers make one only over HTTPS. A hub at an IP address offers no passkeys.
 
 ### Recovery key
 
-A key from the server signs one account in, once, within an hour. It is the way in before the GitHub App is set up, and for someone who lost their GitHub account.
+A key from the server signs one account in, once, within an hour. It is the way in before the GitHub App is set up, and for someone who lost their GitHub account or passkey.
 
 ```bash
 docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com
 ```
 
-It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. It signs the account out everywhere and disconnects its GitHub. After it, connect GitHub again under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page.
+It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. It resets every way in: it signs the account out everywhere, disconnects its GitHub and deletes its passkeys. After it, connect GitHub and add a passkey again under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page, next to **Sign in with a passkey**.
 
 A self-hosted hub has no Admin. Its admins, the addresses in `ADMIN_EMAILS`, get the note with **Update now** at the top of the web ([Updates](#updates)) and see the hub backup in **Settings** ([Database backup](#database-backup)). Your team is in **Settings**, **Team**.
 
@@ -237,6 +238,8 @@ A hub that starts without a database restores the newest one from the bucket by 
 ## A new domain
 
 Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old domain goes on to the same page on the new one, daemons and the CLI move by themselves, and webhooks and API calls there keep working. A self-hosted hub does not show what still arrives there. Keep the old domain until your webhooks, CI and scripts call the new one, then it can go.
+
+Passkeys stay with the old domain: a new domain in `APP_URL` ends every passkey. Everyone signs in with GitHub once and adds a new passkey. Without GitHub, make them a [recovery key](#recovery-key).
 
 ## What it sends us
 
