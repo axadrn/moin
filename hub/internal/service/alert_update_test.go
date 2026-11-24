@@ -65,12 +65,12 @@ func updateActions(t *testing.T, catalogs *CatalogService) []string {
 // app on the newest release gets nothing.
 func TestCheckUpdatesOncePerRelease(t *testing.T) {
 	catalogs, apps, _ := newCatalogService(t)
-	app, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.4.0"})
+	app, _, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.4.0"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	finishDeploys(t, apps, app.ID)
-	current, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Name: "stats-new"})
+	current, _, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Name: "stats-new"})
 	if err != nil {
 		t.Fatal(err)
 	}

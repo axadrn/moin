@@ -50,6 +50,9 @@ type CatalogInstall struct {
 type CatalogDeploy struct {
 	App    App    `json:"app"`
 	Deploy Deploy `json:"deploy"`
+	// Login, only from an install, holds the secrets the first sign-in
+	// needs, such as ADMIN_PASSWORD: the one time they are shown.
+	Login map[string]string `json:"login"`
 }
 
 // Catalog lists the catalog with each app's newest release.

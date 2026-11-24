@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -71,6 +73,28 @@ func TestExecRefused(t *testing.T) {
 		if _, err := a.runExec(t.Context(), start, func(string) {}); err == nil {
 			t.Errorf("%+v ran", start)
 		}
+	}
+}
+
+// TestMaskedCommand: every env value of the app's containers, six
+// characters or more, is masked in the command, the longest first, so a
+// value inside another leaves nothing of the longer one. Without a compose
+// file only the program is left.
+func TestMaskedCommand(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "compose.json")
+	compose := `{"services": {
+		"web": {"environment": {"DB_PASSWORD": "abcdef123", "PRICE": "$$5-dollars", "EMPTY": null}},
+		"db": {"environment": {"SHORT": "abcde", "INNER": "abcdef"}}
+	}}`
+	if err := os.WriteFile(file, []byte(compose), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := maskedCommand(file, []string{"psql", "pw=abcdef123", "short=abcdef", "abcde", "$5-dollars"})
+	if got != "psql pw=••• short=••• abcde '•••'" {
+		t.Errorf("maskedCommand = %q", got)
+	}
+	if got := maskedCommand(filepath.Join(t.TempDir(), "none.json"), []string{"psql", "-c", "secret"}); got != "psql …" {
+		t.Errorf("without a compose file = %q", got)
 	}
 }
 

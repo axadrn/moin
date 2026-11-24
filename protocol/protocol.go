@@ -12,8 +12,9 @@ import (
 // Version is the protocol version the daemon reports in Hello. Bump it when a
 // message changes in a way an older peer cannot read. Version 2 brought
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
-// which was called the agent before (legacy.go).
-const Version = 3
+// which was called the agent before (legacy.go); version 4 the command the
+// daemon masks for the activity (ExecDone.Command).
+const Version = 4
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of

@@ -197,6 +197,7 @@ func (r *Apps) SetDeployDetected(id, detected string) error {
 	return err
 }
 
+// Env returns the sealed env values of an app by key, for its deploys.
 func (r *Apps) Env(appID string) (map[string]string, error) {
 	rows := []struct {
 		Key   string `db:"key"`
@@ -211,6 +212,13 @@ func (r *Apps) Env(appID string) (map[string]string, error) {
 		env[row.Key] = row.Value
 	}
 	return env, nil
+}
+
+// EnvVars lists the env vars of an app by key, without their values.
+func (r *Apps) EnvVars(appID string) ([]model.EnvVar, error) {
+	vars := []model.EnvVar{}
+	err := r.db.Select(&vars, `SELECT key, updated_at FROM app_env WHERE app_id = $1 ORDER BY key`, appID)
+	return vars, err
 }
 
 // SetEnv writes and removes env vars in one transaction.
@@ -326,6 +334,11 @@ func (r *Apps) CatalogApps(slug string) ([]model.App, error) {
 
 func (r *Apps) SetCatalogNotified(appID, version string) error {
 	_, err := r.db.Exec(`UPDATE apps SET catalog_notified = $1 WHERE id = $2`, version, appID)
+	return err
+}
+
+func (r *Apps) SetCatalogVersion(appID, version string) error {
+	_, err := r.db.Exec(`UPDATE apps SET catalog_version = $1 WHERE id = $2`, version, appID)
 	return err
 }
 

@@ -451,33 +451,24 @@ func (m model) envTab(u ui, w, h int) string {
 	if m.app.env == nil {
 		return u.panel("Env", "", loading(u), w, h, true)
 	}
-	keys := m.envKeys()
+	vars := m.app.env
 	iw := inner(w)
-	note := u.faint(fmt.Sprintf("%d vars · values hidden", len(keys)))
-	if m.shown {
-		note = u.warn("values shown")
-	}
-	if len(keys) == 0 {
+	note := u.faint(fmt.Sprintf("%d vars · values are write-only", len(vars)))
+	if len(vars) == 0 {
 		return u.panel("Env", note, []string{"", u.muted("No env vars. a sets one, E opens all of them in your editor.")}, w, h, true)
 	}
 	kw := 8
-	for _, k := range keys {
-		kw = max(kw, min(wid(k)+2, iw/2))
+	for _, v := range vars {
+		kw = max(kw, min(wid(v.Key)+2, iw/2))
 	}
-	body := []string{u.row([]cell{u.head("key", kw, false), u.head("value", 0, false)}, iw, false)}
+	body := []string{u.row([]cell{u.head("key", kw, false), u.head("changed", 0, false)}, iw, false)}
 	n := h - chrome - 2
-	at := m.at("env", len(keys))
-	start := max(0, min(at-n+1, len(keys)-n))
-	for i := start; i < len(keys) && i < start+n; i++ {
-		k := keys[i]
-		v := u.faint("••••••••")
-		if m.shown {
-			v = u.text(m.app.env[k])
-			if m.app.env[k] == "" {
-				v = u.faint("empty")
-			}
-		}
-		body = append(body, u.row([]cell{{u.strong(k), kw, false}, {v, 0, false}}, iw, i == at))
+	at := m.at("env", len(vars))
+	start := max(0, min(at-n+1, len(vars)-n))
+	now := m.now()
+	for i := start; i < len(vars) && i < start+n; i++ {
+		v := vars[i]
+		body = append(body, u.row([]cell{{u.strong(v.Key), kw, false}, {u.muted(human.Ago(v.UpdatedAt, now)), 0, false}}, iw, i == at))
 	}
 	for len(body) < h-chrome-1 {
 		body = append(body, "")

@@ -88,17 +88,21 @@ func runCLI(t *testing.T, api *fakeAPI, args ...string) (code int, stdout, stder
 }
 
 func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
-	env := `{"items":{"KEY":"secret"}}`
+	env := `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`
 	for _, args := range [][]string{
-		{"env", "--show", "shop"},
-		{"env", "--show", "--app", "shop"},
-		{"env", "--app", "shop", "--show"},
-		{"env", "shop", "--show"},
+		{"env", "shop"},
+		{"env", "--app", "shop"},
 	} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": env}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "KEY=secret") {
+		if code != 0 || !strings.Contains(stdout, "KEY") || !strings.Contains(stdout, "Jan 2, 2026") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
+		}
+	}
+	// Values are write-only: --show is gone, like env pull and run.
+	for _, args := range [][]string{{"env", "--show", "shop"}, {"env", "pull", "--app", "shop"}, {"run", "--app", "shop", "--", "env"}} {
+		if code, _, _ := runCLI(t, &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": env}}, args...); code == 0 {
+			t.Errorf("%v still runs", args)
 		}
 	}
 
@@ -191,7 +195,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		// The big ones want the name, the others --yes.
 		if code != 1 || (!strings.Contains(stderr, "--yes") && !strings.Contains(stderr, "--confirm "+args[2])) {
@@ -326,36 +330,19 @@ func TestSQLWrite(t *testing.T) {
 	}
 }
 
-func TestEnvPullAsksBeforeReplacing(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := os.WriteFile(".env", []byte("LOCAL=1\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"secret"}}`}}
-	code, _, stderr := runCLI(t, api, "env", "pull", "--app", "shop")
-	body, _ := os.ReadFile(".env")
-	if code != 1 || !strings.Contains(stderr, "--yes") || string(body) != "LOCAL=1\n" {
-		t.Errorf("without --yes: code %d, stderr %q, .env %q", code, stderr, body)
-	}
-	code, _, stderr = runCLI(t, api, "env", "pull", "--app", "shop", "--yes")
-	body, _ = os.ReadFile(".env")
-	if code != 0 || string(body) != "KEY=secret\n" {
-		t.Errorf("with --yes: code %d, stderr %q, .env %q", code, stderr, body)
-	}
-}
-
-// env push shows the keys that change, asks, and replaces them all.
+// env push shows which keys it adds, replaces and removes, without the
+// values there are, asks, and replaces them all.
 func TestEnvPush(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.WriteFile(".env", []byte("KEEP=1\nEDIT=new\nNEW=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/apps/shop/env": `{"items":{"KEEP":"1","EDIT":"old","GONE":"secret"}}`,
-		"PUT /api/v1/apps/shop/env": `{"items":{"KEEP":"1","EDIT":"new","NEW":"1"},"added":["NEW"],"changed":["EDIT"],"removed":["GONE"]}`,
+		"GET /api/v1/apps/shop/env": `{"items":[{"key":"EDIT","updated_at":"2026-01-02T03:04:05Z"},{"key":"GONE","updated_at":"2026-01-02T03:04:05Z"},{"key":"KEEP","updated_at":"2026-01-02T03:04:05Z"}]}`,
+		"PUT /api/v1/apps/shop/env": `{"items":[],"added":["NEW"],"replaced":["EDIT","KEEP"],"removed":["GONE"]}`,
 	}}
 	code, stdout, stderr := runCLI(t, api, "env", "push", "--app", "shop")
-	if code != 1 || !strings.Contains(stderr, "--yes") || !strings.Contains(stdout, "- GONE") || strings.Contains(stdout, "secret") {
+	if code != 1 || !strings.Contains(stderr, "--yes") || !strings.Contains(stdout, "- GONE") || !strings.Contains(stdout, "~ KEEP") || strings.Contains(stdout, "new") {
 		t.Errorf("without --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	code, stdout, stderr = runCLI(t, api, "env", "push", "--app", "shop", "--yes")
@@ -437,7 +424,7 @@ func TestAsksFirst(t *testing.T) {
 
 // TestEnvRmMissing: a key the app does not have is not removed and says so.
 func TestEnvRmMissing(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "PATCH /api/v1/apps/shop/env": `{"items":{}}`}}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`, "PATCH /api/v1/apps/shop/env": `{"items":[]}`}}
 	code, stdout, stderr := runCLI(t, api, "env", "rm", "--app", "shop", "NOT_THERE", "--yes")
 	if code != 0 || !strings.Contains(stdout, "shop has no NOT_THERE") || strings.Contains(stdout, "Removed") || api.seen("PATCH") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
@@ -513,15 +500,6 @@ func TestDomainsFromComposeAreMarked(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.example.com","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
 	code, stdout, stderr := runCLI(t, api, "domains", "shop")
 	if code != 0 || strings.Contains(stdout, "no domains yet") || !strings.Contains(stdout, "canonical, from compose.yml") || !strings.Contains(stdout, "change them there and deploy") {
-		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
-	}
-}
-
-func TestEnvPullCountsOneVar(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"secret"}}`}}
-	file := filepath.Join(t.TempDir(), "shop.env")
-	code, stdout, stderr := runCLI(t, api, "env", "pull", "--app", "shop", file)
-	if code != 0 || !strings.Contains(stdout, "Wrote 1 env var of shop") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }

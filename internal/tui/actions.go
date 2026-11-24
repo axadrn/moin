@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/axadrn/moin/internal/client"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -192,12 +191,12 @@ func parseMoment(text string, now time.Time) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// envKeys are the keys of the env tab, in its order: by key.
 func (m model) envKeys() []string {
 	var keys []string
-	for k := range m.app.env {
-		keys = append(keys, k)
+	for _, v := range m.app.env {
+		keys = append(keys, v.Key)
 	}
-	sort.Strings(keys)
 	return keys
 }
 

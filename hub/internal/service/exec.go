@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
@@ -66,7 +65,8 @@ func (s *AppService) execServices(app *model.App) []string {
 // Exec runs a command in a container of an app through its server's daemon,
 // and hands what it writes to output as it comes. Only owners and admins
 // may: a command can read and change everything the app can. The activity
-// records the command, masked, and how it ended; never its output.
+// records the command as the daemon masked it, and how it ended; never its
+// output. A command that did not run, refused or failed, keeps only why.
 func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, source Source, idOrName string, input ExecInput, output func(string)) (ExecResult, error) {
 	actor, err := manager(member, source)
 	if err != nil {
@@ -96,6 +96,8 @@ func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, so
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second+30*time.Second)
 	defer cancel()
 	result := ExecResult{Service: service, ExitCode: -1}
+	// Only the daemon knows the env values, so only it masks the command.
+	command := ""
 	start := protocol.ExecStart{App: app.Folder, Service: service, Argv: input.Argv, Timeout: timeout}
 	err = s.servers.Stream(ctx, app.ServerID, protocol.TypeExecStart, start, func(message protocol.Message) (bool, error) {
 		switch message.Type {
@@ -113,12 +115,15 @@ func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, so
 			if done.Error != "" {
 				return true, &DaemonError{Message: done.Error}
 			}
-			result.ExitCode, result.Truncated, result.TimedOut = done.ExitCode, done.Truncated, done.TimedOut
+			result.ExitCode, result.Truncated, result.TimedOut, command = done.ExitCode, done.Truncated, done.TimedOut, done.Command
 			return true, nil
 		}
 		return false, nil
 	})
-	details := map[string]string{"service": service, "command": clipText(s.maskSecrets(app, protocol.JoinCommand(input.Argv)), 300)}
+	details := map[string]string{"service": service}
+	if command != "" {
+		details["command"] = clipText(command, 300)
+	}
 	switch {
 	case err != nil:
 		details["error"] = clipText(err.Error(), 200)
@@ -129,32 +134,4 @@ func (s *AppService) Exec(ctx context.Context, member *model.WorkspaceMember, so
 	}
 	s.servers.record(actor, "app.exec", "app", app.Name, details)
 	return result, err
-}
-
-// maskSecrets hides the app's env values in text, such as a password typed
-// into a command, before it goes into the activity. Short values would
-// mask ordinary words, so only values of six characters or more count.
-func (s *AppService) maskSecrets(app *model.App, text string) string {
-	sealed, err := s.apps.Env(app.ID)
-	if err != nil {
-		return text
-	}
-	values := make([]string, 0, len(sealed))
-	for key, value := range sealed {
-		plain, err := s.box.Open(value, app.ID+"/"+key)
-		if err == nil && len(plain) >= 6 {
-			values = append(values, plain)
-		}
-	}
-	return maskValues(text, values)
-}
-
-// maskValues replaces every value in text with •••, the longest first, so
-// a value inside another is masked as part of the longer one.
-func maskValues(text string, values []string) string {
-	slices.SortFunc(values, func(a, b string) int { return len(b) - len(a) })
-	for _, value := range values {
-		text = strings.ReplaceAll(text, value, "•••")
-	}
-	return text
 }

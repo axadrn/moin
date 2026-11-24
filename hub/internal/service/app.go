@@ -974,7 +974,7 @@ func (s *AppService) ready(workspaceID, idOrName string) (*model.App, error) {
 // start stores the deploy, sends it to the daemon and records action in the
 // activity; an empty action records nothing.
 func (s *AppService) start(actor Actor, action string, app *model.App, deploy *model.Deploy, start protocol.DeployStart) (*model.Deploy, error) {
-	env, err := s.Env(app.WorkspaceID, app.ID)
+	env, err := s.env(app)
 	if err != nil {
 		return nil, err
 	}
@@ -1265,12 +1265,18 @@ func (s *AppService) Logs(ctx context.Context, workspaceID, idOrName string, tai
 	return result.Lines, err
 }
 
-// Env returns the app's env vars in plain text. The next deploy gets them.
-func (s *AppService) Env(workspaceID, idOrName string) (map[string]string, error) {
+// EnvVars lists the app's env vars, without their values: those are
+// write-only and go only to the app's server.
+func (s *AppService) EnvVars(workspaceID, idOrName string) ([]model.EnvVar, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
 		return nil, err
 	}
+	return s.apps.EnvVars(app.ID)
+}
+
+// env opens the app's env values for its deploy, the only place they go.
+func (s *AppService) env(app *model.App) (map[string]string, error) {
 	sealed, err := s.apps.Env(app.ID)
 	if err != nil {
 		return nil, err
@@ -1292,9 +1298,13 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	current, err := s.apps.Env(app.ID)
+	vars, err := s.apps.EnvVars(app.ID)
 	if err != nil {
 		return nil, err
+	}
+	current := make(map[string]bool, len(vars))
+	for _, envVar := range vars {
+		current[envVar.Key] = true
 	}
 	sealed := make(map[string]string, len(set))
 	for key, value := range set {
@@ -1305,7 +1315,7 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 			return nil, ErrEnvValue
 		}
 		sealed[key] = s.box.Seal(value, app.ID+"/"+key)
-		current[key] = ""
+		current[key] = true
 	}
 	for _, key := range unset {
 		if !envKeyPattern.MatchString(key) {
@@ -1335,25 +1345,25 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	return removed, nil
 }
 
-// ReplaceEnv makes env the app's env vars: it sets what is new or changed
-// and removes the keys env does not have. It returns what changed.
+// ReplaceEnv makes env the app's env vars: it sets every key of env and
+// removes the keys env does not have. It returns what changed, by key.
 func (s *AppService) ReplaceEnv(actor Actor, idOrName string, env map[string]string) (dotenv.Change, error) {
-	current, err := s.Env(actor.WorkspaceID, idOrName)
+	vars, err := s.EnvVars(actor.WorkspaceID, idOrName)
 	if err != nil {
 		return dotenv.Change{}, err
 	}
 	if len(env) > maxEnvVars {
 		return dotenv.Change{}, ErrEnvLimit
 	}
+	current := make([]string, len(vars))
+	for index, envVar := range vars {
+		current[index] = envVar.Key
+	}
 	change := dotenv.Diff(current, env)
 	if change.None() {
 		return change, nil
 	}
-	set := make(map[string]string, len(change.Added)+len(change.Changed))
-	for _, key := range append(slices.Clone(change.Added), change.Changed...) {
-		set[key] = env[key]
-	}
-	_, err = s.SetEnv(actor, idOrName, set, change.Removed)
+	_, err = s.SetEnv(actor, idOrName, env, change.Removed)
 	return change, err
 }
 

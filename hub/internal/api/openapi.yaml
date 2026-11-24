@@ -65,7 +65,7 @@ tags:
   - name: Catalog
     description: 'Open source apps moin installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with moin; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
-    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, reads the optional `x-moin` block, builds, starts and checks it. Env vars are stored encrypted. Everything in the moin endpoints belongs to the workspace of the API token.'
+    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, reads the optional `x-moin` block, builds, starts and checks it. Env vars are stored encrypted and write-only: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the API token.'
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
@@ -1045,7 +1045,7 @@ paths:
       tags: [Catalog]
       operationId: installCatalogApp
       summary: Install a catalog app
-      description: Creates the app on the server, generates every secret its compose.yml needs as an env var, sets VERSION and deploys it from the app's bucket. An empty version takes the newest release, an empty name the slug.
+      description: Creates the app on the server, generates every secret its compose.yml needs as an env var, sets VERSION and deploys it. An empty version takes the newest release, an empty name the slug. The answer holds the secret the first sign-in needs, such as ADMIN_PASSWORD, in `login`; it is never shown again.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -2011,8 +2011,8 @@ paths:
         command: pass it as a list of words, and wrap pipes or variables in
         `["sh", "-c", "..."]`. Owners and admins only. Output stops after
         1 MB (`truncated`). The activity records the command, with the
-        app's env values masked, and the exit code, never the output. A
-        server with `exec: off` in its rules refuses it.
+        env values masked by the server's daemon, and the exit code, never
+        the output. A server with `exec: off` in its rules refuses it.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3334,14 +3334,14 @@ paths:
     get:
       tags: [Apps]
       operationId: getAppEnv
-      summary: Get env vars
-      description: In plain text. Tokens need the write scope, because reading secrets is as strong as writing them.
+      summary: List env vars
+      description: The keys and when each changed. Values are write-only: moin never answers one.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - apiTokenAuth: [read]
       responses:
         '200':
-          description: The env vars.
+          description: The env vars, by key.
           content:
             application/json:
               schema:
@@ -3359,7 +3359,7 @@ paths:
       tags: [Apps]
       operationId: updateAppEnv
       summary: Set env vars
-      description: Sets and removes env vars. They are stored encrypted and take effect with the next deploy. A rollback keeps the env of its deploy.
+      description: Sets and removes env vars. They are stored encrypted, are never shown again and take effect with the next deploy. A rollback keeps the env of its deploy.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3371,7 +3371,7 @@ paths:
               $ref: '#/components/schemas/EnvRequest'
       responses:
         '200':
-          description: All env vars after the change.
+          description: All env vars after the change, by key.
           content:
             application/json:
               schema:
@@ -3396,7 +3396,7 @@ paths:
       tags: [Apps]
       operationId: replaceAppEnv
       summary: Replace all env vars
-      description: Makes the sent env vars the app's, all at once, like one .env file. What is new or changed is set, keys not sent are removed. Answers what changed. They take effect with the next deploy.
+      description: Makes the sent env vars the app's, all at once, like one .env file. Every key sent is set, keys not sent are removed. Answers what changed, by key. They take effect with the next deploy.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3408,7 +3408,7 @@ paths:
               $ref: '#/components/schemas/ReplaceEnvRequest'
       responses:
         '200':
-          description: All env vars after the change, and what changed.
+          description: All env vars after the change, by key, and what changed.
           content:
             application/json:
               schema:
@@ -5562,6 +5562,11 @@ components:
           $ref: '#/components/schemas/App'
         deploy:
           $ref: '#/components/schemas/Deploy'
+        login:
+          type: object
+          additionalProperties:
+            type: string
+          description: Only on an install, for an app whose first sign-in needs a secret moin made, such as ADMIN_PASSWORD. The one time it is shown; keep it in your password manager.
     Databases:
       type: object
       required: [items]
@@ -6252,9 +6257,20 @@ components:
       required: [items]
       properties:
         items:
-          type: object
-          additionalProperties:
-            type: string
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvVar'
+    EnvVar:
+      type: object
+      required: [key, updated_at]
+      description: An env var without its value. Values are write-only.
+      properties:
+        key:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+          description: When it was last set.
     ReplaceEnvRequest:
       type: object
       required: [env]
@@ -6266,22 +6282,22 @@ components:
             type: string
     ReplacedEnv:
       type: object
-      required: [items, added, changed, removed]
+      required: [items, added, replaced, removed]
       properties:
         items:
-          type: object
-          additionalProperties:
-            type: string
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvVar'
         added:
           type: array
           items:
             type: string
           description: The keys that are new.
-        changed:
+        replaced:
           type: array
           items:
             type: string
-          description: The keys whose value changed.
+          description: The keys there were and that were sent again. moin never reads a value back, so it does not tell a new value from the same one.
         removed:
           type: array
           items:

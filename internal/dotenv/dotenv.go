@@ -1,11 +1,12 @@
-// Package dotenv reads and writes the env vars of an app as one .env text,
-// KEY=value per line, and says what replacing them with such a text changes.
+// Package dotenv reads the env vars of an app from one .env text, KEY=value
+// per line, and says what replacing them with such a text changes.
 // The CLI, the TUI and the hub share it, so a text means the same
 // everywhere.
 package dotenv
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -75,55 +76,26 @@ func unquote(value string) (string, error) {
 	return value, nil
 }
 
-// Format writes env as a .env text, sorted by key. Parse reads it back as it
-// was.
-func Format(env map[string]string) string {
-	var out strings.Builder
-	for _, key := range Keys(env) {
-		fmt.Fprintf(&out, "%s=%s\n", key, Quote(env[key]))
-	}
-	return out.String()
-}
-
-// Quote puts a value in double quotes when it needs them.
-func Quote(value string) string {
-	if value != "" && !strings.ContainsAny(value, " \t\n\"'\\$#") {
-		return value
-	}
-	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\t", `\t`, "$", `\$`)
-	return `"` + replacer.Replace(value) + `"`
-}
-
-// Keys are the keys of env, sorted.
-func Keys(env map[string]string) []string {
-	keys := make([]string, 0, len(env))
-	for key := range env {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
-}
-
 // Change is what replacing the env vars with others does, by key, sorted.
+// Replaced are the keys there were and that come again: moin never reads a
+// value back, so it cannot tell a new value from the same one.
 type Change struct {
-	Added   []string `json:"added"`
-	Changed []string `json:"changed"`
-	Removed []string `json:"removed"`
+	Added    []string `json:"added"`
+	Replaced []string `json:"replaced"`
+	Removed  []string `json:"removed"`
 }
 
-// Diff compares the env vars there are with the ones that replace them.
-func Diff(current, next map[string]string) Change {
-	change := Change{Added: []string{}, Changed: []string{}, Removed: []string{}}
-	for _, key := range Keys(next) {
-		value, ok := current[key]
-		switch {
-		case !ok:
+// Diff compares the keys there are with the env vars that replace them.
+func Diff(current []string, next map[string]string) Change {
+	change := Change{Added: []string{}, Replaced: []string{}, Removed: []string{}}
+	for _, key := range slices.Sorted(maps.Keys(next)) {
+		if slices.Contains(current, key) {
+			change.Replaced = append(change.Replaced, key)
+		} else {
 			change.Added = append(change.Added, key)
-		case value != next[key]:
-			change.Changed = append(change.Changed, key)
 		}
 	}
-	for _, key := range Keys(current) {
+	for _, key := range slices.Sorted(slices.Values(current)) {
 		if _, ok := next[key]; !ok {
 			change.Removed = append(change.Removed, key)
 		}
@@ -133,16 +105,16 @@ func Diff(current, next map[string]string) Change {
 
 // None reports whether the change changes nothing.
 func (c Change) None() bool {
-	return len(c.Added)+len(c.Changed)+len(c.Removed) == 0
+	return len(c.Added)+len(c.Replaced)+len(c.Removed) == 0
 }
 
-// String says the change in one line: "adds A, changes B, removes C".
+// String says the change in one line: "adds A; replaces B; removes C".
 func (c Change) String() string {
 	var parts []string
 	for _, part := range []struct {
 		verb string
 		keys []string
-	}{{"adds", c.Added}, {"changes", c.Changed}, {"removes", c.Removed}} {
+	}{{"adds", c.Added}, {"replaces", c.Replaced}, {"removes", c.Removed}} {
 		if len(part.keys) > 0 {
 			parts = append(parts, part.verb+" "+strings.Join(part.keys, ", "))
 		}

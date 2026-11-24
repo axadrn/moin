@@ -2,12 +2,10 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"os"
-	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -895,10 +893,10 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 
 // envCommands are the subcommands of env. Any other first argument is the
 // app whose env vars to list.
-var envCommands = []string{"set", "rm", "pull", "push"}
+var envCommands = []string{"set", "rm", "push"}
 
-// env lists the env vars of an app, and sets, removes, pulls and pushes
-// them. In every one, usage mistakes show before a missing login.
+// env lists the env vars of an app, and sets, removes and pushes them. In
+// every one, usage mistakes show before a missing login.
 func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := ""
 	if len(args) > 0 && slices.Contains(envCommands, args[0]) {
@@ -911,18 +909,16 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return envSet(ctx, args, stdout)
 	case "rm":
 		return envRm(ctx, args, stdin, stdout)
-	case "pull":
-		return envPull(ctx, args, stdin, stdout)
 	case "push":
 		return envPush(ctx, args, stdin, stdout)
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "env "+command, build.Name)
 }
 
-// envList lists the env vars of an app, the values hidden without --show.
+// envList lists the env vars of an app: each key and when it changed.
+// Values are write-only, so there is none to show.
 func envList(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("env", "env [--show] [app]").withApp()
-	show := flags.Bool("show", false, "show the values")
+	flags := newFlags("env", "env [app]").withApp()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -937,24 +933,23 @@ func envList(ctx context.Context, args []string, stdout io.Writer) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	values, err := api.Env(ctx, name)
+	vars, err := api.Env(ctx, name)
 	if err != nil {
 		return err
 	}
-	if len(values) == 0 {
+	if len(vars) == 0 {
 		fmt.Fprintf(stdout, "%s has no env vars.\n", name)
 		hint(stdout, "Set one with", build.Name+" env set KEY=value")
 		return nil
 	}
-	for _, key := range sortedKeys(values) {
-		value := style.Muted.Render("••••••")
-		if *show {
-			value = values[key]
-		}
-		fmt.Fprintln(stdout, key+style.Muted.Render("=")+value)
+	var rows [][]string
+	now := time.Now()
+	for _, envVar := range vars {
+		rows = append(rows, []string{envVar.Key, human.Ago(envVar.UpdatedAt, now)})
 	}
-	if !*show && isTTY(stdout) {
-		hint(stdout, "Values hidden. Show them with", build.Name+" env --show")
+	table(stdout, []string{"KEY", "CHANGED"}, rows)
+	if isTTY(stdout) {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Values are write-only: you see the name and when it changed, never the value."))
 	}
 	return nil
 }
@@ -1023,7 +1018,7 @@ func envRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	}
 	var remove, missing []string
 	for _, key := range flags.Args() {
-		if _, ok := current[key]; ok {
+		if slices.ContainsFunc(current, func(envVar client.EnvVar) bool { return envVar.Key == key }) {
 			remove = append(remove, key)
 		} else {
 			missing = append(missing, key)
@@ -1049,45 +1044,8 @@ func envRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	return nil
 }
 
-// envPull writes the env vars of an app to a file, .env by default, and
-// asks before it replaces one.
-func envPull(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("env pull", "env pull [--app <app>] [file] [--yes]").withApp().withYes()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	api, apiErr := apiClient()
-	path, err := envFile(flags)
-	if err != nil {
-		return err
-	}
-	name, err := flags.app("")
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stat(path); err == nil {
-		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Replace %s with the env vars of %s?", path, name))
-		if err != nil {
-			return err
-		}
-	}
-	if apiErr != nil {
-		return apiErr
-	}
-	values, err := api.Env(ctx, name)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(path, []byte(dotenv.Format(values)), 0o600)
-	if err != nil {
-		return err
-	}
-	done(stdout, "Wrote %d %s of %s to %s", len(values), pluralWord(int64(len(values)), "env var", "env vars"), style.Bold.Render(name), path)
-	return nil
-}
-
 // envPush replaces the env vars of an app with a file, .env by default:
-// it shows the keys that change and asks first.
+// it shows which keys it adds, replaces and removes, and asks first.
 func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("env push", "env push [--app <app>] [file] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
@@ -1117,9 +1075,13 @@ func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
-	change := dotenv.Diff(current, next)
+	keys := make([]string, len(current))
+	for index, envVar := range current {
+		keys[index] = envVar.Key
+	}
+	change := dotenv.Diff(keys, next)
 	if change.None() {
-		fmt.Fprintf(stdout, "%s matches the env vars of %s. Nothing changes.\n", path, name)
+		fmt.Fprintf(stdout, "%s has no env vars, and %s has none. Nothing changes.\n", path, name)
 		return nil
 	}
 	printEnvChange(stdout, change)
@@ -1139,7 +1101,7 @@ func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	return nil
 }
 
-// envFile is the file env pull and push work on: the one argument, or .env.
+// envFile is the file env push reads: the one argument, or .env.
 func envFile(flags *flagSet) (string, error) {
 	switch flags.NArg() {
 	case 0:
@@ -1150,54 +1112,18 @@ func envFile(flags *flagSet) (string, error) {
 	return "", flags.wrong()
 }
 
-// printEnvChange lists the keys a push adds, changes and removes. The keys
+// printEnvChange lists the keys a push adds, replaces and removes. The keys
 // only, never a value: the terminal may be shared or recorded.
 func printEnvChange(stdout io.Writer, change dotenv.Change) {
 	for _, line := range []struct {
 		mark string
 		keys []string
 		tint lipgloss.Style
-	}{{"+", change.Added, style.Success}, {"~", change.Changed, style.Warning}, {"-", change.Removed, style.Danger}} {
+	}{{"+", change.Added, style.Success}, {"~", change.Replaced, style.Warning}, {"-", change.Removed, style.Danger}} {
 		for _, key := range line.keys {
 			fmt.Fprintln(stdout, "  "+line.tint.Render(line.mark)+" "+key)
 		}
 	}
-}
-
-// runWithEnv starts a local command with the env vars of an app, without a file.
-func runWithEnv(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("run", "run [--app <app>] -- <command> [args]").withApp()
-	// The command's own flags stay its own.
-	if err := flags.parseStrict(args); err != nil {
-		return err
-	}
-	if flags.NArg() == 0 {
-		return flags.wrong()
-	}
-	name, err := flags.app("")
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	values, err := api.Env(ctx, name)
-	if err != nil {
-		return err
-	}
-	command := exec.CommandContext(ctx, flags.Arg(0), flags.Args()[1:]...)
-	command.Stdin, command.Stdout, command.Stderr = stdin, stdout, os.Stderr
-	command.Env = os.Environ()
-	for _, key := range sortedKeys(values) {
-		command.Env = append(command.Env, key+"="+values[key])
-	}
-	err = command.Run()
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		os.Exit(exitErr.ExitCode())
-	}
-	return err
 }
 
 func sortedKeys(values map[string]string) []string {

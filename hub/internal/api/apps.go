@@ -114,9 +114,25 @@ type AppDetail struct {
 	Deploys []Deploy `json:"deploys"`
 }
 
-// Env is the answer of GET /api/v1/apps/{app}/env.
+// Env is the answer of GET /api/v1/apps/{app}/env: the keys and when they
+// changed. Values are write-only: no answer ever holds one.
 type Env struct {
-	Items map[string]string `json:"items"`
+	Items []EnvVar `json:"items"`
+}
+
+// EnvVar is one env var of an app, without its value.
+type EnvVar struct {
+	Key       string    `json:"key"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// NewEnv is the answer for the env vars of an app.
+func NewEnv(vars []model.EnvVar) Env {
+	items := make([]EnvVar, len(vars))
+	for index, envVar := range vars {
+		items[index] = EnvVar{Key: envVar.Key, UpdatedAt: envVar.UpdatedAt.UTC()}
+	}
+	return Env{Items: items}
 }
 
 // Logs is the answer of GET /api/v1/apps/{app}/logs.
@@ -456,16 +472,15 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, Logs{Lines: lines})
 }
 
-// GetEnv returns the env vars in plain text. Tokens need the write scope:
-// reading secrets is as strong as writing them.
+// GetEnv lists the env vars by key, without their values.
 func (h *AppsHandler) GetEnv(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	vars, err := h.apps.EnvVars(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, Env{Items: env})
+	JSON(w, http.StatusOK, NewEnv(vars))
 }
 
 // UpdateEnv sets and removes env vars. The next deploy gets them.
@@ -480,12 +495,12 @@ func (h *AppsHandler) UpdateEnv(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	vars, err := h.apps.EnvVars(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, Env{Items: env})
+	JSON(w, http.StatusOK, NewEnv(vars))
 }
 
 // replaceEnvRequest is every env var of an app, by key.
@@ -493,9 +508,9 @@ type replaceEnvRequest struct {
 	Env map[string]string `json:"env"`
 }
 
-// ReplacedEnv is the env vars after a replace and what changed.
+// ReplacedEnv is the env vars after a replace and what changed, by key.
 type ReplacedEnv struct {
-	Items map[string]string `json:"items"`
+	Items []EnvVar `json:"items"`
 	dotenv.Change
 }
 
@@ -515,12 +530,12 @@ func (h *AppsHandler) ReplaceEnv(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	vars, err := h.apps.EnvVars(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, ReplacedEnv{Items: env, Change: change})
+	JSON(w, http.StatusOK, ReplacedEnv{Items: NewEnv(vars).Items, Change: change})
 }
 
 // Events streams the app list: once on connect and again after every change.

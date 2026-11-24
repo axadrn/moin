@@ -2,6 +2,8 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ui/components"
+	"maps"
+	"slices"
 	"strconv"
 	"time"
 
@@ -127,6 +129,29 @@ templ CatalogInstall(view CatalogInstallView) {
 			@catalogFacts(view.App)
 		}
 	}
+}
+
+// CatalogInstalled takes the place of the install form when the first
+// sign-in needs a secret moin made, such as ADMIN_PASSWORD: env values
+// are write-only, so this is the one time it is shown.
+templ CatalogInstalled(appPath string, login map[string]string) {
+	<div id="catalog-install-form" class="moin-stack" data-gap="4" data-catalog-installed>
+		<p class="moin-text">Installed. Keep this in your password manager now: it is shown only this once.</p>
+		@components.List() {
+			for _, key := range slices.Sorted(maps.Keys(login)) {
+				@components.Item(components.ItemProps{}) {
+					<span class="moin-mono moin-text">{ key }</span>
+					<span class="moin-fill moin-truncate moin-mono moin-text" data-catalog-secret>{ login[key] }</span>
+					@copyButton(login[key], "", "Copy "+key)
+				}
+			}
+		}
+		<div class="moin-row" data-end>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: appPath}) {
+				Open the app
+			}
+		</div>
+	</div>
 }
 
 // ---------------------------------------------------------------- parts

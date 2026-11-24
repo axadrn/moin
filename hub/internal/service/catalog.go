@@ -31,7 +31,8 @@ var (
 // CatalogService installs the apps of the catalog and updates them. An
 // install is an ordinary app: its compose.yml from the catalog goes to
 // the server like a deploy from the CLI, its secrets are env vars, and
-// VERSION picks the image tag.
+// VERSION picks the image tag. moin keeps the version in the app too, as
+// env values are write-only.
 type CatalogService struct {
 	store *catalog.Store
 	apps  *AppService
@@ -71,11 +72,7 @@ func (s *CatalogService) CheckUpdates(slug string) {
 		if app.CatalogNotified == latest.Tag {
 			continue
 		}
-		env, err := s.apps.Env(app.WorkspaceID, app.ID)
-		if err != nil {
-			continue
-		}
-		current := env[catalog.VersionVar]
+		current := app.CatalogVersion
 		if current == "" || catalog.Compare(latest.Tag, current) <= 0 {
 			continue
 		}
@@ -107,47 +104,52 @@ type CatalogApp struct {
 }
 
 // Install creates the app on a server, gives it its secrets and VERSION,
-// and deploys it.
-func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (*model.App, *model.Deploy, error) {
+// and deploys it. login are the values of the secrets the first sign-in
+// needs (Entry.LoginSecrets), for the person who installs: env values are
+// write-only, so this is the one time they are shown.
+func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (app *model.App, deploy *model.Deploy, login map[string]string, err error) {
 	entry, ok := s.store.Entry(strings.TrimSpace(input.Slug))
 	if !ok {
-		return nil, nil, ErrCatalogApp
+		return nil, nil, nil, ErrCatalogApp
 	}
 	version, err := s.version(entry, input.Version)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	domain := strings.ToLower(strings.TrimSpace(input.Domain))
 	if entry.NeedsURL() && domain == "" {
-		return nil, nil, ErrCatalogDomain
+		return nil, nil, nil, ErrCatalogDomain
 	}
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		name = entry.Slug
 	}
 	if !appNamePattern.MatchString(name) {
-		return nil, nil, ErrAppName
+		return nil, nil, nil, ErrAppName
 	}
 	// Check what would stop the deploy before the app exists.
 	server, err := s.apps.servers.servers.ByIDOrNameForWorkspace(strings.TrimSpace(input.Server), actor.WorkspaceID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if !s.apps.servers.Online(server.ID) {
-		return nil, nil, ErrServerOffline
+		return nil, nil, nil, ErrServerOffline
 	}
 	if catalogTooOld(server.DaemonVersion) {
-		return nil, nil, ErrCatalogDaemon
+		return nil, nil, nil, ErrCatalogDaemon
 	}
-	app, err := s.apps.Create(actor, name, server.ID)
+	app, err = s.apps.Create(actor, name, server.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	err = s.apps.apps.SetCatalog(app.ID, entry.Slug)
-	if err != nil {
-		return app, nil, err
+	if err == nil {
+		err = s.apps.apps.SetCatalogVersion(app.ID, version)
 	}
-	app.Catalog = entry.Slug
+	if err != nil {
+		return app, nil, nil, err
+	}
+	app.Catalog, app.CatalogVersion = entry.Slug, version
 	env := map[string]string{catalog.VersionVar: version}
 	for _, name := range entry.Secrets {
 		env[name] = newSecret(name)
@@ -158,16 +160,23 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	}
 	_, err = s.apps.SetEnv(actor, app.ID, env, nil)
 	if err != nil {
-		return app, nil, err
+		return app, nil, nil, err
 	}
 	if domain != "" {
 		_, err = s.apps.SetDomains(actor, app.ID, "", []string{domain}, "")
 		if err != nil {
-			return app, nil, err
+			return app, nil, nil, err
 		}
 	}
-	deploy, err := s.deploy(ctx, actor, "app.installed", app, entry, version)
-	return app, deploy, err
+	deploy, err = s.deploy(ctx, actor, "app.installed", app, entry, version)
+	if err != nil {
+		return app, nil, nil, err
+	}
+	login = map[string]string{}
+	for _, name := range entry.LoginSecrets() {
+		login[name] = env[name]
+	}
+	return app, deploy, login, nil
 }
 
 // Update sets the app to version, the newest release when empty, and
@@ -189,22 +198,26 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 	if err != nil {
 		return app, nil, err
 	}
-	current, err := s.apps.Env(actor.WorkspaceID, app.ID)
+	vars, err := s.apps.EnvVars(actor.WorkspaceID, app.ID)
 	if err != nil {
 		return app, nil, err
 	}
 	env := map[string]string{catalog.VersionVar: version}
 	// A newer compose.yml may ask for a secret the app does not have yet.
 	for _, name := range entry.Secrets {
-		if current[name] == "" {
+		if !slices.ContainsFunc(vars, func(envVar model.EnvVar) bool { return envVar.Key == name }) {
 			env[name] = newSecret(name)
 		}
 	}
-	if current[catalog.VersionVar] != version || len(env) > 1 {
+	if app.CatalogVersion != version || len(env) > 1 {
 		_, err = s.apps.SetEnv(actor, app.ID, env, nil)
+		if err == nil {
+			err = s.apps.apps.SetCatalogVersion(app.ID, version)
+		}
 		if err != nil {
 			return app, nil, err
 		}
+		app.CatalogVersion = version
 	}
 	deploy, err := s.deploy(ctx, actor, "app.updated", app, entry, version)
 	if err == nil {
@@ -276,7 +289,7 @@ func (s *CatalogService) version(entry catalog.Entry, wanted string) (string, er
 
 // Info says what the catalog knows of app; ok is false for an app of your
 // own.
-func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, bool) {
+func (s *CatalogService) Info(app *model.App) (CatalogApp, bool) {
 	if app.Catalog == "" {
 		return CatalogApp{}, false
 	}
@@ -284,11 +297,7 @@ func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, b
 	if !ok {
 		return CatalogApp{}, false
 	}
-	info := CatalogApp{Entry: entry}
-	env, err := s.apps.Env(workspaceID, app.ID)
-	if err == nil {
-		info.Version = env[catalog.VersionVar]
-	}
+	info := CatalogApp{Entry: entry, Version: app.CatalogVersion}
 	if latest, ok := s.store.Latest(entry.Slug); ok {
 		info.Latest = latest
 		info.Newer = info.Version != "" && catalog.Compare(latest.Tag, info.Version) > 0

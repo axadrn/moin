@@ -123,7 +123,7 @@ func plural(n int, one, many string) string {
 type AppPageView struct {
 	App     model.App
 	Deploys []api.Deploy
-	EnvKeys []string
+	Env     []model.EnvVar
 	// Section is app, deploys, domains, logs or settings; data has its
 	// own page.
 	Section string
@@ -161,7 +161,7 @@ templ AppPage(view AppPageView) {
 					case "logs":
 						@appLogsSection(app, view.Deploys, view.Logs)
 					case "settings":
-						@appSettingsSection(app, view.EnvKeys)
+						@appSettingsSection(app, view.Env)
 					default:
 						@appHomeSection(view)
 				}
@@ -307,7 +307,7 @@ type AppLogsView struct {
 
 // appSettingsSection answers "how is it set up?": its name, its env, the
 // pin, and at the end what stops or removes it.
-templ appSettingsSection(app model.App, envKeys []string) {
+templ appSettingsSection(app model.App, env []model.EnvVar) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	@components.Card(components.CardProps{Title: "Name"}) {
 		<form
@@ -328,7 +328,7 @@ templ appSettingsSection(app model.App, envKeys []string) {
 			</div>
 		</form>
 	}
-	@AppEnv(app.Link(), envKeys, nil)
+	@AppEnv(app.Link(), env)
 	@components.Card(components.CardProps{}) {
 		@components.List() {
 			@PinSwitch(app)
@@ -596,11 +596,12 @@ func parseLogLine(line string) logLine {
 	return entry
 }
 
-// AppEnv is the env vars of an app, one row each, and the row that sets
-// one. values holds the shown values; keys without one show as dots. Saving
+// AppEnv is the env vars of an app, one row each with when it changed, and
+// the row that sets one. Values are write-only: no page shows one. Saving
 // never restarts the app: the head then says what waits for Restart.
-templ AppEnv(appLink string, keys []string, values map[string]string) {
+templ AppEnv(appLink string, env []model.EnvVar) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
+	{{ now := time.Now() }}
 	<div id="app-env">
 		<section class="moin-section">
 			<div class="moin-section-head">
@@ -609,38 +610,25 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 			</div>
 			@components.Card(components.CardProps{}) {
 				@components.List() {
-					if len(keys) == 0 {
+					if len(env) == 0 {
 						@components.Item(components.ItemProps{Name: "No env vars yet"})
 					}
-					for _, key := range keys {
+					for _, envVar := range env {
 						@components.Item(components.ItemProps{}) {
-							<span data-env={ key } class="moin-item-text moin-truncate moin-mono moin-text" title={ key }>{ key }</span>
-							<span class="moin-item-value moin-mono">
-								if value, ok := values[key]; ok {
-									<span data-env-value class="moin-foreground">{ value }</span>
-								} else {
-									<span aria-label="hidden">••••••</span>
-								}
-							</span>
+							<span data-env={ envVar.Key } class="moin-item-text moin-truncate moin-mono moin-text" title={ envVar.Key }>{ envVar.Key }</span>
+							<span class="moin-item-value moin-muted" title={ stamp(envVar.UpdatedAt) }>{ "changed " + human.Ago(envVar.UpdatedAt, now) }</span>
 							@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{
-								"aria-label":          "Remove " + key,
-								"title":               "Remove " + key,
-								"hx-delete":           envPath + "/" + key,
+								"aria-label":          "Remove " + envVar.Key,
+								"title":               "Remove " + envVar.Key,
+								"hx-delete":           envPath + "/" + envVar.Key,
 								"hx-target":           "#app-env",
 								"hx-swap":             "outerHTML",
 								"hx-disable":          "this",
-								"hx-confirm":          "Remove " + key + "? The next deploy or restart drops it.",
+								"hx-confirm":          "Remove " + envVar.Key + "? The next deploy or restart drops it.",
 								"data-confirm-action": "Remove",
 							}}) {
 								@components.Icon("x")
 							}
-						}
-					}
-					if len(keys) > 0 {
-						if len(values) == 0 {
-							@components.Item(components.ItemProps{Button: true, Name: "Show values", Attrs: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}})
-						} else {
-							@components.Item(components.ItemProps{Button: true, Name: "Hide values", Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}})
 						}
 					}
 					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}}) {
@@ -659,9 +647,13 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 					}
 				}
 			}
+			<p class="moin-small moin-muted">{ envWriteOnly }</p>
 		</section>
 	</div>
 }
+
+// envWriteOnly says under every env form that a value never comes back.
+const envWriteOnly = "Values are write-only: you see the name and when it changed, never the value."
 
 // shortPath keeps the last three parts of a long path: …/volumes/data/app.db.
 func shortPath(path string) string {
