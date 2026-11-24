@@ -19,10 +19,10 @@ func TestActivityNeverHoldsSecrets(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetEnv(owner, "blog", map[string]string{"DATABASE_URL": secrets[0]}, nil); err != nil {
+	if _, err := apps.SetEnv(context.Background(), owner, "blog", map[string]string{"DATABASE_URL": secrets[0]}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.SetRegistry(owner, "ghcr.io", "ada", secrets[1]); err != nil {
+	if err := apps.SetRegistry(context.Background(), owner, "ghcr.io", "ada", secrets[1], ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := apps.SetProtection(owner, "blog", "ada", secrets[2]); err != nil {

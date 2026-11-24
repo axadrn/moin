@@ -46,7 +46,7 @@ func TestSecurityPageSendsKeysToIntegrations(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{">Connect Cloudflare</a>", ">Connect Tailscale</a>", `href="/app/tiny-rocket-co/integrations"`, `data-security-line="ssh"`, `id="security-ssh-off"`, `data-security-line="firewall"`, `data-security-line="tunnel"`, `id="security-tunnel-off"`, ">Web<", webHint, sshHint, firewallHint} {
+	for _, want := range []string{">Connect Cloudflare</a>", ">Add a Tailscale key</a>", `href="/app/tiny-rocket-co/integrations"`, `data-security-line="ssh"`, `id="security-ssh-off"`, `data-security-line="firewall"`, `data-security-line="tunnel"`, `id="security-tunnel-off"`, ">Web<", webHint, sshHint, firewallHint} {
 		if !strings.Contains(page, want) {
 			t.Errorf("security page misses %q", want)
 		}
@@ -63,13 +63,22 @@ func TestSecurityPageSendsKeysToIntegrations(t *testing.T) {
 		t.Error("the Cloudflare Tunnel can be picked without Cloudflare")
 	}
 
-	// With Tailscale connected the option opens and its link goes.
+	// With a Tailscale key on this server the option opens and its link
+	// goes; a key on another server does not count.
 	html.Reset()
-	view.Integrations.Tailscale = true
+	view.Integrations.Tailscale = service.SecretServers{On: []service.SecretOn{{Server: "web-2"}}, MissingOn: []string{"web-1"}}
 	if err := ServerSecurity(view).Render(projectPageContext("/app/tiny-rocket-co/servers/web-1/security"), &html); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(html.String(), ">Connect Tailscale</a>") || strings.Contains(html.String(), `disabled id="security-ssh-tailscale"`) {
+	if !strings.Contains(html.String(), `disabled id="security-ssh-tailscale"`) {
+		t.Error("a Tailscale key on another server opens SSH only through Tailscale")
+	}
+	html.Reset()
+	view.Integrations.Tailscale = service.SecretServers{On: []service.SecretOn{{Server: "web-1"}}}
+	if err := ServerSecurity(view).Render(projectPageContext("/app/tiny-rocket-co/servers/web-1/security"), &html); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html.String(), ">Add a Tailscale key</a>") || strings.Contains(html.String(), `disabled id="security-ssh-tailscale"`) {
 		t.Error("Tailscale is connected, but SSH only through Tailscale still waits for it")
 	}
 }
@@ -89,7 +98,24 @@ func TestIntegrationsPage(t *testing.T) {
 			t.Errorf("integrations page misses %q", want)
 		}
 	}
-	if strings.Contains(page, "Disconnect Tailscale") {
-		t.Error("a missing account can be disconnected")
+	if strings.Contains(page, "Remove the Tailscale key") {
+		t.Error("a missing key can be removed")
+	}
+}
+
+// TestIntegrationsTailscalePerServer: the Tailscale key lives on servers.
+// The page says which keep it, takes it for one without it, picks the
+// server for a new key and removes it from one server.
+func TestIntegrationsTailscalePerServer(t *testing.T) {
+	var html strings.Builder
+	view := IntegrationsView{Keys: service.Integrations{Tailscale: service.SecretServers{On: []service.SecretOn{{Server: "server-1"}}, MissingOn: []string{"server-2"}}}}
+	if err := Integrations(view).Render(projectPageContext("/app/tiny-rocket-co/integrations"), &html); err != nil {
+		t.Fatal(err)
+	}
+	page := html.String()
+	for _, want := range []string{"server-1", "server-2 has no Tailscale key.", `data-secret-missing="server-2"`, `name="server" value="server-2"`, `id="tailscale-key-server"`, "Remove the Tailscale key from server-1", `&#34;server&#34;:&#34;server-1&#34;`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("integrations page misses %q", want)
+		}
 	}
 }

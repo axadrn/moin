@@ -13,14 +13,17 @@ import (
 func registerBucketTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, newTool("list_buckets", "List buckets",
-		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that back up there now) and older_backups (apps that moved to another bucket and left what they had there). Needs the read scope.",
+		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that back up there now), older_backups (apps that moved to another bucket and left what they had there), servers (the servers that keep its secret key) and missing_on (the servers that do not: their apps make no backups until set_bucket_key gives them the key). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listBuckets)))
 	mcpsdk.AddTool(server, newTool("add_bucket", "Add a bucket",
-		"Checks and stores a new S3-compatible bucket under a name (lowercase letters, digits, dashes). The first bucket is the default; default true makes this one the default, so every app without a bucket of its own backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
+		"Adds an S3-compatible bucket under a name (lowercase letters, digits, dashes). The secret key goes to server (empty for the workspace's only server), which writes a test file and keeps the key; moin keeps everything but the secret key, which it never shows again. Other servers get it with set_bucket_key. The first bucket is the default; default true makes this one the default, so every app without a bucket of its own backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.addBucket)))
 	mcpsdk.AddTool(server, newTool("edit_bucket", "Change a bucket",
-		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, an empty secret_key keeps the stored one, default true makes it the default. A new place starts with a full copy; the old place keeps what it has. Needs a token with read and write access.",
+		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, default true makes it the default. A new place is checked by server (empty for the workspace's only server) with the secret_key sent, or the key it keeps when empty. A new access key or secret key leaves the other servers without one: give it to them with set_bucket_key. A new place starts with a full copy; the old place keeps what it has. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.editBucket)))
+	mcpsdk.AddTool(server, newTool("set_bucket_key", "Give a server a bucket's key",
+		"Gives one more server the secret key of a bucket, such as a server in missing_on of list_buckets: it writes a test file with it and keeps it. The key goes to the server only. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.setBucketKey)))
 	mcpsdk.AddTool(server, newTool("set_default_bucket", "Make a bucket the default",
 		"Makes a bucket the workspace's default: apps without a bucket of their own back up there from now on; their copies start again there; what is in the old default stays. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDefaultBucket)))
@@ -45,18 +48,20 @@ type BucketNameInput struct {
 
 // AddBucketInput is the input of add_bucket.
 type AddBucketInput struct {
+	Server    string `json:"server,omitempty" jsonschema:"the server that checks the bucket and keeps the secret key; empty for the workspace's only server"`
 	Name      string `json:"name" jsonschema:"a name for the bucket in moin: lowercase letters, digits, dashes"`
 	Endpoint  string `json:"endpoint,omitempty" jsonschema:"https:// URL of an S3-compatible store; empty for AWS S3"`
 	Region    string `json:"region,omitempty" jsonschema:"the region; auto for Cloudflare R2, the default"`
 	Bucket    string `json:"bucket" jsonschema:"the bucket's name at the bucket provider"`
 	Path      string `json:"path,omitempty" jsonschema:"a folder inside the bucket, only if it holds other files too"`
 	AccessKey string `json:"access_key" jsonschema:"the access key ID"`
-	SecretKey string `json:"secret_key" jsonschema:"the secret key"`
+	SecretKey string `json:"secret_key" jsonschema:"the secret key; it goes to the server, never back"`
 	Default   bool   `json:"default,omitempty" jsonschema:"make it the workspace's default bucket"`
 }
 
 // EditBucketInput is the input of edit_bucket.
 type EditBucketInput struct {
+	Server    string `json:"server,omitempty" jsonschema:"the server that checks a new place or key and keeps the key; empty for the workspace's only server"`
 	Name      string `json:"name" jsonschema:"the bucket's current name in moin"`
 	Rename    string `json:"rename,omitempty" jsonschema:"a new name in moin; empty keeps it"`
 	Endpoint  string `json:"endpoint,omitempty" jsonschema:"https:// URL of an S3-compatible store; empty for AWS S3"`
@@ -64,8 +69,15 @@ type EditBucketInput struct {
 	Bucket    string `json:"bucket" jsonschema:"the bucket's name at the bucket provider"`
 	Path      string `json:"path,omitempty" jsonschema:"a folder inside the bucket; empty for none"`
 	AccessKey string `json:"access_key" jsonschema:"the access key ID"`
-	SecretKey string `json:"secret_key,omitempty" jsonschema:"a new secret key; empty keeps the stored one"`
+	SecretKey string `json:"secret_key,omitempty" jsonschema:"a new secret key; empty keeps the one the server has"`
 	Default   bool   `json:"default,omitempty" jsonschema:"make it the workspace's default bucket"`
+}
+
+// BucketKeyInput is the input of set_bucket_key.
+type BucketKeyInput struct {
+	Bucket    string `json:"bucket" jsonschema:"the bucket's name in moin"`
+	Server    string `json:"server,omitempty" jsonschema:"the server that keeps the key; empty for the workspace's only server"`
+	SecretKey string `json:"secret_key" jsonschema:"the secret key; it goes to the server, never back"`
 }
 
 // AppBucketInput is the input of set_app_bucket.
@@ -111,9 +123,17 @@ func (t moinTools) addBucket(ctx context.Context, caller Caller, input AddBucket
 
 func (t moinTools) editBucket(ctx context.Context, caller Caller, input EditBucketInput) (Bucket, error) {
 	bucket, err := t.services.Apps.EditBucket(ctx, caller.actor(), input.Name, service.BucketInput{
-		Name: input.Rename, Endpoint: input.Endpoint, Region: input.Region, Bucket: input.Bucket, Path: input.Path,
+		Server: input.Server, Name: input.Rename, Endpoint: input.Endpoint, Region: input.Region, Bucket: input.Bucket, Path: input.Path,
 		AccessKey: input.AccessKey, SecretKey: input.SecretKey, Default: input.Default,
 	})
+	if err != nil {
+		return Bucket{}, err
+	}
+	return Bucket{api.NewBucket(*bucket)}, nil
+}
+
+func (t moinTools) setBucketKey(ctx context.Context, caller Caller, input BucketKeyInput) (Bucket, error) {
+	bucket, err := t.services.Apps.SetBucketKey(ctx, caller.actor(), input.Bucket, input.Server, input.SecretKey)
 	if err != nil {
 		return Bucket{}, err
 	}

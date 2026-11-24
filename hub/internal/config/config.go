@@ -69,8 +69,9 @@ type Config struct {
 	CloudflareAccountID string
 	CloudflareAPIToken  string
 
-	// SecretsKey seals app env vars: 32 bytes, base64. Development falls
-	// back to a fixed key.
+	// SecretsKey seals what the hub uses itself: the Cloudflare API token,
+	// alert targets and webhook signing secrets. 32 bytes, base64.
+	// Development falls back to a fixed key.
 	SecretsKey []byte
 	// Billing off runs a self-hosted hub: no Stripe, no prices,
 	// every workspace gets everything.
@@ -235,7 +236,7 @@ func Load() (*Config, error) {
 }
 
 // secretsKey decodes SECRETS_KEY. Development without one gets a fixed key,
-// so env vars survive restarts; it protects nothing.
+// so sealed values survive restarts; it protects nothing.
 func secretsKey(raw string, development bool) []byte {
 	if raw == "" && development {
 		key := sha256.Sum256([]byte("ops development secrets key"))

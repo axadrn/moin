@@ -17,6 +17,7 @@ import (
 
 // Every app lives in <state dir>/apps/<app>:
 //
+//	app.env                    the app's env, the values as they are now, 0600
 //	releases/<n>/src           the source of deploy n
 //	releases/<n>/compose.json  the resolved compose project moin runs, 0600
 //	releases/<n>/kind          build, apply or failed, for prune
@@ -24,8 +25,9 @@ import (
 //	volumes/                   bind mounts that are not part of the repo
 //
 // compose.json is the user's compose.yml after `docker compose config`, with
-// image tags per release, the env and the data mounts filled in. Starting an
-// old compose.json again is a rollback: same images, same env.
+// image tags per release and the data mounts filled in; the services that
+// get the env read app.env. Starting an old compose.json again is a
+// rollback: same images, the env as it is now.
 const (
 	maxSourceSize = 200 << 20
 	waitTimeout   = 120 * time.Second
@@ -44,6 +46,11 @@ type apps struct {
 	backups *backups
 	// proxyMode is "direct" or "tunnel", from the server config.
 	proxyMode func() string
+	// registryLogin is the server's login for a registry host, as
+	// <username>:<password>, "" for none.
+	registryLogin func(host string) string
+	// envMu keeps the changes of env files in a row.
+	envMu sync.Mutex
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex
@@ -186,6 +193,8 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
 	// Its containers are gone; volumes.json stays with the volumes.
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
+	// Its env goes with it: nothing runs that reads it.
+	_ = os.Remove(a.envFile(app))
 	return nil
 }
 

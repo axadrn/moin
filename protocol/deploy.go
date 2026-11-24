@@ -8,12 +8,14 @@ import (
 )
 
 // DeployStart is one deploy. Number counts per app. A rollback carries
-// FromNumber and no source: the daemon starts that release's images again,
-// with the env it had. Image replaces the build of the main service with an
-// image built elsewhere, such as in CI; without a source the daemon takes the
-// compose file of the running release. Without source, image and FromNumber
-// the deploy applies env and domains to the running release, without a
-// build.
+// FromNumber and no source: the daemon starts that release's images again.
+// Image replaces the build of the main service with an image built
+// elsewhere, such as in CI; without a source the daemon takes the compose
+// file of the running release. Without source, image and FromNumber the
+// deploy applies env and domains to the running release, without a build.
+// The env never travels with a deploy: every release runs with the app's
+// app.env on the server as it is then (EnvSet), and a login for Image comes
+// from the server too (SecretSet).
 type DeployStart struct {
 	DeployID string `json:"deploy_id"`
 	// App names the app on the server in every message: its folder, the
@@ -41,12 +43,10 @@ type DeployStart struct {
 	// Catalog deploys the catalog app of this name, such as umami: the
 	// daemon takes its compose file from the catalog built into it, never
 	// from the hub. Daemons before v1.0.0-beta.35 do not know it.
-	Catalog    string            `json:"catalog,omitempty"`
-	FromNumber int               `json:"from_number,omitempty"`
-	Image      string            `json:"image,omitempty"`
-	Registry   *Registry         `json:"registry,omitempty"`
-	Env        map[string]string `json:"env,omitempty"`
-	Domains    *Domains          `json:"routing,omitempty"`
+	Catalog    string   `json:"catalog,omitempty"`
+	FromNumber int      `json:"from_number,omitempty"`
+	Image      string   `json:"image,omitempty"`
+	Domains    *Domains `json:"routing,omitempty"`
 }
 
 // Domains is how visitors reach the main service, as set in web, CLI, TUI
@@ -83,11 +83,14 @@ func InstantHost(app, ip, provider string) string {
 	return app + "." + strings.ReplaceAll(address.String(), ".", "-") + "." + provider
 }
 
-// Registry is a login for pulling Image from a private registry.
-type Registry struct {
-	Host     string `json:"host"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+// RegistryHost is the registry of an image reference: its first part when
+// that looks like a host, else Docker Hub.
+func RegistryHost(image string) string {
+	first, _, found := strings.Cut(image, "/")
+	if found && (strings.ContainsAny(first, ".:") || first == "localhost") {
+		return first
+	}
+	return "docker.io"
 }
 
 // DeployLog is one line of build or start output.

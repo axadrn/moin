@@ -24,7 +24,10 @@ func TestResolveFillsVariables(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := newApps(dir, func(protocol.MessageType, string, any) {})
-	config, _, err := a.resolve(context.Background(), "vars", src, map[string]string{"DB_PASSWORD": "s3cret'\"$x"})
+	if err := a.setEnv(protocol.EnvSet{App: "vars", Set: map[string]string{"DB_PASSWORD": "s3cret'\"$x"}}); err != nil {
+		t.Fatal(err)
+	}
+	config, _, err := a.resolve(context.Background(), "vars", src)
 	if err != nil {
 		t.Fatal(err)
 	}

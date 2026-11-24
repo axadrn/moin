@@ -111,3 +111,34 @@ func TestSourceIsOneAnswer(t *testing.T) {
 		}
 	}
 }
+
+// Registry logins live on the servers: the page says which keep one,
+// takes it for a server without it, and picks the server of a new login
+// when there are several.
+func TestRegistriesOnServers(t *testing.T) {
+	logins := []service.RegistryLogin{{Host: "ghcr.io", Username: "ada", Servers: service.SecretServers{On: []service.SecretOn{{Server: "server-1"}}, MissingOn: []string{"server-2"}}}}
+	var html strings.Builder
+	if err := Registries(logins, []string{"server-1", "server-2"}).Render(projectPageContext("/app/tiny-rocket-co/registries"), &html); err != nil {
+		t.Fatal(err)
+	}
+	page := html.String()
+	for _, want := range []string{"as ada. On server-1.", "server-2 has no login for ghcr.io.", `data-secret-missing="server-2"`, `name="host" value="ghcr.io"`, `name="username" value="ada"`, `id="registry-server"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page has no %q", want)
+		}
+	}
+}
+
+// A new app shows the password of its instant address once, in place of
+// the form, with a link to the app.
+func TestAppAddedShowsThePasswordOnce(t *testing.T) {
+	var html strings.Builder
+	if err := AppAdded("/app/tiny-rocket-co/apps/shop", "shop", "made-once-123").Render(projectPageContext("/app/tiny-rocket-co/apps"), &html); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`id="app-add-form"`, "made-once-123", "only this once", `href="/app/tiny-rocket-co/apps/shop"`} {
+		if !strings.Contains(html.String(), want) {
+			t.Errorf("the answer has no %q", want)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,8 +22,11 @@ func registerDomainTools(server *mcpsdk.Server, services Services) {
 		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-moin.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, newTool("get_instant", "Get the instant address",
-		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one moin made, which show returns with a token that may write. Needs the read scope.",
+		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one moin made, which moin showed once and never shows again; new_instant_password makes a new one. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getInstant)))
+	mcpsdk.AddTool(server, newTool("new_instant_password", "New instant password",
+		"Makes a new password for the instant address of an app and returns it with its user: the one time moin shows it, it keeps only a hash. Give it to the user right away. The app takes it on restart_app, a start or a deploy; until then the old one works. Needs a token with read and write access.",
+		change(false, true)), Write(changes(services, tools.newInstantPassword)))
 	mcpsdk.AddTool(server, newTool("set_instant", "Set the instant address",
 		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it. The change waits for restart_app, a start or a deploy. x-moin.instant in compose.yml wins. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setInstant)))
@@ -104,10 +108,9 @@ func (t moinTools) setDomains(_ context.Context, caller Caller, input DomainsInp
 	return t.change(caller, input.App, nil, changed)
 }
 
-// InstantInput is the input of get_instant.
+// InstantInput is the input of get_instant and new_instant_password.
 type InstantInput struct {
-	App  string `json:"app" jsonschema:"the app name or ID"`
-	Show bool   `json:"show,omitempty" jsonschema:"include the password moin made; needs a token with read and write access"`
+	App string `json:"app" jsonschema:"the app name or ID"`
 }
 
 // Instant is the output of get_instant.
@@ -124,18 +127,33 @@ func (i Instant) Summary() string {
 		return i.URL + " via " + i.Provider + ", open to everyone."
 	case i.OwnPassword:
 		return i.URL + " via " + i.Provider + ", behind the app's own password."
-	case i.Password != "":
-		return i.URL + " via " + i.Provider + ", user " + i.User + " with the password in password."
 	}
-	return i.URL + " via " + i.Provider + ", behind a password moin made: show returns it."
+	return i.URL + " via " + i.Provider + ", behind a password moin made, user " + i.User + ": new_instant_password makes a new one."
 }
 
 func (t moinTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
-	instant, err := t.services.Apps.Instant(caller.Token.WorkspaceID, input.App, input.Show, caller.Token)
+	instant, err := t.services.Apps.Instant(caller.Token.WorkspaceID, input.App)
 	if err != nil {
 		return Instant{}, err
 	}
 	return Instant{api.NewInstant(instant)}, nil
+}
+
+// InstantPassword is the output of new_instant_password.
+type InstantPassword struct {
+	api.InstantPassword
+}
+
+func (p InstantPassword) Summary() string {
+	return "New password made: user " + p.User + ", password " + p.Password + ". moin shows it this once. The app takes it on its next restart."
+}
+
+func (t moinTools) newInstantPassword(_ context.Context, caller Caller, input InstantInput) (InstantPassword, error) {
+	password, err := t.services.Apps.NewInstantPassword(caller.actor(), input.App)
+	if err != nil {
+		return InstantPassword{}, err
+	}
+	return InstantPassword{api.InstantPassword{User: service.InstantUser, Password: password}}, nil
 }
 
 // SetInstantInput is the input of set_instant.

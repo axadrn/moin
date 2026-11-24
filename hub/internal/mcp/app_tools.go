@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
+	"github.com/axadrn/moin/hub/internal/service"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,7 +22,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres; the x-moin block). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, newTool("create_app", "Create an app",
-		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. Needs a token with read and write access.",
+		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. instant_password is the password of its instant address: the one time moin shows it, so give it to the user to keep. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.createApp)))
 	mcpsdk.AddTool(server, newTool("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
@@ -159,21 +160,30 @@ func (t moinTools) getApp(_ context.Context, caller Caller, input AppInput) (App
 	return AppDetail{api.AppDetail{App: api.NewApp(*app), Deploys: api.NewDeploys(deploys, app.LiveNumber)}}, nil
 }
 
-// App is the output of create_app.
+// App is the output of set_app_bucket.
 type App struct {
 	api.App
 }
 
 func (a App) Summary() string {
-	return fmt.Sprintf("Created %s on %s. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, a.Name)
+	return fmt.Sprintf("%s backs up to %s.", a.Name, cmp.Or(a.Bucket, "the workspace's default bucket"))
 }
 
-func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (App, error) {
+// CreatedApp is the output of create_app.
+type CreatedApp struct {
+	api.CreatedApp
+}
+
+func (a CreatedApp) Summary() string {
+	return fmt.Sprintf("Created %s on %s. Its instant address asks for user %s and the password in instant_password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, service.InstantUser, a.Name)
+}
+
+func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (CreatedApp, error) {
 	app, err := t.services.Apps.Create(caller.actor(), cmp.Or(input.App, input.Name), input.Server)
 	if err != nil {
-		return App{}, err
+		return CreatedApp{}, err
 	}
-	return App{api.NewApp(*app)}, nil
+	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), InstantPassword: app.InstantPassword}}, nil
 }
 
 func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {

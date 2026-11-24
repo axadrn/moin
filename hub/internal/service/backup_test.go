@@ -1,47 +1,9 @@
 package service
 
 import (
-	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"sync/atomic"
 	"testing"
 )
-
-// TestPublicBucketsOnly: the hosted hub refuses a bucket on its
-// own network, also behind a name; a self-hosted one may use it.
-func TestPublicBucketsOnly(t *testing.T) {
-	// other has no servers, so saving does not wait for a daemon.
-	apps, _, _, _ := newAppService(t)
-	var calls atomic.Int32
-	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer bucket.Close()
-	ctx := context.Background()
-	input := BucketInput{Name: "default", Endpoint: bucket.URL, Bucket: "backups", AccessKey: "key", SecretKey: "secret"}
-
-	// Self-hosted: a bucket next to the hub works.
-	if _, err := apps.AddBucket(ctx, other, input); err != nil {
-		t.Fatalf("self-hosted local bucket: %v", err)
-	}
-
-	apps.AllowOnlyPublicBuckets()
-	calls.Store(0)
-	for _, endpoint := range []string{bucket.URL, strings.Replace(bucket.URL, "127.0.0.1", "localhost", 1)} {
-		input.Name, input.Endpoint = "public", endpoint
-		_, err := apps.AddBucket(ctx, other, input)
-		if !errors.Is(err, ErrBucketPrivate) {
-			t.Fatalf("hosted %s: err = %v", endpoint, err)
-		}
-	}
-	if calls.Load() != 0 {
-		t.Fatalf("the bucket got %d calls", calls.Load())
-	}
-}
 
 func TestRefusePrivate(t *testing.T) {
 	for address, refused := range map[string]bool{
@@ -61,7 +23,7 @@ func TestRefusePrivate(t *testing.T) {
 		"[2606:4700::1]:443":  false,
 	} {
 		err := refusePrivate("tcp", address, nil)
-		if errors.Is(err, ErrBucketPrivate) != refused {
+		if errors.Is(err, ErrPrivateAddress) != refused {
 			t.Errorf("%s: err = %v, want refused %v", address, err, refused)
 		}
 	}

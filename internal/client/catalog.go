@@ -53,6 +53,9 @@ type CatalogDeploy struct {
 	// Login, only from an install, holds the secrets the first sign-in
 	// needs, such as ADMIN_PASSWORD: the one time they are shown.
 	Login map[string]string `json:"login"`
+	// InstantPassword, only from an install, is the password of the
+	// app's instant address: the one time moin shows it.
+	InstantPassword string `json:"instant_password"`
 }
 
 // Catalog lists the catalog with each app's newest release.

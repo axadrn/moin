@@ -89,11 +89,14 @@ func saveState(dir string, state State) error {
 	return os.WriteFile(filepath.Join(dir, stateFile), body, 0o600)
 }
 
-// Hello describes this daemon and server, with its rules.
-func Hello() protocol.Hello {
+// Hello describes this daemon and server, with its rules and the names of
+// the secrets it keeps in dir.
+func Hello(dir string) protocol.Hello {
 	hostname, _ := os.Hostname()
 	rules, _ := LoadRules(RulesFile())
+	file, _ := loadServerFile(dir)
 	return protocol.Hello{
+		Secrets:         file.secretNames(),
 		Rules:           rules,
 		ProtocolVersion: protocol.Version,
 		DaemonVersion:   build.Version,
@@ -112,7 +115,7 @@ func Register(ctx context.Context, dir, baseURL, installToken string) (State, er
 	ctx, cancel := context.WithTimeout(ctx, registerLimit)
 	defer cancel()
 
-	body, err := json.Marshal(protocol.RegisterRequest{Hello: Hello()})
+	body, err := json.Marshal(protocol.RegisterRequest{Hello: Hello(dir)})
 	if err != nil {
 		return State{}, err
 	}
@@ -162,6 +165,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	daemon.apps.backups = daemon.backups
 	daemon.security = newSecurity(dir, daemon.apps)
 	daemon.apps.proxyMode = daemon.security.proxyMode
+	daemon.apps.registryLogin = daemon.security.registryLogin
 	daemon.updater = newUpdater(state.URL)
 	// A restore the daemon stopped in the middle of ends first: its
 	// switch is one step, so the database is whole; the app runs again
@@ -281,7 +285,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 	defer conn.CloseNow()
 	conn.SetReadLimit(1 << 20)
 
-	hello, err := protocol.NewMessage(protocol.TypeHello, Hello())
+	hello, err := protocol.NewMessage(protocol.TypeHello, Hello(r.dir))
 	if err != nil {
 		return true, err
 	}
@@ -354,6 +358,18 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		r.serverConfig(ctx, message, rules)
 	case protocol.TypeBackupConfig:
 		r.backupConfig(message, rules)
+	case protocol.TypeEnvSet:
+		answer(r, message, protocol.TypeOK, func(request protocol.EnvSet) (any, error) {
+			return nil, r.apps.setEnv(request)
+		})
+	case protocol.TypeSecretSet:
+		r.secretSet(message, rules)
+	case protocol.TypeBucketSet:
+		r.bucketSet(ctx, message, rules)
+	case protocol.TypeBackupLink:
+		answer(r, message, protocol.TypeBackupLinkResult, func(request protocol.BackupLink) (any, error) {
+			return r.backups.link(ctx, request)
+		})
 	case protocol.TypeBackupList:
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
 			return r.backups.list(ctx, request), nil

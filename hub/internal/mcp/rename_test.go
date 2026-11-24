@@ -16,7 +16,7 @@ func TestRenameApp(t *testing.T) {
 	session := connectMemory(t, env.server, owner, token)
 
 	server := output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "web-1"}))
-	created := output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "blog", "server": server.Server.ID}))
+	created := output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "blog", "server": server.Server.ID}))
 	if len(created.ID) != 32 || len(created.ServerID) != 32 || created.ServerID != server.Server.ID {
 		t.Fatalf("IDs = %q on %q, server %q", created.ID, created.ServerID, server.Server.ID)
 	}

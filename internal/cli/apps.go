@@ -101,6 +101,7 @@ func appsAdd(ctx context.Context, call appsCall) error {
 		return err
 	}
 	done(call.stdout, "Added %s on %s", style.Bold.Render(app.Name), app.ServerName)
+	printInstantPassword(call.stdout, app.InstantPassword)
 	hint(call.stdout, "Deploy it with", build.Name+" deploy "+app.Name)
 	return nil
 }
@@ -401,7 +402,18 @@ func createApp(ctx context.Context, api *client.Client, name, server string, std
 		return err
 	}
 	done(stdout, "Created app %s on %s", style.Bold.Render(app.Name), app.ServerName)
+	printInstantPassword(stdout, app.InstantPassword)
 	return nil
+}
+
+// printInstantPassword shows the password of a new app's instant address,
+// the one time moin shows it.
+func printInstantPassword(stdout io.Writer, password string) {
+	if password == "" {
+		return
+	}
+	fmt.Fprintln(stdout, "  "+style.Warning.Render("The password of its instant address, shown only this once:"))
+	fmt.Fprintln(stdout, "  user "+instantUser+", password "+password)
 }
 
 // follow prints the deploy log and fails when the deploy fails. what is
@@ -482,7 +494,7 @@ func printLive(app client.App, checks []client.DomainCheck, took string, stdout 
 		fmt.Fprintln(stdout, "  also at "+strings.Join(urls[1:], ", "))
 	}
 	if app.Instant != "" && !app.InstantOpen && !app.Protected {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("A password guards "+app.Instant+": see it with "+build.Name+" instant --show "+app.Name))
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("A password guards "+app.Instant+", shown once when the app was made. A new one: "+build.Name+" instant password "+app.Name))
 	}
 }
 
@@ -803,12 +815,18 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		rows := make([][]string, 0, len(list))
 		for _, login := range list {
-			rows = append(rows, []string{login.Host, login.Username, login.CreatedAt.Local().Format("Jan 2 2006")})
+			rows = append(rows, []string{login.Host, login.Username, login.CreatedAt.Local().Format("Jan 2 2006"), keptOn(login.Servers, login.MissingOn)})
 		}
-		table(stdout, []string{"HOST", "USERNAME", "ADDED"}, rows)
+		table(stdout, []string{"HOST", "USERNAME", "ADDED", "LOGIN ON"}, rows)
+		for _, login := range list {
+			for _, server := range login.MissingOn {
+				hint(stdout, server+" has no login for "+login.Host+". Enter it:", build.Name+" registry set "+login.Host+" "+login.Username+" --server "+server)
+			}
+		}
 		return nil
 	case "set":
-		flags := newFlags("registry set", "registry set <host> <username>, then the password or token on stdin")
+		flags := newFlags("registry set", "registry set <host> <username> [--server <server>], then the password or token on stdin")
+		server := flags.String("server", "", "the server that keeps the login; needed with more than one")
 		if err := flags.parse(args); err != nil {
 			return err
 		}
@@ -829,11 +847,11 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err != nil {
 			return err
 		}
-		err = api.SetRegistry(ctx, host, username, password)
+		err = api.SetRegistry(ctx, host, username, password, *server)
 		if err != nil {
 			return err
 		}
-		done(stdout, "Saved the login for %s. Image deploys from it pull with it.", host)
+		done(stdout, "Saved the login for %s on the server. Image deploys from it pull with it.", host)
 		return nil
 	case "rm":
 		flags := newFlags("registry rm", "registry rm <host> [--yes]").withYes()
@@ -855,7 +873,7 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err != nil {
 			return err
 		}
-		done(stdout, "Removed the login for %s.", host)
+		done(stdout, "Removed the login for %s, also from the servers.", host)
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "registry "+command, build.Name)

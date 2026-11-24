@@ -428,9 +428,9 @@ func TestOldDaemonGetsAnUpdateAnswer(t *testing.T) {
 	}
 }
 
-// TestDownloads: a download is a signed link to the newest copy, or the
-// one named, in the app's own bucket; it expires, and an app without a
-// copy says so.
+// TestDownloads: a download is a link the server signs to the newest
+// copy, or the one named, in the app's own bucket; an app without a copy
+// says so.
 func TestDownloads(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
 	app, err := apps.Create(owner, "shop", "web-1")
@@ -447,15 +447,19 @@ func TestDownloads(t *testing.T) {
 		backupDaemon(t, apps, servers, server, daemon, backup)
 	}
 	answer(backup)
+	// The server signs the link with the key only it keeps.
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupLink, protocol.TypeBackupLinkResult, protocol.BackupLinkResult{Link: "https://s3.example.com/signed"})
 	download, err := apps.Download(ctx, owner, "shop", "", "")
-	if err != nil || download.Copy != "20261107T140200Z" || download.Size != 42 || download.Database != "/data/app.db" {
+	if err != nil || download.Copy != "20261107T140200Z" || download.Size != 42 || download.Database != "/data/app.db" || download.Link != "https://s3.example.com/signed" {
 		t.Fatalf("newest: %+v %v", download, err)
 	}
-	key := owner.WorkspaceID + "/shop/" + app.ID + "/data~app.db/copies/20261107T140200Z.db.gz"
-	if !strings.HasPrefix(download.Link, "https://s3.example.com/owner/"+key) || !strings.Contains(download.Link, "X-Amz-Expires=900") {
-		t.Fatalf("link %s", download.Link)
+	var asked protocol.BackupLink
+	daemon.last(t, protocol.TypeBackupLink, &asked)
+	if asked != (protocol.BackupLink{App: app.Folder, Database: "/data/app.db", Copy: "20261107T140200Z", Name: "shop"}) {
+		t.Fatalf("backup.link = %+v", asked)
 	}
 	answer(backup)
+	go daemonAnswers(servers, server.ID, daemon, protocol.TypeBackupLink, protocol.TypeBackupLinkResult, protocol.BackupLinkResult{Link: "https://s3.example.com/signed"})
 	if download, err := apps.Download(ctx, owner, "shop", "", "20261107T130200Z"); err != nil || download.Copy != "20261107T130200Z" {
 		t.Fatalf("named: %+v %v", download, err)
 	}
@@ -546,7 +550,8 @@ func TestLateCopiesAndEditsDuringARestore(t *testing.T) {
 	}
 }
 
-// A bucket that cannot be opened pauses only its app; the others go on.
+// A bucket whose key the server does not keep pauses only its app; the
+// others go on.
 func TestNoHalfBackupConfig(t *testing.T) {
 	apps, _, server, _ := newAppService(t)
 	app, err := apps.Create(owner, "shop", server.ID)
@@ -557,17 +562,17 @@ func TestNoHalfBackupConfig(t *testing.T) {
 		t.Fatalf("config: %+v %v", config, err)
 	}
 	broken := "bucket-broken"
-	if err := apps.apps.CreateBucket(model.Bucket{ID: broken, WorkspaceID: owner.WorkspaceID, Name: "broken", Endpoint: "https://s3.example.com", Region: "auto", Bucket: "broken", AccessKey: "key", SecretKey: "not sealed"}); err != nil {
+	if err := apps.apps.CreateBucket(model.Bucket{ID: broken, WorkspaceID: owner.WorkspaceID, Name: "broken", Endpoint: "https://s3.example.com", Region: "auto", Bucket: "broken", AccessKey: "key"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := apps.apps.SetAppBucket(app.ID, &broken, "", time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	config, err := apps.backupConfig(owner.WorkspaceID, server.ID)
-	if err != nil || config.Bucket == nil || !strings.Contains(config.Paused["shop"], "cannot be opened") || config.Schedules["shop"].Every != 60 {
-		t.Fatalf("a broken bucket pauses only its app: %+v %v", config, err)
+	if err != nil || config.Bucket == nil || config.Paused["shop"] != "web-1 has no key for the bucket broken. Enter it for web-1 under Backups." || config.Schedules["shop"].Every != 60 {
+		t.Fatalf("a bucket without a key pauses only its app: %+v %v", config, err)
 	}
-	if BackupProblem(config.Paused["shop"]) != "The app's bucket can't be opened: check its keys under Data." {
+	if BackupProblem(config.Paused["shop"]) != "The server has no key for the app's bucket: enter it under Backups." {
 		t.Error("the problem of a paused app")
 	}
 }
@@ -731,7 +736,7 @@ func TestFileLocksInstantAndPassword(t *testing.T) {
 	if _, err := apps.SetInstant(owner, "blog", "sslip.io", nil); !errors.Is(err, ErrInstantInFile) {
 		t.Fatalf("instant, the provider moin has stored: %v", err)
 	}
-	instant, err := apps.Instant(owner.WorkspaceID, "blog", false, nil)
+	instant, err := apps.Instant(owner.WorkspaceID, "blog")
 	if err != nil || instant.Provider != "nip.io" {
 		t.Fatalf("the provider shown: %q, %v", instant.Provider, err)
 	}

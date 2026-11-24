@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -76,25 +75,29 @@ func TestExecRefused(t *testing.T) {
 	}
 }
 
-// TestMaskedCommand: every env value of the app's containers, six
+// TestMaskedCommand: every env value of the app in its app.env, six
 // characters or more, is masked in the command, the longest first, so a
-// value inside another leaves nothing of the longer one. Without a compose
-// file only the program is left.
+// value inside another leaves nothing of the longer one. Values of the
+// compose file that are not env values stay. An env file moin cannot read
+// leaves only the program.
 func TestMaskedCommand(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "compose.json")
-	compose := `{"services": {
-		"web": {"environment": {"DB_PASSWORD": "abcdef123", "PRICE": "$$5-dollars", "EMPTY": null}},
-		"db": {"environment": {"SHORT": "abcde", "INNER": "abcdef"}}
-	}}`
-	if err := os.WriteFile(file, []byte(compose), 0o600); err != nil {
+	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	err := a.setEnv(protocol.EnvSet{App: "web", Set: map[string]string{"DB_PASSWORD": "abcdef123", "PRICE": "$5-dollars", "SHORT": "abcde", "INNER": "abcdef"}})
+	if err != nil {
 		t.Fatal(err)
 	}
-	got := maskedCommand(file, []string{"psql", "pw=abcdef123", "short=abcdef", "abcde", "$5-dollars"})
-	if got != "psql pw=••• short=••• abcde '•••'" {
+	got := a.maskedCommand("web", []string{"psql", "pw=abcdef123", "short=abcdef", "abcde", "$5-dollars", "from-compose"})
+	if got != "psql pw=••• short=••• abcde '•••' from-compose" {
 		t.Errorf("maskedCommand = %q", got)
 	}
-	if got := maskedCommand(filepath.Join(t.TempDir(), "none.json"), []string{"psql", "-c", "secret"}); got != "psql …" {
-		t.Errorf("without a compose file = %q", got)
+	if got := a.maskedCommand("none", []string{"psql", "-c", "secret"}); got != "psql -c secret" {
+		t.Errorf("without env = %q", got)
+	}
+	if err := os.WriteFile(a.envFile("web"), []byte("not a line"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.maskedCommand("web", []string{"psql", "-c", "abcdef123"}); got != "psql …" {
+		t.Errorf("with a broken env file = %q", got)
 	}
 }
 

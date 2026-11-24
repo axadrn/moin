@@ -158,7 +158,7 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 		env[catalog.URLVar] = "https://" + domain
 		env[catalog.DomainVar] = domain
 	}
-	_, err = s.apps.SetEnv(actor, app.ID, env, nil)
+	_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
 	if err != nil {
 		return app, nil, nil, err
 	}
@@ -210,7 +210,7 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 		}
 	}
 	if app.CatalogVersion != version || len(env) > 1 {
-		_, err = s.apps.SetEnv(actor, app.ID, env, nil)
+		_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
 		if err == nil {
 			err = s.apps.apps.SetCatalogVersion(app.ID, version)
 		}

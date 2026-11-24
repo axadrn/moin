@@ -1,7 +1,7 @@
 // Package dotenv reads the env vars of an app from one .env text, KEY=value
-// per line, and says what replacing them with such a text changes.
-// The CLI, the TUI and the hub share it, so a text means the same
-// everywhere.
+// per line, writes them as one, and says what replacing them with such a
+// text changes. The CLI, the TUI, the hub and the daemon share it, so a text
+// means the same everywhere.
 package dotenv
 
 import (
@@ -14,7 +14,8 @@ import (
 // Parse reads a .env text. Empty lines and lines starting with # are skipped,
 // "export " in front of a key is allowed. A value may be bare, in single
 // quotes (taken as it is) or in double quotes, where \n, \", \\ and \$
-// stand for a line break, a quote, a backslash and a dollar.
+// stand for a line break, a quote, a backslash and a dollar; \r for a
+// carriage return.
 func Parse(text string) (map[string]string, error) {
 	env := map[string]string{}
 	for number, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
@@ -58,6 +59,8 @@ func unquote(value string) (string, error) {
 				switch next := value[index]; next {
 				case 'n':
 					out.WriteByte('\n')
+				case 'r':
+					out.WriteByte('\r')
 				case 't':
 					out.WriteByte('\t')
 				default:
@@ -75,6 +78,19 @@ func unquote(value string) (string, error) {
 	}
 	return value, nil
 }
+
+// Format writes env as a .env text Parse reads back exactly, and docker
+// compose too: one KEY="value" per line, sorted by key, with \, ", $ and
+// line breaks escaped, so compose fills in no ${VAR} of a value.
+func Format(env map[string]string) string {
+	var text strings.Builder
+	for _, key := range slices.Sorted(maps.Keys(env)) {
+		text.WriteString(key + `="` + quote(env[key]) + "\"\n")
+	}
+	return text.String()
+}
+
+var quote = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`, "\r", `\r`).Replace
 
 // Change is what replacing the env vars with others does, by key, sorted.
 // Replaced are the keys there were and that come again: moin never reads a

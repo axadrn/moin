@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/link"
@@ -102,6 +103,27 @@ templ AppAddForm(servers []model.Server) {
 			}
 		</div>
 	</form>
+}
+
+// AppAdded takes the place of the add form when an app was added: the
+// password of its instant address, the one time moin shows it, with a
+// link to the app.
+templ AppAdded(appPath, name, password string) {
+	<div id="app-add-form" class="moin-stack" data-gap="4" data-app-added>
+		<p class="moin-text">{ name } is added. Its instant address asks for this password. Keep it now: moin shows it only this once.</p>
+		@components.List() {
+			@components.Item(components.ItemProps{}) {
+				<span class="moin-mono moin-text">{ service.InstantUser }</span>
+				<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ password }</span>
+				@copyButton(password, "", "Copy the password")
+			}
+		}
+		<div class="moin-row" data-end>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: appPath}) {
+				Open the app
+			}
+		</div>
+	</div>
 }
 
 func serverOptions(servers []model.Server) []components.Option {

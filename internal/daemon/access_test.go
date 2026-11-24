@@ -218,3 +218,16 @@ func TestDataFolderThroughLink(t *testing.T) {
 		t.Fatalf("a first data folder: %v", err)
 	}
 }
+
+// TestAppRoomEnvFile: a service reads the app's own env file and no other.
+func TestAppRoomEnvFile(t *testing.T) {
+	room := appRoom{project: "web", envFile: "/var/lib/moin/apps/web/app.env"}
+	own := map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx", "env_file": []any{"/var/lib/moin/apps/web/app.env"}}}}
+	if reason := room.check(own); reason != "" {
+		t.Fatalf("the app's own env file: %s", reason)
+	}
+	other := map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx", "env_file": []any{"/var/lib/moin/apps/shop/app.env"}}}}
+	if reason := room.check(other); !strings.Contains(reason, "not the app's env file") {
+		t.Fatalf("another app's env file: %q", reason)
+	}
+}

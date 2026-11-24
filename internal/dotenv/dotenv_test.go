@@ -39,3 +39,17 @@ func TestDiff(t *testing.T) {
 		t.Error("no env vars replaced by none change something")
 	}
 }
+
+// Format writes what Parse reads back, also values with quotes, dollars,
+// backslashes and line breaks.
+func TestFormatRoundTrip(t *testing.T) {
+	env := map[string]string{"A": "plain", "B": "it's \"$5\"\nnow\r\\end", "C": "", "D": "${HOME}"}
+	text := Format(env)
+	if !strings.HasPrefix(text, "A=\"plain\"\nB=") {
+		t.Errorf("Format = %q", text)
+	}
+	back, err := Parse(text)
+	if err != nil || !maps.Equal(back, env) {
+		t.Errorf("Parse(Format) = %q, %v; want %q", back, err, env)
+	}
+}

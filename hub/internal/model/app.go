@@ -34,12 +34,15 @@ type App struct {
 	ServiceDomains string `db:"service_domains"`
 	// Instant is the provider of the instant address, such as sslip.io, or
 	// off; InstantHost the address the last deploy served it at. A password
-	// guards it unless InstantOpen: Protect when set, else InstantPassword,
-	// sealed.
-	Instant         string `db:"instant"`
-	InstantHost     string `db:"instant_host"`
-	InstantOpen     bool   `db:"instant_open"`
-	InstantPassword string `db:"instant_password"`
+	// guards it unless InstantOpen: Protect when set, else the one moin made,
+	// shown once and kept as its bcrypt hash, InstantPasswordHash.
+	Instant             string `db:"instant"`
+	InstantHost         string `db:"instant_host"`
+	InstantOpen         bool   `db:"instant_open"`
+	InstantPasswordHash string `db:"instant_password_hash"`
+	// InstantPassword is the password moin just made, only in the answer
+	// of Create: moin keeps its hash, never the password.
+	InstantPassword string `db:"-"`
 	// Repo is owner/name on GitHub when the app follows one, with its
 	// branch; AutoDeploy deploys every push to it.
 	Repo           string `db:"repo"`
@@ -119,12 +122,12 @@ type Deploy struct {
 	FinishedAt    *time.Time `db:"finished_at"`
 }
 
-// Registry is a login for a container registry. Password is sealed.
+// Registry is a login for a container registry. Its password lives only
+// on the servers (ServerSecret).
 type Registry struct {
 	WorkspaceID string    `db:"workspace_id"`
 	Host        string    `db:"host"`
 	Username    string    `db:"username"`
-	Password    string    `db:"password"`
 	CreatedAt   time.Time `db:"created_at"`
 }
 
@@ -221,8 +224,9 @@ func (a App) DomainsOf(service string) (domains []string, canonical string) {
 }
 
 // Bucket is one of a workspace's S3-compatible buckets, where the backups
-// of its apps go. SecretKey is sealed. One bucket of a
-// workspace is its default: apps without a bucket of their own use it.
+// of its apps go. Its secret key lives only on the servers
+// (ServerSecret). One bucket of a workspace is its default: apps without a
+// bucket of their own use it.
 type Bucket struct {
 	ID          string    `db:"id"`
 	WorkspaceID string    `db:"workspace_id"`
@@ -233,7 +237,6 @@ type Bucket struct {
 	Bucket      string    `db:"bucket"`
 	Path        string    `db:"path"`
 	AccessKey   string    `db:"access_key"`
-	SecretKey   string    `db:"secret_key"`
 	CreatedAt   time.Time `db:"created_at"`
 }
 

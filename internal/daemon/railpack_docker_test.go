@@ -51,7 +51,10 @@ func TestRailpackDocker(t *testing.T) {
 			a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
 			app := "rptest-" + name
 			env := map[string]string{"BUILD_TOKEN": "s3cr3t-value"}
-			config, detected, err := a.resolve(ctx, app, src, env)
+			if err := a.setEnv(protocol.EnvSet{App: app, Set: env}); err != nil {
+				t.Fatal(err)
+			}
+			config, detected, err := a.resolve(ctx, app, src)
 			if err != nil {
 				t.Fatalf("resolve: %v", err)
 			}
@@ -60,13 +63,13 @@ func TestRailpackDocker(t *testing.T) {
 			}
 			t.Logf("Railpack: %s", detected.Builder)
 			composeFile := filepath.Join(releaseDir, "compose.json")
-			start := protocol.DeployStart{App: app, Number: 1, Env: env}
-			err = finish(&release{start: start, config: config, detected: detected, composeFile: composeFile})
+			start := protocol.DeployStart{App: app, Number: 1}
+			err = finish(&release{start: start, config: config, detected: detected, composeFile: composeFile, envFile: a.envFile(app), env: env})
 			if err != nil {
 				t.Fatal(err)
 			}
-			// The container's environment holds the values, as for every app;
-			// the build and its secrets only name them.
+			// The container reads the values from the env file, as for every
+			// app; the build and its secrets only name them.
 			body, _ := os.ReadFile(composeFile)
 			var written map[string]any
 			json.Unmarshal(body, &written)
@@ -77,11 +80,7 @@ func TestRailpackDocker(t *testing.T) {
 			}
 			var log strings.Builder
 			logf := func(format string, args ...any) { fmt.Fprintf(&log, format+"\n", args...) }
-			envFiles, err := writeEnvFile(releaseDir, env)
-			if err != nil {
-				t.Fatal(err)
-			}
-			args := append([]string{"compose", "-p", project(app), "-f", composeFile}, envFiles...)
+			args := []string{"compose", "-p", project(app), "-f", composeFile, "--env-file", a.envFile(app)}
 			err = a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 			if err != nil {
 				t.Fatalf("build: %v\n%s", err, tail(log.String(), 40))

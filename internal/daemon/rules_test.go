@@ -108,7 +108,7 @@ func TestHelloCarriesTheRules(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "rules")
 	os.WriteFile(file, []byte("data: off\n"), 0o600)
 	t.Setenv("MOIN_RULES", file)
-	if hello := Hello(); hello.Rules == nil || !hello.Rules.DataOff {
+	if hello := Hello(t.TempDir()); hello.Rules == nil || !hello.Rules.DataOff {
 		t.Fatalf("hello = %+v", hello)
 	}
 }

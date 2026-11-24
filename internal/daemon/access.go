@@ -25,6 +25,7 @@ var serviceKeys = map[string]string{
 	"command":           "what the container runs",
 	"entrypoint":        "what the container runs",
 	"environment":       "its env vars",
+	"env_file":          "checked: only the app's own env file",
 	"working_dir":       "its folder inside the container",
 	"user":              "the user inside the container",
 	"healthcheck":       "how moin sees it is up",
@@ -121,6 +122,8 @@ type appRoom struct {
 	volumes []string
 	// project names the app's networks: <project>_<network>.
 	project string
+	// envFile is the app's env file, the only one a service may read.
+	envFile string
 	// mounts are the folders of the server its rules allow, with mounts:.
 	mounts []string
 	// writable are the folders a running container can write, of this
@@ -158,6 +161,7 @@ func (a *apps) roomOf(release *release, config map[string]any) appRoom {
 		releasesDir: resolved(filepath.Join(a.appDir(app), "releases")),
 		volumes:     a.volumeNames(app),
 		project:     nameOf(release.start),
+		envFile:     a.envFile(app),
 	}
 	if release.rules != nil {
 		for _, folder := range release.rules.Mounts {
@@ -264,6 +268,12 @@ func (r appRoom) checkService(service map[string]any) string {
 	if build, ok := service["build"].(map[string]any); ok {
 		if reason := r.checkBuild(build); reason != "" {
 			return "build: " + reason
+		}
+	}
+	envFiles, _ := service["env_file"].([]any)
+	for _, item := range envFiles {
+		if file, _ := item.(string); file != r.envFile {
+			return fmt.Sprintf("env_file %v is not the app's env file", item)
 		}
 	}
 	mounts, _ := service["volumes"].([]any)

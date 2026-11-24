@@ -202,21 +202,34 @@ func instantURL(host string) string {
 }
 
 // Instant is the instant address of an app: its URL, or why it has none,
-// and the password in front of it when asked for.
+// and the user of the password in front of it. moin shows the password
+// only once, when it makes it (InstantPassword). OwnPassword says the
+// app's own password, the one of its domains, guards it instead.
 type Instant struct {
-	URL      string `json:"url"`
-	Provider string `json:"provider"`
-	Reason   string `json:"reason,omitempty"`
-	Open     bool   `json:"open"`
-	User     string `json:"user,omitempty"`
-	// Password is the one moin made, with show=true; OwnPassword says the
-	// app's own password, the one of its domains, guards it instead.
-	Password    string `json:"password,omitempty"`
+	URL         string `json:"url"`
+	Provider    string `json:"provider"`
+	Reason      string `json:"reason,omitempty"`
+	Open        bool   `json:"open"`
+	User        string `json:"user,omitempty"`
 	OwnPassword bool   `json:"own_password"`
 }
 
 func NewInstant(instant service.Instant) Instant {
-	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason, Open: instant.Open, User: instant.User, Password: instant.Password, OwnPassword: instant.OwnPassword}
+	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason, Open: instant.Open, User: instant.User, OwnPassword: instant.OwnPassword}
+}
+
+// InstantPassword is a new password of an app's instant address: the one
+// time moin shows it. The app takes it on its next restart.
+type InstantPassword struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+// CreatedApp is the answer of POST /api/v1/apps: the app and the password
+// of its instant address, shown this once.
+type CreatedApp struct {
+	App
+	InstantPassword string `json:"instant_password,omitempty"`
 }
 
 func NewDeploy(deploy model.Deploy) Deploy {
@@ -284,7 +297,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, NewApp(*app))
+	JSON(w, http.StatusCreated, CreatedApp{App: NewApp(*app), InstantPassword: app.InstantPassword})
 }
 
 // Get returns an app with its newest deploys.
@@ -490,7 +503,7 @@ func (h *AppsHandler) UpdateEnv(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), request.Set, request.Unset)
+	_, err := h.apps.SetEnv(r.Context(), actor(r), r.PathValue("app"), request.Set, request.Unset)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -525,7 +538,7 @@ func (h *AppsHandler) ReplaceEnv(w http.ResponseWriter, r *http.Request) {
 	if request.Env == nil {
 		request.Env = map[string]string{}
 	}
-	change, err := h.apps.ReplaceEnv(actor(r), r.PathValue("app"), request.Env)
+	change, err := h.apps.ReplaceEnv(r.Context(), actor(r), r.PathValue("app"), request.Env)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -637,11 +650,42 @@ func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// Registry is a registry login without its password.
+// Registry is a registry login without its password, which only the
+// servers keep: Servers are the ones that keep it, MissingOn the others.
 type Registry struct {
 	Host      string    `json:"host"`
 	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
+	SecretServers
+}
+
+// NewRegistry is the JSON shape of a registry login.
+func NewRegistry(login service.RegistryLogin) Registry {
+	return Registry{Host: login.Host, Username: login.Username, CreatedAt: login.CreatedAt.UTC(), SecretServers: NewSecretServers(login.Servers)}
+}
+
+// SecretOn is a server that keeps a secret, and since when.
+type SecretOn struct {
+	Server    string    `json:"server"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SecretServers says which servers keep a secret and which do not.
+type SecretServers struct {
+	Servers   []SecretOn `json:"servers"`
+	MissingOn []string   `json:"missing_on"`
+}
+
+// NewSecretServers is the JSON shape of where a secret is.
+func NewSecretServers(where service.SecretServers) SecretServers {
+	out := SecretServers{Servers: make([]SecretOn, 0, len(where.On)), MissingOn: where.MissingOn}
+	if out.MissingOn == nil {
+		out.MissingOn = []string{}
+	}
+	for _, on := range where.On {
+		out.Servers = append(out.Servers, SecretOn{Server: on.Server, UpdatedAt: on.UpdatedAt.UTC()})
+	}
+	return out
 }
 
 // RegistryList is the answer of GET /api/v1/registries.
@@ -649,9 +693,12 @@ type RegistryList struct {
 	Items []Registry `json:"items"`
 }
 
+// registryRequest is a login for one server: server may be empty when
+// the workspace has one.
 type registryRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Server   string `json:"server"`
 }
 
 func (h *AppsHandler) registryList(workspaceID string) (RegistryList, error) {
@@ -661,7 +708,7 @@ func (h *AppsHandler) registryList(workspaceID string) (RegistryList, error) {
 	}
 	list := RegistryList{Items: make([]Registry, 0, len(logins))}
 	for _, login := range logins {
-		list.Items = append(list.Items, Registry{Host: login.Host, Username: login.Username, CreatedAt: login.CreatedAt.UTC()})
+		list.Items = append(list.Items, NewRegistry(login))
 	}
 	return list, nil
 }
@@ -677,13 +724,14 @@ func (h *AppsHandler) Registries(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, list)
 }
 
-// SetRegistry stores the login for one registry host.
+// SetRegistry hands the login for one registry host to a server, which
+// keeps it; the hub keeps the host and the username.
 func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 	var request registryRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.SetRegistry(actor(r), r.PathValue("host"), request.Username, request.Password)
+	err := h.apps.SetRegistry(r.Context(), actor(r), r.PathValue("host"), request.Username, request.Password, request.Server)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -693,7 +741,7 @@ func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 
 // DeleteRegistry removes the login for one registry host.
 func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.RemoveRegistry(actor(r), r.PathValue("host"))
+	err := h.apps.RemoveRegistry(r.Context(), actor(r), r.PathValue("host"))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -813,17 +861,26 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
 }
 
-// GetInstant answers the app's instant address; with show=true the
-// password moin made for it, which needs a token that may write.
+// GetInstant answers the app's instant address, without the password.
 func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	show := r.URL.Query().Get("show") == "true"
-	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"), show, ctxkeys.APIToken(r.Context()))
+	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
 	JSON(w, http.StatusOK, NewInstant(instant))
+}
+
+// NewInstantPassword makes a new password for the app's instant address
+// and answers it, the one time moin shows it.
+func (h *AppsHandler) NewInstantPassword(w http.ResponseWriter, r *http.Request) {
+	password, err := h.apps.NewInstantPassword(actor(r), r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, InstantPassword{User: service.InstantUser, Password: password})
 }
 
 // SetInstant picks the provider of the app's instant address, or off, and

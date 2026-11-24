@@ -223,3 +223,14 @@ func text(result *mcpsdk.CallToolResult) string {
 	}
 	return strings.Join(parts, "\n")
 }
+
+// online puts a server of the owner online, with a daemon that keeps every
+// env value and secret it gets, and returns what takes it offline again.
+func online(t *testing.T, env *environment, o owner, name string) (offline func()) {
+	t.Helper()
+	server, err := env.services.Servers.Get(o.workspace.ID, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return env.services.Servers.Connect(server, testutil.Hello, "203.0.113.5", func() {}, testutil.AnswerOK(env.services.Servers.Receive, server.ID))
+}

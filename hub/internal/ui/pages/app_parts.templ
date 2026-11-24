@@ -1,8 +1,12 @@
 package pages
 
 import (
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/internal/human"
 )
@@ -105,4 +109,89 @@ func took(start time.Time, end *time.Time) string {
 
 func stamp(t time.Time) string {
 	return t.UTC().Format("Jan 2, 2006 15:04:05 UTC")
+}
+
+// ---------------------------------------------------------------- secrets on servers
+
+// A bucket key, a registry login and the Tailscale key live only on the
+// servers: moin forwards a value once and keeps the name. These parts say
+// which server keeps one and take it for a server that does not.
+
+// secretOn is where a secret is, in one quiet line: the servers that keep
+// it, or none.
+func secretOn(where service.SecretServers) string {
+	if len(where.On) == 0 {
+		return "On no server yet"
+	}
+	names := make([]string, 0, len(where.On))
+	for _, on := range where.On {
+		names = append(names, on.Server)
+	}
+	return "On " + strings.Join(names, ", ")
+}
+
+// secretServerNames are the servers of the workspace, the ones without the
+// secret first: every server shows up in one of the two lists.
+func secretServerNames(where service.SecretServers) []string {
+	names := slices.Clone(where.MissingOn)
+	for _, on := range where.On {
+		names = append(names, on.Server)
+	}
+	return names
+}
+
+// missingSecretProps is a server that does not keep a secret: Sentence
+// says so, Action and Target where the form goes, Field and Label the
+// field of the value, Hidden what else the save needs.
+type missingSecretProps struct {
+	Server   string
+	Sentence string
+	Action   string
+	Target   string
+	Field    string
+	Label    string
+	Hidden   map[string]string
+}
+
+// missingSecret takes the secret for one server that does not keep it.
+templ missingSecret(p missingSecretProps) {
+	{{ id := "secret-" + p.Field + "-" + p.Server }}
+	@components.Item(components.ItemProps{Form: true, For: id, Lead: connectedDot(false), Name: p.Server, Note: p.Sentence, Attrs: templ.Attributes{
+		"hx-post":             p.Action,
+		"hx-target":           p.Target,
+		"hx-select":           p.Target,
+		"hx-swap":             "outerHTML",
+		"hx-disable":          "find button[type='submit']",
+		"data-secret-missing": p.Server,
+	}}) {
+		@components.CSRF()
+		<input type="hidden" name="server" value={ p.Server }/>
+		for _, key := range slices.Sorted(maps.Keys(p.Hidden)) {
+			<input type="hidden" name={ key } value={ p.Hidden[key] }/>
+		}
+		<div class="moin-row moin-width" data-gap="2" style="--width:20rem">
+			@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "name": p.Field, "type": "password", "autocomplete": "off", "placeholder": p.Label, "aria-label": p.Label, "required": true}})
+			@components.Button(components.ButtonProps{Type: "submit"}) {
+				Save
+			}
+		</div>
+	}
+}
+
+// serverField picks the server that checks and keeps a new secret, when
+// the workspace has more than one; with one, moin takes it.
+templ serverField(id string, servers []string) {
+	if len(servers) > 1 {
+		@formField("Server", id, "Keeps the key. Enter it for the others below once it is saved.", "") {
+			@components.Select(components.SelectProps{ID: id, Name: "server", Label: "Server", Options: nameOptions(servers), Value: servers[0]})
+		}
+	}
+}
+
+func nameOptions(names []string) []components.Option {
+	options := make([]components.Option, 0, len(names))
+	for _, name := range names {
+		options = append(options, components.Option{Value: name, Label: name})
+	}
+	return options
 }

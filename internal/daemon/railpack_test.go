@@ -94,9 +94,9 @@ func TestRailpackSummary(t *testing.T) {
 func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 	base := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": "/src", "args": map[string]any{"cache-key": "moin-shop"}}}}}
 	file := t.TempDir() + "/compose.json"
-	start := protocol.DeployStart{App: "shop", Number: 3, Env: map[string]string{"TOKEN": "abc"}}
+	start := protocol.DeployStart{App: "shop", Number: 3}
 	for kind, wantSecrets := range map[string]bool{"railpack": true, "dockerfile": false} {
-		err := finish(&release{start: start, config: base, detected: protocol.Detected{Kind: kind, Service: "web", Port: 8080}, composeFile: file})
+		err := finish(&release{start: start, config: base, detected: protocol.Detected{Kind: kind, Service: "web", Port: 8080}, composeFile: file, envFile: "/state/apps/shop/app.env", env: map[string]string{"TOKEN": "abc"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,36 +110,42 @@ func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 		if has != wantSecrets {
 			t.Errorf("%s: secrets = %v:\n%s", kind, has, body)
 		}
-		if !strings.Contains(string(body), `"TOKEN": "abc"`) {
-			t.Errorf("%s: the container lacks its env:\n%s", kind, body)
+		if !strings.Contains(string(body), `"/state/apps/shop/app.env"`) || strings.Contains(string(body), `"abc"`) {
+			t.Errorf("%s: the container does not read its env file, or a value is in the file:\n%s", kind, body)
 		}
 	}
 }
 
-// TestWriteEnvFile writes values compose reads back exactly, and only
-// names a shell and compose take.
-func TestWriteEnvFile(t *testing.T) {
-	dir := t.TempDir()
-	args, err := writeEnvFile(dir, map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "x y": "3"})
+// TestSetEnv: env.set writes values compose reads back exactly into the
+// app's one env file, 0600; a key it removes is gone from the file.
+func TestSetEnv(t *testing.T) {
+	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "OLD": "gone"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(args, " ") != "--env-file "+filepath.Join(dir, "app.env") {
-		t.Fatalf("args = %v", args)
+	if err := a.setEnv(protocol.EnvSet{App: "shop", Remove: []string{"OLD"}}); err != nil {
+		t.Fatal(err)
 	}
-	body, _ := os.ReadFile(filepath.Join(dir, "app.env"))
+	body, _ := os.ReadFile(a.envFile("shop"))
 	want := "A=\"1\"\nB=\"it's \\\"q\\\" \\\\ \\$HOME \\${X}\\nline\\r\"\n"
 	if string(body) != want {
 		t.Fatalf("app.env = %q, want %q", body, want)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o755); err != nil {
+	if info, _ := os.Stat(a.envFile("shop")); info.Mode().Perm() != 0o600 {
+		t.Fatalf("app.env is %v", info.Mode())
+	}
+	if err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"x y": "3"}}); err == nil {
+		t.Fatal("a key a shell does not take was set")
+	}
+	if err := a.setEnv(protocol.EnvSet{App: "../etc", Set: map[string]string{"A": "1"}}); err == nil {
+		t.Fatal("an app name outside the apps was taken")
+	}
+	src := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, ".env"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "src", ".env"), nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	args, _ = writeEnvFile(dir, nil)
-	if len(args) != 4 || args[1] != filepath.Join(dir, "src", ".env") {
+	if args := a.envArgs("shop", src); len(args) != 4 || args[1] != filepath.Join(src, ".env") || args[3] != a.envFile("shop") {
 		t.Fatalf("the source's .env goes first: %v", args)
 	}
 }

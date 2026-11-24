@@ -128,6 +128,10 @@ type release struct {
 	// running names the images of the running release by service, for a
 	// deploy without source.
 	running map[string]string
+	// envFile is the app's env file, which every release reads, and env
+	// the values in it when the deploy started.
+	envFile string
+	env     map[string]string
 	// logf writes a line to the deploy log.
 	logf func(string, ...any)
 }
@@ -198,11 +202,19 @@ func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, log
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, rules: rules, dir: dir, composeFile: filepath.Join(dir, "compose.json"), logf: logf}, nil
+	err = a.ensureEnv(start.App)
+	if err != nil {
+		return nil, err
+	}
+	env, err := a.env(start.App)
+	if err != nil {
+		return nil, err
+	}
+	return &release{start: start, rules: rules, dir: dir, composeFile: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
 }
 
 // rollBack copies the compose file of an older release into this one: the
-// same images and the same env.
+// same images, with the env as it is now.
 func (a *apps) rollBack(ctx context.Context, release *release) error {
 	from := release.start.FromNumber
 	release.logf("rolling back to v%d", from)
@@ -279,7 +291,7 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	if err != nil {
 		return err
 	}
-	release.config, release.detected, err = a.resolve(ctx, start.App, src, start.Env)
+	release.config, release.detected, err = a.resolve(ctx, start.App, src)
 	return err
 }
 
@@ -376,12 +388,8 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	logf("building")
 	// A Railpack build reads the app's env as BuildKit secrets, from the
 	// env file, never from docker's own environment or its arguments.
-	envFiles, err := writeEnvFile(release.dir, start.Env)
-	if err != nil {
-		return err
-	}
-	args := append([]string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile}, envFiles...)
-	err = a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
+	args := []string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--env-file", release.envFile}
+	err := a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
@@ -663,12 +671,15 @@ func (a *apps) copySource(ctx context.Context, app string, number int, target st
 	return nil
 }
 
-// pull fetches the main service's image. A registry login goes into a
-// throwaway Docker config, so no credentials stay on the server.
+// pull fetches the main service's image, with the server's login for its
+// registry when it keeps one. The login goes into a throwaway Docker
+// config, so Docker keeps no copy of it.
 func (a *apps) pull(ctx context.Context, release *release) error {
 	start := release.start
 	args := []string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--progress", "plain", "pull", release.detected.Service}
-	if start.Registry == nil {
+	host := protocol.RegistryHost(start.Image)
+	login := a.registryLogin(host)
+	if login == "" {
 		return a.run(ctx, release.logf, nil, args...)
 	}
 	dir, err := os.MkdirTemp("", tempName("docker-"))
@@ -676,8 +687,8 @@ func (a *apps) pull(ctx context.Context, release *release) error {
 		return err
 	}
 	defer os.RemoveAll(dir)
-	auth := base64.StdEncoding.EncodeToString([]byte(start.Registry.Username + ":" + start.Registry.Password))
-	config, _ := json.Marshal(map[string]any{"auths": map[string]any{start.Registry.Host: map[string]string{"auth": auth}}})
+	auth := base64.StdEncoding.EncodeToString([]byte(login))
+	config, _ := json.Marshal(map[string]any{"auths": map[string]any{host: map[string]string{"auth": auth}}})
 	err = os.WriteFile(filepath.Join(dir, "config.json"), config, 0o600)
 	if err != nil {
 		return err

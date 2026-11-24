@@ -29,7 +29,7 @@ var backupProblems = []struct {
 	{"The bucket refuses the keys.", []string{"accessdenied", "access denied", "invalidaccesskeyid", "signaturedoesnotmatch", "forbidden", "statuscode: 403"}},
 	{"The bucket can't be reached.", []string{"no such host", "connection refused", "i/o timeout", "dial tcp", "deadline exceeded", "tls:", "x509", "connection reset"}},
 	{"The database is not running.", []string{"is not running"}},
-	{"The app's bucket can't be opened: check its keys under Data.", []string{"cannot be opened"}},
+	{"The server has no key for the app's bucket: enter it under Backups.", []string{"has no key for the bucket"}},
 	{"The copies are late.", []string{"copies are late"}},
 	{"The daily check could not restore the newest copy.", []string{"daily check failed"}},
 	{"moin can't back up this database.", []string{"cannot back up"}},

@@ -14,7 +14,7 @@ func TestUptimeTools(t *testing.T) {
 	session := connectMemory(t, env.server, owner, token)
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
-	output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
 	output[mcp.Change](t, call(t, session, "set_domains", map[string]any{"app": "shop", "domains": []string{"shop.example.com"}}))
 
 	uptime := output[mcp.Uptime](t, call(t, session, "get_uptime", map[string]any{"app": "shop"}))

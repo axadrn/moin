@@ -12,16 +12,19 @@ import (
 //	<app>/<app ID>/<database>/copies/        the copies, as long as the app keeps them
 //
 // Workspace is the workspace's ID, which never changes, so workspaces
-// sharing one bucket never touch each other's files. Name is the bucket's
-// name in moin.
+// sharing one bucket never touch each other's files. ID is the bucket's ID
+// in the hub, Name its name in moin. SecretKey never travels in a Bucket:
+// the daemon keeps it in server.json under BucketSecret(ID) and fills it
+// in (BucketSet).
 type Bucket struct {
+	ID        string `json:"id"`
 	Endpoint  string `json:"endpoint"`
 	Region    string `json:"region"`
 	Bucket    string `json:"bucket"`
 	Path      string `json:"path,omitempty"`
 	Workspace string `json:"workspace"`
 	AccessKey string `json:"access_key"`
-	SecretKey string `json:"secret_key"`
+	SecretKey string `json:"-"`
 	Name      string `json:"name,omitempty"`
 }
 
@@ -38,8 +41,8 @@ type BackupConfig struct {
 	AppBuckets map[string]*Bucket  `json:"app_storage,omitempty"`
 	Apps       map[string]string   `json:"apps,omitempty"`
 	Schedules  map[string]Schedule `json:"schedules,omitempty"`
-	// Paused are the apps whose bucket the hub cannot open, with why:
-	// the daemon copies and deletes nothing of them until it can.
+	// Paused are the apps whose bucket the server has no key for, with
+	// why: the daemon copies and deletes nothing of them until it can.
 	Paused map[string]string `json:"paused,omitempty"`
 }
 

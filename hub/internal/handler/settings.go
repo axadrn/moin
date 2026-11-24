@@ -69,13 +69,13 @@ func (h *SettingsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request
 			tailscale = &tailscaleKey
 		}
 	}
-	err := h.apps.SetIntegrations(r.Context(), actor(r), cloudflare, tailscale)
+	err := h.apps.SetIntegrations(r.Context(), actor(r), service.IntegrationsInput{CloudflareToken: cloudflare, TailscaleKey: tailscale, TailscaleServer: r.FormValue("server")})
 	if errors.Is(err, service.ErrCloudflareToken) {
 		fieldRefused(w, r, notDone, "cloudflare-token", errorMessage(err))
 		return
 	}
 	if err != nil {
-		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key"})
+		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key", "server": "tailscale-key-server"})
 		return
 	}
 	h.Integrations(w, r)
