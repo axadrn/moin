@@ -1787,7 +1787,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-moin` block of compose.yml wins for every field it sets.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-moin` block of compose.yml wins for every field it sets.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1820,7 +1820,7 @@ paths:
           description: '`domains_from_compose`. x-moin.domains in compose.yml sets the domains of the live deploy; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.domains`, `fields.canonical` or `fields.service`.'
+          description: '`validation_failed` with `fields.domains`, also when another app or service uses a domain already, `fields.canonical` or `fields.service`.'
         '500':
           $ref: '#/components/responses/Internal'
 

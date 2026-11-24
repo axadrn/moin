@@ -39,6 +39,8 @@ MCP: set_domains
 
 Then, where you bought the domain, add an **A record**: the domain as the name, the server's IPv4 address as the value. If the server has IPv6, add an **AAAA record** too.
 
+A domain belongs to one app in the whole hub. moin refuses one another app uses already.
+
 moin says whether the domain already points at the server. **Check** asks again later. Once DNS points at the server, the domain gets HTTPS by itself.
 
 Behind a [Cloudflare Tunnel](/docs/guides/security#web), moin sets the DNS for you when the domain is in your Cloudflare account.
