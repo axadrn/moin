@@ -198,9 +198,9 @@ func TestUptimeVisitsEveryDomainThatServes(t *testing.T) {
 	}
 }
 
-// A domain is down only after two minutes without an answer: a shorter
-// failure counts in the numbers but changes nothing.
-func TestUptimeDownAfterTwoMinutes(t *testing.T) {
+// A domain is down only after 3 failed visits in a row, and back up only
+// after 3 answers in a row: fewer count in the numbers but change nothing.
+func TestUptimeThreeInARow(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
 	sites := visitSites(t, apps)
 	clock := stopClock(apps, time.Date(2026, 11, 3, 12, 0, 30, 0, time.UTC))
@@ -221,14 +221,14 @@ func TestUptimeDownAfterTwoMinutes(t *testing.T) {
 	}
 	visitAll(apps)
 
-	// One minute of failing is a blip.
+	// Two failed visits are a blip.
 	sites.set("blog.example.com", http.StatusBadGateway)
 	minute()
 	minute()
 	if state() != model.UptimeUp || hasAction(activityActions(t, servers), "uptime.down blog.example.com") {
-		t.Fatalf("a minute of failing: state %s, activity %v", state(), activityActions(t, servers))
+		t.Fatalf("two failed visits: state %s, activity %v", state(), activityActions(t, servers))
 	}
-	// Two minutes is down, since the first failed visit, once.
+	// The third is down, since the first failed visit, once.
 	minute()
 	minute()
 	_, uptime, _ := apps.Uptime(owner.WorkspaceID, "blog")
@@ -244,7 +244,13 @@ func TestUptimeDownAfterTwoMinutes(t *testing.T) {
 		t.Fatalf("uptime = %v, want 20", *domain.Uptime24h)
 	}
 
+	// Back up at the third answer in a row.
 	sites.set("blog.example.com", http.StatusOK)
+	minute()
+	minute()
+	if state() != model.UptimeDown {
+		t.Fatalf("two answers: state %s, want down", state())
+	}
 	minute()
 	_, uptime, _ = apps.Uptime(owner.WorkspaceID, "blog")
 	if uptime.State != model.UptimeUp || uptime.Domains[0].Outages[0].EndedAt == nil {
@@ -255,52 +261,44 @@ func TestUptimeDownAfterTwoMinutes(t *testing.T) {
 	}
 }
 
-// uptimeStep is one visit of TestUptimeMailRule and what it should do.
+// uptimeStep is one visit of TestUptimeRule and whether it changes the
+// state, which sends an alert.
 type uptimeStep struct {
-	name          string
-	up            bool
-	changed, mail bool
+	name    string
+	up      bool
+	changed bool
 }
 
-// A down mails at most once an hour per domain, and an up only after a
-// down that mailed.
-func TestUptimeMailRule(t *testing.T) {
+// The state flips only after 3 visits in a row with the opposite answer,
+// down and back up alike: a flapping site changes nothing and sends
+// nothing.
+func TestUptimeRule(t *testing.T) {
 	state := &uptimeState{}
 	at := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
-	run := func(steps []uptimeStep) {
-		t.Helper()
-		for _, step := range steps {
-			changed := state.see(uptimeResult{at: at, up: step.up})
-			mailed := changed && state.mail(at)
-			if changed != step.changed || mailed != step.mail {
-				t.Fatalf("%s at %s: changed %v, mailed %v; want %v, %v", step.name, at.Format("15:04"), changed, mailed, step.changed, step.mail)
-			}
-			at = at.Add(time.Minute)
+	for _, step := range []uptimeStep{
+		{"first visit", true, true},
+		{"fails once", false, false},
+		{"fails twice", false, false},
+		{"fails 3 times in a row", false, true},
+		{"still down", false, false},
+		{"answers once", true, false},
+		{"fails again", false, false},
+		{"answers once", true, false},
+		{"answers twice", true, false},
+		{"answers 3 times in a row", true, true},
+		{"flaps", false, false},
+		{"flaps back", true, false},
+		{"flaps", false, false},
+		{"flaps back", true, false},
+	} {
+		if changed := state.see(uptimeResult{at: at, up: step.up}); changed != step.changed {
+			t.Fatalf("%s at %s: changed %v, want %v", step.name, at.Format("15:04"), changed, step.changed)
 		}
+		at = at.Add(time.Minute)
 	}
-	run([]uptimeStep{
-		{"first visit", true, true, false},
-		{"failing", false, false, false},
-		{"a minute failing", false, false, false},
-		{"two minutes failing", false, true, true},
-		{"still down", false, false, false},
-		{"back up", true, true, true},
-	})
-	// It flaps within the hour: the down mails nothing, so its up neither.
-	run([]uptimeStep{
-		{"failing again", false, false, false},
-		{"a minute", false, false, false},
-		{"down again", false, true, false},
-		{"up again", true, true, false},
-	})
-	// An hour after the last down mail, a down mails again.
-	at = at.Add(time.Hour)
-	run([]uptimeStep{
-		{"failing later", false, false, false},
-		{"a minute", false, false, false},
-		{"down later", false, true, true},
-		{"up later", true, true, true},
-	})
+	if state.stored.State != model.UptimeUp {
+		t.Fatalf("state = %s, want up", state.stored.State)
+	}
 }
 
 func TestUptimeVisitSettings(t *testing.T) {

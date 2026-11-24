@@ -182,7 +182,7 @@ templ uptimeSettings(app model.App, domain service.UptimeDomain) {
 // that saves itself.
 templ UptimeSwitchForm(app model.App, domain service.UptimeDomain) {
 	{{ id := "uptime-" + domain.Domain }}
-	@components.Item(components.ItemProps{Form: true, For: id + "-on", Name: "Visit every minute", Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+	@components.Item(components.ItemProps{Form: true, For: id + "-on", Name: "Visit every minute", Note: fmt.Sprintf("Down after %d failed visits in a row. Back up after %d answers in a row.", service.UptimeInARow, service.UptimeInARow), Attrs: templ.Attributes{"id": id + "-form", "hx-post": ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() + "/uptime/on", "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
 		@components.CSRF()
 		<input type="hidden" name="domain" value={ domain.Domain }/>
 		@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": id + "-on", "name": "on", "value": "1", "checked": !domain.Paused}})

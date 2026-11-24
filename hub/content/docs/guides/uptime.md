@@ -24,20 +24,22 @@ MCP: get_uptime
 | State | Means |
 | --- | --- |
 | **up** | any answer below 500: a page, a redirect, a `404` or the password prompt of a protected app |
-| **down** | two minutes without an answer: a `5xx`, no answer within 10 seconds, a refused connection, a name that does not resolve or a bad certificate |
+| **down** | 3 visits in a row without an answer: a `5xx`, no answer within 10 seconds, a refused connection, a name that does not resolve or a bad certificate |
 | **pending** | not visited yet |
 | **paused** | uptime of the domain is paused, or the app is stopped |
 
 ## Down and back up
 
-A domain is down after two minutes without an answer, like a server. A shorter failure, like a restart, counts in the percentages but changes nothing.
+moin visits every domain once a minute.
+
+- **Down** after 3 failed visits in a row.
+- **Back up** after 3 answers in a row.
+
+Fewer, like a restart, count in the percentages but change nothing. So a site that flaps sends no flood of alerts.
 
 A domain that goes down or comes back goes into the [activity](/docs/guides/activity) with the reason and how long it was down, every time.
 
-It sends an [alert](/docs/guides/alerts) too, with a brake for a domain that flaps:
-
-- A down alert at most once an hour per domain.
-- A back-up alert only after a down alert.
+It sends an [alert](/docs/guides/alerts) too.
 
 ## Change the path
 

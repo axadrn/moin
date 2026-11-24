@@ -13,8 +13,7 @@ import (
 )
 
 // keepVisit counts a visit, keeps it as the newest, and when the domain
-// went down or came back, stores that, writes it to the activity and sends
-// the alert the mail rule allows.
+// went down or came back, stores that and sends the alert.
 func (s *AppService) keepVisit(key uptimeKey, result uptimeResult) {
 	u := s.uptime
 	u.mu.Lock()
@@ -30,14 +29,13 @@ func (s *AppService) keepVisit(key uptimeKey, result uptimeResult) {
 		u.mu.Unlock()
 		return
 	}
-	mail := state.mail(result.at)
 	stored, workspaceID, appName := state.stored, state.workspaceID, state.appName
 	u.mu.Unlock()
 	err := s.apps.SaveUptimeState(stored)
 	if err != nil {
 		slog.Error("store uptime state failed", "error", err)
 	}
-	s.recordUptimeChange(workspaceID, appName, before, stored, result.failure, mail)
+	s.recordUptimeChange(workspaceID, appName, before, stored, result.failure)
 }
 
 // count adds a result to the counts of its domain and hour. The caller

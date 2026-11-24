@@ -15,20 +15,23 @@ import (
 
 // Uptime. Every domain that serves something gets a watcher: a goroutine
 // that visits it once a minute, like a visitor, at its own moment of the
-// minute. A dead domain only ever slows down its own watcher. A domain is
-// down only after two minutes without an answer. The newest results live
-// in memory. The database gets a write when a state or a setting changes,
-// and the counts per domain and hour in one transaction every few minutes.
+// minute. A dead domain only ever slows down its own watcher. A domain
+// goes down, and back up, only after UptimeInARow visits in a row say so.
+// The newest results live in memory. The database gets a write when a
+// state or a setting changes, and the counts per domain and hour in one
+// transaction every few minutes.
 const (
 	// uptimeTimeout is how long a visitor waits for the answer.
 	uptimeTimeout = 10 * time.Second
 	// uptimeEvery is how often a watcher visits its domain.
 	uptimeEvery = time.Minute
-	// downAfter is how long a domain may fail, or a daemon be gone, before
-	// it counts as down: a restart or a short network hiccup is not.
-	downAfter = 2 * time.Minute
-	// uptimeMailEvery is how often a domain may send a down alert at most.
-	uptimeMailEvery = time.Hour
+	// UptimeInARow is how many visits in a row must say the opposite
+	// before a domain goes down or comes back: a restart or a short
+	// network hiccup changes nothing.
+	UptimeInARow = 3
+	// serverDownAfter is how long a daemon may be gone before its server
+	// counts as down.
+	serverDownAfter = 3 * time.Minute
 	// uptimeFlushEvery is how often the counts go to the database.
 	uptimeFlushEvery = 5 * time.Minute
 	uptimeBodyLimit  = 4 << 10
@@ -59,13 +62,10 @@ type uptimeState struct {
 	// stop ends the domain's watcher; nil while none runs.
 	stop context.CancelFunc
 	last *uptimeResult
-	// failingSince is the first of the failed visits in a row; nil while
-	// the domain answers.
-	failingSince *time.Time
-	// downMailAt is when the last down alert went out. downMailed says it
-	// was sent for this outage, so its end sends an up alert.
-	downMailAt time.Time
-	downMailed bool
+	// changing counts the visits in a row that say the opposite of the
+	// state, since the first of them; 0 while they agree with it.
+	changing      int
+	changingSince time.Time
 }
 
 // uptimeResult is what one visit found.
@@ -129,51 +129,39 @@ func (u *uptimeRunner) load(read func() ([]model.DomainUptime, error)) {
 	u.loaded = true
 }
 
-// see changes the state after a visit: up at once, down only when the
-// visits failed for downAfter, so a short blip changes nothing. It says
-// whether the state changed.
+// see changes the state after a visit. The state flips only when
+// UptimeInARow visits in a row said the opposite, down and back up alike,
+// so a blip or a flapping site changes nothing. A new domain is up at its
+// first answer: there is nothing to flip yet. It says whether the state
+// changed.
 func (state *uptimeState) see(result uptimeResult) bool {
+	seen := model.UptimeDown
 	if result.up {
-		state.failingSince = nil
-		if state.stored.State == model.UptimeUp {
-			return false
-		}
-		state.stored.State, state.stored.Since = model.UptimeUp, &result.at
-		return true
+		seen = model.UptimeUp
 	}
-	if state.failingSince == nil {
-		state.failingSince = &result.at
-	}
-	if state.stored.State == model.UptimeDown || result.at.Sub(*state.failingSince) < downAfter {
+	if seen == state.stored.State {
+		state.changing = 0
 		return false
 	}
-	state.stored.State, state.stored.Since = model.UptimeDown, state.failingSince
-	return true
-}
-
-// mail says whether the change see just made sends an alert: a down at
-// most once an hour per domain, an up only when its down sent one.
-func (state *uptimeState) mail(now time.Time) bool {
-	switch state.stored.State {
-	case model.UptimeDown:
-		if now.Sub(state.downMailAt) < uptimeMailEvery {
-			return false
-		}
-		state.downMailAt, state.downMailed = now, true
-		return true
-	case model.UptimeUp:
-		mailed := state.downMailed
-		state.downMailed = false
-		return mailed
+	if state.changing == 0 {
+		state.changingSince = result.at
 	}
-	return false
+	state.changing++
+	first := state.stored.State == "" && result.up
+	if state.changing < UptimeInARow && !first {
+		return false
+	}
+	since := state.changingSince
+	state.stored.State, state.stored.Since = seen, &since
+	state.changing = 0
+	return true
 }
 
 // startOver forgets what the visits found, for a paused domain or one of
 // an app that is not live: its uptime begins again at pending.
 func (state *uptimeState) startOver() {
 	state.stored.State, state.stored.Since = "", nil
-	state.last, state.failingSince, state.downMailed = nil, nil, false
+	state.last, state.changing = nil, 0
 }
 
 // stopWatcher ends the domain's watcher, if one runs. The caller holds
