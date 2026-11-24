@@ -830,10 +830,16 @@ func (b *backups) busy(app string) bool {
 	return b.restoring[app] > 0
 }
 
-// writeState writes a file whole: a temp file, synced, renamed over the
-// old one, the folder synced. A crash leaves the old file or the new one.
+// writeState writes value as JSON, whole (writeWhole).
 func writeState(name string, value any) error {
 	body, _ := json.Marshal(value)
+	return writeWhole(name, body)
+}
+
+// writeWhole writes a file whole, 0600: a temp file, synced, renamed over
+// the old one, the folder synced. A crash leaves the old file or the new
+// one.
+func writeWhole(name string, body []byte) error {
 	temp := name + ".new"
 	err := errors.Join(os.MkdirAll(filepath.Dir(name), 0o700), os.WriteFile(temp, body, 0o600))
 	if err == nil {

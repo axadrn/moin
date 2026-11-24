@@ -60,6 +60,14 @@ func (f *fakeDaemon) take(servers *ServerService, serverID string, message proto
 		return
 	}
 	reply, _ := protocol.NewMessage(protocol.TypeOK, nil)
+	if message.Type == protocol.TypeEnvSet {
+		var set protocol.EnvSet
+		_ = message.Decode(&set)
+		f.mu.Lock()
+		keys := slices.Sorted(maps.Keys(f.envOf(set.App)))
+		f.mu.Unlock()
+		reply, _ = protocol.NewMessage(protocol.TypeEnvResult, protocol.AppEnv{Keys: keys, ChangedAt: time.Now().UTC()})
+	}
 	if refusal != "" {
 		reply, _ = protocol.NewMessage(protocol.TypeError, protocol.Error{Message: refusal})
 	}
@@ -72,6 +80,11 @@ func (f *fakeDaemon) env(t *testing.T, app string) map[string]string {
 	t.Helper()
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	return f.envOf(app)
+}
+
+// envOf is env without the lock.
+func (f *fakeDaemon) envOf(app string) map[string]string {
 	env := map[string]string{}
 	for _, message := range f.sent {
 		var set protocol.EnvSet

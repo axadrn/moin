@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -120,12 +121,21 @@ func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 // app's one env file, 0600; a key it removes is gone from the file.
 func TestSetEnv(t *testing.T) {
 	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "OLD": "gone"}})
+	_, err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "OLD": "gone"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := a.setEnv(protocol.EnvSet{App: "shop", Remove: []string{"OLD"}}); err != nil {
-		t.Fatal(err)
+	keys, err := a.setEnv(protocol.EnvSet{App: "shop", Remove: []string{"OLD"}})
+	if err != nil || !slices.Equal(keys.Keys, []string{"A", "B"}) || keys.ChangedAt.IsZero() {
+		t.Fatalf("keys = %+v, %v", keys, err)
+	}
+	// Hello names the keys of every app, never a value.
+	hello := Hello(filepath.Dir(a.dir))
+	if !slices.Equal(hello.Env["shop"].Keys, []string{"A", "B"}) || !hello.Env["shop"].ChangedAt.Equal(keys.ChangedAt) {
+		t.Fatalf("hello env = %+v", hello.Env)
+	}
+	if body, _ := json.Marshal(hello); strings.Contains(string(body), "line") {
+		t.Fatalf("hello carries a value: %s", body)
 	}
 	body, _ := os.ReadFile(a.envFile("shop"))
 	want := "A=\"1\"\nB=\"it's \\\"q\\\" \\\\ \\$HOME \\${X}\\nline\\r\"\n"
@@ -135,10 +145,10 @@ func TestSetEnv(t *testing.T) {
 	if info, _ := os.Stat(a.envFile("shop")); info.Mode().Perm() != 0o600 {
 		t.Fatalf("app.env is %v", info.Mode())
 	}
-	if err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"x y": "3"}}); err == nil {
+	if _, err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"x y": "3"}}); err == nil {
 		t.Fatal("a key a shell does not take was set")
 	}
-	if err := a.setEnv(protocol.EnvSet{App: "../etc", Set: map[string]string{"A": "1"}}); err == nil {
+	if _, err := a.setEnv(protocol.EnvSet{App: "../etc", Set: map[string]string{"A": "1"}}); err == nil {
 		t.Fatal("an app name outside the apps was taken")
 	}
 	src := t.TempDir()

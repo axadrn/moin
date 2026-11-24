@@ -54,6 +54,8 @@ The server must be online: the value goes straight to it. An offline one says so
 
 Each name and when it changed. No surface shows a value.
 
+The names come from the server: its daemon reports the keys of each app's `app.env` when it connects and after every change. moin never shows a key the server does not have.
+
 ```surfaces
 Web: the app's **Settings** tab, **Environment**
 CLI: moin env
@@ -102,7 +104,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 ```
 
-A change to such a variable takes a deploy, not just a restart. Docker fills it into the deploy's own compose file on the server, so an old value stays in the deploys that used it until moin cleans them up. moin keeps the last 5 builds.
+A change to such a variable takes a deploy, not just a restart.
+
+**`${NAME}` writes the value into a file.** Docker Compose fills it in when moin reads your compose file, and the result is the compose file of that deploy on the server. Every deploy moin keeps holds it there, also an old value you replaced, until moin cleans that deploy up. moin keeps the last 5 builds. Where you can, let a value reach the container as an env var instead: the services moin builds and the main one get them straight from `app.env`, and nothing writes them anywhere else.
 
 ## Good to know
 

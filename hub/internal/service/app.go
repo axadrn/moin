@@ -1341,14 +1341,20 @@ func (s *AppService) SetEnv(ctx context.Context, actor Actor, idOrName string, s
 	}
 	ctx, cancel := context.WithTimeout(ctx, secretTimeout)
 	defer cancel()
-	err = s.servers.Request(ctx, server.ID, protocol.TypeEnvSet, protocol.EnvSet{App: app.Folder, Set: set, Remove: removed}, nil)
+	var kept protocol.AppEnv
+	err = s.servers.Request(ctx, server.ID, protocol.TypeEnvSet, protocol.EnvSet{App: app.Folder, Set: set, Remove: removed}, &kept)
 	if errors.Is(err, ErrServerOffline) {
 		return nil, &OfflineError{Server: server.Name}
 	}
 	if err != nil {
 		return nil, err
 	}
-	err = s.apps.SetEnv(app.ID, keys, removed, s.now().UTC())
+	// The server's answer is the truth: the keys its env file has now.
+	now := s.now().UTC()
+	err = s.apps.KeepEnv(app.ID, cleanEnvKeys(kept.Keys), now)
+	if err == nil {
+		err = s.apps.SetEnv(app.ID, keys, nil, now)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1361,6 +1367,42 @@ func (s *AppService) SetEnv(ctx context.Context, actor Actor, idOrName string, s
 	}
 	s.notify(actor.WorkspaceID)
 	return removed, nil
+}
+
+// keepEnv makes the env keys of a server's apps what its daemon reported
+// in its hello: the hub never shows a key the server does not have. An
+// app the daemon reported nothing for has no env there.
+func (s *AppService) keepEnv(serverID, workspaceID string, env map[string]protocol.AppEnv, now time.Time) {
+	apps, err := s.apps.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		slog.Error("list apps for their env keys failed", "server_id", serverID, "error", err)
+		return
+	}
+	for _, app := range apps {
+		if app.ServerID != serverID {
+			continue
+		}
+		reported := env[app.Folder]
+		at := reported.ChangedAt.UTC()
+		if at.IsZero() || at.After(now) {
+			at = now
+		}
+		if err := s.apps.KeepEnv(app.ID, cleanEnvKeys(reported.Keys), at); err != nil {
+			slog.Error("store the env keys a daemon reported failed", "app_id", app.ID, "error", err)
+		}
+	}
+}
+
+// cleanEnvKeys keeps the keys a daemon reports that are env keys, at most
+// maxEnvVars.
+func cleanEnvKeys(keys []string) []string {
+	clean := []string{}
+	for _, key := range keys {
+		if len(clean) < maxEnvVars && envKeyPattern.MatchString(key) && !slices.Contains(clean, key) {
+			clean = append(clean, key)
+		}
+	}
+	return clean
 }
 
 // ReplaceEnv makes env the app's env vars: it sets every key of env and

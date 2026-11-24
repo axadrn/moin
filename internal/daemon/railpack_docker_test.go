@@ -51,7 +51,7 @@ func TestRailpackDocker(t *testing.T) {
 			a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
 			app := "rptest-" + name
 			env := map[string]string{"BUILD_TOKEN": "s3cr3t-value"}
-			if err := a.setEnv(protocol.EnvSet{App: app, Set: env}); err != nil {
+			if _, err := a.setEnv(protocol.EnvSet{App: app, Set: env}); err != nil {
 				t.Fatal(err)
 			}
 			config, detected, err := a.resolve(ctx, app, src)

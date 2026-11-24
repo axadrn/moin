@@ -204,6 +204,30 @@ func (r *Apps) EnvVars(appID string) ([]model.EnvVar, error) {
 	return vars, err
 }
 
+// KeepEnv makes keys the env keys of an app, as its server reported them:
+// new ones count from at, the others keep their date.
+func (r *Apps) KeepEnv(appID string, keys []string, at time.Time) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query, args, err := sqlx.In(`DELETE FROM app_env WHERE app_id = ? AND key NOT IN (?)`, appID, append([]string{""}, keys...))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(tx.Rebind(query), args...); err != nil {
+		return err
+	}
+	for _, key := range keys {
+		_, err := tx.Exec(`INSERT INTO app_env (app_id, key, updated_at) VALUES ($1, $2, $3) ON CONFLICT (app_id, key) DO NOTHING`, appID, key, at)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // SetEnv notes the keys set, as changed at, and forgets the keys removed,
 // in one transaction. The values are only on the server.
 func (r *Apps) SetEnv(appID string, set, unset []string, at time.Time) error {

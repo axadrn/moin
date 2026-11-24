@@ -11,11 +11,12 @@ import (
 	"strings"
 )
 
-// Parse reads a .env text. Empty lines and lines starting with # are skipped,
-// "export " in front of a key is allowed. A value may be bare, in single
-// quotes (taken as it is) or in double quotes, where \n, \", \\ and \$
-// stand for a line break, a quote, a backslash and a dollar; \r for a
-// carriage return.
+// Parse reads a .env text. Empty lines and lines starting with # are
+// skipped, "export " in front of a key is allowed. A value may be bare, in
+// single quotes (taken as it is) or in double quotes, where \n, \", \\
+// and \$ stand for a line break, a quote, a backslash and a dollar; \r for
+// a carriage return. An error names the line by its number only, never by
+// what is on it: a broken line may hold a secret.
 func Parse(text string) (map[string]string, error) {
 	env := map[string]string{}
 	for number, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
@@ -26,10 +27,10 @@ func Parse(text string) (map[string]string, error) {
 		key, value, ok := strings.Cut(strings.TrimPrefix(line, "export "), "=")
 		key = strings.TrimSpace(key)
 		if !ok || key == "" {
-			return nil, fmt.Errorf("line %d is not KEY=value: %s", number+1, clip(line))
+			return nil, fmt.Errorf("line %d is not KEY=value", number+1)
 		}
 		if _, twice := env[key]; twice {
-			return nil, fmt.Errorf("line %d sets %s a second time", number+1, key)
+			return nil, fmt.Errorf("line %d sets a key a second time", number+1)
 		}
 		value, err := unquote(strings.TrimSpace(value))
 		if err != nil {
@@ -139,11 +140,4 @@ func (c Change) String() string {
 		return "changes nothing"
 	}
 	return strings.Join(parts, "; ")
-}
-
-func clip(line string) string {
-	if len(line) > 40 {
-		return line[:40] + "…"
-	}
-	return line
 }

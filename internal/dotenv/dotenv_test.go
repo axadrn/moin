@@ -53,3 +53,14 @@ func TestFormatRoundTrip(t *testing.T) {
 		t.Errorf("Parse(Format) = %q, %v; want %q", back, err, env)
 	}
 }
+
+// TestParseErrorsNameOnlyTheLine: a broken line may hold a secret, and the
+// error travels to the hub: it says the line number, never the text.
+func TestParseErrorsNameOnlyTheLine(t *testing.T) {
+	for _, text := range []string{"hunter2-secret", "OK=1\nhunter2-secret", "A='hunter2-secret", "A=\"hunter2-secret", "A=hunter2-secret\nA=hunter2-secret"} {
+		_, err := Parse(text)
+		if err == nil || strings.Contains(err.Error(), "hunter2") || !strings.HasPrefix(err.Error(), "line ") {
+			t.Errorf("Parse(%q) = %v", text, err)
+		}
+	}
+}

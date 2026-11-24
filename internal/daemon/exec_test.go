@@ -82,7 +82,7 @@ func TestExecRefused(t *testing.T) {
 // leaves only the program.
 func TestMaskedCommand(t *testing.T) {
 	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	err := a.setEnv(protocol.EnvSet{App: "web", Set: map[string]string{"DB_PASSWORD": "abcdef123", "PRICE": "$5-dollars", "SHORT": "abcde", "INNER": "abcdef"}})
+	_, err := a.setEnv(protocol.EnvSet{App: "web", Set: map[string]string{"DB_PASSWORD": "abcdef123", "PRICE": "$5-dollars", "SHORT": "abcde", "INNER": "abcdef"}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,32 +37,64 @@ func (a *apps) env(app string) (map[string]string, error) {
 	return env, nil
 }
 
-// setEnv sets and removes env values of an app (EnvSet). The file is
-// replaced in one step, so a deploy reads it whole, before or after.
-func (a *apps) setEnv(request protocol.EnvSet) error {
+// setEnv sets and removes env values of an app (EnvSet) and answers the
+// keys the file has now. The file is replaced in one step, so a deploy
+// reads it whole, before or after.
+func (a *apps) setEnv(request protocol.EnvSet) (protocol.AppEnv, error) {
 	if !protocol.ValidAppName(request.App) {
-		return errors.New("invalid app name")
+		return protocol.AppEnv{}, errors.New("invalid app name")
 	}
 	a.envMu.Lock()
 	defer a.envMu.Unlock()
 	env, err := a.env(request.App)
 	if err != nil {
-		return err
+		return protocol.AppEnv{}, err
 	}
 	for key, value := range request.Set {
 		if !envNamePattern.MatchString(key) {
-			return fmt.Errorf("invalid env key %q", key)
+			return protocol.AppEnv{}, fmt.Errorf("invalid env key %q", key)
 		}
 		env[key] = value
 	}
 	for _, key := range request.Remove {
 		delete(env, key)
 	}
-	err = writeEnv(a.envFile(request.App), env)
-	if err == nil {
-		slog.Info("env set", "app", request.App, "set", slices.Sorted(maps.Keys(request.Set)), "removed", request.Remove)
+	if err := writeEnv(a.envFile(request.App), env); err != nil {
+		return protocol.AppEnv{}, err
 	}
-	return err
+	slog.Info("env set", "app", request.App, "set", slices.Sorted(maps.Keys(request.Set)), "removed", request.Remove)
+	return a.envKeys(request.App), nil
+}
+
+// envKeys names the keys of the app's env file and when it last changed,
+// never a value. An app without one, or with one moin cannot read, has
+// none.
+func (a *apps) envKeys(app string) protocol.AppEnv {
+	keys := protocol.AppEnv{Keys: []string{}}
+	info, err := os.Stat(a.envFile(app))
+	if err != nil {
+		return keys
+	}
+	keys.ChangedAt = info.ModTime().UTC()
+	env, err := a.env(app)
+	if err != nil {
+		slog.Warn("read the env file", "app", app, "error", err)
+		return keys
+	}
+	keys.Keys = slices.Sorted(maps.Keys(env))
+	return keys
+}
+
+// allEnvKeys names the env keys of every app on the server, by its folder.
+func (a *apps) allEnvKeys() map[string]protocol.AppEnv {
+	entries, _ := os.ReadDir(a.dir)
+	all := map[string]protocol.AppEnv{}
+	for _, entry := range entries {
+		if entry.IsDir() && protocol.ValidAppName(entry.Name()) {
+			all[entry.Name()] = a.envKeys(entry.Name())
+		}
+	}
+	return all
 }
 
 // ensureEnv makes an empty env file for an app that has none, so every
@@ -76,16 +108,9 @@ func (a *apps) ensureEnv(app string) error {
 	return writeEnv(a.envFile(app), map[string]string{})
 }
 
-// writeEnv replaces the env file with env, 0600.
+// writeEnv replaces the env file with env, 0600, whole (writeWhole).
 func writeEnv(file string, env map[string]string) error {
-	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-		return err
-	}
-	temp := file + ".new"
-	if err := os.WriteFile(temp, []byte(dotenv.Format(env)), 0o600); err != nil {
-		return err
-	}
-	return os.Rename(temp, file)
+	return writeWhole(file, []byte(dotenv.Format(env)))
 }
 
 // envArgs are the --env-file arguments compose reads a source's compose

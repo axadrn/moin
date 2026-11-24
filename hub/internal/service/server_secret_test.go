@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/protocol"
 	"github.com/jmoiron/sqlx"
@@ -214,5 +215,50 @@ func TestInstantPasswordShownOnce(t *testing.T) {
 	}
 	if start.InstantProtect != "moin:"+renewed.InstantPasswordHash {
 		t.Fatalf("instant protect = %q", start.InstantProtect)
+	}
+}
+
+// TestServerIsTheTruthForEnvKeys: the hub shows the env keys a server
+// reports, in its hello and in its answer to env.set: a key the server
+// lacks goes, one it has, such as from an env file put back by hand,
+// comes, and an app it reports nothing for has none.
+func TestServerIsTheTruthForEnvKeys(t *testing.T) {
+	apps, servers, server, daemon := newAppService(t)
+	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	keys := func(app string) []string {
+		vars, _ := apps.EnvVars(owner.WorkspaceID, app)
+		names := []string{}
+		for _, envVar := range vars {
+			names = append(names, envVar.Key)
+		}
+		return names
+	}
+	if _, err := apps.SetEnv(context.Background(), owner, "blog", map[string]string{"A": "1", "B": "2"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := keys("blog"); !slices.Equal(got, []string{"A", "B"}) {
+		t.Fatalf("after env.set = %v", got)
+	}
+	changed := time.Date(2026, 11, 20, 8, 0, 0, 0, time.UTC)
+	hello := testHello
+	hello.Env = map[string]protocol.AppEnv{"blog": {Keys: []string{"B", "C", "not a key"}, ChangedAt: changed}}
+	servers.Connect(server, hello, "203.0.113.5", func() {}, func(message protocol.Message) error {
+		daemon.take(servers, server.ID, message)
+		return nil
+	})
+	if got := keys("blog"); !slices.Equal(got, []string{"B", "C"}) {
+		t.Fatalf("after the hello = %v", got)
+	}
+	vars, _ := apps.EnvVars(owner.WorkspaceID, "blog")
+	if !vars[1].UpdatedAt.Equal(changed) || vars[0].UpdatedAt.Equal(changed) {
+		t.Fatalf("dates = %+v", vars)
+	}
+	if got := keys("shop"); len(got) != 0 {
+		t.Fatalf("an app the server reported nothing for = %v", got)
 	}
 }

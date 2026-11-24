@@ -31,7 +31,7 @@ func TestEnvNeverReachesDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := map[string]string{"DOCKER_CONFIG": filepath.Join(src, ".docker"), "GREETING": "it's $5\nnow"}
-	if err := a.setEnv(protocol.EnvSet{App: "web", Set: env}); err != nil {
+	if _, err := a.setEnv(protocol.EnvSet{App: "web", Set: env}); err != nil {
 		t.Fatal(err)
 	}
 	config, _, err := a.resolve(context.Background(), "web", src)

@@ -5,7 +5,10 @@
 -- values go: env values, registry passwords, bucket secret keys, the
 -- Tailscale key and tunnel tokens. server_secrets says which server keeps
 -- which secret: bucket/<bucket id>, registry/<host>, tailscale, tunnel.
--- The instant password is shown once and kept as a bcrypt hash.
+-- The instant password is shown once and kept as a bcrypt hash. app_env
+-- mirrors the keys each server reports, so it starts empty: the hub never
+-- shows a key the server does not have.
+DELETE FROM app_env;
 ALTER TABLE app_env DROP COLUMN value;
 ALTER TABLE registries DROP COLUMN password;
 ALTER TABLE buckets DROP COLUMN secret_key;

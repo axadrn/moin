@@ -10,8 +10,8 @@ import (
 )
 
 // TestMigration051DropsTheSecrets runs 051 over a hub with secrets: every
-// sealed value is gone, the names and dates stay, and server_secrets goes
-// with its server.
+// sealed value is gone, the env keys wait for the servers to report them,
+// the other names stay, and server_secrets goes with its server.
 func TestMigration051DropsTheSecrets(t *testing.T) {
 	database, err := db.Init(filepath.Join(t.TempDir(), "hub.db") + "?_pragma=foreign_keys(1)")
 	if err != nil {
@@ -49,8 +49,8 @@ func TestMigration051DropsTheSecrets(t *testing.T) {
 	database.Get(&registries, `SELECT COUNT(*) FROM registries WHERE username = 'ada'`)
 	var cloudflare string
 	database.Get(&cloudflare, `SELECT cloudflare_token FROM integrations`)
-	if keys != 1 || registries != 1 || cloudflare != "sealed-cloudflare" {
-		t.Errorf("names went too: keys %d, registries %d, cloudflare %q", keys, registries, cloudflare)
+	if keys != 0 || registries != 1 || cloudflare != "sealed-cloudflare" {
+		t.Errorf("env keys %d (want none until the server reports them), registries %d, cloudflare %q", keys, registries, cloudflare)
 	}
 	database.MustExec(`INSERT INTO server_secrets (server_id, name, updated_at) VALUES ('s1', 'tunnel', $1)`, now)
 	database.MustExec(`DELETE FROM apps`)

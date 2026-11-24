@@ -102,8 +102,10 @@ const (
 	TypeBackupStatus MessageType = "backup.status"
 
 	// TypeEnvSet sets and removes env values of an app in its app.env on
-	// the server (EnvSet). The daemon answers with TypeOK or TypeError.
-	TypeEnvSet MessageType = "env.set"
+	// the server (EnvSet). The daemon answers with TypeEnvResult (AppEnv)
+	// or TypeError.
+	TypeEnvSet    MessageType = "env.set"
+	TypeEnvResult MessageType = "env.result"
 	// TypeSecretSet keeps a secret of the server in its server.json, or
 	// removes it (SecretSet). The daemon answers with TypeOK or TypeError.
 	TypeSecretSet MessageType = "secret.set"

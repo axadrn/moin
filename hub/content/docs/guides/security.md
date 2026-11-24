@@ -229,6 +229,8 @@ Both are readable by root only. A secret goes to a server only while it is onlin
 - A value you type in after someone broke into the hub passes through it once. They could read that one.
 - The hub can still send what your [rules](#rules) allow. Without `exec: off`, a command in a container can print its env. Strict rules close that.
 - A server rebuilt from scratch starts without secrets. Enter them again, then deploy. A later server gets the bucket key, registry login and Tailscale key once more: the pages show which server lacks one.
+- `${NAME}` in your compose file is filled in by Docker Compose and written into the compose file of each deploy on the server, also an old value you replaced. It stays there until moin cleans that deploy up: moin keeps the last 5 builds. Let values reach the container as env vars instead where you can. [In compose.yml](/docs/guides/env#in-composeyml)
+- The env names moin shows come from the server: each daemon reports which keys its apps have, never the values. A key the server does not have is not shown.
 
 **How Docker gets the env.** Each deploy hands the app's `app.env` to Docker Compose: as `env_file` of the app's services, and as `--env-file` to fill `${NAME}` in your compose file. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
 

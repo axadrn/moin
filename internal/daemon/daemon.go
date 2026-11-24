@@ -89,14 +89,15 @@ func saveState(dir string, state State) error {
 	return os.WriteFile(filepath.Join(dir, stateFile), body, 0o600)
 }
 
-// Hello describes this daemon and server, with its rules and the names of
-// the secrets it keeps in dir.
+// Hello describes this daemon and server, with its rules, the names of the
+// secrets it keeps in dir and the env keys of its apps: never a value.
 func Hello(dir string) protocol.Hello {
 	hostname, _ := os.Hostname()
 	rules, _ := LoadRules(RulesFile())
 	file, _ := loadServerFile(dir)
 	return protocol.Hello{
 		Secrets:         file.secretNames(),
+		Env:             newApps(dir, nil).allEnvKeys(),
 		Rules:           rules,
 		ProtocolVersion: protocol.Version,
 		DaemonVersion:   build.Version,
@@ -359,8 +360,8 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	case protocol.TypeBackupConfig:
 		r.backupConfig(message, rules)
 	case protocol.TypeEnvSet:
-		answer(r, message, protocol.TypeOK, func(request protocol.EnvSet) (any, error) {
-			return nil, r.apps.setEnv(request)
+		answer(r, message, protocol.TypeEnvResult, func(request protocol.EnvSet) (any, error) {
+			return r.apps.setEnv(request)
 		})
 	case protocol.TypeSecretSet:
 		r.secretSet(message, rules)

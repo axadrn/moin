@@ -22,6 +22,9 @@ type Hello struct {
 	// Secrets are the names of the secrets the daemon keeps in its
 	// server.json (SecretSet), never their values.
 	Secrets []string `json:"secrets,omitempty"`
+	// Env are the env keys of every app on the server, by its folder,
+	// never their values. An app without an entry has no env there.
+	Env map[string]AppEnv `json:"env,omitempty"`
 }
 
 // Rules are what the owner of a server allows moin to do there, written in
