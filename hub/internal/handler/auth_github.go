@@ -22,21 +22,24 @@ const githubStateCookie = "oauth_state"
 
 // GitHubAuth sends a guest to GitHub to sign in.
 func (h *authHandler) GitHubAuth(w http.ResponseWriter, r *http.Request) {
-	h.startGitHub(w, r, "")
+	h.startGitHub(w, r, "", http.StatusTemporaryRedirect)
 }
 
 // ConnectGitHub sends a signed-in user without a GitHub account to GitHub,
-// to connect the account they will sign in with.
+// to connect the account they will sign in with. It is a POST with the
+// CSRF token, so no other site can start it.
 func (h *authHandler) ConnectGitHub(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	if session := ctxkeys.Session(r.Context()); session == nil || session.IsImpersonating() || user.GitHubID != nil {
 		redirect(w, r, "/app", http.StatusSeeOther)
 		return
 	}
-	h.startGitHub(w, r, user.ID)
+	h.startGitHub(w, r, user.ID, http.StatusSeeOther)
 }
 
-func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID string) {
+// startGitHub redirects to GitHub with status: a 303 after a POST, so the
+// browser goes there with a GET.
+func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID string, status int) {
 	if !h.cfg.GitHubLogin() {
 		redirect(w, r, "/auth", http.StatusSeeOther)
 		return
@@ -55,7 +58,7 @@ func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   600,
 	})
-	redirect(w, r, h.github.AuthorizeURL(state, h.githubCallbackURL()), http.StatusTemporaryRedirect)
+	redirect(w, r, h.github.AuthorizeURL(state, h.githubCallbackURL()), status)
 }
 
 // githubCallbackURL is where GitHub sends people back, one of the app's

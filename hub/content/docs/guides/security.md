@@ -50,7 +50,9 @@ You sign in with GitHub. Like a club that lets you in when a friend at the door 
 - **Invitations.** The link in an invitation proves its mailbox. Any GitHub account may take it, and the new account gets the invited address.
 - **New accounts.** Only while sign-up is open: on the hosted hub, or with an invitation. A self-hosted hub lets in its admins and invited people.
 - **Every sign-in is a new session.** The cookie the browser had ends, so nobody can plant a session on you. Sessions live in an HttpOnly cookie only, never in a script.
-- **Recovery key.** Lost your GitHub account? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. [Recovery key](/docs/self-hosting#recovery-key)
+- **Recovery key.** Lost your GitHub account? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It signs the account out everywhere and disconnects its GitHub account, so a stolen GitHub account no longer gets in. Then you connect your GitHub again.
+- **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
+- **Connecting GitHub is a form with a CSRF token**, so no other site can start it. [Recovery key](/docs/self-hosting#recovery-key)
 - **Scripts and AI agents** use a personal API token instead, which can never change how you sign in. [Account and tokens](/docs/guides/account)
 
 ## Ports, SSH and the firewall

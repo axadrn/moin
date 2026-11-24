@@ -89,7 +89,9 @@ The card shows **Connected as** and your GitHub login once it is done. `github_l
 
 ## Lost your GitHub account
 
-Ask the admin of your hub for a recovery key. They run `./main recovery-key <email>` on the server. Enter the key at `/auth/key`. It works once, for an hour. Then connect your new GitHub account. [Recovery key](/docs/self-hosting#recovery-key)
+Ask the admin of your hub for a recovery key. They run `./main recovery-key <email>` on the server. Enter the key at `/auth/key`. It works once, for an hour.
+
+The key signs you out everywhere and disconnects GitHub, so the old GitHub account no longer gets in. Then connect your GitHub again under **Settings**, **Account**, **Security**. [Recovery key](/docs/self-hosting#recovery-key)
 
 ```surfaces
 Web: `/auth/key`, **Key from the terminal**, **Sign in**
@@ -114,7 +116,7 @@ API: POST /api/v1/account/avatar
 
 ## Change your email
 
-Links and notices go to the new address once you click the link moin sends there.
+Links and notices go to the new address once you click the link moin sends there. The link signs you out everywhere. A browser signed in to this account stays in; anywhere else, sign in again with GitHub. The link never signs anyone in.
 
 ```surfaces
 Web: **Settings**, **Account**, **Profile** tab, **Email**, **Save**

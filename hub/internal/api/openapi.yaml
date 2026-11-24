@@ -190,8 +190,9 @@ paths:
       summary: Confirm an email change
       description: |
         Moves the pending address to the account, signs out every session of the account, and
-        returns the user. A cookie caller gets a new session cookie. The link in the email
-        points to `APP_URL/auth/verify-email-change/{token}`.
+        returns the user. Only a caller signed in as that user gets a new session cookie: the
+        token never signs anyone in. The link in the email points to
+        `APP_URL/auth/verify-email-change/{token}`.
       security: []
       requestBody:
         required: true
@@ -204,7 +205,7 @@ paths:
           description: The address is changed.
           headers:
             Set-Cookie:
-              description: The new `session_token` cookie, for a cookie caller.
+              description: The new `session_token` cookie, for a caller signed in as that user.
               schema:
                 type: string
           content:
@@ -4095,18 +4096,18 @@ paths:
           description: Too many attempts from this client IP.
 
   /auth/github/connect:
-    get:
+    post:
       tags: [OAuth]
       operationId: connectGitHub
       summary: Connect GitHub to the signed-in account
-      description: Open in a browser, not with fetch. For an account without a GitHub account, such as after a recovery key. Redirects to GitHub, which returns to `APP_URL/auth/github/callback`, and the GitHub account then signs in to this account. A GitHub account that signs in to another account is refused.
+      description: A form post from the security settings with the `csrf_token` field, not JSON. For an account without a GitHub account, such as after a recovery key. Redirects to GitHub, which returns to `APP_URL/auth/github/callback`, and the GitHub account then signs in to this account. A GitHub account that signs in to another account is refused.
       security:
         - cookieAuth: []
       responses:
-        '307':
-          description: Redirect to GitHub.
         '303':
-          description: Not possible for this session, such as during impersonation or with GitHub connected already. Redirect to the app.
+          description: Redirect to GitHub, or to the app when it is not possible for this session, such as during impersonation or with GitHub connected already.
+        '403':
+          description: Without a valid CSRF token.
         '429':
           description: Too many attempts from this client IP.
 
@@ -4115,7 +4116,7 @@ paths:
       tags: [OAuth]
       operationId: signInWithRecoveryKey
       summary: Sign in with a recovery key
-      description: 'A form post from the page `GET /auth/key`, not JSON. The key comes from the server command `recovery-key <email>`: it works once, for an hour. On success the browser gets a new `session_token` cookie and goes to the security settings, to connect GitHub.'
+      description: 'A form post from the page `GET /auth/key`, not JSON. The key comes from the server command `recovery-key <email>`: it works once, for an hour. It signs the account out everywhere and disconnects its GitHub account. On success the browser gets a new `session_token` cookie and goes to the security settings, to connect GitHub again.'
       security: []
       requestBody:
         required: true

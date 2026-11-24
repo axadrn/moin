@@ -211,7 +211,7 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, gi
 	mux.HandleFunc("POST /auth/key", rateLimiter(middleware.RequireGuest(auth.SignInWithKey)))
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
 	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
-	mux.HandleFunc("GET /auth/github/connect", githubLimiter(middleware.RequireAuth(auth.ConnectGitHub)))
+	mux.HandleFunc("POST /auth/github/connect", githubLimiter(middleware.RequireAuth(auth.ConnectGitHub)))
 	mux.HandleFunc("GET /auth/github/callback", githubLimiter(auth.GitHubCallback))
 	mux.HandleFunc("GET /auth/verify-email-change/{token}", auth.VerifyEmailChange)
 	mux.HandleFunc("POST /auth/onboarding", middleware.RequireAuth(auth.CompleteOnboarding))

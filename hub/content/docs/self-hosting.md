@@ -201,7 +201,7 @@ A key from the server signs one account in, once, within an hour. It is the way 
 docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com
 ```
 
-It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. After it, connect GitHub under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page.
+It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. It signs the account out everywhere and disconnects its GitHub. After it, connect GitHub again under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page.
 
 A self-hosted hub has no Admin. Its admins, the addresses in `ADMIN_EMAILS`, get the note with **Update now** at the top of the web ([Updates](#updates)) and see the hub backup in **Settings** ([Database backup](#database-backup)). Your team is in **Settings**, **Team**.
 

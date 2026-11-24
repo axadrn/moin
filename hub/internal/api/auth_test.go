@@ -52,6 +52,29 @@ func TestEmailChangeVerify(t *testing.T) {
 	expectError(t, reused, http.StatusBadRequest, "invalid_token")
 }
 
+// TestEmailChangeVerifySignsNobodyIn: the token is no way in. A caller
+// signed in as another account gets no session, and keeps its own.
+func TestEmailChangeVerifySignsNobodyIn(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	user := seedVerifiedUser(t, environment, "victim", "Victim")
+	other := seedVerifiedUser(t, environment, "caller", "Caller")
+	if err := environment.auth.RequestEmailChange(user.ID, "moved@example.com"); err != nil {
+		t.Fatalf("RequestEmailChange() error = %v", err)
+	}
+	token := environment.mailedToken(t, "/auth/verify-email-change/")
+	caller := environment.signIn(t, other.ID)
+
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + token + `"}`, cookie: caller})
+	expectStatus(t, recorder, http.StatusOK)
+	if cookieValue(recorder, "session_token") != "" {
+		t.Fatalf("the caller got a session: %v", recorder.Result().Cookies())
+	}
+	mine := decodeBody[api.UserResponse](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: caller}))
+	if mine.User.ID != other.ID {
+		t.Fatalf("the caller is %q, want its own account", mine.User.ID)
+	}
+}
+
 func TestOnboardingGate(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "fresh", Email: "fresh@example.com", Verified: true}).User

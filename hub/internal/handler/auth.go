@@ -47,31 +47,36 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// VerifyEmailChange takes the link sent to a new address. It changes the
+// email and signs the user out everywhere; only a browser signed in as
+// that user stays in, with a new session. Anyone else goes to sign in.
 func (h *authHandler) VerifyEmailChange(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-
-	user, err := h.authService.VerifyEmailChange(token)
-	if err != nil {
+	user, signedIn, err := h.authService.ConfirmEmailChange(w, r, r.PathValue("token"))
+	if user == nil {
 		slog.Warn("email change verification failed", "error", err)
 		render(w, r, pages.VerifyEmailError("It expired or was used already."))
 		return
 	}
-
-	_, err = h.authService.StartFreshSession(w, r, user.ID)
 	if err != nil {
-		slog.Error("failed to create session after email change", "error", err, "user_id", user.ID)
-		render(w, r, pages.VerifyEmailError("Something went wrong. Open the link again."))
+		slog.Error("failed to end the sessions after an email change", "error", err, "user_id", user.ID)
+	}
+	slog.Info("email changed", "user_id", user.ID)
+	if !signedIn {
+		redirect(w, r, "/auth?email=changed", http.StatusSeeOther)
 		return
 	}
-
-	slog.Info("email changed", "user_id", user.ID)
 	render(w, r, pages.VerifyEmailSuccess())
 }
 
 // AuthPage is the way in: GitHub where the GitHub App is set up, else the
 // recovery key from the terminal.
+// After an email change from a link it says so.
 func (h *authHandler) AuthPage(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Auth(""))
+	note := ""
+	if r.URL.Query().Get("email") == "changed" {
+		note = "Your email is changed. Sign in again."
+	}
+	render(w, r, pages.Auth(note, ""))
 }
 
 // KeyPage takes a recovery key.
@@ -79,8 +84,9 @@ func (h *authHandler) KeyPage(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AuthKey(""))
 }
 
-// SignInWithKey signs in with a recovery key, once. It leads to the
-// security settings, where an account without GitHub connects it.
+// SignInWithKey signs in with a recovery key, once. It ends every other
+// session of the user, whose GitHub account the key disconnected, and
+// leads to the security settings to connect GitHub again.
 func (h *authHandler) SignInWithKey(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
 	if key == "" {
@@ -98,7 +104,7 @@ func (h *authHandler) SignInWithKey(w http.ResponseWriter, r *http.Request) {
 		answerFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
 		return
 	}
-	if _, err := h.authService.StartSession(w, r, user.ID); err != nil {
+	if _, err := h.authService.StartFreshSession(w, r, user.ID); err != nil {
 		slog.Error("failed to create session", "error", err, "user_id", user.ID)
 		answerFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
 		return

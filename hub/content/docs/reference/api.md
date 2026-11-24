@@ -38,11 +38,11 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | --- | --- | --- |
 | `POST /api/v1/auth/device` | none | starts `moin login` through the browser (RFC 8628) with `{"hostname"}` |
 | `POST /api/v1/auth/device/token` | none | polls it with `{"device_code"}` every `interval` seconds until it answers `access_token`. See [Log in the CLI](/docs/guides/account#log-in-the-cli) |
-| `POST /api/v1/auth/email-change/verify` | session | confirms a new email and answers the user; every session of the account ends, a cookie caller gets a new one |
+| `POST /api/v1/auth/email-change/verify` | session | confirms a new email and answers the user; every session of the account ends, only a caller signed in as that user gets a new one |
 | `POST /api/v1/auth/onboarding` | session | the name of a new account and its first workspace, or none with an `invitation_token`; every other endpoint answers `onboarding_required` until it is done |
 | `POST /api/v1/auth/logout` | session | signs this browser out |
 
-Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `/auth/github/connect` to connect GitHub to a signed-in account, and `/auth/key` for a [recovery key](/docs/self-hosting#recovery-key). [Sign in](/docs/guides/security#sign-in)
+Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /auth/github/connect` to connect GitHub to a signed-in account, and `/auth/key` for a [recovery key](/docs/self-hosting#recovery-key). [Sign in](/docs/guides/security#sign-in)
 
 ## Account
 

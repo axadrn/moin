@@ -96,7 +96,14 @@ templ settingsGitHubCard(user *model.User) {
 			if user.GitHubID != nil {
 				@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected as " + user.GitHubLogin, Note: "You sign in with this account"})
 			} else {
-				@components.Item(components.ItemProps{Href: "/auth/github/connect", Name: "Connect GitHub", Note: "To sign in with it next time"})
+				@components.Item(components.ItemProps{Name: "Not connected", Note: "Connect GitHub to sign in with it next time"}) {
+					<form method="POST" action="/auth/github/connect">
+						@components.CSRF()
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+							Connect GitHub
+						}
+					</form>
+				}
 			}
 		}
 	}

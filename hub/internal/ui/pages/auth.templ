@@ -10,9 +10,15 @@ import (
 )
 
 // Auth is the way in: GitHub where the GitHub App is set up, else the
-// recovery key from the terminal, which signs in the first admin.
-templ Auth(githubError string) {
+// recovery key from the terminal, which signs in the first admin. note
+// says why someone is here, like after an email change.
+templ Auth(note, githubError string) {
 	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {
+		if note != "" {
+			@authLine() {
+				{ note }
+			}
+		}
 		if ctxkeys.RenderConfig(ctx).GitHubLogin {
 			if ctxkeys.RenderConfig(ctx).Billing {
 				@authLine() {
@@ -37,7 +43,7 @@ templ Auth(githubError string) {
 // AuthGitHubFailed is the way in after a GitHub sign-in did not work, with
 // what went wrong.
 templ AuthGitHubFailed(message string) {
-	@Auth(message)
+	@Auth("", message)
 }
 
 // continueWithGitHub is the one button that signs in.

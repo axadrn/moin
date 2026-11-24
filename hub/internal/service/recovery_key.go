@@ -22,7 +22,8 @@ var ErrRecoveryKeyInvalid = errors.New("this key is wrong, used or expired")
 // one they had: 160 random bits, shown once, in groups of four. Only its
 // hash is stored. It works once, for RecoveryKeyExpiry. The operator makes
 // it with a server command, for the first sign-in of a self-hosted hub or
-// for someone who lost their GitHub account.
+// for someone who lost their GitHub account. Signing in with it ends every
+// other session and disconnects GitHub.
 func (s *AuthService) CreateRecoveryKey(email string) (string, error) {
 	user, err := s.userRepository.ByEmail(strings.ToLower(strings.TrimSpace(email)))
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -48,7 +49,8 @@ func (s *AuthService) CreateRecoveryKey(email string) (string, error) {
 	return key, nil
 }
 
-// SignInWithRecoveryKey uses up a recovery key and returns its user.
+// SignInWithRecoveryKey uses up a recovery key and returns its user, whose
+// GitHub account it disconnects: they connect their GitHub again.
 func (s *AuthService) SignInWithRecoveryKey(key string) (*model.User, error) {
 	userID, err := s.userRepository.UseRecoveryKey(recoveryKeyHash(key), s.now().UTC())
 	if errors.Is(err, repository.ErrUserNotFound) {

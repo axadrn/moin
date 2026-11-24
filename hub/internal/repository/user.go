@@ -131,11 +131,12 @@ func (r *Users) SetRecoveryKey(userID, hash string, expiresAt time.Time) error {
 }
 
 // UseRecoveryKey clears the recovery key with this hash, if it has not
-// expired at now, and returns the id of its user. One statement, so a key
-// works only once.
+// expired at now, disconnects the user's GitHub account and returns the id
+// of the user. One statement, so a key works only once, and a lost or
+// hijacked GitHub account no longer signs in.
 func (r *Users) UseRecoveryKey(hash string, now time.Time) (string, error) {
 	var userID string
-	err := r.db.Get(&userID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
+	err := r.db.Get(&userID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2 WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
 	if err == sql.ErrNoRows {
 		return "", ErrUserNotFound
 	}

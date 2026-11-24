@@ -43,6 +43,7 @@ func TestMigrationsCreateSelectedSchema(t *testing.T) {
 	assertColumnExists(t, database, "users", "name")
 	assertColumnExists(t, database, "users", "updated_at")
 	assertColumnExists(t, database, "users", "github_id")
+	assertColumnExists(t, database, "users", "github_disconnected_at")
 	assertColumnMissing(t, database, "users", "password_hash")
 	assertColumnExists(t, database, "tokens", "token_hash")
 	assertColumnMissing(t, database, "tokens", "token")

@@ -22,6 +22,10 @@ type User struct {
 	// is connected. GitHubLogin is its name on GitHub, like octocat.
 	GitHubID    *int64 `db:"github_id"`
 	GitHubLogin string `db:"github_login"`
+	// GitHubDisconnectedAt is when a recovery key last disconnected the
+	// GitHub account. Such an account connects GitHub again only from its
+	// settings, never by its email.
+	GitHubDisconnectedAt *time.Time `db:"github_disconnected_at"`
 	// RecoveryKeyHash is the SHA-256 of a recovery key from the server
 	// command recovery-key, until it is used or expires.
 	RecoveryKeyHash      *string    `db:"recovery_key_hash"`

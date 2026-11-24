@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -96,17 +97,19 @@ func newGitHubSignInTest(t *testing.T, open bool) githubSignInTest {
 // cookie.
 func (g githubSignInTest) start(t *testing.T, user *model.User) *http.Cookie {
 	t.Helper()
-	request := httptest.NewRequest(http.MethodGet, "/auth/github", nil)
 	recorder := httptest.NewRecorder()
+	status := http.StatusTemporaryRedirect
 	if user == nil {
-		g.handler.GitHubAuth(recorder, request)
+		g.handler.GitHubAuth(recorder, httptest.NewRequest(http.MethodGet, "/auth/github", nil))
 	} else {
+		request := httptest.NewRequest(http.MethodPost, "/auth/github/connect", nil)
 		ctx := ctxkeys.WithUser(request.Context(), user)
 		ctx = ctxkeys.WithSession(ctx, &model.Session{ID: "session", UserID: user.ID})
 		g.handler.ConnectGitHub(recorder, request.WithContext(ctx))
+		status = http.StatusSeeOther
 	}
 	location, _ := url.Parse(recorder.Header().Get("Location"))
-	if recorder.Code != http.StatusTemporaryRedirect || location.Query().Get("redirect_uri") != "https://moin.example.com/auth/github/callback" {
+	if recorder.Code != status || location.Query().Get("redirect_uri") != "https://moin.example.com/auth/github/callback" {
 		t.Fatalf("start = %d %q", recorder.Code, location)
 	}
 	return recorder.Result().Cookies()[0]
@@ -277,10 +280,18 @@ func TestConnectGitHubFromSettings(t *testing.T) {
 	}
 }
 
-// TestSignInWithKey: the key from the terminal signs in once and leads to
-// the security settings, to connect GitHub.
+// TestSignInWithKey: the key from the terminal signs in once, signs out
+// every other session, disconnects GitHub and leads to the security
+// settings, to connect GitHub again.
 func TestSignInWithKey(t *testing.T) {
 	g := newGitHubSignInTest(t, false)
+	if err := g.auth.ConnectGitHub(g.owner.User.ID, service.GitHubAccount{ID: 5, Login: "owner"}); err != nil {
+		t.Fatal(err)
+	}
+	_, other, err := g.auth.CreateSession(httptest.NewRequest(http.MethodGet, "/auth/github/callback", nil), g.owner.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	key, err := g.auth.CreateRecoveryKey("owner@example.com")
 	if err != nil {
 		t.Fatal(err)
@@ -307,6 +318,12 @@ func TestSignInWithKey(t *testing.T) {
 	if session == nil || session.Value == "" {
 		t.Fatal("no session cookie")
 	}
+	if _, err := g.auth.AuthenticateSession(other); err == nil {
+		t.Error("another session survived the recovery key")
+	}
+	if stored, _ := g.users.ByID(g.owner.User.ID); stored.GitHubID != nil || stored.GitHubLogin != "" {
+		t.Errorf("GitHub is still connected: %+v", stored)
+	}
 	if again := send(key); !strings.Contains(again.Body.String(), "wrong, used or expired") || again.Header().Get("Set-Cookie") != "" {
 		t.Fatalf("the used key: status = %d, body %s", again.Code, again.Body.String())
 	}
@@ -328,5 +345,85 @@ func TestSignInPageHasOneWayIn(t *testing.T) {
 		if hasGitHub != github || hasKey == github {
 			t.Errorf("GitHub App %v: GitHub button %v, key field %v", github, hasGitHub, hasKey)
 		}
+	}
+}
+
+// TestEmailChangeLinkSignsNobodyIn: the link changes the email and ends
+// every session of the account. Only a browser signed in as that account
+// stays in; anyone else, or another account, goes to sign in.
+func TestEmailChangeLinkSignsNobodyIn(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		as       string
+		signedIn bool
+	}{
+		{name: "guest"},
+		{name: "another account", as: "taken"},
+		{name: "the same account", as: "handler-owner", signedIn: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			g := newGitHubSignInTest(t, false)
+			createHandlerTestUser(t, g.database, "taken", "taken@example.com", "Taken")
+			_, before, err := g.auth.CreateSession(httptest.NewRequest(http.MethodGet, "/", nil), g.owner.User.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := g.auth.RequestEmailChange(g.owner.User.ID, "moved@example.com"); err != nil {
+				t.Fatal(err)
+			}
+			var token string
+			for _, message := range g.mailer.Messages() {
+				if match := regexp.MustCompile(`/auth/verify-email-change/([0-9a-f]{64})`).FindStringSubmatch(message.Text); match != nil {
+					token = match[1]
+				}
+			}
+			request := httptest.NewRequest(http.MethodGet, "/auth/verify-email-change/"+token, nil)
+			request.SetPathValue("token", token)
+			ctx := ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{})
+			var browser string
+			if test.as != "" {
+				session, raw, err := g.auth.CreateSession(request, test.as)
+				if err != nil {
+					t.Fatal(err)
+				}
+				browser = raw
+				request.AddCookie(&http.Cookie{Name: "session_token", Value: raw})
+				user, _ := g.users.ByID(test.as)
+				ctx = ctxkeys.WithSession(ctxkeys.WithUser(ctx, user), session)
+			}
+			recorder := httptest.NewRecorder()
+
+			g.handler.VerifyEmailChange(recorder, request.WithContext(ctx))
+
+			if stored, _ := g.users.ByID(g.owner.User.ID); stored.Email != "moved@example.com" {
+				t.Fatalf("email = %q", stored.Email)
+			}
+			if _, err := g.auth.AuthenticateSession(before); err == nil {
+				t.Error("a session of the account survived the email change")
+			}
+			newSession := ""
+			for _, cookie := range recorder.Result().Cookies() {
+				if cookie.Name == "session_token" && cookie.Value != "" {
+					newSession = cookie.Value
+				}
+			}
+			if !test.signedIn {
+				if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != "/auth?email=changed" || newSession != "" {
+					t.Fatalf("status = %d, location = %q, session %q, want sign in again", recorder.Code, recorder.Header().Get("Location"), newSession)
+				}
+				if browser != "" {
+					if _, err := g.auth.AuthenticateSession(browser); err != nil {
+						t.Errorf("the session of another account ended: %v", err)
+					}
+				}
+				return
+			}
+			if recorder.Code != http.StatusOK || newSession == "" || newSession == browser {
+				t.Fatalf("status = %d, new session %q, want this browser signed in anew", recorder.Code, newSession)
+			}
+			if _, err := g.auth.AuthenticateSession(newSession); err != nil {
+				t.Errorf("the new session does not work: %v", err)
+			}
+		})
 	}
 }

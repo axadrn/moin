@@ -30,7 +30,8 @@ var (
 //  1. The user with this GitHub id. After the first sign-in only the id
 //     counts, so a changed email on GitHub changes nothing.
 //  2. Else the user whose verified email is GitHub's verified primary
-//     email and who has no GitHub account yet: it gets this one.
+//     email and who never had a GitHub account: it gets this one. After a
+//     recovery key disconnected GitHub, only the settings connect it.
 //  3. Else, when that email belongs to another account, nobody.
 //  4. Else a new user, while sign-up is open to the email, or with the
 //     token of a pending invitation. The invitation link proved its
@@ -56,7 +57,7 @@ func (s *AuthService) SignInWithGitHub(account GitHubAccount, invitationToken st
 		user, err = s.userRepository.ByEmail(email)
 		switch {
 		case err == nil:
-			if user.EmailVerifiedAt == nil || user.GitHubID != nil {
+			if user.EmailVerifiedAt == nil || user.GitHubID != nil || user.GitHubDisconnectedAt != nil {
 				return nil, ErrGitHubEmailTaken
 			}
 			err = s.userRepository.ConnectGitHub(user.ID, account.ID, account.Login)

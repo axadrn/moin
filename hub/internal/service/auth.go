@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/validation"
@@ -381,8 +382,28 @@ func (s *AuthService) RequestEmailChange(userID, newEmail string) error {
 	return nil
 }
 
-// VerifyEmailChange completes the email change after verification
-func (s *AuthService) VerifyEmailChange(token string) (*model.User, error) {
+// ConfirmEmailChange moves the pending address of the token's user to the
+// account and ends every session of that user. The link is no way to sign
+// in: only a browser signed in as that user, not impersonating, gets a new
+// session, and signedIn says so. user is nil when the token is wrong, used
+// or expired.
+func (s *AuthService) ConfirmEmailChange(w http.ResponseWriter, r *http.Request, token string) (user *model.User, signedIn bool, err error) {
+	user, err = s.verifyEmailChange(token)
+	if err != nil {
+		return nil, false, err
+	}
+	session := ctxkeys.Session(r.Context())
+	if session != nil && session.UserID == user.ID && !session.IsImpersonating() {
+		if _, err := s.StartFreshSession(w, r, user.ID); err != nil {
+			return user, false, err
+		}
+		return user, true, nil
+	}
+	return user, false, s.RevokeAllSessions(user.ID)
+}
+
+// verifyEmailChange completes the email change after verification
+func (s *AuthService) verifyEmailChange(token string) (*model.User, error) {
 	// ConsumeToken atomically deletes the token, so only one request can use it.
 	tokenModel, err := s.tokenRepository.ConsumeToken(hashToken(token))
 	if err != nil {
