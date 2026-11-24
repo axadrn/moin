@@ -11,9 +11,10 @@ import (
 )
 
 // Settings is your account, one tab at a time: Profile (picture, name,
-// email, alerts), Security (GitHub, sessions, and the account itself at
-// the end) and Tokens. tokenSections are the parts of the tokens tab.
-templ Settings(sessions []model.Session, currentSessionID, activeTab string, tokenSections ...templ.Component) {
+// email, alerts), Security (GitHub, passkeys, sessions, and the account
+// itself at the end) and Tokens. tokenSections are the parts of the tokens
+// tab.
+templ Settings(sessions []model.Session, currentSessionID string, passkeys []model.Passkey, activeTab string, tokenSections ...templ.Component) {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
 	@layouts.App("Account · Settings") {
@@ -28,6 +29,10 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, tok
 				case "security":
 					if ctxkeys.RenderConfig(ctx).GitHubLogin {
 						@settingsGitHubCard(user)
+					}
+					if ctxkeys.RenderConfig(ctx).Passkeys {
+						@SettingsPasskeysSection(passkeys)
+						@passkeyScript()
 					}
 					@SettingsSessionsSection(sessions, currentSessionID)
 					@settingsAccountDanger()
@@ -109,6 +114,53 @@ templ settingsGitHubCard(user *model.User) {
 	}
 }
 
+// SettingsPasskeysSection lists the passkeys you sign in with, each with
+// its button to remove it, and adds one in the browser (passkey.js). The
+// hub refuses to remove the last way in.
+templ SettingsPasskeysSection(passkeys []model.Passkey) {
+	{{ basePath := ctxkeys.AppBasePath(ctx) }}
+	{{ now := time.Now() }}
+	<div id="settings-passkeys" hx-swap-oob="true">
+		<section class="moin-section">
+			<div class="moin-section-head">
+				<h2>Passkeys</h2>
+			</div>
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					for _, passkey := range passkeys {
+						@components.Item(components.ItemProps{Name: passkey.Name, Note: passkeyNote(passkey, now)}) {
+							@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+								"type":       "button",
+								"hx-delete":  basePath + "/settings/passkeys/" + passkey.ID,
+								"hx-swap":    "none",
+								"hx-disable": "this",
+								"hx-confirm": "Remove this passkey? It no longer signs you in.",
+							}}) {
+								Remove
+							}
+						}
+					}
+					@components.Item(components.ItemProps{Button: true, Name: "Add passkey", Attrs: templ.Attributes{
+						"data-passkey":     "add",
+						"data-passkey-url": basePath + "/settings/passkeys",
+					}})
+				}
+			}
+			@passkeyError()
+		</section>
+	</div>
+}
+
+// passkeyNote is the second line of a passkey: when it was added, and
+// when it last signed in.
+func passkeyNote(passkey model.Passkey, now time.Time) string {
+	note := "Added " + human.Ago(passkey.CreatedAt, now)
+	if passkey.LastUsedAt == nil {
+		return note + ", never used"
+	}
+	return note + ", last used " + human.Ago(*passkey.LastUsedAt, now)
+}
+
 // SettingsSessionsSection lists the browsers signed in to the account, each
 // with its button to end it, and ends them all at the end.
 templ SettingsSessionsSection(sessions []model.Session, currentSessionID string) {
@@ -173,7 +225,7 @@ templ settingsAccountDanger() {
 // first): the server checks the typed DELETE.
 templ deleteAccountDialog() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@components.Dialog(components.DialogProps{ID: "delete-account-dialog", Title: "Delete your account?", Note: "Your account, picture, sessions and API tokens are deleted. This cannot be undone."}) {
+	@components.Dialog(components.DialogProps{ID: "delete-account-dialog", Title: "Delete your account?", Note: "Your account, picture, passkeys, sessions and API tokens are deleted. This cannot be undone."}) {
 		<form
 			id="delete-account-form"
 			class="moin-stack"

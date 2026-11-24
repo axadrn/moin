@@ -19,15 +19,17 @@ type authHandler struct {
 	authService      *service.AuthService
 	workspaceService *service.WorkspaceService
 	// github signs people in, nil without the GitHub App.
-	github *service.GitHub
-	cfg    *config.Config
+	github   *service.GitHub
+	passkeys *service.PasskeyService
+	cfg      *config.Config
 }
 
-func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, github *service.GitHub, cfg *config.Config) *authHandler {
+func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, github *service.GitHub, passkeys *service.PasskeyService, cfg *config.Config) *authHandler {
 	return &authHandler{
 		authService:      authService,
 		workspaceService: workspaceService,
 		github:           github,
+		passkeys:         passkeys,
 		cfg:              cfg,
 	}
 }
@@ -85,8 +87,9 @@ func (h *authHandler) KeyPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // SignInWithKey signs in with a recovery key, once. It ends every other
-// session of the user, whose GitHub account the key disconnected, and
-// leads to the security settings to connect GitHub again.
+// session of the user, whose GitHub account the key disconnected and whose
+// passkeys it deleted, and leads to the security settings to connect
+// GitHub and add a passkey again.
 func (h *authHandler) SignInWithKey(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
 	if key == "" {
@@ -186,20 +189,23 @@ func onboardingFieldError(w http.ResponseWriter, r *http.Request, form pages.Onb
 }
 
 func (h *authHandler) redirectAfterAuth(w http.ResponseWriter, r *http.Request, user *model.User) {
+	redirect(w, r, h.afterAuth(w, r, user), http.StatusSeeOther)
+}
+
+// afterAuth is where a sign-in leads: the invitation or the moin login
+// this browser opened before, else the user's first workspace.
+func (h *authHandler) afterAuth(w http.ResponseWriter, r *http.Request, user *model.User) string {
 	if invitation, ok := h.pendingInvitationForUser(w, r, user); ok {
-		redirect(w, r, "/workspaces/invitations/"+invitation, http.StatusSeeOther)
-		return
+		return "/workspaces/invitations/" + invitation
 	}
 	if device, ok := pendingDevice(r); ok {
-		redirect(w, r, device, http.StatusSeeOther)
-		return
+		return device
 	}
 	members, err := h.workspaceService.ListForUser(user.ID)
 	if err != nil || len(members) == 0 {
-		redirect(w, r, "/workspaces/new", http.StatusSeeOther)
-		return
+		return "/workspaces/new"
 	}
-	redirect(w, r, members[0].Path()+"/overview", http.StatusSeeOther)
+	return members[0].Path() + "/overview"
 }
 
 func (h *authHandler) pendingInvitationForUser(w http.ResponseWriter, r *http.Request, user *model.User) (string, bool) {

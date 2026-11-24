@@ -81,11 +81,12 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 
 ## Account, roles and money
 
-These stay in the web on purpose: they move money or decide who is in charge, so they want you signed in with GitHub, not a token. "With a session" means the endpoint answers a signed-in browser and refuses API tokens; the [API reference](/docs/reference/api) marks each one.
+These stay in the web on purpose: they move money or decide who is in charge, so they want you signed in with GitHub or a passkey, not a token. "With a session" means the endpoint answers a signed-in browser and refuses API tokens; the [API reference](/docs/reference/api) marks each one.
 
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
 | Sign up and sign in with GitHub, connect GitHub | ✓ | `login` signs this computer in through the browser; the rest is the web. | Signs in with the browser; the rest is the web. | Browser only: `/auth/github` sets the session cookie. `github_login` in `GET /api/v1/account`. | AI agents use a token, never your GitHub account. |
+| Passkeys: add, sign in, remove | ✓ Settings, Security; sign in on `/auth` | Adding one is a ceremony in the browser: web only. | Web only. | List and remove with a session; adding and signing in are in the browser. | AI agents do not manage ways to sign in. |
 | Recovery key | ✓ `/auth/key` | The operator makes it on the server with `./main recovery-key <email>`. | Web only. | Browser only. | Never. |
 | Email | ✓ | Web only. | Web only. | ✓ with a session | Never. |
 | Sessions | ✓ | A token can't see your sessions. | Web only. | ✓ with a session | Web only. |

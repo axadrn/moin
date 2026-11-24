@@ -30,7 +30,7 @@ func newOnboardingTest(t *testing.T) onboardingTest {
 	email := service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
 	users := repository.NewUsers(database)
 	auth := service.NewAuthService(users, nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour)
-	handler := NewAuthHandler(auth, workspaces, nil, &config.Config{})
+	handler := NewAuthHandler(auth, workspaces, nil, nil, &config.Config{})
 	return onboardingTest{handler: handler, workspaces: workspaces, owner: owner, mailer: mailer, users: users}
 }
 

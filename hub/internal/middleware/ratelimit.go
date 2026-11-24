@@ -146,6 +146,13 @@ func RateLimitGitHubLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) htt
 	return RateLimit(clientIPs, 30, 15*time.Minute)
 }
 
+// RateLimitPasskeys limits signing in with a passkey and adding one. Each
+// is two requests, nothing can be guessed here, and like GitHub it keeps
+// its own budget, apart from the recovery key's.
+func RateLimitPasskeys(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
+	return RateLimit(clientIPs, 30, 15*time.Minute)
+}
+
 // RateLimitDeviceLogin limits `moin login` in the browser: starting a login
 // and opening or answering its code on the web, per client IP.
 func RateLimitDeviceLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {

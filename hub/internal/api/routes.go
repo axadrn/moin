@@ -21,6 +21,7 @@ type Handlers struct {
 	Auth        *AuthHandler
 	Account     *AccountHandler
 	Sessions    *SessionsHandler
+	Passkeys    *PasskeysHandler
 	Tokens      *APITokensHandler
 	Billing     *BillingHandler
 	Admin       *AdminHandler
@@ -87,6 +88,8 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.List), TokenDenied},
 		{"DELETE /api/v1/account/sessions/{id}", m.RequireOnboarded(h.Sessions.Revoke), TokenDenied},
 		{"DELETE /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.RevokeOthers), TokenDenied},
+		{"GET /api/v1/account/passkeys", m.RequireOnboarded(h.Passkeys.List), TokenDenied},
+		{"DELETE /api/v1/account/passkeys/{id}", m.RequireOnboarded(h.Passkeys.Remove), TokenDenied},
 		{"GET /api/v1/account/tokens", m.RequireOnboarded(h.Tokens.List), TokenDenied},
 		{"POST /api/v1/account/tokens", m.RequireOnboarded(h.Tokens.Create), TokenDenied},
 		{"DELETE /api/v1/account/tokens/{id}", m.RequireOnboarded(h.Tokens.Revoke), TokenDenied},

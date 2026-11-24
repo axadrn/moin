@@ -1,11 +1,21 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Sign-in, web, SSH, firewall, rules and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, web, SSH, firewall, rules and signed updates."
 group: "Servers and data"
 order: 2
 ---
 
 How moin keeps your servers safe. First in pictures, then the facts.
+
+## Add a passkey. Everyone should.
+
+A passkey is a key on your phone, laptop or password manager. You unlock it with your face, your finger or your screen lock. It takes a minute: **Settings**, **Account**, **Security**, **Add passkey**.
+
+- **Nobody can phish it.** A passkey works only on your hub's own address. A fake page that looks like moin gets nothing, even when you fall for it.
+- **It works without GitHub.** GitHub down, or your GitHub account lost or taken over? Your passkey still lets you in.
+- **Nothing to leak.** The hub keeps only the public half. The secret half never leaves your device.
+
+Until you have one, moin asks on every page. [Add a passkey](/docs/guides/account#add-a-passkey)
 
 ## How moin keeps you safe
 
@@ -33,26 +43,30 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 
 - The server checks every compose file against a list of what a normal app needs, before anything builds or starts. [Containers](#containers-that-reach-into-the-server)
 
-**One door, one key.** You come in with GitHub, not with a password moin keeps. There is no password to guess, to leak or to reset by email.
+**Two keys, no password.** You come in with GitHub or a passkey, not with a password moin keeps. There is no password to guess, to leak or to reset by email.
 
-- Sign-in is GitHub only, with two-factor as your GitHub account has it. [Sign in](#sign-in)
+- Sign-in is GitHub, with two-factor as your GitHub account has it, or a passkey. [Sign in](#sign-in)
 
 **What stays honest.** A messenger that someone bought can still bring letters your rules allow. Strict rules leave it nothing that hurts.
 
 ## Sign in
 
-You sign in with GitHub. Like a club that lets you in when a friend at the door knows you: GitHub knows you, moin asks GitHub.
+You sign in with GitHub or a passkey. Like a club that lets you in when a friend at the door knows you: GitHub knows you, moin asks GitHub. Or you bring your own key, the passkey, and moin checks it.
 
-- **GitHub only.** No passwords, no sign-in links by email. Nothing to guess, nothing to phish from an inbox, no reset that takes over an account.
+- **GitHub or a passkey, nothing else.** No passwords, no sign-in links by email. Nothing to guess, nothing to phish from an inbox, no reset that takes over an account. Sign-up is GitHub only; a passkey comes later, in the settings.
 - **The GitHub account counts, not the email.** moin stores the id of your GitHub account. It never changes, even when you change your email or name on GitHub.
 - **The first time only, the email.** An account made before GitHub finds its GitHub account by GitHub's verified primary email, if the account proved that address too and has no GitHub account yet. Secondary addresses and unverified ones never count. After that, only the id counts.
 - **A taken address stays taken.** When your GitHub email belongs to another account, moin says so and signs you in nowhere.
 - **Invitations.** The link in an invitation proves its mailbox. Any GitHub account may take it, and the new account gets the invited address.
 - **New accounts.** Only while sign-up is open: on the hosted hub, or with an invitation. A self-hosted hub lets in its admins and invited people.
 - **Every sign-in is a new session.** The cookie the browser had ends, so nobody can plant a session on you. Sessions live in an HttpOnly cookie only, never in a script.
-- **Recovery key.** Lost your GitHub account? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It signs the account out everywhere and disconnects its GitHub account, so a stolen GitHub account no longer gets in. Then you connect your GitHub again.
+- **Passkeys are WebAuthn.** A passkey belongs to the domain of the hub, so a look-alike site cannot use it. The hub stores the public key only. It asks for a passkey the device keeps itself (a discoverable credential) and for your face, finger or screen lock every time (user verification), and wants no attestation, so any passkey provider works.
+- **Every passkey sign-in is checked in full.** The challenge is random, kept on the hub, works once and for five minutes. The signature, the origin, the domain and the flags are checked by go-webauthn, a maintained WebAuthn library, never by code of our own. A sign counter that goes back means a copied passkey: refused. 30 tries per 15 minutes per address.
+- **A new passkey sends you an email**, so one you did not add does not go unseen. An operator impersonating you can neither add nor remove one.
+- **The last way in stays.** Without GitHub, your last passkey cannot be removed. Add another first.
+- **Recovery key.** Lost your GitHub account or your passkey? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It resets every way in: it signs the account out everywhere, disconnects its GitHub account and deletes its passkeys, so a stolen GitHub account or device no longer gets in. Then you connect your GitHub and add a passkey again.
 - **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
-- **Connecting GitHub is a form with a CSRF token**, so no other site can start it. [Recovery key](/docs/self-hosting#recovery-key)
+- **Connecting GitHub and adding a passkey need a CSRF token**, so no other site can start them. [Recovery key](/docs/self-hosting#recovery-key)
 - **Scripts and AI agents** use a personal API token instead, which can never change how you sign in. [Account and tokens](/docs/guides/account)
 
 ## Ports, SSH and the firewall

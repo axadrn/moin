@@ -1,0 +1,23 @@
+package layouts
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+)
+
+// AppPasskeyCard asks everyone without a passkey for one, over every page,
+// until they have one. It is not shown while an operator impersonates.
+templ AppPasskeyCard() {
+	{{ user := ctxkeys.User(ctx) }}
+	if ctxkeys.RenderConfig(ctx).Passkeys && user != nil && user.Passkeys == 0 && ctxkeys.Workspace(ctx) != nil && !ctxkeys.Session(ctx).IsImpersonating() {
+		@components.Card(components.CardProps{Attrs: templ.Attributes{"data-passkey-card": true}}) {
+			<div class="moin-row" data-gap="4" data-phone="stack">
+				<p class="moin-fill moin-text moin-strong">Secure your account: add a passkey.</p>
+				@components.Button(components.ButtonProps{Href: ctxkeys.AppBasePath(ctx) + "/settings/account?tab=security"}) {
+					@components.Icon("key")
+					Add passkey
+				}
+			</div>
+		}
+	}
+}

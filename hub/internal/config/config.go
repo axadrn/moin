@@ -140,6 +140,9 @@ type RenderConfig struct {
 	SignupsOpen       bool
 	// GitHubLogin is Config.GitHubLogin, for the sign-in pages.
 	GitHubLogin bool
+	// Passkeys says the hub offers passkeys, for the sign-in page, the
+	// settings and the banner. The routes set it from the PasskeyService.
+	Passkeys bool
 }
 
 func Load() (*Config, error) {

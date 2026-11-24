@@ -50,6 +50,8 @@ tags:
     description: The signed-in account.
   - name: Sessions
     description: Active sessions of the signed-in account.
+  - name: Passkeys
+    description: Passkeys of the signed-in account. Only a signed-in session lists and removes them. Adding one is a ceremony in the browser, so only the web adds passkeys.
   - name: API tokens
     description: Personal API tokens of the signed-in account. Only a signed-in session manages them. An admin signing the user out everywhere revokes every token. Signing out other sessions keeps them.
   - name: Workspaces
@@ -567,6 +569,52 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No active session with this ID belongs to the account.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/passkeys:
+    get:
+      tags: [Passkeys]
+      operationId: listPasskeys
+      summary: List passkeys
+      description: Oldest first. Never the credential itself.
+      responses:
+        '200':
+          description: Every passkey of the account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasskeyList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a personal API token.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/account/passkeys/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PasskeyID'
+    delete:
+      tags: [Passkeys]
+      operationId: removePasskey
+      summary: Remove a passkey
+      description: The passkey no longer signs in. The last way in stays: an account without GitHub keeps its last passkey.
+      responses:
+        '204':
+          description: The passkey is removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a personal API token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No passkey with this ID belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`last_way_in`. It is the only passkey of an account without GitHub. Add another first.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -4184,6 +4232,13 @@ components:
       description: The session ID from `GET /api/v1/account/sessions`.
       schema:
         type: string
+    PasskeyID:
+      name: id
+      in: path
+      required: true
+      description: The passkey ID from `GET /api/v1/account/passkeys`.
+      schema:
+        type: string
     APITokenID:
       name: id
       in: path
@@ -4651,6 +4706,30 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Session'
+    Passkey:
+      type: object
+      required: [id, name, created_at, last_used_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: Always "Passkey"; `created_at` and `last_used_at` tell passkeys apart.
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: [string, 'null']
+          format: date-time
+          description: When it last signed in, null before its first sign-in.
+    PasskeyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Passkey'
     DeviceLoginRequest:
       type: object
       properties:

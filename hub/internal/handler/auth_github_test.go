@@ -90,7 +90,7 @@ func newGitHubSignInTest(t *testing.T, open bool) githubSignInTest {
 	auth.SetBeta(service.NewBetaService(open, []string{"admin@example.com"}, repository.NewWorkspaceInvitations(database), repository.NewSubscriptions(database)))
 	cfg := githubAppConfig
 	github := fakeGitHub(t, map[string]int64{"stranger": 1, "admin": 2, "mate": 3, "hopper": 4, "owner": 5})
-	return githubSignInTest{database: database, users: users, auth: auth, workspaces: workspaces, owner: owner, mailer: mailer, handler: NewAuthHandler(auth, workspaces, github, &cfg)}
+	return githubSignInTest{database: database, users: users, auth: auth, workspaces: workspaces, owner: owner, mailer: mailer, handler: NewAuthHandler(auth, workspaces, github, nil, &cfg)}
 }
 
 // start goes to GitHub as user (nil for a guest) and returns the state

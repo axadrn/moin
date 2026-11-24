@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/service/mailer"
 )
@@ -39,6 +40,11 @@ func (s *EmailService) SendEmailChangeVerification(newEmail, token, userName str
 
 func (s *EmailService) SendEmailChangeNotification(oldEmail, newEmail, userName string) error {
 	return s.send("email_change_notification", oldEmail, emailChangeNotificationTemplate(userName, newEmail, s.appName))
+}
+
+// SendPasskeyAdded tells the user a passkey was added to their account, at.
+func (s *EmailService) SendPasskeyAdded(email, name string, at time.Time) error {
+	return s.send("passkey_added", email, passkeyAddedTemplate(name, at, s.appName))
 }
 
 func (s *EmailService) SendAccountDeletedEmail(email, name string) error {
