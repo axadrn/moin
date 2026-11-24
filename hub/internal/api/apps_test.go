@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/axadrn/moin/hub/internal/access"
+	"github.com/axadrn/moin/hub/internal/api"
+	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
 
@@ -30,4 +32,13 @@ func TestAppDomainsRules(t *testing.T) {
 
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/instant/password", bearer: reader}), http.StatusForbidden, "insufficient_scope")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/instant/password", bearer: writer}), http.StatusNotFound, "not_found")
+}
+
+// A domain another app or service uses is a validation error that names
+// the domain, the same for the web, the API, the CLI and MCP.
+func TestDomainUsedNamesTheDomain(t *testing.T) {
+	status, detail, known := api.ErrorFor(&repository.DomainUsedError{Name: "example.com"})
+	if status != http.StatusUnprocessableEntity || !known || detail.Fields["domains"] != "example.com is already used by another app or service." {
+		t.Fatalf("ErrorFor = %d, %+v, %v", status, detail, known)
+	}
 }
