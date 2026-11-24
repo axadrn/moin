@@ -27,8 +27,8 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Restart, stop, start | ✓ | ✓ | ✓ `T`, `S` | ✓ | ✓ |
 | Container logs | ✓ | ✓ `logs` | ✓ live, with a filter | ✓ | ✓ |
 | Run a command in a container | ✓ | ✓ `exec` | ✓ `X` | ✓ | ✓ |
-| Env vars: see, set, remove | ✓ | ✓ `env` | ✓ | ✓ | ✓ |
-| Env vars as one `.env` | ✓ | ✓ `env push`, `env pull` | ✓ in `$EDITOR` | ✓ | ✓ |
+| Env vars: names and dates, set, remove; values are write-only | ✓ | ✓ `env` | ✓ | ✓ | ✓ |
+| Env vars as one `.env` | ✓ | ✓ `env push` | ✓ in `$EDITOR` | ✓ | ✓ |
 | Domains and their DNS | ✓ | ✓ `domains` | ✓ | ✓ | ✓ |
 | Add, remove, canonical domain | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Password protection | ✓ | ✓ `protect` | ✓ `p` | ✓ | ✓ |

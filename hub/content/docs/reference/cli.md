@@ -142,19 +142,17 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | --- | --- |
 | `moin catalog` | the [catalog](/docs/guides/catalog), each app with its newest version |
 | `moin catalog <app>` | one catalog app with every version |
-| `moin catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy. `--version` defaults to the newest, `--name` to the catalog app's |
+| `moin catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy. `--version` defaults to the newest, `--name` to the catalog app's. A password the first sign-in needs shows once, at the end |
 | `moin update <app> [--version <tag>]` | sets a catalog app to a version, the newest by default, and deploys it; `moin backups` offers the copy before it |
 
 ## Env vars
 
 | Command | What it does |
 | --- | --- |
-| `moin env [--show] [app]` | lists env vars, values hidden without `--show` |
+| `moin env [app]` | lists env vars and when each changed; values are write-only, so no command shows one |
 | `moin env set [app] KEY=value …` | sets env vars |
 | `moin env rm KEY … [--yes]` | removes env vars |
-| `moin env pull [--app <app>] [--yes] [file]` | writes them to a `.env` file, default `.env`; asks before it replaces a file |
-| `moin env push [--app <app>] [--yes] [file]` | replaces all env vars with a `.env` file, default `.env`; shows the keys that change and asks first |
-| `moin run [--app <app>] -- <command>` | runs a command on your computer with the env vars, like `moin run -- go run .` |
+| `moin env push [--app <app>] [--yes] [file]` | replaces all env vars with a `.env` file, default `.env`; shows which keys it adds, replaces and removes, and asks first |
 
 ## Data
 
@@ -218,7 +216,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app my-app` is
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type my-app to confirm:` |
-| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env pull` over a file, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy` of an app that exists, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
 `--yes` skips the question. For `servers rm`, `apps rm`, `buckets rm` and `restore`, `--yes` is not enough: a script passes the name as `--confirm my-app`. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`.
