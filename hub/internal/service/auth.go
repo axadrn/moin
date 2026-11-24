@@ -445,16 +445,6 @@ func (s *AuthService) EnsureUser(email string) (*model.User, error) {
 	return user, nil
 }
 
-// NeedsOnboarding checks if user needs to complete onboarding (name not set)
-func (s *AuthService) NeedsOnboarding(userID string) (bool, error) {
-	user, err := s.userRepository.ByID(userID)
-	if err != nil {
-		return false, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	return user.Name == "", nil
-}
-
 // CompleteOnboarding sets the user's name during onboarding and, when
 // createWorkspace is set, makes the first workspace: named workspaceName,
 // or "<name>'s Workspace" when it is empty.
