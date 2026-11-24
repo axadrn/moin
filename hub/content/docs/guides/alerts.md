@@ -17,11 +17,11 @@ Open in moin
 
 ## What sends an alert
 
-One alert per event, and one when it is fixed.
+One alert per event, and one when it is fixed. A site that flaps sends at most one down alert an hour, and a back-up alert only after a down alert.
 
 | Event | When |
 | --- | --- |
-| `uptime.down`, `uptime.up` | a site goes down, or comes back ([Uptime](/docs/guides/uptime#down-and-back-up)) |
+| `uptime.down`, `uptime.up` | a site has not answered for two minutes; back up ([Uptime](/docs/guides/uptime#down-and-back-up)) |
 | `server.down`, `server.up` | a daemon has not answered for two minutes; back online |
 | `deploy.failed` | a deploy fails ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
 | `backup.failed`, `backup.recovered` | a copy does not reach the bucket; and when it works again ([Backups](/docs/guides/backups)) |

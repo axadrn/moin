@@ -116,7 +116,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin uptime [app]` | uptime of every domain over 24 hours, 7 and 30 days, the last visit and the last outages |
+| `moin uptime [app]` | uptime of every domain that serves something over 24 hours, 7 and 30 days, the last visit and the last outages |
 | `moin uptime path <domain> <path\|default>` | the path uptime visits on a domain; `default` is the health path or `/` |
 | `moin uptime pause <domain>` · `moin uptime resume <domain>` | pauses uptime of a domain; visits it every minute again |
 | `moin metrics [app\|server] [--range 1h\|24h\|7d\|30d]` | CPU, memory and network of an app now, a sparkline of the range and the deploys that went live; a name that is no app is a server. Default `1h` |

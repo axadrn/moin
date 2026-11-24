@@ -91,7 +91,7 @@ Domains
   protect off        Make the app public again: protect off [app] [--yes]
 
 Uptime
-  uptime             Uptime of every domain, 24 hours, 7 and 30 days, and the last outages: uptime [app]
+  uptime             Uptime of every domain that serves, 24 hours, 7 and 30 days, and the last outages: uptime [app]
   uptime path        The path uptime visits on a domain: uptime path my-app.example.com /health, or default
   uptime pause       Pause uptime of a domain: uptime pause my-app.example.com
   uptime resume      Visit it every minute again: uptime resume my-app.example.com

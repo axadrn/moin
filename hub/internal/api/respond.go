@@ -273,7 +273,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrDomain, field: "domains", message: "Use host names like my-app.example.com."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrServiceCanonical, field: "canonical", message: "canonical is for the main service only."},
-	{err: service.ErrUptimeDomain, field: "domain", message: "The app has no such domain."},
+	{err: service.ErrUptimeDomain, field: "domain", message: "Uptime visits no such domain of this app. A domain that only redirects to the main one is not visited."},
 	{err: service.ErrUptimePath, field: "path", message: "Use a path that starts with /, like /health, without spaces."},
 	{err: service.ErrMetricsRange, field: "range", message: "Use 1h, 24h, 7d or 30d."},
 	{err: service.ErrService, field: "service", message: "Use the name of a service in compose.yml: lowercase letters, digits, dashes, dots or underscores."},

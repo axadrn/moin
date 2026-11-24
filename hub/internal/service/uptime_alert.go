@@ -9,17 +9,28 @@ import (
 
 // recordUptimeChange stores the outage of a domain that went down or came
 // back and writes it to the activity: uptime.down with the reason,
-// uptime.up with how long it was down.
-func (s *AppService) recordUptimeChange(workspaceID, appName string, before, stored model.DomainUptime, failure string) {
-	actor := System(workspaceID)
+// uptime.up with how long it was down. mail says whether it goes out as
+// an alert too.
+func (s *AppService) recordUptimeChange(workspaceID, appName string, before, stored model.DomainUptime, failure string, mail bool) {
 	switch {
 	case stored.State == model.UptimeDown:
 		_ = s.apps.StartUptimeOutage(stored.AppID, stored.Domain, *stored.Since, failure)
-		s.servers.record(actor, "uptime.down", "app", appName, map[string]string{"domain": stored.Domain, "reason": failure})
+		s.tell(workspaceID, appName, "uptime.down", map[string]string{"domain": stored.Domain, "reason": failure}, mail)
 	case before.State == model.UptimeDown:
 		_ = s.apps.EndUptimeOutage(stored.AppID, stored.Domain, *stored.Since)
-		s.servers.record(actor, "uptime.up", "app", appName, map[string]string{"domain": stored.Domain, "duration": stored.Since.Sub(*before.Since).Round(time.Second).String()})
+		s.tell(workspaceID, appName, "uptime.up", map[string]string{"domain": stored.Domain, "duration": stored.Since.Sub(*before.Since).Round(time.Second).String()}, mail)
 	}
+}
+
+// tell writes a change of a domain to the activity, and sends it as an
+// alert only when mail is true: the activity shows every outage, the
+// alerts stay few.
+func (s *AppService) tell(workspaceID, appName, action string, details map[string]string, mail bool) {
+	if mail {
+		s.servers.record(System(workspaceID), action, "app", appName, details)
+		return
+	}
+	recordActivity(s.servers.activity, s.servers.now(), System(workspaceID), action, "app", appName, details)
 }
 
 // watchServers writes a server whose daemon is gone for a while to the
@@ -43,7 +54,7 @@ func (s *AppService) watchServers(now time.Time) {
 			if gone.Before(s.uptime.started) {
 				gone = s.uptime.started
 			}
-			if now.Sub(gone) < serverDownAfter {
+			if now.Sub(gone) < downAfter {
 				continue
 			}
 			err = s.apps.StartServerOutage(server.ID, server.LastSeenAt)
