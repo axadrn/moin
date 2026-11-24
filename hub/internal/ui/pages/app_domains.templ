@@ -18,6 +18,9 @@ type DomainsView struct {
 	// Server runs the app.
 	Server  model.Server
 	Instant service.Instant
+	// NewPassword is the password of the instant address moin just made:
+	// the one time it shows it.
+	NewPassword string
 	// File is the x-moin block of the live deploy: what it sets is locked.
 	File protocol.Config
 }
@@ -189,13 +192,20 @@ templ instantSection(view DomainsView, domainsPath string) {
 								@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open}})
 							}
 							if !instant.Open && !instant.OwnPassword {
-								if instant.Password != "" {
-									@components.Item(components.ItemProps{}) {
-										<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instant.Password }</span>
-										@copyButton(instant.Password, "", "Copy the password")
+								if view.NewPassword != "" {
+									@components.Item(components.ItemProps{Name: "New password", Note: "Shown once. " + view.App.Name + " takes it on its next restart."}) {
+										<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ view.NewPassword }</span>
+										@copyButton(view.NewPassword, "", "Copy the password")
 									}
 								} else {
-									@components.Item(components.ItemProps{Button: true, Name: "Show password", Attrs: templ.Attributes{"hx-get": domainsPath + "/detail?show=true", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "this", "data-instant-show": true}})
+									@components.Item(components.ItemProps{Button: true, Name: "New password", Attrs: templ.Attributes{
+										"hx-post":          domainsPath + "/instant-new-password",
+										"hx-target":        "#app-domains",
+										"hx-swap":          "outerHTML",
+										"hx-disable":       "this",
+										"hx-confirm":       "Make a new password? moin shows it once. The old one works until the next restart.",
+										"data-instant-new": true,
+									}})
 								}
 							}
 						}

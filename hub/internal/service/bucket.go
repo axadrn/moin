@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/url"
 	"path"
 	"strings"
@@ -43,9 +42,10 @@ func (e *BucketInUseError) Error() string {
 	return "The bucket " + e.Bucket + " is in use: " + strings.Join(reasons, ", and ") + "."
 }
 
-// Bucket is one bucket of a workspace without its secret key. Folder is
-// where the workspace's files go in it: <path>/<workspace ID>/. Apps use
-// it now; Older are the apps that left it and keep older backups there.
+// Bucket is one bucket of a workspace without its secret key, which only
+// the servers keep: Servers says which. Folder is where the workspace's
+// files go in it: <path>/<workspace ID>/. Apps use it now; Older are the
+// apps that left it and keep older backups there.
 type Bucket struct {
 	ID        string
 	Name      string
@@ -59,6 +59,7 @@ type Bucket struct {
 	CreatedAt time.Time
 	Apps      []string
 	Older     []string
+	Servers   SecretServers
 }
 
 // AppFolder is where an app's backups go in the bucket:
@@ -67,10 +68,12 @@ func (b Bucket) AppFolder(app *model.App) string {
 	return b.Folder + app.Folder + "/" + app.ID + "/"
 }
 
-// BucketInput is a bucket as people enter it. An empty SecretKey keeps the
-// stored one when a bucket changes. Default makes it the workspace's
-// default bucket.
+// BucketInput is a bucket as people enter it. Server is the server that
+// checks it and keeps SecretKey, empty for the workspace's only one. An
+// empty SecretKey keeps the server's key when a bucket changes. Default
+// makes it the workspace's default bucket.
 type BucketInput struct {
+	Server    string
 	Name      string
 	Endpoint  string
 	Region    string
@@ -98,11 +101,13 @@ func newBucket(bucket model.Bucket) Bucket {
 	}
 }
 
-// withApps adds the apps that use the bucket.
-func (s *AppService) withApps(bucket model.Bucket) (Bucket, error) {
+// withApps adds the apps that use the bucket and the servers that keep
+// its key.
+func (s *AppService) withApps(bucket model.Bucket, index secretsIndex) (Bucket, error) {
 	view := newBucket(bucket)
 	var err error
 	view.Apps, view.Older, err = s.apps.BucketApps(bucket.WorkspaceID, bucket.ID)
+	view.Servers = index.of(protocol.BucketSecret(bucket.ID))
 	return view, err
 }
 
@@ -113,9 +118,13 @@ func (s *AppService) Buckets(workspaceID string) ([]Bucket, error) {
 	if err != nil {
 		return nil, err
 	}
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return nil, err
+	}
 	views := make([]Bucket, 0, len(buckets))
 	for _, bucket := range buckets {
-		view, err := s.withApps(bucket)
+		view, err := s.withApps(bucket, index)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +139,11 @@ func (s *AppService) Bucket(workspaceID, name string) (*Bucket, error) {
 	if err != nil {
 		return nil, err
 	}
-	view, err := s.withApps(*bucket)
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	view, err := s.withApps(*bucket, index)
 	return &view, err
 }
 
@@ -143,7 +156,11 @@ func (s *AppService) DefaultBucket(workspaceID string) (*Bucket, error) {
 	if err != nil {
 		return nil, err
 	}
-	view, err := s.withApps(*bucket)
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	view, err := s.withApps(*bucket, index)
 	return &view, err
 }
 
@@ -191,17 +208,19 @@ func (s *AppService) OlderBuckets(app *model.App) ([]Bucket, error) {
 	return views, nil
 }
 
-// AddBucket checks that moin can write to a new bucket and stores it. The
-// first bucket of a workspace is its default.
+// AddBucket has a server check that moin can write to a new bucket and
+// keep its secret key, then stores the bucket without the key. The first
+// bucket of a workspace is its default.
 func (s *AppService) AddBucket(ctx context.Context, actor Actor, input BucketInput) (*Bucket, error) {
 	clean, err := cleanBucket(actor.WorkspaceID, input)
 	if err != nil {
 		return nil, err
 	}
-	if clean.SecretKey == "" {
+	if input.SecretKey == "" {
 		return nil, ErrBackupBucket
 	}
-	if err := s.checkBucket(ctx, actor, clean); err != nil {
+	server, err := s.servers.secretServer(actor.WorkspaceID, input.Server)
+	if err != nil {
 		return nil, err
 	}
 	_, err = s.apps.DefaultBucket(actor.WorkspaceID)
@@ -219,15 +238,21 @@ func (s *AppService) AddBucket(ctx context.Context, actor Actor, input BucketInp
 		Bucket:      clean.Bucket,
 		Path:        clean.Path,
 		AccessKey:   clean.AccessKey,
-		SecretKey:   s.box.Seal(clean.SecretKey, actor.WorkspaceID+"/backups"),
 		CreatedAt:   s.now().UTC(),
+	}
+	if _, err := s.apps.Bucket(actor.WorkspaceID, bucket.Name); err == nil {
+		return nil, repository.ErrDuplicateBucket
+	}
+	err = s.keepBucketKey(ctx, server, bucket, strings.TrimSpace(input.SecretKey))
+	if err != nil {
+		return nil, err
 	}
 	err = s.apps.CreateBucket(bucket)
 	if err != nil {
 		return nil, err
 	}
 	s.configureDaemons(actor.WorkspaceID)
-	s.servers.record(actor, "bucket.added", "bucket", bucket.Name, map[string]string{"bucket": bucket.Bucket, "endpoint": bucket.Endpoint, "path": bucket.Path})
+	s.servers.record(actor, "bucket.added", "bucket", bucket.Name, map[string]string{"bucket": bucket.Bucket, "endpoint": bucket.Endpoint, "path": bucket.Path, "server": server.Name})
 	if bucket.IsDefault && !first {
 		s.servers.record(actor, "bucket.default", "bucket", bucket.Name, nil)
 	}
@@ -235,9 +260,27 @@ func (s *AppService) AddBucket(ctx context.Context, actor Actor, input BucketInp
 	return s.Bucket(actor.WorkspaceID, bucket.Name)
 }
 
+// keepBucketKey has a server write a test file to the bucket with
+// secretKey, or with the key it keeps when secretKey is empty, and keep
+// the key.
+func (s *AppService) keepBucketKey(ctx context.Context, server *model.Server, bucket model.Bucket, secretKey string) error {
+	ctx, cancel := context.WithTimeout(ctx, secretTimeout)
+	defer cancel()
+	err := s.servers.Request(ctx, server.ID, protocol.TypeBucketSet, protocol.BucketSet{Bucket: *daemonBucket(&bucket), SecretKey: secretKey}, nil)
+	if errors.Is(err, ErrServerOffline) {
+		return &OfflineError{Server: server.Name}
+	}
+	if err != nil {
+		return err
+	}
+	return s.servers.servers.SetServerSecret(server.ID, protocol.BucketSecret(bucket.ID), false, s.now().UTC())
+}
+
 // EditBucket changes a bucket: its name, where it is, its keys, or makes
-// it the default. A new place or new keys are checked first; apps then
-// start there with a full copy, and the old place keeps what it has.
+// it the default. A new place or new keys are checked first by a server,
+// which keeps the key; apps then start there with a full copy, and the old
+// place keeps what it has. A new access key or secret key leaves the other
+// servers without a key: enter it for them again.
 func (s *AppService) EditBucket(ctx context.Context, actor Actor, name string, input BucketInput) (*Bucket, error) {
 	stored, err := s.apps.Bucket(actor.WorkspaceID, name)
 	if err != nil {
@@ -250,25 +293,25 @@ func (s *AppService) EditBucket(ctx context.Context, actor Actor, name string, i
 	if err != nil {
 		return nil, err
 	}
-	sealed := stored.SecretKey
-	if clean.SecretKey == "" {
-		clean.SecretKey, err = s.box.Open(stored.SecretKey, actor.WorkspaceID+"/backups")
+	secretKey := strings.TrimSpace(input.SecretKey)
+	newKey := clean.AccessKey != stored.AccessKey || secretKey != ""
+	moved := newKey || clean.Endpoint != stored.Endpoint || clean.Region != stored.Region || clean.Bucket != stored.Bucket || clean.Path != stored.Path
+	bucket := *stored
+	bucket.Name, bucket.Endpoint, bucket.Region, bucket.Bucket, bucket.Path, bucket.AccessKey =
+		clean.Name, clean.Endpoint, clean.Region, clean.Bucket, clean.Path, clean.AccessKey
+	var server *model.Server
+	if moved {
+		server, err = s.servers.secretServer(actor.WorkspaceID, input.Server)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		sealed = s.box.Seal(clean.SecretKey, actor.WorkspaceID+"/backups")
-	}
-	moved := clean.Endpoint != stored.Endpoint || clean.Region != stored.Region || clean.Bucket != stored.Bucket ||
-		clean.Path != stored.Path || clean.AccessKey != stored.AccessKey || sealed != stored.SecretKey
-	if moved {
-		if err := s.checkBucket(ctx, actor, clean); err != nil {
+		if err := s.keepBucketKey(ctx, server, bucket, secretKey); err != nil {
 			return nil, err
 		}
+		if newKey {
+			s.dropBucketKeyElsewhere(ctx, actor.WorkspaceID, bucket.ID, server.ID)
+		}
 	}
-	bucket := *stored
-	bucket.Name, bucket.Endpoint, bucket.Region, bucket.Bucket, bucket.Path, bucket.AccessKey, bucket.SecretKey =
-		clean.Name, clean.Endpoint, clean.Region, clean.Bucket, clean.Path, clean.AccessKey, sealed
 	becameDefault := input.Default && !stored.IsDefault
 	bucket.IsDefault = stored.IsDefault || input.Default
 	if !moved && !becameDefault && bucket.Name == stored.Name {
@@ -284,6 +327,9 @@ func (s *AppService) EditBucket(ctx context.Context, actor Actor, name string, i
 		if bucket.Name != stored.Name {
 			details["from"] = stored.Name
 		}
+		if server != nil {
+			details["server"] = server.Name
+		}
 		s.servers.record(actor, "bucket.changed", "bucket", bucket.Name, details)
 	}
 	if becameDefault {
@@ -291,6 +337,50 @@ func (s *AppService) EditBucket(ctx context.Context, actor Actor, name string, i
 	}
 	s.notify(actor.WorkspaceID)
 	return s.Bucket(actor.WorkspaceID, bucket.Name)
+}
+
+// SetBucketKey hands one more server the secret key of a bucket, such as
+// a server added after the bucket: it checks the bucket with it first.
+func (s *AppService) SetBucketKey(ctx context.Context, actor Actor, name, serverName, secretKey string) (*Bucket, error) {
+	bucket, err := s.apps.Bucket(actor.WorkspaceID, name)
+	if err != nil {
+		return nil, err
+	}
+	secretKey = strings.TrimSpace(secretKey)
+	if secretKey == "" {
+		return nil, ErrBackupBucket
+	}
+	server, err := s.servers.secretServer(actor.WorkspaceID, serverName)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.keepBucketKey(ctx, server, *bucket, secretKey); err != nil {
+		return nil, err
+	}
+	s.reconfigure(server.ID, actor.WorkspaceID)
+	s.servers.record(actor, "bucket.key_set", "bucket", bucket.Name, map[string]string{"server": server.Name})
+	s.notify(actor.WorkspaceID)
+	return s.Bucket(actor.WorkspaceID, bucket.Name)
+}
+
+// dropBucketKeyElsewhere has every server but keep forget the key of a
+// bucket whose keys change: the old key is no use to them.
+func (s *AppService) dropBucketKeyElsewhere(ctx context.Context, workspaceID, bucketID, keep string) {
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return
+	}
+	for _, server := range index.servers {
+		if server.ID == keep || !index.has(server.ID, protocol.BucketSecret(bucketID)) {
+			continue
+		}
+		if s.servers.Online(server.ID) {
+			if err := s.servers.setSecret(ctx, &server, protocol.BucketSecret(bucketID), ""); err == nil {
+				continue
+			}
+		}
+		_ = s.servers.servers.SetServerSecret(server.ID, protocol.BucketSecret(bucketID), true, s.now().UTC())
+	}
 }
 
 // MakeDefaultBucket makes a bucket the workspace's default, as it is.
@@ -325,6 +415,7 @@ func (s *AppService) RemoveBucket(actor Actor, name, confirm string) error {
 		return err
 	}
 	s.configureDaemons(actor.WorkspaceID)
+	s.servers.dropSecret(context.Background(), actor.WorkspaceID, protocol.BucketSecret(bucket.ID))
 	s.servers.record(actor, "bucket.removed", "bucket", bucket.Name, nil)
 	s.notify(actor.WorkspaceID)
 	return nil
@@ -369,8 +460,8 @@ func (s *AppService) SetAppBucket(actor Actor, idOrName, name string) (*model.Ap
 }
 
 // cleanBucket trims what people typed and checks the name, the endpoint
-// and the required fields. The secret key may be empty: AddBucket needs
-// it, EditBucket keeps the stored one.
+// and the required fields. The secret key is not part of it: AddBucket
+// needs it, EditBucket may keep the one the servers have.
 func cleanBucket(workspaceID string, input BucketInput) (protocol.Bucket, error) {
 	bucket := protocol.Bucket{
 		Name:      strings.TrimSpace(input.Name),
@@ -380,7 +471,6 @@ func cleanBucket(workspaceID string, input BucketInput) (protocol.Bucket, error)
 		Path:      strings.Trim(strings.TrimSpace(input.Path), "/"),
 		Workspace: workspaceID,
 		AccessKey: strings.TrimSpace(input.AccessKey),
-		SecretKey: strings.TrimSpace(input.SecretKey),
 	}
 	if !protocol.ValidAppName(bucket.Name) {
 		return bucket, ErrBucketName
@@ -401,43 +491,17 @@ func cleanBucket(workspaceID string, input BucketInput) (protocol.Bucket, error)
 	return bucket, nil
 }
 
-// checkBucket writes and deletes a test file with the keys.
-func (s *AppService) checkBucket(ctx context.Context, actor Actor, bucket protocol.Bucket) error {
-	err := checkBucket(ctx, bucket, s.publicBucketsOnly)
-	if errors.Is(err, ErrBucketPrivate) {
-		return ErrBucketPrivate
-	}
-	if err != nil {
-		slog.Info("backup bucket check failed", "workspace_id", actor.WorkspaceID, "error", err)
-		return ErrBackupAccess
-	}
-	return nil
-}
-
-// openBucket is a bucket as the daemon needs it, with its secret key.
-func (s *AppService) openBucket(bucket *model.Bucket) (*protocol.Bucket, error) {
-	secretKey, err := s.box.Open(bucket.SecretKey, bucket.WorkspaceID+"/backups")
-	if err != nil {
-		slog.Error("open backup secret failed", "workspace_id", bucket.WorkspaceID, "bucket", bucket.Name, "error", err)
-		return nil, err
-	}
+// daemonBucket is a bucket as the daemon needs it: the server fills in
+// the secret key it keeps.
+func daemonBucket(bucket *model.Bucket) *protocol.Bucket {
 	return &protocol.Bucket{
+		ID:        bucket.ID,
 		Endpoint:  bucket.Endpoint,
 		Region:    bucket.Region,
 		Bucket:    bucket.Bucket,
 		Path:      bucket.Path,
 		Workspace: bucket.WorkspaceID,
 		AccessKey: bucket.AccessKey,
-		SecretKey: secretKey,
 		Name:      bucket.Name,
-	}, nil
-}
-
-// openAppBucket is the bucket of an app with its secret key.
-func (s *AppService) openAppBucket(app *model.App) (*protocol.Bucket, error) {
-	bucket, err := s.appBucket(app)
-	if err != nil {
-		return nil, err
 	}
-	return s.openBucket(bucket)
 }

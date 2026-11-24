@@ -188,10 +188,10 @@ func New(cfg *config.Config) (*App, error) {
 		slog.Warn("GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET are not set: nobody signs in with GitHub, and moin cannot check who installed the GitHub App, so a member could connect another account's installation by its ID. Set both and turn on \"Request user authorization (OAuth) during installation\" in the app settings")
 	}
 	appService.SetGitHub(github)
-	// The hosted plane reaches only public buckets; in development it may
-	// use the local fake S3.
+	// The hosted hub's uptime checks reach only public addresses; in
+	// development they may check an app next to it.
 	if cfg.Billing && !cfg.IsDevelopment() {
-		appService.AllowOnlyPublicBuckets()
+		appService.AllowOnlyPublicAddresses()
 	}
 	appService.SetCloudflare(service.NewCloudflare(cfg.CloudflareAPIURL))
 	if cfg.SameServer {

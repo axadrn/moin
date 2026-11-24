@@ -172,32 +172,36 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 		"redis":  map[string]any{"image": "redis:7"},
 	}}
 	file := filepath.Join(t.TempDir(), "compose.json")
-	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc", Env: map[string]string{"KEY": "a$b"}}
+	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc"}
 	running := map[string]string{"web": "ghcr.io/me/blog:old", "worker": "moin-blog-worker:3", "redis": "redis:7"}
-	err := finish(&release{start: start, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeFile: file})
+	env := map[string]string{"KEY": "a$b"}
+	err := finish(&release{start: start, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeFile: file, envFile: "/state/apps/blog/app.env", env: env})
 	if err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(file)
 	var config struct {
 		Services map[string]struct {
-			Build       any               `json:"build"`
-			Image       string            `json:"image"`
-			Environment map[string]string `json:"environment"`
-			Restart     string            `json:"restart"`
+			Build   any      `json:"build"`
+			Image   string   `json:"image"`
+			EnvFile []string `json:"env_file"`
+			Restart string   `json:"restart"`
 		} `json:"services"`
 	}
 	if err := json.Unmarshal(body, &config); err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(string(body), "a$b") {
+		t.Fatalf("compose.json holds an env value:\n%s", body)
+	}
 	web, worker, redis := config.Services["web"], config.Services["worker"], config.Services["redis"]
-	if web.Image != "ghcr.io/me/blog:abc" || web.Build != nil || web.Environment["KEY"] != "a$$b" {
+	if web.Image != "ghcr.io/me/blog:abc" || web.Build != nil || !slices.Equal(web.EnvFile, []string{"/state/apps/blog/app.env"}) {
 		t.Fatalf("web = %+v", web)
 	}
-	if worker.Image != "moin-blog-worker:3" || worker.Build != nil || worker.Environment["KEY"] == "" {
+	if worker.Image != "moin-blog-worker:3" || worker.Build != nil || len(worker.EnvFile) != 1 {
 		t.Fatalf("worker = %+v", worker)
 	}
-	if redis.Image != "redis:7" || redis.Environment != nil || redis.Restart != "unless-stopped" {
+	if redis.Image != "redis:7" || redis.EnvFile != nil || redis.Restart != "unless-stopped" {
 		t.Fatalf("redis = %+v", redis)
 	}
 	if builds(base) != true {

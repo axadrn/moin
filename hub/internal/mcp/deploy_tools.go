@@ -33,13 +33,13 @@ func registerDeployTools(server *mcpsdk.Server, services Services) {
 		"Turns off the deploy hook of an app: its URL stops working and CI can no longer deploy. get_app says in hook whether there is one; create_deploy_hook makes a new one. Works while the plan allows no changes. Needs a token with read and write access.",
 		change(true, true)), Write(member(services, tools.removeDeployHook)))
 	mcpsdk.AddTool(server, newTool("list_registries", "List registry logins",
-		"Lists the registry logins daemons use to pull private images, without passwords. Needs the read scope.",
+		"Lists the registry logins servers pull private images with, without passwords: servers are the servers that keep each login, missing_on the ones that do not, whose image deploys from that registry fail until set_registry gives them the login. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listRegistries)))
 	mcpsdk.AddTool(server, newTool("set_registry", "Set a registry login",
-		"Stores the login for a registry host such as ghcr.io, sealed. Image deploys from that host pull with it. Needs a token with read and write access.",
+		"Gives server (empty for the workspace's only server) the login for a registry host such as ghcr.io. The server keeps it and pulls image deploys from that host with it; moin keeps the host and the username, never the password. Call it once per server. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setRegistry)))
 	mcpsdk.AddTool(server, newTool("remove_registry", "Remove a registry login",
-		"Removes the login for a registry host. Private images from it no longer pull. Needs a token with read and write access.",
+		"Removes the login for a registry host, also from the servers. Private images from it no longer pull. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.removeRegistry)))
 }
 
@@ -163,7 +163,7 @@ func (t moinTools) listRegistries(_ context.Context, caller Caller, _ NoInput) (
 	}
 	list := RegistryList{api.RegistryList{Items: make([]api.Registry, 0, len(logins))}}
 	for _, login := range logins {
-		list.Items = append(list.Items, api.Registry{Host: login.Host, Username: login.Username, CreatedAt: login.CreatedAt.UTC()})
+		list.Items = append(list.Items, api.NewRegistry(login))
 	}
 	return list, nil
 }
@@ -172,11 +172,12 @@ func (t moinTools) listRegistries(_ context.Context, caller Caller, _ NoInput) (
 type RegistryInput struct {
 	Host     string `json:"host" jsonschema:"the registry host, like ghcr.io or docker.io"`
 	Username string `json:"username"`
-	Password string `json:"password" jsonschema:"a password or access token with read access to packages"`
+	Password string `json:"password" jsonschema:"a password or access token with read access to packages; it goes to the server, never back"`
+	Server   string `json:"server,omitempty" jsonschema:"the server that keeps the login; empty for the workspace's only server"`
 }
 
 func (t moinTools) setRegistry(ctx context.Context, caller Caller, input RegistryInput) (RegistryList, error) {
-	err := t.services.Apps.SetRegistry(caller.actor(), input.Host, input.Username, input.Password)
+	err := t.services.Apps.SetRegistry(ctx, caller.actor(), input.Host, input.Username, input.Password, input.Server)
 	if err != nil {
 		return RegistryList{}, err
 	}
@@ -188,8 +189,8 @@ type HostInput struct {
 	Host string `json:"host" jsonschema:"the registry host"`
 }
 
-func (t moinTools) removeRegistry(_ context.Context, caller Caller, input HostInput) (Done, error) {
-	err := t.services.Apps.RemoveRegistry(caller.actor(), input.Host)
+func (t moinTools) removeRegistry(ctx context.Context, caller Caller, input HostInput) (Done, error) {
+	err := t.services.Apps.RemoveRegistry(ctx, caller.actor(), input.Host)
 	if err != nil {
 		return Done{}, err
 	}

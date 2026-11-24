@@ -90,7 +90,7 @@ Deploy v1 of my-app started
 
 You need no Dockerfile. moin builds Node, Bun, Python, Ruby, PHP, Go and more. It also uses your `Dockerfile` or `compose.yml` if you have one.
 
-The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password. `moin instant --show` prints both.
+The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password. moin prints the password once, when it makes the app. Keep it in your password manager. `moin instant password` makes a new one.
 
 This page deploys what you pushed. You can also deploy every push, or an image from CI. It all comes down to [three questions](/docs/guides/deploy#three-questions).
 

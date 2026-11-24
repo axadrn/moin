@@ -10,9 +10,11 @@ import (
 )
 
 // BucketView is the buckets page: the workspace's own S3-compatible
-// buckets, the default first.
+// buckets, the default first, and the names of its servers, which keep
+// the secret keys.
 type BucketView struct {
 	Buckets []service.Bucket
+	Servers []string
 }
 
 // Bucket is where the workspace keeps code and backups: its own
@@ -24,17 +26,18 @@ templ Bucket(view BucketView) {
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: ctxkeys.AppBasePath(ctx) + "/settings"}, Title: "Bucket"})
 			<div id="bucket" class="moin-stack" data-gap="6">
 				for _, bucket := range view.Buckets {
-					@bucketPanel(bucket)
+					@bucketPanel(bucket, view.Servers)
 				}
-				@bucketAdd(len(view.Buckets) == 0)
+				@bucketAdd(len(view.Buckets) == 0, view.Servers)
 			</div>
 		}
 	}
 }
 
-// bucketPanel is one bucket: where it is and which apps use it, then
-// changing it, making it the default and removing it.
-templ bucketPanel(bucket service.Bucket) {
+// bucketPanel is one bucket: where it is, which apps use it and which
+// servers keep its key, a field for each server without it, then changing
+// it, making it the default and removing it.
+templ bucketPanel(bucket service.Bucket, servers []string) {
 	{{ bucketPath := ctxkeys.AppBasePath(ctx) + "/bucket/" + bucket.Name }}
 	<div data-bucket={ bucket.Name }>
 		<section class="moin-section">
@@ -51,6 +54,17 @@ templ bucketPanel(bucket service.Bucket) {
 					}
 					@bucketFact("Endpoint", orAWS(bucket.Endpoint), true, nil)
 					@bucketFact("Access key", bucket.AccessKey, true, nil)
+					@bucketFact("Secret key", secretOn(bucket.Servers), false, templ.Attributes{"data-bucket-key": true})
+					for _, server := range bucket.Servers.MissingOn {
+						@missingSecret(missingSecretProps{
+							Server:   server,
+							Sentence: server + " has no key for this bucket. Its apps back up once it has.",
+							Action:   bucketPath + "/key",
+							Target:   "#bucket",
+							Field:    "secret_key",
+							Label:    "Secret key",
+						})
+					}
 					if len(bucket.Older) > 0 {
 						@components.Item(components.ItemProps{}) {
 							<div class="moin-item-text" data-bucket-older>
@@ -60,7 +74,7 @@ templ bucketPanel(bucket service.Bucket) {
 						}
 					}
 					@bucketDisclosure("Change") {
-						@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false)
+						@bucketForm(bucketPath, "bucket-"+bucket.Name+"-", bucket, false, servers)
 					}
 					if !bucket.Default {
 						@components.Item(components.ItemProps{Button: true, Name: "Make default", Attrs: templ.Attributes{
@@ -109,20 +123,20 @@ templ bucketDisclosure(label string) {
 }
 
 // bucketAdd adds a bucket. Without any bucket its form is open.
-templ bucketAdd(first bool) {
+templ bucketAdd(first bool, servers []string) {
 	<div data-add-bucket>
 		if first {
 			@components.Card(components.CardProps{Title: "Add your bucket"}) {
 				<p class="moin-small moin-muted">
 					Backups go there. Its keys need read and write access to this one bucket.
 				</p>
-				@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{Name: "default"}, true)
+				@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{Name: "default"}, true, servers)
 			}
 		} else {
 			@components.Card(components.CardProps{}) {
 				@components.List() {
 					@bucketDisclosure("Another bucket") {
-						@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{}, true)
+						@bucketForm(ctxkeys.AppBasePath(ctx)+"/bucket", "bucket-new-", service.Bucket{}, true, servers)
 					}
 				}
 			}
@@ -131,8 +145,9 @@ templ bucketAdd(first bool) {
 }
 
 // bucketForm adds a bucket or changes one. The IDs of its fields start
-// with prefix, so every form on the page has its own.
-templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
+// with prefix, so every form on the page has its own. A server checks the
+// bucket and keeps the secret key: with several, the form picks one.
+templ bucketForm(action, prefix string, bucket service.Bucket, adding bool, servers []string) {
 	<form class="moin-stack" data-gap="4" hx-post={ action } hx-target="#bucket" hx-select="#bucket" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-bucket-form>
 		@components.CSRF()
 		<div class="moin-grid">
@@ -142,10 +157,11 @@ templ bucketForm(action, prefix string, bucket service.Bucket, adding bool) {
 			@bucketField(prefix, "bucket", "Bucket", bucket.Bucket, "your bucket's name", "", "text", false)
 			@bucketField(prefix, "path", "Folder", bucket.Path, "optional", "Only if the bucket holds other files too", "text", false)
 			@bucketField(prefix, "access_key", "Access key", bucket.AccessKey, "", "", "text", false)
-			@bucketField(prefix, "secret_key", "Secret key", "", secretPlaceholder(adding), "Stored encrypted", "password", false)
+			@bucketField(prefix, "secret_key", "Secret key", "", secretPlaceholder(adding), "Goes to the server, never back", "password", false)
 		</div>
+		@serverField(prefix+"server", servers)
 		<div class="moin-row" data-wrap data-end data-gap="3">
-			<p class="moin-text moin-muted">moin writes and deletes a test file first.</p>
+			<p class="moin-text moin-muted">The server writes and deletes a test file first.</p>
 			if adding {
 				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Add bucket
@@ -191,5 +207,5 @@ func secretPlaceholder(adding bool) string {
 	if adding {
 		return ""
 	}
-	return "empty keeps the stored one"
+	return "empty keeps the server's key"
 }

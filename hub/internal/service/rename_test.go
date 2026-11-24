@@ -136,7 +136,7 @@ func TestRenameApp(t *testing.T) {
 func TestBucketAndServerByLink(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
 	const id = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b"
-	if err := apps.apps.CreateBucket(model.Bucket{ID: id, WorkspaceID: owner.WorkspaceID, Name: "client-a", Endpoint: "https://s3.example.com", Region: "auto", Bucket: "a", AccessKey: "k", SecretKey: "s"}); err != nil {
+	if err := apps.apps.CreateBucket(model.Bucket{ID: id, WorkspaceID: owner.WorkspaceID, Name: "client-a", Endpoint: "https://s3.example.com", Region: "auto", Bucket: "a", AccessKey: "k"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, ref := range []string{"client-a", id, link.ID(id)} {

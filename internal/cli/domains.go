@@ -165,13 +165,15 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 }
 
 // instantCommands are the subcommands of instant; anything else is the app.
-var instantCommands = append([]string{"open", "protect"}, append(slices.Clone(protocol.InstantProviders), "off")...)
+var instantCommands = append([]string{"open", "protect", "password"}, append(slices.Clone(protocol.InstantProviders), "off")...)
 
-// instant shows the app's instant address, picks its provider or off, and
-// opens it or puts the password back.
+// instantUser is the username in front of an instant address.
+const instantUser = build.Name
+
+// instant shows the app's instant address, picks its provider or off,
+// opens it or puts the password back, or makes a new password.
 func instant(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("instant", "instant [--show] [app]; instant sslip.io|nip.io|off [app]; instant open|protect [app]").withApp()
-	show := flags.Bool("show", false, "show the password moin made for it")
+	flags := newFlags("instant", "instant [app]; instant sslip.io|nip.io|off [app]; instant open|protect [app]; instant password [app]").withApp()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -189,6 +191,16 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 	api, err := apiClient()
 	if err != nil {
 		return err
+	}
+	if command == "password" {
+		made, err := api.NewInstantPassword(ctx, name)
+		if err != nil {
+			return err
+		}
+		done(stdout, "A new password for the instant address of %s, shown only this once:", name)
+		table(stdout, []string{"", ""}, [][]string{{"user", made.User}, {"password", made.Password}})
+		hint(stdout, "The app takes it on its next restart:", build.Name+" restart "+name)
+		return nil
 	}
 	if command != "" {
 		var change client.Change
@@ -216,7 +228,7 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		reportChange(ctx, api, name, change, stdout)
 	}
-	address, err := api.Instant(ctx, name, *show)
+	address, err := api.Instant(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -233,10 +245,8 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 		rows = append(rows, []string{"password", "none: open to everyone"})
 	case address.OwnPassword:
 		rows = append(rows, []string{"password", "the app's own, user " + address.User})
-	case address.Password != "":
-		rows = append(rows, []string{"user", address.User}, []string{"password", address.Password})
 	default:
-		rows = append(rows, []string{"user", address.User}, []string{"password", "hidden: add --show"})
+		rows = append(rows, []string{"user", address.User}, []string{"password", "shown once when it was made; a new one: " + build.Name + " instant password " + name})
 	}
 	table(stdout, []string{"", ""}, rows)
 	if command == "" {

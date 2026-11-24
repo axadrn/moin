@@ -59,9 +59,9 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin servers auto-update [on\|off]` | shows or sets whether daemons update by themselves; on by default |
 | `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached; prints what is on it, line by line. See [Security](/docs/guides/security) |
 | `moin servers rules <name>` | the server's own rules for moin, from `/etc/moin/rules` on it ([Rules](/docs/guides/security#rules)) |
-| `moin integrations` | whether Cloudflare and Tailscale are connected, never the keys |
-| `moin integrations cloudflare` · `moin integrations tailscale` | stores the Cloudflare API token or the Tailscale auth key, or replaces it; the key comes on stdin |
-| `moin integrations rm cloudflare\|tailscale [--yes]` | removes a key |
+| `moin integrations` | whether Cloudflare is connected and which servers keep a Tailscale key, never the keys |
+| `moin integrations cloudflare` · `moin integrations tailscale [--server <server>]` | stores the Cloudflare API token in the hub, or hands a server the Tailscale auth key, which only it keeps; replaces it; the key comes on stdin. `--server` is needed with more than one server |
+| `moin integrations rm cloudflare\|tailscale [--server <server>] [--yes]` | removes a key; the Tailscale key from one server |
 
 | Flag of `servers secure` | Does |
 | --- | --- |
@@ -75,7 +75,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | --- | --- |
 | `moin apps` | lists apps |
 | `moin apps <app>` | one app: its state, server, domains, password, repo and deploys, and "N changes waiting" with the restart that applies them |
-| `moin apps add --server <server> <name>` | adds an app |
+| `moin apps add --server <server> <name>` | adds an app and shows the password of its instant address, this once |
 | `moin apps rename <app> <new name>` | renames an app; its links, data, backups and instant address stay, the next restart gives its containers the name ([Names and links](/docs/guides/names)) |
 | `moin apps rm <app> [--confirm <app>]` | asks you to type its name and removes the app; its data stays on the server |
 | `moin apps pin [app]` · `moin apps unpin [app]` | keeps an app above the others that run fine, in every list |
@@ -84,7 +84,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin deploy [--server <server>] [--detach] [--yes] [app]` | in the top folder of a GitHub repo, [deploys the commit you pushed](/docs/guides/deploy#deploy-what-you-pushed); refuses changes that are not committed or pushed. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts). An app that follows no repo is linked to this one. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
+| `moin deploy [--server <server>] [--detach] [--yes] [app]` | in the top folder of a GitHub repo, [deploys the commit you pushed](/docs/guides/deploy#deploy-what-you-pushed); refuses changes that are not committed or pushed. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts), and shows the password of its instant address once. An app that follows no repo is linked to this one. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
 | `moin deploy --image <image> [--ref <ref>] [app]` | deploys an image built in CI as the main service, with the compose file of `--ref` in the linked repo, its branch by default. An app without a repo keeps the compose file it runs |
 | `moin deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `moin redeploy [app]` | builds the newest source again, or pulls the image again, with the current env |
@@ -105,7 +105,8 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin domains add [--service <service>] <domain> ...` | adds domains; `--service` for a service of `compose.yml` other than the main one |
 | `moin domains rm [--service <service>] <domain> ... [--yes]` | removes domains |
 | `moin domains canonical <domain\|none>` | the domain the others redirect to, or none |
-| `moin instant [--show] [app]` | the [instant address](/docs/guides/domains#instant-address), `https://<app>.<ip>.sslip.io`; `--show` adds the password moin made for it |
+| `moin instant [app]` | the [instant address](/docs/guides/domains#instant-address), `https://<app>.<ip>.sslip.io`, and its user |
+| `moin instant password [app]` | makes a new password for the instant address and shows it this once; the next restart applies it |
 | `moin instant sslip.io\|nip.io\|off [app]` | picks the provider of the instant address, or turns it off |
 | `moin instant open\|protect [app]` | takes the password away from the instant address, or puts it back |
 | `moin protect [--user moin] [app]` | asks visitors for a password; the password comes on stdin, `--user` is the name the browser asks for |
@@ -132,8 +133,8 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin unlink [app] [--yes]` | stops following it |
 | `moin hook [app] [--yes]` | prints a new deploy hook URL for CI; the old one stops working and pushes no longer deploy, so it asks first when that turns something off. The repo stays linked for the compose file |
 | `moin hook off [app] [--yes]` | turns the deploy hook off; CI can no longer deploy |
-| `moin registry` | lists registry logins for private images |
-| `moin registry set <host> <username>` | saves a login; the password or token comes on stdin |
+| `moin registry` | lists registry logins for private images, with the servers that keep each and the ones that do not |
+| `moin registry set <host> <username> [--server <server>]` | hands a server a login, which only it keeps; the password or token comes on stdin. `--server` is needed with more than one server |
 | `moin registry rm <host> [--yes]` | removes a login |
 
 ## Catalog
@@ -179,9 +180,10 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin buckets` | your buckets, the default first, with the apps that use each and the apps that left it |
-| `moin buckets add <name> --endpoint … --bucket … --access-key … [--region auto] [--path <folder>] [--default]` | adds a bucket; the secret key comes on stdin; the first one is the default |
-| `moin buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the stored one stays |
+| `moin buckets` | your buckets, the default first, with the apps that use each, the apps that left it and the servers that keep its key |
+| `moin buckets add <name> --endpoint … --bucket … --access-key … [--region auto] [--path <folder>] [--default] [--server <server>]` | adds a bucket; the secret key comes on stdin; the server tests the bucket and keeps the key; the first one is the default |
+| `moin buckets edit <name> [--name <new>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … \| --secret] [--server <server>]` | changes a bucket; a new access key, or `--secret`, reads the secret key on stdin, otherwise the server's stays; `--server` tests a new place or key |
+| `moin buckets key <name> [--server <server>]` | hands one more server the bucket's key, such as one added later; the secret key comes on stdin |
 | `moin buckets default <name>` | makes a bucket the default for apps without one of their own |
 | `moin buckets rm <name> [--confirm <name>]` | asks you to type its name and removes a bucket from moin; refused while apps use it or apps left it. What is in it stays |
 | `moin buckets use <bucket> [app]` · `moin buckets use --default [app]` | moves an app's backups to a bucket, or back to the default; the copies start again there |

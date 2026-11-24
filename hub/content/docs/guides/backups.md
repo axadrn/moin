@@ -124,7 +124,7 @@ MCP: restore_app
 
 ## Download a copy
 
-A link to a copy in your bucket: the newest one, or the one you name. It works for 15 minutes. The file comes straight from your bucket, not through moin.
+A link to a copy in your bucket: the newest one, or the one you name. It works for 15 minutes. The app's server signs it with the bucket's key, so the server must be online. The file comes straight from your bucket, not through moin.
 
 ```surfaces
 Web: the app, **Data**, a database, **Download a copy**
@@ -135,6 +135,8 @@ MCP: download_backup
 ```
 
 The CLI saves it in the current folder. `--link` prints the link instead. `--to before-v12` takes another copy.
+
+A server whose [rules](/docs/guides/security#rules) say `data: off` refuses the link. Download the copy from your bucket yourself, or remove that line.
 
 A SQLite copy is gzipped: `gunzip` it and open it with `sqlite3`. A Postgres copy is a `pg_dump`: `pg_restore` puts it into any Postgres. You need no moin for either.
 

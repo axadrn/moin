@@ -65,7 +65,7 @@ tags:
   - name: Catalog
     description: 'Open source apps moin installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with moin; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
-    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, reads the optional `x-moin` block, builds, starts and checks it. Env vars are stored encrypted and write-only: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the API token.'
+    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, reads the optional `x-moin` block, builds, starts and checks it. Env values are write-only and live only on the app''s server: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the API token.'
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
@@ -1108,7 +1108,7 @@ paths:
       tags: [Apps]
       operationId: createApp
       summary: Add an app
-      description: The name is also the compose project on the server.
+      description: The name is also the compose project on the server. The answer carries the password of the app's instant address, the one time moin shows it.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1120,11 +1120,17 @@ paths:
               $ref: '#/components/schemas/CreateAppRequest'
       responses:
         '201':
-          description: The new app.
+          description: The new app, with `instant_password`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/App'
+                allOf:
+                  - $ref: '#/components/schemas/App'
+                  - type: object
+                    properties:
+                      instant_password:
+                        type: string
+                        description: The password of the instant address, user `moin`. The one time moin shows it; it keeps only its hash.
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
@@ -1576,7 +1582,7 @@ paths:
       tags: [Apps]
       operationId: listRegistries
       summary: List registry logins
-      description: The logins daemons use to pull private images, without passwords.
+      description: The logins servers pull private images with, without passwords, each with the servers that keep it and those that do not.
       security:
         - cookieAuth: []
         - apiTokenAuth: [read]
@@ -1606,7 +1612,7 @@ paths:
       tags: [Apps]
       operationId: setRegistry
       summary: Set a registry login
-      description: Stores the login sealed with AES-256-GCM. Image deploys from this host pull with it.
+      description: 'Hands the login to `server`, which keeps it in its server.json and pulls image deploys from this host with it. moin keeps the host and the username, never the password. Set it once per server.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1631,9 +1637,12 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline` when the server is offline, in words that name it; `no_server` when the workspace has no server.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.host` or `fields.password`.'
+          description: '`validation_failed` with `fields.host`, `fields.password` or `fields.server`, which the workspace needs with more than one server.'
         '500':
           $ref: '#/components/responses/Internal'
     delete:
@@ -1822,17 +1831,10 @@ paths:
       tags: [Apps]
       operationId: getInstant
       summary: Get the instant address
-      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one moin made, shown with `show=true`, which needs a token with read and write access.'
+      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one moin made. moin showed that one once and keeps only its hash; `POST /api/v1/apps/{app}/instant/password` makes a new one.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [read]
-      parameters:
-        - name: show
-          in: query
-          required: false
-          schema:
-            type: boolean
-          description: Include the password moin made for the address.
       responses:
         '200':
           description: The instant address.
@@ -1844,7 +1846,6 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
-          description: '`insufficient_scope` for `show=true` with a read-only token.'
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No app with this ID or name belongs to the account.'
@@ -1885,6 +1886,34 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.provider`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/apps/{app}/instant/password:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    post:
+      tags: [Apps]
+      operationId: newInstantPassword
+      summary: Make a new instant password
+      description: 'Makes a new password for the app''s instant address and answers it: the one time moin shows it, it keeps only its hash. The app takes it on its next restart, start or deploy; until then the old one works.'
+      security:
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The user and the new password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstantPassword'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -2648,7 +2677,7 @@ paths:
       tags: [Backups]
       operationId: addBucket
       summary: Add a bucket
-      description: Checks that moin can write to the bucket and stores it under a name, with the secret key encrypted. The first bucket is the default; `default` makes a later one the default.
+      description: 'Hands the secret key to `server`, which writes a test file to the bucket with it and keeps it in its server.json; moin stores the rest under a name, never the secret key. Other servers get the key with `PUT /api/v1/buckets/{name}/key`. The first bucket is the default; `default` makes a later one the default.'
       requestBody:
         required: true
         content:
@@ -2669,9 +2698,15 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline` when the server that keeps the key is offline, in words that name it; `no_server` when the workspace has no server.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket` or `fields.secret_key`.'
+          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket`, `fields.secret_key` or `fields.server`, which the workspace needs with more than one server.'
+        '424':
+          $ref: '#/components/responses/DaemonError'
+          description: '`daemon_error` when the server could not write a test file with the keys, or its rules refuse the bucket.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -2706,7 +2741,7 @@ paths:
       tags: [Backups]
       operationId: editBucket
       summary: Change a bucket
-      description: Sets every field of a bucket. An empty `name` keeps the name, an empty `secret_key` keeps the stored key, `default` makes it the default. A new place or new keys are checked first; its apps then start there with a full copy and the old place keeps what it has.
+      description: 'Sets every field of a bucket. An empty `name` keeps the name, `default` makes it the default. A new place or new keys are checked first by `server`, with `secret_key` or, when empty, the key it keeps. A new access key or secret key leaves the other servers without a key: give it to them again. Its apps then start there with a full copy and the old place keeps what it has.'
       requestBody:
         required: true
         content:
@@ -2730,9 +2765,15 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. The workspace has no bucket by this name.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline` when the server that keeps the key is offline, in words that name it; `no_server` when the workspace has no server.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket` or `fields.secret_key`.'
+          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket`, `fields.secret_key` or `fields.server`, which the workspace needs with more than one server.'
+        '424':
+          $ref: '#/components/responses/DaemonError'
+          description: '`daemon_error` when the server could not write a test file with the keys, or its rules refuse the bucket.'
         '500':
           $ref: '#/components/responses/Internal'
     delete:
@@ -2760,6 +2801,51 @@ paths:
           description: '`bucket_in_use` when apps use it or it keeps older backups; the message names the apps.'
         '422':
           $ref: '#/components/responses/ConfirmMismatch'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/buckets/{name}/key:
+    parameters:
+      - $ref: '#/components/parameters/BucketName'
+    put:
+      tags: [Backups]
+      operationId: setBucketKey
+      summary: Give a server a bucket's key
+      description: 'Hands the secret key of a bucket to one more server, such as one in `missing_on`: it writes a test file with it and keeps it. The key goes to the server only.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BucketKeyRequest'
+      security:
+        - cookieAuth: []
+        - apiTokenAuth: [write]
+      responses:
+        '200':
+          description: The bucket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bucket'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. The workspace has no bucket by this name.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline` when the server that keeps the key is offline, in words that name it; `no_server` when the workspace has no server.'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`, `fields.endpoint`, `fields.bucket`, `fields.secret_key` or `fields.server`, which the workspace needs with more than one server.'
+        '424':
+          $ref: '#/components/responses/DaemonError'
+          description: '`daemon_error` when the server could not write a test file with the keys, or its rules refuse the bucket.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3219,7 +3305,7 @@ paths:
       tags: [Servers]
       operationId: getIntegrations
       summary: Get integrations
-      description: Whether a Cloudflare API token and a Tailscale auth key are stored. The keys never come back.
+      description: Whether the hub keeps a Cloudflare API token, and which servers keep a Tailscale auth key. The keys never come back.
       security:
         - cookieAuth: []
         - apiTokenAuth: [read]
@@ -3240,7 +3326,7 @@ paths:
       tags: [Servers]
       operationId: setIntegrations
       summary: Set integrations
-      description: 'Stores the Cloudflare API token, checked against Cloudflare first, and the Tailscale auth key, both encrypted. A missing field keeps its key, an empty one removes it. The token needs Account: Cloudflare Tunnel Edit and Zone: DNS Edit; Zone: Zone Settings Edit is optional and lets moin turn on Always Use HTTPS.'
+      description: 'Stores the Cloudflare API token, checked against Cloudflare first and kept encrypted by the hub, which uses it. Hands the Tailscale auth key to `server`, which keeps it; the hub never does. A missing field keeps its key, an empty one removes it (the Tailscale key from `server`). The token needs Account: Cloudflare Tunnel Edit and Zone: DNS Edit; Zone: Zone Settings Edit is optional and lets moin turn on Always Use HTTPS.'
       requestBody:
         required: true
         content:
@@ -3252,6 +3338,9 @@ paths:
                   type: string
                 tailscale_key:
                   type: string
+                server:
+                  type: string
+                  description: The server that keeps the Tailscale key. Empty for the workspace's only server.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3268,10 +3357,10 @@ paths:
           $ref: '#/components/responses/OnboardedForbidden'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.cloudflare_token` or `fields.tailscale_key`.'
+          description: '`validation_failed` with `fields.cloudflare_token`, `fields.tailscale_key` or `fields.server`, which the workspace needs with more than one server.'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`tunnels_on`. An empty `cloudflare_token` while a server has a tunnel: turn the tunnels off first, as moin needs the token to delete them.'
+          description: '`tunnels_on`. An empty `cloudflare_token` while a server has a tunnel: turn the tunnels off first, as moin needs the token to delete them. `server_offline` when the server for the Tailscale key is offline; `no_server` without a server.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -3359,7 +3448,7 @@ paths:
       tags: [Apps]
       operationId: updateAppEnv
       summary: Set env vars
-      description: Sets and removes env vars. They are stored encrypted, are never shown again and take effect with the next deploy. A rollback keeps the env of its deploy.
+      description: 'Sets and removes env vars. The values go to the app''s server, which keeps them in the app''s env file; moin keeps only the keys and when they changed, and never shows a value. The server must be online. They take effect with the next deploy, restart or start; a rollback runs with them too.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3390,13 +3479,18 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.set`.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline` when the app''s server is offline, in words that name it: moin keeps no value to send later.'
+        '424':
+          $ref: '#/components/responses/DaemonError'
         '500':
           $ref: '#/components/responses/Internal'
     put:
       tags: [Apps]
       operationId: replaceAppEnv
       summary: Replace all env vars
-      description: Makes the sent env vars the app's, all at once, like one .env file. Every key sent is set, keys not sent are removed. Answers what changed, by key. They take effect with the next deploy.
+      description: 'Makes the sent env vars the app''s, all at once, like one .env file. Every key sent is set, keys not sent are removed. The values go to the app''s server, which must be online. Answers what changed, by key. They take effect with the next deploy.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3427,6 +3521,11 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.set`.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`server_offline` when the app''s server is offline, in words that name it: moin keeps no value to send later.'
+        '424':
+          $ref: '#/components/responses/DaemonError'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -5224,12 +5323,30 @@ components:
           description: No password guards it.
         user:
           type: string
-        password:
-          type: string
-          description: The password moin made, with show=true.
+          description: Who signs in with the password moin made. moin showed that password once, when it made it, and never again.
         own_password:
           type: boolean
           description: The app's own password, the one of its domains, guards it.
+    InstantPassword:
+      type: object
+      required: [user, password]
+      properties:
+        user:
+          type: string
+        password:
+          type: string
+          description: The new password. The one time moin shows it; it keeps only its hash.
+    SecretOn:
+      type: object
+      required: [server, updated_at]
+      properties:
+        server:
+          type: string
+          description: The name of a server that keeps the secret.
+        updated_at:
+          type: string
+          format: date-time
+          description: When the server got it.
     InstantRequest:
       type: object
       properties:
@@ -5372,7 +5489,7 @@ components:
             enum: [uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available, server.daemon_update_failed]
     Registry:
       type: object
-      required: [host, username, created_at]
+      required: [host, username, created_at, servers, missing_on]
       properties:
         host:
           type: string
@@ -5381,6 +5498,16 @@ components:
         created_at:
           type: string
           format: date-time
+        servers:
+          type: array
+          description: The servers that keep the login. Only they have the password.
+          items:
+            $ref: '#/components/schemas/SecretOn'
+        missing_on:
+          type: array
+          description: The servers without the login. Image deploys from this registry fail there until one is set for them.
+          items:
+            type: string
     RegistryList:
       type: object
       required: [items]
@@ -5397,7 +5524,10 @@ components:
           type: string
         password:
           type: string
-          description: A password or access token with read access to packages.
+          description: A password or access token with read access to packages. It goes to the server, never back.
+        server:
+          type: string
+          description: The server that keeps the login. Empty for the workspace's only server.
     RollbackRequest:
       type: object
       properties:
@@ -5567,6 +5697,9 @@ components:
           additionalProperties:
             type: string
           description: Only on an install, for an app whose first sign-in needs a secret moin made, such as ADMIN_PASSWORD. The one time it is shown; keep it in your password manager.
+        instant_password:
+          type: string
+          description: Only on an install. The password of the app's instant address, the one time it is shown.
     Databases:
       type: object
       required: [items]
@@ -5741,7 +5874,7 @@ components:
           type: integer
     Bucket:
       type: object
-      required: [id, name, default, endpoint, region, bucket, path, folder, access_key, apps, older_backups, created_at]
+      required: [id, name, default, endpoint, region, bucket, path, folder, access_key, apps, older_backups, created_at, servers, missing_on]
       properties:
         id:
           type: string
@@ -5779,6 +5912,16 @@ components:
         created_at:
           type: string
           format: date-time
+        servers:
+          type: array
+          description: The servers that keep the secret key. Only they have it.
+          items:
+            $ref: '#/components/schemas/SecretOn'
+        missing_on:
+          type: array
+          description: The servers without the key. Their apps make no backups to this bucket until it is set for them.
+          items:
+            type: string
     BucketList:
       type: object
       required: [items]
@@ -5791,6 +5934,9 @@ components:
       type: object
       required: [bucket, access_key]
       properties:
+        server:
+          type: string
+          description: The server that writes a test file and keeps the secret key. Empty for the workspace's only server.
         name:
           type: string
           description: 1 to 63 lowercase letters, digits or dashes. Needed to add a bucket; on a change, empty keeps the name.
@@ -5808,10 +5954,20 @@ components:
           type: string
         secret_key:
           type: string
-          description: Needed to add a bucket; on a change, empty keeps the stored one.
+          description: Needed to add a bucket; on a change, empty keeps the one the server has. It goes to the server, never back.
         default:
           type: boolean
           description: Make it the workspace's default bucket.
+    BucketKeyRequest:
+      type: object
+      required: [secret_key]
+      properties:
+        server:
+          type: string
+          description: The server that keeps the key. Empty for the workspace's only server.
+        secret_key:
+          type: string
+          description: The bucket's secret key. It goes to the server, never back.
     AppBucketRequest:
       type: object
       properties:
@@ -6243,7 +6399,18 @@ components:
         cloudflare_account:
           type: string
         tailscale:
-          type: boolean
+          type: object
+          description: Which servers keep a Tailscale auth key. Only they have it.
+          required: [servers, missing_on]
+          properties:
+            servers:
+              type: array
+              items:
+                $ref: '#/components/schemas/SecretOn'
+            missing_on:
+              type: array
+              items:
+                type: string
     Logs:
       type: object
       required: [lines]

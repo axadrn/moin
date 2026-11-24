@@ -16,7 +16,7 @@ func TestStatusTool(t *testing.T) {
 	writer, _ := createToken(t, env, owner, "read", "write")
 	session := connectMemory(t, env.server, owner, writer)
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
-	output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
 
 	reader, _ := createToken(t, env, owner, "read")
 	status := output[mcp.Status](t, call(t, connectMemory(t, env.server, owner, reader), "get_status", map[string]any{}))

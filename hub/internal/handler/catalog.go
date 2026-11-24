@@ -154,9 +154,9 @@ func (h *CatalogHandler) InstallPage(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.CatalogInstall(pages.CatalogInstallView{App: view, Servers: servers}))
 }
 
-// Install installs the catalog app and opens its page, which follows the
-// deploy. When the first sign-in needs a secret moin made, the form shows
-// it once instead, with a link to the app.
+// Install installs the catalog app. The form shows the secrets moin made
+// for it once instead, the password of its instant address and those the
+// first sign-in needs, with a link to its page, which follows the deploy.
 func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 	app, _, login, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
 		Slug: r.PathValue("slug"), Version: r.FormValue("version"), Server: r.FormValue("server"),
@@ -171,14 +171,10 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	appPath := ctxkeys.AppBasePath(r.Context()) + "/apps/" + app.Link()
-	if len(login) > 0 {
-		// Shown in place of the form: a new page would lose it.
-		w.Header().Set("HX-Retarget", "#catalog-install-form")
-		w.Header().Set("HX-Reswap", "outerHTML")
-		render(w, r, pages.CatalogInstalled(appPath, login))
-		return
-	}
-	redirect(w, r, appPath, http.StatusSeeOther)
+	// Shown in place of the form: a new page would lose it.
+	w.Header().Set("HX-Retarget", "#catalog-install-form")
+	w.Header().Set("HX-Reswap", "outerHTML")
+	render(w, r, pages.CatalogInstalled(appPath, login, app.InstantPassword))
 }
 
 // UpdatePanel is the catalog panel of an installed app; nothing for an

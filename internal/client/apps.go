@@ -55,6 +55,9 @@ type App struct {
 	// an app of your own.
 	Catalog   string    `json:"catalog"`
 	CreatedAt time.Time `json:"created_at"`
+	// InstantPassword is the password of the instant address, only in the
+	// answer that created the app: the one time moin shows it.
+	InstantPassword string `json:"instant_password"`
 }
 
 // Deploy is one version of an app, v12.
@@ -282,11 +285,20 @@ func (c *Client) RemoveDeployHook(ctx context.Context, app string) error {
 	return c.do(ctx, http.MethodDelete, appPath(app, "hook"), nil, nil)
 }
 
-// Registry is a registry login without its password.
+// Registry is a registry login without its password, which only the
+// servers keep: Servers say which, MissingOn which do not.
 type Registry struct {
-	Host      string    `json:"host"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
+	Host      string     `json:"host"`
+	Username  string     `json:"username"`
+	CreatedAt time.Time  `json:"created_at"`
+	Servers   []SecretOn `json:"servers"`
+	MissingOn []string   `json:"missing_on"`
+}
+
+// SecretOn is a server that keeps a secret, and since when.
+type SecretOn struct {
+	Server    string    `json:"server"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Registries lists the workspace's registry logins.
@@ -298,9 +310,10 @@ func (c *Client) Registries(ctx context.Context) ([]Registry, error) {
 	return response.Items, err
 }
 
-// SetRegistry stores the login for a registry host.
-func (c *Client) SetRegistry(ctx context.Context, host, username, password string) error {
-	return c.do(ctx, http.MethodPut, "/api/v1/registries/"+url.PathEscape(host), map[string]string{"username": username, "password": password}, nil)
+// SetRegistry hands the login for a registry host to a server, which
+// keeps it; an empty server is the workspace's only one.
+func (c *Client) SetRegistry(ctx context.Context, host, username, password, server string) error {
+	return c.do(ctx, http.MethodPut, "/api/v1/registries/"+url.PathEscape(host), map[string]string{"username": username, "password": password, "server": server}, nil)
 }
 
 // RemoveRegistry deletes the login for a registry host.
@@ -364,19 +377,28 @@ type Instant struct {
 	Reason      string `json:"reason"`
 	Open        bool   `json:"open"`
 	User        string `json:"user"`
-	Password    string `json:"password"`
 	OwnPassword bool   `json:"own_password"`
 }
 
-// Instant reports the app's instant address; show includes the password
-// moin made for it.
-func (c *Client) Instant(ctx context.Context, app string, show bool) (Instant, error) {
+// Instant reports the app's instant address. moin never shows its
+// password again: NewInstantPassword makes a new one.
+func (c *Client) Instant(ctx context.Context, app string) (Instant, error) {
 	var response Instant
-	path := appPath(app, "instant")
-	if show {
-		path += "?show=true"
-	}
-	err := c.do(ctx, http.MethodGet, path, nil, &response)
+	err := c.do(ctx, http.MethodGet, appPath(app, "instant"), nil, &response)
+	return response, err
+}
+
+// InstantPassword is a new password of the instant address, shown once.
+type InstantPassword struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+// NewInstantPassword makes a new password for the instant address: the
+// one time moin shows it. The app takes it on its next restart.
+func (c *Client) NewInstantPassword(ctx context.Context, app string) (InstantPassword, error) {
+	var response InstantPassword
+	err := c.do(ctx, http.MethodPost, appPath(app, "instant", "password"), nil, &response)
 	return response, err
 }
 

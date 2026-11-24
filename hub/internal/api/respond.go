@@ -98,6 +98,14 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &hookImage) {
 		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"image": hookImage.Error()}}, true
 	}
+	var offline *service.OfflineError
+	if errors.As(err, &offline) {
+		return http.StatusConflict, ErrorDetail{Code: "server_offline", Message: offline.Error()}, true
+	}
+	var missing *service.MissingSecretError
+	if errors.As(err, &missing) {
+		return http.StatusConflict, ErrorDetail{Code: "secret_missing", Message: missing.Error()}, true
+	}
 	var inUse *service.BucketInUseError
 	if errors.As(err, &inUse) {
 		return http.StatusConflict, ErrorDetail{Code: "bucket_in_use", Message: inUse.Error()}, true
@@ -235,6 +243,8 @@ var serviceErrors = []serviceError{
 	{err: service.ErrTrialEnded, status: http.StatusPaymentRequired, code: "trial_ended", message: TrialEndedMessage},
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to moin under Billing to add servers."},
 	{err: service.ErrNoDaemonBinary, status: http.StatusConflict, code: "no_daemon_binary", message: "This hub serves no daemon binary for the server's system. Update the daemon on the server instead."},
+	{err: service.ErrNoServer, status: http.StatusConflict, code: "no_server", message: "Add a server first: a secret lives on a server."},
+	{err: service.ErrServerRequired, field: "server", message: "Name the server that keeps it: this workspace has more than one."},
 	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its daemon and try again."},
 	{err: service.ErrDaemonUpdating, status: http.StatusConflict, code: "daemon_updating", message: "The daemon of this server is updating. Try again in a minute."},
 	{err: repository.ErrAppNotFound, status: http.StatusNotFound, code: "not_found", message: "The app was not found."},
@@ -259,7 +269,6 @@ var serviceErrors = []serviceError{
 	{err: service.ErrDomain, field: "domains", message: "Use host names like my-app.example.com."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrServiceCanonical, field: "canonical", message: "canonical is for the main service only."},
-	{err: service.ErrInstantShow, status: http.StatusForbidden, code: "insufficient_scope", message: "Showing the password needs a token with read and write access."},
 	{err: service.ErrUptimeDomain, field: "domain", message: "The app has no such domain."},
 	{err: service.ErrUptimePath, field: "path", message: "Use a path that starts with /, like /health, without spaces."},
 	{err: service.ErrMetricsRange, field: "range", message: "Use 1h, 24h, 7d or 30d."},
@@ -296,12 +305,10 @@ var serviceErrors = []serviceError{
 	{err: service.ErrNotCatalog, status: http.StatusConflict, code: "not_from_catalog", message: "This app was not installed from the catalog. Deploy it with moin deploy."},
 	{err: service.ErrNoBackups, status: http.StatusConflict, code: "no_backups", message: "Backups are not set up. Add a bucket first."},
 	{err: service.ErrBackupEndpoint, field: "endpoint", message: "Use an https:// URL, or leave it empty for AWS S3."},
-	{err: service.ErrBucketPrivate, field: "endpoint", message: "This endpoint points to a private or local address. moin can only reach buckets on the public internet."},
 	{err: service.ErrBackupBucket, field: "bucket", message: "Enter the bucket, the access key and the secret key."},
 	{err: service.ErrBucketName, field: "name", message: "Name the bucket with 1 to 63 lowercase letters, digits or dashes, like client-a."},
 	{err: repository.ErrDuplicateBucket, field: "name", message: "A bucket with this name already exists."},
 	{err: repository.ErrBucketNotFound, status: http.StatusNotFound, code: "not_found", message: "The bucket was not found. List them with moin buckets."},
-	{err: service.ErrBackupAccess, field: "secret_key", message: "moin could not write to the bucket with these keys. Check the bucket name, the endpoint and that the key may write."},
 	{err: service.ErrRestoreTarget, field: "moment", message: "Pick a moment to go back to, from moin backups."},
 	{err: service.ErrMoment, field: "moment", message: "There is no such moment. Pick one from moin backups, like before-v12."},
 	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one."},
@@ -327,7 +334,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrRefName, field: "ref", message: "This is not a valid branch, tag or commit name. Use git's rules, at most 255 characters."},
 	{err: service.ErrNoCloudflare, status: http.StatusConflict, code: "no_cloudflare", message: "Connect Cloudflare in Settings, Integrations first."},
 	{err: service.ErrTunnelsOn, status: http.StatusConflict, code: "tunnels_on", message: "Turn the tunnels off first: without the token moin cannot delete them in Cloudflare."},
-	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "Connect Tailscale in Settings, Integrations first, or join the server to your tailnet by hand."},
+	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "This server has no Tailscale key. Enter one for it in Settings, Integrations, or join the server to your tailnet by hand."},
 	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit is optional: with it moin turns on Always Use HTTPS."},
 	{err: service.ErrUpdateNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this hub, in ADMIN_EMAILS, update it."},
 	{err: service.ErrUpdateHosted, status: http.StatusConflict, code: "hosted", message: "The hosted hub updates itself with every release. Nothing to do."},

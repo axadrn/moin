@@ -83,11 +83,12 @@ func (h *AppsHandler) Bucket(w http.ResponseWriter, r *http.Request) {
 // bucketFields are the fields of a bucket form, by API field name, with
 // prefix the start of their IDs.
 func bucketFields(prefix string) map[string]string {
-	return map[string]string{"name": prefix + "name", "endpoint": prefix + "endpoint", "bucket": prefix + "bucket", "secret_key": prefix + "secret_key"}
+	return map[string]string{"name": prefix + "name", "endpoint": prefix + "endpoint", "bucket": prefix + "bucket", "secret_key": prefix + "secret_key", "server": prefix + "server"}
 }
 
 func bucketInput(r *http.Request) service.BucketInput {
 	return service.BucketInput{
+		Server:    r.FormValue("server"),
 		Name:      r.FormValue("name"),
 		Endpoint:  r.FormValue("endpoint"),
 		Region:    r.FormValue("region"),
@@ -123,6 +124,18 @@ func (h *AppsHandler) EditBucket(w http.ResponseWriter, r *http.Request) {
 	answerDone(w, r, "Bucket saved", "Its apps back up there now.")
 }
 
+// SetBucketKey hands the secret key of a bucket to a server that has none.
+func (h *AppsHandler) SetBucketKey(w http.ResponseWriter, r *http.Request) {
+	name, server := r.PathValue("name"), r.FormValue("server")
+	_, err := h.apps.SetBucketKey(r.Context(), actor(r), name, server, r.FormValue("secret_key"))
+	if err != nil {
+		failed(w, r, "Key not saved", err, nil)
+		return
+	}
+	h.renderBucket(w, r)
+	answerDone(w, r, server+" has the key", "It backs up to "+name+" now. moin keeps no copy.")
+}
+
 // DefaultBucket makes a bucket the workspace's default.
 func (h *AppsHandler) DefaultBucket(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
@@ -147,12 +160,13 @@ func (h *AppsHandler) RemoveBucket(w http.ResponseWriter, r *http.Request) {
 }
 
 // bucketFailed answers a bucket form that failed and reports whether it
-// did. A check that could not write points at the secret key.
+// did. A check the server could not write with points at the secret key.
 func (h *AppsHandler) bucketFailed(w http.ResponseWriter, r *http.Request, title, prefix string, err error) bool {
+	var daemonErr *service.DaemonError
 	switch {
 	case err == nil:
 		return false
-	case errors.Is(err, service.ErrBackupAccess):
+	case errors.As(err, &daemonErr):
 		fieldRefused(w, r, title, prefix+"secret_key", errorMessage(err))
 	default:
 		failed(w, r, title, err, bucketFields(prefix))
@@ -161,12 +175,18 @@ func (h *AppsHandler) bucketFailed(w http.ResponseWriter, r *http.Request, title
 }
 
 func (h *AppsHandler) renderBucket(w http.ResponseWriter, r *http.Request) {
-	buckets, err := h.apps.Buckets(ctxkeys.Workspace(r.Context()).ID)
+	workspace := ctxkeys.Workspace(r.Context())
+	buckets, err := h.apps.Buckets(workspace.ID)
 	if err != nil {
 		renderError(w, "load buckets failed", err)
 		return
 	}
-	render(w, r, pages.Bucket(pages.BucketView{Buckets: buckets}))
+	servers, err := h.servers.List(workspace.ID)
+	if err != nil {
+		renderError(w, "list servers failed", err)
+		return
+	}
+	render(w, r, pages.Bucket(pages.BucketView{Buckets: buckets, Servers: serverNames(servers)}))
 }
 
 // backupsView is how an app is backed up: its bucket and the buckets to

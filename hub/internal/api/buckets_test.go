@@ -18,7 +18,7 @@ import (
 
 // TestBucketRoutes: buckets are added, listed and picked per app through
 // the API; a bucket in use answers 409 bucket_in_use naming the app. The
-// workspace has no online server, so no change waits for a daemon.
+// server's daemon keeps every key it gets.
 func TestBucketRoutes(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
@@ -33,6 +33,7 @@ func TestBucketRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	servers.Connect(server, testutil.Hello, "203.0.113.5", func() {}, testutil.AnswerOK(servers.Receive, server.ID))
 	if _, err := apps.Create(actor, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -46,6 +47,7 @@ func TestBucketRoutes(t *testing.T) {
 		"POST /api/v1/buckets":             handler.AddBucket,
 		"GET /api/v1/buckets/{name}":       handler.GetBucket,
 		"PUT /api/v1/buckets/{name}":       handler.EditBucket,
+		"PUT /api/v1/buckets/{name}/key":   handler.SetBucketKey,
 		"DELETE /api/v1/buckets/{name}":    handler.DeleteBucket,
 		"PUT /api/v1/apps/{app}/bucket":    handler.SetAppBucket,
 		"POST /api/v1/apps/{app}/restores": handler.StartRestore,
@@ -132,5 +134,28 @@ func TestBucketRoutes(t *testing.T) {
 	}
 	if status, answer := send("GET", "/api/v1/buckets/client-b", ""); status != http.StatusOK || answer["bucket"] != "client" {
 		t.Fatalf("get renamed: %d %v", status, answer)
+	}
+
+	// The key lives on the servers: web-1 keeps it. A second server,
+	// offline, has none, cannot take one, and a new bucket must name the
+	// server now.
+	if _, _, err := servers.Create(actor, "web-2"); err != nil {
+		t.Fatal(err)
+	}
+	status, answer = send("GET", "/api/v1/buckets/main", "")
+	keepers, _ := answer["servers"].([]any)
+	missing, _ := answer["missing_on"].([]any)
+	if status != http.StatusOK || len(keepers) != 1 || keepers[0].(map[string]any)["server"] != "web-1" || len(missing) != 1 || missing[0] != "web-2" {
+		t.Fatalf("where the key is: %d %v", status, answer)
+	}
+	if status, answer := send("PUT", "/api/v1/buckets/main/key", `{"server":"web-2","secret_key":"s"}`); status != http.StatusConflict || code(answer) != "server_offline" || answer["error"].(map[string]any)["message"] != "web-2 is offline. Try again when it is back." {
+		t.Fatalf("key for an offline server: %d %v", status, answer)
+	}
+	if status, answer := send("PUT", "/api/v1/buckets/main/key", `{"server":"web-1","secret_key":"s"}`); status != http.StatusOK || answer["name"] != "main" {
+		t.Fatalf("key for web-1: %d %v", status, answer)
+	}
+	body = `{"name":"third","endpoint":"` + bucket.URL + `","bucket":"third","access_key":"k","secret_key":"s"}`
+	if status, answer := send("POST", "/api/v1/buckets", body); status != http.StatusUnprocessableEntity || answer["error"].(map[string]any)["fields"].(map[string]any)["server"] == nil {
+		t.Fatalf("a new bucket without a server of two: %d %v", status, answer)
 	}
 }

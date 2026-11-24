@@ -21,7 +21,8 @@ func TestRemoveToolsNeedTheName(t *testing.T) {
 	defer bucket.Close()
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
-	output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	online(t, env, owner, "box-1")
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
 	output[mcp.Bucket](t, call(t, session, "add_bucket", map[string]any{"name": "spare", "endpoint": bucket.URL, "bucket": "spare", "access_key": "k", "secret_key": "s"}))
 
 	// The app goes first: the bucket is the default every app uses.

@@ -13,10 +13,12 @@ import (
 	"maps"
 	"net"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
@@ -53,7 +55,7 @@ func (s *AppService) RunUptime(ctx context.Context) {
 	u := s.uptime
 	u.started = s.now()
 	if u.client == nil {
-		u.client = newUptimeClient(s.publicBucketsOnly)
+		u.client = newUptimeClient(s.publicOnly)
 	}
 	jobs := make(chan uptimeJob, uptimeQueue)
 	var workers sync.WaitGroup
@@ -139,7 +141,7 @@ func (s *AppService) runUptimeJob(ctx context.Context, job uptimeJob, jobs chan<
 func (s *AppService) VisitUptime(ctx context.Context) {
 	u := s.uptime
 	if u.client == nil {
-		u.client = newUptimeClient(s.publicBucketsOnly)
+		u.client = newUptimeClient(s.publicOnly)
 	}
 	now := s.now()
 	plan := s.planUptime(now)
@@ -327,7 +329,7 @@ func uptimeFailure(err error) string {
 	var hostnameErr x509.HostnameError
 	var netErr net.Error
 	switch {
-	case errors.Is(err, ErrBucketPrivate):
+	case errors.Is(err, ErrPrivateAddress):
 		return "the domain points at a private address"
 	case errors.As(err, &dnsErr):
 		return "DNS: no address for " + dnsErr.Name
@@ -343,4 +345,30 @@ func uptimeFailure(err error) string {
 		return "connection reset"
 	}
 	return clipText(err.Error(), 160)
+}
+
+// ErrPrivateAddress refuses a connection to an address that is not on the
+// public internet (AllowOnlyPublicAddresses).
+var ErrPrivateAddress = errors.New("the address is private or local: moin only reaches the public internet")
+
+// sharedNetwork is 100.64.0.0/10: carrier networks and Tailscale.
+var sharedNetwork = netip.MustParsePrefix("100.64.0.0/10")
+
+// refusePrivate stops a connection to loopback, private, link-local,
+// shared or unspecified addresses, like 127.0.0.1, 10.0.0.5, 169.254.169.254
+// or 0.0.0.0.
+func refusePrivate(network, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
+		return err
+	}
+	ip = ip.Unmap()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() || sharedNetwork.Contains(ip) {
+		return ErrPrivateAddress
+	}
+	return nil
 }

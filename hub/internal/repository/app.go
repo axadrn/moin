@@ -197,23 +197,6 @@ func (r *Apps) SetDeployDetected(id, detected string) error {
 	return err
 }
 
-// Env returns the sealed env values of an app by key, for its deploys.
-func (r *Apps) Env(appID string) (map[string]string, error) {
-	rows := []struct {
-		Key   string `db:"key"`
-		Value string `db:"value"`
-	}{}
-	err := r.db.Select(&rows, `SELECT key, value FROM app_env WHERE app_id = $1`, appID)
-	if err != nil {
-		return nil, err
-	}
-	env := make(map[string]string, len(rows))
-	for _, row := range rows {
-		env[row.Key] = row.Value
-	}
-	return env, nil
-}
-
 // EnvVars lists the env vars of an app by key, without their values.
 func (r *Apps) EnvVars(appID string) ([]model.EnvVar, error) {
 	vars := []model.EnvVar{}
@@ -221,18 +204,43 @@ func (r *Apps) EnvVars(appID string) ([]model.EnvVar, error) {
 	return vars, err
 }
 
-// SetEnv writes and removes env vars in one transaction.
-func (r *Apps) SetEnv(appID string, set map[string]string, unset []string, at time.Time) error {
+// KeepEnv makes keys the env keys of an app, as its server reported them:
+// new ones count from at, the others keep their date.
+func (r *Apps) KeepEnv(appID string, keys []string, at time.Time) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	for key, value := range set {
+	query, args, err := sqlx.In(`DELETE FROM app_env WHERE app_id = ? AND key NOT IN (?)`, appID, append([]string{""}, keys...))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(tx.Rebind(query), args...); err != nil {
+		return err
+	}
+	for _, key := range keys {
+		_, err := tx.Exec(`INSERT INTO app_env (app_id, key, updated_at) VALUES ($1, $2, $3) ON CONFLICT (app_id, key) DO NOTHING`, appID, key, at)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SetEnv notes the keys set, as changed at, and forgets the keys removed,
+// in one transaction. The values are only on the server.
+func (r *Apps) SetEnv(appID string, set, unset []string, at time.Time) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, key := range set {
 		_, err = tx.Exec(`
-			INSERT INTO app_env (app_id, key, value, updated_at) VALUES ($1, $2, $3, $4)
-			ON CONFLICT (app_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-		`, appID, key, value, at)
+			INSERT INTO app_env (app_id, key, updated_at) VALUES ($1, $2, $3)
+			ON CONFLICT (app_id, key) DO UPDATE SET updated_at = excluded.updated_at
+		`, appID, key, at)
 		if err != nil {
 			return err
 		}
@@ -270,9 +278,9 @@ func (r *Apps) Registries(workspaceID string) ([]model.Registry, error) {
 
 func (r *Apps) SetRegistry(registry model.Registry) error {
 	_, err := r.db.Exec(`
-		INSERT INTO registries (workspace_id, host, username, password, created_at) VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (workspace_id, host) DO UPDATE SET username = excluded.username, password = excluded.password
-	`, registry.WorkspaceID, registry.Host, registry.Username, registry.Password, registry.CreatedAt)
+		INSERT INTO registries (workspace_id, host, username, created_at) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (workspace_id, host) DO UPDATE SET username = excluded.username
+	`, registry.WorkspaceID, registry.Host, registry.Username, registry.CreatedAt)
 	return err
 }
 
@@ -311,10 +319,10 @@ func (r *Apps) SetInstantHost(appID, host string) error {
 	return err
 }
 
-// SetInstantPassword stores the sealed password moin made for the instant
-// address.
-func (r *Apps) SetInstantPassword(appID, sealed string) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant_password = $1 WHERE id = $2`, sealed, appID)
+// SetInstantPasswordHash stores the bcrypt hash of the password moin made
+// for the instant address.
+func (r *Apps) SetInstantPasswordHash(appID, hash string) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant_password_hash = $1 WHERE id = $2`, hash, appID)
 	return err
 }
 

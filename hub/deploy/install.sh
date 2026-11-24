@@ -59,7 +59,7 @@ SAME_SERVER=true
 # The first address is the admin; only these may sign up.
 ADMIN_EMAILS=$email
 DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
-# Seals the secrets of your apps. Keep a copy somewhere safe.
+# Seals the Cloudflare token and alert targets the hub uses. Keep a copy.
 SECRETS_KEY=$(openssl rand -base64 32)
 # The proxy on this server is a Docker container.
 TRUSTED_PROXY_CIDRS=172.16.0.0/12

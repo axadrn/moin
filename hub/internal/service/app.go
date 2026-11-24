@@ -94,8 +94,8 @@ type AppService struct {
 	github     *GitHub
 	cloudflare *Cloudflare
 	now        func() time.Time
-	// publicBucketsOnly refuses buckets on private or local addresses.
-	publicBucketsOnly bool
+	// publicOnly has uptime checks refuse private or local addresses.
+	publicOnly bool
 	// proxyOnFirstConnect sends a server its config the first time its
 	// daemon connects, which starts the proxy; see ProxyOnFirstConnect.
 	proxyOnFirstConnect bool
@@ -142,11 +142,14 @@ func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Bo
 		}
 		service.configureServerOnConnect(serverID, workspaceID)
 		service.reconcileRestores(serverID)
+		service.forgetOldSecrets(serverID, workspaceID)
 	})
 	return service
 }
 
-// Create adds an app on one of the user's servers.
+// Create adds an app on one of the user's servers. The app it returns
+// carries the password of its instant address: the one time moin shows
+// it.
 func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.App, error) {
 	name = strings.TrimSpace(name)
 	if !appNamePattern.MatchString(name) {
@@ -177,10 +180,20 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
+	// The password of its instant address, shown this once.
+	password, err := s.newInstantPassword(app)
+	if err != nil {
+		return nil, err
+	}
 	s.servers.record(actor, "app.created", "app", name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
 	s.reconfigure(server.ID, actor.WorkspaceID)
-	return s.apps.ByID(app.ID)
+	created, err := s.apps.ByID(app.ID)
+	if err != nil {
+		return nil, err
+	}
+	created.InstantPassword = password
+	return created, nil
 }
 
 // Rename gives an app a new name under the rules of Create. Links to it
@@ -379,92 +392,100 @@ func (s *AppService) RemoveDeployHook(actor Actor, idOrName string) (bool, error
 	return true, nil
 }
 
-// RegistryLogin is a registry login without its password.
+// RegistryLogin is a registry login without its password, which only
+// the servers keep: Servers says which.
 type RegistryLogin struct {
 	Host      string
 	Username  string
 	CreatedAt time.Time
+	Servers   SecretServers
 }
 
-// Registries lists the user's registry logins.
+// Registries lists the workspace's registry logins.
 func (s *AppService) Registries(workspaceID string) ([]RegistryLogin, error) {
 	registries, err := s.apps.Registries(workspaceID)
 	if err != nil {
 		return nil, err
 	}
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return nil, err
+	}
 	logins := make([]RegistryLogin, 0, len(registries))
 	for _, registry := range registries {
-		logins = append(logins, RegistryLogin{Host: registry.Host, Username: registry.Username, CreatedAt: registry.CreatedAt})
+		logins = append(logins, RegistryLogin{Host: registry.Host, Username: registry.Username, CreatedAt: registry.CreatedAt, Servers: index.of(protocol.RegistrySecret(registry.Host))})
 	}
 	return logins, nil
 }
 
-// SetRegistry stores a login daemons use to pull the user's images from host.
-func (s *AppService) SetRegistry(actor Actor, host, username, password string) error {
+// SetRegistry hands a login for host to a server, which pulls the
+// workspace's images from there with it: the named one, or the only one.
+// The hub keeps the host and the username.
+func (s *AppService) SetRegistry(ctx context.Context, actor Actor, host, username, password, serverName string) error {
 	host = strings.ToLower(strings.TrimSpace(host))
+	username = strings.TrimSpace(username)
 	if !registryHostPattern.MatchString(host) {
 		return ErrRegistryHost
 	}
-	if strings.TrimSpace(username) == "" || password == "" {
+	if username == "" || strings.Contains(username, ":") || password == "" {
 		return ErrRegistryLogin
 	}
-	err := s.apps.SetRegistry(model.Registry{
-		WorkspaceID: actor.WorkspaceID,
-		Host:        host,
-		Username:    strings.TrimSpace(username),
-		Password:    s.box.Seal(password, actor.WorkspaceID+"/"+host),
-		CreatedAt:   s.now().UTC(),
-	})
+	server, err := s.servers.secretServer(actor.WorkspaceID, serverName)
 	if err != nil {
 		return err
 	}
-	s.servers.record(actor, "registry.set", "registry", host, map[string]string{"username": strings.TrimSpace(username)})
+	err = s.servers.setSecret(ctx, server, protocol.RegistrySecret(host), username+":"+password)
+	if err != nil {
+		return err
+	}
+	err = s.apps.SetRegistry(model.Registry{WorkspaceID: actor.WorkspaceID, Host: host, Username: username, CreatedAt: s.now().UTC()})
+	if err != nil {
+		return err
+	}
+	s.servers.record(actor, "registry.set", "registry", host, map[string]string{"username": username, "server": server.Name})
 	return nil
 }
 
-// RemoveRegistry deletes a registry login.
-func (s *AppService) RemoveRegistry(actor Actor, host string) error {
+// RemoveRegistry deletes a registry login, also from the servers.
+func (s *AppService) RemoveRegistry(ctx context.Context, actor Actor, host string) error {
 	host = strings.ToLower(strings.TrimSpace(host))
 	err := s.apps.DeleteRegistry(actor.WorkspaceID, host)
 	if err != nil {
 		return err
 	}
+	s.servers.dropSecret(ctx, actor.WorkspaceID, protocol.RegistrySecret(host))
 	s.servers.record(actor, "registry.removed", "registry", host, nil)
 	return nil
 }
 
-// registry returns the user's login for the registry of image, if any.
-func (s *AppService) registry(workspaceID, image string) (*protocol.Registry, error) {
-	host := registryHost(image)
-	registries, err := s.apps.Registries(workspaceID)
+// checkRegistry refuses a deploy of image when the workspace has a login
+// for its registry and the app's server does not keep it: the pull would
+// fail without it.
+func (s *AppService) checkRegistry(app *model.App, image string) error {
+	host := protocol.RegistryHost(image)
+	registries, err := s.apps.Registries(app.WorkspaceID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	for _, registry := range registries {
-		if registry.Host != host {
-			continue
-		}
-		password, err := s.box.Open(registry.Password, workspaceID+"/"+host)
-		if err != nil {
-			return nil, fmt.Errorf("registry %s: %w", host, err)
-		}
-		return &protocol.Registry{Host: host, Username: registry.Username, Password: password}, nil
+	if !slices.ContainsFunc(registries, func(registry model.Registry) bool { return registry.Host == host }) {
+		return nil
 	}
-	return nil, nil
-}
-
-// registryHost is the registry of an image reference: its first part when
-// that looks like a host, else Docker Hub.
-func registryHost(image string) string {
-	first, _, found := strings.Cut(image, "/")
-	if found && (strings.ContainsAny(first, ".:") || first == "localhost") {
-		return first
+	index, err := s.servers.secretsIndex(app.WorkspaceID)
+	if err != nil {
+		return err
 	}
-	return "docker.io"
+	if index.has(app.ServerID, protocol.RegistrySecret(host)) {
+		return nil
+	}
+	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	return &MissingSecretError{Message: server.Name + " has no login for " + host + ". Enter it for " + server.Name + " under Registries, then deploy again."}
 }
 
 // Redeploy runs the newest deploy that had a source or an image again, with
-// the env as it is now. Rollbacks are skipped.
+// the env as it is now on the server. Rollbacks are skipped.
 func (s *AppService) Redeploy(actor Actor, idOrName string) (*model.Deploy, error) {
 	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
@@ -655,7 +676,7 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 
 // waitingActions are the changes an app takes only on its next restart,
 // start or deploy: saving never restarts it (DESIGN.md, Feedback).
-var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set", "app.renamed"}
+var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.instant_password", "app.bucket_set", "app.renamed"}
 
 // ChangesWaiting counts the changes made to an app since its live deploy
 // started, which its next restart applies. A stopped app or one never
@@ -866,7 +887,8 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 }
 
 // Rollback starts the images of an earlier successful deploy again, with
-// the env it had. Number 0 means the one before the live deploy.
+// the env as it is now on the server. Number 0 means the one before the
+// live deploy.
 func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.Deploy, error) {
 	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
@@ -974,17 +996,12 @@ func (s *AppService) ready(workspaceID, idOrName string) (*model.App, error) {
 // start stores the deploy, sends it to the daemon and records action in the
 // activity; an empty action records nothing.
 func (s *AppService) start(actor Actor, action string, app *model.App, deploy *model.Deploy, start protocol.DeployStart) (*model.Deploy, error) {
-	env, err := s.env(app)
-	if err != nil {
-		return nil, err
-	}
 	if start.Image != "" {
-		start.Registry, err = s.registry(app.WorkspaceID, start.Image)
-		if err != nil {
+		if err := s.checkRegistry(app, start.Image); err != nil {
 			return nil, err
 		}
 	}
-	err = s.apps.CreateDeploy(deploy)
+	err := s.apps.CreateDeploy(deploy)
 	if err != nil {
 		return nil, err
 	}
@@ -994,15 +1011,16 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	if err != nil {
 		return nil, err
 	}
-	if start.FromNumber == 0 {
-		start.Env = env
-	}
 	s.mu.Lock()
 	s.live[deploy.ID] = &liveDeploy{workspaceID: app.WorkspaceID, serverID: app.ServerID, followers: map[chan struct{}]struct{}{}}
 	s.mu.Unlock()
 	s.notify(app.WorkspaceID)
 
 	err = s.servers.Send(app.ServerID, protocol.TypeDeployStart, start)
+	if errors.Is(err, ErrDaemonOutdated) {
+		s.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID, Error: ErrDaemonOutdated.Error()})
+		return nil, err
+	}
 	if err != nil {
 		s.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID, Error: "the server went offline before the deploy started"})
 		return nil, ErrServerOffline
@@ -1275,25 +1293,11 @@ func (s *AppService) EnvVars(workspaceID, idOrName string) ([]model.EnvVar, erro
 	return s.apps.EnvVars(app.ID)
 }
 
-// env opens the app's env values for its deploy, the only place they go.
-func (s *AppService) env(app *model.App) (map[string]string, error) {
-	sealed, err := s.apps.Env(app.ID)
-	if err != nil {
-		return nil, err
-	}
-	env := make(map[string]string, len(sealed))
-	for key, value := range sealed {
-		env[key], err = s.box.Open(value, app.ID+"/"+key)
-		if err != nil {
-			return nil, fmt.Errorf("env %s: %w", key, err)
-		}
-	}
-	return env, nil
-}
-
-// SetEnv sets and removes env vars. They take effect with the next deploy.
-// removed are the keys of unset the app had; the others were not set.
-func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string, unset []string) (removed []string, err error) {
+// SetEnv sets and removes env vars. The values go to the app's server,
+// which keeps them in the app's env file; the hub keeps only the keys and
+// when they changed. They take effect with the next deploy. removed are
+// the keys of unset the app had; the others were not set.
+func (s *AppService) SetEnv(ctx context.Context, actor Actor, idOrName string, set map[string]string, unset []string) (removed []string, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -1306,7 +1310,6 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	for _, envVar := range vars {
 		current[envVar.Key] = true
 	}
-	sealed := make(map[string]string, len(set))
 	for key, value := range set {
 		if !envKeyPattern.MatchString(key) {
 			return nil, ErrEnvKey
@@ -1314,7 +1317,6 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 		if len(value) > maxEnvValueSize {
 			return nil, ErrEnvValue
 		}
-		sealed[key] = s.box.Seal(value, app.ID+"/"+key)
 		current[key] = true
 	}
 	for _, key := range unset {
@@ -1329,12 +1331,34 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	if len(current) > maxEnvVars {
 		return nil, ErrEnvLimit
 	}
-	err = s.apps.SetEnv(app.ID, sealed, unset, s.now().UTC())
+	keys := slices.Sorted(maps.Keys(set))
+	if len(keys) == 0 && len(removed) == 0 {
+		return nil, nil
+	}
+	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, secretTimeout)
+	defer cancel()
+	var kept protocol.AppEnv
+	err = s.servers.Request(ctx, server.ID, protocol.TypeEnvSet, protocol.EnvSet{App: app.Folder, Set: set, Remove: removed}, &kept)
+	if errors.Is(err, ErrServerOffline) {
+		return nil, &OfflineError{Server: server.Name}
+	}
+	if err != nil {
+		return nil, err
+	}
+	// The server's answer is the truth: the keys its env file has now.
+	now := s.now().UTC()
+	err = s.apps.KeepEnv(app.ID, cleanEnvKeys(kept.Keys), now)
+	if err == nil {
+		err = s.apps.SetEnv(app.ID, keys, nil, now)
+	}
 	if err != nil {
 		return nil, err
 	}
 	// The activity names the keys, never the values.
-	keys := slices.Sorted(maps.Keys(set))
 	if len(keys) > 0 {
 		s.servers.record(actor, "env.set", "app", app.Name, map[string]string{"keys": strings.Join(keys, ", ")})
 	}
@@ -1345,9 +1369,45 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	return removed, nil
 }
 
+// keepEnv makes the env keys of a server's apps what its daemon reported
+// in its hello: the hub never shows a key the server does not have. An
+// app the daemon reported nothing for has no env there.
+func (s *AppService) keepEnv(serverID, workspaceID string, env map[string]protocol.AppEnv, now time.Time) {
+	apps, err := s.apps.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		slog.Error("list apps for their env keys failed", "server_id", serverID, "error", err)
+		return
+	}
+	for _, app := range apps {
+		if app.ServerID != serverID {
+			continue
+		}
+		reported := env[app.Folder]
+		at := reported.ChangedAt.UTC()
+		if at.IsZero() || at.After(now) {
+			at = now
+		}
+		if err := s.apps.KeepEnv(app.ID, cleanEnvKeys(reported.Keys), at); err != nil {
+			slog.Error("store the env keys a daemon reported failed", "app_id", app.ID, "error", err)
+		}
+	}
+}
+
+// cleanEnvKeys keeps the keys a daemon reports that are env keys, at most
+// maxEnvVars.
+func cleanEnvKeys(keys []string) []string {
+	clean := []string{}
+	for _, key := range keys {
+		if len(clean) < maxEnvVars && envKeyPattern.MatchString(key) && !slices.Contains(clean, key) {
+			clean = append(clean, key)
+		}
+	}
+	return clean
+}
+
 // ReplaceEnv makes env the app's env vars: it sets every key of env and
 // removes the keys env does not have. It returns what changed, by key.
-func (s *AppService) ReplaceEnv(actor Actor, idOrName string, env map[string]string) (dotenv.Change, error) {
+func (s *AppService) ReplaceEnv(ctx context.Context, actor Actor, idOrName string, env map[string]string) (dotenv.Change, error) {
 	vars, err := s.EnvVars(actor.WorkspaceID, idOrName)
 	if err != nil {
 		return dotenv.Change{}, err
@@ -1363,7 +1423,7 @@ func (s *AppService) ReplaceEnv(actor Actor, idOrName string, env map[string]str
 	if change.None() {
 		return change, nil
 	}
-	_, err = s.SetEnv(actor, idOrName, env, change.Removed)
+	_, err = s.SetEnv(ctx, actor, idOrName, env, change.Removed)
 	return change, err
 }
 

@@ -163,7 +163,7 @@ moin daemon uninstall --apps   # the apps and their data go too, for good
 
 | | `uninstall` | `uninstall --apps` |
 | --- | --- | --- |
-| `moin-daemon` service, `moin` binary, daemon state in `/var/lib/moin` | removed | removed |
+| `moin-daemon` service, `moin` binary, daemon state in `/var/lib/moin`, with the server's secrets | removed | removed |
 | apps and their data in `/var/lib/moin/apps` | keep running | removed with containers, images and volumes |
 | proxy, tunnel, firewall | stay | removed |
 | `/etc/moin/rules`, Docker | stay | stay |
@@ -171,6 +171,8 @@ moin daemon uninstall --apps   # the apps and their data go too, for good
 ## Good to know
 
 - **Disk space**: after every deploy and once a day the daemon removes images nothing uses and old build cache. What a rollback needs, your volumes and anything moin did not put there stay.
+- **A second server** has none of the bucket keys, registry logins and Tailscale key of the first. The Bucket, Registries and Integrations pages say which server lacks one. Enter it for that server. [Where your secrets live](/docs/guides/security#where-your-secrets-live)
+- **A server rebuilt from scratch** starts without env values and keys. Enter them again, then deploy.
 - Next: close every port with the [Cloudflare Tunnel and the firewall](/docs/guides/security).
 
 ## Under the hood
@@ -182,4 +184,4 @@ systemctl status moin-daemon    # does the daemon run?
 journalctl -u moin-daemon -f     # its log
 ```
 
-It keeps its state in `/var/lib/moin`: its token in `daemon.json` and every app under `apps/<app>`.
+It keeps its state in `/var/lib/moin`: its token in `daemon.json`, the server's secrets in `server.json`, and every app under `apps/<app>`, with its env in `app.env`.

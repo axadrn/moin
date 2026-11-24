@@ -34,8 +34,9 @@ func TestDomainsMarkComposeDomains(t *testing.T) {
 	}
 }
 
-// The instant address shows with its password hidden, and a domain of
-// another service shows its service and no canonical action.
+// The instant address shows without its password, which moin never shows
+// again, with New password; a new one shows once. A domain of another
+// service shows its service and no canonical action.
 func TestDomainsInstantAndServices(t *testing.T) {
 	view := DomainsView{
 		App:     model.App{Name: "shop"},
@@ -47,7 +48,7 @@ func TestDomainsInstantAndServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-show", `data-domain-service="api"`, "Remove api.shop.example.com", "canonical", `/apps/shop/domains/remove"`, `/apps/shop/domains/detail?show=true"`, `id="app-domains"`} {
+	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-new", `data-domain-service="api"`, "Remove api.shop.example.com", "canonical", `/apps/shop/domains/remove"`, `/apps/shop/domains/instant-new-password"`, `id="app-domains"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("no %s", want)
 		}
@@ -58,6 +59,18 @@ func TestDomainsInstantAndServices(t *testing.T) {
 	if strings.Contains(page, "data-domain-checked") {
 		t.Errorf("a domain shows a DNS answer it was never asked for")
 	}
+	if strings.Contains(page, "data-instant-password") {
+		t.Errorf("a password shows that nobody just made")
+	}
+	view.NewPassword = "fresh-password-123"
+	html.Reset()
+	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html.String(), "fresh-password-123") || !strings.Contains(html.String(), "Shown once.") || strings.Contains(html.String(), "data-instant-new") {
+		t.Errorf("the new password is not shown once:\n%s", html.String())
+	}
+	view.NewPassword = ""
 
 	view.Instant = service.Instant{Provider: "sslip.io", Reason: "The server runs behind a Cloudflare Tunnel."}
 	html.Reset()

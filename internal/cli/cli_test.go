@@ -195,7 +195,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`, "GET /api/v1/integrations": `{"tailscale":{"servers":[{"server":"server-1"}],"missing_on":[]}}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		// The big ones want the name, the others --yes.
 		if code != 1 || (!strings.Contains(stderr, "--yes") && !strings.Contains(stderr, "--confirm "+args[2])) {
@@ -566,7 +566,7 @@ func TestActivityFilterThatMatchesNothing(t *testing.T) {
 }
 
 func TestIntegrationsRmWithoutAKeyChangesNothing(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/integrations": `{"cloudflare":true,"tailscale":false}`}}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/integrations": `{"cloudflare":true,"tailscale":{"servers":[],"missing_on":["server-1"]}}`}}
 	code, stdout, stderr := runCLI(t, api, "integrations", "rm", "tailscale", "--yes")
 	if code != 0 || !strings.Contains(stdout, "Nothing changed: no tailscale key is stored.") || api.seen("PUT") || api.seen("PATCH") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
@@ -638,5 +638,28 @@ func TestDeployDeploysThePushedCommit(t *testing.T) {
 	code, _, stderr = runCLI(t, api, "deploy", "shop")
 	if code == 0 || !strings.Contains(stderr, "follows me/other, and this folder is me/shop") || api.seen("POST") || api.seen("PUT") {
 		t.Errorf("another repo: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}
+
+// TestInstantPassword: moin shows the password of the instant address
+// once, when it makes the app or a new password, never again.
+func TestInstantPassword(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"POST /api/v1/apps": `{"name":"shop","server_name":"server-1","instant_password":"pw-shown-once"}`}}
+	code, stdout, stderr := runCLI(t, api, "apps", "add", "--server", "server-1", "shop")
+	if code != 0 || !strings.Contains(stdout, "pw-shown-once") || !strings.Contains(stdout, "only this once") {
+		t.Fatalf("add: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	api = &fakeAPI{answers: map[string]string{"POST /api/v1/apps/shop/instant/password": `{"user":"moin","password":"pw-new"}`}}
+	code, stdout, stderr = runCLI(t, api, "instant", "password", "shop")
+	if code != 0 || !strings.Contains(stdout, "pw-new") || !strings.Contains(stdout, "restart shop") {
+		t.Fatalf("password: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/instant": `{"url":"https://shop.203-0-113-7.sslip.io","provider":"sslip.io","user":"moin"}`}}
+	code, stdout, stderr = runCLI(t, api, "instant", "shop")
+	if code != 0 || !strings.Contains(stdout, "instant password shop") || strings.Contains(strings.Join(api.requests, " "), "show") {
+		t.Fatalf("show: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	if code, _, _ := runCLI(t, api, "instant", "--show", "shop"); code == 0 {
+		t.Fatal("instant --show still runs")
 	}
 }

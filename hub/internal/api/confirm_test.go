@@ -33,6 +33,7 @@ func TestRemoveNeedsTheName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	servers.Connect(server, testutil.Hello, "203.0.113.5", func() {}, testutil.AnswerOK(servers.Receive, server.ID))
 	if _, err := apps.Create(actor, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}

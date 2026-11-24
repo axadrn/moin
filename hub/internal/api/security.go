@@ -7,19 +7,22 @@ import (
 	"github.com/axadrn/moin/hub/internal/service"
 )
 
-// Integrations is the answer of GET /api/v1/integrations: which keys are
-// stored, never the keys.
+// Integrations is the answer of GET /api/v1/integrations: which keys there
+// are, never the keys. The hub keeps the Cloudflare API token; the
+// Tailscale key only the servers keep.
 type Integrations struct {
-	Cloudflare        bool   `json:"cloudflare"`
-	CloudflareAccount string `json:"cloudflare_account"`
-	Tailscale         bool   `json:"tailscale"`
+	Cloudflare        bool          `json:"cloudflare"`
+	CloudflareAccount string        `json:"cloudflare_account"`
+	Tailscale         SecretServers `json:"tailscale"`
 }
 
 // IntegrationsRequest is the body of PUT /api/v1/integrations. A missing
-// key stays, an empty one is removed.
+// key stays, an empty one is removed. Server is the server that keeps the
+// Tailscale key, empty for the workspace's only one.
 type IntegrationsRequest struct {
 	CloudflareToken *string `json:"cloudflare_token"`
 	TailscaleKey    *string `json:"tailscale_key"`
+	Server          string  `json:"server"`
 }
 
 // SecurityRequest is the body of PUT /api/v1/servers/{id}/security.
@@ -37,16 +40,22 @@ func (h *AppsHandler) GetIntegrations(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, Integrations{Cloudflare: integrations.Cloudflare, CloudflareAccount: integrations.CloudflareAccount, Tailscale: integrations.Tailscale})
+	JSON(w, http.StatusOK, NewIntegrations(integrations))
 }
 
-// SetIntegrations stores the Cloudflare API token and the Tailscale key.
+// NewIntegrations is the JSON shape of the workspace's keys.
+func NewIntegrations(integrations service.Integrations) Integrations {
+	return Integrations{Cloudflare: integrations.Cloudflare, CloudflareAccount: integrations.CloudflareAccount, Tailscale: NewSecretServers(integrations.Tailscale)}
+}
+
+// SetIntegrations stores the Cloudflare API token and hands the Tailscale
+// key to a server.
 func (h *AppsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request) {
 	var request IntegrationsRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.SetIntegrations(r.Context(), actor(r), request.CloudflareToken, request.TailscaleKey)
+	err := h.apps.SetIntegrations(r.Context(), actor(r), service.IntegrationsInput{CloudflareToken: request.CloudflareToken, TailscaleKey: request.TailscaleKey, TailscaleServer: request.Server})
 	if err != nil {
 		ServiceError(w, err)
 		return

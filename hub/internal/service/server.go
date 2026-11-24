@@ -329,6 +329,10 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 	if err != nil {
 		slog.Error("store daemon hello failed", "error", err, "server_id", server.ID)
 	}
+	s.keepSecretNames(server.ID, hello.Secrets, now)
+	if s.apps != nil {
+		s.apps.keepEnv(server.ID, server.WorkspaceID, hello.Env, now)
+	}
 	session := &daemonSession{workspaceID: server.WorkspaceID, protocol: hello.ProtocolVersion, kick: kick, send: send, waiting: map[string]chan protocol.Message{}, streams: map[string]chan protocol.Message{}, gone: make(chan struct{})}
 	s.mu.Lock()
 	previous := s.sessions[server.ID]
@@ -486,6 +490,9 @@ func (s *ServerService) Send(serverID string, messageType protocol.MessageType, 
 	s.mu.Unlock()
 	if session == nil {
 		return ErrServerOffline
+	}
+	if session.protocol < protocol.Needs(messageType) {
+		return ErrDaemonOutdated
 	}
 	return session.send(message)
 }

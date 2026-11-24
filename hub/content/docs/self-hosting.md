@@ -27,7 +27,7 @@ The rest of these docs apply as they are.
 
 ## Good to know
 
-- Keep a copy of `SECRETS_KEY`. It seals the secrets of your apps. Without it they are lost.
+- Keep a copy of `SECRETS_KEY`. It seals the Cloudflare token and the alert targets the hub keeps. Without it you enter them again. Env values, bucket keys and registry logins live on your servers, never in the hub.
 - Email and a bucket can come later. Until email is set up, invitations go to the hub's log.
 - A new key any time: `docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com`. [Recovery key](#recovery-key)
 - Add `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the hub's own backup, then run `sh /opt/moin/update.sh`.
@@ -123,7 +123,7 @@ The files are in the repo, in `hub/deploy/`:
 | --- | --- |
 | `APP_URL` | the address of the hub; [passkeys](#who-signs-in) belong to its domain |
 | `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up with GitHub without an invitation |
-| `SECRETS_KEY` | seals the secrets of your apps; keep a copy |
+| `SECRETS_KEY` | seals the secrets the hub keeps itself: the Cloudflare token and the alert targets; keep a copy |
 | `BILLING` | `false` turns off prices, checkout and the billing page |
 | `SIGNUPS_OPEN` | `true` lets anyone sign up; off by default without billing, keep it off on a hub the internet can reach |
 | `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | email through Cloudflare Email Sending |

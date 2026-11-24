@@ -8,9 +8,11 @@ import (
 )
 
 // Registries is where the workspace keeps the logins its servers pull
-// private images with, built in CI: the list, each with Remove, and the
-// form for another. Saving or removing one answers the whole page.
-templ Registries(logins []service.RegistryLogin) {
+// private images with, built in CI: the list, each with the servers that
+// keep it and Remove, a field for each server without it, and the form for
+// another. The password goes to a server, never back. Saving or removing
+// one answers the whole page. servers are the workspace's servers.
+templ Registries(logins []service.RegistryLogin, servers []string) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Registries") {
 		@panelPage() {
@@ -27,7 +29,7 @@ templ Registries(logins []service.RegistryLogin) {
 							@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-registry": login.Host, "data-control": true}}) {
 								<div class="moin-fill">
 									<div class="moin-truncate moin-mono moin-strong">{ login.Host }</div>
-									<div class="moin-truncate moin-text moin-muted">{ "as " + login.Username }</div>
+									<div class="moin-truncate moin-text moin-muted">{ "as " + login.Username + ". " + secretOn(login.Servers) + "." }</div>
 								</div>
 								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
 									"hx-delete":  base + "/registries/" + login.Host,
@@ -39,6 +41,17 @@ templ Registries(logins []service.RegistryLogin) {
 								}}) {
 									Remove
 								}
+							}
+							for _, server := range login.Servers.MissingOn {
+								@missingSecret(missingSecretProps{
+									Server:   server,
+									Sentence: server + " has no login for " + login.Host + ".",
+									Action:   base + "/registries",
+									Target:   "#registries",
+									Field:    "password",
+									Label:    "Password or token",
+									Hidden:   map[string]string{"host": login.Host, "username": login.Username},
+								})
 							}
 						}
 					}
@@ -65,6 +78,7 @@ templ Registries(logins []service.RegistryLogin) {
 								@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "registry-password", "aria-describedby": "registry-password-hint", "name": "password", "type": "password", "autocomplete": "new-password", "required": true}})
 							}
 						</div>
+						@serverField("registry-server", servers)
 						<div class="moin-row" data-end>
 							@components.Button(components.ButtonProps{Type: "submit"}) {
 								Save login

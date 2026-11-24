@@ -26,7 +26,10 @@ func checkResolved(t *testing.T, compose string, env map[string]string) (string,
 	if err := os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	config, _, err := a.resolve(ctx, "web", src, env)
+	if _, err := a.setEnv(protocol.EnvSet{App: "web", Set: env}); err != nil {
+		t.Fatal(err)
+	}
+	config, _, err := a.resolve(ctx, "web", src)
 	if err != nil {
 		return "", err
 	}

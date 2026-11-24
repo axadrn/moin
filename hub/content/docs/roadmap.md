@@ -23,9 +23,9 @@ On every surface: web, CLI, terminal UI, API and MCP.
 - **Metrics**: CPU, memory, disk and network of every server and app, up to 30 days back. [Metrics](/docs/guides/metrics)
 - **More than one bucket**, one per app if you like. [Bucket](/docs/guides/bucket#more-than-one-bucket)
 - **Updates in one click** for a self-hosted moin; daemons update themselves. [Self-hosting](/docs/self-hosting#updates)
-- **Env vars** as fields or one `.env` text. [Env vars](/docs/guides/env)
+- **Env vars** as fields or one `.env` text, kept only on your server. [Env vars](/docs/guides/env)
 - **Terminal UI** for the daily work. [Terminal UI](/docs/reference/tui)
-- **Security**: Cloudflare Tunnel, SSH only on Tailscale, a firewall and a rules file on your server. [Security](/docs/guides/security)
+- **Security**: Cloudflare Tunnel, SSH only on Tailscale, a firewall and a rules file on your server. Env values, bucket keys and registry logins live only there. [Security](/docs/guides/security)
 - **Team and activity**: who changed what, to the second. [Activity](/docs/guides/activity)
 - **Self-hosting**, free, every feature, one command. [Self-hosting](/docs/self-hosting)
 
@@ -38,8 +38,6 @@ On every surface: web, CLI, terminal UI, API and MCP.
 
 Zero trust: even someone in full control of moin can't read your data or command your servers. [#16](https://github.com/axadrn/moin/issues/16)
 
-- **Bucket keys only on your servers**: moin knows the bucket's name, never its key.
-- **Secrets encrypted end to end**: only your servers can read your env vars.
 - **Signed commands**: your server only obeys changes signed by a key on your own device.
 - **Signed daemon updates**: your server checks every new daemon before it runs it.
 

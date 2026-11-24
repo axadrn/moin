@@ -36,16 +36,13 @@ func TestCatalogInstall(t *testing.T) {
 	if app.Name != "umami" || app.Catalog != "umami" || deploy.Number != 1 || len(login) != 0 {
 		t.Errorf("app %s catalog %q, deploy %d, login %v", app.Name, app.Catalog, deploy.Number, login)
 	}
-	env, err := apps.env(app)
-	if err != nil {
-		t.Fatal(err)
-	}
+	env := daemon.env(t, app.Folder)
 	if env["VERSION"] != "3.4.1" || len(env["DB_PASSWORD"]) != 43 || len(env["APP_SECRET"]) != 43 || env["DB_PASSWORD"] == env["APP_SECRET"] {
 		t.Errorf("env = %v", env)
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Catalog != "umami" || start.SourceURL != "" || start.Env["VERSION"] != "3.4.1" || start.Domains == nil || len(start.Domains.Domains) != 1 {
+	if start.Catalog != "umami" || start.SourceURL != "" || start.Domains == nil || len(start.Domains.Domains) != 1 {
 		t.Errorf("deploy start = %+v", start)
 	}
 	listed, _ := apps.Get(owner.WorkspaceID, "umami")
@@ -58,15 +55,12 @@ func TestCatalogInstall(t *testing.T) {
 // TestCatalogInstallShowsTheLogin: the secret the first sign-in needs comes
 // back once, from the install; the others never do.
 func TestCatalogInstallShowsTheLogin(t *testing.T) {
-	catalogs, apps, _ := newCatalogService(t)
+	catalogs, _, daemon := newCatalogService(t)
 	app, _, login, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "miniflux", Server: "web-1", Version: "2.2.0"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := apps.env(app)
-	if err != nil {
-		t.Fatal(err)
-	}
+	env := daemon.env(t, app.Folder)
 	if len(login) != 1 || login["ADMIN_PASSWORD"] == "" || login["ADMIN_PASSWORD"] != env["ADMIN_PASSWORD"] || env["DB_PASSWORD"] == "" {
 		t.Errorf("login = %v", login)
 	}
@@ -98,7 +92,7 @@ func TestCatalogUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, _ := apps.env(app)
+	before := daemon.env(t, app.Folder)
 	listed, _ := apps.Get(owner.WorkspaceID, app.ID)
 	if info, _ := catalogs.Info(listed); !info.Newer || info.Latest.Tag != "3.4.1" {
 		t.Errorf("before the update = %+v", info)
@@ -108,14 +102,14 @@ func TestCatalogUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, _ := apps.env(app)
+	after := daemon.env(t, app.Folder)
 	if after["VERSION"] != "3.4.1" || after["DB_PASSWORD"] != before["DB_PASSWORD"] || deploy.Number != 2 {
 		t.Errorf("after the update: env %v, deploy %d", after, deploy.Number)
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Env["VERSION"] != "3.4.1" {
-		t.Errorf("deploy env = %v", start.Env)
+	if start.Catalog != "umami" || start.Number != 2 {
+		t.Errorf("deploy start = %+v", start)
 	}
 	own, err := apps.Create(owner, "blog", "web-1")
 	if err != nil {

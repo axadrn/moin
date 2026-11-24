@@ -44,13 +44,15 @@ Only for private images. For GitHub Container Registry, use a token with `read:p
 
 ```surfaces
 Web: **Settings**, **Registries**, **Save login**
-CLI: moin registry set ghcr.io <username>
+CLI: moin registry set ghcr.io <username> --server web-1
 TUI: opens the web: `w`, then `r`
 API: PUT /api/v1/registries/{host}
 MCP: set_registry
 ```
 
-The CLI reads the token from stdin. It is stored encrypted. The daemon gets it only for the pull.
+The CLI reads the token from stdin. The login goes to the server you pick, which keeps it. The hub keeps only the host and the username. The server must be online. With one server, moin picks it.
+
+Each server that pulls the image needs the login. A server without it is listed, and an image deploy there stops with `web-2 has no login for ghcr.io`. Save the login again for that server.
 
 ## 2. Create a deploy hook
 
@@ -165,7 +167,7 @@ MCP: list_registries
 MCP: remove_registry
 ```
 
-The list never shows passwords. Public images need no login.
+The list never shows passwords. It says which servers keep each login and which do not. Removing a login removes it from the servers too. Public images need no login.
 
 ## Good to know
 

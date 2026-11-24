@@ -39,3 +39,28 @@ func TestDiff(t *testing.T) {
 		t.Error("no env vars replaced by none change something")
 	}
 }
+
+// Format writes what Parse reads back, also values with quotes, dollars,
+// backslashes and line breaks.
+func TestFormatRoundTrip(t *testing.T) {
+	env := map[string]string{"A": "plain", "B": "it's \"$5\"\nnow\r\\end", "C": "", "D": "${HOME}"}
+	text := Format(env)
+	if !strings.HasPrefix(text, "A=\"plain\"\nB=") {
+		t.Errorf("Format = %q", text)
+	}
+	back, err := Parse(text)
+	if err != nil || !maps.Equal(back, env) {
+		t.Errorf("Parse(Format) = %q, %v; want %q", back, err, env)
+	}
+}
+
+// TestParseErrorsNameOnlyTheLine: a broken line may hold a secret, and the
+// error travels to the hub: it says the line number, never the text.
+func TestParseErrorsNameOnlyTheLine(t *testing.T) {
+	for _, text := range []string{"hunter2-secret", "OK=1\nhunter2-secret", "A='hunter2-secret", "A=\"hunter2-secret", "A=hunter2-secret\nA=hunter2-secret"} {
+		_, err := Parse(text)
+		if err == nil || strings.Contains(err.Error(), "hunter2") || !strings.HasPrefix(err.Error(), "line ") {
+			t.Errorf("Parse(%q) = %v", text, err)
+		}
+	}
+}

@@ -13,14 +13,18 @@ import (
 // message changes in a way an older peer cannot read. Version 2 brought
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
 // which was called the agent before (legacy.go); version 4 the command the
-// daemon masks for the activity (ExecDone.Command).
-const Version = 4
+// daemon masks for the activity (ExecDone.Command); version 5 secrets that
+// live only on the server (secrets.go).
+const Version = 5
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
-// sending it.
+// sending it. Since version 5 deploys, backups and the server config take
+// their secrets from the server: an older daemon would run them without.
 func Needs(messageType MessageType) int {
 	switch messageType {
+	case TypeDeployStart, TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
+		return 5
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2
 	}
@@ -96,6 +100,24 @@ const (
 	// the daemon after a daily check or a restore, or when a backup breaks
 	// or works again.
 	TypeBackupStatus MessageType = "backup.status"
+
+	// TypeEnvSet sets and removes env values of an app in its app.env on
+	// the server (EnvSet). The daemon answers with TypeEnvResult (AppEnv)
+	// or TypeError.
+	TypeEnvSet    MessageType = "env.set"
+	TypeEnvResult MessageType = "env.result"
+	// TypeSecretSet keeps a secret of the server in its server.json, or
+	// removes it (SecretSet). The daemon answers with TypeOK or TypeError.
+	TypeSecretSet MessageType = "secret.set"
+	// TypeBucketSet has the daemon write a test file to a bucket and keep
+	// its secret key when that works (BucketSet). The daemon answers with
+	// TypeOK or TypeError.
+	TypeBucketSet MessageType = "bucket.set"
+	// TypeBackupLink asks for a signed link to download a copy
+	// (BackupLink). The daemon answers with TypeBackupLinkResult or
+	// TypeError.
+	TypeBackupLink       MessageType = "backup.link"
+	TypeBackupLinkResult MessageType = "backup.link.result"
 
 	// TypeServerConfig sets how the server is reached and locked down
 	// (ServerConfig). The hub sends it after hello and whenever

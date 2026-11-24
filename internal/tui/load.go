@@ -177,7 +177,7 @@ func (m model) loadDomains(app string) tea.Cmd {
 			return tabErrMsg{app, tDomains, err}
 		}
 		msg := domainsMsg{app: app, checks: checks}
-		if instant, err := api.Instant(ctx, app, false); err == nil {
+		if instant, err := api.Instant(ctx, app); err == nil {
 			msg.instant = &instant
 		}
 		return msg

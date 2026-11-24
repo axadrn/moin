@@ -33,8 +33,10 @@ func buckets(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		return bucketsRm(ctx, args, stdin, stdout)
 	case "use":
 		return bucketsUse(ctx, args, stdout)
+	case "key":
+		return bucketsKey(ctx, args, stdin, stdout)
 	}
-	return fmt.Errorf("unknown command %q: use %s buckets, buckets add, edit, default, rm or use", command, build.Name)
+	return fmt.Errorf("unknown command %q: use %s buckets, buckets add, edit, key, default, rm or use", command, build.Name)
 }
 
 // bucketFlags are the settings of a bucket that add and edit take.
@@ -85,16 +87,22 @@ func bucketsList(ctx context.Context, args []string, stdout io.Writer) error {
 		if len(item.OlderBackups) > 0 {
 			apps = strings.TrimPrefix(apps+"; left by "+strings.Join(item.OlderBackups, ", "), "; ")
 		}
-		rows = append(rows, []string{name, item.Bucket, item.Folder, orAWS(item.Endpoint), item.AccessKey, dash(apps)})
+		rows = append(rows, []string{name, item.Bucket, item.Folder, orAWS(item.Endpoint), item.AccessKey, dash(apps), keptOn(item.Servers, item.MissingOn)})
 	}
-	table(stdout, []string{"NAME", "BUCKET", "FOLDER", "ENDPOINT", "ACCESS KEY", "APPS"}, rows)
+	table(stdout, []string{"NAME", "BUCKET", "FOLDER", "ENDPOINT", "ACCESS KEY", "APPS", "KEY ON"}, rows)
+	for _, item := range list {
+		for _, server := range item.MissingOn {
+			hint(stdout, server+" has no key for "+item.Name+". Enter it:", build.Name+" buckets key "+item.Name+" --server "+server)
+		}
+	}
 	return nil
 }
 
 // bucketsAdd adds a bucket; the secret key comes on stdin.
 func bucketsAdd(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("buckets add", "buckets add <name> --endpoint https://… --bucket <bucket> --access-key <key> [--region auto] [--path <folder>] [--default], then the secret key on stdin")
+	flags := newFlags("buckets add", "buckets add <name> --endpoint https://… --bucket <bucket> --access-key <key> [--region auto] [--path <folder>] [--default] [--server <server>], then the secret key on stdin")
 	settings := newBucketFlags(flags)
+	server := flags.String("server", "", "the server that tests the bucket and keeps the key; needed with more than one")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -115,7 +123,7 @@ func bucketsAdd(ctx context.Context, args []string, stdin io.Reader, stdout io.W
 	if secret == "" {
 		return errors.New("the secret key is empty")
 	}
-	added, err := api.AddBucket(ctx, client.BucketInput{Name: flags.Arg(0), Endpoint: *settings.endpoint, Region: *settings.region, Bucket: *settings.bucket, Path: *settings.folder, AccessKey: *settings.accessKey, SecretKey: secret, Default: *settings.makeDefault})
+	added, err := api.AddBucket(ctx, client.BucketInput{Server: *server, Name: flags.Arg(0), Endpoint: *settings.endpoint, Region: *settings.region, Bucket: *settings.bucket, Path: *settings.folder, AccessKey: *settings.accessKey, SecretKey: secret, Default: *settings.makeDefault})
 	if err != nil {
 		return err
 	}
@@ -130,8 +138,9 @@ func bucketsAdd(ctx context.Context, args []string, stdin io.Reader, stdout io.W
 // bucketsEdit changes the settings given as flags and keeps the others. A
 // new access key, or --secret, reads a new secret key on stdin.
 func bucketsEdit(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("buckets edit", "buckets edit <name> [--name <new name>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … or --secret, then the secret key on stdin]")
+	flags := newFlags("buckets edit", "buckets edit <name> [--name <new name>] [--endpoint …] [--bucket …] [--path …] [--region …] [--access-key … or --secret, then the secret key on stdin] [--server <server>]")
 	settings := newBucketFlags(flags)
+	server := flags.String("server", "", "the server that tests a new place or key and keeps the key; needed with more than one")
 	rename := flags.String("name", "", "a new name in "+build.Name)
 	newSecret := flags.Bool("secret", false, "read a new secret key on stdin")
 	if err := flags.parse(args); err != nil {
@@ -170,6 +179,7 @@ func bucketsEdit(ctx context.Context, args []string, stdin io.Reader, stdout io.
 		input.Name = *rename
 	}
 	input.Default = current.Default || *settings.makeDefault
+	input.Server = *server
 	if given["access-key"] || *newSecret {
 		input.SecretKey, err = askSecret(stdin, stdout)
 		if err != nil {
@@ -184,6 +194,36 @@ func bucketsEdit(ctx context.Context, args []string, stdin io.Reader, stdout io.
 		return err
 	}
 	done(stdout, "Saved %s.", changed.Name)
+	return nil
+}
+
+// bucketsKey hands one more server the secret key of a bucket, such as a
+// server added after it. The server tests the bucket with it first.
+func bucketsKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("buckets key", "buckets key <name> [--server <server>], then the secret key on stdin")
+	server := flags.String("server", "", "the server that keeps the key; needed with more than one")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return flags.wrong()
+	}
+	secret, err := askSecret(stdin, stdout)
+	if err != nil {
+		return err
+	}
+	if secret == "" {
+		return errors.New("the secret key is empty")
+	}
+	bucket, err := api.SetBucketKey(ctx, flags.Arg(0), *server, secret)
+	if err != nil {
+		return err
+	}
+	done(stdout, "The key of %s is on %s now.", bucket.Name, serverNames(bucket.Servers))
 	return nil
 }
 
@@ -289,6 +329,25 @@ func askSecret(stdin io.Reader, stdout io.Writer) (string, error) {
 		fmt.Fprintln(stdout)
 	}
 	return secret, err
+}
+
+// keptOn says which servers keep a secret and which do not: "server-1;
+// not on server-2".
+func keptOn(servers []client.SecretOn, missing []string) string {
+	text := serverNames(servers)
+	if len(missing) > 0 {
+		text = strings.TrimPrefix(text+"; not on "+strings.Join(missing, ", "), "-; ")
+	}
+	return text
+}
+
+// serverNames lists the servers by name, - for none.
+func serverNames(servers []client.SecretOn) string {
+	names := make([]string, len(servers))
+	for index, server := range servers {
+		names[index] = server.Server
+	}
+	return dash(strings.Join(names, ", "))
 }
 
 func orAWS(endpoint string) string {

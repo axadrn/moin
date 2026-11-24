@@ -56,7 +56,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `update_hub` | updates a self-hosted hub to the newest version, for its admins: first it returns the release notes, then it updates with `confirm` | write |
 | `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
-| `create_app` | creates an app on a server | write |
+| `create_app` | creates an app on a server; returns the password of its instant address, this once | write |
 | `remove_app` | stops and removes an app, keeps its data; `confirm` is its name | write, destructive |
 | `rename_app` | renames an app; links, data and backups stay | write |
 | `pin_app` | pins an app, or unpins it with `pinned` false | write |
@@ -65,13 +65,13 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `deploy_image` | deploys an image built in CI, with the compose file of `ref` in the linked repo | write |
 | `create_deploy_hook` | a new deploy hook URL for CI, shown once; the old one stops working and pushes no longer deploy | write, destructive |
 | `remove_deploy_hook` | turns the deploy hook off; CI can no longer deploy | write, destructive |
-| `list_registries` | registry logins, without passwords | read |
-| `set_registry` | stores a registry login | write |
-| `remove_registry` | removes a registry login | write, destructive |
+| `list_registries` | registry logins, without passwords, with the servers that keep each and the ones that do not | read |
+| `set_registry` | hands a server a registry login, which only it keeps | write |
+| `remove_registry` | removes a registry login, also from the servers | write, destructive |
 | `rollback_app` | starts an earlier deploy again | write, destructive |
 | `list_catalog` | the catalog with each app's newest version | read |
 | `get_catalog_app` | a catalog app with every version | read |
-| `install_catalog_app` | installs a catalog app on a server | write |
+| `install_catalog_app` | installs a catalog app on a server; returns the first sign-in password and the instant password, this once | write |
 | `update_app` | sets a catalog app to a version and deploys it | write |
 | `get_logs` | the last container lines | read |
 | `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin) | write |
@@ -81,10 +81,11 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `get_backups` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to | read |
 | `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30); refused when `x-moin.backups` sets them | write |
 | `restore_app` | goes back to a moment (`moment`, its id or label: a copy, `before-v12`, `undo-…`) or a time (`at`), the newest copy at or before it; keeps the database before, so it can be undone; `confirm` is the app's name. It runs on its own and answers its state; with `id` it tells how it stands | write, destructive |
-| `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`; it works for 15 minutes | write |
-| `list_buckets` | the buckets, without their secrets, with the apps that use each | read |
-| `add_bucket` | adds a bucket; the first is the default | write |
-| `edit_bucket` | changes a bucket; an empty `secret_key` keeps the stored one | write |
+| `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`, signed by the app's server; it works for 15 minutes | write |
+| `list_buckets` | the buckets, without their secrets, with the apps that use each and the servers that keep its key | read |
+| `add_bucket` | adds a bucket; `server` tests it and keeps the secret key; the first is the default | write |
+| `edit_bucket` | changes a bucket; `server` tests a new place or key, an empty `secret_key` keeps the server's | write |
+| `set_bucket_key` | hands one more server the bucket's secret key | write |
 | `set_default_bucket` | makes a bucket the default | write |
 | `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
 | `set_app_bucket` | moves an app's backups to a bucket; the copies start again there | write |
@@ -93,7 +94,8 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `set_uptime` | the path uptime visits on a domain, or pauses and resumes it | write |
 | `get_metrics` | CPU, memory, disk and network of an app or a server, now and over 1h, 24h, 7d or 30d; for an app the deploys that went live, for a server its apps by memory | read |
 | `set_domains` | domains and the canonical one, or with `service` the domains of another service | write |
-| `get_instant` | the instant address, or why the app has none; `show` returns its password with a token that may write | read |
+| `get_instant` | the instant address and its user, or why the app has none | read |
+| `new_instant_password` | a new password for the instant address, returned this once; the next restart applies it | write |
 | `set_instant` | the provider of the instant address or off, and whether a password guards it | write |
 | `set_protection` | a password in front of the app | write |
 | `remove_protection` | makes the app public again | write, destructive |
@@ -109,8 +111,8 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `link_repo` | follows a repo and branch; with `auto_deploy` the deploy hook turns off | write, destructive |
 | `unlink_repo` | stops following it | write, destructive |
 | `deploy_ref` | deploys a branch, tag or commit from GitHub | write |
-| `get_integrations` | whether Cloudflare and Tailscale are connected | read |
-| `set_integrations` | stores them | write |
+| `get_integrations` | whether Cloudflare is connected and which servers keep a Tailscale key | read |
+| `set_integrations` | stores the Cloudflare token in the hub; hands `server` the Tailscale key, which only it keeps | write |
 | `set_server_security` | visitors through a Cloudflare Tunnel, SSH for everyone, only through Tailscale or off, the firewall | write, destructive |
 | `get_billing` | the subscription; on a self-hosted hub it says billing is off | read |
 | `list_workspaces` · `get_workspace` | the token's workspace with its team | read |

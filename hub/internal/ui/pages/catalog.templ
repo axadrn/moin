@@ -131,13 +131,21 @@ templ CatalogInstall(view CatalogInstallView) {
 	}
 }
 
-// CatalogInstalled takes the place of the install form when the first
-// sign-in needs a secret moin made, such as ADMIN_PASSWORD: env values
-// are write-only, so this is the one time it is shown.
-templ CatalogInstalled(appPath string, login map[string]string) {
+// CatalogInstalled takes the place of the install form: the secrets the
+// first sign-in needs that moin made, such as ADMIN_PASSWORD, and the
+// password of the instant address. moin keeps neither, so this is the one
+// time they are shown.
+templ CatalogInstalled(appPath string, login map[string]string, instantPassword string) {
 	<div id="catalog-install-form" class="moin-stack" data-gap="4" data-catalog-installed>
 		<p class="moin-text">Installed. Keep this in your password manager now: it is shown only this once.</p>
 		@components.List() {
+			if instantPassword != "" {
+				@components.Item(components.ItemProps{}) {
+					<span class="moin-mono moin-text">Instant address</span>
+					<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instantPassword }</span>
+					@copyButton(instantPassword, "", "Copy the password")
+				}
+			}
 			for _, key := range slices.Sorted(maps.Keys(login)) {
 				@components.Item(components.ItemProps{}) {
 					<span class="moin-mono moin-text">{ key }</span>

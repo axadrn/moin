@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/secret"
 	"github.com/axadrn/moin/hub/internal/testutil"
 	"github.com/axadrn/moin/protocol"
+	"github.com/jmoiron/sqlx"
 )
 
 // owner and other are members of their own workspaces.
@@ -35,10 +37,66 @@ func deploySource(apps *AppService) (*model.Deploy, error) {
 	return apps.start(owner, "app.deployed", app, deploy, protocol.DeployStart{SourceURL: "https://api.github.com/repos/me/blog/tarball/abc123", SourceStripTop: true})
 }
 
-// fakeDaemon is an online server whose daemon records what it gets.
+// fakeDaemon is an online server whose daemon records what it gets. It
+// keeps env values and secrets as a daemon does, and answers them OK, or
+// with the error in refuse for their type.
 type fakeDaemon struct {
-	mu   sync.Mutex
-	sent []protocol.Message
+	mu     sync.Mutex
+	sent   []protocol.Message
+	refuse map[protocol.MessageType]string
+}
+
+// keeps answers the requests a daemon answers at once: env values and
+// secrets it keeps.
+var keeps = []protocol.MessageType{protocol.TypeEnvSet, protocol.TypeSecretSet, protocol.TypeBucketSet}
+
+// take records a message and answers it when the daemon keeps something.
+func (f *fakeDaemon) take(servers *ServerService, serverID string, message protocol.Message) {
+	f.mu.Lock()
+	f.sent = append(f.sent, message)
+	refusal := f.refuse[message.Type]
+	f.mu.Unlock()
+	if !slices.Contains(keeps, message.Type) {
+		return
+	}
+	reply, _ := protocol.NewMessage(protocol.TypeOK, nil)
+	if message.Type == protocol.TypeEnvSet {
+		var set protocol.EnvSet
+		_ = message.Decode(&set)
+		f.mu.Lock()
+		keys := slices.Sorted(maps.Keys(f.envOf(set.App)))
+		f.mu.Unlock()
+		reply, _ = protocol.NewMessage(protocol.TypeEnvResult, protocol.AppEnv{Keys: keys, ChangedAt: time.Now().UTC()})
+	}
+	if refusal != "" {
+		reply, _ = protocol.NewMessage(protocol.TypeError, protocol.Error{Message: refusal})
+	}
+	reply.RequestID = message.RequestID
+	servers.Receive(serverID, reply)
+}
+
+// env is the env the server keeps for app, from every env.set it took.
+func (f *fakeDaemon) env(t *testing.T, app string) map[string]string {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.envOf(app)
+}
+
+// envOf is env without the lock.
+func (f *fakeDaemon) envOf(app string) map[string]string {
+	env := map[string]string{}
+	for _, message := range f.sent {
+		var set protocol.EnvSet
+		if message.Type != protocol.TypeEnvSet || message.Decode(&set) != nil || set.App != app || f.refuse[protocol.TypeEnvSet] != "" {
+			continue
+		}
+		maps.Copy(env, set.Set)
+		for _, key := range set.Remove {
+			delete(env, key)
+		}
+	}
+	return env
 }
 
 func (f *fakeDaemon) last(t *testing.T, messageType protocol.MessageType, target any) protocol.Message {
@@ -74,6 +132,13 @@ func (f *fakeDaemon) count(messageType protocol.MessageType) int {
 
 func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *fakeDaemon) {
 	t.Helper()
+	apps, servers, server, daemon, _ := newAppServiceOn(t)
+	return apps, servers, server, daemon
+}
+
+// newAppServiceOn is newAppService with the hub's database.
+func newAppServiceOn(t *testing.T) (*AppService, *ServerService, *model.Server, *fakeDaemon, *sqlx.DB) {
+	t.Helper()
 	database := testutil.NewDatabase(t)
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
 	testutil.SeedUser(t, database, testutil.UserOptions{ID: "other"})
@@ -83,8 +148,9 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 		t.Fatal(err)
 	}
 	apps := NewAppService(repository.NewApps(database, database), servers, box)
-	// A bucket for backups, stored without the check.
-	err = apps.apps.CreateBucket(model.Bucket{ID: "bucket-owner", WorkspaceID: owner.WorkspaceID, Name: "default", IsDefault: true, Endpoint: "https://s3.example.com", Region: "auto", Bucket: "owner", AccessKey: "key", SecretKey: box.Seal("secret", owner.WorkspaceID+"/backups")})
+	// A bucket for backups, stored without the check; the server keeps
+	// its key.
+	err = apps.apps.CreateBucket(model.Bucket{ID: "bucket-owner", WorkspaceID: owner.WorkspaceID, Name: "default", IsDefault: true, Endpoint: "https://s3.example.com", Region: "auto", Bucket: "owner", AccessKey: "key"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,13 +163,34 @@ func newAppService(t *testing.T) (*AppService, *ServerService, *model.Server, *f
 		t.Fatal(err)
 	}
 	daemon := &fakeDaemon{}
-	servers.Connect(server, testHello, "203.0.113.5", func() {}, func(message protocol.Message) error {
-		daemon.mu.Lock()
-		daemon.sent = append(daemon.sent, message)
-		daemon.mu.Unlock()
+	hello := testHello
+	hello.Secrets = []string{protocol.BucketSecret("bucket-owner")}
+	servers.Connect(server, hello, "203.0.113.5", func() {}, func(message protocol.Message) error {
+		daemon.take(servers, server.ID, message)
 		return nil
 	})
-	return apps, servers, server, daemon
+	return apps, servers, server, daemon, database
+}
+
+// connectServer adds a server to the actor's workspace whose daemon
+// connects with secrets, the names of the secrets it keeps.
+func connectServer(t *testing.T, servers *ServerService, actor Actor, name string, secrets ...string) (*model.Server, *fakeDaemon) {
+	t.Helper()
+	server, installToken, err := servers.Create(actor, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := servers.Register(installToken, testHello); err != nil {
+		t.Fatal(err)
+	}
+	daemon := &fakeDaemon{}
+	hello := testHello
+	hello.Secrets = secrets
+	servers.Connect(server, hello, "203.0.113.6", func() {}, func(message protocol.Message) error {
+		daemon.take(servers, server.ID, message)
+		return nil
+	})
+	return server, daemon
 }
 
 func daemonSays(t *testing.T, servers *ServerService, serverID string, messageType protocol.MessageType, data any) {
@@ -148,26 +235,34 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("app on another user's server: err = %v", err)
 	}
 
-	_, err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "a$b", "OLD": "x"}, nil)
+	ctx := context.Background()
+	_, err = apps.SetEnv(ctx, owner, "blog", map[string]string{"SECRET": "a$b", "OLD": "x"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetEnv(owner, "blog", map[string]string{"1BAD": "x"}, nil); !errors.Is(err, ErrEnvKey) {
+	if _, err := apps.SetEnv(ctx, owner, "blog", map[string]string{"1BAD": "x"}, nil); !errors.Is(err, ErrEnvKey) {
 		t.Fatalf("bad key: err = %v", err)
 	}
 	// Only keys the app had count as removed.
-	if removed, err := apps.SetEnv(owner, "blog", nil, []string{"OLD", "NOT_THERE"}); err != nil || !slices.Equal(removed, []string{"OLD"}) {
+	if removed, err := apps.SetEnv(ctx, owner, "blog", nil, []string{"OLD", "NOT_THERE"}); err != nil || !slices.Equal(removed, []string{"OLD"}) {
 		t.Fatalf("removed = %v, %v; want OLD", removed, err)
 	}
+	// The values went to the server; the hub keeps the keys and dates.
+	if env := daemon.env(t, "blog"); !maps.Equal(env, map[string]string{"SECRET": "a$b"}) {
+		t.Fatalf("the server keeps %v", env)
+	}
+	if vars, _ := apps.EnvVars(owner.WorkspaceID, "blog"); len(vars) != 1 || vars[0].Key != "SECRET" || vars[0].UpdatedAt.IsZero() {
+		t.Fatalf("the hub lists %+v", vars)
+	}
 
-	// v1: the daemon gets the source URL and the env.
+	// v1: the daemon gets the source URL; the env is on the server.
 	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Number != 1 || start.App != "blog" || start.SourceURL == "" || start.Env["SECRET"] != "a$b" {
+	if start.Number != 1 || start.App != "blog" || start.SourceURL == "" {
 		t.Fatalf("deploy.start = %+v", start)
 	}
 	if _, err := deploySource(apps); !errors.Is(err, ErrDeployRunning) {
@@ -218,7 +313,8 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("rollback to a deploy that does not exist: err = %v", err)
 	}
 
-	// v3 succeeds, then a rollback to v1 starts its release without env.
+	// v3 succeeds, then a rollback to v1 starts its release, with the env
+	// the server keeps now.
 	third, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +326,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	}
 	start = protocol.DeployStart{}
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Number != 4 || start.FromNumber != 1 || start.SourceURL != "" || start.Env != nil {
+	if start.Number != 4 || start.FromNumber != 1 || start.SourceURL != "" {
 		t.Fatalf("rollback deploy.start = %+v", start)
 	}
 	if rollback.FromNumber != 1 {
@@ -239,9 +335,12 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: rollback.ID, OK: true})
 
 	// A redeploy builds the newest source again, with the env as it is now.
-	_, err = apps.SetEnv(owner, "blog", map[string]string{"SECRET": "new"}, nil)
+	_, err = apps.SetEnv(ctx, owner, "blog", map[string]string{"SECRET": "new"}, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if env := daemon.env(t, "blog"); env["SECRET"] != "new" {
+		t.Fatalf("the server keeps %v", env)
 	}
 	redeploy, err := apps.Redeploy(owner, "blog")
 	if err != nil {
@@ -249,7 +348,7 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	}
 	start = protocol.DeployStart{}
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Number != 5 || start.SourceNumber != third.Number || start.SourceURL != "" || start.Env["SECRET"] != "new" || redeploy.SourceKey != third.SourceKey {
+	if start.Number != 5 || start.SourceNumber != third.Number || start.SourceURL != "" || redeploy.SourceKey != third.SourceKey {
 		t.Fatalf("redeploy deploy.start = %+v", start)
 	}
 
@@ -399,16 +498,23 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	if _, err := apps.Deploy(context.Background(), owner, "blog", "not an image", ""); !errors.Is(err, ErrImage) {
 		t.Fatalf("bad image: err = %v", err)
 	}
-	if err := apps.SetRegistry(owner, "https://ghcr.io", "me", "x"); !errors.Is(err, ErrRegistryHost) {
+	ctx := context.Background()
+	if err := apps.SetRegistry(ctx, owner, "https://ghcr.io", "me", "x", ""); !errors.Is(err, ErrRegistryHost) {
 		t.Fatalf("registry URL as host: err = %v", err)
 	}
-	err = apps.SetRegistry(owner, "GHCR.io", "me", "ghp_secret")
+	err = apps.SetRegistry(ctx, owner, "GHCR.io", "me", "ghp_secret", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	logins, _ := apps.Registries(owner.WorkspaceID)
-	if len(logins) != 1 || logins[0].Host != "ghcr.io" {
+	if len(logins) != 1 || logins[0].Host != "ghcr.io" || len(logins[0].Servers.On) != 1 || logins[0].Servers.On[0].Server != "web-1" {
 		t.Fatalf("registries = %+v", logins)
+	}
+	// The login went to the server, never into a deploy.
+	var secret protocol.SecretSet
+	daemon.last(t, protocol.TypeSecretSet, &secret)
+	if secret != (protocol.SecretSet{Name: "registry/ghcr.io", Value: "me:ghp_secret"}) {
+		t.Fatalf("secret.set = %+v", secret)
 	}
 
 	// A hook deploys nothing while no image runs: a person picks the image.
@@ -435,14 +541,14 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
 
-	// Then the hook deploys a new tag and hands the daemon the matching login.
+	// Then the hook deploys a new tag; the server pulls it with its login.
 	_, deploy, err := apps.DeployHook(context.Background(), token, "ghcr.io/me/blog:abc", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Image != "ghcr.io/me/blog:abc" || start.SourceURL != "" || start.Registry == nil || start.Registry.Password != "ghp_secret" || deploy.Image != start.Image {
+	if start.Image != "ghcr.io/me/blog:abc" || start.SourceURL != "" || deploy.Image != start.Image {
 		t.Fatalf("deploy.start = %+v", start)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
@@ -483,15 +589,10 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 		}
 	}
 
-	// A Docker Hub image gets no ghcr.io login; a redeploy pulls the image again.
+	// A Docker Hub image needs no login; a redeploy pulls the image again.
 	deploy, err = apps.Deploy(context.Background(), owner, "blog", "nginx:1.27", "")
 	if err != nil {
 		t.Fatal(err)
-	}
-	start = protocol.DeployStart{}
-	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Registry != nil {
-		t.Fatalf("docker hub image got a login: %+v", start.Registry)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
 	redeploy, err := apps.Redeploy(owner, "blog")
@@ -511,8 +612,13 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	if _, _, err := apps.DeployHook(context.Background(), token, "nginx:1.27", ""); !errors.Is(err, ErrDeployHook) {
 		t.Fatalf("old hook: err = %v", err)
 	}
-	if err := apps.RemoveRegistry(owner, "ghcr.io"); err != nil {
+	if err := apps.RemoveRegistry(ctx, owner, "ghcr.io"); err != nil {
 		t.Fatal(err)
+	}
+	secret = protocol.SecretSet{}
+	daemon.last(t, protocol.TypeSecretSet, &secret)
+	if secret != (protocol.SecretSet{Name: "registry/ghcr.io"}) {
+		t.Fatalf("after remove, secret.set = %+v", secret)
 	}
 }
 

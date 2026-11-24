@@ -19,9 +19,9 @@ API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
 
-It creates the app, makes every secret as an encrypted env var, sets `VERSION` and deploys. Without a version it takes the newest.
+It creates the app, makes every secret as an env var on the server, sets `VERSION` and deploys. Without a version it takes the newest. The server must be online.
 
-Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password moin made, such as `ADMIN_PASSWORD`, the install shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. Keep it in your password manager. Env values are write-only, so moin never shows it again.
+Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password moin made, such as `ADMIN_PASSWORD`, the install shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. The password of the app's [instant address](/docs/guides/domains#instant-address) shows the same way, once. Keep them in your password manager. Env values are write-only, so moin never shows it again.
 
 ## See the catalog
 

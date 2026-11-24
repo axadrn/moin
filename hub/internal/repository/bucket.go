@@ -50,15 +50,15 @@ func (r *Apps) DefaultBucket(workspaceID string) (*model.Bucket, error) {
 // default and the apps that follow the default move with it.
 func (r *Apps) CreateBucket(bucket model.Bucket) error {
 	return r.writeBucket(bucket, `
-		INSERT INTO buckets (id, workspace_id, name, is_default, endpoint, region, bucket, path, access_key, secret_key, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`)
+		INSERT INTO buckets (id, workspace_id, name, is_default, endpoint, region, bucket, path, access_key, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`)
 }
 
 // UpdateBucket changes a bucket by its ID, the same way.
 func (r *Apps) UpdateBucket(bucket model.Bucket) error {
 	return r.writeBucket(bucket, `
 		UPDATE buckets SET workspace_id = $2, name = $3, is_default = $4, endpoint = $5, region = $6, bucket = $7,
-			path = $8, access_key = $9, secret_key = $10, created_at = $11
+			path = $8, access_key = $9, created_at = $10
 		WHERE id = $1`)
 }
 
@@ -77,7 +77,7 @@ func (r *Apps) writeBucket(bucket model.Bucket, query string) error {
 		}
 	}
 	_, err = tx.Exec(query, bucket.ID, bucket.WorkspaceID, bucket.Name, bucket.IsDefault, bucket.Endpoint, bucket.Region, bucket.Bucket,
-		bucket.Path, bucket.AccessKey, bucket.SecretKey, bucket.CreatedAt)
+		bucket.Path, bucket.AccessKey, bucket.CreatedAt)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: buckets.workspace_id, buckets.name") {
 		return ErrDuplicateBucket
 	}

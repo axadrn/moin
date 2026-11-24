@@ -43,7 +43,7 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"add_alert_destination", "add_bucket", "add_server", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "download_backup", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_deploy", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_env", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "pin_app", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_app", "rename_server", "rename_workspace", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_app_bucket", "set_backups", "set_daemon_updates", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_app", "update_daemon", "update_hub", "whoami"}
+	want := []string{"add_alert_destination", "add_bucket", "add_server", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "download_backup", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_deploy", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_env", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "new_instant_password", "pin_app", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_app", "rename_server", "rename_workspace", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_app_bucket", "set_backups", "set_bucket_key", "set_daemon_updates", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_app", "update_daemon", "update_hub", "whoami"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
 	}
@@ -412,8 +412,8 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"name": "box-2"}))
-	output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
-	output[mcp.App](t, call(t, session, "create_app", map[string]any{"name": "blog", "server": "box-1"}))
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"name": "blog", "server": "box-1"}))
 	for _, input := range []map[string]any{{"app": "shop"}, {"name": "blog"}} {
 		output[mcp.AppDetail](t, call(t, session, "get_app", input))
 	}
@@ -437,6 +437,9 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	}
 	toolError(t, call(t, session, "set_backups", map[string]any{"app": "shop", "every_minutes": 5, "keep_days": 30}), "validation_failed")
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))
+	// Env values go to the server, which must be online.
+	toolError(t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1"}}), "server_offline")
+	offline := online(t, env, owner, "box-1")
 	output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "1", "GONE": "1"}}))
 	replaced := output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "2", "NEW": "1"}}))
 	if strings.Join(replaced.Added, ",") != "NEW" || strings.Join(replaced.Replaced, ",") != "EDIT,KEEP" || strings.Join(replaced.Removed, ",") != "GONE" || len(replaced.Items) != 3 {
@@ -447,6 +450,7 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	if len(listed.Items) != 3 || listed.Items[0].Key != "EDIT" || listed.Items[0].UpdatedAt.IsZero() {
 		t.Fatalf("list_env = %+v", listed)
 	}
+	offline()
 	// box-1 is offline: its apps go with it.
 	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"})); strings.Join(removed.Apps, ",") != "blog,shop" || !strings.Contains(removed.Message, "apps went with it") {
 		t.Fatalf("removed an offline server with apps = %+v", removed)
@@ -467,5 +471,47 @@ func TestExecCommandIsForOwnersAndAdmins(t *testing.T) {
 	fields := toolError(t, call(t, session, "exec_command", map[string]any{"app": "blog", "command": `echo "open`}), "validation_failed").Fields
 	if fields["command"] == "" {
 		t.Errorf("fields = %v", fields)
+	}
+}
+
+// TestSecretsGoToServers: create_app shows the instant password once,
+// new_instant_password makes another; a registry login, a bucket key and
+// the Tailscale key go to the server named, and the lists say which
+// servers keep them and which do not.
+func TestSecretsGoToServers(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "keys")
+	upgrade(t, env, owner)
+	token, _ := createToken(t, env, owner, "read", "write")
+	session := connectMemory(t, env.server, owner, token)
+	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	defer bucket.Close()
+
+	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "server-1"}))
+	online(t, env, owner, "server-1")
+	created := output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "server-1"}))
+	if created.InstantPassword == "" {
+		t.Fatalf("create_app = %+v", created)
+	}
+	instant := output[mcp.Instant](t, call(t, session, "get_instant", map[string]any{"app": "shop"}))
+	fresh := output[mcp.InstantPassword](t, call(t, session, "new_instant_password", map[string]any{"app": "shop"}))
+	if fresh.Password == "" || fresh.Password == created.InstantPassword || fresh.User != instant.User {
+		t.Fatalf("new_instant_password = %+v, get_instant = %+v", fresh, instant)
+	}
+
+	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "server-2"}))
+	toolError(t, call(t, session, "set_registry", map[string]any{"host": "ghcr.io", "username": "ada", "password": "token"}), "validation_failed")
+	logins := output[mcp.RegistryList](t, call(t, session, "set_registry", map[string]any{"host": "ghcr.io", "username": "ada", "password": "token", "server": "server-1"}))
+	if len(logins.Items) != 1 || len(logins.Items[0].Servers) != 1 || strings.Join(logins.Items[0].MissingOn, ",") != "server-2" {
+		t.Fatalf("set_registry = %+v", logins)
+	}
+	added := output[mcp.Bucket](t, call(t, session, "add_bucket", map[string]any{"name": "main", "endpoint": bucket.URL, "bucket": "main", "access_key": "k", "secret_key": "s", "server": "server-1"}))
+	if len(added.Servers) != 1 || added.Servers[0].Server != "server-1" || strings.Join(added.MissingOn, ",") != "server-2" {
+		t.Fatalf("add_bucket = %+v", added)
+	}
+	toolError(t, call(t, session, "set_bucket_key", map[string]any{"bucket": "main", "server": "server-2", "secret_key": "s"}), "server_offline")
+	integrations := output[mcp.Integrations](t, call(t, session, "set_integrations", map[string]any{"tailscale_key": "tskey-auth-1", "server": "server-1"}))
+	if len(integrations.Tailscale.Servers) != 1 || strings.Join(integrations.Tailscale.MissingOn, ",") != "server-2" {
+		t.Fatalf("set_integrations = %+v", integrations)
 	}
 }

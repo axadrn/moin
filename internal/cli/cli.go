@@ -55,12 +55,12 @@ Servers
   servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
   servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]
   servers rules      The server's own rules for moin, from /etc/moin/rules on it
-  integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
-  integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
+  integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare|tailscale [--server web-1], key on stdin
+  integrations rm    Remove one: integrations rm cloudflare|tailscale [--server web-1] [--yes]
 
 Apps
   apps               List apps; one app with its domains and deploys: apps <app>
-  apps add           Add an app: apps add --server <server> <name>
+  apps add           Add an app; shows its instant password once: apps add --server <server> <name>
   apps rename        Rename an app; links, data and backups stay: apps rename my-app blog
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--confirm <app>]
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
@@ -83,7 +83,8 @@ Domains
   domains add        Add domains: domains add my-app.example.com www.my-app.example.com, or for another service: --service api api.my-app.example.com
   domains rm         Remove domains: domains rm www.my-app.example.com [--yes]
   domains canonical  Redirect the others to one: domains canonical my-app.example.com|none
-  instant            The instant address, https://<app>.<ip>.sslip.io: instant [--show] [app]
+  instant            The instant address, https://<app>.<ip>.sslip.io: instant [app]
+  instant password   A new password, shown once; the next restart applies it: instant password [app]
   instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
   instant open       No password on the instant address; protect puts it back: instant open [app]
   protect            Ask for a password: protect [--user moin], password on stdin
@@ -109,8 +110,8 @@ GitHub
 CI
   hook               New deploy hook URL for CI; pushes no longer deploy: hook [app] [--yes]
   hook off           Turn the deploy hook off; CI can no longer deploy: hook off [app] [--yes]
-  registry           List registry logins for private images
-  registry set       Save a login: registry set <host> <username>
+  registry           List registry logins for private images, and the servers that keep each
+  registry set       Hand a server a login: registry set <host> <username> [--server web-1], password on stdin
   registry rm        Remove a login: registry rm <host> [--yes]
 
 Catalog
@@ -131,9 +132,10 @@ Backups
   backup download    Save a copy of a database from your bucket: backup download [app] [--db <path>] [--to <moment>] [--link]
 
 Buckets
-  buckets            Your buckets, the default first, and the apps that use each
-  buckets add        Add one: buckets add <name> --endpoint https://… --bucket … --access-key … [--default], secret key on stdin
-  buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret]
+  buckets            Your buckets, the default first, the apps that use each and the servers that keep its key
+  buckets add        Add one: buckets add <name> --endpoint https://… --bucket … --access-key … [--default] [--server web-1], secret key on stdin
+  buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret] [--server web-1]
+  buckets key        Hand one more server the key: buckets key <name> --server web-2, secret key on stdin
   buckets default    Make one the default for apps without their own: buckets default <name>
   buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--confirm <name>]
   buckets use        Move an app's backups: buckets use <bucket> [app], or --default

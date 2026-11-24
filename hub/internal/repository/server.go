@@ -195,8 +195,8 @@ func (r *Servers) SetInstallToken(id, workspaceID, hash string, expiresAt time.T
 }
 
 func (r *Servers) SetSecurity(server model.Server) error {
-	_, err := r.db.Exec(`UPDATE servers SET tunnel = $1, tunnel_id = $2, tunnel_token = $3, ssh = $4, firewall = $5 WHERE id = $6`,
-		server.Tunnel, server.TunnelID, server.TunnelToken, server.SSH, server.Firewall, server.ID)
+	_, err := r.db.Exec(`UPDATE servers SET tunnel = $1, tunnel_id = $2, ssh = $3, firewall = $4 WHERE id = $5`,
+		server.Tunnel, server.TunnelID, server.SSH, server.Firewall, server.ID)
 	return err
 }
 
@@ -217,11 +217,59 @@ func (r *Servers) Integrations(workspaceID string) (model.Integrations, error) {
 
 func (r *Servers) SetIntegrations(integrations model.Integrations) error {
 	_, err := r.db.Exec(`
-		INSERT INTO integrations (workspace_id, cloudflare_token, cloudflare_account, tailscale_key, updated_at) VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO integrations (workspace_id, cloudflare_token, cloudflare_account, updated_at) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (workspace_id) DO UPDATE SET cloudflare_token = excluded.cloudflare_token, cloudflare_account = excluded.cloudflare_account,
-			tailscale_key = excluded.tailscale_key, updated_at = excluded.updated_at
-	`, integrations.WorkspaceID, integrations.CloudflareToken, integrations.CloudflareAccount, integrations.TailscaleKey, integrations.UpdatedAt)
+			updated_at = excluded.updated_at
+	`, integrations.WorkspaceID, integrations.CloudflareToken, integrations.CloudflareAccount, integrations.UpdatedAt)
 	return err
+}
+
+// ServerSecrets lists the secrets the servers of a workspace keep, by
+// server and name.
+func (r *Servers) ServerSecrets(workspaceID string) ([]model.ServerSecret, error) {
+	secrets := []model.ServerSecret{}
+	err := r.db.Select(&secrets, `
+		SELECT s.server_id, s.name, s.updated_at FROM server_secrets s JOIN servers v ON v.id = s.server_id
+		WHERE v.workspace_id = $1 ORDER BY v.name, s.name`, workspaceID)
+	return secrets, err
+}
+
+// SetServerSecret notes that a server keeps the secret name since at, or
+// forgets it when removed.
+func (r *Servers) SetServerSecret(serverID, name string, removed bool, at time.Time) error {
+	if removed {
+		_, err := r.db.Exec(`DELETE FROM server_secrets WHERE server_id = $1 AND name = $2`, serverID, name)
+		return err
+	}
+	_, err := r.db.Exec(`
+		INSERT INTO server_secrets (server_id, name, updated_at) VALUES ($1, $2, $3)
+		ON CONFLICT (server_id, name) DO UPDATE SET updated_at = excluded.updated_at
+	`, serverID, name, at)
+	return err
+}
+
+// KeepServerSecrets makes names the secrets a server keeps, as its daemon
+// reported them: new ones count from at, the others keep their date.
+func (r *Servers) KeepServerSecrets(serverID string, names []string, at time.Time) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query, args, err := sqlx.In(`DELETE FROM server_secrets WHERE server_id = ? AND name NOT IN (?)`, serverID, append([]string{""}, names...))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(tx.Rebind(query), args...); err != nil {
+		return err
+	}
+	for _, name := range names {
+		_, err := tx.Exec(`INSERT INTO server_secrets (server_id, name, updated_at) VALUES ($1, $2, $3) ON CONFLICT (server_id, name) DO NOTHING`, serverID, name, at)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // AutoUpdateDaemons reports whether the hub updates the daemons of

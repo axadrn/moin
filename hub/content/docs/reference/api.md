@@ -14,7 +14,7 @@ The CLI, the terminal UI and your own scripts use this API. Its OpenAPI 3.1 docu
 | Token | a personal API token as `Authorization: Bearer pat_…`. It belongs to one workspace; every endpoint below works in it |
 | Token column | **read**: a read token is enough. **write**: needs a token with read and write. **session**: a signed-in browser only, never a token. **none**: needs no login |
 | Session | people sign in in the browser with GitHub or a passkey and get a session cookie, never a bearer token; `GET /api/v1/csrf` gives the CSRF token a session sends with every change; the `Moin-Workspace` header names the workspace |
-| Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback` |
+| Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback`. A secret goes straight to a server: `409` `server_offline` when it is offline, `409` `secret_missing` when a server lacks a key a request needs |
 | Confirm | what is big and cannot be undone takes the name, typed out, as `?confirm=`: removing a server, an app or a bucket, deleting a workspace. Without it or with another name: `422` `confirm_mismatch` |
 | Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place |
 | IDs | answers carry the `id` of a workspace, app, server or bucket in 32 characters, the UUID without dashes, as links do. `{app}`, `{id}`, `{name}` and `{slug}` in a path, and fields that name one, take its name, its ID or a link part like `my-app-<id>` ([Names and links](/docs/guides/names)) |
@@ -93,13 +93,13 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `GET` · `PUT /api/v1/daemon-updates` | read · write | whether daemons update by themselves, `{"auto": true}`; on by default |
 | `GET /api/v1/servers/{id}/metrics?range=1h` | read | CPU, memory, disk, network and load now and over `1h`, `24h`, `7d` or `30d`, and its apps now, the most memory first |
 | `PUT /api/v1/servers/{id}/security` | write | `tunnel`, `ssh` (`everyone`, `tailscale` or `off`) and `firewall` ([Security](/docs/guides/security)) |
-| `GET` · `PUT /api/v1/integrations` | read · write | connect Cloudflare and Tailscale with their keys; an empty key disconnects ([Integrations](/docs/guides/security#integrations)) |
+| `GET` · `PUT /api/v1/integrations` | read · write | connect Cloudflare and Tailscale with their keys; an empty key disconnects. The Tailscale key goes to `server`, which keeps it; `tailscale` answers `servers` and `missing_on` ([Integrations](/docs/guides/security#integrations)) |
 
 ## Apps
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET /api/v1/apps` · `POST /api/v1/apps` | read · write | lists apps; adds one |
+| `GET /api/v1/apps` · `POST /api/v1/apps` | read · write | lists apps; adds one, and its answer holds `instant_password`, the password of its instant address, shown this once |
 | `GET /api/v1/apps/{app}` · `DELETE /api/v1/apps/{app}?confirm=<app>` | read · write | one app, with `changes_waiting`: the changes the next restart applies; removes it, its data stays on the server |
 | `GET /api/v1/apps/events` | read | the app list as server-sent events |
 | `PATCH /api/v1/apps/{app}` | write | renames an app: `{"name": "…"}`; links, data, backups and the instant address stay, the next restart gives the containers the name |
@@ -121,8 +121,8 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `POST /api/v1/apps/{app}/rollback` | write | starts an earlier deploy again |
 | `POST /api/v1/apps/{app}/hook` · `DELETE /apps/{app}/hook` | write | a new deploy hook URL, shown once, which turns deploy on push off and keeps the repo; turns the hook off |
 | `POST /webhooks/deploy/{token}` | the hook | what CI calls, with `?image=&commit=` or the body `{"image": "…", "commit": "…"}`. The commit's compose file comes from the linked repo, its branch without one; an app without a repo refuses a commit. Only a new tag of the app's `hook_image`, the image running now; another gets `422` |
-| `GET /api/v1/registries` | read | registry logins for private images |
-| `PUT` · `DELETE /api/v1/registries/{host}` | write | saves a login for a host like `ghcr.io`, `{"username", "password"}`, stored encrypted; removes it |
+| `GET /api/v1/registries` | read | registry logins for private images, each with the `servers` that keep it and `missing_on`, the servers that do not |
+| `PUT` · `DELETE /api/v1/registries/{host}` | write | hands a server a login for a host like `ghcr.io`, `{"username", "password", "server"}`; the server keeps it, the hub only the host and username. `server` may be left out with one server. Removes it, also from the servers |
 | `GET /api/v1/github` · `GET /api/v1/github/repos` | read | GitHub installations with their `settings_url` and the install link; the repos moin may read |
 | `GET /api/v1/github/repos/{owner}/{repo}/branches` | read | the branches of a repo, the default first |
 | `PUT` · `DELETE /api/v1/apps/{app}/repo` | write | links a GitHub repo and branch; `auto_deploy` turns the deploy hook off; unlinks it |
@@ -132,7 +132,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET /api/v1/catalog` · `GET /api/v1/catalog/{slug}` | read | the [catalog](/docs/guides/catalog) with each app's newest version; one app with every version |
-| `POST /api/v1/catalog/{slug}/install` | write | installs a catalog app: `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy, and in `login` a password the first sign-in needs, shown this once |
+| `POST /api/v1/catalog/{slug}/install` | write | installs a catalog app: `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy, in `login` a password the first sign-in needs and in `instant_password` the password of the instant address, both shown this once |
 | `POST /api/v1/apps/{app}/update` | write | sets a catalog app to a version, `{"version": "3.4.1"}`, the newest when empty, and deploys it |
 
 ## Domains
@@ -140,7 +140,8 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`. `409` `domains_from_compose` when `x-moin.domains` sets them |
-| `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address, its provider and password (`?show=true` with a write token); picks the provider or `off`, and `open` |
+| `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address, its provider and user; picks the provider or `off`, and `open` |
+| `POST /api/v1/apps/{app}/instant/password` | write | a new password for the instant address, `{"user", "password"}`, shown this once; the next restart applies it |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | write | puts a password in front of the app; takes it away |
 | `GET /api/v1/apps/{app}/uptime` | read | uptime per domain: state, 24 hours, 7 and 30 days, the last visit, the last outages |
 | `PUT /api/v1/apps/{app}/uptime/{domain}` | write | the path uptime visits on a domain, `{"path": "/health"}`, or `{"paused": true}` |
@@ -150,7 +151,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET /api/v1/apps/{app}/env` | read | the env vars as `{"items": [{"key", "updated_at"}]}`; values are write-only, so no answer holds one |
-| `PATCH /api/v1/apps/{app}/env` | write | sets and removes some; changes take effect with the next deploy, a rollback keeps the env of its deploy |
+| `PATCH /api/v1/apps/{app}/env` | write | sets and removes some on the app's server, which must be online; changes take effect with the next deploy, a rollback too |
 | `PUT /api/v1/apps/{app}/env` | write | replaces them all at once; answers the keys `added`, `replaced` and `removed` |
 
 ## Data
@@ -170,9 +171,10 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `PUT /api/v1/apps/{app}/backups` | write | how often and how long, `{"every_minutes": 15, "keep_days": 30}`: `every_minutes` 15, 60 or 1440, `keep_days` 1, 3, 7 or 30. `409` `schedule_in_file` when `x-moin.backups` sets them |
 | `POST /api/v1/apps/{app}/restores` | write | goes back to a moment, `{"moment": "before-v12"}` (its id or label), or a time, `{"at": "2026-11-07T14:01:00Z"}`: the newest copy at or before it; `database` when the app has several, and `confirm`, the app's name typed out by the user. `202` with the restore; `422` `confirm_mismatch` without the exact name; `409` `restore_running` while one runs |
 | `GET /api/v1/apps/{app}/restores/{restore}` | read | how a restore stands: `running`, `unknown` while its server is offline, then `done` or `failed` with `error`; kept a week. `POST /api/v1/apps/{app}/restore` is gone |
-| `POST /api/v1/apps/{app}/backups/download` | write | a link to a copy in the app's own bucket, `{"database": "/data/app.db", "moment": "before-v12"}`, both optional: the newest copy of the only database. `200` with `copy`, `label`, `at`, `size` and `link`, valid 15 minutes |
-| `GET /api/v1/buckets` · `POST /api/v1/buckets` | read · write | the workspace's buckets, the default first, with the apps that use each; adds one |
-| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | read · write | one bucket; changes it (an empty `secret_key` keeps the stored one, `default: true` makes it the default); removes it with `?confirm=<name>`, `409` `bucket_in_use` while apps use it or left it |
+| `POST /api/v1/apps/{app}/backups/download` | write | a link to a copy in the app's own bucket, `{"database": "/data/app.db", "moment": "before-v12"}`, both optional: the newest copy of the only database. The app's server signs the link, so it must be online. `200` with `copy`, `label`, `at`, `size` and `link`, valid 15 minutes |
+| `GET /api/v1/buckets` · `POST /api/v1/buckets` | read · write | the workspace's buckets, the default first, with the apps that use each, the `servers` that keep its key and `missing_on`; adds one: `server` tests it and keeps the `secret_key` |
+| `GET` · `PUT` · `DELETE /api/v1/buckets/{name}` | read · write | one bucket; changes it (`server` tests a new place or key, an empty `secret_key` keeps the server's, `default: true` makes it the default); removes it with `?confirm=<name>`, `409` `bucket_in_use` while apps use it or left it |
+| `PUT /api/v1/buckets/{name}/key` | write | hands one more server the bucket's key, `{"server", "secret_key"}`; it tests the bucket first |
 | `PUT /api/v1/apps/{app}/bucket` | write | the app's bucket, `{"bucket": "client-a"}`, or `""` for the default; the copies start again there |
 
 ## Alerts

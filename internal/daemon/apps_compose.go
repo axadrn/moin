@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,16 +20,19 @@ import (
 // compose config` and moves the data mounts out of the release. It reports
 // what it found. The app's env vars fill ${VAR} in the file, as a .env
 // next to it would, so a service like postgres gets its password.
-func (a *apps) resolve(ctx context.Context, app, src string, env map[string]string) (map[string]any, protocol.Detected, error) {
+func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, protocol.Detected, error) {
 	detected := protocol.Detected{Kind: "compose"}
 	if composePath(src) == "" {
-		var err error
+		env, err := a.env(app)
+		if err != nil {
+			return nil, detected, err
+		}
 		detected.Kind, detected.Builder, err = a.generateCompose(ctx, app, src, env)
 		if err != nil {
 			return nil, detected, err
 		}
 	}
-	config, err := a.readComposeConfig(ctx, app, src, env)
+	config, err := a.readComposeConfig(ctx, app, src)
 	if err != nil {
 		return nil, detected, err
 	}
@@ -69,14 +71,11 @@ func (a *apps) generateCompose(ctx context.Context, app, src string, env map[str
 }
 
 // readComposeConfig has docker compose read the compose file of a source.
-// The app's env fills ${VAR} through an env file next to src.
-func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[string]string) (map[string]any, error) {
-	envFiles, err := writeEnvFile(filepath.Dir(src), env)
-	if err != nil {
-		return nil, err
-	}
+// The app's env fills ${VAR} through its env file (envArgs).
+func (a *apps) readComposeConfig(ctx context.Context, app, src string) (map[string]any, error) {
+	envFiles := a.envArgs(app, src)
 	// Before compose reads any file the compose file names into it.
-	err = a.checkSourceFiles(ctx, app, src, envFiles)
+	err := a.checkSourceFiles(ctx, app, src, envFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -92,35 +91,6 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string, env map[s
 	}
 	return config, nil
 }
-
-// writeEnvFile writes the app's env to app.env in dir, for docker compose,
-// and returns the --env-file arguments that read it: the source's own .env
-// first, when it has one, then app.env, whose values win.
-//
-// The env goes to compose in a file, never in docker's own environment:
-// docker reads variables like DOCKER_CONFIG and DOCKER_HOST itself, so an
-// env var of the app could make it run another program, as root.
-func writeEnvFile(dir string, env map[string]string) ([]string, error) {
-	var lines strings.Builder
-	for _, name := range slices.Sorted(maps.Keys(env)) {
-		if envNamePattern.MatchString(name) {
-			lines.WriteString(name + `="` + quoteEnv(env[name]) + "\"\n")
-		}
-	}
-	file := filepath.Join(dir, "app.env")
-	if err := os.WriteFile(file, []byte(lines.String()), 0o600); err != nil {
-		return nil, err
-	}
-	var args []string
-	if dotEnv := filepath.Join(dir, "src", ".env"); exists(dotEnv) {
-		args = append(args, "--env-file", dotEnv)
-	}
-	return append(args, "--env-file", file), nil
-}
-
-// quoteEnv escapes value for the double quotes of an env file, so compose
-// reads it back exactly: with its newlines, quotes and dollar signs.
-var quoteEnv = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`, "\r", `\r`).Replace
 
 // readConfigBlock reads the x-moin block of a compose file, nil when there
 // is none. What it could read comes back with an error too.
@@ -336,8 +306,8 @@ func imagesOfRelease(dir string) map[string]string {
 
 // finish writes compose.json for a release: built services get an image tag
 // per deploy, or keep their running image when there is no source; the main
-// service runs start.Image when set; the app's services get the env; the
-// main service gets the router labels; every service restarts unless
+// service runs start.Image when set; the app's services read the env file;
+// the main service gets the router labels; every service restarts unless
 // stopped. release.config stays as it is.
 func finish(release *release) error {
 	config, err := copyConfig(release.config)
@@ -345,7 +315,7 @@ func finish(release *release) error {
 		return err
 	}
 	detected := release.detected
-	env := release.start.Env
+	env := release.env
 	services, _ := config["services"].(map[string]any)
 	for name, item := range services {
 		service, _ := item.(map[string]any)
@@ -354,7 +324,7 @@ func finish(release *release) error {
 		getsEnv := service["build"] != nil || isMain
 		setImage(release, name, service)
 		if getsEnv {
-			addEnv(service, env)
+			addEnv(service, release.envFile, env)
 		}
 		if isMain && detected.Kind == "railpack" {
 			railpackSecrets(config, service, env)
@@ -401,16 +371,16 @@ func setImage(release *release, name string, service map[string]any) {
 	}
 }
 
-// addEnv gives a service the app's env.
-func addEnv(service map[string]any, env map[string]string) {
+// addEnv has a service read the app's env file when it starts, so no
+// value is in compose.json. A key the compose file sets too goes from its
+// environment: the app's env wins, and compose would let environment win
+// over env_file.
+func addEnv(service map[string]any, file string, env map[string]string) {
 	environment, _ := service["environment"].(map[string]any)
-	if environment == nil {
-		environment = map[string]any{}
+	for key := range env {
+		delete(environment, key)
 	}
-	for key, value := range env {
-		environment[key] = escape(value)
-	}
-	service["environment"] = environment
+	service["env_file"] = []any{file}
 }
 
 // routeService puts a service on the proxy when it has an address: the

@@ -1,4 +1,6 @@
-// Package secret seals small values, such as app env vars, with AES-256-GCM.
+// Package secret seals the few small values the hub uses itself, such as
+// the Cloudflare API token and alert targets, with AES-256-GCM. Secrets of
+// apps and servers never reach the hub's database: the servers keep them.
 package secret
 
 import (

@@ -17,10 +17,10 @@ func registerEnvTools(server *mcpsdk.Server, services Services) {
 		"Lists the env vars of an app: each key and when it changed. Values are write-only: no tool returns one. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listEnv)))
 	mcpsdk.AddTool(server, newTool("set_env", "Set env vars",
-		"Sets and removes env vars of an app. They are stored encrypted, are never shown again and reach the app with its next restart_app or deploy. Returns the keys. Needs a token with read and write access.",
+		"Sets and removes env vars of an app. The values go to the app's server, which keeps them; moin keeps only the keys and never shows a value. The server must be online (server_offline otherwise). They reach the app with its next restart_app or deploy. Returns the keys. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setEnv)))
 	mcpsdk.AddTool(server, newTool("replace_env", "Replace all env vars",
-		"Makes env every env var of an app, all at once, like one .env file: every key in env is set, keys not in env are removed. Show the user what changes first: list_env, then compare the keys. Returns the keys added, replaced and removed. They reach the app with its next restart_app or deploy. Needs a token with read and write access.",
+		"Makes env every env var of an app, all at once, like one .env file: every key in env is set, keys not in env are removed. Show the user what changes first: list_env, then compare the keys. Returns the keys added, replaced and removed. The values go to the app's server, which must be online. They reach the app with its next restart_app or deploy. Needs a token with read and write access.",
 		change(true, true)), Write(changes(services, tools.replaceEnv)))
 }
 
@@ -84,8 +84,8 @@ func (e EnvSet) Summary() string {
 	return strings.ToUpper(changed[:1]) + changed[1:] + "." + missing + " Restart the app to apply " + it + ": restart_app."
 }
 
-func (t moinTools) setEnv(_ context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {
-	removed, err := t.services.Apps.SetEnv(caller.actor(), input.App, input.Set, input.Unset)
+func (t moinTools) setEnv(ctx context.Context, caller Caller, input SetEnvInput) (EnvSet, error) {
+	removed, err := t.services.Apps.SetEnv(ctx, caller.actor(), input.App, input.Set, input.Unset)
 	if err != nil {
 		return EnvSet{}, err
 	}
@@ -109,11 +109,11 @@ func (e EnvReplaced) Summary() string {
 	return "Replaced the env vars: " + e.Change.String() + ". " + e.Env.Summary()
 }
 
-func (t moinTools) replaceEnv(_ context.Context, caller Caller, input ReplaceEnvInput) (EnvReplaced, error) {
+func (t moinTools) replaceEnv(ctx context.Context, caller Caller, input ReplaceEnvInput) (EnvReplaced, error) {
 	if input.Env == nil {
 		input.Env = map[string]string{}
 	}
-	change, err := t.services.Apps.ReplaceEnv(caller.actor(), input.App, input.Env)
+	change, err := t.services.Apps.ReplaceEnv(ctx, caller.actor(), input.App, input.Env)
 	if err != nil {
 		return EnvReplaced{}, err
 	}
