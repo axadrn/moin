@@ -250,7 +250,7 @@ network: locked
 
 | Rule | What it stops |
 | --- | --- |
-| `data: off` | reading tables, running SQL and editing rows through moin |
+| `data: off` | reading tables, running SQL, editing rows and downloading backups through moin |
 | `logs: off` | reading container logs through moin; logs often hold what your users sent |
 | `exec: off` | [running commands](/docs/guides/exec) in containers through moin |
 | `deploy-from: <sources>` | deploys from anywhere else |

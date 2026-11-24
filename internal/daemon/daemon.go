@@ -368,7 +368,7 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		r.bucketSet(ctx, message, rules)
 	case protocol.TypeBackupLink:
 		answer(r, message, protocol.TypeBackupLinkResult, func(request protocol.BackupLink) (any, error) {
-			return r.backups.link(ctx, request)
+			return r.backupLink(ctx, request, rules)
 		})
 	case protocol.TypeBackupList:
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {

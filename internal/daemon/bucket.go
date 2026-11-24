@@ -103,6 +103,15 @@ func testBucket(ctx context.Context, bucket protocol.Bucket) error {
 	return err
 }
 
+// backupLink answers backup.link (BackupLink) unless the rules say
+// data: off: a download reads the app's data through moin, like SQL does.
+func (r *runner) backupLink(ctx context.Context, request protocol.BackupLink, rules *protocol.Rules) (protocol.BackupLinkResult, error) {
+	if rules != nil && rules.DataOff {
+		return protocol.BackupLinkResult{}, refused(r.rulesFile, "data: off")
+	}
+	return r.backups.link(ctx, request)
+}
+
 // link signs a link to download a copy (BackupLink), with the key of the
 // app's bucket, so the hub never holds it.
 func (b *backups) link(ctx context.Context, request protocol.BackupLink) (protocol.BackupLinkResult, error) {

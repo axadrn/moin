@@ -28,7 +28,7 @@ type Hello struct {
 // /etc/moin/rules on the server. The hub cannot change them; the
 // daemon refuses every request they do not allow.
 type Rules struct {
-	// DataOff refuses tables, SQL and row edits.
+	// DataOff refuses tables, SQL, row edits and backup downloads.
 	DataOff bool `json:"data_off,omitempty"`
 	// LogsOff refuses container logs.
 	LogsOff bool `json:"logs_off,omitempty"`

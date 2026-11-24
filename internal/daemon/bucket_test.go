@@ -117,3 +117,13 @@ func mustUnescape(text string) string {
 	unescaped, _ := url.QueryUnescape(text)
 	return unescaped
 }
+
+// TestBackupLinkObeysDataOff: a download reads data through moin, so
+// data: off refuses it and names the line.
+func TestBackupLinkObeysDataOff(t *testing.T) {
+	r := testRunner(t)
+	_, err := r.backupLink(t.Context(), protocol.BackupLink{App: "shop", Database: "/data/app.db", Copy: "c1", Name: "shop"}, &protocol.Rules{DataOff: true})
+	if err == nil || err.Error() != "refused by the rules of this server (/etc/moin/rules): data: off" {
+		t.Fatalf("err = %v", err)
+	}
+}
