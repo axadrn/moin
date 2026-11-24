@@ -133,7 +133,7 @@ func (s *AppService) syncDomains(now time.Time) (map[uptimeKey]bool, bool) {
 	for _, app := range apps {
 		live[app.ID] = true
 		health := s.healthPath(&app)
-		for _, domain := range s.uptimeDomains(&app) {
+		for _, domain := range uptimeDomains(&app) {
 			key := uptimeKey{app.ID, domain}
 			current[key] = true
 			watch[key] = !u.track(key, app, health)
@@ -218,12 +218,12 @@ func (s *AppService) pruneUptime(now time.Time) {
 // that serves something, so not the main service's domains besides its
 // canonical one, which only redirect to it. The other services' domains
 // follow, by service.
-func (s *AppService) uptimeDomains(app *model.App) []string {
-	domains, canonical := app.MainDomains()
+func uptimeDomains(app *model.App) []string {
+	domains, canonical := app.DomainsOf("")
 	if canonical != "" {
 		domains = []string{canonical}
 	}
-	services := s.otherServiceDomains(app)
+	services := app.ServiceDomains()
 	for _, service := range slices.Sorted(maps.Keys(services)) {
 		domains = append(domains, services[service]...)
 	}

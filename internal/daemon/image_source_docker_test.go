@@ -51,6 +51,7 @@ func TestImageWithSource(t *testing.T) {
 			done = append(done, value)
 		}
 	})
+	a.ask = func(context.Context, protocol.MessageType, any) error { return nil }
 	a.deploy(ctx, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/blog/tarball/abc123", Image: "alpine:latest"}, nil)
 	mu.Lock()
 	last := done[len(done)-1]

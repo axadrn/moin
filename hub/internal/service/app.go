@@ -595,8 +595,8 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 	if err != nil {
 		return false, err
 	}
-	// x-moin wins, so a change here would never reach the app.
-	if fromCompose, _ := app.ComposeDomains(); len(fromCompose) > 0 {
+	// If compose.yml has domains, exactly those count.
+	if app.DomainsFromCompose() {
 		return false, ErrComposeDomains
 	}
 	clean, err := cleanDomains(domains)
@@ -732,31 +732,6 @@ func (s *AppService) FileConfig(app *model.App) protocol.Config {
 	return *detected.Config
 }
 
-// composeServiceDomains are the domains x-moin.domains sets for the other
-// services in the live deploy, by service.
-func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil {
-		return nil
-	}
-	set := map[string][]string{}
-	for service, domains := range detected.Config.ServiceDomains {
-		if service != detected.Service && len(domains) > 0 {
-			set[service] = domains
-		}
-	}
-	return set
-}
-
-// otherServiceDomains are the domains of the app's other services, by
-// service: compose.yml's where it sets them, else moin's.
-func (s *AppService) otherServiceDomains(app *model.App) map[string][]string {
-	services := app.ServiceDomains()
-	maps.Copy(services, s.composeServiceDomains(app))
-	delete(services, s.mainService(app))
-	return services
-}
-
 // ServerAddresses are the IPv4 and IPv6 of a server: the address its daemon
 // connects from and the ones it reports.
 func ServerAddresses(server model.Server) (ipv4, ipv6 string) {
@@ -865,17 +840,16 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 		return domain
 	}
 	checks := []DomainCheck{}
-	domains, canonical := app.MainDomains()
-	fromCompose, _ := app.ComposeDomains()
+	fromCompose := app.DomainsFromCompose()
+	domains, canonical := app.DomainsOf("")
 	for _, domain := range domains {
-		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
+		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: fromCompose}))
 	}
 	// Then the domains of the other services, by service.
-	services := s.otherServiceDomains(app)
-	fromComposeServices := s.composeServiceDomains(app)
+	services := app.ServiceDomains()
 	for _, service := range slices.Sorted(maps.Keys(services)) {
 		for _, domain := range services[service] {
-			checks = append(checks, check(DomainCheck{Domain: domain, Service: service, FromCompose: len(fromComposeServices[service]) > 0}))
+			checks = append(checks, check(DomainCheck{Domain: domain, Service: service, FromCompose: fromCompose}))
 		}
 	}
 	return checks, nil
@@ -1001,8 +975,14 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 		return nil, err
 	}
 	start.DeployID, start.App, start.Name, start.AppID, start.Number = deploy.ID, app.Folder, app.Name, app.ID, deploy.Number
-	domains, canonical := app.DomainsOf("")
-	start.Domains = &protocol.Domains{Domains: domains, Canonical: canonical, Protect: app.Protect, Services: serviceDomains(app)}
+	// The daemon gets the domains entered in moin. When the app's domains
+	// come from compose.yml there are none: the daemon reads those from
+	// the file of the release, which may have changed them.
+	start.Domains = &protocol.Domains{Protect: app.Protect}
+	if !app.DomainsFromCompose() {
+		start.Domains.Domains, start.Domains.Canonical = app.DomainsOf("")
+		start.Domains.Services = serviceDomains(app)
+	}
 	err = s.fillInstant(app, start.Domains)
 	if err != nil {
 		return nil, err
@@ -1094,6 +1074,13 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 		if message.Decode(&backups) == nil {
 			s.receiveBackupStatus(serverID, backups)
 		}
+	case protocol.TypeDeployDomains:
+		var reported protocol.DeployDomains
+		err := message.Decode(&reported)
+		if err == nil {
+			err = s.setComposeDomains(serverID, reported)
+		}
+		s.servers.Answer(serverID, message.RequestID, err)
 	case protocol.TypeDeployDone:
 		var done protocol.DeployDone
 		if message.Decode(&done) != nil {

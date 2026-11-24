@@ -42,6 +42,9 @@ var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 type apps struct {
 	dir  string
 	send func(protocol.MessageType, string, any)
+	// ask sends a request to the hub and waits for its answer: nil for
+	// TypeOK, the hub's message for TypeError.
+	ask func(context.Context, protocol.MessageType, any) error
 	// backups follows the databases a deploy adds or removes.
 	backups *backups
 	// proxyMode is "direct" or "tunnel", from the server config.

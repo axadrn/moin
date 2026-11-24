@@ -24,7 +24,7 @@ func TestValidCopyID(t *testing.T) {
 }
 
 func TestNeeds(t *testing.T) {
-	if Needs(TypeBackupRestore) != 2 || Needs(TypeBackupList) != 2 || Needs(TypeDeployStart) != 5 || Needs(TypeEnvSet) != 5 || Needs(TypeLogs) != 1 {
+	if Needs(TypeBackupRestore) != 2 || Needs(TypeBackupList) != 2 || Needs(TypeDeployStart) != 6 || Needs(TypeEnvSet) != 5 || Needs(TypeLogs) != 1 {
 		t.Error("Needs is wrong")
 	}
 }

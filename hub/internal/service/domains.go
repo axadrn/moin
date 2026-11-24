@@ -3,6 +3,8 @@ package service
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -18,6 +20,7 @@ var (
 	ErrMainService      = errors.New("this is the app's main service: set its domains without --service")
 	ErrServiceCanonical = errors.New("canonical is for the main service only")
 	ErrInstantProvider  = errors.New("the instant address provider is sslip.io, nip.io or off")
+	ErrNotDeploying     = errors.New("no deploy of this server runs with this ID")
 )
 
 // servicePattern is a compose service name.
@@ -41,7 +44,7 @@ func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, do
 	if main := s.mainService(app); main != "" && main == service {
 		return false, ErrMainService
 	}
-	if len(s.composeServiceDomains(app)[service]) > 0 {
+	if app.DomainsFromCompose() {
 		return false, ErrComposeDomains
 	}
 	clean, err := cleanDomains(domains)
@@ -60,6 +63,63 @@ func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, do
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"service": service, "from": before, "domains": strings.Join(clean, ", ")})
 	s.notify(actor.WorkspaceID)
 	return true, nil
+}
+
+// setComposeDomains makes the domains a daemon reports from the
+// compose.yml of a release the app's domains, before the release starts.
+// If compose.yml has domains, exactly those count. Otherwise the ones
+// entered in moin. The hub checks them as it checks the ones entered in
+// moin, so no daemon sets a domain moin would refuse. An error stops the
+// deploy, and the release that runs keeps running.
+func (s *AppService) setComposeDomains(serverID string, reported protocol.DeployDomains) error {
+	deploy, err := s.apps.DeployByID(reported.DeployID)
+	if err != nil {
+		return ErrNotDeploying
+	}
+	app, err := s.apps.ByID(deploy.AppID)
+	if err != nil || app.ServerID != serverID || deploy.Status != model.DeployRunning {
+		return ErrNotDeploying
+	}
+	domains, err := composeDomainRows(reported)
+	if err != nil {
+		return fmt.Errorf("x-moin.domains in compose.yml: %w", err)
+	}
+	err = s.apps.SetComposeDomains(app.ID, domains)
+	if err != nil {
+		return err
+	}
+	s.notify(app.WorkspaceID)
+	return nil
+}
+
+// composeDomainRows are the rows of the domains compose.yml sets, cleaned
+// and checked like the ones entered in moin. None when it sets none.
+func composeDomainRows(reported protocol.DeployDomains) ([]model.Domain, error) {
+	main, err := cleanDomains(reported.Domains)
+	if err != nil {
+		return nil, err
+	}
+	canonical := strings.ToLower(strings.TrimSpace(reported.Canonical))
+	if canonical != "" && !slices.Contains(main, canonical) {
+		return nil, ErrCanonical
+	}
+	rows := []model.Domain{}
+	for _, name := range main {
+		rows = append(rows, model.Domain{Name: name, Main: name == canonical})
+	}
+	for _, service := range slices.Sorted(maps.Keys(reported.Services)) {
+		if !servicePattern.MatchString(service) {
+			return nil, ErrService
+		}
+		names, err := cleanDomains(reported.Services[service])
+		if err != nil {
+			return nil, err
+		}
+		for _, name := range names {
+			rows = append(rows, model.Domain{Service: service, Name: name})
+		}
+	}
+	return rows, nil
 }
 
 // cleanDomains lowercases the domains, drops empty ones and repeats, and

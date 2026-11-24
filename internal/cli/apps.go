@@ -201,7 +201,7 @@ func appsShow(ctx context.Context, call appsCall) error {
 func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	app := detail.App
 	fmt.Fprintln(stdout, style.Bold.Render(app.Name)+" "+badge(stdout, style.App(app), app.Status()))
-	domains, canonical, fromCompose := app.Domains, app.Canonical, false
+	domains, canonical := app.Domains, app.Canonical
 	built := ""
 	for _, deploy := range detail.Deploys {
 		if deploy.Number == app.LiveNumber && deploy.Detected != nil {
@@ -210,10 +210,6 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 				built = "Railpack: " + deploy.Detected.Builder
 			}
 		}
-		// The live deploy says what it answers on; x-moin wins there.
-		if deploy.Number == app.LiveNumber && deploy.Detected != nil && deploy.Detected.Config != nil && len(deploy.Detected.Config.Domains) > 0 {
-			domains, canonical, fromCompose = deploy.Detected.Domains, deploy.Detected.Canonical, true
-		}
 	}
 	domainText := "none"
 	if len(domains) > 0 {
@@ -221,7 +217,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 		if canonical != "" {
 			domainText += " (canonical " + canonical + ")"
 		}
-		if fromCompose {
+		if app.DomainsFromCompose {
 			domainText += ", from compose.yml"
 		}
 	}

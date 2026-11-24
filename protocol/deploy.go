@@ -49,11 +49,13 @@ type DeployStart struct {
 	Domains    *Domains `json:"routing,omitempty"`
 }
 
-// Domains is how visitors reach the main service, as set in web, CLI, TUI
-// or MCP. The x-moin block of compose.yml wins for every field it sets.
-// Protect is an htpasswd line ("user:bcrypt hash") when password protection
-// is on. DeployStart carries it under the JSON key routing, which daemons of
-// protocol version 1 read.
+// Domains is how visitors reach the app, as set in web, CLI, TUI or MCP.
+// Domains, Canonical and Services are the domains entered in moin. If
+// compose.yml has domains, exactly those count; otherwise these. Never a
+// mix. For protect and instant, the x-moin block wins for every field it
+// sets. Protect is an htpasswd line ("user:bcrypt hash") when password
+// protection is on. DeployStart carries it under the JSON key routing,
+// which daemons of protocol version 1 read.
 type Domains struct {
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`
@@ -91,6 +93,18 @@ func RegistryHost(image string) string {
 		return first
 	}
 	return "docker.io"
+}
+
+// DeployDomains are the domains x-moin.domains in the compose.yml of a
+// release sets, which the daemon reports before the release starts
+// (TypeDeployDomains). Domains and Canonical are the main service's,
+// Services the other services' domains by service. All empty when
+// compose.yml sets none: then the domains entered in moin count.
+type DeployDomains struct {
+	DeployID  string              `json:"deploy_id"`
+	Domains   []string            `json:"domains,omitempty"`
+	Canonical string              `json:"canonical,omitempty"`
+	Services  map[string][]string `json:"services,omitempty"`
 }
 
 // DeployLog is one line of build or start output.

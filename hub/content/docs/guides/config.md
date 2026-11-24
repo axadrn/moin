@@ -38,6 +38,8 @@ If a setting is in `x-moin`, the file decides. If it is not, moin decides. There
 
 A setting in the file is locked in moin, marked **from compose.yml**. To change it, change the file and deploy.
 
+Domains follow the same rule, as a whole: if `compose.yml` has domains, exactly those count. Otherwise the ones entered in moin. Never a mix. So `domains` for one service also replaces the domains entered in moin for the others, and `canonical` works only next to `domains`. [Domains in the repo](/docs/guides/domains#in-the-repo).
+
 ## Good to know
 
 - After you [rename the app](/docs/guides/names#rename-an-app), set `app` to its new name. Otherwise `moin deploy` in a folder of the old name offers to make a new app.

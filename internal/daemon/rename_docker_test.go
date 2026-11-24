@@ -77,6 +77,7 @@ func TestRenameDocker(t *testing.T) {
 			done = append(done, value)
 		}
 	})
+	a.ask = func(context.Context, protocol.MessageType, any) error { return nil }
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
 		a.deploy(ctx, start, nil)

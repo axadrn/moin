@@ -113,7 +113,7 @@ func (s *AppService) Uptime(workspaceID, idOrName string) (*model.App, AppUptime
 	health := s.healthPath(app)
 	now := s.now()
 	uptime := AppUptime{Server: app.ServerName, ServerOnline: s.servers.Online(app.ServerID), Domains: []UptimeDomain{}}
-	for _, domain := range s.uptimeDomains(app) {
+	for _, domain := range uptimeDomains(app) {
 		view, err := s.uptimeDomain(app, domain, health, now)
 		if err != nil {
 			return nil, AppUptime{}, err
@@ -231,7 +231,7 @@ func (s *AppService) SetUptime(actor Actor, idOrName, domain string, path *strin
 	}
 	health := s.healthPath(app)
 	domain = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
-	if !slices.Contains(s.uptimeDomains(app), domain) {
+	if !slices.Contains(uptimeDomains(app), domain) {
 		return nil, UptimeDomain{}, ErrUptimeDomain
 	}
 	if path != nil {

@@ -142,8 +142,8 @@ func hasSource(start protocol.DeployStart) bool {
 }
 
 // runDeploy runs the steps of one deploy in order: make the release, take
-// the compose file of an older release or fetch and build a new one, start
-// it, then follow its databases and clean up.
+// the compose file of an older release or fetch and build a new one, tell
+// the hub its domains, start it, then follow its databases and clean up.
 func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, rules *protocol.Rules, logf func(string, ...any)) (protocol.Detected, error) {
 	if !protocol.ValidAppName(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
 		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
@@ -167,6 +167,10 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, rules 
 		return release.detected, err
 	}
 	saveJSON(filepath.Join(release.dir, "detected.json"), release.detected)
+	err = a.reportDomains(ctx, release)
+	if err != nil {
+		return release.detected, err
+	}
 	a.ownVolumes(ctx, release)
 	err = a.startRelease(ctx, release)
 	if err != nil {
@@ -392,6 +396,24 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	err := a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
+	}
+	return nil
+}
+
+// reportDomains tells the hub the domains compose.yml of the release sets,
+// none when it sets none, before anything of the release starts. The hub
+// keeps them as the app's domains. When it refuses one, such as a domain
+// another app uses, the deploy stops here and the running release stays.
+func (a *apps) reportDomains(ctx context.Context, release *release) error {
+	config := release.detected.Config
+	if config == nil {
+		config = &protocol.Config{}
+	}
+	domains := composeDomains(release.detected.Service, config)
+	domains.DeployID = release.start.DeployID
+	err := a.ask(ctx, protocol.TypeDeployDomains, domains)
+	if err != nil {
+		return fmt.Errorf("domains: %w", err)
 	}
 	return nil
 }

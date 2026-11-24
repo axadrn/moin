@@ -37,7 +37,10 @@ type App struct {
 	LiveNumber   int      `json:"live_number"`
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
-	Protected    bool     `json:"protected"`
+	// DomainsFromCompose says the domains come from x-moin.domains in
+	// compose.yml: they change there, not in moin.
+	DomainsFromCompose bool `json:"domains_from_compose"`
+	Protected          bool `json:"protected"`
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
 	// Instant is the app's instant address, "" when it has none;
@@ -163,34 +166,35 @@ type envRequest struct {
 }
 
 func NewApp(app model.App) App {
-	domains, canonical := app.MainDomains()
+	domains, canonical := app.DomainsOf("")
 	return App{
-		ID:              link.ID(app.ID),
-		Name:            app.Name,
-		ServerID:        link.ID(app.ServerID),
-		ServerName:      app.ServerName,
-		LatestNumber:    app.LatestNumber,
-		LatestStatus:    app.LatestStatus,
-		LiveNumber:      app.LiveNumber,
-		Domains:         domains,
-		Canonical:       canonical,
-		Protected:       app.Protect != "",
-		ServiceDomains:  app.ServiceDomains(),
-		Instant:         instantURL(app.InstantHost),
-		InstantProvider: app.Instant,
-		InstantOpen:     app.InstantOpen,
-		Stopped:         app.Stopped,
-		ChangesWaiting:  app.ChangesWaiting,
-		Repo:            app.Repo,
-		Branch:          app.Branch,
-		AutoDeploy:      app.AutoDeploy,
-		Pinned:          app.Pinned,
-		Hook:            app.DeployHookHash != nil,
-		DeployFrom:      app.DeployFrom(),
-		HookImage:       app.HookImage(),
-		Bucket:          app.BucketName,
-		Catalog:         app.Catalog,
-		CreatedAt:       app.CreatedAt.UTC(),
+		ID:                 link.ID(app.ID),
+		Name:               app.Name,
+		ServerID:           link.ID(app.ServerID),
+		ServerName:         app.ServerName,
+		LatestNumber:       app.LatestNumber,
+		LatestStatus:       app.LatestStatus,
+		LiveNumber:         app.LiveNumber,
+		Domains:            domains,
+		Canonical:          canonical,
+		DomainsFromCompose: app.DomainsFromCompose(),
+		Protected:          app.Protect != "",
+		ServiceDomains:     app.ServiceDomains(),
+		Instant:            instantURL(app.InstantHost),
+		InstantProvider:    app.Instant,
+		InstantOpen:        app.InstantOpen,
+		Stopped:            app.Stopped,
+		ChangesWaiting:     app.ChangesWaiting,
+		Repo:               app.Repo,
+		Branch:             app.Branch,
+		AutoDeploy:         app.AutoDeploy,
+		Pinned:             app.Pinned,
+		Hook:               app.DeployHookHash != nil,
+		DeployFrom:         app.DeployFrom(),
+		HookImage:          app.HookImage(),
+		Bucket:             app.BucketName,
+		Catalog:            app.Catalog,
+		CreatedAt:          app.CreatedAt.UTC(),
 	}
 }
 

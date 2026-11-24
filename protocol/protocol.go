@@ -14,16 +14,22 @@ import (
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
 // which was called the agent before (legacy.go); version 4 the command the
 // daemon masks for the activity (ExecDone.Command); version 5 secrets that
-// live only on the server (secrets.go).
-const Version = 5
+// live only on the server (secrets.go); version 6 the domains of
+// compose.yml, which the daemon reports before a release starts
+// (DeployDomains).
+const Version = 6
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
 // sending it. Since version 5 deploys, backups and the server config take
 // their secrets from the server: an older daemon would run them without.
+// Since version 6 a deploy reports the domains of compose.yml before it
+// starts: an older daemon would start it without.
 func Needs(messageType MessageType) int {
 	switch messageType {
-	case TypeDeployStart, TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
+	case TypeDeployStart:
+		return 6
+	case TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
 		return 5
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2
@@ -53,6 +59,11 @@ const (
 	TypeDeployLog MessageType = "deploy.log"
 	// TypeDeployDone ends a deploy (DeployDone).
 	TypeDeployDone MessageType = "deploy.done"
+	// TypeDeployDomains is a request from the daemon: the domains
+	// compose.yml of a release sets (DeployDomains), sent before the
+	// release starts. The hub answers with TypeOK, or TypeError when it
+	// refuses a domain; then the deploy stops.
+	TypeDeployDomains MessageType = "deploy.domains"
 
 	// TypeLogs asks for the last lines of an app's output (LogsRequest).
 	// The daemon answers with TypeLogsResult or TypeError.

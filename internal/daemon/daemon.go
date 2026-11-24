@@ -5,6 +5,7 @@ package daemon
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -160,8 +161,9 @@ func Run(ctx context.Context, dir string, state State) error {
 	if _, err := LoadRules(rulesFile); err != nil {
 		return err
 	}
-	daemon := &runner{dir: dir, state: state, rulesFile: rulesFile, pending: map[string]protocol.DeployDone{}}
+	daemon := &runner{dir: dir, state: state, rulesFile: rulesFile, pending: map[string]protocol.DeployDone{}, asking: map[string]chan protocol.Message{}}
 	daemon.apps = newApps(dir, daemon.send)
+	daemon.apps.ask = daemon.ask
 	daemon.backups = newBackups(daemon.apps, daemon.send)
 	daemon.apps.backups = daemon.backups
 	daemon.security = newSecurity(dir, daemon.apps)
@@ -231,6 +233,75 @@ type runner struct {
 	// pending holds the deploy.done messages no session took yet. They go
 	// out on the next one, so a deploy never ends unseen.
 	pending map[string]protocol.DeployDone
+	// asking holds the requests to the hub that wait for an answer, by
+	// request ID (ask).
+	asking map[string]chan protocol.Message
+}
+
+// askTimeout is how long ask waits for the hub's answer.
+const askTimeout = 30 * time.Second
+
+// ask sends a request to the hub and waits for its answer: nil for TypeOK,
+// the hub's message for TypeError. Without a session it fails at once.
+func (r *runner) ask(ctx context.Context, messageType protocol.MessageType, data any) error {
+	message, err := protocol.NewMessage(messageType, data)
+	if err != nil {
+		return err
+	}
+	message.RequestID = rand.Text()
+	answer := make(chan protocol.Message, 1)
+	r.mu.Lock()
+	conn := r.conn
+	if conn != nil {
+		r.asking[message.RequestID] = answer
+	}
+	r.mu.Unlock()
+	if conn == nil {
+		return errors.New("the daemon is not connected to the hub")
+	}
+	defer func() {
+		r.mu.Lock()
+		delete(r.asking, message.RequestID)
+		r.mu.Unlock()
+	}()
+	writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err = wsjson.Write(writeCtx, conn, message)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("ask the hub: %w", err)
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, askTimeout)
+	defer cancel()
+	select {
+	case <-waitCtx.Done():
+		return errors.New("the hub did not answer")
+	case reply := <-answer:
+		if reply.Type != protocol.TypeError {
+			return nil
+		}
+		var hubErr protocol.Error
+		_ = reply.Decode(&hubErr)
+		return errors.New(hubErr.Message)
+	}
+}
+
+// deliver hands an answer of the hub to the ask that waits for it, and
+// says whether one did.
+func (r *runner) deliver(message protocol.Message) bool {
+	if message.RequestID == "" {
+		return false
+	}
+	r.mu.Lock()
+	answer := r.asking[message.RequestID]
+	r.mu.Unlock()
+	if answer == nil {
+		return false
+	}
+	select {
+	case answer <- message:
+	default:
+	}
+	return true
 }
 
 // send writes a message to the current session. Log lines without a session
@@ -322,6 +393,9 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 		err = wsjson.Read(ctx, conn, &message)
 		if err != nil {
 			return true, err
+		}
+		if r.deliver(message) {
+			continue
 		}
 		go r.handle(ctx, message)
 	}

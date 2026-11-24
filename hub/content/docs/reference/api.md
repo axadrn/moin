@@ -139,7 +139,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`. `409` `domains_from_compose` when `x-moin.domains` sets them |
+| `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice`. `409` `domains_from_compose` when `x-moin.domains` sets them: then the app shows `domains_from_compose: true` |
 | `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address, its provider and user; picks the provider or `off`, and `open` |
 | `POST /api/v1/apps/{app}/instant/password` | write | a new password for the instant address, `{"user", "password"}`, shown this once; the next restart applies it |
 | `PUT` · `DELETE /api/v1/apps/{app}/protection` | write | puts a password in front of the app; takes it away |

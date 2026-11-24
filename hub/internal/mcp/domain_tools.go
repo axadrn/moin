@@ -16,10 +16,10 @@ import (
 func registerDomainTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, newTool("check_domains", "Check domains",
-		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-moin.domains in compose.yml sets; they change there. Needs the read scope.",
+		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-moin.domains in compose.yml sets, as the last deploy reported them; they change there. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, newTool("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-moin.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. If compose.yml has domains, exactly those count, otherwise the ones set here: while x-moin.domains sets them, this fails with domains_from_compose; change them there and deploy. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, newTool("get_instant", "Get the instant address",
 		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one moin made, which moin showed once and never shows again; new_instant_password makes a new one. Needs the read scope.",

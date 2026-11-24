@@ -11,7 +11,8 @@ import (
 // Domains x-moin sets are marked and offer no remove, canonical or add,
 // because moin cannot change them.
 func TestDomainsMarkComposeDomains(t *testing.T) {
-	view := DomainsView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true, FromCompose: true}}}
+	app := model.App{Name: "shop", Domains: []model.Domain{{Name: "shop.example.com", Main: true, FromCompose: true}}}
+	view := DomainsView{App: app, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true, FromCompose: true}}}
 	var html strings.Builder
 	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
@@ -24,6 +25,18 @@ func TestDomainsMarkComposeDomains(t *testing.T) {
 		t.Errorf("compose domains offer changes: %s", page)
 	}
 
+	// Domains compose.yml sets only for another service lock the main
+	// service too: never a mix.
+	html.Reset()
+	api := DomainsView{App: model.App{Name: "shop", Domains: []model.Domain{{Service: "api", Name: "api.example.com", FromCompose: true}}}, Checks: []service.DomainCheck{{Domain: "api.example.com", Service: "api", FromCompose: true}}}
+	if err := AppDomains(api).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html.String(), "data-add-domain") {
+		t.Errorf("service domains from compose.yml offer to add a domain")
+	}
+
+	view.App.Domains[0].FromCompose = false
 	view.Checks[0].FromCompose = false
 	html.Reset()
 	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
@@ -105,7 +118,7 @@ func TestDomainsShowTheCheck(t *testing.T) {
 
 // The overview lists the domains compose.yml sets, like the Domains page.
 func TestOverviewListsComposeDomains(t *testing.T) {
-	app := model.App{Name: "my-app", LiveNumber: 3, LiveDetected: `{"service":"web","domains":["my-app.example.com"],"config":{"domains":["my-app.example.com"]}}`}
+	app := model.App{Name: "my-app", LiveNumber: 3, Domains: []model.Domain{{Name: "my-app.example.com", FromCompose: true}}}
 	var html strings.Builder
 	if err := appHomeSection(AppPageView{App: app}).Render(projectPageContext("/app/tiny-rocket-co/apps/my-app"), &html); err != nil {
 		t.Fatal(err)

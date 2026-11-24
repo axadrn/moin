@@ -1,11 +1,8 @@
 package model
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // App is a compose project on one server. The deploy fields come from its
@@ -24,8 +21,9 @@ type App struct {
 	Pinned         bool      `db:"pinned"`
 	CreatedAt      time.Time `db:"created_at"`
 	DeployHookHash *string   `db:"deploy_hook_hash"`
-	// Domains are the domains saved in moin, oldest first, from the
-	// domains table. x-moin in compose.yml can set others: MainDomains.
+	// Domains are the app's domains, oldest first, from the domains
+	// table: the ones of compose.yml when it has any, else the ones
+	// entered in moin (DomainsFromCompose).
 	Domains []Domain `db:"-"`
 	// Protect is an htpasswd line when a password protects the app.
 	Protect string `db:"protect"`
@@ -79,9 +77,6 @@ type App struct {
 	// succeeded deploy that set what runs (a build, an image or a rollback;
 	// a restart keeps it). Empty when it was built from the app's repo.
 	LiveImage string `db:"live_image"`
-	// LiveDetected is what the daemon found in the live deploy, as JSON;
-	// empty before the first.
-	LiveDetected string `db:"live_detected"`
 }
 
 // EnvVar is an env var of an app as moin shows it: its key and when it
@@ -173,20 +168,34 @@ func ImageName(ref string) string {
 	return host + "/" + path
 }
 
-// Domain is a name visitors reach an app on, saved in moin. Service is
-// the compose service it reaches, "" for the app's main service. Main
-// marks the one the others of its service redirect to, the canonical one.
+// Domain is a name visitors reach an app on. Service is the compose
+// service it reaches, "" for the app's main service. Main marks the one
+// the others of its service redirect to, the canonical one. FromCompose
+// says x-moin.domains in compose.yml set it, not someone in moin.
 type Domain struct {
-	ID        int64     `db:"id"`
-	AppID     string    `db:"app_id"`
-	Service   string    `db:"service"`
-	Name      string    `db:"name"`
-	Main      bool      `db:"main"`
-	CreatedAt time.Time `db:"created_at"`
+	ID          int64     `db:"id"`
+	AppID       string    `db:"app_id"`
+	Service     string    `db:"service"`
+	Name        string    `db:"name"`
+	Main        bool      `db:"main"`
+	FromCompose bool      `db:"from_compose"`
+	CreatedAt   time.Time `db:"created_at"`
 }
 
-// DomainsOf returns the saved domains of a service, the main one for "",
-// and its canonical domain, "" for none.
+// DomainsFromCompose says the app's domains come from x-moin.domains in
+// compose.yml. If compose.yml has domains, exactly those count, otherwise
+// the ones entered in moin, so one row says it for all.
+func (a App) DomainsFromCompose() bool {
+	for _, domain := range a.Domains {
+		if domain.FromCompose {
+			return true
+		}
+	}
+	return false
+}
+
+// DomainsOf returns the domains of a service, the main one for "", and
+// its canonical domain, "" for none.
 func (a App) DomainsOf(service string) (names []string, canonical string) {
 	names = []string{}
 	for _, domain := range a.Domains {
@@ -201,8 +210,8 @@ func (a App) DomainsOf(service string) (names []string, canonical string) {
 	return names, canonical
 }
 
-// ServiceDomains returns the saved domains of the app's other services,
-// by service.
+// ServiceDomains returns the domains of the app's other services, by
+// service.
 func (a App) ServiceDomains() map[string][]string {
 	services := map[string][]string{}
 	for _, domain := range a.Domains {
@@ -211,30 +220,6 @@ func (a App) ServiceDomains() map[string][]string {
 		}
 	}
 	return services
-}
-
-// ComposeDomains are the domains x-moin.domains in the live deploy's
-// compose.yml sets for the main service, and its canonical one; none when
-// it sets none for it.
-func (a App) ComposeDomains() (domains []string, canonical string) {
-	var detected protocol.Detected
-	if a.LiveDetected == "" || json.Unmarshal([]byte(a.LiveDetected), &detected) != nil || detected.Config == nil {
-		return nil, ""
-	}
-	if len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0 {
-		return nil, ""
-	}
-	return detected.Domains, detected.Canonical
-}
-
-// MainDomains are the domains the main service answers on, and its
-// canonical one: the ones compose.yml sets, else the ones saved in moin.
-// Every view shows these.
-func (a App) MainDomains() (domains []string, canonical string) {
-	if domains, canonical := a.ComposeDomains(); len(domains) > 0 {
-		return domains, canonical
-	}
-	return a.DomainsOf("")
 }
 
 // Bucket is one of a workspace's S3-compatible buckets, where the backups

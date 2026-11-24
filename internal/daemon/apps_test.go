@@ -262,7 +262,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.example.com"}}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Protect: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{}}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com", Protect: "me:$2y$05$abc"})
 	if err != nil {
 		t.Fatal(err)
 	}

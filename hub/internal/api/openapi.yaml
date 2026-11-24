@@ -1787,7 +1787,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-moin` block of compose.yml wins for every field it sets.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. If compose.yml has domains, exactly those count; otherwise the ones entered here. Never a mix.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1817,7 +1817,7 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '409':
           $ref: '#/components/responses/Conflict'
-          description: '`domains_from_compose`. x-moin.domains in compose.yml sets the domains of the live deploy; change them there and deploy.'
+          description: '`domains_from_compose`. x-moin.domains in compose.yml sets the app''s domains; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.domains`, also when another app or service uses a domain already, `fields.canonical` or `fields.service`.'
@@ -5066,7 +5066,7 @@ components:
           description: Run it on the server as root, or with sudo in front, to remove the daemon, its binary and state. The apps keep running with their data; add `--apps` to remove them too. Empty when no daemon ever connected, so nothing is installed there.
     App:
       type: object
-      required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, protected, stopped, created_at]
+      required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, domains_from_compose, protected, stopped, created_at]
       properties:
         id:
           type: string
@@ -5088,12 +5088,15 @@ components:
           description: The newest successful deploy, which is running. 0 before the first.
         domains:
           type: array
-          description: The domains the app answers on. The ones x-moin.domains in compose.yml sets, else the ones saved in moin.
+          description: The domains of the app's main service. If compose.yml has domains, exactly those count. Otherwise the ones entered in moin.
           items:
             type: string
         canonical:
           type: string
           description: The domain the others redirect to. Empty for none.
+        domains_from_compose:
+          type: boolean
+          description: The app's domains come from x-moin.domains in compose.yml, as its last deploy reported them. They change there, then a deploy; setting them in moin answers `domains_from_compose`.
         protected:
           type: boolean
           description: A password guards the app.
@@ -5399,7 +5402,7 @@ components:
                 type: boolean
               from_compose:
                 type: boolean
-                description: x-moin.domains in compose.yml of the live deploy sets the domain. It wins over the domains set in moin, so it changes in compose.yml, then a deploy.
+                description: x-moin.domains in compose.yml sets the domain. If compose.yml has domains, exactly those count, so it changes in compose.yml, then a deploy.
               service:
                 type: string
                 description: The service of compose.yml the domain reaches; absent for the main one.

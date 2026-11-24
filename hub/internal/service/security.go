@@ -375,8 +375,8 @@ func leftOver(report *protocol.ServerConfigResult) bool {
 	return report != nil && (report.Firewall || report.Proxy == "tunnel" || report.SSH == protocol.SSHTailscale || report.SSH == protocol.SSHOff)
 }
 
-// tunnelHosts are the domains of every app on a server: the ones set
-// through moin and the ones x-moin set in the live deploy.
+// tunnelHosts are the domains of the main service of every app on a
+// server.
 func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 	apps, err := s.apps.ListByWorkspaceID(server.WorkspaceID)
 	if err != nil {
@@ -388,15 +388,6 @@ func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 			continue
 		}
 		domains, _ := app.DomainsOf("")
-		if app.LiveNumber > 0 {
-			deploy, err := s.apps.Deploy(app.ID, app.LiveNumber)
-			if err == nil {
-				detected := Detected(*deploy)
-				if detected != nil && len(detected.Domains) > 0 {
-					domains = detected.Domains
-				}
-			}
-		}
 		for _, domain := range domains {
 			if !slices.Contains(hosts, domain) {
 				hosts = append(hosts, domain)

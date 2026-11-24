@@ -182,7 +182,14 @@ x-moin:
     api: 5678
 ```
 
-Once a deploy with `x-moin.domains` is live, those domains show **from compose.yml** and change only in the file. Trying it in moin says so (API code `domains_from_compose`). [Who decides](/docs/guides/config#who-decides).
+One rule: if `compose.yml` has domains, exactly those count. Otherwise the ones entered in moin. Never a mix.
+
+- Each deploy reads the domains in the file before the new version starts. They replace the ones entered in moin, also those of other services.
+- Take a line out of the file, and the next deploy drops that domain. Take the whole `domains` out, and the app has none until you enter some in moin.
+- They show **from compose.yml** and change only in the file. Trying it in moin says so (API code `domains_from_compose`).
+- A domain another app uses, or one that is no host name like `my-app.example.com:8080`, stops the deploy before the new version starts. The running version keeps running.
+
+[Who decides](/docs/guides/config#who-decides).
 
 ## Good to know
 

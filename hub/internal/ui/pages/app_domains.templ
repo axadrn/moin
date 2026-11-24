@@ -40,10 +40,10 @@ templ AppDomains(view DomainsView) {
 					for _, check := range view.Checks {
 						@domainRow(check, view.App.Name, domainsPath)
 					}
-					if options := canonicalOptions(view.Checks); len(options) > 2 && !fromCompose(view.Checks) {
+					if options := canonicalOptions(view.Checks); len(options) > 2 && !view.App.DomainsFromCompose() {
 						@canonicalRow(options, canonicalDomain(view.Checks), domainsPath)
 					}
-					if fromCompose(view.Checks) {
+					if view.App.DomainsFromCompose() {
 						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-domains-from-compose": true}}) {
 							<p class="moin-fill moin-text moin-muted">Change them in compose.yml (<span class="moin-mono">x-moin.domains</span>) and deploy.</p>
 						}
@@ -331,12 +331,6 @@ func canonicalDomain(checks []service.DomainCheck) string {
 		}
 	}
 	return ""
-}
-
-// fromCompose says x-moin.domains in compose.yml sets the domains of the
-// main service.
-func fromCompose(checks []service.DomainCheck) bool {
-	return len(checks) > 0 && checks[0].FromCompose && checks[0].Service == ""
 }
 
 func orDash(value string) string {

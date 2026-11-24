@@ -23,10 +23,11 @@ const proxyImage = "traefik:v3.6"
 
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
-// route settles the domains of a deploy: x-moin wins for every field it
-// sets, the hub's settings fill the rest. Domains are the main
-// service's; ServiceDomains those of the others; Instant its instant
-// address.
+// route settles the domains of a deploy. If compose.yml has domains,
+// exactly those count. Otherwise the ones entered in moin, which the hub
+// sends. Never a mix. Domains are the main service's; ServiceDomains
+// those of the others; Instant its instant address. For protect and
+// instant, x-moin wins for every field it sets.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {
 		domains = &protocol.Domains{}
@@ -35,12 +36,18 @@ func route(app string, detected protocol.Detected, domains *protocol.Domains) (p
 	if config == nil {
 		config = &protocol.Config{}
 	}
-	detected.Domains = mainDomains(detected.Service, domains, config)
-	detected.ServiceDomains = otherServiceDomains(detected.Service, domains, config)
-	detected.Canonical = domains.Canonical
-	if config.Canonical != "" {
-		detected.Canonical = config.Canonical
+	main, canonical, services := domains.Domains, domains.Canonical, domains.Services
+	if config.HasDomains() {
+		fromCompose := composeDomains(detected.Service, config)
+		main, canonical, services = fromCompose.Domains, fromCompose.Canonical, fromCompose.Services
+	} else if config.Canonical != "" {
+		// The canonical one belongs to the domains: it never mixes with
+		// the ones entered in moin.
+		return detected, errors.New("x-moin.canonical needs x-moin.domains: set the domains there too, or remove canonical")
 	}
+	detected.Domains = slices.Clone(main)
+	detected.ServiceDomains = otherServiceDomains(detected.Service, services)
+	detected.Canonical = canonical
 	detected.Protected = domains.Protect != "" || config.Protect
 	err := cleanDomains(detected)
 	if err != nil {
@@ -60,36 +67,33 @@ func route(app string, detected protocol.Detected, domains *protocol.Domains) (p
 	return detected, nil
 }
 
-// mainDomains are the domains of the main service.
-func mainDomains(mainName string, domains *protocol.Domains, config *protocol.Config) []string {
-	if len(config.Domains) > 0 {
-		return slices.Clone(config.Domains)
-	}
-	// The map form of x-moin domains may name the main service too.
-	named, ok := config.ServiceDomains[mainName]
-	if ok {
-		return slices.Clone(named)
-	}
-	return slices.Clone(domains.Domains)
-}
-
-// otherServiceDomains are the domains of the services other than the main
-// one, nil when there are none.
-func otherServiceDomains(mainName string, domains *protocol.Domains, config *protocol.Config) map[string][]string {
-	byService := map[string][]string{}
-	for service, list := range domains.Services {
-		if service != mainName {
-			byService[service] = slices.Clone(list)
-		}
+// composeDomains are the domains x-moin.domains sets, all empty when it
+// sets none. The map form may name the main service: those are its
+// domains, not another service's.
+func composeDomains(mainName string, config *protocol.Config) protocol.DeployDomains {
+	domains := protocol.DeployDomains{Domains: config.Domains, Canonical: config.Canonical}
+	if len(domains.Domains) == 0 {
+		domains.Domains = config.ServiceDomains[mainName]
 	}
 	for service, list := range config.ServiceDomains {
-		if service != mainName {
-			byService[service] = slices.Clone(list)
+		if service == mainName || len(list) == 0 {
+			continue
 		}
+		if domains.Services == nil {
+			domains.Services = map[string][]string{}
+		}
+		domains.Services[service] = list
 	}
-	for service, list := range byService {
-		if len(list) == 0 {
-			delete(byService, service)
+	return domains
+}
+
+// otherServiceDomains are copies of the domains of the services other
+// than the main one, nil when there are none.
+func otherServiceDomains(mainName string, services map[string][]string) map[string][]string {
+	byService := map[string][]string{}
+	for service, list := range services {
+		if service != mainName && len(list) > 0 {
+			byService[service] = slices.Clone(list)
 		}
 	}
 	if len(byService) == 0 {

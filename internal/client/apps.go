@@ -24,7 +24,10 @@ type App struct {
 	LiveNumber   int      `json:"live_number"`
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
-	Protected    bool     `json:"protected"`
+	// DomainsFromCompose says the domains come from x-moin.domains in
+	// compose.yml.
+	DomainsFromCompose bool `json:"domains_from_compose"`
+	Protected          bool `json:"protected"`
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
 	// Instant is the instant address, "" when the app has none.

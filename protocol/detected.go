@@ -97,6 +97,20 @@ type Config struct {
 	Instant        string              `json:"instant,omitempty"`
 }
 
+// HasDomains says whether x-moin.domains names at least one domain. Then
+// exactly the domains of compose.yml count, else the ones entered in moin.
+func (c Config) HasDomains() bool {
+	if len(c.Domains) > 0 {
+		return true
+	}
+	for _, list := range c.ServiceDomains {
+		if len(list) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // ConfigBackups is the backups block of x-moin: how often and how long.
 // What it leaves out is the default.
 type ConfigBackups struct {

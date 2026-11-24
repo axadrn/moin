@@ -72,3 +72,38 @@ func (r *Apps) SetDomains(appID, service string, names []string, canonical strin
 	}
 	return tx.Commit()
 }
+
+// SetComposeDomains makes domains, from x-moin.domains in compose.yml, the
+// app's domains, in one transaction. With domains the app has exactly
+// those: every other row of it goes, also the ones entered in moin.
+// Without domains only the rows from compose.yml go, and the ones entered
+// in moin count again. A name in use by another app is a DomainUsedError.
+func (r *Apps) SetComposeDomains(appID string, domains []model.Domain) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if len(domains) == 0 {
+		_, err = tx.Exec(`DELETE FROM domains WHERE app_id = $1 AND from_compose = 1`, appID)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	_, err = tx.Exec(`DELETE FROM domains WHERE app_id = $1`, appID)
+	if err != nil {
+		return err
+	}
+	for _, domain := range domains {
+		_, err = tx.Exec(`INSERT INTO domains (app_id, service, name, main, from_compose) VALUES ($1, $2, $3, $4, 1)`, appID, domain.Service, domain.Name, domain.Main)
+		if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: domains.name") {
+			return &DomainUsedError{Name: domain.Name}
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}

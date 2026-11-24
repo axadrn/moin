@@ -464,8 +464,9 @@ func (s *ServerService) OnDaemonConnect(handle func(serverID, workspaceID string
 	s.mu.Unlock()
 }
 
-// OnDaemonMessage sets who gets the daemon messages that answer no request,
-// such as deploy logs. Wiring calls it once.
+// OnDaemonMessage sets who gets the daemon messages that answer no request
+// of the hub, such as deploy logs, or a request of the daemon, such as
+// deploy.domains, which Answer answers. Wiring calls it once.
 func (s *ServerService) OnDaemonMessage(handle func(serverID string, message protocol.Message)) {
 	s.mu.Lock()
 	s.onMessage = handle
@@ -623,8 +624,32 @@ func (s *ServerService) Receive(serverID string, message protocol.Message) {
 		}
 		return
 	}
-	if handle != nil && message.RequestID == "" {
+	if handle != nil {
 		handle(serverID, message)
+	}
+}
+
+// Answer answers a request the daemon of a server sent: TypeOK when err is
+// nil, else TypeError with its message. A daemon that went away gets none.
+func (s *ServerService) Answer(serverID, requestID string, err error) {
+	message, encodeErr := protocol.NewMessage(protocol.TypeOK, nil)
+	if err != nil {
+		message, encodeErr = protocol.NewMessage(protocol.TypeError, protocol.Error{Message: err.Error()})
+	}
+	if encodeErr != nil {
+		slog.Error("encode answer failed", "error", encodeErr)
+		return
+	}
+	message.RequestID = requestID
+	s.mu.Lock()
+	session := s.sessions[serverID]
+	s.mu.Unlock()
+	if session == nil {
+		return
+	}
+	sendErr := session.send(message)
+	if sendErr != nil {
+		slog.Warn("answer to the daemon failed", "server_id", serverID, "error", sendErr)
 	}
 }
 

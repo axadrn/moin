@@ -1,22 +1,25 @@
 package daemon
 
 import (
+	"context"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestRouteServices: domains per service from the hub and from
-// the map form of x-moin, x-moin winning per service; the main service's
-// entry of the map is its domains; a domain on two services fails.
+// TestRouteServices: domains per service from the hub; the main
+// service's entry of the map form of x-moin is its domains; a domain on
+// two services fails.
 func TestRouteServices(t *testing.T) {
-	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Services: map[string][]string{"api": {"API.shop.example.net"}, "admin": {"admin.shop.example.net"}}}
-	detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"admin": {"desk.shop.example.net"}}}}, domains)
+	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Canonical: "shop.example.net", Services: map[string][]string{"api": {"API.shop.example.net"}, "web": {"lost.example.net"}}}
+	detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{}}, domains)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(detected.Domains, []string{"shop.example.net"}) || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.example.net"}) || !slices.Equal(detected.ServiceDomains["admin"], []string{"desk.shop.example.net"}) {
+	if !slices.Equal(detected.Domains, []string{"shop.example.net"}) || detected.Canonical != "shop.example.net" || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.example.net"}) || len(detected.ServiceDomains) != 1 {
 		t.Errorf("domains %v, services %v", detected.Domains, detected.ServiceDomains)
 	}
 	detected, err = route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"web": {"x.example.com"}, "api": {"api.x.example.com"}}}}, nil)
@@ -29,6 +32,44 @@ func TestRouteServices(t *testing.T) {
 	// The hub's settings are not changed by route.
 	if domains.Services["api"][0] != "API.shop.example.net" {
 		t.Errorf("route changed the domains it was given: %v", domains.Services)
+	}
+}
+
+// TestRouteComposeOrMoin: if compose.yml has domains, exactly those count,
+// otherwise the ones entered in moin. Never a mix: a compose file with
+// domains for one service drops every domain entered in moin, and a
+// canonical one in compose.yml without domains there fails.
+func TestRouteComposeOrMoin(t *testing.T) {
+	entered := &protocol.Domains{Domains: []string{"shop.example.net"}, Canonical: "shop.example.net", Services: map[string][]string{"api": {"api.shop.example.net"}}}
+	detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"admin": {"desk.shop.example.net"}}}}, entered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detected.Domains) != 0 || detected.Canonical != "" || len(detected.ServiceDomains) != 1 || !slices.Equal(detected.ServiceDomains["admin"], []string{"desk.shop.example.net"}) {
+		t.Errorf("compose with domains: %v %q %v", detected.Domains, detected.Canonical, detected.ServiceDomains)
+	}
+	detected, err = route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{Domains: []string{"Example.com", "www.example.com"}, Canonical: "example.com"}}, entered)
+	if err != nil || !slices.Equal(detected.Domains, []string{"example.com", "www.example.com"}) || detected.Canonical != "example.com" || detected.ServiceDomains != nil {
+		t.Errorf("compose list: %v %q %v %v", detected.Domains, detected.Canonical, detected.ServiceDomains, err)
+	}
+	if _, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{Canonical: "shop.example.net"}}, entered); err == nil {
+		t.Error("x-moin.canonical without x-moin.domains passed")
+	}
+	if _, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{Domains: []string{"shop.example.net:8080"}}}, nil); err == nil {
+		t.Error("a domain with a port passed")
+	}
+}
+
+// TestComposeDomains: what the daemon reports to the hub, the domains of
+// compose.yml by service; none when it sets none.
+func TestComposeDomains(t *testing.T) {
+	domains := composeDomains("web", &protocol.Config{ServiceDomains: map[string][]string{"web": {"example.com"}, "api": {"api.example.com"}, "admin": {}}, Canonical: "example.com"})
+	if !slices.Equal(domains.Domains, []string{"example.com"}) || domains.Canonical != "example.com" || len(domains.Services) != 1 || !slices.Equal(domains.Services["api"], []string{"api.example.com"}) {
+		t.Errorf("map form: %+v", domains)
+	}
+	none := composeDomains("web", &protocol.Config{})
+	if len(none.Domains) != 0 || none.Canonical != "" || none.Services != nil {
+		t.Errorf("no domains: %+v", none)
 	}
 }
 
@@ -98,5 +139,37 @@ func TestDomainsByService(t *testing.T) {
 	}
 	if port := servicePort("api", map[string]any{}, &protocol.Config{Ports: map[string]int{"api": 7000}}); port != 7000 {
 		t.Errorf("service port from x-moin: %d", port)
+	}
+}
+
+// TestReportDomains: the daemon tells the hub the domains of compose.yml
+// with the deploy's ID, and a refusal of the hub stops the deploy with the
+// hub's words.
+func TestReportDomains(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	var asked protocol.DeployDomains
+	a.ask = func(_ context.Context, messageType protocol.MessageType, data any) error {
+		if messageType != protocol.TypeDeployDomains {
+			t.Errorf("asked %s", messageType)
+		}
+		asked = data.(protocol.DeployDomains)
+		return errors.New("shop.example.net is already used by another app or service")
+	}
+	refused := &release{start: protocol.DeployStart{DeployID: "d1"}, detected: protocol.Detected{Service: "web", Config: &protocol.Config{Domains: []string{"shop.example.net"}}}}
+	err := a.reportDomains(context.Background(), refused)
+	if err == nil || !strings.Contains(err.Error(), "shop.example.net is already used by another app") {
+		t.Errorf("err = %v", err)
+	}
+	if asked.DeployID != "d1" || !slices.Equal(asked.Domains, []string{"shop.example.net"}) {
+		t.Errorf("asked %+v", asked)
+	}
+	// Without x-moin the report says none, so the hub drops the ones
+	// compose.yml set before.
+	a.ask = func(_ context.Context, _ protocol.MessageType, data any) error {
+		asked = data.(protocol.DeployDomains)
+		return nil
+	}
+	if err := a.reportDomains(context.Background(), &release{start: protocol.DeployStart{DeployID: "d2"}, detected: protocol.Detected{Service: "web"}}); err != nil || asked.DeployID != "d2" || len(asked.Domains) != 0 || asked.Services != nil {
+		t.Errorf("no x-moin: %+v %v", asked, err)
 	}
 }
