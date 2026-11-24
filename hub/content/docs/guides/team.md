@@ -49,7 +49,7 @@ Everyone can leave a workspace. A workspace always keeps one owner.
 
 ## Invite someone
 
-moin sends an email to join the workspace. It is good for seven days. They sign up with that address and land in your workspace.
+moin sends an email to join the workspace. It is good for seven days. They open the link and **Continue with GitHub**, with any GitHub account. A new account gets the invited address, and they land in your workspace. Someone who has an account already signs in with it; its address must be the invited one.
 
 ```surfaces
 Web: **Settings**, **Team**, **Invite a teammate**, **Send invite**

@@ -13,7 +13,7 @@ The CLI, the terminal UI and your own scripts use this API. Its OpenAPI 3.1 docu
 | --- | --- |
 | Token | a personal API token as `Authorization: Bearer pat_…`. It belongs to one workspace; every endpoint below works in it |
 | Token column | **read**: a read token is enough. **write**: needs a token with read and write. **session**: a signed-in browser only, never a token. **none**: needs no login |
-| Session | sign-in and two-step flows are under `/api/v1/auth`; `GET /api/v1/csrf` gives the CSRF token a session sends with every change; the `Moin-Workspace` header names the workspace |
+| Session | people sign in in the browser with GitHub and get a session cookie, never a bearer token; `GET /api/v1/csrf` gives the CSRF token a session sends with every change; the `Moin-Workspace` header names the workspace |
 | Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback` |
 | Confirm | what is big and cannot be undone takes the name, typed out, as `?confirm=`: removing a server, an app or a bucket, deleting a workspace. Without it or with another name: `422` `confirm_mismatch` |
 | Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place |
@@ -38,24 +38,21 @@ Session-only endpoints keep a leaked token from making new tokens, changing role
 | --- | --- | --- |
 | `POST /api/v1/auth/device` | none | starts `moin login` through the browser (RFC 8628) with `{"hostname"}` |
 | `POST /api/v1/auth/device/token` | none | polls it with `{"device_code"}` every `interval` seconds until it answers `access_token`. See [Log in the CLI](/docs/guides/account#log-in-the-cli) |
-| `POST /api/v1/auth/password` | session | signs in with email and password |
-| `POST /api/v1/auth/magic-link` · `POST /auth/magic-link/verify` | session | sends a sign-in link; signs in with it |
-| `POST /api/v1/auth/forgot-password` · `POST /auth/forgot-password/verify` | session | emails a reset link; signs in with it, which removes the password, signs out every other session and revokes every API token. Set a new one with `POST /account/password/set` |
-| `POST /api/v1/auth/email-change/verify` | session | confirms a new email |
+| `POST /api/v1/auth/email-change/verify` | session | confirms a new email and answers the user; every session of the account ends, a cookie caller gets a new one |
 | `POST /api/v1/auth/onboarding` | session | the name of a new account and its first workspace, or none with an `invitation_token`; every other endpoint answers `onboarding_required` until it is done |
 | `POST /api/v1/auth/logout` | session | signs this browser out |
+
+Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `/auth/github/connect` to connect GitHub to a signed-in account, and `/auth/key` for a [recovery key](/docs/self-hosting#recovery-key). [Sign in](/docs/guides/security#sign-in)
 
 ## Account
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET /api/v1/account` | read | the signed-in account, with `email_alerts` |
+| `GET /api/v1/account` | read | the signed-in account, with `email_alerts` and `github_login` |
 | `PATCH /api/v1/account/name` | write | your name |
 | `POST` · `DELETE /api/v1/account/avatar` | write | uploads or removes your picture |
 | `PUT /api/v1/account/email-alerts` | write | your [email alerts](/docs/guides/alerts) on or off: `{"on": false}` |
 | `PATCH /api/v1/account/email` | session | changes your email |
-| `POST /api/v1/account/password` | session | changes your password |
-| `POST /api/v1/account/password/set` · `DELETE /account/password` | session | sets a first password; removes it |
 | `DELETE /api/v1/account` | session | deletes your account |
 | `GET` · `POST /api/v1/account/tokens` · `DELETE /account/tokens/{id}` | session | personal API tokens and the computers logged in with `moin login`, `kind` `personal` or `device`; makes one; revokes one |
 | `GET /api/v1/account/sessions` · `DELETE /account/sessions/{id}` · `DELETE /account/sessions` | session | signed-in browsers; signs one, or all others, out |

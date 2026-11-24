@@ -50,11 +50,11 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 
 - JSON handlers live in `internal/api` and call the same services as the HTML handlers. Never duplicate a rule or a permission check there.
 - Every route under `/api/v1` is listed once in `api.Routes` in `internal/api/routes.go`. `internal/api/openapi.yaml` documents each one and is served at `GET /api/v1/openapi.yaml`. `internal/api/openapi_test.go` fails when the two drift.
-- Clients sign in with an `/api/v1/auth` endpoint and send the returned token as `Authorization: Bearer <token>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`.
+- People sign in in the browser, with GitHub through the moin GitHub App, and get the `session_token` cookie; a hub without the app takes a recovery key from `./main recovery-key <email>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`. Scripts, the CLI and AI agents send a personal API token as `Authorization: Bearer pat_...`; a session is never a bearer token.
 - Personal API tokens (`pat_...`) let scripts and AI agents act for a user. Each route in `api.Routes` declares `TokenRead`, `TokenWrite` or the default `TokenDenied`. Open a new route to tokens only when an AI agent should reach it, and update its `apiTokenAuth` entry in `openapi.yaml`. A token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
 - Every non-2xx answer is the envelope `{"error":{"code","message","fields"}}`. Codes are stable lowercase snake case. `fields` appears only for `validation_failed`.
 - `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards.
-- Magic link, password reset, and email change emails link to the HTML routes under `APP_URL/auth/...`. An API client that receives the token another way calls the matching `/api/v1/auth/.../verify` endpoint.
+- Email change emails link to the HTML route under `APP_URL/auth/...`. An API client that receives the token another way calls `POST /api/v1/auth/email-change/verify`.
 
 ## MCP server
 
@@ -63,7 +63,7 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 - Built-in tools: `whoami`, `list_workspaces`, `get_workspace`, `list_activity`, `get_billing`, `invite_member`, `rename_workspace`. `registerTools` in `internal/mcp/tools.go` registers them in one place.
 - Wrap a tool body in `mcp.Read` when it only reads and in `mcp.Write` when it changes data. A read-only token gets `insufficient_scope` from a `Write` tool. Workspace tools take an optional `workspace` slug, default to the token's workspace, and answer `not_found` for every other workspace.
 - Failed calls return the JSON API error envelope as the tool result. Return service errors unchanged; `api.ErrorFor` maps them to the same codes as the API. Use `mcp.InvalidField` for a `validation_failed` field.
-- Tools are a curated list for AI agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, passwords, or email.
+- Tools are a curated list for AI agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, sign-in, or email.
 - `mcp.Services` in `internal/mcp/server.go` lists the services tools may call. Add your service there and pass it where `internal/routes/routes.go` calls `mcp.NewServer`.
 - Raise `mcp.Version` when the tool list or a tool's schema changes.
 
@@ -131,6 +131,5 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `/ui` is the website of moin UI: `ui/docs` and `ui/blocks` at the repo root, `internal/handler/ui.go`, `internal/ui/pages/ui.templ`.
 
 ## Included product surface
-This project includes authentication with email links and passwords, email verification, password recovery, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.
-OAuth provider: GitHub.
+This project includes sign-in with GitHub through the moin GitHub App, one-time recovery keys from a server command, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.
 It also includes workspaces with Owner, Admin, and Member roles, invitations, seat limits, workspace billing, and the activity.

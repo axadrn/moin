@@ -81,16 +81,18 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 
 ## Account, roles and money
 
-These stay in the web on purpose: they move money or decide who is in charge, so they want your password, not a token. "With a session" means the endpoint answers a signed-in browser and refuses API tokens; the [API reference](/docs/reference/api) marks each one.
+These stay in the web on purpose: they move money or decide who is in charge, so they want you signed in with GitHub, not a token. "With a session" means the endpoint answers a signed-in browser and refuses API tokens; the [API reference](/docs/reference/api) marks each one.
 
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
-| Sign up, sign in, passwords, email | ✓ | `login` signs this computer in; the rest is the web. | Signs in with the browser; the rest is the web. | ✓ with a session | AI agents use a token, never your password. |
+| Sign up and sign in with GitHub, connect GitHub | ✓ | `login` signs this computer in through the browser; the rest is the web. | Signs in with the browser; the rest is the web. | Browser only: `/auth/github` sets the session cookie. `github_login` in `GET /api/v1/account`. | AI agents use a token, never your GitHub account. |
+| Recovery key | ✓ `/auth/key` | The operator makes it on the server with `./main recovery-key <email>`. | Web only. | Browser only. | Never. |
+| Email | ✓ | Web only. | Web only. | ✓ with a session | Never. |
 | Sessions | ✓ | A token can't see your sessions. | Web only. | ✓ with a session | Web only. |
 | API tokens | ✓ | A token can't make tokens. | A token can't make tokens. | ✓ with a session | A token can't make tokens. |
 | Name, picture | ✓ | Set it in the web. | Set it in the web. | ✓ | Set it in the web. |
-| Change roles, remove someone, leave, delete the workspace | ✓ | Who is in charge is decided with a password. | Web only. | ✓ with a session | Web only. |
+| Change roles, remove someone, leave, delete the workspace | ✓ | Who is in charge is decided signed in on the web. | Web only. | ✓ with a session | Web only. |
 | Create a workspace, accept an invitation | ✓ | It starts with a signed-in browser. | Web only. | ✓ with a session | Web only. |
 | Plan and trial | ✓ | Web only. | Web only. | ✓ | ✓ `get_billing` |
 | Checkout, card, invoices | ✓, as a business | Your card belongs to Stripe, not your terminal. | Your card belongs to Stripe, not your terminal. | ✓ with a session | AI agents never move money. |
-| Delete your account | ✓ | Web only, with your password. | Web only. | ✓ with a session | AI agents never delete accounts. |
+| Delete your account | ✓ | Web only, signed in. | Web only. | ✓ with a session | AI agents never delete accounts. |

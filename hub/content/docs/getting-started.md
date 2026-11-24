@@ -23,7 +23,7 @@ moin login --url https://moin.example.com
 
 Your browser opens and shows a code. Check that it is the same code as in your terminal. Press **Approve**.
 
-No account yet? The same page signs you up, with GitHub or your email.
+No account yet? The same page signs you up, with GitHub.
 
 ## 2. Add a server
 

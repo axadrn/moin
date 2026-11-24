@@ -1,6 +1,6 @@
 ---
 title: "Account and tokens"
-description: "Your name, email, password, sessions, the CLI login and API tokens"
+description: "Your name, email, GitHub sign-in, sessions, the CLI login and API tokens"
 group: "Team"
 order: 3
 ---
@@ -65,11 +65,34 @@ A token cannot be renamed or get more rights: make a new one and revoke the old 
 
 ## Sign up and sign in
 
-With GitHub, with a link moin emails you, or with a password once you set one. The first sign-in asks for your name and your first workspace's name. Someone invited gives only a name.
+With GitHub. No passwords, no links by email. The first sign-in asks for your name and your first workspace's name. Someone invited gives only a name.
 
 ```surfaces
-Web: the sign-in page, **Continue with GitHub** or **Continue with email**
+Web: the sign-in page, **Continue with GitHub**
 API: POST /api/v1/auth/onboarding
+```
+
+- Your GitHub account is your key. moin remembers it, not its email: change your email or name on GitHub and you still get in.
+- An account from before GitHub finds yours by GitHub's verified primary email, once.
+- An invitation lets you in with any GitHub account. [Team](/docs/guides/team#invite-someone)
+- How it stays safe: [Security](/docs/guides/security#sign-in).
+
+## Connect GitHub
+
+An account without GitHub, such as after a recovery key, connects one here. From then on you sign in with it. A GitHub account that signs in to another account cannot be connected.
+
+```surfaces
+Web: **Settings**, **Account**, **Security** tab, **GitHub**, **Connect GitHub**
+```
+
+The card shows **Connected as** and your GitHub login once it is done. `github_login` in `GET /api/v1/account` says the same.
+
+## Lost your GitHub account
+
+Ask the admin of your hub for a recovery key. They run `./main recovery-key <email>` on the server. Enter the key at `/auth/key`. It works once, for an hour. Then connect your new GitHub account. [Recovery key](/docs/self-hosting#recovery-key)
+
+```surfaces
+Web: `/auth/key`, **Key from the terminal**, **Sign in**
 ```
 
 ## Change your name
@@ -97,16 +120,6 @@ Links and notices go to the new address once you click the link moin sends there
 Web: **Settings**, **Account**, **Profile** tab, **Email**, **Save**
 API: PATCH /api/v1/account/email
 ```
-
-## Set, change or remove your password
-
-
-```surfaces
-Web: **Settings**, **Account**, **Security** tab, **Password**
-API: POST /api/v1/account/password
-```
-
-`POST /api/v1/account/password/set` sets the first one, `DELETE /api/v1/account/password` removes it.
 
 ## See and end sessions
 
@@ -146,4 +159,4 @@ Only the owner sees the plan and pays. A self-hosted hub has no billing.
 
 ## Good to know
 
-- A token with write access can change your name, picture and email alerts. It can never change your email, password, sessions or tokens, or delete the account. So a leaked token never takes over your account.
+- A token with write access can change your name, picture and email alerts. It can never change your email, how you sign in, sessions or tokens, or delete the account. So a leaked token never takes over your account.
