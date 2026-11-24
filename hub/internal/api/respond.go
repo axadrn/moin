@@ -110,6 +110,10 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &inUse) {
 		return http.StatusConflict, ErrorDetail{Code: "bucket_in_use", Message: inUse.Error()}, true
 	}
+	var used *repository.DomainUsedError
+	if errors.As(err, &used) {
+		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"domains": used.Error() + "."}}, true
+	}
 	for _, known := range serviceErrors {
 		if !errors.Is(err, known.err) {
 			continue
@@ -274,7 +278,6 @@ var serviceErrors = []serviceError{
 	{err: service.ErrMetricsRange, field: "range", message: "Use 1h, 24h, 7d or 30d."},
 	{err: service.ErrService, field: "service", message: "Use the name of a service in compose.yml: lowercase letters, digits, dashes, dots or underscores."},
 	{err: service.ErrMainService, field: "service", message: "This is the app's main service: set its domains without a service."},
-	{err: service.ErrDomainTaken, field: "domains", message: "A domain reaches one service of an app: remove it from the other one first."},
 	{err: service.ErrInstantProvider, field: "provider", message: "Choose sslip.io, nip.io or off."},
 	{err: service.ErrInstantInFile, status: http.StatusConflict, code: "instant_in_file", message: "The instant address is set in compose.yml. Change it there and deploy."},
 	{err: service.ErrProtectInFile, status: http.StatusConflict, code: "protect_in_file", message: "The password is required by compose.yml. Change it there and deploy."},

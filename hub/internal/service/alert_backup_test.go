@@ -196,7 +196,7 @@ func TestStoreBackupStatusAlertsOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := &model.App{ID: "app-shop", WorkspaceID: owner.WorkspaceID, ServerID: server.ID, Name: "shop", Domains: "[]", CreatedAt: time.Now()}
+	app := &model.App{ID: "app-shop", WorkspaceID: owner.WorkspaceID, ServerID: server.ID, Name: "shop", CreatedAt: time.Now()}
 	if err := repository.NewApps(database, database).Create(app); err != nil {
 		t.Fatal(err)
 	}

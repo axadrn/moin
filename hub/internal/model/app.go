@@ -24,14 +24,11 @@ type App struct {
 	Pinned         bool      `db:"pinned"`
 	CreatedAt      time.Time `db:"created_at"`
 	DeployHookHash *string   `db:"deploy_hook_hash"`
-	// Domains is a JSON array; use DomainList.
-	Domains   string `db:"domains"`
-	Canonical string `db:"canonical"`
+	// Domains are the domains saved in moin, oldest first, from the
+	// domains table. x-moin in compose.yml can set others: MainDomains.
+	Domains []Domain `db:"-"`
 	// Protect is an htpasswd line when a password protects the app.
 	Protect string `db:"protect"`
-	// ServiceDomains is a JSON object of the domains of the app's other
-	// services, by service; use ServiceDomainMap.
-	ServiceDomains string `db:"service_domains"`
 	// Instant is the provider of the instant address, such as sslip.io, or
 	// off; InstantHost the address the last deploy served it at. A password
 	// guards it unless InstantOpen: Protect when set, else the one moin made,
@@ -176,18 +173,44 @@ func ImageName(ref string) string {
 	return host + "/" + path
 }
 
-// ServiceDomainMap returns the domains of the app's other services.
-func (a App) ServiceDomainMap() map[string][]string {
-	domains := map[string][]string{}
-	_ = json.Unmarshal([]byte(a.ServiceDomains), &domains)
-	return domains
+// Domain is a name visitors reach an app on, saved in moin. Service is
+// the compose service it reaches, "" for the app's main service. Main
+// marks the one the others of its service redirect to, the canonical one.
+type Domain struct {
+	ID        int64     `db:"id"`
+	AppID     string    `db:"app_id"`
+	Service   string    `db:"service"`
+	Name      string    `db:"name"`
+	Main      bool      `db:"main"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
-// DomainList returns the app's domains.
-func (a App) DomainList() []string {
-	domains := []string{}
-	_ = json.Unmarshal([]byte(a.Domains), &domains)
-	return domains
+// DomainsOf returns the saved domains of a service, the main one for "",
+// and its canonical domain, "" for none.
+func (a App) DomainsOf(service string) (names []string, canonical string) {
+	names = []string{}
+	for _, domain := range a.Domains {
+		if domain.Service != service {
+			continue
+		}
+		names = append(names, domain.Name)
+		if domain.Main {
+			canonical = domain.Name
+		}
+	}
+	return names, canonical
+}
+
+// ServiceDomains returns the saved domains of the app's other services,
+// by service.
+func (a App) ServiceDomains() map[string][]string {
+	services := map[string][]string{}
+	for _, domain := range a.Domains {
+		if domain.Service != "" {
+			services[domain.Service] = append(services[domain.Service], domain.Name)
+		}
+	}
+	return services
 }
 
 // ComposeDomains are the domains x-moin.domains in the live deploy's
@@ -211,16 +234,7 @@ func (a App) MainDomains() (domains []string, canonical string) {
 	if domains, canonical := a.ComposeDomains(); len(domains) > 0 {
 		return domains, canonical
 	}
-	return a.DomainList(), a.Canonical
-}
-
-// DomainsOf returns the domains of a service, the main one for "", and its
-// canonical domain: only the main service has one.
-func (a App) DomainsOf(service string) (domains []string, canonical string) {
-	if service == "" {
-		return a.DomainList(), a.Canonical
-	}
-	return a.ServiceDomainMap()[service], ""
+	return a.DomainsOf("")
 }
 
 // Bucket is one of a workspace's S3-compatible buckets, where the backups

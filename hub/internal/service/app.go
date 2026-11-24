@@ -603,27 +603,19 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 	if err != nil {
 		return false, err
 	}
-	for _, list := range app.ServiceDomainMap() {
-		for _, domain := range clean {
-			if slices.Contains(list, domain) {
-				return false, ErrDomainTaken
-			}
-		}
-	}
 	canonical = strings.ToLower(strings.TrimSpace(canonical))
 	if canonical != "" && !slices.Contains(clean, canonical) {
 		return false, ErrCanonical
 	}
-	if slices.Equal(clean, app.DomainList()) && canonical == app.Canonical {
+	saved, savedCanonical := app.DomainsOf("")
+	if sameDomains(clean, saved) && canonical == savedCanonical {
 		return false, nil
 	}
-	before := strings.Join(app.DomainList(), ", ")
-	body, _ := json.Marshal(clean)
-	err = s.apps.SetDomains(app.ID, string(body), canonical)
+	before := strings.Join(saved, ", ")
+	err = s.apps.SetDomains(app.ID, "", clean, canonical)
 	if err != nil {
 		return false, err
 	}
-	app.Domains = string(body)
 	s.syncTunnelOf(app)
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"from": before, "domains": strings.Join(clean, ", "), "canonical": canonical})
 	s.notify(actor.WorkspaceID)
@@ -871,7 +863,7 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 	}
 	// Then the domains of the other services, by service: compose.yml's
 	// where it sets them, else moin'.
-	services := app.ServiceDomainMap()
+	services := app.ServiceDomains()
 	fromComposeServices := s.composeServiceDomains(app)
 	maps.Copy(services, fromComposeServices)
 	main := s.mainService(app)
@@ -1006,7 +998,8 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 		return nil, err
 	}
 	start.DeployID, start.App, start.Name, start.AppID, start.Number = deploy.ID, app.Folder, app.Name, app.ID, deploy.Number
-	start.Domains = &protocol.Domains{Domains: app.DomainList(), Canonical: app.Canonical, Protect: app.Protect, Services: serviceDomains(app)}
+	domains, canonical := app.DomainsOf("")
+	start.Domains = &protocol.Domains{Domains: domains, Canonical: canonical, Protect: app.Protect, Services: serviceDomains(app)}
 	err = s.fillInstant(app, start.Domains)
 	if err != nil {
 		return nil, err

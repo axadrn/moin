@@ -167,7 +167,8 @@ func (s *AppService) appUptimeDomains(app *model.App) ([]string, string) {
 			detected = deploy.Detected
 		}
 	}
-	return uptimeDomains(app.Domains, detected)
+	saved, _ := app.DomainsOf("")
+	return uptimeDomains(saved, detected)
 }
 
 // uptimeDomain is one domain with its newest result from memory and its

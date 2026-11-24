@@ -72,6 +72,7 @@ func (r *Apps) Create(app *model.App) error {
 	return err
 }
 
+// get finds one app with its domains.
 func (r *Apps) get(query string, args ...any) (*model.App, error) {
 	app := &model.App{}
 	err := r.db.Get(app, query, args...)
@@ -81,7 +82,27 @@ func (r *Apps) get(query string, args ...any) (*model.App, error) {
 	if err != nil {
 		return nil, err
 	}
+	app.Domains, err = r.Domains(app.ID)
+	if err != nil {
+		return nil, err
+	}
 	return app, nil
+}
+
+// list finds apps, each with its domains.
+func (r *Apps) list(query string, args ...any) ([]model.App, error) {
+	apps := []model.App{}
+	err := r.db.Select(&apps, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	for i := range apps {
+		apps[i].Domains, err = r.Domains(apps[i].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return apps, nil
 }
 
 // ByIDOrNameForWorkspace finds an app of the workspace by its ID or its
@@ -123,9 +144,7 @@ func (r *Apps) ByID(id string) (*model.App, error) {
 }
 
 func (r *Apps) ListByWorkspaceID(workspaceID string) ([]model.App, error) {
-	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.workspace_id = $1 ORDER BY a.name, a.id`, workspaceID)
-	return apps, err
+	return r.list(appSelect+` WHERE a.workspace_id = $1 ORDER BY a.name, a.id`, workspaceID)
 }
 
 func (r *Apps) DeleteForWorkspace(id, workspaceID string) error {
@@ -295,18 +314,6 @@ func (r *Apps) DeleteRegistry(workspaceID, host string) error {
 	return nil
 }
 
-// SetDomains stores the domains (a JSON array) and the canonical domain.
-func (r *Apps) SetDomains(appID, domains, canonical string) error {
-	_, err := r.db.Exec(`UPDATE apps SET domains = $1, canonical = $2 WHERE id = $3`, domains, canonical, appID)
-	return err
-}
-
-// SetServiceDomains stores the domains of the other services, a JSON object.
-func (r *Apps) SetServiceDomains(appID, domains string) error {
-	_, err := r.db.Exec(`UPDATE apps SET service_domains = $1 WHERE id = $2`, domains, appID)
-	return err
-}
-
 // SetInstant stores the instant address provider and whether it is open.
 func (r *Apps) SetInstant(appID, provider string, open bool) error {
 	_, err := r.db.Exec(`UPDATE apps SET instant = $1, instant_open = $2 WHERE id = $3`, provider, open, appID)
@@ -335,9 +342,7 @@ func (r *Apps) SetProtect(appID, protect string) error {
 // CatalogApps are the apps of every workspace installed from the
 // catalog entry slug.
 func (r *Apps) CatalogApps(slug string) ([]model.App, error) {
-	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.catalog = $1 ORDER BY a.created_at`, slug)
-	return apps, err
+	return r.list(appSelect+` WHERE a.catalog = $1 ORDER BY a.created_at`, slug)
 }
 
 func (r *Apps) SetCatalogNotified(appID, version string) error {
@@ -500,8 +505,7 @@ func (r *Apps) GitHubInstallation(installationID int64) (*model.GitHubInstallati
 	if err != nil {
 		return nil, nil, err
 	}
-	apps := []model.App{}
-	err = r.db.Select(&apps, appSelect+` WHERE a.installation_id = $1`, installationID)
+	apps, err := r.list(appSelect+` WHERE a.installation_id = $1`, installationID)
 	return installation, apps, err
 }
 
@@ -529,9 +533,7 @@ func (r *Apps) SetAutoDeploy(appID string, on bool) error {
 }
 
 func (r *Apps) AppsForPush(installationID int64, repo, branch string) ([]model.App, error) {
-	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.installation_id = $1 AND lower(a.repo) = lower($2) AND a.branch = $3 AND a.auto_deploy = 1`, installationID, repo, branch)
-	return apps, err
+	return r.list(appSelect+` WHERE a.installation_id = $1 AND lower(a.repo) = lower($2) AND a.branch = $3 AND a.auto_deploy = 1`, installationID, repo, branch)
 }
 
 // SetPinned pins or unpins an app.
