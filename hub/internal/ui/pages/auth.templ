@@ -11,7 +11,7 @@ import (
 
 // Auth is the way in: GitHub where the GitHub App is set up, else the
 // recovery key from the terminal, which signs in the first admin, and a
-// passkey on every hub with a domain. note says why someone is here, like
+// passkey where the hub offers them. note says why someone is here, like
 // after an email change.
 templ Auth(note, githubError string) {
 	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {

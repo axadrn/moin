@@ -149,10 +149,7 @@ func New(cfg *config.Config) (*App, error) {
 		fileService,
 		email, workspaceService,
 	)
-	passkeys, err := newPasskeys(cfg, users, email, repository.NewPasskeys(database))
-	if err != nil {
-		return nil, err
-	}
+	passkeys := newPasskeys(cfg, users, email, repository.NewPasskeys(database))
 	apiTokenService := service.NewAPITokenService(repository.NewAPITokens(database), workspaceService)
 	auth.UseAPITokens(apiTokenService)
 	secrets, err := secret.New(cfg.SecretsKey)
@@ -255,15 +252,14 @@ func New(cfg *config.Config) (*App, error) {
 }
 
 // newPasskeys is the passkeys of the hub, which belong to the domain of
-// APP_URL. Passkeys need a domain name, which go-webauthn checks; on a hub
-// at an IP address, the service refuses them.
-func newPasskeys(cfg *config.Config, users *repository.Users, email *service.EmailService, passkeys *repository.Passkeys) (*service.PasskeyService, error) {
-	if !cfg.Passkeys() {
-		return service.NewPasskeyService(passkeys, users, email, nil), nil
-	}
+// APP_URL. Browsers make passkeys only over HTTPS or on localhost, and
+// go-webauthn takes only a host it can use as the relying party. Else
+// passkeys are off: the hub starts and says why once.
+func newPasskeys(cfg *config.Config, users *repository.Users, email *service.EmailService, passkeys *repository.Passkeys) *service.PasskeyService {
 	appURL, err := url.Parse(cfg.AppURL)
-	if err != nil {
-		return nil, err
+	if err != nil || (appURL.Scheme != "https" && appURL.Hostname() != "localhost") {
+		slog.Warn("passkeys are off: APP_URL is not https or localhost", "app_url", cfg.AppURL)
+		return service.NewPasskeyService(passkeys, users, email, nil)
 	}
 	ceremony := webauthn.TimeoutConfig{Enforce: true, Timeout: service.PasskeyCeremonyExpiry, TimeoutUVD: service.PasskeyCeremonyExpiry}
 	webAuthn, err := webauthn.New(&webauthn.Config{
@@ -279,9 +275,10 @@ func newPasskeys(cfg *config.Config, users *repository.Users, email *service.Ema
 		Timeouts: webauthn.TimeoutsConfig{Login: ceremony, Registration: ceremony},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("set up passkeys: %w", err)
+		slog.Warn("passkeys are off: "+err.Error(), "app_url", cfg.AppURL)
+		return service.NewPasskeyService(passkeys, users, email, nil)
 	}
-	return service.NewPasskeyService(passkeys, users, email, webAuthn), nil
+	return service.NewPasskeyService(passkeys, users, email, webAuthn)
 }
 
 func (a *App) Close() error {

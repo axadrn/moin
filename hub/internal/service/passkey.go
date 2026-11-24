@@ -23,9 +23,9 @@ import (
 const PasskeyCeremonyExpiry = 5 * time.Minute
 
 var (
-	// ErrPasskeysOff says this hub has no passkeys: APP_URL is an IP
-	// address, which no passkey belongs to.
-	ErrPasskeysOff = errors.New("passkeys need APP_URL on a domain name")
+	// ErrPasskeysOff says this hub has no passkeys: APP_URL is neither
+	// https nor localhost, or go-webauthn takes no passkey for its host.
+	ErrPasskeysOff = errors.New("passkeys need APP_URL on https with a domain name")
 	// ErrPasskeyExpired refuses a ceremony that is unknown, used or older
 	// than PasskeyCeremonyExpiry.
 	ErrPasskeyExpired = errors.New("this passkey request expired")
@@ -44,13 +44,19 @@ type PasskeyService struct {
 	passkeys *repository.Passkeys
 	users    *repository.Users
 	email    *EmailService
-	// webAuthn is nil on a hub without passkeys (Config.Passkeys).
+	// webAuthn is nil on a hub without passkeys (app.newPasskeys).
 	webAuthn *webauthn.WebAuthn
 	now      func() time.Time
 }
 
 func NewPasskeyService(passkeys *repository.Passkeys, users *repository.Users, email *EmailService, webAuthn *webauthn.WebAuthn) *PasskeyService {
 	return &PasskeyService{passkeys: passkeys, users: users, email: email, webAuthn: webAuthn, now: time.Now}
+}
+
+// On says this hub offers passkeys. The sign-in page, the settings, the
+// banner and the routes all ask this.
+func (s *PasskeyService) On() bool {
+	return s.webAuthn != nil
 }
 
 // BeginSignIn starts a sign-in with any passkey of this hub: nobody types
@@ -149,8 +155,9 @@ func (s *PasskeyService) BeginAdd(session *model.Session) (*protocol.PublicKeyCr
 }
 
 // Add checks the browser's answer to the options of the ceremony and
-// stores the new passkey. Only the user who began the ceremony adds with it. An email tells
-// the user, so a passkey nobody expected does not go unseen.
+// stores the new passkey. Only the user who began the ceremony adds with it,
+// and only while session is live. An email tells the user, so a passkey
+// nobody expected does not go unseen.
 func (s *PasskeyService) Add(session *model.Session, ceremony string, answer io.Reader) (*model.Passkey, error) {
 	if session == nil || session.IsImpersonating() {
 		return nil, ErrImpersonating
@@ -188,7 +195,7 @@ func (s *PasskeyService) Add(session *model.Session, ceremony string, answer io.
 		Name:         "Passkey",
 		CreatedAt:    now,
 	}
-	if err := s.passkeys.Create(passkey); err != nil {
+	if err := s.passkeys.Create(passkey, session.ID); err != nil {
 		return nil, err
 	}
 	slog.Info("passkey added", "user_id", user.ID)

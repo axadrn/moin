@@ -14,8 +14,8 @@ import (
 
 // Passkeys go through two requests from passkey.js: the options, which
 // start a ceremony, and the browser's answer. The ceremony's id travels in
-// a cookie between them. Both answer passkey.js: JSON options, a redirect
-// on success, or the reason in plain text.
+// a cookie between them. Both answer passkey.js: JSON options, the JSON
+// location to go to on success, or the reason in plain text.
 
 // passkeyCeremonyCookie carries the id of a passkey ceremony from its
 // options to the answer, for this site only and never to scripts.
@@ -35,8 +35,8 @@ func (h *authHandler) PasskeyOptions(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, http.StatusOK, options)
 }
 
-// SignInWithPasskey takes the browser's answer, starts a session and leads
-// on like every sign-in.
+// SignInWithPasskey takes the browser's answer, starts a session and says
+// where to go, like every sign-in.
 func (h *authHandler) SignInWithPasskey(w http.ResponseWriter, r *http.Request) {
 	user, err := h.passkeys.SignIn(takePasskeyCeremony(w, r), http.MaxBytesReader(w, r.Body, maxPasskeyAnswer))
 	if err != nil {
@@ -48,7 +48,7 @@ func (h *authHandler) SignInWithPasskey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	slog.Info("user signed in with a passkey", "user_id", user.ID)
-	h.redirectAfterAuth(w, r, user)
+	api.JSON(w, http.StatusOK, passkeyDone{Location: h.afterAuth(w, r, user)})
 }
 
 // PasskeyOptions starts adding a passkey to the signed-in user.
@@ -62,15 +62,20 @@ func (h *SettingsHandler) PasskeyOptions(w http.ResponseWriter, r *http.Request)
 	api.JSON(w, http.StatusOK, options)
 }
 
-// AddPasskey takes the browser's answer, stores the passkey and goes back
-// to the security settings, which list it.
+// AddPasskey takes the browser's answer, stores the passkey and says to
+// go back to the security settings, which list it.
 func (h *SettingsHandler) AddPasskey(w http.ResponseWriter, r *http.Request) {
 	_, err := h.passkeys.Add(ctxkeys.Session(r.Context()), takePasskeyCeremony(w, r), http.MaxBytesReader(w, r.Body, maxPasskeyAnswer))
 	if err != nil {
 		passkeyFailed(w, err)
 		return
 	}
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/settings/account?tab=security", http.StatusSeeOther)
+	api.JSON(w, http.StatusOK, passkeyDone{Location: ctxkeys.AppBasePath(r.Context()) + "/settings/account?tab=security"})
+}
+
+// passkeyDone tells passkey.js where to go after a ceremony worked.
+type passkeyDone struct {
+	Location string `json:"location"`
 }
 
 // RemovePasskey removes a passkey of the signed-in user, unless it is
@@ -142,8 +147,10 @@ func passkeyFailed(w http.ResponseWriter, err error) {
 		http.Error(w, "This passkey is added already.", http.StatusConflict)
 	case errors.Is(err, service.ErrImpersonating):
 		http.Error(w, "Impersonation is read-only.", http.StatusForbidden)
+	case errors.Is(err, repository.ErrSessionNotFound):
+		http.Error(w, "Your session ended. Sign in again.", http.StatusUnauthorized)
 	case errors.Is(err, service.ErrPasskeysOff):
-		http.Error(w, "Passkeys need this hub on a domain name.", http.StatusConflict)
+		http.Error(w, "Passkeys need this hub on HTTPS with a domain name.", http.StatusConflict)
 	default:
 		slog.Error("passkey failed", "error", err)
 		http.Error(w, "Something went wrong. Please try again.", http.StatusInternalServerError)

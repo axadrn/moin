@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -168,6 +170,16 @@ func newPasskeyEnvironment(t *testing.T) passkeyEnvironment {
 	return passkeyEnvironment{authFlowEnvironment: environment, passkeys: passkeys}
 }
 
+// session is a new session of the user, as a sign-in makes one.
+func (e passkeyEnvironment) session(t *testing.T, userID string) *model.Session {
+	t.Helper()
+	session, _, err := e.auth.CreateSession(httptest.NewRequest(http.MethodGet, "/", nil), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return session
+}
+
 // add adds a passkey on authenticator to the user of session.
 func (e passkeyEnvironment) add(t *testing.T, session *model.Session, authenticator *softAuthenticator) *model.Passkey {
 	t.Helper()
@@ -199,7 +211,7 @@ func TestPasskeyAddsAndSignsIn(t *testing.T) {
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	authenticator := newSoftAuthenticator(t)
 
-	passkey := environment.add(t, &model.Session{UserID: "ada"}, authenticator)
+	passkey := environment.add(t, environment.session(t, "ada"), authenticator)
 	if passkey.Name != "Passkey" || !bytes.Equal(passkey.CredentialID, authenticator.id) {
 		t.Fatalf("passkey = %+v", passkey)
 	}
@@ -231,7 +243,7 @@ func TestPasskeyRefusesAnotherOrigin(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	authenticator := newSoftAuthenticator(t)
-	environment.add(t, &model.Session{UserID: "ada"}, authenticator)
+	environment.add(t, environment.session(t, "ada"), authenticator)
 
 	if _, err := environment.signIn(t, authenticator, "https://phish.example.com"); !errors.Is(err, ErrPasskeyRefused) {
 		t.Fatalf("another origin: error = %v, want ErrPasskeyRefused", err)
@@ -243,7 +255,7 @@ func TestPasskeyRefusesAReplay(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	authenticator := newSoftAuthenticator(t)
-	environment.add(t, &model.Session{UserID: "ada"}, authenticator)
+	environment.add(t, environment.session(t, "ada"), authenticator)
 
 	options, ceremony, err := environment.passkeys.BeginSignIn()
 	if err != nil {
@@ -273,7 +285,7 @@ func TestPasskeyCeremonyExpires(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	authenticator := newSoftAuthenticator(t)
-	environment.add(t, &model.Session{UserID: "ada"}, authenticator)
+	environment.add(t, environment.session(t, "ada"), authenticator)
 
 	options, ceremony, err := environment.passkeys.BeginSignIn()
 	if err != nil {
@@ -293,7 +305,7 @@ func TestPasskeyRefusesALowerCounter(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	authenticator := newSoftAuthenticator(t)
-	environment.add(t, &model.Session{UserID: "ada"}, authenticator)
+	environment.add(t, environment.session(t, "ada"), authenticator)
 	for range 2 {
 		if _, err := environment.signIn(t, authenticator, passkeyOrigin); err != nil {
 			t.Fatal(err)
@@ -314,11 +326,11 @@ func TestPasskeyAddBelongsToItsUser(t *testing.T) {
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "bob", Email: "bob@example.com", Name: "Bob", Verified: true})
 	authenticator := newSoftAuthenticator(t)
 
-	options, ceremony, err := environment.passkeys.BeginAdd(&model.Session{UserID: "ada"})
+	options, ceremony, err := environment.passkeys.BeginAdd(environment.session(t, "ada"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := environment.passkeys.Add(&model.Session{UserID: "bob"}, ceremony, authenticator.create(t, options)); !errors.Is(err, ErrPasskeyRefused) {
+	if _, err := environment.passkeys.Add(environment.session(t, "bob"), ceremony, authenticator.create(t, options)); !errors.Is(err, ErrPasskeyRefused) {
 		t.Fatalf("Ada's ceremony for Bob: error = %v, want ErrPasskeyRefused", err)
 	}
 	operator := "operator"
@@ -339,7 +351,7 @@ func TestPasskeyAddBelongsToItsUser(t *testing.T) {
 func TestPasskeyKeepsTheLastWayIn(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
-	session := &model.Session{UserID: "ada"}
+	session := environment.session(t, "ada")
 	first := environment.add(t, session, newSoftAuthenticator(t))
 
 	if err := environment.passkeys.Remove(session, first.ID); !errors.Is(err, repository.ErrPasskeyLastWayIn) {
@@ -366,7 +378,7 @@ func TestRecoveryKeyDeletesPasskeys(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	authenticator := newSoftAuthenticator(t)
-	environment.add(t, &model.Session{UserID: "ada"}, authenticator)
+	environment.add(t, environment.session(t, "ada"), authenticator)
 	key, err := environment.auth.CreateRecoveryKey("ada@example.com")
 	if err != nil {
 		t.Fatal(err)
@@ -384,8 +396,34 @@ func TestRecoveryKeyDeletesPasskeys(t *testing.T) {
 	}
 }
 
-// A hub at an IP address has no passkeys.
-func TestPasskeysNeedADomain(t *testing.T) {
+// A recovery key resets every way in at once: a passkey added from a
+// session it ended stores nothing, even with its ceremony begun before.
+func TestRecoveryKeyBeatsAPasskeyAddInFlight(t *testing.T) {
+	environment := newPasskeyEnvironment(t)
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
+	old := environment.session(t, "ada")
+	options, ceremony, err := environment.passkeys.BeginAdd(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := environment.auth.CreateRecoveryKey("ada@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := environment.auth.SignInWithRecoveryKey(key); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := environment.passkeys.Add(old, ceremony, newSoftAuthenticator(t).create(t, options)); !errors.Is(err, repository.ErrSessionNotFound) {
+		t.Fatalf("Add() from the ended session: error = %v, want ErrSessionNotFound", err)
+	}
+	if passkeys, err := environment.passkeys.List("ada"); err != nil || len(passkeys) != 0 {
+		t.Fatalf("List() = %v, %v, want none", passkeys, err)
+	}
+}
+
+// A hub without passkeys refuses them.
+func TestPasskeysOffRefuses(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
 	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, nil, nil)
 	if _, _, err := passkeys.BeginSignIn(); !errors.Is(err, ErrPasskeysOff) {

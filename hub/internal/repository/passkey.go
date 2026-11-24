@@ -32,13 +32,25 @@ func NewPasskeys(db *sqlx.DB) *Passkeys {
 	return &Passkeys{db: db}
 }
 
-func (r *Passkeys) Create(passkey *model.Passkey) error {
-	_, err := r.db.Exec(`INSERT INTO passkeys (id, user_id, credential_id, credential, name, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
-		passkey.ID, passkey.UserID, passkey.CredentialID, passkey.Credential, passkey.Name, passkey.CreatedAt)
+// Create stores the passkey while sessionID is a live session of its user.
+// One statement, so a recovery key, which ends every session and deletes
+// every passkey at once, never leaves a passkey added from an old session:
+// such an add stores nothing and is ErrSessionNotFound.
+func (r *Passkeys) Create(passkey *model.Passkey, sessionID string) error {
+	result, err := r.db.Exec(`INSERT INTO passkeys (id, user_id, credential_id, credential, name, created_at)
+		SELECT $1, $2, $3, $4, $5, $6
+		WHERE EXISTS (SELECT 1 FROM sessions WHERE id = $7 AND user_id = $2 AND expires_at > $6)`,
+		passkey.ID, passkey.UserID, passkey.CredentialID, passkey.Credential, passkey.Name, passkey.CreatedAt, sessionID)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
 		return ErrPasskeyTaken
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
 }
 
 // ByUser is every passkey of the user, oldest first.

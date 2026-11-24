@@ -135,10 +135,11 @@ func (r *Users) SetRecoveryKey(userID, hash string, expiresAt time.Time) error {
 }
 
 // UseRecoveryKey clears the recovery key with this hash, if it has not
-// expired at now, disconnects the user's GitHub account, deletes their
-// passkeys and returns the id of the user. One transaction, so a key works
-// only once, and a lost or hijacked GitHub account or passkey no longer
-// signs in.
+// expired at now, disconnects the user's GitHub account, ends their
+// sessions, deletes their passkeys and returns the id of the user. One
+// transaction, so a key works only once, a lost or hijacked GitHub account
+// or passkey no longer signs in, and no old session adds a passkey after
+// it (Passkeys.Create).
 func (r *Users) UseRecoveryKey(hash string, now time.Time) (string, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
@@ -153,6 +154,9 @@ func (r *Users) UseRecoveryKey(hash string, now time.Time) (string, error) {
 		return "", ErrUserNotFound
 	}
 	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id = $1 OR impersonator_user_id = $1`, userID); err != nil {
 		return "", err
 	}
 	if _, err := tx.Exec(`DELETE FROM passkeys WHERE user_id = $1`, userID); err != nil {

@@ -192,7 +192,7 @@ Everyone signs up with GitHub, then signs in with GitHub or a [passkey](/docs/gu
 - **You, first.** The install made your account. Sign in with the [recovery key](#recovery-key) it printed, then **Connect GitHub** under **Settings**, **Account**, **Security**. Or, once the GitHub App is set up, sign in with a GitHub account whose verified primary email is your address in `ADMIN_EMAILS`.
 - **Your team.** Invite teammates. The invitation link lets them in with any GitHub account, under the invited address.
 - **Nobody else.** If `ADMIN_EMAILS` is empty nobody can create the first account, and the log says so when the hub starts.
-- **Passkeys need a domain with HTTPS.** A passkey belongs to the domain in `APP_URL`, and browsers make one only over HTTPS. A hub at an IP address offers no passkeys.
+- **Passkeys need a domain with HTTPS.** A passkey belongs to the domain in `APP_URL`, and browsers make one only over HTTPS. With `APP_URL` on plain HTTP or an IP address, the hub starts with passkeys off and says why in its log.
 
 ### Recovery key
 

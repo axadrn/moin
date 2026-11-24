@@ -3,7 +3,7 @@
 // the options at <url>/options, lets the browser make or use the passkey,
 // and sends its answer to <url>. The hub checks everything; this only
 // carries the JSON both ways, with the browser's own PublicKeyCredential
-// methods. On success the hub sends the page on, like any sign-in.
+// methods. On success the hub answers where to go, like any sign-in.
 (() => {
   if (window.moinPasskey) return;
   window.moinPasskey = true;
@@ -15,11 +15,14 @@
     line.hidden = !message;
   };
 
+  // A redirect is never followed: the hub sends one only when the page is
+  // out of date, like signed in already, and a reload shows where to be.
   const post = (url, body) =>
     fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
       body,
+      redirect: "manual",
     });
 
   // The hub says why in plain text; anything else is a page, not a reason.
@@ -41,7 +44,7 @@
     button.disabled = true;
     try {
       const options = await post(url + "/options");
-      if (options.redirected) return location.assign(options.url);
+      if (options.type === "opaqueredirect") return location.reload();
       if (!options.ok) return say(await reason(options));
       const json = await options.json();
       const credential =
@@ -49,8 +52,9 @@
           ? await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(json) })
           : await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(json) });
       const answer = await post(url, JSON.stringify(credential.toJSON()));
+      if (answer.type === "opaqueredirect") return location.reload();
       if (!answer.ok) return say(await reason(answer));
-      location.assign(answer.url);
+      location.assign((await answer.json()).location);
     } catch (error) {
       // Closing the browser's dialog is no mistake.
       if (error.name === "NotAllowedError" || error.name === "AbortError") return;
