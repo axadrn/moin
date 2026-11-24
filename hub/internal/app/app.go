@@ -7,6 +7,7 @@ import (
 	"github.com/axadrn/moin/internal/build"
 	"io/fs"
 	"log/slog"
+	"net/url"
 	"path/filepath"
 
 	catalogfiles "github.com/axadrn/moin/catalog"
@@ -22,6 +23,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/service/mailer"
 	"github.com/axadrn/moin/hub/internal/service/payment"
 	"github.com/axadrn/moin/hub/internal/storage"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -54,6 +57,7 @@ type App struct {
 	AppService          *service.AppService
 	// GitHub is the GitHub App, nil without one.
 	GitHub         *service.GitHub
+	Passkeys       *service.PasskeyService
 	CatalogService *service.CatalogService
 	StatusService  *service.StatusService
 	AlertService   *service.AlertService
@@ -145,6 +149,10 @@ func New(cfg *config.Config) (*App, error) {
 		fileService,
 		email, workspaceService,
 	)
+	passkeys, err := newPasskeys(cfg, users, email, repository.NewPasskeys(database))
+	if err != nil {
+		return nil, err
+	}
 	apiTokenService := service.NewAPITokenService(repository.NewAPITokens(database), workspaceService)
 	auth.UseAPITokens(apiTokenService)
 	secrets, err := secret.New(cfg.SecretsKey)
@@ -232,6 +240,7 @@ func New(cfg *config.Config) (*App, error) {
 		ServerService:      serverService,
 		AppService:         appService,
 		GitHub:             github,
+		Passkeys:           passkeys,
 		CatalogService:     catalogService,
 		StatusService:      service.NewStatusService(appService, serverService, catalogService),
 		AlertService:       alertService,
@@ -243,6 +252,36 @@ func New(cfg *config.Config) (*App, error) {
 		adminService.UseNetwork(application.TelemetryService.Network)
 	}
 	return application, nil
+}
+
+// newPasskeys is the passkeys of the hub, which belong to the domain of
+// APP_URL. Passkeys need a domain name, which go-webauthn checks; on a hub
+// at an IP address, the service refuses them.
+func newPasskeys(cfg *config.Config, users *repository.Users, email *service.EmailService, passkeys *repository.Passkeys) (*service.PasskeyService, error) {
+	if !cfg.Passkeys() {
+		return service.NewPasskeyService(passkeys, users, email, nil), nil
+	}
+	appURL, err := url.Parse(cfg.AppURL)
+	if err != nil {
+		return nil, err
+	}
+	ceremony := webauthn.TimeoutConfig{Enforce: true, Timeout: service.PasskeyCeremonyExpiry, TimeoutUVD: service.PasskeyCeremonyExpiry}
+	webAuthn, err := webauthn.New(&webauthn.Config{
+		RPID:                  appURL.Hostname(),
+		RPDisplayName:         build.Name,
+		RPOrigins:             []string{appURL.Scheme + "://" + appURL.Host},
+		AttestationPreference: protocol.PreferNoAttestation,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			RequireResidentKey: protocol.ResidentKeyRequired(),
+			UserVerification:   protocol.VerificationRequired,
+		},
+		Timeouts: webauthn.TimeoutsConfig{Login: ceremony, Registration: ceremony},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("set up passkeys: %w", err)
+	}
+	return service.NewPasskeyService(passkeys, users, email, webAuthn), nil
 }
 
 func (a *App) Close() error {

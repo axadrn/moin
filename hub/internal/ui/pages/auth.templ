@@ -10,8 +10,9 @@ import (
 )
 
 // Auth is the way in: GitHub where the GitHub App is set up, else the
-// recovery key from the terminal, which signs in the first admin. note
-// says why someone is here, like after an email change.
+// recovery key from the terminal, which signs in the first admin, and a
+// passkey on every hub with a domain. note says why someone is here, like
+// after an email change.
 templ Auth(note, githubError string) {
 	@authScreen(layouts.SEOProps{Title: "Sign in", Description: "Sign in to " + brand.Name + " or create your account"}, authTitle(ctx)) {
 		if note != "" {
@@ -30,11 +31,13 @@ templ Auth(note, githubError string) {
 			}
 			@authStack() {
 				@continueWithGitHub()
+				@signInWithPasskey()
 			}
 			@authTerms()
 		} else {
 			@authStack() {
 				@AuthKeyForm("")
+				@signInWithPasskey()
 			}
 		}
 	}
@@ -52,6 +55,30 @@ templ continueWithGitHub() {
 		@components.Icon("git-hub")
 		Continue with GitHub
 	}
+}
+
+// signInWithPasskey signs in with a passkey of this hub, without an email
+// typed: the passkey names the account (passkey.js).
+templ signInWithPasskey() {
+	if ctxkeys.RenderConfig(ctx).Passkeys {
+		@components.Button(components.ButtonProps{Attrs: templ.Attributes{"data-passkey": "sign-in", "data-passkey-url": "/auth/passkey"}}) {
+			@components.Icon("key")
+			Sign in with a passkey
+		}
+		@passkeyError()
+		@passkeyScript()
+	}
+}
+
+// passkeyError is the line under a passkey button that says why it did
+// not work. passkey.js fills it.
+templ passkeyError() {
+	<p class="moin-text moin-failed" role="alert" data-passkey-error hidden></p>
+}
+
+// passkeyScript is passkey.js, for a page with a passkey button.
+templ passkeyScript() {
+	<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/js/passkey.js") }></script>
 }
 
 // AuthKey takes a recovery key from the terminal.

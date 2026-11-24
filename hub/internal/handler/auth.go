@@ -19,15 +19,17 @@ type authHandler struct {
 	authService      *service.AuthService
 	workspaceService *service.WorkspaceService
 	// github signs people in, nil without the GitHub App.
-	github *service.GitHub
-	cfg    *config.Config
+	github   *service.GitHub
+	passkeys *service.PasskeyService
+	cfg      *config.Config
 }
 
-func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, github *service.GitHub, cfg *config.Config) *authHandler {
+func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, github *service.GitHub, passkeys *service.PasskeyService, cfg *config.Config) *authHandler {
 	return &authHandler{
 		authService:      authService,
 		workspaceService: workspaceService,
 		github:           github,
+		passkeys:         passkeys,
 		cfg:              cfg,
 	}
 }
@@ -85,8 +87,9 @@ func (h *authHandler) KeyPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // SignInWithKey signs in with a recovery key, once. It ends every other
-// session of the user, whose GitHub account the key disconnected, and
-// leads to the security settings to connect GitHub again.
+// session of the user, whose GitHub account the key disconnected and whose
+// passkeys it deleted, and leads to the security settings to connect
+// GitHub and add a passkey again.
 func (h *authHandler) SignInWithKey(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
 	if key == "" {

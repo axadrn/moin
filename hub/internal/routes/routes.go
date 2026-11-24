@@ -38,7 +38,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux := http.NewServeMux()
 	siteRoutes(mux, app, home, catalogPages)
-	authRoutes(mux, app, rateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs))
+	authRoutes(mux, app, rateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs), middleware.RateLimitPasskeyLogin(clientIPs))
 	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter))
 	appRoutes(mux, app, catalogPages)
 	adminRoutes(mux, app)
@@ -202,13 +202,15 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 
 // authRoutes sign people in and out, start a workspace, take an invitation
 // and approve moin login in the browser.
-func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, githubLimiter limiter) {
-	auth := handler.NewAuthHandler(app.AuthService, app.WorkspaceService, app.GitHub, app.Cfg)
+func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, githubLimiter, passkeyLimiter limiter) {
+	auth := handler.NewAuthHandler(app.AuthService, app.WorkspaceService, app.GitHub, app.Passkeys, app.Cfg)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
 	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
 	mux.HandleFunc("GET /auth", middleware.RequireGuest(auth.AuthPage))
 	mux.HandleFunc("GET /auth/key", middleware.RequireGuest(auth.KeyPage))
 	mux.HandleFunc("POST /auth/key", rateLimiter(middleware.RequireGuest(auth.SignInWithKey)))
+	mux.HandleFunc("POST /auth/passkey/options", passkeyLimiter(middleware.RequireGuest(auth.PasskeyOptions)))
+	mux.HandleFunc("POST /auth/passkey", passkeyLimiter(middleware.RequireGuest(auth.SignInWithPasskey)))
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
 	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
 	mux.HandleFunc("POST /auth/github/connect", githubLimiter(middleware.RequireAuth(auth.ConnectGitHub)))
@@ -239,7 +241,7 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 // the overview, settings, the account, billing, the team and alerts.
 func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations limiter) {
 	workspace := inWorkspace(app)
-	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService, app.UpdateService)
+	settings := handler.NewSettingsHandler(app.AuthService, app.Passkeys, app.APITokenService, app.AppService, app.UpdateService)
 	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
@@ -260,6 +262,9 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	mux.HandleFunc("POST /app/{workspaceSlug}/integrations", workspace(settings.SetIntegrations))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys/options", workspace(settings.PasskeyOptions))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys", workspace(settings.AddPasskey))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RemovePasskey))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/api-tokens/{id}", workspace(apiTokens.Revoke))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/profile/name", workspace(profile.UpdateName))
@@ -447,6 +452,7 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Auth:        api.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService),
 		Account:     api.NewAccountHandler(app.AuthService, app.UserService, app.FileService),
 		Sessions:    api.NewSessionsHandler(app.AuthService),
+		Passkeys:    api.NewPasskeysHandler(app.Passkeys),
 		Tokens:      api.NewAPITokensHandler(app.APITokenService),
 		Billing:     apiBilling,
 		Admin:       api.NewAdminHandler(app.AdminService),

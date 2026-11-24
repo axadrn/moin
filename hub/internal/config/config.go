@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/internal/client"
+	"net"
 	"net/mail"
 	"net/netip"
 	"net/url"
@@ -140,6 +141,8 @@ type RenderConfig struct {
 	SignupsOpen       bool
 	// GitHubLogin is Config.GitHubLogin, for the sign-in pages.
 	GitHubLogin bool
+	// Passkeys is Config.Passkeys, for the sign-in page and the settings.
+	Passkeys bool
 }
 
 func Load() (*Config, error) {
@@ -451,7 +454,16 @@ func (c *Config) Render() RenderConfig {
 		Billing:           c.Billing,
 		SignupsOpen:       c.SignupsOpen,
 		GitHubLogin:       c.GitHubLogin(),
+		Passkeys:          c.Passkeys(),
 	}
+}
+
+// Passkeys says whether people sign in with passkeys: APP_URL names a
+// domain, not an IP address. A passkey belongs to that domain, so a new
+// domain in APP_URL leaves every passkey behind.
+func (c *Config) Passkeys() bool {
+	parsed, err := url.Parse(c.AppURL)
+	return err == nil && parsed.Hostname() != "" && net.ParseIP(parsed.Hostname()) == nil
 }
 
 // GitHubLogin says whether people sign in with GitHub: the GitHub App is

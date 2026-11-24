@@ -1,6 +1,9 @@
 package service
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func welcomeEmailTemplate(name, appURL, appName string) emailContent {
 	return emailContent{
@@ -60,6 +63,27 @@ func emailChangeNotificationTemplate(name, newEmail, appName string) emailConten
 			"If this was you, verify the new email address using the link we sent to it.",
 		},
 		Outro:   []string{"If you didn't request this change, your account may be compromised. Sign in and use Sign out everywhere under Settings, Security."},
+		AppName: appName,
+	}
+}
+
+// passkeyAddedTemplate tells a user a passkey was added to their account,
+// so one nobody expected does not go unseen.
+func passkeyAddedTemplate(name, passkeyName string, at time.Time, appName string) emailContent {
+	greeting := "Hi,"
+	if name != "" {
+		greeting = fmt.Sprintf("Hi %s,", name)
+	}
+	return emailContent{
+		Subject:   "A passkey was added to your account",
+		Preheader: fmt.Sprintf("A passkey now signs in to your %s account.", appName),
+		Heading:   "A passkey was added",
+		Greeting:  greeting,
+		Intro: []string{
+			fmt.Sprintf("A passkey (%s) was added to your %s account on %s.", passkeyName, appName, at.UTC().Format("January 2, 2006 at 15:04 UTC")),
+			"It signs in to your account from now on.",
+		},
+		Outro:   []string{"If this was not you, sign in, remove the passkey under Settings, Account, Security, and use Sign out everywhere."},
 		AppName: appName,
 	}
 }

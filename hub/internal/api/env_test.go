@@ -110,6 +110,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Auth:        authHandler,
 		Account:     accountHandler,
 		Sessions:    sessionsHandler,
+		Passkeys:    api.NewPasskeysHandler(service.NewPasskeyService(repository.NewPasskeys(database), userRepository, email, nil)),
 		Tokens:      api.NewAPITokensHandler(environment.tokens),
 		Billing:     billingHandler,
 		Admin:       adminHandler,

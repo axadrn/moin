@@ -51,9 +51,13 @@ func (r *Users) Create(user *model.User) error {
 	return nil
 }
 
+// userColumns are the columns of a model.User: the row and how many
+// passkeys the user has.
+const userColumns = `users.*, (SELECT COUNT(*) FROM passkeys WHERE passkeys.user_id = users.id) AS passkeys`
+
 func (r *Users) ByID(id string) (*model.User, error) {
 	user := &model.User{}
-	query := `SELECT * FROM users WHERE id = $1`
+	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
 	err := r.db.Get(user, query, id)
 	if err == sql.ErrNoRows {
@@ -65,7 +69,7 @@ func (r *Users) ByID(id string) (*model.User, error) {
 
 func (r *Users) ByEmail(email string) (*model.User, error) {
 	user := &model.User{}
-	query := `SELECT * FROM users WHERE email = $1`
+	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
 
 	err := r.db.Get(user, query, email)
 	if err == sql.ErrNoRows {
@@ -78,7 +82,7 @@ func (r *Users) ByEmail(email string) (*model.User, error) {
 // ByGitHubID is the user who signs in with the GitHub account id.
 func (r *Users) ByGitHubID(id int64) (*model.User, error) {
 	user := &model.User{}
-	err := r.db.Get(user, `SELECT * FROM users WHERE github_id = $1`, id)
+	err := r.db.Get(user, `SELECT `+userColumns+` FROM users WHERE github_id = $1`, id)
 	if err == sql.ErrNoRows {
 		return nil, ErrUserNotFound
 	}
@@ -131,16 +135,30 @@ func (r *Users) SetRecoveryKey(userID, hash string, expiresAt time.Time) error {
 }
 
 // UseRecoveryKey clears the recovery key with this hash, if it has not
-// expired at now, disconnects the user's GitHub account and returns the id
-// of the user. One statement, so a key works only once, and a lost or
-// hijacked GitHub account no longer signs in.
+// expired at now, disconnects the user's GitHub account, deletes their
+// passkeys and returns the id of the user. One transaction, so a key works
+// only once, and a lost or hijacked GitHub account or passkey no longer
+// signs in.
 func (r *Users) UseRecoveryKey(hash string, now time.Time) (string, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
 	var userID string
-	err := r.db.Get(&userID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2 WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
+	err = tx.Get(&userID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2 WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
 	if err == sql.ErrNoRows {
 		return "", ErrUserNotFound
 	}
-	return userID, err
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(`DELETE FROM passkeys WHERE user_id = $1`, userID); err != nil {
+		return "", err
+	}
+	return userID, tx.Commit()
 }
 
 func (r *Users) UpdateName(userID, name string, updatedAt time.Time) error {

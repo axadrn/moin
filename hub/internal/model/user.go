@@ -30,6 +30,9 @@ type User struct {
 	// command recovery-key, until it is used or expires.
 	RecoveryKeyHash      *string    `db:"recovery_key_hash"`
 	RecoveryKeyExpiresAt *time.Time `db:"recovery_key_expires_at"`
+	// Passkeys is how many passkeys the user has. Users.ByID, ByEmail
+	// and ByGitHubID count them; without one, the app asks for one.
+	Passkeys int `db:"passkeys"`
 
 	// Computed fields (not in database)
 	AvatarURL string `db:"-"`

@@ -77,3 +77,28 @@ func renderApp(t *testing.T, ctx context.Context) string {
 	}
 	return output.String()
 }
+
+// Everyone without a passkey is asked for one over every page, until they
+// have one. An operator impersonating them is not, and nor is a hub
+// without passkeys.
+func TestAppAsksForAPasskeyUntilThereIsOne(t *testing.T) {
+	withPasskeys := func(ctx context.Context, passkeys int) context.Context {
+		ctx = ctxkeys.WithRenderConfig(ctx, config.RenderConfig{Passkeys: true})
+		return ctxkeys.WithUser(ctx, &model.User{ID: "user-1", Email: "user@example.com", Name: "Test User", Passkeys: passkeys})
+	}
+	page := renderApp(t, withPasskeys(appContext(model.WorkspaceRoleOwner, 1), 0))
+	if !strings.Contains(page, "Secure your account: add a passkey.") || !strings.Contains(page, `href="/app/first-workspace/settings/account?tab=security"`) {
+		t.Fatal("no passkey card without a passkey")
+	}
+	if page := renderApp(t, withPasskeys(appContext(model.WorkspaceRoleOwner, 1), 1)); strings.Contains(page, "data-passkey-card") {
+		t.Fatal("the passkey card stays with a passkey")
+	}
+	operator := "operator"
+	impersonating := ctxkeys.WithSession(withPasskeys(appContext(model.WorkspaceRoleOwner, 1), 0), &model.Session{ImpersonatorUserID: &operator})
+	if page := renderApp(t, impersonating); strings.Contains(page, "data-passkey-card") {
+		t.Fatal("the passkey card shows while impersonating")
+	}
+	if page := renderAppLayout(t, model.WorkspaceRoleOwner, 1); strings.Contains(page, "data-passkey-card") {
+		t.Fatal("the passkey card shows on a hub without passkeys")
+	}
+}

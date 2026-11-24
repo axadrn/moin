@@ -18,9 +18,10 @@ import (
 //	                       when its daemon connected already
 //	recovery-key <email>   prints a key that signs in to the account of
 //	                       email once, within an hour, signs it out
-//	                       everywhere else and disconnects its GitHub: the
-//	                       first sign-in of a self-hosted hub, or a way back
-//	                       for someone who lost their GitHub account
+//	                       everywhere else, disconnects its GitHub and
+//	                       deletes its passkeys: the first sign-in of a
+//	                       self-hosted hub, or a way back for someone who
+//	                       lost their GitHub account or passkey
 func command(cfg *config.Config, args []string) error {
 	switch args[0] {
 	case "bootstrap":
@@ -58,7 +59,7 @@ func command(cfg *config.Config, args []string) error {
 		}
 		fmt.Println(key)
 		fmt.Println("Enter it at " + strings.TrimRight(cfg.AppURL, "/") + "/auth/key. It is valid for 1 hour and works once.")
-		fmt.Println("It signs out everywhere and disconnects GitHub: connect your GitHub again under Settings, Account, Security.")
+		fmt.Println("It signs out everywhere, disconnects GitHub and deletes every passkey: connect GitHub and add a passkey again under Settings, Account, Security.")
 		return nil
 	}
 	return fmt.Errorf("unknown command %q: bootstrap <server name> or recovery-key <email>", args[0])

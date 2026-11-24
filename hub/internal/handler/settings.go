@@ -14,13 +14,14 @@ import (
 
 type SettingsHandler struct {
 	authService *service.AuthService
+	passkeys    *service.PasskeyService
 	apiTokens   *service.APITokenService
 	apps        *service.AppService
 	updates     *service.UpdateService
 }
 
-func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService, apps *service.AppService, updates *service.UpdateService) *SettingsHandler {
-	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps, updates: updates}
+func NewSettingsHandler(authService *service.AuthService, passkeys *service.PasskeyService, apiTokens *service.APITokenService, apps *service.AppService, updates *service.UpdateService) *SettingsHandler {
+	return &SettingsHandler{authService: authService, passkeys: passkeys, apiTokens: apiTokens, apps: apps, updates: updates}
 }
 
 // Home is Settings: you, your workspaces, this workspace, moin, sign out.
@@ -118,7 +119,14 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
 		return
 	}
-	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, pages.SettingsAPITokensSection(tokens)))
+	passkeys, err := h.passkeys.List(user.ID)
+	if err != nil {
+		slog.Error("failed to list passkeys", "error", err, "user_id", user.ID)
+		w.WriteHeader(http.StatusInternalServerError)
+		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
+		return
+	}
+	render(w, r, pages.Settings(sessions, currentSessionID, passkeys, activeTab, pages.SettingsAPITokensSection(tokens)))
 }
 
 func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {
