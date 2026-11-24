@@ -13,7 +13,7 @@ import (
 func registerUptimeTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_uptime", Title: "Get uptime", Annotations: readOnly("Get uptime"),
-		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the visit goes, its state, the last visit with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. moin visits every domain that serves something once a minute like a visitor, not one that only redirects to the main domain; an answer below 500 is up, and two minutes without one is down. Needs the read scope.",
+		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the visit goes, its state, the last visit with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. moin visits every domain that serves something once a minute like a visitor, not one that only redirects to the main domain; an answer below 500 is up; a domain goes down after 3 failed visits in a row and back up after 3 answers in a row. Needs the read scope.",
 	}, Read(member(services, tools.getUptime)))
 	writeTool := change(false, true)
 	writeTool.Title = "Set uptime"

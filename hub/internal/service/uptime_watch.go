@@ -118,7 +118,10 @@ func (u *uptimeRunner) pathOf(key uptimeKey) (string, bool) {
 // apps could not be read.
 func (s *AppService) syncDomains(now time.Time) (map[uptimeKey]bool, bool) {
 	u := s.uptime
-	u.load(s.apps.DomainUptimes)
+	if err := u.load(s.apps.DomainUptimes); err != nil {
+		slog.Error("load uptime failed", "error", err)
+		return nil, false
+	}
 	apps, err := s.apps.LiveApps()
 	if err != nil {
 		slog.Error("list apps for uptime failed", "error", err)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"hash/fnv"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"sync"
@@ -111,22 +110,23 @@ func newUptimeRunner() *uptimeRunner {
 	}
 }
 
-// load reads the stored uptime into memory, once.
-func (u *uptimeRunner) load(read func() ([]model.DomainUptime, error)) {
+// load reads the stored uptime into memory, once. Until it worked, uptime
+// does nothing: it would start from nothing and lose what is stored.
+func (u *uptimeRunner) load(read func() ([]model.DomainUptime, error)) error {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if u.loaded {
-		return
+		return nil
 	}
 	all, err := read()
 	if err != nil {
-		slog.Error("load uptime failed", "error", err)
-		return
+		return err
 	}
 	for _, stored := range all {
 		u.states[uptimeKey{stored.AppID, stored.Domain}] = &uptimeState{stored: stored}
 	}
 	u.loaded = true
+	return nil
 }
 
 // see changes the state after a visit. The state flips only when
@@ -143,12 +143,16 @@ func (state *uptimeState) see(result uptimeResult) bool {
 		state.changing = 0
 		return false
 	}
+	if state.stored.State == "" && result.up {
+		state.changing = 0
+		state.stored.State, state.stored.Since = model.UptimeUp, &result.at
+		return true
+	}
 	if state.changing == 0 {
 		state.changingSince = result.at
 	}
 	state.changing++
-	first := state.stored.State == "" && result.up
-	if state.changing < UptimeInARow && !first {
+	if state.changing < UptimeInARow {
 		return false
 	}
 	since := state.changingSince

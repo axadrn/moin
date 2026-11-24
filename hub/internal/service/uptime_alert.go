@@ -7,16 +7,30 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-// recordUptimeChange stores the outage of a domain that went down or came
-// back and writes it to the activity: uptime.down with the reason,
-// uptime.up with how long it was down. Both go out as alerts.
-func (s *AppService) recordUptimeChange(workspaceID, appName string, before, stored model.DomainUptime, failure string) {
+// storeUptimeChange stores the new state of a domain that went down or
+// came back, and starts or ends its outage.
+func (s *AppService) storeUptimeChange(before, stored model.DomainUptime, failure string) {
+	err := s.apps.SaveUptimeState(stored)
+	switch {
+	case err != nil:
+	case stored.State == model.UptimeDown:
+		err = s.apps.StartUptimeOutage(stored.AppID, stored.Domain, *stored.Since, failure)
+	case before.State == model.UptimeDown:
+		err = s.apps.EndUptimeOutage(stored.AppID, stored.Domain, *stored.Since)
+	}
+	if err != nil {
+		slog.Error("store uptime change failed", "error", err, "domain", stored.Domain)
+	}
+}
+
+// alertUptimeChange writes a domain that went down or came back to the
+// activity, which sends the alert: uptime.down with the reason, uptime.up
+// with how long it was down.
+func (s *AppService) alertUptimeChange(workspaceID, appName string, before, stored model.DomainUptime, failure string) {
 	switch {
 	case stored.State == model.UptimeDown:
-		_ = s.apps.StartUptimeOutage(stored.AppID, stored.Domain, *stored.Since, failure)
 		s.servers.record(System(workspaceID), "uptime.down", "app", appName, map[string]string{"domain": stored.Domain, "reason": failure})
 	case before.State == model.UptimeDown:
-		_ = s.apps.EndUptimeOutage(stored.AppID, stored.Domain, *stored.Since)
 		s.servers.record(System(workspaceID), "uptime.up", "app", appName, map[string]string{"domain": stored.Domain, "duration": stored.Since.Sub(*before.Since).Round(time.Second).String()})
 	}
 }

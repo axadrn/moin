@@ -299,6 +299,15 @@ func TestUptimeRule(t *testing.T) {
 	if state.stored.State != model.UptimeUp {
 		t.Fatalf("state = %s, want up", state.stored.State)
 	}
+
+	// A new domain that failed before its first answer is up since that
+	// answer.
+	fresh := &uptimeState{}
+	fresh.see(uptimeResult{at: at, up: false})
+	answer := at.Add(time.Minute)
+	if !fresh.see(uptimeResult{at: answer, up: true}) || !fresh.stored.Since.Equal(answer) {
+		t.Fatalf("new domain = %+v", fresh.stored)
+	}
 }
 
 func TestUptimeVisitSettings(t *testing.T) {
