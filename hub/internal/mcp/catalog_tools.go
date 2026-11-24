@@ -3,6 +3,8 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -23,7 +25,7 @@ func registerCatalogTools(server *mcpsdk.Server, services Services) {
 	install := change(false, false)
 	install.Title = "Install a catalog app"
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "install_catalog_app", Title: install.Title, Annotations: install,
-		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. Needs a token with read and write access.",
+		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. When the first sign-in needs a secret moin made, such as ADMIN_PASSWORD, login holds it: the one time it is shown, so hand it to the user to keep in their password manager. Needs a token with read and write access.",
 	}, Write(changes(services, tools.install)))
 	update := change(false, false)
 	update.Title = "Update a catalog app"
@@ -88,7 +90,11 @@ type CatalogDeploy struct {
 }
 
 func (d CatalogDeploy) Summary() string {
-	return fmt.Sprintf("Deploy v%d of %s started.", d.Deploy.Number, d.App.Name)
+	summary := fmt.Sprintf("Deploy v%d of %s started.", d.Deploy.Number, d.App.Name)
+	if len(d.Login) > 0 {
+		summary += " The first sign-in needs " + strings.Join(slices.Sorted(maps.Keys(d.Login)), ", ") + ", in login: shown this once."
+	}
+	return summary
 }
 
 func (t catalogTools) list(_ context.Context, _ Caller, _ struct{}) (CatalogList, error) {
@@ -110,11 +116,11 @@ func (t catalogTools) get(_ context.Context, _ Caller, input CatalogSlugInput) (
 }
 
 func (t catalogTools) install(ctx context.Context, caller Caller, input CatalogInstallInput) (CatalogDeploy, error) {
-	app, deploy, err := t.services.Catalog.Install(ctx, caller.actor(), service.CatalogInstall{Slug: input.Slug, Version: input.Version, Server: input.Server, Name: input.Name, Domain: input.Domain})
+	app, deploy, login, err := t.services.Catalog.Install(ctx, caller.actor(), service.CatalogInstall{Slug: input.Slug, Version: input.Version, Server: input.Server, Name: input.Name, Domain: input.Domain})
 	if err != nil {
 		return CatalogDeploy{}, err
 	}
-	return CatalogDeploy{api.CatalogDeploy{App: api.NewApp(*app), Deploy: api.NewDeploy(*deploy)}}, nil
+	return CatalogDeploy{api.CatalogDeploy{App: api.NewApp(*app), Deploy: api.NewDeploy(*deploy), Login: login}}, nil
 }
 
 func (t catalogTools) update(ctx context.Context, caller Caller, input AppUpdateInput) (CatalogDeploy, error) {

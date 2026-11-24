@@ -29,14 +29,14 @@ func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeDaemon)
 // from the hub.
 func TestCatalogInstall(t *testing.T) {
 	catalogs, apps, daemon := newCatalogService(t)
-	app, deploy, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Domain: "stats.example.com"})
+	app, deploy, login, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Domain: "stats.example.com"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.Name != "umami" || app.Catalog != "umami" || deploy.Number != 1 {
-		t.Errorf("app %s catalog %q, deploy %d", app.Name, app.Catalog, deploy.Number)
+	if app.Name != "umami" || app.Catalog != "umami" || deploy.Number != 1 || len(login) != 0 {
+		t.Errorf("app %s catalog %q, deploy %d, login %v", app.Name, app.Catalog, deploy.Number, login)
 	}
-	env, err := apps.Env(owner.WorkspaceID, app.ID)
+	env, err := apps.env(app)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,9 +49,26 @@ func TestCatalogInstall(t *testing.T) {
 		t.Errorf("deploy start = %+v", start)
 	}
 	listed, _ := apps.Get(owner.WorkspaceID, "umami")
-	info, ok := catalogs.Info(owner.WorkspaceID, listed)
+	info, ok := catalogs.Info(listed)
 	if !ok || info.Version != "3.4.1" || info.Newer {
 		t.Errorf("catalog info = %+v, %v", info, ok)
+	}
+}
+
+// TestCatalogInstallShowsTheLogin: the secret the first sign-in needs comes
+// back once, from the install; the others never do.
+func TestCatalogInstallShowsTheLogin(t *testing.T) {
+	catalogs, apps, _ := newCatalogService(t)
+	app, _, login, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "miniflux", Server: "web-1", Version: "2.2.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := apps.env(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(login) != 1 || login["ADMIN_PASSWORD"] == "" || login["ADMIN_PASSWORD"] != env["ADMIN_PASSWORD"] || env["DB_PASSWORD"] == "" {
+		t.Errorf("login = %v", login)
 	}
 }
 
@@ -64,7 +81,7 @@ func TestCatalogInstallRefuses(t *testing.T) {
 		"bad name":        {Slug: "umami", Server: "web-1", Name: "My App"},
 		"no server":       {Slug: "umami", Server: "nope"},
 	} {
-		if _, _, err := catalogs.Install(context.Background(), owner, input); err == nil {
+		if _, _, _, err := catalogs.Install(context.Background(), owner, input); err == nil {
 			t.Errorf("%s: installed", name)
 		}
 	}
@@ -77,13 +94,13 @@ func TestCatalogInstallRefuses(t *testing.T) {
 // of your own refuses it.
 func TestCatalogUpdate(t *testing.T) {
 	catalogs, apps, daemon := newCatalogService(t)
-	app, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.3.1"})
+	app, _, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "umami", Server: "web-1", Version: "3.3.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, _ := apps.Env(owner.WorkspaceID, app.ID)
+	before, _ := apps.env(app)
 	listed, _ := apps.Get(owner.WorkspaceID, app.ID)
-	if info, _ := catalogs.Info(owner.WorkspaceID, listed); !info.Newer || info.Latest.Tag != "3.4.1" {
+	if info, _ := catalogs.Info(listed); !info.Newer || info.Latest.Tag != "3.4.1" {
 		t.Errorf("before the update = %+v", info)
 	}
 	finishDeploys(t, apps, app.ID)
@@ -91,7 +108,7 @@ func TestCatalogUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, _ := apps.Env(owner.WorkspaceID, app.ID)
+	after, _ := apps.env(app)
 	if after["VERSION"] != "3.4.1" || after["DB_PASSWORD"] != before["DB_PASSWORD"] || deploy.Number != 2 {
 		t.Errorf("after the update: env %v, deploy %d", after, deploy.Number)
 	}

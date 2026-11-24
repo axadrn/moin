@@ -7,6 +7,8 @@ order: 3
 
 Env vars are the settings and secrets your app reads when it starts. `DATABASE_URL` or an API key, for example. moin keeps them encrypted. Your app gets them on the next restart, start or deploy.
 
+Values are write-only. moin shows the name and when it changed, never the value. Keep your secrets in a password manager: moin holds them for your server, not for you.
+
 ```text
 moin env set KEY=value
    │
@@ -45,19 +47,22 @@ Saving never restarts the app. Change several, then [restart](/docs/guides/deplo
 
 ## See the env vars
 
+Each name and when it changed. No surface shows a value.
+
 ```surfaces
 Web: the app's **Settings** tab, **Environment**
 CLI: moin env
-CLI: moin env --show
-TUI: on the app, `e`; `v` shows the values
+TUI: on the app, `e`
 API: GET /api/v1/apps/{app}/env
-MCP: get_env
+MCP: list_env
 ```
+
+To change a value, set it again.
 
 ## Remove an env var
 
 ```surfaces
-Web: the app's **Settings** tab, **Environment**, **Show values**
+Web: the app's **Settings** tab, **Environment**, × on its row
 CLI: moin env rm KEY
 TUI: on the app, `e`, pick the key, `x`, then `y`
 API: PATCH /api/v1/apps/{app}/env
@@ -68,12 +73,12 @@ The API and MCP take the names as `unset`.
 
 ## Edit them all as one text
 
-All env vars as one `.env` file, `KEY=value` per line. Saving replaces all of them. A key missing from the text is removed. moin first shows what it adds, changes and removes, by name only, and asks.
+All env vars as one `.env` file, `KEY=value` per line. Saving replaces all of them. A key missing from the text is removed. The text starts empty: paste your whole `.env`. moin first shows which names it adds, replaces and removes, and asks.
 
 ```surfaces
 Web: the app, **Environment**, switch **Fields** to **Text**, then **Review changes**
 CLI: moin env push [file]
-TUI: on the app, `e`, then `E`: the text opens in `$EDITOR`
+TUI: on the app, `e`, then `E`: an empty text opens in `$EDITOR`
 API: PUT /api/v1/apps/{app}/env
 MCP: replace_env
 ```
@@ -94,16 +99,10 @@ services:
 
 A change to such a variable takes a deploy, not just a restart.
 
-## Use them on your computer
-
-```bash
-moin env pull           # writes .env, readable only by you
-moin run -- go run .    # runs a command with the env vars, without a file
-```
-
 ## Good to know
 
-- Reading values needs an API token with write access. Reading a secret is as strong as writing it.
-- An AI agent that reads or sets values over MCP sees them, and so does its model provider. Give it only the secrets it needs.
+- Your computer keeps its own `.env` for local work. moin never sends a value back.
+- A [catalog](/docs/guides/catalog) app whose first sign-in needs a password moin made shows it once, when you install it.
+- An AI agent that sets values over MCP sees them, and so does its model provider. Give it only the secrets it needs.
 - A rollback keeps the env vars of its deploy.
 - Commands take the app from `--app`, from `x-moin.app` in [the repo](/docs/guides/config), or from the folder name.

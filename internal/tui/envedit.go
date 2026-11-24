@@ -1,7 +1,8 @@
 package tui
 
 // The env vars of an app as one .env text in the editor: `E` on the env
-// tab.
+// tab. Values are write-only, so the editor opens without them: the text
+// replaces every env var.
 
 import (
 	"errors"
@@ -15,11 +16,11 @@ import (
 )
 
 type (
-	// editMsg is the .env text of an app, written to path, ready for the
-	// editor.
+	// editMsg is the file for the .env text of an app, ready for the
+	// editor, and the keys the app has now.
 	editMsg struct {
 		app, path string
-		env       map[string]string
+		keys      []string
 	}
 	// editedMsg comes when the editor closed.
 	editedMsg struct {
@@ -28,8 +29,8 @@ type (
 	}
 )
 
-// editEnv writes the env vars of an app to a file only you can read, for
-// the editor.
+// editEnv makes a file only you can read for the editor, which names the
+// keys the app has in a comment.
 func (m model) editEnv(name string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
@@ -37,11 +38,19 @@ func (m model) editEnv(name string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
+		keys := make([]string, len(env))
+		for i, v := range env {
+			keys[i] = v.Key
+		}
 		file, err := os.CreateTemp("", name+"-*.env")
 		if err != nil {
 			return errMsg{err}
 		}
-		text := "# The env vars of " + name + ". Save and close to see what changes; a key you delete is removed.\n" + dotenv.Format(env)
+		text := "# Every env var of " + name + ", as KEY=value lines. Values are write-only, so none are here.\n" +
+			"# Save and close to see what changes. A key that is not in the text is removed.\n"
+		if len(keys) > 0 {
+			text += "# Now: " + strings.Join(keys, ", ") + "\n"
+		}
 		_, err = file.WriteString(text)
 		if closeErr := file.Close(); err == nil {
 			err = closeErr
@@ -50,7 +59,7 @@ func (m model) editEnv(name string) tea.Cmd {
 			_ = os.Remove(file.Name())
 			return errMsg{err}
 		}
-		return editMsg{app: name, path: file.Name(), env: env}
+		return editMsg{app: name, path: file.Name(), keys: keys}
 	}
 }
 
@@ -88,7 +97,7 @@ func (m model) edited(msg editedMsg) (model, tea.Cmd) {
 		m.fail(errors.New(err.Error() + "; nothing changed. E tries again"))
 		return m, nil
 	}
-	change := dotenv.Diff(msg.env, next)
+	change := dotenv.Diff(msg.keys, next)
 	if change.None() {
 		m.say("Nothing changed in the env vars of " + msg.app)
 		return m, nil

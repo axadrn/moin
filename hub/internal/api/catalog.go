@@ -71,10 +71,13 @@ type AppUpdateRequest struct {
 }
 
 // CatalogDeploy is the answer of an install or an update: the app and
-// its new deploy, which streams like every deploy.
+// its new deploy, which streams like every deploy. Login, only on an
+// install, holds the secrets the first sign-in needs, such as
+// ADMIN_PASSWORD: the one time they are shown.
 type CatalogDeploy struct {
-	App    App    `json:"app"`
-	Deploy Deploy `json:"deploy"`
+	App    App               `json:"app"`
+	Deploy Deploy            `json:"deploy"`
+	Login  map[string]string `json:"login,omitempty"`
 }
 
 func newCatalogVersion(version catalog.Version) CatalogVersion {
@@ -136,14 +139,14 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	app, deploy, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
+	app, deploy, login, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
 		Slug: r.PathValue("slug"), Version: request.Version, Server: request.Server, Name: request.Name, Domain: request.Domain,
 	})
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy)})
+	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy), Login: login})
 }
 
 // Update sets a catalog app to a version and deploys it.

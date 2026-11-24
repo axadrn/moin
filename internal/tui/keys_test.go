@@ -357,7 +357,7 @@ func TestEnvSetAndRemove(t *testing.T) {
 func TestChangesShowAtOnce(t *testing.T) {
 	m := press(fixture(120, 40).withApp("shop", tEnv), "a", "K", "=", "v")
 	m, _ = update(m, keyMsg("enter"))
-	if m.app.env["K"] != "v" {
+	if !slices.Contains(m.envKeys(), "K") {
 		t.Fatal("a new env var shows before the hub answers")
 	}
 	m = press(m, "x")
@@ -366,7 +366,7 @@ func TestChangesShowAtOnce(t *testing.T) {
 		t.Fatal("y removes it")
 	}
 	m, _ = update(m, cmd())
-	if _, ok := m.app.env["DATABASE_URL"]; ok {
+	if slices.Contains(m.envKeys(), "DATABASE_URL") {
 		t.Fatal("the removed var goes at once")
 	}
 
@@ -408,7 +408,7 @@ func TestOpeningAnotherAppDropsTheOldData(t *testing.T) {
 	if m.app.name != "blog" || m.app.env != nil {
 		t.Fatal("another app starts empty")
 	}
-	m, _ = update(m, envMsg{"shop", map[string]string{"A": "1"}})
+	m, _ = update(m, envMsg{"shop", []client.EnvVar{{Key: "A"}}})
 	if m.app.env != nil {
 		t.Fatal("a late answer for shop does not show in blog")
 	}
@@ -418,11 +418,8 @@ func TestComingBackToAnAppShowsItsDataAtOnce(t *testing.T) {
 	m := fixture(120, 40).withApp("shop", tEnv)
 	m, _ = m.openApp("blog", tEnv)
 	m, _ = m.back()
-	if m.app.name != "shop" || m.app.env["STRIPE_KEY"] == "" || m.app.detail == nil {
+	if m.app.name != "shop" || !slices.Contains(m.envKeys(), "STRIPE_KEY") || m.app.detail == nil {
 		t.Fatal("shop shows what it showed when you left it")
-	}
-	if m.shown {
-		t.Error("the values are hidden again")
 	}
 }
 
@@ -605,7 +602,7 @@ func TestHelpShowsEveryKeyOfThePlaceAndScrolls(t *testing.T) {
 			t.Errorf("the keys of an app lack %q", a.label)
 		}
 	}
-	for _, want := range []string{"Env", "set KEY=value", "all in $EDITOR", "Tabs", "metrics", "Everywhere", "the palette"} {
+	for _, want := range []string{"Env", "set KEY=value", "replace all in $EDITOR", "Tabs", "metrics", "Everywhere", "the palette"} {
 		if !strings.Contains(frame, want) {
 			t.Errorf("the keys lack %q", want)
 		}

@@ -50,7 +50,7 @@ Everything after `--` is the command, word by word. For pipes, ask for a shell: 
 | Output | up to 1 MB, the rest is cut and moin says so. MCP keeps the last 64 KB |
 | Needs | the server online and the app live |
 | Who | owners and admins only: a command can do anything the app can |
-| Activity | every command lands in the [activity](/docs/guides/activity) as `app.exec`; the output is never stored |
+| Activity | every command lands in the [activity](/docs/guides/activity) as `app.exec`, with the app's env values masked by the server; the output is never stored |
 
 ## Turn it off on a server
 

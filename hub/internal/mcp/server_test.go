@@ -43,7 +43,7 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"add_alert_destination", "add_bucket", "add_server", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "download_backup", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_deploy", "get_env", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "pin_app", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_app", "rename_server", "rename_workspace", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_app_bucket", "set_backups", "set_daemon_updates", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_app", "update_daemon", "update_hub", "whoami"}
+	want := []string{"add_alert_destination", "add_bucket", "add_server", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "download_backup", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_deploy", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_env", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "pin_app", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_app", "rename_server", "rename_workspace", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_app_bucket", "set_backups", "set_daemon_updates", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_app", "update_daemon", "update_hub", "whoami"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
 	}
@@ -439,8 +439,13 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	output[mcp.Done](t, call(t, session, "remove_deploy_hook", map[string]any{"app": "shop"}))
 	output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "1", "GONE": "1"}}))
 	replaced := output[mcp.EnvReplaced](t, call(t, session, "replace_env", map[string]any{"app": "shop", "env": map[string]any{"KEEP": "1", "EDIT": "2", "NEW": "1"}}))
-	if strings.Join(replaced.Added, ",") != "NEW" || strings.Join(replaced.Changed, ",") != "EDIT" || strings.Join(replaced.Removed, ",") != "GONE" || len(replaced.Items) != 3 {
+	if strings.Join(replaced.Added, ",") != "NEW" || strings.Join(replaced.Replaced, ",") != "EDIT,KEEP" || strings.Join(replaced.Removed, ",") != "GONE" || len(replaced.Items) != 3 {
 		t.Fatalf("replace_env = %+v", replaced)
+	}
+	// Values are write-only: list_env answers keys and dates, never one.
+	listed := output[mcp.Env](t, call(t, session, "list_env", map[string]any{"app": "shop"}))
+	if len(listed.Items) != 3 || listed.Items[0].Key != "EDIT" || listed.Items[0].UpdatedAt.IsZero() {
+		t.Fatalf("list_env = %+v", listed)
 	}
 	// box-1 is offline: its apps go with it.
 	if removed := output[mcp.RemovedServer](t, call(t, session, "remove_server", map[string]any{"server": "box-1", "confirm": "box-1"})); strings.Join(removed.Apps, ",") != "blog,shop" || !strings.Contains(removed.Message, "apps went with it") {

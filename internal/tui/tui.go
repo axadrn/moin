@@ -124,7 +124,7 @@ type appData struct {
 	logs    []string
 	logsAt  time.Time
 	backups *client.AppBackups
-	env     map[string]string
+	env     []client.EnvVar
 	domains []client.DomainCheck
 	instant *client.Instant
 	uptime  *client.Uptime
@@ -198,7 +198,6 @@ type model struct {
 	logs     scroll
 	execLine string
 	text     scroll // the deploy and exec output
-	shown    bool   // env values visible
 	rng      int    // metrics range, an index into ranges
 
 	pick    *picker
@@ -260,7 +259,7 @@ type (
 	}
 	envMsg struct {
 		app string
-		env map[string]string
+		env []client.EnvVar
 	}
 	domainsMsg struct {
 		app     string
@@ -466,7 +465,6 @@ func (m model) show(s screen) (model, tea.Cmd) {
 			m.app = seen
 		}
 		m.logs = scroll{}
-		m.shown = false
 	}
 	if s.v == vApp && s.tab == 0 {
 		s.tab = tDeploys

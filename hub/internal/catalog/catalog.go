@@ -220,6 +220,18 @@ func (e Entry) BackupRequestURL() string {
 	return "https://github.com/axadrn/moin/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want moin to back up its "+e.DatabaseName()+".")
 }
 
+// LoginSecrets are the secrets the first sign-in needs: those Login names,
+// such as ADMIN_PASSWORD. moin shows their values once, on install.
+func (e Entry) LoginSecrets() []string {
+	var names []string
+	for _, name := range e.Secrets {
+		if strings.Contains(e.Login, name) {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // Secrets lists the ${NAME}s compose uses, except VERSION and those with a
 // default, sorted: moin generates a value for each on install.
 func Secrets(compose []byte) []string {

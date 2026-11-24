@@ -132,7 +132,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET /api/v1/catalog` · `GET /api/v1/catalog/{slug}` | read | the [catalog](/docs/guides/catalog) with each app's newest version; one app with every version |
-| `POST /api/v1/catalog/{slug}/install` | write | installs a catalog app: `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy |
+| `POST /api/v1/catalog/{slug}/install` | write | installs a catalog app: `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy, and in `login` a password the first sign-in needs, shown this once |
 | `POST /api/v1/apps/{app}/update` | write | sets a catalog app to a version, `{"version": "3.4.1"}`, the newest when empty, and deploys it |
 
 ## Domains
@@ -149,9 +149,9 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET /api/v1/apps/{app}/env` | write | the env vars, values included |
+| `GET /api/v1/apps/{app}/env` | read | the env vars as `{"items": [{"key", "updated_at"}]}`; values are write-only, so no answer holds one |
 | `PATCH /api/v1/apps/{app}/env` | write | sets and removes some; changes take effect with the next deploy, a rollback keeps the env of its deploy |
-| `PUT /api/v1/apps/{app}/env` | write | replaces them all at once; answers the keys `added`, `changed` and `removed` |
+| `PUT /api/v1/apps/{app}/env` | write | replaces them all at once; answers the keys `added`, `replaced` and `removed` |
 
 ## Data
 

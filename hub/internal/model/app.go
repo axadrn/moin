@@ -59,6 +59,9 @@ type App struct {
 	// CatalogNotified is the newest release an update.available alert
 	// went out for.
 	CatalogNotified string `db:"catalog_notified"`
+	// CatalogVersion is the release a catalog app runs, the value moin
+	// gives its env var VERSION.
+	CatalogVersion string `db:"catalog_version"`
 	// BucketID is the bucket the app's backups go to; nil uses the
 	// workspace's default bucket. BucketName is its name.
 	BucketID *string `db:"bucket_id"`
@@ -79,6 +82,14 @@ type App struct {
 	// LiveDetected is what the daemon found in the live deploy, as JSON;
 	// empty before the first.
 	LiveDetected string `db:"live_detected"`
+}
+
+// EnvVar is an env var of an app as moin shows it: its key and when it
+// last changed. Its value is write-only: it goes to the server, never back
+// to a person.
+type EnvVar struct {
+	Key       string    `db:"key"`
+	UpdatedAt time.Time `db:"updated_at"`
 }
 
 // Deploy statuses.

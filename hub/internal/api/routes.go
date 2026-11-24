@@ -189,7 +189,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PUT /api/v1/buckets/{name}", m.InWorkspace(h.Apps.EditBucket), TokenWrite},
 		{"DELETE /api/v1/buckets/{name}", m.InWorkspace(h.Apps.DeleteBucket), TokenWrite},
 		{"PUT /api/v1/apps/{app}/bucket", m.InWorkspace(h.Apps.SetAppBucket), TokenWrite},
-		{"GET /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.GetEnv), TokenWrite},
+		{"GET /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.GetEnv), TokenRead},
 		{"PATCH /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.UpdateEnv), TokenWrite},
 		{"PUT /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.ReplaceEnv), TokenWrite},
 		{"GET /api/v1/admin/users", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.Users))), TokenDenied},

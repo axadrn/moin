@@ -139,12 +139,10 @@ Buckets
   buckets use        Move an app's backups: buckets use <bucket> [app], or --default
 
 Env
-  env                List env vars: env [--show] [app]
+  env                List env vars and when each changed; values are write-only: env [app]
   env set            Set env vars: env set [app] KEY=value ...
   env rm             Remove env vars: env rm KEY ... [--yes]
-  env pull           Write the env vars to .env: env pull [file] [--yes]
   env push           Replace all env vars with a .env, after a yes: env push [file] [--yes]
-  run                Run a command with the env vars: run -- go run .
 
 Daemon
   daemon register    Connect this server with an install token
@@ -317,8 +315,6 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return stop(ctx, rest, stdin, stdout)
 	case "registry":
 		return registry(ctx, rest, stdin, stdout)
-	case "run":
-		return runWithEnv(ctx, rest, stdin, stdout)
 	case "exec":
 		return execCommand(ctx, rest, stdout)
 	case "daemon":

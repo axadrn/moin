@@ -185,26 +185,35 @@ func (c *Client) Logs(ctx context.Context, app string, tail int) ([]string, erro
 	return response.Lines, err
 }
 
-// Env returns the env vars of an app.
-func (c *Client) Env(ctx context.Context, app string) (map[string]string, error) {
+// EnvVar is an env var of an app: its key and when it changed. Values are
+// write-only: the hub never answers one.
+type EnvVar struct {
+	Key       string    `json:"key"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Env lists the env vars of an app, by key.
+func (c *Client) Env(ctx context.Context, app string) ([]EnvVar, error) {
 	var response struct {
-		Items map[string]string `json:"items"`
+		Items []EnvVar `json:"items"`
 	}
 	err := c.do(ctx, http.MethodGet, appPath(app, "env"), nil, &response)
 	return response.Items, err
 }
 
-// SetEnv sets and removes env vars. The next deploy gets them.
-func (c *Client) SetEnv(ctx context.Context, app string, set map[string]string, unset []string) (map[string]string, error) {
+// SetEnv sets and removes env vars and answers them all, by key. The next
+// deploy gets them.
+func (c *Client) SetEnv(ctx context.Context, app string, set map[string]string, unset []string) ([]EnvVar, error) {
 	var response struct {
-		Items map[string]string `json:"items"`
+		Items []EnvVar `json:"items"`
 	}
 	err := c.do(ctx, http.MethodPatch, appPath(app, "env"), map[string]any{"set": set, "unset": unset}, &response)
 	return response.Items, err
 }
 
 // ReplaceEnv makes env every env var of the app, like one .env file: keys
-// not in env are removed. It answers what changed. The next deploy gets them.
+// not in env are removed. It answers what changed, by key. The next deploy
+// gets them.
 func (c *Client) ReplaceEnv(ctx context.Context, app string, env map[string]string) (dotenv.Change, error) {
 	var response dotenv.Change
 	err := c.do(ctx, http.MethodPut, appPath(app, "env"), map[string]any{"env": env}, &response)

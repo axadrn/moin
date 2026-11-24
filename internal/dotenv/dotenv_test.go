@@ -25,24 +25,17 @@ func TestParse(t *testing.T) {
 	}
 }
 
-// What Format writes, Parse reads back the same.
-func TestRoundTrip(t *testing.T) {
-	env := map[string]string{"PLAIN": "abc", "SPACE": "a b", "QUOTES": `"'`, "LINES": "a\nb\tc", "DOLLAR": "$X", "HASH": "a #b", "EMPTY": "", "SLASH": `a\b`}
-	back, err := Parse(Format(env))
-	if err != nil || !maps.Equal(back, env) {
-		t.Errorf("round trip = %q, %v", back, err)
-	}
-}
-
+// Diff needs only the keys there are: every key that comes again is
+// replaced, whatever its value was.
 func TestDiff(t *testing.T) {
-	change := Diff(map[string]string{"KEEP": "1", "EDIT": "1", "GONE": "1"}, map[string]string{"KEEP": "1", "EDIT": "2", "NEW": "1"})
-	if strings.Join(change.Added, ",") != "NEW" || strings.Join(change.Changed, ",") != "EDIT" || strings.Join(change.Removed, ",") != "GONE" {
+	change := Diff([]string{"KEEP", "GONE"}, map[string]string{"KEEP": "1", "NEW": "1"})
+	if strings.Join(change.Added, ",") != "NEW" || strings.Join(change.Replaced, ",") != "KEEP" || strings.Join(change.Removed, ",") != "GONE" {
 		t.Errorf("Diff = %+v", change)
 	}
-	if change.String() != "adds NEW; changes EDIT; removes GONE" {
+	if change.String() != "adds NEW; replaces KEEP; removes GONE" {
 		t.Errorf("String = %q", change)
 	}
-	if !Diff(map[string]string{"A": "1"}, map[string]string{"A": "1"}).None() {
-		t.Error("the same env vars change something")
+	if !Diff(nil, map[string]string{}).None() {
+		t.Error("no env vars replaced by none change something")
 	}
 }

@@ -2,12 +2,16 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/axadrn/moin/protocol"
@@ -86,6 +90,7 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 	err := command.Run()
 	writer.Close()
 	<-copied
+	done.Command = maskedCommand(composeFile, start.Argv)
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -98,6 +103,47 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 		return protocol.ExecDone{}, err
 	}
 	return done, nil
+}
+
+// maskedCommand is argv as one line for the activity, with the env values
+// of the app's containers masked, such as a password typed into the
+// command. The hub never sees the values, so it cannot mask them. Short
+// values would mask ordinary words, so only values of six characters or
+// more count. When the compose file cannot be read, only the program is
+// left.
+func maskedCommand(composeFile string, argv []string) string {
+	var compose struct {
+		Services map[string]struct {
+			Environment map[string]*string `json:"environment"`
+		} `json:"services"`
+	}
+	body, err := os.ReadFile(composeFile)
+	if err == nil {
+		err = json.Unmarshal(body, &compose)
+	}
+	if err != nil {
+		return argv[0] + " …"
+	}
+	var values []string
+	for _, service := range compose.Services {
+		for _, value := range service.Environment {
+			// compose.json writes a $ as $$.
+			if value != nil && len(*value) >= 6 {
+				values = append(values, strings.ReplaceAll(*value, "$$", "$"))
+			}
+		}
+	}
+	return maskValues(protocol.JoinCommand(argv), values)
+}
+
+// maskValues replaces every value in text with •••, the longest first, so
+// a value inside another is masked as part of the longer one.
+func maskValues(text string, values []string) string {
+	slices.SortFunc(values, func(a, b string) int { return len(b) - len(a) })
+	for _, value := range values {
+		text = strings.ReplaceAll(text, value, "•••")
+	}
+	return text
 }
 
 // copyCapped hands what reader gives to output in pieces, at most limit

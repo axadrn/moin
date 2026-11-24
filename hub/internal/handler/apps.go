@@ -12,6 +12,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -116,17 +117,17 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		renderError(w, "load app failed", err)
 		return
 	}
-	env, err := h.apps.Env(workspace.ID, app.ID)
+	env, err := h.apps.EnvVars(workspace.ID, app.ID)
 	if err != nil {
 		renderError(w, "load env failed", err)
 		return
 	}
-	view := pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), EnvKeys: sortedKeys(env), Section: section}
+	view := pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), Env: env, Section: section}
 	view.Selected, _ = strconv.Atoi(r.PathValue("number"))
 	switch section {
 	case "app":
 		if h.catalogs != nil {
-			view.Catalog = catalogUpdate(h.catalogs, workspace.ID, app)
+			view.Catalog = catalogUpdate(h.catalogs, app)
 		}
 	case "deploys":
 		repo, err := h.repoView(r, app, false)
@@ -375,27 +376,24 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AppLogs(lines, ""))
 }
 
-// Env answers the env table; with show=1 the values are visible, with
-// text=1 they are one .env text to edit.
+// Env answers the env table; with text=1 the empty box that takes them
+// all as one .env text.
 func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("text") == "1" {
 		app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
-		var env map[string]string
-		if err == nil {
-			env, err = h.apps.Env(app.WorkspaceID, app.ID)
-		}
 		if err != nil {
 			renderError(w, "load env failed", err)
 			return
 		}
-		render(w, r, pages.AppEnvText(app.Link(), dotenv.Format(env), ""))
+		render(w, r, pages.AppEnvText(app.Link(), "", ""))
 		return
 	}
-	h.renderEnv(w, r, r.URL.Query().Get("show") == "1")
+	h.renderEnv(w, r)
 }
 
-// EnvText takes the env vars as one .env text: first it shows what changes,
-// with confirm=1 it replaces them, with back=1 it goes back to the text.
+// EnvText takes the env vars as one .env text: first it shows which keys
+// change, with confirm=1 it replaces them, with back=1 it goes back to the
+// text.
 func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
@@ -413,15 +411,19 @@ func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.FormValue("confirm") != "1" {
-		current, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
+		vars, err := h.apps.EnvVars(ctxkeys.Workspace(r.Context()).ID, name)
 		if err != nil {
 			renderError(w, "load env failed", err)
 			return
 		}
-		change := dotenv.Diff(current, next)
+		keys := make([]string, len(vars))
+		for index, envVar := range vars {
+			keys[index] = envVar.Key
+		}
+		change := dotenv.Diff(keys, next)
 		if change.None() {
-			h.renderEnv(w, r, false)
-			answerDone(w, r, "Nothing changed", "The text has the env vars there are.")
+			h.renderEnv(w, r)
+			answerDone(w, r, "Nothing changed", "The text has no env vars, and the app has none.")
 			return
 		}
 		render(w, r, pages.AppEnvReview(link, text, change))
@@ -432,7 +434,7 @@ func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.AppEnvText(link, text, errorMessage(err)+" Nothing changed."))
 		return
 	}
-	h.renderEnv(w, r, false)
+	h.renderEnv(w, r)
 	answerDone(w, r, "Env vars replaced", "It "+change.String()+". The next deploy or restart hands them to the app.")
 }
 
@@ -448,7 +450,7 @@ func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Variable not saved", err, map[string]string{"set": "env-key"})
 		return
 	}
-	h.renderEnv(w, r, false)
+	h.renderEnv(w, r)
 	answerDone(w, r, key+" saved", "The next deploy or restart hands it to the app.")
 }
 
@@ -460,25 +462,21 @@ func (h *AppsHandler) UnsetEnv(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, key+" not removed", err, nil)
 		return
 	}
-	h.renderEnv(w, r, false)
+	h.renderEnv(w, r)
 	answerDone(w, r, key+" removed", "The next deploy or restart drops it.")
 }
 
-func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show bool) {
+func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
-	var env map[string]string
+	var env []model.EnvVar
 	if err == nil {
-		env, err = h.apps.Env(app.WorkspaceID, app.ID)
+		env, err = h.apps.EnvVars(app.WorkspaceID, app.ID)
 	}
 	if err != nil {
 		renderError(w, "load env failed", err)
 		return
 	}
-	values := map[string]string{}
-	if show {
-		values = env
-	}
-	render(w, r, pages.AppEnv(app.Link(), sortedKeys(env), values))
+	render(w, r, pages.AppEnv(app.Link(), env))
 }
 
 // Delete stops the app on its server and removes it, then goes to the list.
@@ -489,15 +487,6 @@ func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/apps")
-}
-
-func sortedKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // DomainsDetail answers the domains of an app, its instant address and its

@@ -67,6 +67,14 @@ func TestLoadRefusesBadEntries(t *testing.T) {
 	}
 }
 
+// TestLoginSecrets: only the secrets the login names are shown on install.
+func TestLoginSecrets(t *testing.T) {
+	entry := Entry{Login: "Sign in as admin with the password in ADMIN_PASSWORD.", Secrets: []string{"ADMIN_PASSWORD", "DB_PASSWORD"}}
+	if got := entry.LoginSecrets(); !slices.Equal(got, []string{"ADMIN_PASSWORD"}) {
+		t.Errorf("LoginSecrets = %v", got)
+	}
+}
+
 func TestSecrets(t *testing.T) {
 	compose := []byte("image: a:${VERSION}\nA: ${DB_PASSWORD}\nB: ${APP_SECRET}\nC: ${DB_PASSWORD}\nD: ${OPTIONAL:-x}\nE: $PLAIN\n")
 	if got := Secrets(compose); !slices.Equal(got, []string{"APP_SECRET", "DB_PASSWORD"}) {

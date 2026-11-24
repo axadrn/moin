@@ -130,7 +130,7 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 			}
 		}
 		if s.catalog != nil && app.Catalog != "" {
-			if info, ok := s.catalog.Info(workspaceID, &app); ok && info.Newer {
+			if info, ok := s.catalog.Info(&app); ok && info.Newer {
 				status.Updates = append(status.Updates, StatusUpdate{App: app.Name, Link: app.Link(), Name: info.Entry.Name, Version: info.Version, Latest: info.Latest.Tag})
 			}
 		}

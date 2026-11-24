@@ -21,7 +21,7 @@ MCP: install_catalog_app
 
 It creates the app, makes every secret as an encrypted env var, sets `VERSION` and deploys. Without a version it takes the newest.
 
-Some apps have a first login. Its page in the catalog says so under **First sign-in**. `moin env --show` shows the passwords it made.
+Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password moin made, such as `ADMIN_PASSWORD`, the install shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. Keep it in your password manager. Env values are write-only, so moin never shows it again.
 
 ## See the catalog
 
@@ -68,7 +68,7 @@ license: Apache-2.0
 image: miniflux/miniflux
 database: postgres
 port: 8080
-login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
 ---
 
 Two or three plain sentences: what it does, and where its data lives.
@@ -111,6 +111,7 @@ The rules, which a test checks:
 | --- | --- |
 | Image | on Docker Hub or `ghcr.io`, for `amd64` and `arm64`, run as `<image>:${VERSION}` |
 | Secrets | every one a `${NAME}`, made on install: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
+| First sign-in | a secret the person needs to sign in, named in `login:` like `ADMIN_PASSWORD`, is the one the install shows once |
 | Its own domain | `${APP_URL}` is `https://<its domain>`, `${APP_DOMAIN}` the domain alone; an app that uses either needs a domain on install |
 | Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data` |
 | Versions | only tags like `1.2.3` or `v1.2.3` count, unless `versions:` sets a regular expression. A project that tags betas like versions sets `stable:` to its channel tag, such as `stable` |

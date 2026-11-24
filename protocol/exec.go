@@ -17,12 +17,15 @@ type ExecOutput struct {
 
 // ExecDone ends a run: the exit code, or the error that kept the command
 // from running. Truncated says the output passed ExecMaxOutput and the rest
-// was dropped; TimedOut that the daemon stopped it.
+// was dropped; TimedOut that the daemon stopped it. Command is the command
+// line for the activity, with the env values of the app masked: only the
+// daemon knows them.
 type ExecDone struct {
 	ExitCode  int    `json:"exit_code"`
 	Truncated bool   `json:"truncated,omitempty"`
 	TimedOut  bool   `json:"timed_out,omitempty"`
 	Error     string `json:"error,omitempty"`
+	Command   string `json:"command,omitempty"`
 }
 
 const (

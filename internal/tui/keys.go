@@ -7,7 +7,6 @@ package tui
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
@@ -364,20 +363,18 @@ func (m model) backupsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 	return m, nil
 }
 
-// envTabKey shows, sets, removes and edits the env vars.
+// envTabKey sets, removes and replaces the env vars. Values are
+// write-only: nothing here shows one.
 func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 	keys := m.envKeys()
 	if d != 0 {
 		return m.cursor("env", len(keys), d), nil
 	}
 	switch s {
-	case "v":
-		m.shown = !m.shown
 	case "a", "enter":
 		value := ""
 		if s == "enter" && len(keys) > 0 {
-			k := keys[m.at("env", len(keys))]
-			value = k + "=" + m.app.env[k]
+			value = keys[m.at("env", len(keys))] + "="
 		}
 		return m.input("Set an env var of "+a.Name, "KEY=value · the next deploy gets it", value, func(m model, v string) (model, tea.Cmd) {
 			key, val, ok := strings.Cut(v, "=")
@@ -386,11 +383,9 @@ func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 				m.fail(fmt.Errorf("type KEY=value"))
 				return m, nil
 			}
-			env := maps.Clone(m.app.env)
-			if env == nil {
-				env = map[string]string{}
-			}
-			env[key] = val
+			env := slices.DeleteFunc(slices.Clone(m.app.env), func(v client.EnvVar) bool { return v.Key == key })
+			env = append(env, client.EnvVar{Key: key, UpdatedAt: m.now()})
+			slices.SortFunc(env, func(a, b client.EnvVar) int { return strings.Compare(a.Key, b.Key) })
 			m.app.env = env
 			return m, m.setEnv(m.cur.app, map[string]string{key: val}, nil)
 		}), nil
@@ -402,9 +397,7 @@ func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 					if m.app.name != a.Name {
 						return m
 					}
-					env := maps.Clone(m.app.env)
-					delete(env, k)
-					m.app.env = env
+					m.app.env = slices.DeleteFunc(slices.Clone(m.app.env), func(v client.EnvVar) bool { return v.Key == k })
 					return m
 				}, cmd: m.setEnv(a.Name, nil, []string{k})}
 			}), nil

@@ -196,6 +196,8 @@ The CLI shows it in the ACCESS column, and `servers secure` line by line. The AP
 
 ## Env of your apps
 
+moin never shows an env value again once it is set. Not on the web, in the API, the CLI or to an AI agent: only the name and when it changed.
+
 Your app's env vars reach your app and nothing else. The daemon writes them to `app.env` in the release's folder on the server, readable by root only, and hands that file to Docker Compose with `--env-file`. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
 
 ## Rules

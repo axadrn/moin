@@ -100,9 +100,9 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `restart_app` | starts the live deploy again with the current settings | write |
 | `stop_app` | takes the app offline; its data stays | write, destructive |
 | `start_app` | runs a stopped app again | write |
-| `get_env` | env vars in plain text | write |
+| `list_env` | the env vars of an app, by name, with when each changed; never a value | read |
 | `set_env` | sets and removes env vars | write |
-| `replace_env` | replaces all env vars at once, like one `.env` file; keys not sent are removed; returns the keys added, changed and removed | write, destructive |
+| `replace_env` | replaces all env vars at once, like one `.env` file; keys not sent are removed; returns the keys added, replaced and removed | write, destructive |
 | `get_github` | GitHub installations and the install link | read |
 | `list_branches` | the branches of a repo, the default first | read |
 | `list_repos` | repos moin may read, and where on GitHub to give it more | read |
