@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, web, SSH, firewall, rules and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, where your secrets live, web, SSH, firewall, rules and signed updates."
 group: "Servers and data"
 order: 2
 ---
@@ -30,6 +30,10 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 
 - The daemon runs on the server and acts there. The hub holds no SSH key, password or token that opens your server.
 - The hub never holds your code. Code comes only from a GitHub repo, an image or the catalog. The daemon downloads nothing else, so `deploy-from` decides every source.
+
+**Your secrets stay in your house.** The messenger carries a secret to your server once, then forgets it. It keeps a list of names, never the values.
+
+- Env values, bucket keys and registry logins live only on the server, in two files readable by root. [Where your secrets live](#where-your-secrets-live)
 
 **You write the house rules.** A note on your door says what the messenger may do. Only you can write it, on the server. The messenger cannot change it.
 
@@ -94,7 +98,7 @@ The dot in front of a line:
 - **Red**: the server is not as you set it. A red sentence says both, like `SSH on the server is Off. moin says Everyone. Pick the one you want.`
 - **Waiting for the server**: the daemon has not reported yet.
 
-SSH and the firewall always work. Only the Cloudflare Tunnel needs Cloudflare, and only SSH through Tailscale needs Tailscale. Until you connect them, the line has a short link to [Integrations](#integrations).
+SSH and the firewall always work. Only the Cloudflare Tunnel needs Cloudflare, and only SSH through Tailscale needs a Tailscale key on the server. Until you have them, the line has a short link to [Integrations](#integrations).
 
 Every change asks first. The CLI too; `--yes` skips it in scripts. If you do one thing, turn on the firewall.
 
@@ -107,15 +111,17 @@ The daemon looks at its server after each start and every five minutes. What dri
 
 ## Integrations
 
-The accounts a workspace connects once, for every app and server: GitHub, Cloudflare and Tailscale. Each says whether it is connected. A connected one has **New key**: save a new key there and it replaces the old one, without disconnecting. Disconnect sits at the end.
+The accounts a workspace connects: GitHub, Cloudflare and Tailscale. Each says whether it is connected. A connected one has **New key**: save a new key there and it replaces the old one, without disconnecting. Disconnect sits at the end.
+
+The Cloudflare token is for the whole workspace: the hub keeps it and uses it itself. The Tailscale key goes to one server, which keeps it. The hub never does. Tailscale lists the servers that have the key and the ones that do not. Enter it again for each one that needs it.
 
 ```surfaces
 Web: **Settings**, **Integrations**
 CLI: moin integrations
 CLI: moin integrations cloudflare
-CLI: moin integrations tailscale
+CLI: moin integrations tailscale --server web-1
 CLI: moin integrations rm cloudflare
-CLI: moin integrations rm tailscale
+CLI: moin integrations rm tailscale --server web-1
 TUI: `w` opens the web
 API: GET /api/v1/integrations
 API: PUT /api/v1/integrations
@@ -123,13 +129,13 @@ MCP: get_integrations
 MCP: set_integrations
 ```
 
-`moin integrations` shows what is connected, never the keys. The CLI reads a key from stdin, so it never lands in your shell history. A new key replaces the old one, on every surface. The API and MCP disconnect when you send a key empty. Keys are stored encrypted.
+`moin integrations` shows what is connected, never the keys. The CLI reads a key from stdin, so it never lands in your shell history. A new key replaces the old one, on every surface. The API and MCP disconnect when you send a key empty. With more than one server, name the server for the Tailscale key: `--server` in the CLI, `server` in the API and MCP. It must be online.
 
 - **Cloudflare**: an API token. In Cloudflare, **My Profile**, **API Tokens**, **Create Token**, **Create Custom Token**. Account **Cloudflare Tunnel: Edit** and Zone **DNS: Edit** for the zones of your apps. Zone **Zone Settings: Edit** is optional: with it moin turns on **Always Use HTTPS**, without it you do that in Cloudflare. moin checks the token before it stores it.
 - **Tailscale**: an auth key. In the Tailscale admin console, **Settings**, **Keys**. Make it reusable.
 - With Cloudflare connected, every new server gets the tunnel. Turn it off on its Security page.
 - Turn the tunnels off before you disconnect Cloudflare. Without the token moin cannot delete a tunnel (`tunnels_on`). To change the token, save a new key instead: the tunnels keep running.
-- Disconnecting Tailscale changes no server. Servers stay in your tailnet; new ones no longer join it.
+- Removing the Tailscale key from a server changes nothing on it. It stays in your tailnet. The key only joins a server once.
 
 ## Web
 
@@ -162,7 +168,7 @@ Who can log in to the server with SSH, on port 22.
 moin servers secure web-1 --ssh tailscale
 ```
 
-- Only through Tailscale needs the server in a tailnet: joined by hand, or with Tailscale connected. Then the daemon installs Tailscale if it is missing and joins. Port 22 closes to everyone else only once Tailscale is up.
+- Only through Tailscale needs the server in a tailnet: joined by hand, or with a Tailscale key on that server. Then the daemon installs Tailscale if it is missing and joins. Port 22 closes to everyone else only once Tailscale is up.
 - Off is for a server you reach with Tailscale SSH or your provider's console. Going back from off starts sshd again.
 - Before you close SSH, keep a second way in, such as your provider's web console.
 
@@ -194,11 +200,37 @@ MCP: list_servers
 
 The CLI shows it in the ACCESS column, and `servers secure` line by line. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
 
-## Env of your apps
+## Where your secrets live
 
-moin never shows an env value again once it is set. Not on the web, in the API, the CLI or to an AI agent: only the name and when it changed.
+On your server, and only there. The hub passes a value on once, the moment you enter it, and forgets it. It keeps the name and when it changed.
 
-Your app's env vars reach your app and nothing else. The daemon writes them to `app.env` in the release's folder on the server, readable by root only, and hands that file to Docker Compose with `--env-file`. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
+| File on the server | What is in it |
+| --- | --- |
+| `/var/lib/moin/apps/<app>/app.env` | the [env vars](/docs/guides/env) of one app |
+| `/var/lib/moin/server.json` | the secrets of the server: the secret keys of your [buckets](/docs/guides/bucket), the [registry logins](/docs/guides/ci#registry-logins), the Tailscale key and the token of the Cloudflare Tunnel |
+
+Both are readable by root only. A secret goes to a server only while it is online. When it is offline, moin says so and keeps nothing to send later.
+
+**What the hub keeps.** Names and dates, never a value:
+
+- the names of your env vars, and when each changed
+- each bucket's endpoint, bucket, folder and access key ID
+- each registry's host and username
+- which server has which key
+- the instant address password as a hash only. moin shows it once, when it makes it
+
+**What stays with the hub.** The hub uses these itself, so it has to keep them, encrypted with its own key:
+
+- The Cloudflare API token. With it, someone who breaks into the hub can change the DNS of your zones and your tunnels. Give the token only the zones your apps use.
+- Alert targets: Slack and Discord webhooks, Telegram bot tokens, webhook URLs, and the webhook signing secret. With them, someone can post in your channels as moin, or sign fake alerts. Use a channel or bot made only for moin.
+
+**What stays honest.**
+
+- A value you type in after someone broke into the hub passes through it once. They could read that one.
+- The hub can still send what your [rules](#rules) allow. Without `exec: off`, a command in a container can print its env. Strict rules close that.
+- A server rebuilt from scratch starts without secrets. Enter them again, then deploy. A later server gets the bucket key, registry login and Tailscale key once more: the pages show which server lacks one.
+
+**How Docker gets the env.** Each deploy hands the app's `app.env` to Docker Compose: as `env_file` of the app's services, and as `--env-file` to fill `${NAME}` in your compose file. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
 
 ## Rules
 

@@ -76,7 +76,7 @@ The first five are in [moin in five words](/docs/moin-in-five-words). The rest:
 | **service** | one part of an app, such as its website or its database: one container of its `compose.yml` |
 | **restart** | starts the live deploy again, so the changes that wait take effect |
 | **domain** | the name people type to reach your app, such as `my-app.example.com`, always with HTTPS |
-| **env vars** | the settings and secrets of an app, kept encrypted |
+| **env vars** | the settings and secrets of an app, kept only on its server |
 | **restore** | going back to a copy. It can be undone |
 | **health check** | after a deploy, moin checks that the app starts and stays up |
 | **catalog** | the place with apps you install in one click |
@@ -147,7 +147,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 
 1. Gets the code from GitHub, or the compose file of a catalog app, and keeps it with the deploy.
 2. Reads the compose file and the [x-moin block](/docs/guides/config).
-3. Tags the built images, sets the env vars and `restart: unless-stopped`.
+3. Tags the built images, points the app's services at its env file on the server and sets `restart: unless-stopped`.
 4. Builds.
 5. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
 6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds.
@@ -156,7 +156,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 
 If the start or the health check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
 
-The server keeps the last 5 builds, with their images. A rollback can go to any of those.
+The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env as it is now.
 
 ### How moin reads your database
 

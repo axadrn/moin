@@ -45,7 +45,7 @@ Only what you open, passed through to you and never stored. `data: off` and `log
 
 ## Where are my env vars?
 
-In the hub, sealed with AES-256-GCM, and handed to your server with each deploy. [Roadmap](/roadmap) says what comes next.
+On your server, in a file only root can read. The hub passes each value on once and keeps only its name. [Where your secrets live](/docs/guides/security#where-your-secrets-live).
 
 ## What is a workspace?
 

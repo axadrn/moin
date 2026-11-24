@@ -124,7 +124,7 @@ MCP: restore_app
 
 ## Download a copy
 
-A link to a copy in your bucket: the newest one, or the one you name. It works for 15 minutes. The file comes straight from your bucket, not through moin.
+A link to a copy in your bucket: the newest one, or the one you name. It works for 15 minutes. The app's server signs it with the bucket's key, so the server must be online. The file comes straight from your bucket, not through moin.
 
 ```surfaces
 Web: the app, **Data**, a database, **Download a copy**

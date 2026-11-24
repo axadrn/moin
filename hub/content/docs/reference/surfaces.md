@@ -27,7 +27,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Restart, stop, start | ✓ | ✓ | ✓ `T`, `S` | ✓ | ✓ |
 | Container logs | ✓ | ✓ `logs` | ✓ live, with a filter | ✓ | ✓ |
 | Run a command in a container | ✓ | ✓ `exec` | ✓ `X` | ✓ | ✓ |
-| Env vars: names and dates, set, remove; values are write-only | ✓ | ✓ `env` | ✓ | ✓ | ✓ |
+| Env vars: names and dates, set, remove; values are write-only and live only on the server | ✓ | ✓ `env` | ✓ | ✓ | ✓ |
 | Env vars as one `.env` | ✓ | ✓ `env push` | ✓ in `$EDITOR` | ✓ | ✓ |
 | Domains and their DNS | ✓ | ✓ `domains` | ✓ | ✓ | ✓ |
 | Add, remove, canonical domain | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -57,7 +57,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Rename, remove a server | ✓ | ✓ | Opens the web. | ✓ | ✓ |
 | Web, SSH, firewall: what is on the server | ✓ | ✓ `servers secure` | Shows what is on the server; `W` changes it in the web. | ✓ | ✓ |
 | Server rules | ✓ | ✓ `servers rules` | ✓ on the server | ✓ | ✓ |
-| Integrations: Cloudflare, Tailscale: connect, replace the key, disconnect | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
+| Integrations: Cloudflare, Tailscale: connect, replace the key, disconnect; the Tailscale key per server | ✓ | ✓ `integrations` | Opens the web. | ✓ | ✓ |
 | Daemon auto-update | ✓ | ✓ `servers auto-update` | Opens the web. | ✓ | ✓ |
 | Uninstall the daemon | Runs on the server. | ✓ `daemon uninstall`, on the server | Runs on the server. | Runs on the server. | Runs on the server. |
 | Create, remove an app | ✓ | ✓ `apps add`, `deploy` asks first | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
@@ -66,9 +66,11 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |
 | Link or unlink a repo | ✓ | ✓ `link`, `unlink` | Opens the web. | ✓ | ✓ |
 | Deploy hook for CI, with image and commit | ✓ | ✓ `hook` | Opens the web. | ✓ | ✓ |
-| Registry logins | ✓ | ✓ `registry` | Opens the web. | ✓ | ✓ |
+| Registry logins, kept per server; which servers lack one | ✓ | ✓ `registry` | Opens the web. | ✓ | ✓ |
 | Instant address: provider, open | ✓ | ✓ `instant` | Shows it; change it in the web. | ✓ | ✓ |
-| Buckets | ✓ | ✓ `buckets` | Opens the web. | ✓ | ✓ |
+| Instant password: shown once when made, a new one | ✓ | ✓ `instant password` | Opens the web. | ✓ | ✓ |
+| Buckets; the key kept per server, which servers lack it | ✓ | ✓ `buckets` | Opens the web. | ✓ | ✓ |
+| Give another server a bucket key | ✓ | ✓ `buckets key` | Opens the web. | ✓ | ✓ |
 | Move an app to another bucket | ✓ | ✓ `buckets use` | Opens the web. | ✓ | ✓ |
 | Data: tables, rows, schema | ✓ | ✓ `db` | A grid of rows wants a page: opens the web. | ✓ | ✓ `list_tables`, rows through SQL |
 | SQL, read and write | ✓ | ✓ `sql` | Opens the web. | ✓ | ✓ |

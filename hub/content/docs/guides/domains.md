@@ -54,13 +54,17 @@ https://my-app.203-0-113-7.sslip.io
 
 The name carries the server's IP, so it needs no DNS. A password guards it by default, user `moin`: the app's own [password](#protect-with-a-password) when it has one, else one moin made.
 
+moin shows its password once, when it makes the app: on the web, in `moin apps add` and `moin deploy`, in the API and MCP answer as `instant_password`. It keeps only a hash, so it can never show it again. Lost it? Make a new one. It is shown once too, and the app takes it on its next restart.
+
 ```surfaces
-Web: the app, **Instant address**, **Show password**
-CLI: moin instant --show
+Web: the app, **Instant address**, **New password**
+CLI: moin instant password
 TUI: on the app, `o`: the instant address
-API: GET /api/v1/apps/{app}/instant?show=true
-MCP: get_instant
+API: POST /api/v1/apps/{app}/instant/password
+MCP: new_instant_password
 ```
+
+`moin instant` shows the address and its user, `GET /api/v1/apps/{app}/instant` and `get_instant` the same.
 
 Switch the provider, drop the password, or turn the address off:
 

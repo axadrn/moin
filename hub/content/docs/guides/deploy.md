@@ -221,7 +221,7 @@ MCP: start_app
 
 ## Roll back
 
-Starts an earlier good deploy again, with the env vars it had.
+Starts an earlier good deploy again, with the env vars as they are now.
 
 ```surfaces
 Web: the app, **Deploys**, **Roll back** on a deploy
