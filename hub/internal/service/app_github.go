@@ -67,7 +67,13 @@ func (s *AppService) GitHubConnectURL(actor Actor) (string, error) {
 	if !s.github.ChecksInstaller() {
 		return s.github.InstallURL(s.gitHubState(actor)), nil
 	}
-	return s.github.AuthorizeURL(s.gitHubState(actor)), nil
+	return s.github.AuthorizeURL(s.gitHubState(actor), s.gitHubSetupURL()), nil
+}
+
+// gitHubSetupURL is where GitHub sends a member back after installing the
+// app or signing in to connect a workspace: the app's setup URL.
+func (s *AppService) gitHubSetupURL() string {
+	return s.servers.appURL + "/app/github/setup"
 }
 
 func (s *AppService) gitHubState(actor Actor) string {
@@ -109,9 +115,9 @@ func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installatio
 		return "", s.addGitHubInstallation(ctx, actor, installationID)
 	}
 	if code == "" {
-		return s.github.AuthorizeURL(state), nil
+		return s.github.AuthorizeURL(state, s.gitHubSetupURL()), nil
 	}
-	ids, err := s.github.UserInstallations(ctx, code)
+	ids, err := s.github.UserInstallations(ctx, code, s.gitHubSetupURL())
 	if err != nil {
 		return "", err
 	}

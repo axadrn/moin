@@ -1,17 +1,13 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/validation"
-	"golang.org/x/crypto/bcrypt"
 )
-
-var ErrInvalidCurrentPassword = errors.New("current password is incorrect")
 
 func (s *UserService) ByID(id string) (*model.User, error) {
 	user, err := s.userRepository.ByID(id)
@@ -20,43 +16,6 @@ func (s *UserService) ByID(id string) (*model.User, error) {
 	}
 
 	return s.decorateUser(user)
-}
-
-func (s *UserService) UpdatePassword(userID, currentPassword, newPassword string) error {
-	user, err := s.userRepository.ByID(userID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
-	}
-
-	if !user.HasPassword() {
-		return fmt.Errorf("passwordless accounts cannot update password. Please set a password first")
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(currentPassword))
-	if err != nil {
-		return ErrInvalidCurrentPassword
-	}
-
-	// Validate new password
-	err = validation.ValidatePassword(newPassword)
-	if err != nil {
-		return err
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-
-	hashStr := string(hashedPassword)
-	user.PasswordHash = &hashStr
-
-	err = s.userRepository.Update(user)
-	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
-	}
-
-	return nil
 }
 
 func (s *UserService) UpdateName(userID, name string) (*model.User, error) {

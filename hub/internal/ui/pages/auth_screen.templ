@@ -72,11 +72,6 @@ templ authLink(href string) {
 	</div>
 }
 
-// authOr parts two ways to sign in.
-templ authOr() {
-	<div class="moin-or" aria-hidden="true">or</div>
-}
-
 // authTerms is the line about the terms where moin is sold.
 templ authTerms() {
 	if ctxkeys.RenderConfig(ctx).Billing {

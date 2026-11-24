@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Web, SSH, firewall, rules and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Sign-in, web, SSH, firewall, rules and signed updates."
 group: "Servers and data"
 order: 2
 ---
@@ -33,7 +33,27 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 
 - The server checks every compose file against a list of what a normal app needs, before anything builds or starts. [Containers](#containers-that-reach-into-the-server)
 
+**One door, one key.** You come in with GitHub, not with a password moin keeps. There is no password to guess, to leak or to reset by email.
+
+- Sign-in is GitHub only, with two-factor as your GitHub account has it. [Sign in](#sign-in)
+
 **What stays honest.** A messenger that someone bought can still bring letters your rules allow. Strict rules leave it nothing that hurts.
+
+## Sign in
+
+You sign in with GitHub. Like a club that lets you in when a friend at the door knows you: GitHub knows you, moin asks GitHub.
+
+- **GitHub only.** No passwords, no sign-in links by email. Nothing to guess, nothing to phish from an inbox, no reset that takes over an account.
+- **The GitHub account counts, not the email.** moin stores the id of your GitHub account. It never changes, even when you change your email or name on GitHub.
+- **The first time only, the email.** An account made before GitHub finds its GitHub account by GitHub's verified primary email, if the account proved that address too and has no GitHub account yet. Secondary addresses and unverified ones never count. After that, only the id counts.
+- **A taken address stays taken.** When your GitHub email belongs to another account, moin says so and signs you in nowhere.
+- **Invitations.** The link in an invitation proves its mailbox. Any GitHub account may take it, and the new account gets the invited address.
+- **New accounts.** Only while sign-up is open: on the hosted hub, or with an invitation. A self-hosted hub lets in its admins and invited people.
+- **Every sign-in is a new session.** The cookie the browser had ends, so nobody can plant a session on you. Sessions live in an HttpOnly cookie only, never in a script.
+- **Recovery key.** Lost your GitHub account? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It signs the account out everywhere and disconnects its GitHub account, so a stolen GitHub account no longer gets in. Then you connect your GitHub again.
+- **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
+- **Connecting GitHub is a form with a CSRF token**, so no other site can start it. [Recovery key](/docs/self-hosting#recovery-key)
+- **Scripts and AI agents** use a personal API token instead, which can never change how you sign in. [Account and tokens](/docs/guides/account)
 
 ## Ports, SSH and the firewall
 

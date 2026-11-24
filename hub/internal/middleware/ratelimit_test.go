@@ -27,44 +27,6 @@ func TestRateLimiterEnforcesLimitPerIP(t *testing.T) {
 	}
 }
 
-func TestAuthEmailRateLimitIsScopedByIPAndNormalizedRecipient(t *testing.T) {
-	ipLimiter := NewRateLimiter(3, time.Hour)
-	recipientLimiter := NewRateLimiter(2, time.Hour)
-	t.Cleanup(ipLimiter.Close)
-	t.Cleanup(recipientLimiter.Close)
-	handler := rateLimitAuthEmail(NewClientIPResolver(nil), ipLimiter, recipientLimiter)(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-
-	request := func(ip, email string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, "/auth/magic-link", strings.NewReader("email="+url.QueryEscape(email)))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.RemoteAddr = ip + ":1234"
-		recorder := httptest.NewRecorder()
-		handler(recorder, req)
-		return recorder
-	}
-
-	if recorder := request("192.0.2.1", "Reader@Example.com"); recorder.Code != http.StatusNoContent {
-		t.Fatalf("first request status = %d", recorder.Code)
-	}
-	if recorder := request("192.0.2.2", " reader@example.com "); recorder.Code != http.StatusNoContent {
-		t.Fatalf("second request status = %d", recorder.Code)
-	}
-	if recorder := request("192.0.2.3", "READER@example.com"); recorder.Code != http.StatusTooManyRequests || recorder.Header().Get("Retry-After") != "3600" {
-		t.Fatalf("recipient-limited status = %d, Retry-After = %q", recorder.Code, recorder.Header().Get("Retry-After"))
-	}
-	if recorder := request("192.0.2.1", "other-1@example.com"); recorder.Code != http.StatusNoContent {
-		t.Fatalf("same IP second recipient status = %d", recorder.Code)
-	}
-	if recorder := request("192.0.2.1", "other-2@example.com"); recorder.Code != http.StatusNoContent {
-		t.Fatalf("same IP third recipient status = %d", recorder.Code)
-	}
-	if recorder := request("192.0.2.1", "other-3@example.com"); recorder.Code != http.StatusTooManyRequests {
-		t.Fatalf("IP-limited status = %d", recorder.Code)
-	}
-}
-
 func TestEmailChangeRateLimitIsScopedByUser(t *testing.T) {
 	userLimiter := NewRateLimiter(2, time.Hour)
 	recipientLimiter := NewRateLimiter(2, time.Hour)

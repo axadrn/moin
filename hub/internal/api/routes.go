@@ -42,10 +42,6 @@ type Middleware struct {
 	RequireAuth Wrap
 	// RequireOnboarded also answers 403 onboarding_required without a name.
 	RequireOnboarded Wrap
-	// RateLimitAuth limits sign-in attempts per client IP.
-	RateLimitAuth Wrap
-	// RateLimitAuthEmail limits emails per client IP and recipient.
-	RateLimitAuthEmail Wrap
 	// RateLimitEmailChanges limits email change requests per user and
 	// recipient.
 	RateLimitEmailChanges Wrap
@@ -78,11 +74,6 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/meta", h.Meta.Meta, TokenRead},
 		{"GET /api/v1/version", m.RequireOnboarded(h.Version.Show), TokenRead},
 		{"POST /api/v1/version/update", m.InWorkspace(h.Version.Update), TokenWrite},
-		{"POST /api/v1/auth/password", m.RateLimitAuth(h.Auth.PasswordAuth), TokenDenied},
-		{"POST /api/v1/auth/magic-link", m.RateLimitAuthEmail(h.Auth.SendMagicLink), TokenDenied},
-		{"POST /api/v1/auth/magic-link/verify", h.Auth.VerifyMagicLink, TokenDenied},
-		{"POST /api/v1/auth/forgot-password", m.RateLimitAuthEmail(h.Auth.ForgotPassword), TokenDenied},
-		{"POST /api/v1/auth/forgot-password/verify", h.Auth.VerifyForgotPassword, TokenDenied},
 		{"POST /api/v1/auth/email-change/verify", h.Auth.VerifyEmailChange, TokenDenied},
 		{"POST /api/v1/auth/device", m.RateLimitDevice(h.Device.Start), TokenDenied},
 		{"POST /api/v1/auth/device/token", m.RateLimitDevicePoll(h.Device.Token), TokenDenied},
@@ -92,9 +83,6 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PATCH /api/v1/account/name", m.RequireOnboarded(h.Account.UpdateName), TokenWrite},
 		{"PUT /api/v1/account/email-alerts", m.RequireOnboarded(h.Account.SetEmailAlerts), TokenWrite},
 		{"PATCH /api/v1/account/email", m.RequireOnboarded(m.RateLimitEmailChanges(h.Account.ChangeEmail)), TokenDenied},
-		{"POST /api/v1/account/password", m.RequireOnboarded(h.Account.ChangePassword), TokenDenied},
-		{"POST /api/v1/account/password/set", m.RequireOnboarded(h.Account.SetPassword), TokenDenied},
-		{"DELETE /api/v1/account/password", m.RequireOnboarded(h.Account.RemovePassword), TokenDenied},
 		{"DELETE /api/v1/account", m.RequireOnboarded(h.Account.DeleteAccount), TokenDenied},
 		{"GET /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.List), TokenDenied},
 		{"DELETE /api/v1/account/sessions/{id}", m.RequireOnboarded(h.Sessions.Revoke), TokenDenied},

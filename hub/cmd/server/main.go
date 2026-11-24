@@ -67,7 +67,7 @@ func run(cfg *config.Config) error {
 		slog.Warn("database backup off: a dead server takes the database with it; set S3_BUCKET and BACKUP_DATABASE=true")
 	}
 	if cfg.IsProduction() && cfg.CloudflareAccountID == "" {
-		slog.Warn("email off: sign-in links and invitations go to this log instead; set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, or print a sign-in link with ./main sign-in-link")
+		slog.Warn("email off: invitations and alerts go to this log instead; set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN")
 	}
 	application, err := app.New(cfg)
 	if err != nil {

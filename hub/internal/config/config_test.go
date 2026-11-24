@@ -188,50 +188,21 @@ func TestLoadParsesTrustedProxyCIDRsWithLoopbackDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadDefaultsAPIURLToAppURL(t *testing.T) {
-	setCoreEnvironment(t)
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+// GitHubLogin needs the GitHub App with its client ID and secret: the
+// button never leads to a broken GitHub page.
+func TestGitHubLoginNeedsTheWholeApp(t *testing.T) {
+	app := Config{GitHubAppID: "1", GitHubAppClientID: "Iv1.test", GitHubAppClientSecret: "secret"}
+	if !app.GitHubLogin() || !app.Render().GitHubLogin {
+		t.Fatal("the whole GitHub App does not sign in")
 	}
-	if cfg.APIURL != cfg.AppURL {
-		t.Fatalf("APIURL = %q, want APP_URL %q", cfg.APIURL, cfg.AppURL)
-	}
-}
-
-func TestLoadReadsAPIURL(t *testing.T) {
-	setCoreEnvironment(t)
-	t.Setenv("APP_URL", "https://app.example.com")
-	t.Setenv("API_URL", "https://api.example.com")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.APIURL != "https://api.example.com" || cfg.AppURL != "https://app.example.com" {
-		t.Fatalf("APIURL = %q, AppURL = %q", cfg.APIURL, cfg.AppURL)
-	}
-}
-
-func TestLoadRejectsInvalidAPIURL(t *testing.T) {
-	for _, value := range []string{
-		"api.example.com",
-		"ftp://api.example.com",
-		"https://api.example.com/",
-		"https://api.example.com/v1",
-		"https://api.example.com?x=1",
-		"https://user@api.example.com",
+	for _, partial := range []Config{
+		{GitHubAppClientID: "Iv1.test", GitHubAppClientSecret: "secret"},
+		{GitHubAppID: "1", GitHubAppClientID: "Iv1.test"},
+		{GitHubAppID: "1", GitHubAppClientSecret: "secret"},
 	} {
-		t.Run(value, func(t *testing.T) {
-			setCoreEnvironment(t)
-			t.Setenv("API_URL", value)
-
-			_, err := Load()
-			if err == nil || !strings.Contains(err.Error(), "API_URL") {
-				t.Fatalf("Load() error = %v, want API_URL error", err)
-			}
-		})
+		if partial.GitHubLogin() {
+			t.Errorf("%+v signs in with GitHub", partial)
+		}
 	}
 }
 
@@ -268,7 +239,6 @@ func setCoreEnvironment(t *testing.T) {
 	for _, key := range []string{
 		"APP_ENV",
 		"APP_URL",
-		"API_URL",
 		"ADMIN_EMAILS",
 		"SESSION_EXPIRY",
 		"TRUSTED_PROXY_CIDRS",
@@ -278,8 +248,9 @@ func setCoreEnvironment(t *testing.T) {
 		"LOG_HTTP",
 		"GOOGLE_CLIENT_ID",
 		"GOOGLE_CLIENT_SECRET",
-		"GITHUB_CLIENT_ID",
-		"GITHUB_CLIENT_SECRET",
+		"GITHUB_APP_ID",
+		"GITHUB_APP_CLIENT_ID",
+		"GITHUB_APP_CLIENT_SECRET",
 		"EMAIL_FROM",
 		"RESEND_API_KEY",
 		"RESEND_AUDIENCE_ID",

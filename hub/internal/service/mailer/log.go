@@ -6,7 +6,7 @@ import (
 )
 
 // LogMailer writes every email to the log. Development uses it when no
-// Cloudflare credentials are set, so magic links work without a mail account.
+// Cloudflare credentials are set, so invitations work without a mail account.
 type LogMailer struct{}
 
 func (LogMailer) Name() string { return ProviderLog }

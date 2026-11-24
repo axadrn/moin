@@ -58,7 +58,7 @@ func (r *Admin) ListUsers(query string, limit, offset int, now time.Time) ([]mod
 
 	users := []model.AdminUser{}
 	err := r.db.Select(&users, adminUserSelect+where+`
-		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.created_at
+		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.github_login, u.created_at
 		ORDER BY u.created_at DESC, u.id
 		LIMIT $3 OFFSET $4
 	`, pattern, now, limit, offset)
@@ -72,6 +72,7 @@ const adminUserSelect = `
 			u.email,
 			u.name,
 			u.email_verified_at,
+			u.github_login,
 			u.created_at,
 			COUNT(DISTINCT m.id) AS workspace_count,
 			COUNT(DISTINCT CASE WHEN s.expires_at > $2 THEN s.id END) AS active_session_count
@@ -86,7 +87,7 @@ func (r *Admin) User(id string, now time.Time) (*model.AdminUser, error) {
 	var user model.AdminUser
 	err := r.db.Get(&user, adminUserSelect+`
 		WHERE u.id = $1
-		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.created_at
+		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.github_login, u.created_at
 	`, id, now)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound

@@ -118,7 +118,7 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
 		return
 	}
-	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, r.URL.Query().Get("password_removed") == "1", pages.SettingsAPITokensSection(tokens)))
+	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, pages.SettingsAPITokensSection(tokens)))
 }
 
 func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {

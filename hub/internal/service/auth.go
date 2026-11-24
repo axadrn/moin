@@ -12,40 +12,35 @@ import (
 	"sync"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/validation"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrEmailAlreadyExists = errors.New("email already exists")
-	ErrWeakPassword       = errors.New("password must be at least 12 characters")
-	ErrCommonPassword     = errors.New("password is too common, please choose a stronger one")
-	ErrEmailNotVerified   = errors.New("email not verified")
 	ErrInvalidEmail       = errors.New("invalid email address")
 	ErrNameRequired       = errors.New("name is required")
 )
 
 type AuthService struct {
 	// beta closes sign-up to everyone it does not let in; nil keeps it open.
-	beta                     *BetaService
-	userRepository           *repository.Users
-	tokenRepository          *repository.Tokens
-	sessionRepository        *repository.Sessions
-	workspaceService         *WorkspaceService
-	emailService             *EmailService
-	isProduction             bool
-	sessionExpiry            time.Duration
-	tokenEmailVerifyExpiry   time.Duration
-	tokenPasswordResetExpiry time.Duration
-	tokenEmailChangeExpiry   time.Duration
-	tokenMagicLinkExpiry     time.Duration
-	sessionCleanupMu         sync.Mutex
-	lastSessionCleanup       time.Time
-	apiTokens                *APITokenService
+	beta                   *BetaService
+	userRepository         *repository.Users
+	tokenRepository        *repository.Tokens
+	sessionRepository      *repository.Sessions
+	workspaceService       *WorkspaceService
+	emailService           *EmailService
+	isProduction           bool
+	sessionExpiry          time.Duration
+	tokenEmailVerifyExpiry time.Duration
+	tokenEmailChangeExpiry time.Duration
+	sessionCleanupMu       sync.Mutex
+	lastSessionCleanup     time.Time
+	apiTokens              *APITokenService
+	now                    func() time.Time
 }
 
 func NewAuthService(
@@ -57,66 +52,20 @@ func NewAuthService(
 	isProduction bool,
 	sessionExpiry time.Duration,
 	tokenEmailVerifyExpiry time.Duration,
-	tokenPasswordResetExpiry time.Duration,
 	tokenEmailChangeExpiry time.Duration,
-	tokenMagicLinkExpiry time.Duration,
 ) *AuthService {
 	return &AuthService{
-		userRepository:           userRepository,
-		tokenRepository:          tokenRepository,
-		sessionRepository:        sessionRepository,
-		workspaceService:         workspaceService,
-		emailService:             emailService,
-		isProduction:             isProduction,
-		sessionExpiry:            sessionExpiry,
-		tokenEmailVerifyExpiry:   tokenEmailVerifyExpiry,
-		tokenPasswordResetExpiry: tokenPasswordResetExpiry,
-		tokenEmailChangeExpiry:   tokenEmailChangeExpiry,
-		tokenMagicLinkExpiry:     tokenMagicLinkExpiry,
+		userRepository:         userRepository,
+		tokenRepository:        tokenRepository,
+		sessionRepository:      sessionRepository,
+		workspaceService:       workspaceService,
+		emailService:           emailService,
+		isProduction:           isProduction,
+		sessionExpiry:          sessionExpiry,
+		tokenEmailVerifyExpiry: tokenEmailVerifyExpiry,
+		tokenEmailChangeExpiry: tokenEmailChangeExpiry,
+		now:                    time.Now,
 	}
-}
-
-func (s *AuthService) Login(email, password string) (*model.User, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-
-	user, err := s.userRepository.ByEmail(email)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, fmt.Errorf("invalid credentials: %w", ErrInvalidCredentials)
-		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	if !user.HasPassword() {
-		return nil, fmt.Errorf("this account uses passwordless login. Please use the magic link option")
-	}
-
-	err = s.ComparePassword(password, *user.PasswordHash)
-	if err != nil {
-		return nil, fmt.Errorf("invalid credentials: %w", ErrInvalidCredentials)
-	}
-
-	if user.EmailVerifiedAt == nil {
-		return nil, fmt.Errorf("email not verified: %w", ErrEmailNotVerified)
-	}
-
-	return user, nil
-}
-
-func (s *AuthService) ValidatePassword(password string) error {
-	return validation.ValidatePassword(password)
-}
-
-func (s *AuthService) HashPassword(password string) (string, error) {
-	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hashedBytes), nil
-}
-
-func (s *AuthService) ComparePassword(password, hash string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
 func (s *AuthService) GenerateToken() (string, error) {
@@ -267,15 +216,6 @@ func (s *AuthService) RevokeOtherSessions(userID, currentSessionID string) error
 
 func (s *AuthService) RevokeAllSessions(userID string) error {
 	return s.sessionRepository.DeleteAllForUser(userID)
-}
-
-// RevokeSessionByToken deletes the session that belongs to a raw token, such
-// as a bearer token presented to the API.
-func (s *AuthService) RevokeSessionByToken(token string) error {
-	if token == "" {
-		return repository.ErrSessionNotFound
-	}
-	return s.sessionRepository.DeleteByTokenHash(hashToken(token))
 }
 
 func (s *AuthService) EndSession(r *http.Request) error {
@@ -442,8 +382,28 @@ func (s *AuthService) RequestEmailChange(userID, newEmail string) error {
 	return nil
 }
 
-// VerifyEmailChange completes the email change after verification
-func (s *AuthService) VerifyEmailChange(token string) (*model.User, error) {
+// ConfirmEmailChange moves the pending address of the token's user to the
+// account and ends every session of that user. The link is no way to sign
+// in: only a browser signed in as that user, not impersonating, gets a new
+// session, and signedIn says so. user is nil when the token is wrong, used
+// or expired.
+func (s *AuthService) ConfirmEmailChange(w http.ResponseWriter, r *http.Request, token string) (user *model.User, signedIn bool, err error) {
+	user, err = s.verifyEmailChange(token)
+	if err != nil {
+		return nil, false, err
+	}
+	session := ctxkeys.Session(r.Context())
+	if session != nil && session.UserID == user.ID && !session.IsImpersonating() {
+		if _, err := s.StartFreshSession(w, r, user.ID); err != nil {
+			return user, false, err
+		}
+		return user, true, nil
+	}
+	return user, false, s.RevokeAllSessions(user.ID)
+}
+
+// verifyEmailChange completes the email change after verification
+func (s *AuthService) verifyEmailChange(token string) (*model.User, error) {
 	// ConsumeToken atomically deletes the token, so only one request can use it.
 	tokenModel, err := s.tokenRepository.ConsumeToken(hashToken(token))
 	if err != nil {
@@ -476,237 +436,34 @@ func (s *AuthService) VerifyEmailChange(token string) (*model.User, error) {
 	return user, nil
 }
 
-func (s *AuthService) SetPassword(userID, newPassword string) error {
-	user, err := s.userRepository.ByID(userID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
-	}
-
-	if user.HasPassword() {
-		return errors.New("password already set, use change password instead")
-	}
-
-	err = s.ValidatePassword(newPassword)
-	if err != nil {
-		return err
-	}
-
-	hashedPassword, err := s.HashPassword(newPassword)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-
-	user.PasswordHash = &hashedPassword
-	err = s.userRepository.Update(user)
-	if err != nil {
-		return fmt.Errorf("failed to set password: %w", err)
-	}
-
-	slog.Info("password set for passwordless account", "user_id", userID)
-	return nil
-}
-
-func (s *AuthService) RemovePassword(userID string) error {
-	user, err := s.userRepository.ByID(userID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
-	}
-
-	if !user.HasPassword() {
-		return errors.New("account is already passwordless")
-	}
-
-	user.PasswordHash = nil
-	err = s.userRepository.Update(user)
-	if err != nil {
-		return fmt.Errorf("failed to remove password: %w", err)
-	}
-
-	slog.Info("password removed, account is now passwordless", "user_id", userID)
-	return nil
-}
-
-// SendMagicLink generates a magic link and sends it to the user's email
-// SendMagicLink handles the combined login/signup flow
-// If user exists → sends magic link for login
-// If user is new → creates account and sends magic link for verification + first login
-func (s *AuthService) SendMagicLink(email string) error {
-	user, magicToken, err := s.magicLink(email)
-	if err != nil {
-		return err
-	}
-	err = s.emailService.SendMagicLinkEmail(user.Email, magicToken, user.Name)
-	if err != nil {
-		slog.Error("failed to send magic link email", "error", err)
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-	slog.Info("magic link sent")
-	return nil
-}
-
-// SignInLink makes a sign-in link for email without sending it, for the
-// operator of a hub that has no email yet. Like a sent one, it
-// works once and expires.
-func (s *AuthService) SignInLink(email string) (string, error) {
-	_, magicToken, err := s.magicLink(email)
-	if err != nil {
-		return "", err
-	}
-	return s.emailService.MagicLinkURL(magicToken), nil
-}
-
-// EnsureUser returns the user of email, and creates a passwordless account
-// when there is none and email may sign up.
+// EnsureUser returns the user of email with a verified address, and
+// creates the account when there is none and email may sign up. Only the
+// operator calls it, from a server command, for their own address.
 func (s *AuthService) EnsureUser(email string) (*model.User, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	if err := validation.ValidateEmail(email); err != nil {
 		return nil, ErrInvalidEmail
 	}
+	now := time.Now()
 	user, err := s.userRepository.ByEmail(email)
 	if err == nil {
+		if user.EmailVerifiedAt == nil {
+			user.EmailVerifiedAt = &now
+			if err := s.userRepository.Update(user); err != nil {
+				return nil, fmt.Errorf("verify the email: %w", err)
+			}
+		}
 		return user, nil
 	}
 	if err := s.mayCreate(email); err != nil {
 		return nil, err
 	}
-	// password_hash stays NULL: a passwordless account.
-	user = &model.User{ID: uuid.New().String(), Email: email, CreatedAt: time.Now()}
+	user = &model.User{ID: uuid.New().String(), Email: email, EmailVerifiedAt: &now, CreatedAt: now}
 	if err := s.userRepository.Create(user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
-	slog.Info("new passwordless user created", "user_id", user.ID)
+	slog.Info("new user created", "user_id", user.ID)
 	return user, nil
-}
-
-// magicLink replaces the magic link of email's user, creating the user
-// first when needed, and returns the raw token.
-func (s *AuthService) magicLink(email string) (*model.User, string, error) {
-	user, err := s.EnsureUser(email)
-	if err != nil {
-		return nil, "", err
-	}
-	err = s.tokenRepository.DeleteByUserAndType(user.ID, model.TokenTypeMagicLink)
-	if err != nil {
-		slog.Warn("failed to delete old magic link tokens", "error", err, "user_id", user.ID)
-	}
-	magicToken, err := s.GenerateToken()
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate token: %w", err)
-	}
-	err = s.tokenRepository.Create(&model.Token{
-		UserID:    user.ID,
-		Type:      model.TokenTypeMagicLink,
-		TokenHash: hashToken(magicToken),
-		ExpiresAt: time.Now().Add(s.tokenMagicLinkExpiry),
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create token: %w", err)
-	}
-	return user, magicToken, nil
-}
-
-// SendForgotPasswordLink sends a forgot password link that will remove the password and log the user in
-// Reuses magic link infrastructure but sends different email
-func (s *AuthService) SendForgotPasswordLink(email string) error {
-	email = strings.TrimSpace(strings.ToLower(email))
-
-	// Validate email
-	err := validation.ValidateEmail(email)
-	if err != nil {
-		return ErrInvalidEmail
-	}
-
-	// Check if user exists
-	user, err := s.userRepository.ByEmail(email)
-	if err != nil {
-		// User doesn't exist. Silently fail to prevent email enumeration
-		slog.Info("forgot password requested for non-existent email")
-		return nil // Always return success to prevent enumeration
-	}
-
-	// Only works if user has a password
-	if !user.HasPassword() {
-		slog.Info("forgot password requested for passwordless account")
-		return nil // Return success to prevent enumeration
-	}
-
-	// Delete any existing magic link tokens for this user
-	err = s.tokenRepository.DeleteByUserAndType(user.ID, model.TokenTypeMagicLink)
-	if err != nil {
-		slog.Warn("failed to delete old tokens", "error", err, "user_id", user.ID)
-	}
-
-	// Generate magic link token (reuse same token type)
-	magicToken, err := s.GenerateToken()
-	if err != nil {
-		return fmt.Errorf("failed to generate token: %w", err)
-	}
-
-	// Save token to database
-	token := &model.Token{
-		UserID:    user.ID,
-		Type:      model.TokenTypeMagicLink,
-		TokenHash: hashToken(magicToken),
-		ExpiresAt: time.Now().Add(s.tokenMagicLinkExpiry),
-	}
-	err = s.tokenRepository.Create(token)
-	if err != nil {
-		return fmt.Errorf("failed to create token: %w", err)
-	}
-
-	// Send forgot password email (different template)
-	err = s.emailService.SendForgotPasswordEmail(user.Email, magicToken, user.Name)
-	if err != nil {
-		slog.Error("failed to send forgot password email", "error", err)
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	slog.Info("forgot password link sent")
-	return nil
-}
-
-// VerifyMagicLink verifies the magic link token and returns the authenticated user
-func (s *AuthService) VerifyMagicLink(token string) (*model.User, error) {
-	// ConsumeToken atomically deletes the token, so only one request can use it.
-	tokenModel, err := s.tokenRepository.ConsumeToken(hashToken(token))
-	if err != nil {
-		return nil, fmt.Errorf("invalid or expired magic link")
-	}
-
-	// Verify token type
-	if tokenModel.Type != model.TokenTypeMagicLink {
-		return nil, fmt.Errorf("invalid token type")
-	}
-
-	// Get user
-	user, err := s.userRepository.ByID(tokenModel.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
-	}
-
-	// Auto-verify email if not already verified (important for passwordless registration)
-	if user.EmailVerifiedAt == nil {
-		now := time.Now()
-		user.EmailVerifiedAt = &now
-		err = s.userRepository.Update(user)
-		if err != nil {
-			slog.Warn("failed to verify email", "error", err, "user_id", user.ID)
-		}
-		// Note: Welcome email is sent after onboarding (when we have the user's name)
-	}
-
-	slog.Info("user authenticated via magic link", "user_id", user.ID)
-	return user, nil
-}
-
-// NeedsOnboarding checks if user needs to complete onboarding (name not set)
-func (s *AuthService) NeedsOnboarding(userID string) (bool, error) {
-	user, err := s.userRepository.ByID(userID)
-	if err != nil {
-		return false, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	return user.Name == "", nil
 }
 
 // CompleteOnboarding sets the user's name during onboarding and, when
@@ -755,76 +512,6 @@ func (s *AuthService) CompleteOnboarding(userID, name, workspaceName string, cre
 
 	slog.Info("onboarding completed", "user_id", userID)
 	return workspace, nil
-}
-
-// AuthenticateOAuth handles OAuth authentication (Google, GitHub, etc.)
-// It returns the user of email, or of the first of others with an account:
-// more verified addresses of the same person, so signing in with GitHub
-// finds an account made with a second address. Without any account, it
-// creates one for email.
-func (s *AuthService) AuthenticateOAuth(email, provider string, others ...string) (*model.User, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-
-	// Validate email
-	err := validation.ValidateEmail(email)
-	if err != nil {
-		return nil, ErrInvalidEmail
-	}
-
-	// Check if user exists
-	user, err := s.userRepository.ByEmail(email)
-	for _, other := range others {
-		if !errors.Is(err, repository.ErrUserNotFound) {
-			break
-		}
-		other = strings.TrimSpace(strings.ToLower(other))
-		if other == email || validation.ValidateEmail(other) != nil {
-			continue
-		}
-		user, err = s.userRepository.ByEmail(other)
-	}
-	if err != nil {
-		if !errors.Is(err, repository.ErrUserNotFound) {
-			return nil, fmt.Errorf("failed to lookup user: %w", err)
-		}
-
-		if err := s.mayCreate(email); err != nil {
-			return nil, err
-		}
-		// User doesn't exist. Create new account via OAuth
-		now := time.Now()
-		userID := uuid.New().String()
-
-		user = &model.User{
-			ID:              userID,
-			Email:           email,
-			EmailVerifiedAt: &now, // OAuth provider has verified email
-			CreatedAt:       now,
-			// password_hash is NULL for OAuth accounts
-		}
-
-		err = s.userRepository.Create(user)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create user: %w", err)
-		}
-
-		slog.Info("new OAuth user created", "user_id", userID, "provider", provider)
-		return user, nil
-	}
-
-	// User exists. Ensure email is verified (OAuth provider has verified it)
-	if user.EmailVerifiedAt == nil {
-		now := time.Now()
-		user.EmailVerifiedAt = &now
-		err = s.userRepository.Update(user)
-		if err != nil {
-			slog.Warn("failed to mark email as verified", "error", err, "user_id", user.ID)
-			// Don't fail login
-		}
-	}
-
-	slog.Info("user authenticated via OAuth", "user_id", user.ID, "provider", provider)
-	return user, nil
 }
 
 // SetBeta closes sign-up to everyone the beta does not let in.

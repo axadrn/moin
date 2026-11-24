@@ -19,7 +19,6 @@ func TestAuthMiddlewareLoadsAuthenticatedContext(t *testing.T) {
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{
 		ID:       "authenticated-user",
 		Name:     "Authenticated User",
-		Password: "correct horse battery staple",
 		Verified: true,
 	})
 	authService, userService, _ := authenticationServices(database)
@@ -38,9 +37,6 @@ func TestAuthMiddlewareLoadsAuthenticatedContext(t *testing.T) {
 		currentSession := ctxkeys.Session(r.Context())
 		if user == nil || user.ID != fixture.User.ID {
 			t.Fatalf("context user = %#v", user)
-		}
-		if user.PasswordHash != nil || !user.PasswordSet {
-			t.Fatalf("context exposed password hash or lost password state: %#v", user)
 		}
 		if user.Name != fixture.User.Name {
 			t.Fatalf("context user name = %q", user.Name)
@@ -175,7 +171,7 @@ func TestBlockImpersonatedWrites(t *testing.T) {
 		{http.MethodGet, "/app/workspace/billing/manage", http.StatusForbidden, false},
 		{http.MethodHead, "/app/workspace/billing/manage", http.StatusForbidden, false},
 		{http.MethodGet, "/auth/google/callback", http.StatusForbidden, false},
-		{http.MethodGet, "/auth/magic-link/token", http.StatusForbidden, false},
+		{http.MethodGet, "/auth/verify-email-change/token", http.StatusForbidden, false},
 		{http.MethodGet, "/assets/app.css", http.StatusNoContent, true},
 		{http.MethodGet, "/llms.txt", http.StatusNoContent, true},
 		{http.MethodPost, "/app/workspace/workspace/delete", http.StatusForbidden, false},
@@ -366,9 +362,7 @@ func authenticationServices(database *sqlx.DB) (*service.AuthService, *service.U
 		false,
 		7*24*time.Hour,
 		24*time.Hour,
-		time.Hour,
 		24*time.Hour,
-		10*time.Minute,
 	)
 	userService := service.NewUserService(userRepository, fileService, nil, workspaceService)
 	return authService, userService, subscriptionService

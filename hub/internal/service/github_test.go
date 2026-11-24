@@ -67,7 +67,7 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			var grant map[string]string
 			json.NewDecoder(r.Body).Decode(&grant)
 			tokens := map[string]string{"code-axadrn": "ghu_axadrn", "code-mallory": "ghu_mallory", "code-nobody": "ghu_nobody"}
-			if grant["client_id"] != "Iv1.test" || grant["client_secret"] != "client-secret" || tokens[grant["code"]] == "" {
+			if grant["client_id"] != "Iv1.test" || grant["client_secret"] != "client-secret" || tokens[grant["code"]] == "" || !strings.HasPrefix(grant["redirect_uri"], "https://") {
 				json.NewEncoder(w).Encode(map[string]string{"error": "bad_verification_code"})
 				return
 			}
@@ -82,6 +82,21 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{"total_count": len(found), "installations": found})
+		case r.URL.Path == "/user":
+			users := map[string]map[string]any{"Bearer ghu_axadrn": {"id": 1, "login": "axadrn", "name": "Ax"}, "Bearer ghu_mallory": {"id": 2, "login": "mallory", "name": nil}}
+			if _, ok := users[auth]; !ok {
+				http.Error(w, "token", http.StatusUnauthorized)
+				return
+			}
+			json.NewEncoder(w).Encode(users[auth])
+		case r.URL.Path == "/user/emails":
+			// axadrn has a verified primary and a secondary address;
+			// mallory added someone else's as primary, unverified.
+			emails := map[string][]map[string]any{
+				"Bearer ghu_axadrn":  {{"email": "work@example.com", "primary": false, "verified": true}, {"email": "ada@example.com", "primary": true, "verified": true}},
+				"Bearer ghu_mallory": {{"email": "victim@example.com", "primary": true, "verified": false}, {"email": "mallory@example.com", "primary": false, "verified": true}},
+			}
+			json.NewEncoder(w).Encode(emails[auth])
 		case auth != "token ghs_test":
 			http.Error(w, "token", http.StatusUnauthorized)
 		case r.URL.Path == "/installation/repositories":
@@ -362,11 +377,14 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 	ctx := context.Background()
 
 	link, err := apps.GitHubConnectURL(owner)
-	if err != nil || !strings.HasPrefix(link, githubServer.URL+"/login/oauth/authorize?client_id=Iv1.test&state=") {
+	if err != nil || !strings.HasPrefix(link, githubServer.URL+"/login/oauth/authorize?client_id=Iv1.test&redirect_uri=") {
 		t.Fatalf("connect link = %q, %v", link, err)
 	}
 	parsed, _ := url.Parse(link)
 	state := parsed.Query().Get("state")
+	if redirect := parsed.Query().Get("redirect_uri"); !strings.HasSuffix(redirect, "/app/github/setup") {
+		t.Fatalf("redirect_uri = %q, want the setup URL", redirect)
+	}
 
 	// After a change of the repos ("Redirect on update") GitHub sends the
 	// installation without a code: moin asks for a sign-in with the same
@@ -490,5 +508,43 @@ func TestImageDeploysTakeTheCommit(t *testing.T) {
 	}
 	if app, err := apps.SetAutoDeploy(owner, "blog", true); err != nil || !app.AutoDeploy || app.DeployHookHash != nil {
 		t.Fatalf("deploy on push = %+v, %v", app, err)
+	}
+}
+
+// TestGitHubAccount: a sign-in with the app gives the GitHub account with
+// its verified primary email only. A secondary address or an unverified
+// primary one never counts.
+func TestGitHubAccount(t *testing.T) {
+	githubServer := (&fakeGitHub{}).serve(t)
+	defer githubServer.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	github, err := NewGitHub("123", "moin-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	const callback = "https://moin.example.com/auth/github/callback"
+
+	link, _ := url.Parse(github.AuthorizeURL("state-1", callback))
+	if link.Query().Get("redirect_uri") != callback || link.Query().Get("state") != "state-1" || link.Query().Get("client_id") != "Iv1.test" {
+		t.Fatalf("authorize URL = %s", link)
+	}
+	account, err := github.Account(ctx, "code-axadrn", callback)
+	if err != nil || account != (GitHubAccount{ID: 1, Login: "axadrn", Name: "Ax", Email: "ada@example.com"}) {
+		t.Fatalf("Account() = %+v, %v", account, err)
+	}
+	account, err = github.Account(ctx, "code-mallory", callback)
+	if err != nil || account.ID != 2 || account.Email != "" {
+		t.Fatalf("an unverified primary email: Account() = %+v, %v", account, err)
+	}
+	if _, err := github.Account(ctx, "code-wrong", callback); err == nil {
+		t.Fatal("a wrong code signed in")
+	}
+	if _, err := github.Account(ctx, "code-axadrn", ""); err == nil {
+		t.Fatal("a code without the redirect URI signed in")
 	}
 }

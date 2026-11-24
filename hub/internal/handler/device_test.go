@@ -73,11 +73,11 @@ func TestDevicePageSignsInFirstAndComesBack(t *testing.T) {
 	}
 
 	// Any sign-in ends in redirectAfterAuth, which goes back to the page.
-	auth := service.NewAuthService(nil, nil, nil, test.workspaces, nil, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
+	auth := service.NewAuthService(nil, nil, nil, test.workspaces, nil, false, time.Hour, time.Hour, time.Hour)
 	signIn := deviceRequest(http.MethodGet, "/auth/onboarding", nil, test.owner.User)
 	signIn.AddCookie(cookie)
 	recorder = httptest.NewRecorder()
-	NewAuthHandler(auth, nil, test.workspaces, &config.Config{}).OnboardingPage(recorder, signIn)
+	NewAuthHandler(auth, test.workspaces, nil, &config.Config{}).OnboardingPage(recorder, signIn)
 	want := "/device?code=" + started.UserCode
 	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != want {
 		t.Fatalf("after sign-in: status %d, location %q, want %q", recorder.Code, recorder.Header().Get("Location"), want)

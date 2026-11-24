@@ -57,7 +57,7 @@ func TestDeviceLoginOverTheAPI(t *testing.T) {
 		t.Fatalf("account = %s", account.Body.String())
 	}
 	// The device token is listed with the user's tokens, by its kind.
-	list := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", bearer: owner.session})
+	list := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/tokens", cookie: owner.session})
 	expectStatus(t, list, http.StatusOK)
 	if !strings.Contains(list.Body.String(), `"kind":"device"`) {
 		t.Fatalf("tokens = %s", list.Body.String())

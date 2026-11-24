@@ -19,7 +19,6 @@ func TestRevokeAccessRevokesAPITokens(t *testing.T) {
 		kept   []string
 	}{
 		{name: "all", revoke: func(auth *AuthService) error { return auth.RevokeAllAccess("user") }},
-		{name: "others", revoke: func(auth *AuthService) error { return auth.RevokeOtherAccess("user", "current") }, kept: []string{"current"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			database := testutil.NewDatabase(t)

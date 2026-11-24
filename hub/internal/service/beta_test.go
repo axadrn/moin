@@ -14,10 +14,7 @@ func signUpOpen(t *testing.T, beta *BetaService, environment authFlowEnvironment
 	t.Helper()
 	beta.open = true
 	defer func() { beta.open = false }()
-	if err := environment.auth.SendMagicLink(address); err != nil {
-		t.Fatal(err)
-	}
-	user, err := environment.userRepository.ByEmail(address)
+	user, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 9001, Login: "someone", Email: address}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +29,7 @@ func TestOpenSignupLetsAnyoneIn(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
 	beta := NewBetaService(true, nil, repository.NewWorkspaceInvitations(environment.database), environment.subscriptionRepository)
 	environment.auth.SetBeta(beta)
-	if err := environment.auth.SendMagicLink("anyone@example.com"); err != nil {
+	if _, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 1, Login: "anyone", Email: "anyone@example.com"}, ""); err != nil {
 		t.Fatalf("open sign-up: err = %v", err)
 	}
 }
@@ -42,17 +39,14 @@ func TestClosedSignupIsPrivate(t *testing.T) {
 	beta := NewBetaService(false, []string{"admin@example.com"}, repository.NewWorkspaceInvitations(environment.database), environment.subscriptionRepository)
 	environment.auth.SetBeta(beta)
 
-	if err := environment.auth.SendMagicLink("stranger@example.com"); !errors.Is(err, ErrPrivate) {
+	if _, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 1, Login: "stranger", Email: "stranger@example.com"}, ""); !errors.Is(err, ErrPrivate) {
 		t.Fatalf("a stranger: err = %v", err)
-	}
-	if _, err := environment.auth.AuthenticateOAuth("stranger@example.com", "github"); !errors.Is(err, ErrPrivate) {
-		t.Fatalf("a stranger through GitHub: err = %v", err)
 	}
 	if _, err := environment.userRepository.ByEmail("stranger@example.com"); err == nil {
 		t.Fatal("a stranger got an account")
 	}
 
-	if err := environment.auth.SendMagicLink("Admin@Example.com"); err != nil {
+	if _, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 2, Login: "admin", Email: "Admin@Example.com"}, ""); err != nil {
 		t.Fatalf("an admin: err = %v", err)
 	}
 	admin, err := environment.userRepository.ByEmail("admin@example.com")
@@ -73,7 +67,7 @@ func TestClosedSignupIsPrivate(t *testing.T) {
 	if err := environment.workspaceService.Invite(member, workspace, "mate@example.com", model.WorkspaceRoleMember, Source{Via: "web"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := environment.auth.SendMagicLink("mate@example.com"); err != nil {
+	if _, err := environment.auth.SignInWithGitHub(GitHubAccount{ID: 3, Login: "mate", Email: "mate@example.com"}, ""); err != nil {
 		t.Fatalf("an invited teammate: err = %v", err)
 	}
 	if _, err := environment.userRepository.ByEmail("mate@example.com"); err != nil {

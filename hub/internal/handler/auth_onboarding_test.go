@@ -29,8 +29,8 @@ func newOnboardingTest(t *testing.T) onboardingTest {
 	database, workspaces, owner, mailer := invitationHandlerTestSetup(t)
 	email := service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
 	users := repository.NewUsers(database)
-	auth := service.NewAuthService(users, nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-	handler := NewAuthHandler(auth, nil, workspaces, &config.Config{})
+	auth := service.NewAuthService(users, nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour)
+	handler := NewAuthHandler(auth, workspaces, nil, &config.Config{})
 	return onboardingTest{handler: handler, workspaces: workspaces, owner: owner, mailer: mailer, users: users}
 }
 
@@ -173,18 +173,9 @@ func TestOnboardingNeedsBothFieldsWithoutInvitation(t *testing.T) {
 }
 
 func TestGitHubNameFallsBackToTheLogin(t *testing.T) {
-	for profile, want := range map[string]string{
-		`{"email":"a@example.com","name":"Grace Hopper","login":"grace"}`: "Grace Hopper",
-		`{"email":"a@example.com","name":null,"login":"grace"}`:           "grace",
-		`{"email":"a@example.com","name":"  ","login":"grace"}`:           "grace",
-	} {
-		client := &http.Client{Transport: fakeGitHubAPI{
-			"https://api.github.com/user":        profile,
-			"https://api.github.com/user/emails": `[{"email":"a@example.com","primary":true,"verified":true}]`,
-		}}
-		_, name, err := githubAccount(client, "https://api.github.com")
-		if err != nil || name != want {
-			t.Errorf("githubAccount(%s) name = %q, %v, want %q", profile, name, err, want)
+	for name, want := range map[string]string{"Grace Hopper": "Grace Hopper", "": "grace", "Bad\nName": "grace"} {
+		if got := githubDisplayName(service.GitHubAccount{ID: 1, Login: "grace", Name: name}); got != want {
+			t.Errorf("githubDisplayName(%q) = %q, want %q", name, got, want)
 		}
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/testutil"
 	"github.com/axadrn/moin/internal/link"
 )
@@ -60,7 +61,7 @@ func TestWorkspaceListCreateAndShow(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	seeded := seedTeam(t, environment)
 
-	list := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: seeded.member})
+	list := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", cookie: seeded.member})
 	expectStatus(t, list, http.StatusOK)
 	memberships := decodeBody[struct {
 		Items []api.Membership `json:"items"`
@@ -69,13 +70,13 @@ func TestWorkspaceListCreateAndShow(t *testing.T) {
 		t.Fatalf("memberships = %#v", memberships)
 	}
 
-	created := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"Side Project"}`, bearer: seeded.member})
+	created := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"Side Project"}`, cookie: seeded.member})
 	expectStatus(t, created, http.StatusCreated)
 	membership := decodeBody[api.Membership](t, created)
 	if membership.Workspace.Name != "Side Project" || membership.Role != model.WorkspaceRoleOwner || membership.Workspace.Slug == "" {
 		t.Fatalf("created = %#v", membership)
 	}
-	invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"x"}`, bearer: seeded.member})
+	invalid := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/workspaces", body: `{"name":"x"}`, cookie: seeded.member})
 	if expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed").Fields["name"] == "" {
 		t.Fatalf("missing name field: %s", invalid.Body.String())
 	}
@@ -87,7 +88,7 @@ func TestWorkspaceListCreateAndShow(t *testing.T) {
 		Invitations []api.PendingInvitation  `json:"invitations"`
 		Seats       api.Seats                `json:"seats"`
 	}
-	ownerView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.owner})
+	ownerView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.owner})
 	expectStatus(t, ownerView, http.StatusOK)
 	owner := decodeBody[detail](t, ownerView)
 	if owner.Role != model.WorkspaceRoleOwner || !owner.Permissions.ManageBilling || !owner.Permissions.DeleteWorkspace || len(owner.Members) != 3 || owner.Members[0].Email == "" {
@@ -97,11 +98,11 @@ func TestWorkspaceListCreateAndShow(t *testing.T) {
 	if owner.Seats.Used != 3 || owner.Seats.Limit != nil {
 		t.Fatalf("seats = %#v", owner.Seats)
 	}
-	memberView := decodeBody[detail](t, environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.member}))
+	memberView := decodeBody[detail](t, environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.member}))
 	if memberView.Role != model.WorkspaceRoleMember || memberView.Permissions.ManageMembers || memberView.Members[0].Email != "" || len(memberView.Invitations) != 0 {
 		t.Fatalf("member view = %#v", memberView)
 	}
-	outsider := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.outsider})
+	outsider := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.outsider})
 	expectError(t, outsider, http.StatusNotFound, "not_found")
 }
 
@@ -116,7 +117,7 @@ func TestWorkspaceRename(t *testing.T) {
 		{model.WorkspaceRoleAdmin, http.StatusOK},
 		{model.WorkspaceRoleOwner, http.StatusOK},
 	} {
-		recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/name"), body: `{"name":"Renamed by ` + test.role + `"}`, bearer: seeded.token(test.role)})
+		recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/name"), body: `{"name":"Renamed by ` + test.role + `"}`, cookie: seeded.token(test.role)})
 		expectStatus(t, recorder, test.status)
 		if test.status != http.StatusOK {
 			continue
@@ -130,7 +131,7 @@ func TestWorkspaceRename(t *testing.T) {
 		}
 		seeded.workspace.Slug = renamed.Slug
 	}
-	invalid := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/name"), body: `{"name":" "}`, bearer: seeded.owner})
+	invalid := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/name"), body: `{"name":" "}`, cookie: seeded.owner})
 	expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
 }
 
@@ -146,7 +147,7 @@ func TestWorkspaceInviteRoleMatrix(t *testing.T) {
 		t.Run(test.role, func(t *testing.T) {
 			environment := newAPIEnvironment(t)
 			seeded := seedTeam(t, environment)
-			recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"new@example.com","role":"member"}`, bearer: seeded.token(test.role)})
+			recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"new@example.com","role":"member"}`, cookie: seeded.token(test.role)})
 			expectStatus(t, recorder, test.status)
 		})
 	}
@@ -162,7 +163,7 @@ func TestWorkspaceInviteRoleMatrix(t *testing.T) {
 		{body: `{"email":"nope","role":"member"}`, status: http.StatusUnprocessableEntity, code: "validation_failed"},
 		{body: `{"email":"member@example.com","role":"member"}`, status: http.StatusConflict, code: "already_member"},
 	} {
-		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: test.body, bearer: seeded.owner})
+		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: test.body, cookie: seeded.owner})
 		expectError(t, recorder, test.status, test.code)
 	}
 
@@ -170,14 +171,14 @@ func TestWorkspaceInviteRoleMatrix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("downgrade workspace: %v", err)
 	}
-	free := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"new@example.com","role":"member"}`, bearer: seeded.owner})
+	free := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"new@example.com","role":"member"}`, cookie: seeded.owner})
 	expectStatus(t, free, http.StatusAccepted)
 }
 
 func TestWorkspaceInvitationResendAndRevoke(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	seeded := seedTeam(t, environment)
-	invite := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"guest@example.com","role":"admin"}`, bearer: seeded.admin})
+	invite := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"guest@example.com","role":"admin"}`, cookie: seeded.admin})
 	expectStatus(t, invite, http.StatusAccepted)
 	first := environment.invitationToken(t)
 
@@ -185,16 +186,16 @@ func TestWorkspaceInvitationResendAndRevoke(t *testing.T) {
 		t.Helper()
 		return decodeBody[struct {
 			Invitations []api.PendingInvitation `json:"invitations"`
-		}](t, environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.owner})).Invitations
+		}](t, environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.owner})).Invitations
 	}
 	invitations := pending()
 	if len(invitations) != 1 || invitations[0].Email != "guest@example.com" || invitations[0].Role != model.WorkspaceRoleAdmin {
 		t.Fatalf("invitations = %#v", invitations)
 	}
 
-	denied := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations/" + invitations[0].ID + "/resend"), bearer: seeded.member})
+	denied := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations/" + invitations[0].ID + "/resend"), cookie: seeded.member})
 	expectError(t, denied, http.StatusForbidden, "forbidden")
-	resent := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations/" + invitations[0].ID + "/resend"), bearer: seeded.owner})
+	resent := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations/" + invitations[0].ID + "/resend"), cookie: seeded.owner})
 	expectStatus(t, resent, http.StatusAccepted)
 	second := environment.invitationToken(t)
 	if second == first {
@@ -207,14 +208,14 @@ func TestWorkspaceInvitationResendAndRevoke(t *testing.T) {
 		t.Fatalf("invitations after resend = %#v", invitations)
 	}
 	invitationID := invitations[0].ID
-	missing := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations/missing/resend"), bearer: seeded.owner})
+	missing := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations/missing/resend"), cookie: seeded.owner})
 	expectError(t, missing, http.StatusNotFound, "not_found")
 
-	memberRevoke := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/invitations/" + invitationID), bearer: seeded.member})
+	memberRevoke := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/invitations/" + invitationID), cookie: seeded.member})
 	expectError(t, memberRevoke, http.StatusForbidden, "forbidden")
-	revoked := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/invitations/" + invitationID), bearer: seeded.admin})
+	revoked := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/invitations/" + invitationID), cookie: seeded.admin})
 	expectStatus(t, revoked, http.StatusNoContent)
-	again := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/invitations/" + invitationID), bearer: seeded.admin})
+	again := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/invitations/" + invitationID), cookie: seeded.admin})
 	expectError(t, again, http.StatusNotFound, "not_found")
 	show := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/invitations/" + second})
 	expectError(t, show, http.StatusGone, "invitation_unavailable")
@@ -249,7 +250,7 @@ func TestWorkspaceChangeRoleMatrix(t *testing.T) {
 			if memberID == "owner" {
 				memberID = seeded.ownerMemberID
 			}
-			recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/members/" + memberID + "/role"), body: `{"role":"` + test.role + `"}`, bearer: seeded.token(test.actor)})
+			recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: seeded.path("/members/" + memberID + "/role"), body: `{"role":"` + test.role + `"}`, cookie: seeded.token(test.actor)})
 			if test.code != "" {
 				expectError(t, recorder, test.status, test.code)
 				return
@@ -287,13 +288,13 @@ func TestWorkspaceRemoveMemberMatrix(t *testing.T) {
 			if memberID == "owner" {
 				memberID = seeded.ownerMemberID
 			}
-			recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/members/" + memberID), bearer: seeded.token(test.actor)})
+			recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/members/" + memberID), cookie: seeded.token(test.actor)})
 			if test.code != "" {
 				expectError(t, recorder, test.status, test.code)
 				return
 			}
 			expectStatus(t, recorder, test.status)
-			removed := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.token(map[string]string{"member-admin": model.WorkspaceRoleAdmin, "member-member": model.WorkspaceRoleMember}[memberID])})
+			removed := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.token(map[string]string{"member-admin": model.WorkspaceRoleAdmin, "member-member": model.WorkspaceRoleMember}[memberID])})
 			expectError(t, removed, http.StatusNotFound, "not_found")
 		})
 	}
@@ -302,11 +303,11 @@ func TestWorkspaceRemoveMemberMatrix(t *testing.T) {
 func TestWorkspaceLeave(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	seeded := seedTeam(t, environment)
-	lastOwner := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/leave"), bearer: seeded.owner})
+	lastOwner := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/leave"), cookie: seeded.owner})
 	expectError(t, lastOwner, http.StatusConflict, "last_owner")
-	left := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/leave"), bearer: seeded.member})
+	left := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/leave"), cookie: seeded.member})
 	expectStatus(t, left, http.StatusNoContent)
-	gone := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.member})
+	gone := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.member})
 	expectError(t, gone, http.StatusNotFound, "not_found")
 }
 
@@ -314,7 +315,7 @@ func TestWorkspaceDeleteMatrix(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	seeded := seedTeam(t, environment)
 	for _, role := range []string{model.WorkspaceRoleMember, model.WorkspaceRoleAdmin} {
-		denied := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path(""), bearer: seeded.token(role)})
+		denied := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path(""), cookie: seeded.token(role)})
 		expectError(t, denied, http.StatusForbidden, "forbidden")
 	}
 
@@ -322,7 +323,7 @@ func TestWorkspaceDeleteMatrix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("set provider subscription: %v", err)
 	}
-	paid := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + "?confirm=" + url.QueryEscape(seeded.workspace.Name), bearer: seeded.owner})
+	paid := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + "?confirm=" + url.QueryEscape(seeded.workspace.Name), cookie: seeded.owner})
 	expectError(t, paid, http.StatusConflict, "active_subscription")
 	_, err = environment.database.Exec(`UPDATE subscriptions SET provider_subscription_id = NULL, plan_id = $1 WHERE workspace_id = $2`, model.SubscriptionPlanFree, seeded.workspace.ID)
 	if err != nil {
@@ -330,13 +331,13 @@ func TestWorkspaceDeleteMatrix(t *testing.T) {
 	}
 
 	for _, query := range []string{"", "?confirm=", "?confirm=" + url.QueryEscape(seeded.workspace.Name+"x")} {
-		unconfirmed := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + query, bearer: seeded.owner})
+		unconfirmed := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + query, cookie: seeded.owner})
 		expectError(t, unconfirmed, http.StatusUnprocessableEntity, "confirm_mismatch")
 	}
-	deleted := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + "?confirm=" + url.QueryEscape(seeded.workspace.Name), bearer: seeded.owner})
+	deleted := environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("") + "?confirm=" + url.QueryEscape(seeded.workspace.Name), cookie: seeded.owner})
 	expectStatus(t, deleted, http.StatusNoContent)
 	for _, role := range []string{model.WorkspaceRoleOwner, model.WorkspaceRoleAdmin, model.WorkspaceRoleMember} {
-		gone := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.token(role)})
+		gone := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.token(role)})
 		expectError(t, gone, http.StatusNotFound, "not_found")
 	}
 }
@@ -360,7 +361,7 @@ func TestWorkspaceActivityPagination(t *testing.T) {
 	}
 	all := decodeBody[struct {
 		Items []api.WorkspaceEvent `json:"items"`
-	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity?limit=200"), bearer: seeded.owner})).Items
+	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity?limit=200"), cookie: seeded.owner})).Items
 	if len(all) != 8 {
 		t.Fatalf("events = %d, want 8 (7 seeded and workspace.created)", len(all))
 	}
@@ -379,7 +380,7 @@ func TestWorkspaceActivityPagination(t *testing.T) {
 		if cursor != "" {
 			path += "&cursor=" + cursor
 		}
-		recorder := environment.send(t, apiRequest{method: http.MethodGet, path: path, bearer: seeded.admin})
+		recorder := environment.send(t, apiRequest{method: http.MethodGet, path: path, cookie: seeded.admin})
 		expectStatus(t, recorder, http.StatusOK)
 		current := decodeBody[page](t, recorder)
 		if len(current.Items) > 3 {
@@ -408,10 +409,10 @@ func TestWorkspaceActivityPagination(t *testing.T) {
 	}
 
 	// Every member sees the activity.
-	memberView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity"), bearer: seeded.member})
+	memberView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity"), cookie: seeded.member})
 	expectStatus(t, memberView, http.StatusOK)
 	// The actor by name to everyone, the email only to admins and owners.
-	adminView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity"), bearer: seeded.admin})
+	adminView := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity"), cookie: seeded.admin})
 	if body := memberView.Body.String(); strings.Contains(body, `"actor_email"`) || !strings.Contains(body, `"actor_name"`) {
 		t.Fatalf("a member's activity = %s", body)
 	}
@@ -419,11 +420,11 @@ func TestWorkspaceActivityPagination(t *testing.T) {
 		t.Fatalf("an admin's activity = %s", body)
 	}
 	for _, query := range []string{"?limit=0", "?limit=201", "?limit=ten"} {
-		invalid := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity" + query), bearer: seeded.owner})
+		invalid := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity" + query), cookie: seeded.owner})
 		expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
 	}
 	for _, cursor := range []string{"!!!", "bWlzc2luZw"} {
-		invalid := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity?cursor=" + cursor), bearer: seeded.owner})
+		invalid := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path("/activity?cursor=" + cursor), cookie: seeded.owner})
 		expectError(t, invalid, http.StatusBadRequest, "invalid_cursor")
 	}
 }
@@ -433,7 +434,7 @@ func TestWorkspaceInvitationAccept(t *testing.T) {
 	seeded := seedTeam(t, environment)
 	invite := func(email string) string {
 		t.Helper()
-		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"` + email + `","role":"member"}`, bearer: seeded.owner})
+		recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"` + email + `","role":"member"}`, cookie: seeded.owner})
 		expectStatus(t, recorder, http.StatusAccepted)
 		return environment.invitationToken(t)
 	}
@@ -450,24 +451,24 @@ func TestWorkspaceInvitationAccept(t *testing.T) {
 	guest := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept"})
 	expectError(t, guest, http.StatusUnauthorized, "unauthenticated")
 
-	// A new account signs up through the magic link, finishes onboarding
-	// and accepts.
-	sent := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link", body: `{"email":"newcomer@example.com"}`})
-	expectStatus(t, sent, http.StatusAccepted)
-	verified := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/magic-link/verify", body: `{"token":"` + environment.mailedToken(t, "/auth/magic-link/") + `"}`})
-	expectStatus(t, verified, http.StatusOK)
-	newcomer := decodeBody[api.SessionToken](t, verified).Token
-	gated := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", bearer: newcomer})
+	// A new account signs up with GitHub, finishes onboarding and
+	// accepts.
+	signedUp, err := environment.auth.SignInWithGitHub(service.GitHubAccount{ID: 1, Login: "newcomer"}, newToken)
+	if err != nil {
+		t.Fatalf("SignInWithGitHub() error = %v", err)
+	}
+	newcomer := environment.signIn(t, signedUp.ID)
+	gated := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", cookie: newcomer})
 	expectError(t, gated, http.StatusForbidden, "onboarding_required")
 	// The invitation token skips the default workspace.
-	onboarded := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Newcomer","invitation_token":"` + newToken + `"}`, bearer: newcomer})
+	onboarded := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Newcomer","invitation_token":"` + newToken + `"}`, cookie: newcomer})
 	expectStatus(t, onboarded, http.StatusOK)
 	if body := decodeBody[map[string]any](t, onboarded); body["workspace"] != nil {
 		t.Fatalf("onboarding with an invitation created a workspace: %s", onboarded.Body.String())
 	}
-	wrongAccount := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", bearer: seeded.outsider})
+	wrongAccount := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", cookie: seeded.outsider})
 	expectError(t, wrongAccount, http.StatusForbidden, "invitation_email_mismatch")
-	accepted := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", bearer: newcomer})
+	accepted := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", cookie: newcomer})
 	expectStatus(t, accepted, http.StatusOK)
 	membership := decodeBody[api.Membership](t, accepted)
 	if membership.Workspace.ID != link.ID(seeded.workspace.ID) || membership.Role != model.WorkspaceRoleMember {
@@ -475,33 +476,33 @@ func TestWorkspaceInvitationAccept(t *testing.T) {
 	}
 	joined := decodeBody[struct {
 		Items []api.Membership `json:"items"`
-	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", bearer: newcomer}))
+	}](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/workspaces", cookie: newcomer}))
 	if len(joined.Items) != 1 || joined.Items[0].Workspace.ID != link.ID(seeded.workspace.ID) {
 		t.Fatalf("newcomer workspaces = %#v", joined.Items)
 	}
-	again := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", bearer: newcomer})
+	again := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + newToken + "/accept", cookie: newcomer})
 	expectError(t, again, http.StatusGone, "invitation_unavailable")
 	used := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/invitations/" + newToken})
 	expectError(t, used, http.StatusGone, "invitation_unavailable")
 
 	// An existing account accepts with its current session.
 	existingToken := invite("outsider@example.com")
-	acceptedExisting := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + existingToken + "/accept", bearer: seeded.outsider})
+	acceptedExisting := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + existingToken + "/accept", cookie: seeded.outsider})
 	expectStatus(t, acceptedExisting, http.StatusOK)
-	view := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), bearer: seeded.outsider})
+	view := environment.send(t, apiRequest{method: http.MethodGet, path: seeded.path(""), cookie: seeded.outsider})
 	expectStatus(t, view, http.StatusOK)
 
 	// An invitation for someone who joined in the meantime.
 	lateToken := invite("late@example.com")
 	late := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "late", Email: "late@example.com", Name: "Late", Verified: true})
-	_, err := environment.database.Exec(`
+	_, err = environment.database.Exec(`
 		INSERT INTO workspace_members (id, workspace_id, user_id, role, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 	`, "membership-late", seeded.workspace.ID, late.User.ID, model.WorkspaceRoleMember, time.Now())
 	if err != nil {
 		t.Fatalf("add late member: %v", err)
 	}
-	already := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + lateToken + "/accept", bearer: environment.signIn(t, late.User.ID)})
+	already := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/invitations/" + lateToken + "/accept", cookie: environment.signIn(t, late.User.ID)})
 	expectError(t, already, http.StatusConflict, "already_member")
 
 	_, err = environment.database.Exec(`UPDATE workspace_invitations SET expires_at = $1 WHERE workspace_id = $2 AND email = $3`, time.Now().Add(-time.Minute), seeded.workspace.ID, "late@example.com")
@@ -515,7 +516,7 @@ func TestWorkspaceInvitationAccept(t *testing.T) {
 func TestOnboardingIgnoresUnavailableInvitations(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	seeded := seedTeam(t, environment)
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"someone-else@example.com","role":"member"}`, bearer: seeded.owner})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/invitations"), body: `{"email":"someone-else@example.com","role":"member"}`, cookie: seeded.owner})
 	expectStatus(t, recorder, http.StatusAccepted)
 	foreign := environment.invitationToken(t)
 
@@ -528,13 +529,13 @@ func TestOnboardingIgnoresUnavailableInvitations(t *testing.T) {
 			t.Fatalf("remove fixture workspace: %v", err)
 		}
 		bearer := environment.signIn(t, fresh.User.ID)
-		onboarded := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Fresh","invitation_token":"` + token + `"}`, bearer: bearer})
+		onboarded := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Fresh","invitation_token":"` + token + `"}`, cookie: bearer})
 		expectStatus(t, onboarded, http.StatusOK)
 		if body := decodeBody[map[string]any](t, onboarded); body["workspace"] == nil {
 			t.Fatalf("token %q skipped the default workspace: %s", token, onboarded.Body.String())
 		}
 	}
 
-	unknownField := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Fresh","invite":"x"}`, bearer: seeded.outsider})
+	unknownField := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Fresh","invite":"x"}`, cookie: seeded.outsider})
 	expectError(t, unknownField, http.StatusBadRequest, "invalid_body")
 }

@@ -30,16 +30,16 @@ moin sets only cookies it needs to work, so there is no cookie banner:
 
 - **session_token** keeps you signed in, for up to 7 days.
 - **csrf_token** protects forms against forged requests.
-- **auth_email**, **oauth_state** and **github_next** remember a step for at most an hour while you sign in or connect GitHub.
+- **oauth_state** and **github_next** remember a step for at most an hour while you sign in or connect GitHub.
 - **pending_invitation** remembers an invitation you opened, for up to 7 days.
 
 Your light or dark theme and a few view choices stay in your browser's local storage and are never sent to us.
 
 ## Your account
 
-For your account we store your email address and, if you add them, your name and avatar. You sign in with a link sent by email, or with GitHub if it is offered; with GitHub we ask GitHub for your verified email address and store only that. Sign-in links expire after 10 minutes. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and sign-in links are stored only as cryptographic hashes.
+For your account we store your email address and, if you add them, your name and avatar. You sign in with GitHub: we ask GitHub for your account's ID, its username and its verified primary email address, and store the ID and the username with your account. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and recovery keys are stored only as cryptographic hashes.
 
-We send only emails that belong to the service: sign-in links, invitations, changes to your account, and important changes to moin. No newsletters or marketing emails.
+We send only emails that belong to the service: invitations, changes to your account, and important changes to moin. No newsletters or marketing emails.
 
 Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
@@ -104,7 +104,7 @@ We share data only with the services that run moin for us, and only what each on
 | Hetzner Online (EU) | Hosts the hub | Everything moin stores, on our server |
 | Cloudflare (USA) | Protects the site, sends our emails, stores files and a copy of our database | Every request to the site, your email address and the emails we send you, your avatar, a copy of our database |
 | Stripe (USA and EU) | Payments, tax and invoices | Your email address and what you enter at checkout |
-| GitHub (USA) | Sign-in with GitHub and the moin GitHub App, if you use them | What you allow on GitHub; moin reads your email address and the repos you chose |
+| GitHub (USA) | Sign-in with GitHub and the moin GitHub App | What you allow on GitHub; moin reads your account ID, username and email address, and the repos you chose |
 
 Umami runs on a server we control, so no other company gets the page views.
 

@@ -29,7 +29,7 @@ func TestUpdateName(t *testing.T) {
 			user := seedVerifiedUser(t, environment, "namer", "Namer")
 			token := environment.signIn(t, user.ID)
 
-			recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/name", body: test.body, bearer: token})
+			recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/name", body: test.body, cookie: token})
 			if test.code != "" {
 				detail := expectError(t, recorder, test.status, test.code)
 				if test.code == "validation_failed" && detail.Fields["name"] == "" {
@@ -52,19 +52,19 @@ func TestChangeEmail(t *testing.T) {
 	seedVerifiedUser(t, environment, "taken", "Taken")
 	token := environment.signIn(t, user.ID)
 
-	same := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"CHANGER@example.com"}`, bearer: token})
+	same := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"CHANGER@example.com"}`, cookie: token})
 	expectError(t, same, http.StatusUnprocessableEntity, "validation_failed")
-	invalid := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"nope"}`, bearer: token})
+	invalid := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"nope"}`, cookie: token})
 	expectError(t, invalid, http.StatusUnprocessableEntity, "validation_failed")
-	taken := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"taken@example.com"}`, bearer: token})
+	taken := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"taken@example.com"}`, cookie: token})
 	expectError(t, taken, http.StatusConflict, "email_taken")
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"changed@example.com"}`, bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"changed@example.com"}`, cookie: token})
 	expectStatus(t, recorder, http.StatusAccepted)
 	verification := environment.mailedToken(t, "/auth/verify-email-change/")
 	verified := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + verification + `"}`})
 	expectStatus(t, verified, http.StatusOK)
-	if decodeBody[api.SessionToken](t, verified).User.Email != "changed@example.com" {
+	if decodeBody[api.UserResponse](t, verified).User.Email != "changed@example.com" {
 		t.Fatalf("email change was not applied: %s", verified.Body.String())
 	}
 }
@@ -74,69 +74,12 @@ func TestChangeEmailIsRateLimitedPerRecipient(t *testing.T) {
 	for index, id := range []string{"first", "second", "third", "fourth"} {
 		user := seedVerifiedUser(t, environment, id, "Limit")
 		token := environment.signIn(t, user.ID)
-		recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"wanted@example.com"}`, bearer: token})
+		recorder := environment.send(t, apiRequest{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"wanted@example.com"}`, cookie: token})
 		if index < 3 {
 			expectStatus(t, recorder, http.StatusAccepted)
 			continue
 		}
 		expectError(t, recorder, http.StatusTooManyRequests, "rate_limited")
-	}
-}
-
-func TestChangePasswordSignsOutOtherSessions(t *testing.T) {
-	environment := newAPIEnvironment(t)
-	user := seedVerifiedUser(t, environment, "rotator", "Rotator")
-	token := environment.signIn(t, user.ID)
-	other := environment.signIn(t, user.ID)
-
-	wrong := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"wrong password here","new_password":"another long passphrase"}`, bearer: token})
-	detail := expectError(t, wrong, http.StatusUnprocessableEntity, "validation_failed")
-	if detail.Fields["current_password"] == "" {
-		t.Fatalf("fields = %#v", detail.Fields)
-	}
-	weak := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"` + testPassword + `","new_password":"short"}`, bearer: token})
-	detail = expectError(t, weak, http.StatusUnprocessableEntity, "validation_failed")
-	if detail.Fields["new_password"] != "Password must be at least 12 characters." {
-		t.Fatalf("fields = %#v", detail.Fields)
-	}
-
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"` + testPassword + `","new_password":"another long passphrase"}`, bearer: token})
-	expectStatus(t, recorder, http.StatusNoContent)
-
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusOK)
-	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: other}), http.StatusUnauthorized, "unauthenticated")
-	login := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/password", body: `{"email":"rotator@example.com","password":"another long passphrase"}`})
-	expectStatus(t, login, http.StatusOK)
-}
-
-func TestSetAndRemovePassword(t *testing.T) {
-	environment := newAPIEnvironment(t)
-	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "passwordless", Email: "passwordless@example.com", Name: "Passwordless", Verified: true}).User
-	token := environment.signIn(t, user.ID)
-	other := environment.signIn(t, user.ID)
-
-	change := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"anything","new_password":"another long passphrase"}`, bearer: token})
-	expectError(t, change, http.StatusConflict, "password_not_set")
-	remove := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/password", bearer: token})
-	expectError(t, remove, http.StatusConflict, "password_not_set")
-	weak := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"short"}`, bearer: token})
-	expectError(t, weak, http.StatusUnprocessableEntity, "validation_failed")
-
-	set := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"` + testPassword + `"}`, bearer: token})
-	expectStatus(t, set, http.StatusNoContent)
-	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: other}), http.StatusUnauthorized, "unauthenticated")
-	account := decodeBody[api.UserResponse](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}))
-	if !account.User.PasswordSet {
-		t.Fatalf("password_set = false after set: %#v", account.User)
-	}
-	again := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"` + testPassword + `"}`, bearer: token})
-	expectError(t, again, http.StatusConflict, "password_already_set")
-
-	removed := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/password", bearer: token})
-	expectStatus(t, removed, http.StatusNoContent)
-	account = decodeBody[api.UserResponse](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}))
-	if account.User.PasswordSet {
-		t.Fatalf("password_set = true after removal: %#v", account.User)
 	}
 }
 
@@ -153,15 +96,15 @@ func TestDeleteAccount(t *testing.T) {
 	}
 	token := environment.signIn(t, user.ID)
 
-	wrong := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"other@example.com"}`, bearer: token})
+	wrong := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"other@example.com"}`, cookie: token})
 	detail := expectError(t, wrong, http.StatusUnprocessableEntity, "validation_failed")
 	if detail.Fields["confirm_email"] == "" {
 		t.Fatalf("fields = %#v", detail.Fields)
 	}
 
-	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"LEAVING@example.com"}`, bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"LEAVING@example.com"}`, cookie: token})
 	expectStatus(t, recorder, http.StatusNoContent)
-	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusUnauthorized, "unauthenticated")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token}), http.StatusUnauthorized, "unauthenticated")
 	_, err = environment.users.ByID(user.ID)
 	if err == nil {
 		t.Fatal("account still exists")
@@ -173,9 +116,9 @@ func TestDeleteAccountRefusesSoleWorkspaceOwner(t *testing.T) {
 	owner := seedVerifiedUser(t, environment, "owner", "Owner")
 	token := environment.signIn(t, owner.ID)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"owner@example.com"}`, bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"owner@example.com"}`, cookie: token})
 	expectError(t, recorder, http.StatusConflict, "sole_workspace_owner")
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token}), http.StatusOK)
 }
 
 func TestAccountRoutesRequireOnboarding(t *testing.T) {
@@ -186,9 +129,6 @@ func TestAccountRoutesRequireOnboarding(t *testing.T) {
 	routes := []apiRequest{
 		{method: http.MethodPatch, path: "/api/v1/account/name", body: `{"name":"Named"}`},
 		{method: http.MethodPatch, path: "/api/v1/account/email", body: `{"email":"named@example.com"}`},
-		{method: http.MethodPost, path: "/api/v1/account/password", body: `{"current_password":"x","new_password":"y"}`},
-		{method: http.MethodPost, path: "/api/v1/account/password/set", body: `{"password":"x"}`},
-		{method: http.MethodDelete, path: "/api/v1/account/password"},
 		{method: http.MethodDelete, path: "/api/v1/account", body: `{"confirm_email":"unnamed@example.com"}`},
 		{method: http.MethodGet, path: "/api/v1/account/sessions"},
 		{method: http.MethodDelete, path: "/api/v1/account/sessions/any"},
@@ -200,7 +140,7 @@ func TestAccountRoutesRequireOnboarding(t *testing.T) {
 		t.Run(route.method+" "+route.path, func(t *testing.T) {
 			anonymous := route
 			expectError(t, environment.send(t, anonymous), http.StatusUnauthorized, "unauthenticated")
-			route.bearer = token
+			route.cookie = token
 			expectError(t, environment.send(t, route), http.StatusForbidden, "onboarding_required")
 		})
 	}
@@ -213,19 +153,19 @@ func TestEmailAlerts(t *testing.T) {
 	user := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Name: "Ada", Verified: true})
 	token := environment.signIn(t, user.User.ID)
 
-	account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	account := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token})
 	if account.Code != http.StatusOK || !strings.Contains(account.Body.String(), `"email_alerts":true`) {
 		t.Fatalf("GET account = %d %s", account.Code, account.Body)
 	}
-	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/account/email-alerts", body: `{"on":false}`, bearer: token})
+	off := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/account/email-alerts", body: `{"on":false}`, cookie: token})
 	if off.Code != http.StatusOK || off.Body.String() != "{\"on\":false}\n" {
 		t.Fatalf("PUT email-alerts = %d %s", off.Code, off.Body)
 	}
-	account = environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	account = environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token})
 	if !strings.Contains(account.Body.String(), `"email_alerts":false`) {
 		t.Fatalf("GET account after off = %s", account.Body)
 	}
-	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/account/email-alerts", body: `{}`, bearer: token})
+	invalid := environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/account/email-alerts", body: `{}`, cookie: token})
 	if invalid.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("PUT email-alerts {} = %d %s", invalid.Code, invalid.Body)
 	}

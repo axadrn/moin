@@ -29,7 +29,7 @@ func TestAccountReportsAdmin(t *testing.T) {
 		{name: "operator", token: operatorToken, want: true},
 		{name: "user", token: targetToken, want: false},
 	} {
-		recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: check.token})
+		recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: check.token})
 		expectStatus(t, recorder, http.StatusOK)
 		body := decodeBody[map[string]any](t, recorder)
 		if body["is_admin"] != check.want {
@@ -45,21 +45,21 @@ func TestAdminUsers(t *testing.T) {
 	seedVerifiedUser(t, environment, "grace", "Grace Hopper")
 	targetToken := environment.signIn(t, target.ID)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: operatorToken})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", cookie: operatorToken})
 	expectStatus(t, recorder, http.StatusOK)
 	overview := decodeBody[api.AdminOverview](t, recorder)
 	if overview.Metrics.Users != 3 || overview.Users.TotalUsers != 3 || len(overview.Users.Items) != 3 || overview.Users.Page != 1 {
 		t.Fatalf("overview = %s", recorder.Body.String())
 	}
 
-	filtered := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users?query=ada&page=1", bearer: operatorToken})
+	filtered := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users?query=ada&page=1", cookie: operatorToken})
 	expectStatus(t, filtered, http.StatusOK)
 	page := decodeBody[api.AdminOverview](t, filtered).Users
 	if page.Query != "ada" || len(page.Items) != 1 || page.Items[0].ID != target.ID || page.Items[0].IsAdmin {
 		t.Fatalf("filtered users = %#v", page)
 	}
 
-	denied := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: targetToken})
+	denied := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", cookie: targetToken})
 	expectError(t, denied, http.StatusForbidden, "forbidden")
 	guest := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users"})
 	expectError(t, guest, http.StatusUnauthorized, "unauthenticated")
@@ -72,20 +72,20 @@ func TestAdminRevokeUserSessions(t *testing.T) {
 	target := seedVerifiedUser(t, environment, "target", "Target")
 	targetToken := environment.signIn(t, target.ID)
 
-	denied := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + operatorID + "/sessions/revoke", bearer: targetToken})
+	denied := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + operatorID + "/sessions/revoke", cookie: targetToken})
 	expectError(t, denied, http.StatusForbidden, "forbidden")
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + target.ID + "/sessions/revoke", bearer: operatorToken})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + target.ID + "/sessions/revoke", cookie: operatorToken})
 	expectStatus(t, recorder, http.StatusNoContent)
-	revoked := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: targetToken})
+	revoked := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: targetToken})
 	expectError(t, revoked, http.StatusUnauthorized, "unauthenticated")
 
-	self := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + operatorID + "/sessions/revoke", bearer: operatorToken})
+	self := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + operatorID + "/sessions/revoke", cookie: operatorToken})
 	expectError(t, self, http.StatusConflict, "admin_self_action")
-	missing := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/missing/sessions/revoke", bearer: operatorToken})
+	missing := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/missing/sessions/revoke", cookie: operatorToken})
 	expectError(t, missing, http.StatusNotFound, "not_found")
 
-	overview := decodeBody[api.AdminOverview](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", bearer: operatorToken}))
+	overview := decodeBody[api.AdminOverview](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/admin/users", cookie: operatorToken}))
 	if len(overview.Events) == 0 || overview.Events[0].Action != "admin.sessions_revoked" || overview.Events[0].TargetID != target.ID {
 		t.Fatalf("events = %#v", overview.Events)
 	}
@@ -97,7 +97,7 @@ func TestAdminRevokeUserSessionsRevokesAPITokens(t *testing.T) {
 	target := seedTokenOwner(t, environment, "compromised")
 	created := createAPIToken(t, environment, target, `"name":"Script"`)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + target.id + "/sessions/revoke", bearer: operatorToken})
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + target.id + "/sessions/revoke", cookie: operatorToken})
 	expectStatus(t, recorder, http.StatusNoContent)
 
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: created.Token}), http.StatusUnauthorized, "unauthenticated")

@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -99,13 +98,8 @@ func TestServiceErrorMapsKnownErrors(t *testing.T) {
 		wantCode   string
 		wantField  string
 	}{
-		{service.ErrInvalidCredentials, http.StatusUnauthorized, "invalid_credentials", ""},
-		{fmt.Errorf("login: %w", service.ErrInvalidCredentials), http.StatusUnauthorized, "invalid_credentials", ""},
-		{service.ErrEmailNotVerified, http.StatusForbidden, "email_not_verified", ""},
 		{repository.ErrTokenExpired, http.StatusBadRequest, "invalid_token", ""},
 		{repository.ErrSessionNotFound, http.StatusNotFound, "not_found", ""},
-		{service.ErrWeakPassword, http.StatusUnprocessableEntity, "validation_failed", "password"},
-		{service.ErrInvalidCurrentPassword, http.StatusUnprocessableEntity, "validation_failed", "current_password"},
 		{service.ErrAdminPermission, http.StatusForbidden, "forbidden", ""},
 		{service.ErrActiveSubscription, http.StatusConflict, "active_subscription", ""},
 		{repository.ErrLastOwner, http.StatusConflict, "last_owner", ""},
@@ -183,7 +177,7 @@ func TestDecodeRequiresJSONContentType(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.contentType, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/magic-link", strings.NewReader(`{"email":"ada@example.com"}`))
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/account/email", strings.NewReader(`{"email":"ada@example.com"}`))
 			if test.contentType != "" {
 				request.Header.Set("Content-Type", test.contentType)
 			}
@@ -229,7 +223,7 @@ func TestDecode(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/magic-link", strings.NewReader(test.body))
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/account/email", strings.NewReader(test.body))
 			request.Header.Set("Content-Type", "application/json")
 			recorder := httptest.NewRecorder()
 			var value payload

@@ -22,20 +22,6 @@ func NewEmailService(provider mailer.Mailer, appURL, appName string) *EmailServi
 	}
 }
 
-func (s *EmailService) SendForgotPasswordEmail(email, token, name string) error {
-	signInURL := fmt.Sprintf("%s/auth/forgot-password/%s", s.appURL, token)
-	return s.send("forgot_password", email, forgotPasswordEmailTemplate(signInURL, s.appName))
-}
-
-func (s *EmailService) SendMagicLinkEmail(email, token, name string) error {
-	return s.send("magic_link", email, magicLinkEmailTemplate(s.MagicLinkURL(token), s.appName))
-}
-
-// MagicLinkURL is the sign-in link of a magic link token.
-func (s *EmailService) MagicLinkURL(token string) string {
-	return fmt.Sprintf("%s/auth/magic-link/%s", s.appURL, token)
-}
-
 func (s *EmailService) SendWelcomeEmail(email, name string) error {
 	link := fmt.Sprintf("%s/app", s.appURL)
 	return s.send("welcome", email, welcomeEmailTemplate(name, link, s.appName))

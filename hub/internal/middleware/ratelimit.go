@@ -132,15 +132,16 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// RateLimitAuth creates middleware for auth endpoints
-// Limits: 5 requests per 15 minutes per IP
+// RateLimitAuth limits guessing a recovery key: 5 tries per 15 minutes per
+// IP.
 func RateLimitAuth(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
 	return RateLimit(clientIPs, 5, 15*time.Minute)
 }
 
 // RateLimitGitHubLogin limits signing in with GitHub. One sign-in is two
-// requests, nothing can be guessed here, and it must not share the password
-// budget: a few tries would lock the callback out in the middle of a sign-in.
+// requests, nothing can be guessed here, and it must not share the budget
+// of the recovery key: a few tries would lock the callback out in the
+// middle of a sign-in.
 func RateLimitGitHubLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
 	return RateLimit(clientIPs, 30, 15*time.Minute)
 }
@@ -170,33 +171,6 @@ func RateLimit(clientIPs ClientIPResolver, limit int, window time.Duration) func
 					"path", r.URL.Path,
 				)
 				writeRateLimitError(w, r, limiter)
-				return
-			}
-
-			next(w, r)
-		}
-	}
-}
-
-// RateLimitAuthEmail limits authentication email delivery by client and recipient.
-func RateLimitAuthEmail(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
-	return rateLimitAuthEmail(clientIPs, NewRateLimiter(10, time.Hour), NewRateLimiter(3, time.Hour))
-}
-
-func rateLimitAuthEmail(clientIPs ClientIPResolver, ipLimiter, recipientLimiter *RateLimiter) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			ip := clientIPs.ClientIP(r)
-			if !ipLimiter.Allow(ip) {
-				slog.Warn("authentication email rate limit exceeded", "ip", ip, "path", r.URL.Path)
-				writeRateLimitError(w, r, ipLimiter)
-				return
-			}
-
-			email := requestEmail(r)
-			if email != "" && !recipientLimiter.Allow(rateLimitEmailKey(email)) {
-				slog.Warn("authentication email recipient rate limit exceeded", "path", r.URL.Path)
-				writeRateLimitError(w, r, recipientLimiter)
 				return
 			}
 

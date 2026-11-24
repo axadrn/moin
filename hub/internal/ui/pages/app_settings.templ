@@ -11,9 +11,9 @@ import (
 )
 
 // Settings is your account, one tab at a time: Profile (picture, name,
-// email, alerts), Security (password, sessions, and the account itself at
+// email, alerts), Security (GitHub, sessions, and the account itself at
 // the end) and Tokens. tokenSections are the parts of the tokens tab.
-templ Settings(sessions []model.Session, currentSessionID, activeTab string, passwordRemoved bool, tokenSections ...templ.Component) {
+templ Settings(sessions []model.Session, currentSessionID, activeTab string, tokenSections ...templ.Component) {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
 	@layouts.App("Account · Settings") {
@@ -26,12 +26,9 @@ templ Settings(sessions []model.Session, currentSessionID, activeTab string, pas
 			}})
 			switch activeTab {
 				case "security":
-					if passwordRemoved {
-						<p class="moin-small moin-muted">
-							Password removed.
-						</p>
+					if ctxkeys.RenderConfig(ctx).GitHubLogin {
+						@settingsGitHubCard(user)
 					}
-					@settingsPasswordCard()
 					@SettingsSessionsSection(sessions, currentSessionID)
 					@settingsAccountDanger()
 				case "tokens":
@@ -91,62 +88,25 @@ templ EmailAlertsForm(on bool) {
 	@switchForm("email-alerts-form", ctxkeys.AppBasePath(ctx)+"/profile/email-alerts", "email-alerts", "Email me alerts", "Downtime and failed deploys", on)
 }
 
-// SettingsPasswordSection is what a change of the password answers: the
-// password card and the list at the end, which has Remove password only
-// while there is one. Both swap in by their ids.
-templ SettingsPasswordSection() {
-	@templ.Fragment("settings-password-form") {
-		@settingsPasswordCard()
-		@settingsAccountDanger()
-	}
-}
-
-// settingsPasswordCard changes the password, or sets a first one.
-templ settingsPasswordCard() {
-	{{ user := ctxkeys.User(ctx) }}
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="password-form" hx-swap-oob="true">
-		@components.Card(components.CardProps{Title: "Password"}) {
-			if user.HasPassword() {
-				<form class="moin-stack" data-gap="4" hx-post={ basePath + "/account/password" } hx-swap="none" hx-disable="find button[type='submit']">
-					@components.CSRF()
-					<div class="moin-grid" data-cols="3">
-						@formField("Current password", "current_password", "", "") {
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "current_password", "aria-describedby": "current_password-hint", "name": "current_password", "type": "password", "autocomplete": "current-password"}})
-						}
-						@formField("New password", "new_password", "At least 12 characters.", "") {
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"}})
-						}
-						@formField("Repeat it", "confirm_password", "", "") {
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"}})
-						}
-					</div>
-					<div class="moin-row" data-end>
-						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-							Change password
-						}
-					</div>
-				</form>
+// settingsGitHubCard is the GitHub account you sign in with, or the way
+// to connect one, for an account that signed in with a recovery key.
+templ settingsGitHubCard(user *model.User) {
+	@components.Card(components.CardProps{Title: "GitHub"}) {
+		@components.List() {
+			if user.GitHubID != nil {
+				@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected as " + user.GitHubLogin, Note: "You sign in with this account"})
 			} else {
-				<form class="moin-stack" data-gap="4" hx-post={ basePath + "/account/password/set" } hx-swap="none" hx-disable="find button[type='submit']">
-					@components.CSRF()
-					<div class="moin-grid" data-cols="2">
-						@formField("New password", "new_password", "At least 12 characters.", "") {
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "new_password", "name": "new_password", "type": "password", "autocomplete": "new-password", "aria-describedby": "new_password-hint"}})
-						}
-						@formField("Repeat it", "confirm_password", "", "") {
-							@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "confirm_password", "aria-describedby": "confirm_password-hint", "name": "confirm_password", "type": "password", "autocomplete": "new-password"}})
-						}
-					</div>
-					<div class="moin-row" data-end>
+				@components.Item(components.ItemProps{Name: "Not connected", Note: "Connect GitHub to sign in with it next time"}) {
+					<form method="POST" action="/auth/github/connect">
+						@components.CSRF()
 						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-							Set password
+							Connect GitHub
 						}
-					</div>
-				</form>
+					</form>
+				}
 			}
 		}
-	</div>
+	}
 }
 
 // SettingsSessionsSection lists the browsers signed in to the account, each
@@ -198,27 +158,15 @@ func sessionNote(session model.Session, currentSessionID string, now time.Time) 
 	return "Active " + human.Ago(session.LastSeenAt, now)
 }
 
-// settingsAccountDanger is the end of the security tab: remove the
-// password, and delete the account behind its typed-DELETE dialog.
+// settingsAccountDanger is the end of the security tab: delete the account
+// behind its typed-DELETE dialog.
 templ settingsAccountDanger() {
-	{{ user := ctxkeys.User(ctx) }}
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="account-danger" hx-swap-oob="true">
-		@components.Card(components.CardProps{}) {
-			@components.List() {
-				if user.HasPassword() {
-					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
-						"hx-delete":  basePath + "/account/password",
-						"hx-swap":    "none",
-						"hx-disable": "this",
-						"hx-confirm": "Remove your password? You then sign in with email links.",
-					}})
-				}
-				@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete account", Attrs: components.OpenDialog("delete-account-dialog")})
-			}
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Delete account", Attrs: components.OpenDialog("delete-account-dialog")})
 		}
-		@deleteAccountDialog()
-	</div>
+	}
+	@deleteAccountDialog()
 }
 
 // deleteAccountDialog is the one question of its own (DESIGN.md, Asking

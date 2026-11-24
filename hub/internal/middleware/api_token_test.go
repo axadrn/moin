@@ -16,7 +16,6 @@ type requestIdentity struct {
 	userID  string
 	session bool
 	token   bool
-	bearer  bool
 }
 
 func identify(t *testing.T, environment bearerTestEnvironment, path, authorization string) requestIdentity {
@@ -29,7 +28,6 @@ func identify(t *testing.T, environment bearerTestEnvironment, path, authorizati
 		}
 		identity.session = ctxkeys.Session(r.Context()) != nil
 		identity.token = ctxkeys.APIToken(r.Context()) != nil
-		identity.bearer = ctxkeys.IsBearer(r.Context())
 	})
 	request := httptest.NewRequest(http.MethodGet, path, nil)
 	if authorization != "" {
@@ -67,7 +65,7 @@ func TestAPITokenAuthenticatesOnlyTheJSONAPI(t *testing.T) {
 
 	session := startCookieSession(t, environment.auth, fixture.User.ID)
 	identity = identify(t, environment, "/api/v1/account", "Bearer "+session.Value)
-	if identity != (requestIdentity{userID: fixture.User.ID, session: true, bearer: true}) {
-		t.Fatalf("session bearer identity = %#v", identity)
+	if identity != (requestIdentity{}) {
+		t.Fatalf("session bearer identity = %#v, want unauthenticated", identity)
 	}
 }

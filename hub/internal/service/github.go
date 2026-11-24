@@ -113,10 +113,10 @@ func (g *GitHub) InstallURL(state string) string {
 }
 
 // AuthorizeURL is where a user signs in to GitHub with the app. GitHub
-// sends them back to the callback URL, the setup URL, with a code and the
-// state: no installation ID, so moin looks up their installations itself.
-func (g *GitHub) AuthorizeURL(state string) string {
-	return g.webURL + "/login/oauth/authorize?client_id=" + url.QueryEscape(g.clientID) + "&state=" + url.QueryEscape(state)
+// sends them back to redirectURI, one of the app's callback URLs, with a
+// code and the state.
+func (g *GitHub) AuthorizeURL(state, redirectURI string) string {
+	return g.webURL + "/login/oauth/authorize?" + url.Values{"client_id": {g.clientID}, "redirect_uri": {redirectURI}, "state": {state}}.Encode()
 }
 
 // ChecksInstaller says whether moin can ask GitHub who installed the app.
@@ -129,17 +129,12 @@ func (g *GitHub) ChecksInstaller() bool {
 // moin trades it for a token of that user and asks GitHub. Without this
 // check anyone could claim someone else's installation by its ID, which is
 // only a counter. A code that is wrong, used or expired finds none.
-func (g *GitHub) UserInstallations(ctx context.Context, code string) ([]int64, error) {
+func (g *GitHub) UserInstallations(ctx context.Context, code, redirectURI string) ([]int64, error) {
 	if code == "" {
 		return nil, nil
 	}
-	var grant struct {
-		AccessToken string `json:"access_token"`
-		Error       string `json:"error"`
-	}
-	form := map[string]string{"client_id": g.clientID, "client_secret": g.clientSecret, "code": code}
-	err := g.send(ctx, http.MethodPost, g.webURL+"/login/oauth/access_token", "", form, &grant)
-	if err != nil || grant.AccessToken == "" {
+	token, err := g.userToken(ctx, code, redirectURI)
+	if err != nil || token == "" {
 		return nil, err
 	}
 	ids := []int64{}
@@ -149,7 +144,7 @@ func (g *GitHub) UserInstallations(ctx context.Context, code string) ([]int64, e
 				ID int64 `json:"id"`
 			} `json:"installations"`
 		}
-		err = g.call(ctx, http.MethodGet, "/user/installations?per_page=100&page="+strconv.Itoa(page), "Bearer "+grant.AccessToken, nil, &answer)
+		err = g.call(ctx, http.MethodGet, "/user/installations?per_page=100&page="+strconv.Itoa(page), "Bearer "+token, nil, &answer)
 		if err != nil {
 			return nil, err
 		}
@@ -161,6 +156,66 @@ func (g *GitHub) UserInstallations(ctx context.Context, code string) ([]int64, e
 		}
 	}
 	return ids, nil
+}
+
+// GitHubAccount is who signed in to GitHub: the id, which never changes,
+// the login, like octocat, the profile name, and the primary email when
+// GitHub has verified it, else "".
+type GitHubAccount struct {
+	ID    int64
+	Login string
+	Name  string
+	Email string
+}
+
+// Account trades the code of a sign-in with the app for the GitHub account
+// that signed in. Its emails need the app's account permission "Email
+// addresses: Read".
+func (g *GitHub) Account(ctx context.Context, code, redirectURI string) (GitHubAccount, error) {
+	token, err := g.userToken(ctx, code, redirectURI)
+	if err != nil {
+		return GitHubAccount{}, err
+	}
+	if token == "" {
+		return GitHubAccount{}, errors.New("GitHub refused the sign-in code")
+	}
+	var user struct {
+		ID    int64  `json:"id"`
+		Login string `json:"login"`
+		Name  string `json:"name"`
+	}
+	if err := g.call(ctx, http.MethodGet, "/user", "Bearer "+token, nil, &user); err != nil {
+		return GitHubAccount{}, err
+	}
+	if user.ID == 0 {
+		return GitHubAccount{}, errors.New("GitHub answered no account")
+	}
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := g.call(ctx, http.MethodGet, "/user/emails", "Bearer "+token, nil, &emails); err != nil {
+		return GitHubAccount{}, err
+	}
+	account := GitHubAccount{ID: user.ID, Login: user.Login, Name: strings.TrimSpace(user.Name)}
+	for _, email := range emails {
+		if email.Primary && email.Verified {
+			account.Email = email.Email
+		}
+	}
+	return account, nil
+}
+
+// userToken trades the code GitHub sent back to redirectURI for a token of
+// that user. A code that is wrong, used or expired gets "".
+func (g *GitHub) userToken(ctx context.Context, code, redirectURI string) (string, error) {
+	var grant struct {
+		AccessToken string `json:"access_token"`
+	}
+	form := map[string]string{"client_id": g.clientID, "client_secret": g.clientSecret, "code": code, "redirect_uri": redirectURI}
+	err := g.send(ctx, http.MethodPost, g.webURL+"/login/oauth/access_token", "", form, &grant)
+	return grant.AccessToken, err
 }
 
 // jwt signs the app's own token, valid for nine minutes.

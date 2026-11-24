@@ -2,39 +2,6 @@ package service
 
 import "fmt"
 
-func forgotPasswordEmailTemplate(signInURL, appName string) emailContent {
-	return emailContent{
-		Subject:     fmt.Sprintf("Reset your password for %s", appName),
-		Preheader:   "Reset your password securely.",
-		Heading:     "Reset your password",
-		Intro:       []string{"You requested to reset your password. For security, we'll remove your password and sign you in with this link."},
-		ActionLabel: "Reset password",
-		ActionURL:   signInURL,
-		Outro: []string{
-			"After signing in, you can set a new password in Settings.",
-			"This link expires in 10 minutes and can only be used once.",
-			"If you didn't request this, you can safely ignore this email. Your password won't be changed.",
-		},
-		AppName: appName,
-	}
-}
-
-func magicLinkEmailTemplate(magicURL, appName string) emailContent {
-	return emailContent{
-		Subject:     "Moin, here is your sign-in link",
-		Preheader:   fmt.Sprintf("Use this secure link to sign in to %s.", appName),
-		Heading:     fmt.Sprintf("Sign in to %s", appName),
-		Intro:       []string{"Use the button below to sign in to your account."},
-		ActionLabel: "Sign in",
-		ActionURL:   magicURL,
-		Outro: []string{
-			"This link expires in 10 minutes and can only be used once.",
-			"If you didn't request this, you can safely ignore this email.",
-		},
-		AppName: appName,
-	}
-}
-
 func welcomeEmailTemplate(name, appURL, appName string) emailContent {
 	return emailContent{
 		Subject:     fmt.Sprintf("Welcome to %s!", appName),
@@ -92,7 +59,7 @@ func emailChangeNotificationTemplate(name, newEmail, appName string) emailConten
 			fmt.Sprintf("A request was made to change your email address to %s.", newEmail),
 			"If this was you, verify the new email address using the link we sent to it.",
 		},
-		Outro:   []string{"If you didn't request this change, your account may be compromised. Please secure your account immediately by changing your password."},
+		Outro:   []string{"If you didn't request this change, your account may be compromised. Sign in and use Sign out everywhere under Settings, Security."},
 		AppName: appName,
 	}
 }

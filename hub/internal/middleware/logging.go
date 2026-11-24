@@ -89,8 +89,6 @@ func safeRequestLogPath(path string) string {
 		return apiInvitations + ":token"
 	}
 	for _, prefix := range []string{
-		"/auth/magic-link/",
-		"/auth/forgot-password/",
 		"/auth/verify-email-change/",
 		"/workspaces/invitations/",
 		"/webhooks/deploy/",
