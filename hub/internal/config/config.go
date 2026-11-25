@@ -100,8 +100,11 @@ type Config struct {
 	// first connect, since the proxy serves the hub too.
 	SameServer bool
 	// Payment, Stripe
-	StripeSecretKey         string
-	StripeWebhookSecret     string
+	StripeSecretKey     string
+	StripeWebhookSecret string
+	// StripeProductIDPro is the hosted product: every price of it is the
+	// pro plan. The two prices are what a new checkout sells.
+	StripeProductIDPro      string
 	StripePriceIDProMonthly string
 	StripePriceIDProYearly  string
 	// Analytics
@@ -179,6 +182,7 @@ func Load() (*Config, error) {
 		UpdateCheck:             r.boolean("UPDATE_CHECK", true),
 		StripeSecretKey:         r.string("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:     r.string("STRIPE_WEBHOOK_SECRET", ""),
+		StripeProductIDPro:      r.string("STRIPE_PRODUCT_ID_PRO", ""),
 		StripePriceIDProMonthly: r.string("STRIPE_PRICE_ID_PRO_MONTHLY", ""),
 		StripePriceIDProYearly:  r.string("STRIPE_PRICE_ID_PRO_YEARLY", ""),
 		UmamiWebsiteID:          r.string("UMAMI_WEBSITE_ID", ""),
@@ -320,6 +324,7 @@ func (c *Config) validatePayments() []error {
 	require("STRIPE_SECRET_KEY", c.StripeSecretKey)
 	require("STRIPE_WEBHOOK_SECRET", c.StripeWebhookSecret)
 	if c.IsProduction() {
+		require("STRIPE_PRODUCT_ID_PRO", c.StripeProductIDPro)
 		require("STRIPE_PRICE_ID_PRO_MONTHLY", c.StripePriceIDProMonthly)
 		require("STRIPE_PRICE_ID_PRO_YEARLY", c.StripePriceIDProYearly)
 	}

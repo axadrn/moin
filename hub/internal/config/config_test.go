@@ -331,3 +331,17 @@ func TestSelfHostedIsPrivateByDefault(t *testing.T) {
 		}
 	}
 }
+
+// TestProductionBillingNeedsTheProduct: the hosted product is required
+// where the two prices are.
+func TestProductionBillingNeedsTheProduct(t *testing.T) {
+	cfg := &Config{AppEnv: EnvironmentProduction, StripeSecretKey: "sk_test", StripeWebhookSecret: "whsec_test", StripePriceIDProMonthly: "price_month", StripePriceIDProYearly: "price_year"}
+	errs := cfg.validatePayments()
+	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "STRIPE_PRODUCT_ID_PRO") {
+		t.Fatalf("errors = %v, want STRIPE_PRODUCT_ID_PRO", errs)
+	}
+	cfg.StripeProductIDPro = "prod_hosted"
+	if errs := cfg.validatePayments(); len(errs) != 0 {
+		t.Fatalf("errors = %v", errs)
+	}
+}

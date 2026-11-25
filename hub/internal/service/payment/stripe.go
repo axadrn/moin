@@ -233,6 +233,7 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 				CurrentPeriodEnd int64 `json:"current_period_end"`
 				Price            struct {
 					ID         string `json:"id"`
+					Product    string `json:"product"`
 					UnitAmount int64  `json:"unit_amount"`
 					Currency   string `json:"currency"`
 					Recurring  struct {
@@ -264,11 +265,11 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 		return fmt.Errorf("subscription has no items")
 	}
 
-	// A price moin does not sell must not open a paid plan.
-	priceID := subscription.Items.Data[0].Price.ID
-	planID := s.getLocalPlanID(priceID)
+	// A product moin does not sell must not open a paid plan.
+	productID := subscription.Items.Data[0].Price.Product
+	planID := s.planOfProduct(productID)
 	if planID == "" {
-		slog.Warn("stripe subscription has an unknown price, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "price_id", priceID)
+		slog.Warn("stripe subscription has an unknown product, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "product_id", productID)
 		return nil
 	}
 	sub.PlanID = planID
@@ -310,6 +311,7 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 				CurrentPeriodEnd int64 `json:"current_period_end"`
 				Price            struct {
 					ID         string `json:"id"`
+					Product    string `json:"product"`
 					UnitAmount int64  `json:"unit_amount"`
 					Currency   string `json:"currency"`
 					Recurring  struct {
@@ -332,11 +334,11 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 	}
 
 	if len(subscription.Items.Data) > 0 {
-		// A price moin does not sell leaves plan and status as they are.
-		priceID := subscription.Items.Data[0].Price.ID
-		planID := s.getLocalPlanID(priceID)
+		// A product moin does not sell leaves plan and status as they are.
+		productID := subscription.Items.Data[0].Price.Product
+		planID := s.planOfProduct(productID)
 		if planID == "" {
-			slog.Warn("stripe subscription has an unknown price, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "price_id", priceID)
+			slog.Warn("stripe subscription has an unknown product, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "product_id", productID)
 			return nil
 		}
 		sub.PlanID = planID
@@ -472,18 +474,15 @@ func (s *StripeProvider) getStripePriceID(planID, interval string) string {
 	}
 }
 
-// getLocalPlanID answers the plan of a configured price, or "" for any
-// other price. An empty price never matches a price left unset.
-func (s *StripeProvider) getLocalPlanID(priceID string) string {
-	if priceID == "" {
+// planOfProduct answers the plan a Stripe product sells, or "" for any
+// other product. The plan comes from the product, not the price: every
+// price of the hosted product, also one moin no longer offers, is that
+// plan. An empty product never matches a product left unset.
+func (s *StripeProvider) planOfProduct(productID string) string {
+	if productID == "" || productID != s.cfg.StripeProductIDPro {
 		return ""
 	}
-	switch priceID {
-	case s.cfg.StripePriceIDProMonthly, s.cfg.StripePriceIDProYearly:
-		return model.SubscriptionPlanPro
-	default:
-		return ""
-	}
+	return model.SubscriptionPlanPro
 }
 
 func (s *StripeProvider) mapStripeStatus(status string) string {
