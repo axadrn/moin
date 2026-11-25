@@ -34,7 +34,7 @@
     color: var(--muted-foreground);
     font-style: italic;
   }
-  .moin-table tbody tr:hover { background: color-mix(in oklab, var(--foreground) 3%, transparent); }
+  .moin-table tbody tr:hover { background: var(--hover); }
 
   /* A column to sort by is a link: the server sorts. */
   .moin-table th a {

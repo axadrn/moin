@@ -42,7 +42,7 @@
     text-overflow: ellipsis;
     field-sizing: content;
   }
-  .moin-input[data-bare]:hover { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
+  .moin-input[data-bare]:hover { background: var(--hover); }
   .moin-input[data-bare]:focus-visible { background: var(--muted); }
   .moin-input[data-bare]::placeholder { font-style: italic; }
   .moin-input[data-num] { text-align: right; }

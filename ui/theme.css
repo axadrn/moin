@@ -62,6 +62,11 @@
     /* Focus */
     --focus: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
 
+    /* Lit: what the pointer is on, one step toward the text, so it shows
+       on any surface. Pressed is one more step. */
+    --hover: color-mix(in oklab, var(--foreground) 8%, transparent);
+    --active: color-mix(in oklab, var(--foreground) 12%, transparent);
+
     /* Depth */
     --shadow-low: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
     --shadow-float: 0 25px 50px -12px rgb(0 0 0 / 25%);

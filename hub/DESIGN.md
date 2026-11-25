@@ -86,8 +86,12 @@ instead of on every page.
 
 Overlays (the palette, a select's list, the keys, the confirm dialog) float:
 one step lighter than what they cover (`--popover`: white in light, #2c2c2e
-in dark), a shadow, no border. What is lit inside them is the foreground at 8 %,
-so it shows on any surface.
+in dark), a shadow, no border.
+
+What the pointer is on is lit with `--hover`, the foreground at 8 %, and
+pressed with `--active`, at 12 %: cards, rows, items, everywhere. One value
+in `theme.css`, so it shows on any surface. On a white card in light mode
+that is a step darker than the page, as in iOS.
 
 Never a card in a card. Marketing illustrations (terminal, chat, the
 product frame) keep their own shapes.
