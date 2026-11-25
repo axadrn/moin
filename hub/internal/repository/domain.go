@@ -7,14 +7,15 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-// DomainUsedError means another app, or another service of the app,
-// uses the domain already: a domain reaches one service in the whole hub.
+// DomainUsedError means another service of the app uses the domain
+// already: a domain reaches one service of an app. Other apps may use it
+// too; then whoever set it twice sorts it out.
 type DomainUsedError struct {
 	Name string
 }
 
 func (e *DomainUsedError) Error() string {
-	return e.Name + " is already used by another app or service"
+	return e.Name + " is already used by another service of this app"
 }
 
 // Domains are the domains of an app, oldest first.
@@ -26,7 +27,8 @@ func (r *Apps) Domains(appID string) ([]model.Domain, error) {
 
 // SetDomains makes names the domains of one service of an app, "" for its
 // main service, and canonical their main one, "" for none. A domain that
-// stays keeps its row; a name in use elsewhere is a DomainUsedError.
+// stays keeps its row; a name another service of the app uses is a
+// DomainUsedError.
 func (r *Apps) SetDomains(appID, service string, names []string, canonical string) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
@@ -43,7 +45,7 @@ func (r *Apps) SetDomains(appID, service string, names []string, canonical strin
 		if slices.Contains(names, name) {
 			continue
 		}
-		_, err = tx.Exec(`DELETE FROM domains WHERE name = $1`, name)
+		_, err = tx.Exec(`DELETE FROM domains WHERE app_id = $1 AND name = $2`, appID, name)
 		if err != nil {
 			return err
 		}
@@ -53,7 +55,7 @@ func (r *Apps) SetDomains(appID, service string, names []string, canonical strin
 			continue
 		}
 		_, err = tx.Exec(`INSERT INTO domains (app_id, service, name) VALUES ($1, $2, $3)`, appID, service, name)
-		if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: domains.name") {
+		if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: domains.app_id, domains.name") {
 			return &DomainUsedError{Name: name}
 		}
 		if err != nil {
