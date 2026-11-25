@@ -114,6 +114,6 @@ func (m model) replaceEnv(name string, env map[string]string) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
-		return reloadMsg{notice: "Saved: it " + change.String() + ". The next deploy gets them"}
+		return reloadMsg{notice: "Saved: it " + change.String() + ". The app gets them when it restarts; T restarts now"}
 	}
 }

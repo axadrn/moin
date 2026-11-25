@@ -31,11 +31,11 @@ Usage
   moin <command>      Run one command
 
 Account
-  login              Connect this computer through the browser, with the rights you pick: login [--url <url>]; --token <token> or a CI token on stdin for CI
+  login              Connect this computer through the browser, with the rights you pick: login [--url <url>] [--web]; --token <token> or a CI token on stdin for CI
   logout             End this computer's connection and forget it, and what the TUI kept on this machine
   connections        Your connections and the CI tokens of the workspace; remove one: connections rm <id> [--yes]
   status             Is everything OK? What needs you, updates, what runs; exits 1 when something needs you
-  activity           Who deployed, restored or changed what: activity [--limit 30]
+  activity           Who deployed, restored or changed what: activity [--app <app>] [--server <server>] [--user <email>] [--limit 30]
   alerts             Email me when a site or server goes down or a deploy fails, on by default: alerts [on|off]; also lists the destinations
   alerts add         Send alerts to Slack, Discord, Telegram or a webhook: alerts add slack|discord|telegram|webhook <name> [--chat <id>] [--events a,b], URL or bot token on stdin
   alerts test        Send a test alert: alerts test <name>
@@ -54,8 +54,8 @@ Servers
   servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
   servers update     Update the daemon to the hub's version now: servers update [web-1]
   servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
-  servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]
-  servers rules      The server's own rules for moin, from /etc/moin/rules on it
+  servers secure     How it is reached; lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]
+  servers rules      The server's own rules for moin, from /etc/moin/rules on it: servers rules web-1
   integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare|tailscale [--server web-1], key on stdin
   integrations rm    Remove one: integrations rm cloudflare|tailscale [--server web-1] [--yes]
 
@@ -77,7 +77,7 @@ Deploys
   deploys            Deploy history: deploys [app]; one deploy with its log: deploys [app] v3
   rollback           Start an earlier deploy again: rollback [app] [v<number>] [--yes]
   logs               Show the last lines of the app: logs [--tail 200] [app]
-  exec               Run a command in a container, no shell: exec [app] [--service web] -- rails db:migrate
+  exec               Run a command in a container, no shell: exec [app] [--service web] [--timeout 10m] -- rails db:migrate
   compose            The compose file moin runs, without secret values, to run it elsewhere: compose [app] > compose.yml
 
 Domains
@@ -115,8 +115,8 @@ CI
   registry rm        Remove a login: registry rm <host> [--yes]
 
 Catalog
-  catalog            Open source apps to install in one click, with their newest release
-  catalog <app>      An app of the catalog with every release: catalog umami
+  catalog            Open source apps to install in one click, with their newest version
+  catalog <app>      An app of the catalog with every version: catalog umami
   catalog install    Install one: catalog install umami --server web-1 [--version 3.4.1] [--name stats] [--domain stats.example.com]
 
 Data
@@ -128,7 +128,7 @@ Data
 
 Backups
   backups            The copies of each database, the moments to go back to, how often: backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d]
-  restore            Go back to a copy; can be undone: restore [app] --to before-v12|14:01 [--confirm <app>]
+  restore            Go back to a copy; can be undone: restore [app] --to before-v12|14:01 [--db <path>] [--confirm <app>]
   backup download    Save a copy of a database from your bucket: backup download [app] [--db <path>] [--to <moment>] [--link]
 
 Buckets

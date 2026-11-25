@@ -379,7 +379,7 @@ func (m model) backupStatusLines(u ui, backups *client.AppBackups, innerWidth in
 	}
 	if backups.Bucket != "" {
 		lines = append(lines, "", backupField(u, "bucket", u.text(backups.Bucket)))
-		lines = append(lines, backupField(u, "schedule", u.text(scheduleText(backups.BackupSchedule))+u.faint("  w: change it on the web")))
+		lines = append(lines, backupField(u, "schedule", u.text(scheduleText(backups.BackupSchedule))+u.faint("  w changes it on the web")))
 	}
 	lines = append(lines, backupField(u, "a copy", u.faint("c downloads the newest")))
 	return lines
@@ -473,7 +473,7 @@ func (m model) envTab(u ui, w, h int) string {
 	for len(body) < h-chrome-1 {
 		body = append(body, "")
 	}
-	body = append(body, u.faint("Changes take effect with the next deploy. R redeploys now."))
+	body = append(body, u.faint("The app gets changes when it restarts. T restarts now."))
 	return u.panel("Env", note, body, w, h, true)
 }
 

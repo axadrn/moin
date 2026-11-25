@@ -496,6 +496,10 @@ func TestWebPagesOpenTheBrowser(t *testing.T) {
 	if opened[len(opened)-1] != "https://moin.example/app/acme/apps/shop/settings#compose-file" {
 		t.Errorf("C opens the compose file in the web, got %v", opened)
 	}
+	press(fixture(120, 40).withApp("shop", tBackups), "w")
+	if opened[len(opened)-1] != "https://moin.example/app/acme/apps/shop/data?db=shop.db" {
+		t.Errorf("w on the backups tab opens where the schedule is set, got %v", opened)
+	}
 }
 
 func TestLoginShowsTheCodeThenConnects(t *testing.T) {

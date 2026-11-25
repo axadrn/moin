@@ -42,6 +42,7 @@ func TestIsRelease(t *testing.T) {
 		"v1.0.0-%2e%2e":  false,
 		"v1.0.0+/../x":   false,
 		"v1.0.0-beta..1": false,
+		" v1.0.0\n":      false,
 		"main-b4be272":   false,
 		"1.0.0":          false,
 		"":               false,

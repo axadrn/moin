@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"net/http"
+	"net/url"
 )
 
 // Integrations says which keys there are: the Cloudflare API token the
@@ -31,7 +32,7 @@ type Security struct {
 // daemon set up.
 func (c *Client) SetSecurity(ctx context.Context, server string, security Security) (Server, error) {
 	var answer Server
-	err := c.do(ctx, http.MethodPut, "/api/v1/servers/"+server+"/security", security, &answer)
+	err := c.do(ctx, http.MethodPut, "/api/v1/servers/"+url.PathEscape(server)+"/security", security, &answer)
 	return answer, err
 }
 
