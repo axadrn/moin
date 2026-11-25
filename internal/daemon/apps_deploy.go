@@ -28,11 +28,9 @@ func (r *runner) deployStart(ctx context.Context, message protocol.Message, rule
 		return
 	}
 	if err := checkDeploy(rules, r.rulesFile, start); err != nil {
-		slog.Warn("deploy refused", "app", start.App, "number", start.Number, "error", err)
 		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
 		return
 	}
-	slog.Info("deploy", "app", start.App, "number", start.Number)
 	if !r.beginWork() {
 		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: errUpdating.Error()})
 		return

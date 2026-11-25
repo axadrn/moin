@@ -46,7 +46,8 @@ type Server struct {
 	Firewall bool                         `json:"firewall"`
 	Security *protocol.ServerConfigResult `json:"security"`
 	// Rules are what the owner of the server allows moin to do there, from
-	// /etc/moin/rules on the server. Null without rules.
+	// /etc/moin/rules on the server. Null for a server without the file, an
+	// empty object for one whose rules limit nothing.
 	Rules     *protocol.Rules `json:"rules"`
 	CreatedAt time.Time       `json:"created_at"`
 }

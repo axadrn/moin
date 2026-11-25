@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, where your secrets live, web, SSH, firewall, rules and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, secrets, web, SSH, firewall, rules, the journal and signed updates."
 group: "Servers and data"
 order: 2
 ---
@@ -38,6 +38,7 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 **You write the house rules.** A note on your door says what the messenger may do. Only you can write it, on the server. The messenger cannot change it.
 
 - `/etc/moin/rules`, readable by root. The daemon checks every request against it. [Rules](#rules)
+- The daemon writes every request in the server's journal, and whether it did it. [See what the hub asked](#see-what-the-hub-asked)
 
 **New versions carry a seal.** A messenger cannot slip your server a fake daemon.
 
@@ -244,6 +245,33 @@ A file on your server, `/etc/moin/rules`, says what moin may do there. Only you,
 
 Nobody can change it through moin: not us, not your team, not someone who breaks into moin.
 
+A new server gets the file when you install the daemon. Every rule is in it, with the value moin takes without the file, so you see what moin may do there. A second install keeps your file.
+
+```
+# What moin may do on this server. Only root can change this file, the hub cannot.
+# The daemon checks every request against it, at once. A mistake refuses everything until it is fixed.
+# These are the values moin takes without the file. Docs: Security, Rules.
+
+# off: no tables, SQL, row edits or backup downloads through moin.
+data: on
+# off: no container logs through moin.
+logs: on
+# off: no commands in containers through moin.
+exec: on
+# locked: no changes to web, SSH and the firewall through moin.
+network: open
+# on: containers may reach beyond the app, like privileged ones or the Docker socket.
+server-access: off
+# Deploys only from these sources. Without it: from anywhere.
+# deploy-from: github.com/<owner>/*, ghcr.io/<owner>/*, catalog
+# Backups and restores only with this bucket. Without it: any bucket.
+# backups-to: <endpoint-host>/<bucket-name>
+# Folders of the server that apps may mount. Without it: none.
+# mounts: /mnt/media
+```
+
+Lock it down by changing a value, or by writing a rule without its `#`:
+
 ```
 # /etc/moin/rules
 data: off
@@ -267,7 +295,7 @@ network: locked
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `catalog` for the apps of the [catalog](/docs/guides/catalog), whose compose files come with the signed daemon. `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. An image deploy of an app that follows a repo brings both, the image and the commit for its `compose.yml`, so `deploy-from` must list both. A commit named by its SHA must be on the app's branch, so a fork's commit, which GitHub also serves through the repo, never deploys. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
-- No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
+- No file, as on a server installed before the install wrote one: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
 - A server with rules updates its daemon like any other ([Updates](#updates)). Each release carries our signature, so a new daemon cannot drop the rules.
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.
@@ -331,6 +359,26 @@ MCP: list_servers
 ```
 
 `moin servers` shows them in its RULES column; the API in the `rules` field.
+
+## See what the hub asked
+
+Your server keeps a diary. Every letter the messenger brings goes in it: what it asked, and whether the daemon did it or said no, and why. The messenger cannot tear out a page: the diary is on your server.
+
+```
+journalctl -u moin-daemon
+```
+
+```
+Nov 25 09:14:02 server-1 moin[812]: 2026/11/25 09:14:02 INFO hub asked type=deploy.start app=my-app deploy=d-41 number=12 source=api.github.com/repos/acme/blog/tarball/abc123
+Nov 25 09:14:31 server-1 moin[812]: 2026/11/25 09:14:31 INFO done deploy=d-41
+Nov 25 09:20:45 server-1 moin[812]: 2026/11/25 09:20:45 INFO hub asked type=exec.start request=r-7 app=my-app service=web command=psql
+Nov 25 09:20:45 server-1 moin[812]: 2026/11/25 09:20:45 WARN not done request=r-7 why="refused by the rules of this server (/etc/moin/rules): exec: off"
+```
+
+- One line for what was asked, one for what came of it. `request` or `deploy` ties the two together.
+- It names the app and what the request is about: the deploy number, the source, the image, the command, the env keys, a secret's name, the bucket, SSH and the firewall. Never an env value, a secret, a key, a password, SQL, the arguments of a command or a file.
+- Why a request was not done shows in full when the rules refused it. Any other error says `why=failed`, as it may hold what a command printed: the hub shows the whole error.
+- `journalctl -u moin-daemon -f` follows it as it happens. `--since today` shows one day.
 
 ## Updates
 

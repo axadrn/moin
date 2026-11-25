@@ -848,7 +848,7 @@ func printRules(ctx context.Context, api *client.Client, nameOrID string, stdout
 		lines := server.Rules.Lines()
 		if len(lines) == 0 {
 			fmt.Fprintf(stdout, "%s has no rules: %s may do everything there.\n", style.Bold.Render(server.Name), build.Name)
-			hint(stdout, "Write them on the server in", "/etc/moin/rules")
+			hint(stdout, "Edit them on the server in", "/etc/moin/rules")
 			return nil
 		}
 		fmt.Fprintf(stdout, "/etc/moin/rules on %s:\n\n", style.Bold.Render(server.Name))

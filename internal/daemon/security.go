@@ -176,7 +176,6 @@ func (r *runner) secretSet(message protocol.Message, rules *protocol.Rules) {
 		if network && rules != nil && rules.NetworkLocked {
 			return nil, refused(r.rulesFile, "network: locked")
 		}
-		slog.Info("secret set", "name", request.Name, "removed", request.Value == "")
 		return nil, r.security.setSecret(request.Name, request.Value)
 	})
 }

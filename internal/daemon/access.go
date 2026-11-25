@@ -134,6 +134,9 @@ type appRoom struct {
 	writable []string
 }
 
+// beyondTheApp says why the server refuses a compose setting.
+const beyondTheApp = "this reaches beyond the app, so the server refuses it"
+
 // checkCompose refuses a release whose compose file reaches beyond its
 // app, unless the server's rules allow it with server-access: on. It reads
 // the compose file as it will run, after moin filled it in, so it holds for
@@ -151,7 +154,7 @@ func (a *apps) checkCompose(release *release) error {
 	}
 	room := a.roomOf(release, config)
 	if reason := room.check(config); reason != "" {
-		return fmt.Errorf("%s: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in %s", reason, RulesFile())
+		return fmt.Errorf("%s: %s. Allow it with server-access: on in %s", reason, beyondTheApp, RulesFile())
 	}
 	return nil
 }

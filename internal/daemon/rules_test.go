@@ -4,9 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -25,6 +27,30 @@ backups-to: s3.eu-central-1.amazonaws.com/acme-backups
 	want := protocol.Rules{DataOff: true, LogsOff: true, NetworkLocked: true, DeployFrom: []string{"github.com/acme/*", "ghcr.io/acme/*", "catalog"}, BackupsTo: "s3.eu-central-1.amazonaws.com/acme-backups"}
 	if strings.Join(rules.DeployFrom, ",") != strings.Join(want.DeployFrom, ",") || rules.DataOff != want.DataOff || rules.LogsOff != want.LogsOff || rules.NetworkLocked != want.NetworkLocked || rules.BackupsTo != want.BackupsTo {
 		t.Fatalf("rules = %+v", rules)
+	}
+}
+
+// The rules file a new server gets allows what no file allows, names every
+// rule, and its examples are rules the daemon reads.
+func TestTheInstalledRulesAreTheDefaults(t *testing.T) {
+	text := protocol.DaemonRules(build.Name)
+	rules, err := parseRules(text, "rules")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*rules, protocol.Rules{}) {
+		t.Errorf("rules = %+v, want what no file allows", rules)
+	}
+	for _, rule := range []string{"data", "logs", "exec", "network", "server-access", "deploy-from", "backups-to", "mounts"} {
+		if !strings.Contains(text, "\n"+rule+": ") && !strings.Contains(text, "\n# "+rule+": ") {
+			t.Errorf("the file misses %s", rule)
+		}
+	}
+	examples := strings.ReplaceAll(text, "\n# deploy-from:", "\ndeploy-from:")
+	examples = strings.ReplaceAll(examples, "\n# backups-to:", "\nbackups-to:")
+	examples = strings.ReplaceAll(examples, "\n# mounts:", "\nmounts:")
+	if _, err := parseRules(examples, "rules"); err != nil {
+		t.Errorf("an example is no rule: %v", err)
 	}
 }
 

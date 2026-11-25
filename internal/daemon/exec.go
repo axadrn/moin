@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -46,7 +45,6 @@ func (r *runner) execStart(ctx context.Context, message protocol.Message, rules 
 		r.fail(message, refused(r.rulesFile, "exec: off"))
 		return
 	}
-	slog.Info("exec", "app", start.App, "service", start.Service)
 	done, err := r.apps.runExec(ctx, start, func(data string) {
 		r.send(protocol.TypeExecOutput, message.RequestID, protocol.ExecOutput{Data: data})
 	})
