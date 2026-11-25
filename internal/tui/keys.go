@@ -411,7 +411,7 @@ func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 // domainsTabKey adds and removes domains, picks the canonical one and sets
 // the password.
 func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
-	doms := m.mainDomains()
+	doms := slices.Clone(a.Domains)
 	if d != 0 {
 		return m.cursor("domains", len(m.app.domains), d), nil
 	}
@@ -436,10 +436,6 @@ func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 			return m, nil
 		}
 		dc := m.app.domains[m.at("domains", len(m.app.domains))]
-		if dc.FromCompose {
-			m.say(dc.Domain + " comes from compose.yml: change it there and deploy")
-			return m, nil
-		}
 		if s == "c" {
 			if dc.Service != "" {
 				m.say("Only a domain of the main service can be the canonical one")

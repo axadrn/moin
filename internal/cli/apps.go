@@ -148,7 +148,6 @@ func appsRename(ctx context.Context, call appsCall) error {
 	}
 	done(call.stdout, "Renamed %s to %s. Its links, data and backups stay", flags.Arg(0), style.Bold.Render(renamed.Name))
 	hint(call.stdout, "Its containers take the name on the next restart:", build.Name+" restart "+renamed.Name)
-	hint(call.stdout, "In its repo, set x-moin.app: "+renamed.Name+" in compose.yml for", build.Name+" deploy")
 	return nil
 }
 
@@ -201,7 +200,6 @@ func appsShow(ctx context.Context, call appsCall) error {
 func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	app := detail.App
 	fmt.Fprintln(stdout, style.Bold.Render(app.Name)+" "+badge(stdout, style.App(app), app.Status()))
-	domains, canonical, fromCompose := app.Domains, app.Canonical, false
 	built := ""
 	for _, deploy := range detail.Deploys {
 		if deploy.Number == app.LiveNumber && deploy.Detected != nil {
@@ -210,19 +208,12 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 				built = "Railpack: " + deploy.Detected.Builder
 			}
 		}
-		// The live deploy says what it answers on; x-moin wins there.
-		if deploy.Number == app.LiveNumber && deploy.Detected != nil && deploy.Detected.Config != nil && len(deploy.Detected.Config.Domains) > 0 {
-			domains, canonical, fromCompose = deploy.Detected.Domains, deploy.Detected.Canonical, true
-		}
 	}
 	domainText := "none"
-	if len(domains) > 0 {
-		domainText = strings.Join(domains, ", ")
-		if canonical != "" {
-			domainText += " (canonical " + canonical + ")"
-		}
-		if fromCompose {
-			domainText += ", from compose.yml"
+	if len(app.Domains) > 0 {
+		domainText = strings.Join(app.Domains, ", ")
+		if app.Canonical != "" {
+			domainText += " (canonical " + app.Canonical + ")"
 		}
 	}
 	from := "your folder, " + build.Name + " deploy"
@@ -309,6 +300,12 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
+	if picked.from == client.FromDirectory {
+		name, err = repoApp(ctx, api, name)
+		if err != nil {
+			return err
+		}
+	}
 	if *ref != "" && !protocol.ValidRefName(*ref) {
 		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
@@ -346,6 +343,30 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 }
 
+// repoApp is the app moin deploy deploys when no app is named: the one app
+// that follows the GitHub repo of this folder, else the folder's name.
+func repoApp(ctx context.Context, api *client.Client, folderName string) (string, error) {
+	repo := client.OriginRepo(".")
+	if repo == "" {
+		return folderName, nil
+	}
+	apps, err := api.Apps(ctx)
+	if err != nil {
+		return "", err
+	}
+	following := []string{}
+	for _, app := range apps {
+		if strings.EqualFold(app.Repo, repo) {
+			following = append(following, app.Name)
+		}
+	}
+	if len(following) != 1 {
+		return folderName, nil
+	}
+	picked = pickedApp{name: following[0], from: "the app that follows " + repo}
+	return following[0], nil
+}
+
 // printCommit names the GitHub commit a deploy came from, if any.
 func printCommit(stdout io.Writer, started client.Deploy) {
 	if started.Commit != "" {
@@ -355,8 +376,8 @@ func printCommit(stdout io.Writer, started client.Deploy) {
 
 // followRepo makes the app follow repo before moin deploy deploys a commit
 // of it. An app that does not exist yet is created after a question, so a
-// typo makes no new app: on the server x-moin or --server names, or on the
-// only server. An app that follows no repo is linked to this one, without
+// typo makes no new app: on the server --server names, or on the only
+// server. An app that follows no repo is linked to this one, without
 // deploys on push.
 func followRepo(ctx context.Context, api *client.Client, name, server, repo string, yes bool, stdin io.Reader, stdout io.Writer) error {
 	detail, err := api.App(ctx, name)
@@ -385,15 +406,12 @@ func followRepo(ctx context.Context, api *client.Client, name, server, repo stri
 
 func createApp(ctx context.Context, api *client.Client, name, server string, stdout io.Writer) error {
 	if server == "" {
-		server = client.ReadLocalConfig(".").Server
-	}
-	if server == "" {
 		servers, err := api.Servers(ctx)
 		if err != nil {
 			return err
 		}
 		if len(servers) != 1 {
-			return fmt.Errorf("app %s does not exist yet: pass --server or set x-moin.server, you have %d servers", name, len(servers))
+			return fmt.Errorf("app %s does not exist yet: pass --server, you have %d servers", name, len(servers))
 		}
 		server = servers[0].Name
 	}

@@ -21,8 +21,7 @@ Who presses the button?
   CLI, TUI, web, API or MCP
 
 Where do settings live?
-  in the repo (x-moin), which wins
-  otherwise in moin
+  in moin, always
 ```
 
 All of them work. Mix them as you like.
@@ -50,7 +49,7 @@ MCP: get_app, deploy_from
 
 Switch with what turns one on: [deploy every push](/docs/guides/github#deploy-every-push), [turn on the deploy hook](/docs/guides/ci). Turning the hook off leaves the repo linked, without deploys on push. Unlinking leaves neither. `moin deploy` in the repo links it again.
 
-Settings: [who decides](/docs/guides/config#who-decides).
+Settings live in moin. [compose.yml](/docs/guides/compose) is plain Docker.
 
 ## Deploy what you pushed
 
@@ -109,9 +108,9 @@ start       v3 takes v2's place
    │
    ▼
 check       v3 runs 10 seconds
-   │        without a restart; the
-   │        health path, if set,
-   │        answers
+   │        without a restart; with
+   │        a healthcheck, Docker
+   │        says it is healthy
    ▼
 live ✓      v3 is live
 
@@ -261,7 +260,7 @@ You type the app's name to confirm, and the hub checks it. A script passes it as
 
 ## Good to know
 
-- Commands on an app take its name as the last word. Without it, moin uses the app of your folder: `app` in [x-moin](/docs/guides/config), or the folder's name.
+- Commands on an app take its name as the last word. Without it, moin uses the folder's name. `moin deploy` first takes the app that follows the folder's GitHub repo.
 - moin never stores your code. Your server downloads it from GitHub.
 - Your data survives every deploy: [how](/docs/concepts/how-moin-works#your-data-survives-every-deploy).
 - A deploy refuses settings that reach beyond the app, like `privileged: true` or a mount of `/var/run/docker.sock`. A normal app needs none of them. [Containers that reach into the server](/docs/guides/security#containers-that-reach-into-the-server)

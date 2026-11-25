@@ -40,7 +40,6 @@ type CatalogEntry struct {
 	// DatabaseNote says so for a database moin does not back up; empty
 	// otherwise.
 	DatabaseNote string `json:"database_note"`
-	Port         int    `json:"port"`
 	// Login says how to sign in the first time.
 	Login string `json:"login"`
 	// NeedsDomain says the install needs a domain: moin sets APP_URL from it.
@@ -96,7 +95,7 @@ func NewCatalogEntry(store *catalog.Store, entry catalog.Entry, withVersions boo
 	out := CatalogEntry{
 		Slug: entry.Slug, Name: entry.Name, Pitch: entry.Pitch, Category: entry.Category,
 		Website: entry.Website, Source: entry.Source, License: entry.License, Image: entry.Image,
-		Database: entry.Database, DatabaseNote: entry.DatabaseNote(), NeedsDomain: entry.NeedsURL(), Port: entry.Port, Login: entry.Login, Secrets: entry.Secrets,
+		Database: entry.Database, DatabaseNote: entry.DatabaseNote(), NeedsDomain: entry.NeedsURL(), Login: entry.Login, Secrets: entry.Secrets,
 	}
 	if out.Secrets == nil {
 		out.Secrets = []string{}

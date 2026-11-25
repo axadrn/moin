@@ -8,7 +8,6 @@ license: Open WebUI License
 image: ghcr.io/open-webui/open-webui
 versions: '^v[0-9]+\.[0-9]+\.[0-9]+$'
 database: sqlite
-port: 8080
 login: "The first account you create becomes the admin."
 logo: https://raw.githubusercontent.com/open-webui/open-webui/main/static/favicon.png
 ---

@@ -11,7 +11,7 @@ inputs:
     description: A personal API token with write access. Store it as a secret.
     required: true
   app:
-    description: The app to deploy. Default x-moin.app in compose.yml or the repo name.
+    description: The app to deploy. Default the app that follows the repo, else the repo name.
     required: false
   image:
     description: Deploy this image, built and pushed earlier in the job, instead of the repo.

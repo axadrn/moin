@@ -7,7 +7,6 @@ source: github.com/RocketChat/Rocket.Chat
 license: MIT
 image: rocketchat/rocket.chat
 database: mongodb
-port: 3000
 logo: https://simpleicons.org/?q=rocketdotchat (CC0)
 ---
 

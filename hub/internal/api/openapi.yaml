@@ -65,7 +65,7 @@ tags:
   - name: Catalog
     description: 'Open source apps moin installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with moin; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
-    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, reads the optional `x-moin` block, builds, starts and checks it. Env values are write-only and live only on the app''s server: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the API token.'
+    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, builds, starts and checks it. compose.yml is plain Docker: every moin setting is set here. Env values are write-only and live only on the app''s server: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the API token.'
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
@@ -1787,7 +1787,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. The `x-moin` block of compose.yml wins for every field it sets.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1815,9 +1815,6 @@ paths:
           description: '`not_found`. No app with this ID or name belongs to the account.'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
-        '409':
-          $ref: '#/components/responses/Conflict'
-          description: '`domains_from_compose`. x-moin.domains in compose.yml sets the domains of the live deploy; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.domains`, also when another app or service uses a domain already, `fields.canonical` or `fields.service`.'
@@ -1855,7 +1852,7 @@ paths:
       tags: [Apps]
       operationId: setInstant
       summary: Set the instant address
-      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it. The change waits for the next restart. Empty `provider` keeps it; no `open` keeps the password as it is. `x-moin.instant` in compose.yml wins.'
+      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it. The change waits for the next restart. Empty `provider` keeps it; no `open` keeps the password as it is.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -2513,7 +2510,7 @@ paths:
       tags: [Uptime]
       operationId: setUptime
       summary: Set uptime
-      description: Changes the path uptime visits on a domain, or pauses and resumes it. A missing field keeps its setting; an empty path goes back to the app's health path, or /. A paused domain starts over when it resumes.
+      description: Changes the path uptime visits on a domain, or pauses and resumes it. A missing field keeps its setting; an empty path goes back to /. A paused domain starts over when it resumes.
       requestBody:
         required: true
         content:
@@ -5088,7 +5085,7 @@ components:
           description: The newest successful deploy, which is running. 0 before the first.
         domains:
           type: array
-          description: The domains the app answers on. The ones x-moin.domains in compose.yml sets, else the ones saved in moin.
+          description: The domains the app answers on.
           items:
             type: string
         canonical:
@@ -5257,26 +5254,6 @@ components:
               service:
                 type: string
                 description: The compose service that runs Postgres.
-        config:
-          type: object
-          description: The `x-moin` block of compose.yml.
-          properties:
-            app:
-              type: string
-            server:
-              type: string
-            service:
-              type: string
-            port:
-              type: integer
-            health:
-              type: string
-            domains:
-              type: array
-              items:
-                type: string
-            database:
-              type: string
     Change:
       type: object
       required: [app, deploy]
@@ -5373,7 +5350,7 @@ components:
           type: array
           items:
             type: object
-            required: [domain, canonical, address, ipv4, ipv6, advice, found, points, from_compose]
+            required: [domain, canonical, address, ipv4, ipv6, advice, found, points]
             properties:
               domain:
                 type: string
@@ -5397,9 +5374,6 @@ components:
                   type: string
               points:
                 type: boolean
-              from_compose:
-                type: boolean
-                description: x-moin.domains in compose.yml of the live deploy sets the domain. It wins over the domains set in moin, so it changes in compose.yml, then a deploy.
               service:
                 type: string
                 description: The service of compose.yml the domain reaches; absent for the main one.
@@ -5572,8 +5546,6 @@ components:
         database_note:
           type: string
           description: 'For a database moin does not back up, says so: "Runs on MySQL: moin doesn''t back it up yet." Empty otherwise.' 
-        port:
-          type: integer
         login:
           type: string
           description: How to sign in the first time, when the app has a default.
@@ -6236,7 +6208,7 @@ components:
           type: string
         path:
           type: string
-          description: Where uptime visits. The app's health path from `x-moin.health`, or /, unless set.
+          description: Where uptime visits: / unless set.
         custom_path:
           type: boolean
         paused:
@@ -6298,7 +6270,7 @@ components:
       properties:
         path:
           type: string
-          description: A path like /health; empty goes back to the health path or /.
+          description: A path like /health; empty goes back to /.
         paused:
           type: boolean
     AppBackups:

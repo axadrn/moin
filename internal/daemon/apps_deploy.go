@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -488,7 +487,9 @@ func logDatabases(detected protocol.Detected, logf func(string, ...any)) {
 	}
 }
 
-// start brings the release up and checks that it stays up.
+// start brings the release up and checks that it stays up. --wait waits
+// until every service runs, and one with a Docker healthcheck until Docker
+// says it is healthy; one that is not fails the start.
 func (a *apps) start(ctx context.Context, app, composeFile string, detected protocol.Detected, recreate bool, logf func(string, ...any)) error {
 	args := []string{"up", "-d", "--remove-orphans", "--wait", "--wait-timeout", strconv.Itoa(int(waitTimeout.Seconds()))}
 	if recreate {
@@ -516,15 +517,7 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 		_ = a.compose(ctx, app, composeFile, logf, "logs", "--no-color", "--tail", "20", detected.Service)
 		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
 	}
-	ids, _ := a.runningContainers(ctx, app, composeFile, detected.Service)
-	containers := strings.Fields(ids)
-	if len(containers) == 0 {
-		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
-	}
-	if detected.Config == nil || detected.Config.Health == "" {
-		return nil
-	}
-	return a.checkHealth(ctx, containers[0], detected.Port, detected.Config.Health, logf)
+	return nil
 }
 
 // serviceState says whether a service runs, and a fingerprint of its
@@ -588,45 +581,6 @@ func (a *apps) stable(ctx context.Context, state func() (bool, string)) (bool, e
 		case <-time.After(stableTick):
 		}
 	}
-}
-
-// checkHealth calls the health path on the container until it answers below 500.
-func (a *apps) checkHealth(ctx context.Context, container string, port int, path string, logf func(string, ...any)) error {
-	address, err := a.output(ctx, "docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", container)
-	ips := strings.Fields(address)
-	if err != nil || len(ips) == 0 {
-		return errors.New("health check: the container has no IP address")
-	}
-	url := fmt.Sprintf("http://%s:%d/%s", ips[0], port, strings.TrimPrefix(path, "/"))
-	logf("health check %s", url)
-	return healthy(ctx, url, path)
-}
-
-// healthy calls url until it answers below 500, for up to healthTimeout.
-func healthy(ctx context.Context, url, path string) error {
-	// A redirect answers too: an app that sends http to its https domain,
-	// like Ghost, runs; following it would leave the container's address.
-	client := http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	deadline := time.Now().Add(healthTimeout)
-	var last string
-	for time.Now().Before(deadline) {
-		response, err := client.Get(url)
-		if err == nil {
-			response.Body.Close()
-			if response.StatusCode < 500 {
-				return nil
-			}
-			last = response.Status
-		} else {
-			last = err.Error()
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(time.Second):
-		}
-	}
-	return fmt.Errorf("health check %s failed: %s", path, last)
 }
 
 // rebuildMissing lets finish build again the images of built services that

@@ -18,7 +18,7 @@ func registerUptimeTools(server *mcpsdk.Server, services Services) {
 	writeTool := change(false, true)
 	writeTool.Title = "Set uptime"
 	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "set_uptime", Title: "Set uptime", Annotations: writeTool,
-		Description: "Changes the path uptime visits on one domain of an app (empty goes back to the health path from x-moin.health, or /), or pauses and resumes it. A missing field keeps its setting. Returns the domain. Needs a token with read and write access.",
+		Description: "Changes the path uptime visits on one domain of an app (empty goes back to /), or pauses and resumes it. A missing field keeps its setting. Returns the domain. Needs a token with read and write access.",
 	}, Write(changes(services, tools.setUptime)))
 }
 
@@ -70,7 +70,7 @@ func (d UptimeDomain) Summary() string {
 type UptimeInput struct {
 	App    string  `json:"app" jsonschema:"the app name or ID"`
 	Domain string  `json:"domain" jsonschema:"one of the app's domains"`
-	Path   *string `json:"path,omitempty" jsonschema:"the path to visit, like /health; empty for the health path or /"`
+	Path   *string `json:"path,omitempty" jsonschema:"the path to visit, like /health; empty for /"`
 	Paused *bool   `json:"paused,omitempty" jsonschema:"true pauses uptime of the domain, false resumes it"`
 }
 

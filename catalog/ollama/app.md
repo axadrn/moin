@@ -6,7 +6,6 @@ website: https://ollama.com
 source: github.com/ollama/ollama
 license: MIT
 image: ollama/ollama
-port: 11434
 logo: https://simpleicons.org (CC0)
 ---
 

@@ -7,7 +7,6 @@ source: github.com/outline/outline
 license: BSL-1.1
 image: outlinewiki/outline
 database: postgres
-port: 3000
 logo: https://simpleicons.org (CC0)
 ---
 

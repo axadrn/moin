@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /
-
 services:
   web:
     image: docmost/docmost:${VERSION}
+    expose: ["3000"]
     environment:
       APP_URL: ${APP_URL}
       APP_SECRET: ${APP_SECRET}

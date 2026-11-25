@@ -7,7 +7,6 @@ source: github.com/mealie-recipes/mealie
 license: AGPL-3.0
 image: ghcr.io/mealie-recipes/mealie
 database: sqlite
-port: 9000
 login: Sign in as changeme@example.com with the password MyPassword, then change both.
 logo: https://github.com/mealie-recipes/mealie/blob/HEAD/frontend/public/icons/apple-touch-icon.png
 ---

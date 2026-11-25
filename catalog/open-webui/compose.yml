@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 8080
-  health: /health
-
 services:
   web:
     image: ghcr.io/open-webui/open-webui:${VERSION}
+    expose: ["8080"]
     environment:
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
     volumes:

@@ -728,25 +728,31 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 }
 
-// x-moin.domains wins over the domains set in moin, so moin lists those and
-// refuses to change domains it cannot apply.
-func TestComposeDomainsAreListedAndCannotChangeInOps(t *testing.T) {
+// Domains come only from moin: after a deploy, moin lists the ones saved
+// in it and changes them.
+func TestDomainsChangeAfterADeploy(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
-	detected := protocol.Detected{Kind: "compose", Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Config: &protocol.Config{Domains: []string{"shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com"}}
+	detected := protocol.Detected{Kind: "compose", Service: "web", Domains: []string{"blog.example.com"}}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
-	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
-	if err != nil || len(checks) != 2 || checks[0].Domain != "shop.example.com" || !checks[0].Canonical || !checks[0].FromCompose || !checks[1].FromCompose {
-		t.Fatalf("checks = %+v, %v", checks, err)
+	if _, err := apps.SetDomains(owner, "blog", "", []string{"shop.example.com", "www.shop.example.com"}, "shop.example.com"); err != nil {
+		t.Fatalf("set domains after a deploy: %v", err)
 	}
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); !errors.Is(err, ErrComposeDomains) {
-		t.Fatalf("set domains under x-moin: err = %v", err)
+	if _, err := apps.SetDomains(owner, "blog", "api", []string{"api.shop.example.com"}, ""); err != nil {
+		t.Fatalf("set domains of another service after a deploy: %v", err)
+	}
+	checks, err := apps.CheckDomains(context.Background(), owner.WorkspaceID, "blog")
+	if err != nil || len(checks) != 3 || checks[0].Domain != "shop.example.com" || !checks[0].Canonical || checks[2].Service != "api" {
+		t.Fatalf("checks = %+v, %v", checks, err)
 	}
 }
 

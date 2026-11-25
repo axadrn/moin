@@ -7,7 +7,6 @@ source: github.com/healthchecks/healthchecks
 license: BSD-3-Clause
 image: healthchecks/healthchecks
 database: postgres
-port: 8000
 logo: https://raw.githubusercontent.com/healthchecks/healthchecks/master/static/img/favicon.svg
 ---
 

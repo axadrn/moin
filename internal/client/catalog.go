@@ -28,7 +28,6 @@ type CatalogEntry struct {
 	Database string `json:"database"`
 	// DatabaseNote says when moin does not back up the app's database.
 	DatabaseNote string `json:"database_note"`
-	Port         int    `json:"port"`
 	Login        string `json:"login"`
 	// NeedsDomain says the install needs --domain.
 	NeedsDomain bool             `json:"needs_domain"`

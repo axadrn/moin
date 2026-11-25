@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 8000
-  health: /api/health
-
 services:
   web:
     image: ghcr.io/plausible/community-edition:${VERSION}
+    expose: ["8000"]
     command: sh -c "/entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
     environment:
       BASE_URL: ${APP_URL}

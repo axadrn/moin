@@ -7,7 +7,6 @@ source: github.com/n8n-io/n8n
 license: Sustainable Use License
 image: n8nio/n8n
 database: postgres
-port: 5678
 stable: stable
 logo: https://github.com/n8n-io/n8n/blob/HEAD/packages/frontend/@n8n/design-system/src/components/N8nLogo/logo-icon.svg
 ---

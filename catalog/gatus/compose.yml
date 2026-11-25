@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 8080
-  health: /health
-
 services:
   web:
     image: twinproduction/gatus:${VERSION}
+    expose: ["8080"]
     configs:
       - source: gatus
         target: /config/config.yaml

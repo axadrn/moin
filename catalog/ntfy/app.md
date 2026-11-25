@@ -7,7 +7,6 @@ source: github.com/binwiederhier/ntfy
 license: Apache-2.0
 image: binwiederhier/ntfy
 database: sqlite
-port: 80
 logo: https://github.com/binwiederhier/ntfy/blob/HEAD/.github/images/logo.png
 ---
 

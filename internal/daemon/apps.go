@@ -30,10 +30,10 @@ import (
 // rollback: same images, the env as it is now.
 const (
 	maxSourceSize = 200 << 20
-	waitTimeout   = 120 * time.Second
-	// healthTimeout is as long as compose waits: a JVM app such as Metabase
-	// takes a minute or more to answer on its first start.
-	healthTimeout = 120 * time.Second
+	// waitTimeout is how long compose waits for the services to run and be
+	// healthy: a JVM app such as Metabase takes a minute or more on its
+	// first start.
+	waitTimeout = 120 * time.Second
 )
 
 var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)

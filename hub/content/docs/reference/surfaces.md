@@ -45,7 +45,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Activity by app, server or person | ✓ | ✓ `--app`, `--server`, `--user` | Shows all of it: filter in the CLI or the web. | ✓ | ✓ |
 | Jump to anything | ✓ [palette](/docs/reference/palette), `⌘K` | Commands take the app by name. | ✓ palette: `space`, `ctrl+k` | Not a place to jump in. | Not a place to jump in. |
 
-Domains and backups set in `x-moin` are locked on every surface: [Who decides](/docs/guides/config#who-decides).
+Every setting lives in moin and changes on every surface. [compose.yml](/docs/guides/compose) is plain Docker.
 
 ## Setup
 

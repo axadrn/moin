@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /api/info
-
 services:
   web:
     image: rocketchat/rocket.chat:${VERSION}
+    expose: ["3000"]
     environment:
       ROOT_URL: ${APP_URL}
       PORT: "3000"

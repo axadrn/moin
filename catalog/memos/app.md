@@ -7,7 +7,6 @@ source: github.com/usememos/memos
 license: MIT
 image: neosmemo/memos
 database: sqlite
-port: 5230
 logo: https://github.com/usememos/memos/blob/HEAD/web/public/logo.svg
 ---
 

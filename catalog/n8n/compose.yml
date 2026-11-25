@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 5678
-  health: /healthz
-
 services:
   web:
     image: n8nio/n8n:${VERSION}
+    expose: ["5678"]
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: db

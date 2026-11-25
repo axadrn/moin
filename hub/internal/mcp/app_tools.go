@@ -19,7 +19,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.listApps)))
 	mcpsdk.AddTool(server, newTool("get_app", "Get an app",
-		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres; the x-moin block). Needs the read scope.",
+		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, newTool("create_app", "Create an app",
 		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. instant_password is the password of its instant address: the one time moin shows it, so give it to the user to keep. Needs a token with read and write access.",

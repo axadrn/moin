@@ -7,7 +7,6 @@ source: github.com/sissbruecker/linkding
 license: MIT
 image: sissbruecker/linkding
 database: sqlite
-port: 9090
 login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
 logo: https://github.com/sissbruecker/linkding/blob/HEAD/assets/logo.svg
 ---

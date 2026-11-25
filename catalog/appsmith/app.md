@@ -7,7 +7,6 @@ source: github.com/appsmithorg/appsmith
 license: Apache-2.0
 image: appsmith/appsmith-ce
 database: mongodb
-port: 80
 login: "The first visit asks you to create the admin."
 logo: https://simpleicons.org (CC0)
 ---

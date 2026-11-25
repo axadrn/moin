@@ -3,7 +3,6 @@ package service
 // How often an app is copied and how long each copy stays.
 
 import (
-	"log/slog"
 	"slices"
 	"strconv"
 
@@ -24,31 +23,10 @@ func (s *AppService) SetBackupSchedule(actor Actor, idOrName string, schedule pr
 	if !slices.Contains(protocol.Keeps, schedule.Keep) {
 		return nil, ErrBackupKeep
 	}
-	if s.ScheduleInFile(app) {
-		return nil, ErrScheduleInFile
-	}
 	if err := s.saveSchedule(actor, app, schedule); err != nil {
 		return nil, err
 	}
 	return app, nil
-}
-
-// ScheduleInFile says the live deploy's compose.yml sets the backup
-// schedule. Then only the file changes it.
-func (s *AppService) ScheduleInFile(app *model.App) bool {
-	return s.FileConfig(app).Backups != nil
-}
-
-// applyScheduleInFile saves the backup schedule compose.yml asks for.
-func (s *AppService) applyScheduleInFile(app *model.App, backups protocol.ConfigBackups) {
-	schedule, err := backups.Schedule()
-	if err != nil {
-		slog.Error("the backup schedule in compose.yml is wrong", "app_id", app.ID, "error", err.Error())
-		return
-	}
-	if err := s.saveSchedule(System(app.WorkspaceID), app, schedule); err != nil {
-		slog.Error("save the backup schedule failed", "app_id", app.ID, "error", err.Error())
-	}
 }
 
 // saveSchedule stores a schedule, writes the change to the activity and

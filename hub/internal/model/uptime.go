@@ -17,8 +17,7 @@ const (
 )
 
 // DomainUptime is what the hub keeps of the uptime of one domain:
-// its settings and its state. Path is empty for the default: the app's
-// health path, or /. State is "" until the first visit, then up or down.
+// its settings and its state. Path is empty for the default, /. State is "" until the first visit, then up or down.
 type DomainUptime struct {
 	AppID  string     `db:"app_id"`
 	Domain string     `db:"domain"`

@@ -7,7 +7,6 @@ source: github.com/louislam/uptime-kuma
 license: MIT
 image: louislam/uptime-kuma
 database: sqlite
-port: 3001
 logo: https://github.com/louislam/uptime-kuma/blob/HEAD/public/icon.svg
 ---
 

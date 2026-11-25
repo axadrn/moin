@@ -1,11 +1,8 @@
 package model
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // App is a compose project on one server. The deploy fields come from its
@@ -24,8 +21,8 @@ type App struct {
 	Pinned         bool      `db:"pinned"`
 	CreatedAt      time.Time `db:"created_at"`
 	DeployHookHash *string   `db:"deploy_hook_hash"`
-	// Domains are the domains saved in moin, oldest first, from the
-	// domains table. x-moin in compose.yml can set others: MainDomains.
+	// Domains are the domains of the app, oldest first, from the domains
+	// table.
 	Domains []Domain `db:"-"`
 	// Protect is an htpasswd line when a password protects the app.
 	Protect string `db:"protect"`
@@ -79,9 +76,6 @@ type App struct {
 	// succeeded deploy that set what runs (a build, an image or a rollback;
 	// a restart keeps it). Empty when it was built from the app's repo.
 	LiveImage string `db:"live_image"`
-	// LiveDetected is what the daemon found in the live deploy, as JSON;
-	// empty before the first.
-	LiveDetected string `db:"live_detected"`
 }
 
 // EnvVar is an env var of an app as moin shows it: its key and when it
@@ -211,30 +205,6 @@ func (a App) ServiceDomains() map[string][]string {
 		}
 	}
 	return services
-}
-
-// ComposeDomains are the domains x-moin.domains in the live deploy's
-// compose.yml sets for the main service, and its canonical one; none when
-// it sets none for it.
-func (a App) ComposeDomains() (domains []string, canonical string) {
-	var detected protocol.Detected
-	if a.LiveDetected == "" || json.Unmarshal([]byte(a.LiveDetected), &detected) != nil || detected.Config == nil {
-		return nil, ""
-	}
-	if len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0 {
-		return nil, ""
-	}
-	return detected.Domains, detected.Canonical
-}
-
-// MainDomains are the domains the main service answers on, and its
-// canonical one: the ones compose.yml sets, else the ones saved in moin.
-// Every view shows these.
-func (a App) MainDomains() (domains []string, canonical string) {
-	if domains, canonical := a.ComposeDomains(); len(domains) > 0 {
-		return domains, canonical
-	}
-	return a.DomainsOf("")
 }
 
 // Bucket is one of a workspace's S3-compatible buckets, where the backups

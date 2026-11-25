@@ -269,7 +269,7 @@ func appSectionValue(app model.App, id string) string {
 // appDomains are where the app answers: its domains, then its instant
 // address.
 func appDomains(app model.App) []string {
-	domains, _ := app.MainDomains()
+	domains, _ := app.DomainsOf("")
 	if app.InstantHost != "" {
 		domains = append(domains, app.InstantHost)
 	}

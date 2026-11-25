@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 80
-  health: /
-
 services:
   web:
     image: seafileltd/seafile-mc:${VERSION}
+    expose: ["80"]
     environment:
       SEAFILE_SERVER_HOSTNAME: ${APP_DOMAIN}
       SEAFILE_SERVER_PROTOCOL: https

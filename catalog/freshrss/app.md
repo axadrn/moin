@@ -7,7 +7,6 @@ source: github.com/FreshRSS/FreshRSS
 license: AGPL-3.0
 image: freshrss/freshrss
 database: sqlite
-port: 80
 logo: https://github.com/FreshRSS/FreshRSS/blob/HEAD/p/themes/icons/FreshRSS-logo.svg
 ---
 

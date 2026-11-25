@@ -157,8 +157,8 @@ Daemon
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then
-from x-moin.app in compose.yml, then from the name of the current directory.
-Flags may come before or after the arguments. Commands that remove or
+from the name of the current directory; deploy first takes the app that
+follows the GitHub repo of the directory. Flags may come before or after the arguments. Commands that remove or
 replace something ask first; --yes skips the question, and without a
 terminal they need it. Every command shows its usage with --help.
 

@@ -132,11 +132,10 @@ func (s *AppService) syncDomains(now time.Time) (map[uptimeKey]bool, bool) {
 	watch := map[uptimeKey]bool{}
 	for _, app := range apps {
 		live[app.ID] = true
-		health := s.healthPath(&app)
 		for _, domain := range s.uptimeDomains(&app) {
 			key := uptimeKey{app.ID, domain}
 			current[key] = true
-			watch[key] = !u.track(key, app, health)
+			watch[key] = !u.track(key, app)
 		}
 	}
 	var gone, reset []model.DomainUptime
@@ -169,7 +168,7 @@ func (s *AppService) syncDomains(now time.Time) (map[uptimeKey]bool, bool) {
 
 // track keeps a domain in memory with its app and where its visit goes,
 // and says whether the domain is paused.
-func (u *uptimeRunner) track(key uptimeKey, app model.App, health string) (paused bool) {
+func (u *uptimeRunner) track(key uptimeKey, app model.App) (paused bool) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	state := u.states[key]
@@ -178,7 +177,7 @@ func (u *uptimeRunner) track(key uptimeKey, app model.App, health string) (pause
 		u.states[key] = state
 	}
 	state.workspaceID, state.appName = app.WorkspaceID, app.Name
-	state.path = cmp.Or(state.stored.Path, health)
+	state.path = cmp.Or(state.stored.Path, defaultUptimePath)
 	return state.stored.Paused
 }
 
@@ -219,7 +218,7 @@ func (s *AppService) pruneUptime(now time.Time) {
 // canonical one, which only redirect to it. The other services' domains
 // follow, by service.
 func (s *AppService) uptimeDomains(app *model.App) []string {
-	domains, canonical := app.MainDomains()
+	domains, canonical := app.DomainsOf("")
 	if canonical != "" {
 		domains = []string{canonical}
 	}
@@ -230,11 +229,5 @@ func (s *AppService) uptimeDomains(app *model.App) []string {
 	return domains
 }
 
-// healthPath is where a visit goes unless a path is set: x-moin.health of
-// the live deploy, else /.
-func (s *AppService) healthPath(app *model.App) string {
-	if health := s.FileConfig(app).Health; uptimePath.MatchString(health) {
-		return health
-	}
-	return "/"
-}
+// defaultUptimePath is where a visit goes unless a path is set.
+const defaultUptimePath = "/"

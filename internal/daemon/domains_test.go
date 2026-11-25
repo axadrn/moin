@@ -7,21 +7,16 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestRouteServices: domains per service from the hub and from
-// the map form of x-moin, x-moin winning per service; the main service's
-// entry of the map is its domains; a domain on two services fails.
+// TestRouteServices: domains per service come from the hub; an entry for
+// the main service is not another service; a domain on two services fails.
 func TestRouteServices(t *testing.T) {
-	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Services: map[string][]string{"api": {"API.shop.example.net"}, "admin": {"admin.shop.example.net"}}}
-	detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"admin": {"desk.shop.example.net"}}}}, domains)
+	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Services: map[string][]string{"web": {"x.example.net"}, "api": {"API.shop.example.net"}, "admin": {}}}
+	detected, err := route("shop", protocol.Detected{Service: "web"}, domains)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(detected.Domains, []string{"shop.example.net"}) || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.example.net"}) || !slices.Equal(detected.ServiceDomains["admin"], []string{"desk.shop.example.net"}) {
+	if !slices.Equal(detected.Domains, []string{"shop.example.net"}) || len(detected.ServiceDomains) != 1 || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.example.net"}) {
 		t.Errorf("domains %v, services %v", detected.Domains, detected.ServiceDomains)
-	}
-	detected, err = route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{"web": {"x.example.com"}, "api": {"api.x.example.com"}}}}, nil)
-	if err != nil || !slices.Equal(detected.Domains, []string{"x.example.com"}) || len(detected.ServiceDomains) != 1 {
-		t.Errorf("map form with the main service: %v %v %v", detected.Domains, detected.ServiceDomains, err)
 	}
 	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"x.example.com"}, Services: map[string][]string{"api": {"x.example.com"}}}); err == nil {
 		t.Error("a domain on two services passed")
@@ -32,23 +27,18 @@ func TestRouteServices(t *testing.T) {
 	}
 }
 
-// TestRouteInstant: the hub's provider, x-moin picking another or
-// off, an unknown provider failing, and nothing without a public IPv4.
+// TestRouteInstant: the hub's provider names the instant address; off, an
+// unknown provider or no public IPv4 give none.
 func TestRouteInstant(t *testing.T) {
-	for _, test := range []struct {
-		provider, xops, ip, want string
-		fails                    bool
-	}{
-		{"sslip.io", "", "203.0.113.7", "shop.203-0-113-7.sslip.io", false},
-		{"sslip.io", "nip.io", "203.0.113.7", "shop.203-0-113-7.nip.io", false},
-		{"sslip.io", "off", "203.0.113.7", "", false},
-		{"", "traefik.me", "203.0.113.7", "", true},
-		{"sslip.io", "", "", "", false},
-		{"sslip.io", "", "2a01:4f8::1", "", false},
-		{"sslip.io", "example.com", "203.0.113.7", "", true},
+	for _, test := range []struct{ provider, ip, want string }{
+		{"sslip.io", "203.0.113.7", "shop.203-0-113-7.sslip.io"},
+		{"nip.io", "203.0.113.7", "shop.203-0-113-7.nip.io"},
+		{"off", "203.0.113.7", ""},
+		{"sslip.io", "", ""},
+		{"sslip.io", "2a01:4f8::1", ""},
 	} {
-		detected, err := route("shop", protocol.Detected{Service: "web", Config: &protocol.Config{Instant: test.xops}}, &protocol.Domains{Instant: test.provider, InstantIP: test.ip})
-		if (err != nil) != test.fails || detected.Instant != test.want {
+		detected, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Instant: test.provider, InstantIP: test.ip})
+		if err != nil || detected.Instant != test.want {
 			t.Errorf("%+v: instant %q, err %v", test, detected.Instant, err)
 		}
 	}
@@ -93,10 +83,7 @@ func TestDomainsByService(t *testing.T) {
 	if config["networks"].(map[string]any)["default"].(map[string]any)["name"] != "moin-shop_default" {
 		t.Errorf("networks: %v", config["networks"])
 	}
-	if port := servicePort("api", map[string]any{"expose": []any{"9000"}}, nil); port != 9000 {
+	if port := servicePort("", map[string]any{"expose": []any{"9000"}}); port != 9000 {
 		t.Errorf("service port from expose: %d", port)
-	}
-	if port := servicePort("api", map[string]any{}, &protocol.Config{Ports: map[string]int{"api": 7000}}); port != 7000 {
-		t.Errorf("service port from x-moin: %d", port)
 	}
 }

@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /api/health
-
 services:
   web:
     image: metabase/metabase:${VERSION}
+    expose: ["3000"]
     environment:
       MB_DB_TYPE: postgres
       MB_DB_HOST: db

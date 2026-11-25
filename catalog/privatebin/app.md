@@ -6,7 +6,6 @@ website: https://privatebin.info
 source: github.com/PrivateBin/PrivateBin
 license: Zlib
 image: privatebin/nginx-fpm-alpine
-port: 8080
 logo: https://raw.githubusercontent.com/PrivateBin/PrivateBin/master/img/icon.svg
 ---
 

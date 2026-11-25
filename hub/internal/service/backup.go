@@ -29,7 +29,6 @@ var (
 	ErrRestoreRunning  = errors.New("a restore of this app runs: wait until it is done")
 	ErrRestoreNotFound = errors.New("there is no such restore: it is older than a week, or of another app")
 	ErrNoCopy          = errors.New("there is no copy yet: the first one is taken within a minute of a deploy with a bucket")
-	ErrScheduleInFile  = errors.New("the backup schedule is set in compose.yml: change it there and deploy")
 	ErrBackupEvery     = errors.New("how often: every 15 minutes, hourly or daily")
 	ErrBackupKeep      = errors.New("keep: 1, 3, 7 or 30 days")
 )

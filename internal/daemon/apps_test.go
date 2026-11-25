@@ -103,47 +103,55 @@ func TestGenerateOrder(t *testing.T) {
 	}
 }
 
+// The main service comes from Docker's own fields: the only service, else
+// the only one moin builds, else web. Its port: ports, expose, env PORT,
+// the Dockerfile's EXPOSE, else 8080.
 func TestMainServiceAndPort(t *testing.T) {
-	services := map[string]any{
-		"web":   map[string]any{"build": map[string]any{}, "ports": []any{map[string]any{"target": float64(3000)}}},
-		"redis": map[string]any{"image": "redis"},
+	for _, test := range []struct {
+		services map[string]any
+		want     string
+	}{
+		{map[string]any{"app": map[string]any{"image": "x"}}, "app"},
+		{map[string]any{"app": map[string]any{"build": "."}, "redis": map[string]any{"image": "redis"}}, "app"},
+		{map[string]any{"web": map[string]any{"image": "x"}, "redis": map[string]any{"image": "redis"}}, "web"},
+		{map[string]any{"app": map[string]any{"image": "x"}, "redis": map[string]any{"image": "redis"}}, ""},
+		{map[string]any{"app": map[string]any{"build": "."}, "api": map[string]any{"build": "./api"}}, ""},
+	} {
+		if got := mainService(test.services); got != test.want {
+			t.Errorf("main service of %v = %q, want %q", test.services, got, test.want)
+		}
 	}
-	if got := mainService(services, nil); got != "web" {
-		t.Fatalf("main service = %q", got)
+	src := t.TempDir()
+	os.WriteFile(filepath.Join(src, "Dockerfile"), []byte("FROM scratch\nEXPOSE 4000\n"), 0o644)
+	for _, test := range []struct {
+		service map[string]any
+		want    int
+	}{
+		{map[string]any{"ports": []any{map[string]any{"target": float64(3000)}}, "expose": []any{"9000"}}, 3000},
+		{map[string]any{"expose": []any{"9000/tcp"}, "environment": map[string]any{"PORT": "5000"}}, 9000},
+		{map[string]any{"environment": map[string]any{"PORT": "5000"}}, 5000},
+		{map[string]any{}, 4000},
+	} {
+		if got := servicePort(src, test.service); got != test.want {
+			t.Errorf("port of %v = %d, want %d", test.service, got, test.want)
+		}
 	}
-	if got := mainService(services, &protocol.Config{Service: "redis"}); got != "redis" {
-		t.Fatalf("x-moin service = %q", got)
-	}
-	if got := mainService(services, &protocol.Config{Service: "nope"}); got != "" {
-		t.Fatalf("unknown x-moin service = %q", got)
-	}
-	if got := mainPort(t.TempDir(), services["web"], nil); got != 3000 {
-		t.Fatalf("port = %d", got)
-	}
-	if got := mainPort(t.TempDir(), services["web"], &protocol.Config{Port: 9000}); got != 9000 {
-		t.Fatalf("x-moin port = %d", got)
+	if got := servicePort("", map[string]any{}); got != 8080 {
+		t.Errorf("port without anything = %d, want 8080", got)
 	}
 }
 
-// x-moin is the block. A block of the old name is an error that says to
-// rename it, never quietly ignored, even next to x-moin.
-func TestConfigBlock(t *testing.T) {
-	block, key, err := configBlock(map[string]any{"x-moin": map[string]any{"app": "new"}})
-	if err != nil || key != "x-moin" || block.(map[string]any)["app"] != "new" {
-		t.Fatalf("x-moin: %v %q %v", block, key, err)
-	}
-	if block, _, err := configBlock(map[string]any{}); err != nil || block != nil {
-		t.Fatalf("no block: %v %v", block, err)
-	}
-	old := protocol.OldConfigKey
-	for _, config := range []map[string]any{
-		{old: map[string]any{"app": "old"}},
-		{old: map[string]any{"app": "old"}, "x-moin": map[string]any{"app": "new"}},
-	} {
-		_, key, err := configBlock(config)
-		if err == nil || key != old || err.Error() != "compose.yml has an "+old+" block: rename it to x-moin" {
-			t.Fatalf("old block: %q %v", key, err)
-		}
+// A compose file that still has the block moin read its settings from fails
+// the deploy before anything builds, with what to do.
+func TestOldBlockFailsTheDeploy(t *testing.T) {
+	src := t.TempDir()
+	os.WriteFile(filepath.Join(src, "compose.yml"), []byte("services:\n  web:\n    image: x\n"), 0o644)
+	fakeCommand(t, "docker", `echo '{"services":{"web":{"image":"x"}},"x-moin":{"domains":["blog.example.com"]}}'`+"\n")
+	a := &apps{dir: t.TempDir()}
+	_, _, err := a.resolve(context.Background(), "blog", src)
+	want := "x-moin is gone: compose.yml is plain Docker now, and moin keeps its settings. Remove the x-moin block. https://moin.run/docs/guides/compose"
+	if err == nil || err.Error() != want {
+		t.Fatalf("err = %v, want %q", err, want)
 	}
 }
 
@@ -262,7 +270,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080, Config: &protocol.Config{Canonical: "blog.example.com"}}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Protect: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com", Protect: "me:$2y$05$abc"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +296,8 @@ func TestRouterLabels(t *testing.T) {
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
 		t.Fatal("the main service is not on the proxy network")
 	}
-	if _, err := route("blog", protocol.Detected{Config: &protocol.Config{Protect: true}}, nil); err == nil {
-		t.Fatal("protect without password must fail")
+	if _, err := route("blog", protocol.Detected{}, &protocol.Domains{Domains: []string{"blog.example.com"}, Canonical: "www.blog.example.com"}); err == nil {
+		t.Fatal("a canonical domain that is not one of the domains must fail")
 	}
 	if _, err := route("blog", protocol.Detected{}, &protocol.Domains{Domains: []string{"not a domain"}}); err == nil {
 		t.Fatal("a bad domain must fail")
@@ -402,5 +410,21 @@ func TestPruneKeepsBuildsAndTheRestartsAfterThem(t *testing.T) {
 	}
 	if want := []int{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}; !slices.Equal(kept, want) {
 		t.Fatalf("kept %v, want %v", kept, want)
+	}
+}
+
+// start waits for Docker: --wait holds until a service with a healthcheck
+// is healthy, and one that is not fails the start.
+func TestStartWaitsForTheHealthcheck(t *testing.T) {
+	calls := filepath.Join(t.TempDir(), "calls")
+	fakeCommand(t, "docker", "echo \"$*\" >> "+calls+"\ncase \"$*\" in\n*\" up \"*) echo \"container blog-web-1 is unhealthy\" >&2; exit 1 ;;\nesac\n")
+	a := &apps{}
+	err := a.start(context.Background(), "blog", "compose.json", protocol.Detected{Service: "web"}, false, func(string, ...any) {})
+	if err == nil || !strings.HasPrefix(err.Error(), "start: ") {
+		t.Fatalf("err = %v, want the failed start", err)
+	}
+	body, _ := os.ReadFile(calls)
+	if !strings.Contains(string(body), " up -d --remove-orphans --wait --wait-timeout 120") {
+		t.Fatalf("calls = %s, want up with --wait", body)
 	}
 }

@@ -35,27 +35,24 @@ const (
 )
 
 var (
-	ErrAppName        = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
-	ErrDeployRunning  = errors.New("a deploy of this app is still running")
-	ErrNoRollback     = errors.New("there is no earlier successful deploy to roll back to")
-	ErrDeployGone     = errors.New("that deploy is no longer on the server")
-	ErrNoSource       = errors.New("no deploy has a source yet")
-	ErrNotLive        = errors.New("the app has no live deploy yet")
-	ErrRunning        = errors.New("the app is already running")
-	ErrImage          = errors.New("image must be a reference like ghcr.io/me/app:tag")
-	ErrDeployHook     = errors.New("deploy hook is invalid")
-	ErrRegistryHost   = errors.New("registry host must be a host name like ghcr.io")
-	ErrRegistryLogin  = errors.New("registry username and password are required")
-	ErrDomain         = errors.New("domains must be host names like my-app.example.com")
-	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
-	ErrInstantInFile  = errors.New("the instant address is set in compose.yml: change it there and deploy")
-	ErrProtectInFile  = errors.New("the password is required by compose.yml: change it there and deploy")
-	ErrComposeDomains = errors.New("the domains of this app come from x-moin.domains in compose.yml")
-	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")
-	ErrProtectUser    = errors.New("protection needs a username without spaces or colons")
-	ErrEnvKey         = errors.New("env keys are letters, digits and underscores and do not start with a digit")
-	ErrEnvValue       = errors.New("env values are at most 32 KB")
-	ErrEnvLimit       = errors.New("an app has at most 200 env vars")
+	ErrAppName       = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
+	ErrDeployRunning = errors.New("a deploy of this app is still running")
+	ErrNoRollback    = errors.New("there is no earlier successful deploy to roll back to")
+	ErrDeployGone    = errors.New("that deploy is no longer on the server")
+	ErrNoSource      = errors.New("no deploy has a source yet")
+	ErrNotLive       = errors.New("the app has no live deploy yet")
+	ErrRunning       = errors.New("the app is already running")
+	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
+	ErrDeployHook    = errors.New("deploy hook is invalid")
+	ErrRegistryHost  = errors.New("registry host must be a host name like ghcr.io")
+	ErrRegistryLogin = errors.New("registry username and password are required")
+	ErrDomain        = errors.New("domains must be host names like my-app.example.com")
+	ErrCanonical     = errors.New("the canonical domain must be one of the domains")
+	ErrProtect       = errors.New("protection needs a password of 8 to 72 characters")
+	ErrProtectUser   = errors.New("protection needs a username without spaces or colons")
+	ErrEnvKey        = errors.New("env keys are letters, digits and underscores and do not start with a digit")
+	ErrEnvValue      = errors.New("env values are at most 32 KB")
+	ErrEnvLimit      = errors.New("an app has at most 200 env vars")
 )
 
 const deployHookMarker = "dph_"
@@ -595,10 +592,6 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 	if err != nil {
 		return false, err
 	}
-	// x-moin wins, so a change here would never reach the app.
-	if fromCompose, _ := app.ComposeDomains(); len(fromCompose) > 0 {
-		return false, ErrComposeDomains
-	}
 	clean, err := cleanDomains(domains)
 	if err != nil {
 		return false, err
@@ -629,9 +622,6 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err
-	}
-	if password == "" && s.FileConfig(app).Protect {
-		return false, ErrProtectInFile
 	}
 	protect := ""
 	if password != "" {
@@ -701,9 +691,6 @@ type DomainCheck struct {
 	Points bool
 	// Checked says the domain was looked up, so Found and Points hold.
 	Checked bool
-	// FromCompose says x-moin.domains in compose.yml sets the domain, so
-	// it changes there, not in moin.
-	FromCompose bool
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
 	Service string
@@ -722,37 +709,10 @@ func (s *AppService) liveDetected(app *model.App) *protocol.Detected {
 	return Detected(*deploy)
 }
 
-// FileConfig is the x-moin block of the live deploy, empty when there is
-// none. A setting in it is locked in moin: the file decides.
-func (s *AppService) FileConfig(app *model.App) protocol.Config {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil {
-		return protocol.Config{}
-	}
-	return *detected.Config
-}
-
-// composeServiceDomains are the domains x-moin.domains sets for the other
-// services in the live deploy, by service.
-func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil {
-		return nil
-	}
-	set := map[string][]string{}
-	for service, domains := range detected.Config.ServiceDomains {
-		if service != detected.Service && len(domains) > 0 {
-			set[service] = domains
-		}
-	}
-	return set
-}
-
 // otherServiceDomains are the domains of the app's other services, by
-// service: compose.yml's where it sets them, else moin's.
+// service.
 func (s *AppService) otherServiceDomains(app *model.App) map[string][]string {
 	services := app.ServiceDomains()
-	maps.Copy(services, s.composeServiceDomains(app))
 	delete(services, s.mainService(app))
 	return services
 }
@@ -865,17 +825,15 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 		return domain
 	}
 	checks := []DomainCheck{}
-	domains, canonical := app.MainDomains()
-	fromCompose, _ := app.ComposeDomains()
+	domains, canonical := app.DomainsOf("")
 	for _, domain := range domains {
-		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
+		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical}))
 	}
 	// Then the domains of the other services, by service.
 	services := s.otherServiceDomains(app)
-	fromComposeServices := s.composeServiceDomains(app)
 	for _, service := range slices.Sorted(maps.Keys(services)) {
 		for _, domain := range services[service] {
-			checks = append(checks, check(DomainCheck{Domain: domain, Service: service, FromCompose: len(fromComposeServices[service]) > 0}))
+			checks = append(checks, check(DomainCheck{Domain: domain, Service: service}))
 		}
 	}
 	return checks, nil
@@ -1154,16 +1112,12 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 		if err == nil {
 			app, err := s.apps.ByID(deploy.AppID)
 			if err == nil {
-				// The instant address the release serves, which x-moin may
-				// have changed or turned off.
+				// The instant address the release serves.
 				if app.InstantHost != done.Detected.Instant {
 					_ = s.apps.SetInstantHost(app.ID, done.Detected.Instant)
 				}
 				if len(done.Detected.Domains) > 0 {
 					s.syncTunnelOf(app)
-				}
-				if done.Detected.Config != nil && done.Detected.Config.Backups != nil {
-					s.applyScheduleInFile(app, *done.Detected.Config.Backups)
 				}
 				s.forgetGoneDatabases(app)
 			}

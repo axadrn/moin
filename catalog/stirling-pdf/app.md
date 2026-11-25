@@ -6,7 +6,6 @@ website: "https://www.stirlingpdf.com"
 source: github.com/Stirling-Tools/Stirling-PDF
 license: MIT
 image: stirlingtools/stirling-pdf
-port: 8080
 logo: https://github.com/Stirling-Tools/Stirling-PDF/blob/HEAD/frontend/src-tauri/icons/Square142x142Logo.png
 ---
 

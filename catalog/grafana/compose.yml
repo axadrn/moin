@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /api/health
-
 services:
   web:
     image: grafana/grafana:${VERSION}
+    expose: ["3000"]
     user: "0"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${ADMIN_PASSWORD}

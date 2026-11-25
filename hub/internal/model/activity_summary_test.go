@@ -92,7 +92,7 @@ var summaryCases = []struct{ action, target, metadata, want string }{
 	{"uptime.resumed", "blog", `{"domain":"blog.example.com"}`,
 		"resumed uptime of blog.example.com of blog"},
 	{"uptime.path_set", "blog", `{"domain":"blog.example.com","path":""}`,
-		"set the uptime path of blog.example.com of blog back to the health path or /"},
+		"set the uptime path of blog.example.com of blog back to /"},
 	{"uptime.path_set", "blog", `{"domain":"blog.example.com","path":"/health"}`,
 		"set the uptime path of blog.example.com of blog to /health"},
 	{"backup.taken", "blog", `{}`,

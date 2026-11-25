@@ -7,7 +7,6 @@ source: github.com/go-vikunja/vikunja
 license: AGPL-3.0
 image: vikunja/vikunja
 database: sqlite
-port: 3456
 logo: https://github.com/go-vikunja/vikunja/blob/HEAD/frontend/originalMedia/images/logo.svg
 ---
 

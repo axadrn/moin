@@ -1,10 +1,6 @@
-x-moin:
-  service: web
-  port: 11434
-  health: /
-
 services:
   web:
     image: ollama/ollama:${VERSION}
+    expose: ["11434"]
     volumes:
       - ./data:/root/.ollama

@@ -505,8 +505,6 @@ func (m model) domainsTab(u ui, w, h int, a client.App) string {
 		switch {
 		case !d.Points && d.Advice != "":
 			note = d.Advice
-		case d.FromCompose:
-			note = "from compose.yml"
 		case d.Canonical:
 			note = "canonical, the others redirect here"
 		}

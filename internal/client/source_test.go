@@ -8,24 +8,6 @@ import (
 	"testing"
 )
 
-func TestReadLocalConfig(t *testing.T) {
-	dir := t.TempDir()
-	compose := "services:\n  web:\n    build: .\n\nx-moin:\n  app: blog # the name\n  server: \"web-1\"\n  domains: [blog.example.com]\n\nvolumes:\n  app: {}\n"
-	os.WriteFile(filepath.Join(dir, "compose.yml"), []byte(compose), 0o644)
-	config := ReadLocalConfig(dir)
-	if config.App != "blog" || config.Server != "web-1" {
-		t.Fatalf("config = %+v", config)
-	}
-	// The block of the old name counts for nothing: the daemon refuses it.
-	os.WriteFile(filepath.Join(dir, "compose.yml"), []byte("x-ops:\n  app: old\n"), 0o644)
-	if got := ReadLocalConfig(dir); got.App != "" {
-		t.Fatalf("x-ops read: %+v", got)
-	}
-	if got := ReadLocalConfig(t.TempDir()); got != (LocalConfig{}) {
-		t.Fatalf("no compose.yml: %+v", got)
-	}
-}
-
 // pushedRepo is a repo with one commit, origin on GitHub, and that commit
 // on origin's main as git push leaves it.
 func pushedRepo(t *testing.T) string {
@@ -70,8 +52,14 @@ func TestPushedCommit(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "top folder") {
 		t.Errorf("a subfolder: %v", err)
 	}
+	if repo := OriginRepo(dir); repo != "me/shop" {
+		t.Errorf("origin repo = %q", repo)
+	}
 	git(dir, "remote", "set-url", "origin", "https://gitlab.com/me/shop.git")
 	fails("push this folder to a GitHub repo")
+	if repo := OriginRepo(dir); repo != "" {
+		t.Errorf("origin repo of GitLab = %q", repo)
+	}
 	if _, _, err := PushedCommit(t.TempDir()); err == nil || !strings.Contains(err.Error(), "push this folder to a GitHub repo") {
 		t.Errorf("no repo: %v", err)
 	}

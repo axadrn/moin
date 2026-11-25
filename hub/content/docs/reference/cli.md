@@ -117,7 +117,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin uptime [app]` | uptime of every domain that serves something over 24 hours, 7 and 30 days, the last visit and the last outages |
-| `moin uptime path <domain> <path\|default>` | the path uptime visits on a domain; `default` is the health path or `/` |
+| `moin uptime path <domain> <path\|default>` | the path uptime visits on a domain; `default` is `/` |
 | `moin uptime pause <domain>` · `moin uptime resume <domain>` | pauses uptime of a domain; visits it every minute again |
 | `moin metrics [app\|server] [--range 1h\|24h\|7d\|30d]` | CPU, memory and network of an app now, a sparkline of the range and the deploys that went live; a name that is no app is a server. Default `1h` |
 | `moin metrics --server <server>` | CPU, memory, disk, network and load of a server, and its apps by memory |
@@ -172,7 +172,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin backups [app]` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to |
-| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d` | sets how often the app is copied and how long each copy stays; one of them or both. Locked when `x-moin.backups` sets them ([Who decides](/docs/guides/config#who-decides)) |
+| `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d` | sets how often the app is copied and how long each copy stays; one of them or both |
 | `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. A time takes the newest copy at or before it. Keeps the database before, so it can be undone as long as the copies are kept, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
 | `moin backup download [app] [--db <path>] [--to <moment>] [--link]` | saves a copy of a database in the current folder, straight from your bucket: the newest, or the one `--to` names; `--link` prints its 15 minute link instead |
 
@@ -209,7 +209,7 @@ These run on a server, as root.
 
 ## How commands find the app
 
-A command that works on an app takes it as an argument or as `--app`, then from `x-moin.app` in `compose.yml`, then from the name of the directory.
+A command that works on an app takes it as an argument or as `--app`, then from the name of the directory. `moin deploy` first takes the app that follows the directory's GitHub repo.
 
 Flags may come before or after the arguments: `moin rollback v3 --app my-app` is `moin rollback --app my-app v3`. Every command has one name, the one on this page.
 

@@ -7,7 +7,6 @@ source: github.com/navidrome/navidrome
 license: GPL-3.0
 image: deluan/navidrome
 database: sqlite
-port: 4533
 logo: https://github.com/navidrome/navidrome/blob/HEAD/resources/logo-192x192.png
 ---
 

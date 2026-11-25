@@ -24,8 +24,9 @@ func TestEntries(t *testing.T) {
 		t.Fatalf("%d entries", len(entries))
 	}
 	for _, entry := range entries {
-		if !strings.Contains(string(entry.Compose), "x-moin:") {
-			t.Errorf("%s: compose.yml has no x-moin block", entry.Slug)
+		// compose.yml is plain Docker: the port of web comes from it.
+		if strings.HasPrefix(string(entry.Compose), "x-") || strings.Contains(string(entry.Compose), "\nx-") || !strings.Contains(string(entry.Compose), "\n    expose: [") {
+			t.Errorf("%s: compose.yml needs expose on web and no x- block", entry.Slug)
 		}
 		// pgvector/pgvector is Postgres with vectors; the daemon backs it up
 		// like postgres.
@@ -47,9 +48,8 @@ func TestEntries(t *testing.T) {
 
 func TestLoadRefusesBadEntries(t *testing.T) {
 	for name, files := range map[string]map[string]string{
-		"no version":   {"app.md": "---\nname: A\npitch: p\ncategory: Analytics\nwebsite: https://a.example\nimage: a/b\nport: 80\n---\nx", "compose.yml": "services:\n  web:\n    image: a/b:1.0.0\n"},
-		"bad category": {"app.md": "---\nname: A\npitch: p\ncategory: Games\nwebsite: https://a.example\nimage: a/b\nport: 80\n---\nx", "compose.yml": "services:\n  web:\n    image: a/b:${VERSION}\n"},
-		"no port":      {"app.md": "---\nname: A\npitch: p\ncategory: Analytics\nwebsite: https://a.example\nimage: a/b\n---\nx", "compose.yml": "services:\n  web:\n    image: a/b:${VERSION}\n"},
+		"no version":   {"app.md": "---\nname: A\npitch: p\ncategory: Analytics\nwebsite: https://a.example\nimage: a/b\n---\nx", "compose.yml": "services:\n  web:\n    image: a/b:1.0.0\n"},
+		"bad category": {"app.md": "---\nname: A\npitch: p\ncategory: Games\nwebsite: https://a.example\nimage: a/b\n---\nx", "compose.yml": "services:\n  web:\n    image: a/b:${VERSION}\n"},
 	} {
 		dir := t.TempDir()
 		entry := filepath.Join(dir, "catalog", "a")

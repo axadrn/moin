@@ -50,8 +50,7 @@ type DeployStart struct {
 }
 
 // Domains is how visitors reach the main service, as set in web, CLI, TUI
-// or MCP. The x-moin block of compose.yml wins for every field it sets.
-// Protect is an htpasswd line ("user:bcrypt hash") when password protection
+// or MCP: the only place they are set. Protect is an htpasswd line ("user:bcrypt hash") when password protection
 // is on. DeployStart carries it under the JSON key routing, which daemons of
 // protocol version 1 read.
 type Domains struct {

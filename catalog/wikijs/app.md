@@ -7,7 +7,6 @@ source: github.com/requarks/wiki
 license: AGPL-3.0
 image: ghcr.io/requarks/wiki
 database: postgres
-port: 3000
 logo: https://github.com/requarks/wiki/blob/HEAD/frontend/public/_assets/logo-wikijs.svg
 ---
 

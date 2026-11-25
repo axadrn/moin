@@ -7,7 +7,6 @@ source: github.com/go-gitea/gitea
 license: MIT
 image: gitea/gitea
 database: sqlite
-port: 3000
 logo: https://github.com/go-gitea/gitea/blob/HEAD/assets/logo.svg
 ---
 

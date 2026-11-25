@@ -7,7 +7,6 @@ source: github.com/metabase/metabase
 license: AGPL-3.0
 image: metabase/metabase
 database: postgres
-port: 3000
 versions: "^v0\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
 logo: https://simpleicons.org (CC0)
 ---

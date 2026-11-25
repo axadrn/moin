@@ -639,9 +639,9 @@ func TestBeforeLabelByID(t *testing.T) {
 	}
 }
 
-// A schedule in compose.yml is saved at the deploy and locks the schedule
-// in moin. A database found later reaches the live deploy.
-func TestScheduleInFileAndDatabaseFoundLater(t *testing.T) {
+// The schedule changes in moin after a deploy. A database found later
+// reaches the live deploy.
+func TestScheduleChangesAfterADeployAndDatabaseFoundLater(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
@@ -650,18 +650,12 @@ func TestScheduleInFileAndDatabaseFoundLater(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Config: &protocol.Config{Backups: &protocol.ConfigBackups{Every: "1d", Keep: "30d"}}}
+	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
 
-	app, err := apps.apps.ByIDOrNameForWorkspace("blog", owner.WorkspaceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if app.BackupEvery != 24*60 || app.BackupKeep != 30 {
-		t.Fatalf("the schedule in the file: every %d keep %d", app.BackupEvery, app.BackupKeep)
-	}
-	if _, err := apps.SetBackupSchedule(owner, "blog", protocol.Schedule{Every: 60, Keep: 7}); !errors.Is(err, ErrScheduleInFile) {
-		t.Fatalf("changed a schedule the file sets: %v", err)
+	app, err := apps.SetBackupSchedule(owner, "blog", protocol.Schedule{Every: 24 * 60, Keep: 30})
+	if err != nil || app.BackupEvery != 24*60 || app.BackupKeep != 30 {
+		t.Fatalf("the schedule after a deploy: %+v, %v", app, err)
 	}
 
 	detected.Databases = []protocol.Database{{Path: "/data/app.db", HostPath: "/x/app.db"}}
@@ -714,9 +708,8 @@ func TestGoneDatabaseIsForgotten(t *testing.T) {
 	}
 }
 
-// A setting in compose.yml is locked: the instant address, and the
-// password compose.yml requires. A new password is still fine.
-func TestFileLocksInstantAndPassword(t *testing.T) {
+// The instant address and the password change in moin after a deploy.
+func TestInstantAndPasswordChangeAfterADeploy(t *testing.T) {
 	apps, servers, server, _ := newAppService(t)
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
@@ -728,22 +721,16 @@ func TestFileLocksInstantAndPassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Config: &protocol.Config{Protect: true, Instant: "nip.io"}}
+	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Protected: true}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
-	if _, err := apps.SetInstant(owner, "blog", "off", nil); !errors.Is(err, ErrInstantInFile) {
+	if _, err := apps.SetInstant(owner, "blog", "nip.io", nil); err != nil {
 		t.Fatalf("instant: %v", err)
-	}
-	if _, err := apps.SetInstant(owner, "blog", "sslip.io", nil); !errors.Is(err, ErrInstantInFile) {
-		t.Fatalf("instant, the provider moin has stored: %v", err)
 	}
 	instant, err := apps.Instant(owner.WorkspaceID, "blog")
 	if err != nil || instant.Provider != "nip.io" {
 		t.Fatalf("the provider shown: %q, %v", instant.Provider, err)
 	}
-	if _, err := apps.SetProtection(owner, "blog", "", ""); !errors.Is(err, ErrProtectInFile) {
+	if _, err := apps.SetProtection(owner, "blog", "", ""); err != nil {
 		t.Fatalf("remove the password: %v", err)
-	}
-	if _, err := apps.SetProtection(owner, "blog", "moin", "another-long-password"); err != nil {
-		t.Fatalf("a new password: %v", err)
 	}
 }

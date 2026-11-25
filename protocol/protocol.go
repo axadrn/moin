@@ -14,16 +14,21 @@ import (
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
 // which was called the agent before (legacy.go); version 4 the command the
 // daemon masks for the activity (ExecDone.Command); version 5 secrets that
-// live only on the server (secrets.go).
-const Version = 5
+// live only on the server (secrets.go); version 6 compose.yml as plain
+// Docker, with every setting from the hub.
+const Version = 6
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
-// sending it. Since version 5 deploys, backups and the server config take
-// their secrets from the server: an older daemon would run them without.
+// sending it. Since version 5 backups and the server config take their
+// secrets from the server: an older daemon would run them without. Since
+// version 6 a deploy takes its domains only from the hub: an older daemon
+// would still let compose.yml change them.
 func Needs(messageType MessageType) int {
 	switch messageType {
-	case TypeDeployStart, TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
+	case TypeDeployStart:
+		return 6
+	case TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
 		return 5
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2

@@ -156,33 +156,7 @@ API: PUT /api/v1/apps/{app}/domains with "service": "api"
 MCP: set_domains with service
 ```
 
-Each service gets its own port: `x-moin.ports`, else its `ports` or `expose`, then 8080. A domain reaches one service only.
-
-## In the repo
-
-Domains can live next to your code, in `compose.yml`:
-
-```yaml
-x-moin:
-  domains: [<domain>, www.<domain>]
-  canonical: <domain>
-  protect: true   # the password itself is set in moin, never in the repo
-  instant: nip.io # or sslip.io, off
-```
-
-For several services, `domains` takes a map and `ports` their ports:
-
-```yaml
-x-moin:
-  service: web
-  domains:
-    web: [<domain>]
-    api: [api.<domain>]
-  ports:
-    api: 5678
-```
-
-Once a deploy with `x-moin.domains` is live, those domains show **from compose.yml** and change only in the file. Trying it in moin says so (API code `domains_from_compose`). [Who decides](/docs/guides/config#who-decides).
+Each service gets its own port: its `ports` or `expose` in [compose.yml](/docs/guides/compose), else its env `PORT`, then 8080. A domain reaches one service only.
 
 ## Good to know
 
