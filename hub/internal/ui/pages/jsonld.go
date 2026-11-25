@@ -5,6 +5,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
@@ -37,6 +38,21 @@ func homeJSONLD(appURL string) string {
 			"logo":     appURL + components.AssetURL("/assets/img/logo.svg"),
 			"email":    brand.SupportEmail,
 		},
+	})
+}
+
+// blogJSONLD says what a post is, who wrote it and when.
+func blogJSONLD(post service.BlogPost, appURL string) string {
+	return jsonLD(map[string]any{
+		"@context":         "https://schema.org",
+		"@type":            "BlogPosting",
+		"headline":         post.Title,
+		"description":      post.Description,
+		"datePublished":    post.Date.Format("2006-01-02"),
+		"url":              appURL + "/blog/" + post.Slug,
+		"mainEntityOfPage": appURL + "/blog/" + post.Slug,
+		"author":           map[string]any{"@type": "Person", "name": "Axel Adrian", "url": "https://x.com/axadrn"},
+		"publisher":        map[string]any{"@type": "Organization", "name": brand.Name, "url": appURL},
 	})
 }
 

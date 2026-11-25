@@ -46,6 +46,9 @@ func NewSEOHandler(
 		competitors = compare.Competitors
 		sitemap.AddCompare(compare.Slugs())
 	}
+	if posts, err := service.BlogPosts(files); err == nil {
+		sitemap.AddBlog(posts)
+	}
 	if releases, err := service.ChangelogReleases(files); err == nil && len(releases) > 0 {
 		sitemap.AddChangelog(releases[0].Date)
 	}
@@ -89,6 +92,12 @@ func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
 			description = "Product documentation"
 		}
 		_, _ = fmt.Fprintf(w, "- [%s](%s%s): %s\n", page.Title, h.baseURL, path, description)
+	}
+	if posts, err := service.BlogPosts(h.files); err == nil && len(posts) > 0 {
+		_, _ = fmt.Fprint(w, "\n## Blog\n\n")
+		for _, post := range posts {
+			_, _ = fmt.Fprintf(w, "- [%s](%s/blog/%s): %s\n", post.Title, h.baseURL, post.Slug, post.Description)
+		}
 	}
 	if len(h.catalog) > 0 {
 		_, _ = fmt.Fprint(w, "\n## Catalog\n\n")
