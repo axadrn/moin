@@ -232,6 +232,17 @@ func (e Entry) LoginSecrets() []string {
 	return names
 }
 
+// Similar are up to n other apps of e's category, in the order of entries.
+func Similar(entries []Entry, e Entry, n int) []Entry {
+	var similar []Entry
+	for _, other := range entries {
+		if other.Category == e.Category && other.Slug != e.Slug && len(similar) < n {
+			similar = append(similar, other)
+		}
+	}
+	return similar
+}
+
 // Secrets lists the ${NAME}s compose uses, except VERSION and those with a
 // default, sorted: moin generates a value for each on install.
 func Secrets(compose []byte) []string {
