@@ -31,11 +31,11 @@ API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-Deploy every push is on by default on the web and in the CLI. The API and MCP turn it on with `auto_deploy: true`. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy. Or run [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) in the pushed repo: it links the app and deploys, without deploys on push.
+Deploy every push is on by default, on every surface. The API and MCP turn it off with `auto_deploy: false`. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy. Or run [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) in the pushed repo: it links the app and deploys, without deploys on push.
 
 An app deploys from one place at a time: [GitHub or CI](/docs/guides/deploy#deploy-from). Deploy every push turns the deploy hook off, so moin asks first. `--yes` skips it.
 
-On the web, an app with a deploy hook links without deploy on push. In the CLI add `--auto=false`, in the API and MCP leave `auto_deploy` out. Then CI keeps deploying, and each image deploy takes `compose.yml` from the repo: [Build in CI](/docs/guides/ci).
+An app with a deploy hook links without deploy on push on the web, and in the API and MCP when `auto_deploy` is left out. The CLI asks first, or add `--auto=false`. Then CI keeps deploying, and each image deploy takes `compose.yml` from the repo: [Build in CI](/docs/guides/ci).
 
 ## Deploy from GitHub
 

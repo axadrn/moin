@@ -194,13 +194,14 @@ This is the firewall on the server. Your provider may have a cloud firewall in f
 
 ```surfaces
 Web: **Servers**, **Security** on the server
+CLI: moin servers secure web-1
 CLI: moin servers
 TUI: on the server, **Access**
 API: GET /api/v1/servers
 MCP: list_servers
 ```
 
-The CLI shows it in the ACCESS column. `moin servers secure web-1` prints it line by line too, but it needs the servers right: it applies the settings again. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
+The CLI shows it in the ACCESS column, and `servers secure` without flags line by line. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
 
 ## Where your secrets live
 

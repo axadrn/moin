@@ -59,7 +59,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its daemon there |
 | `moin servers update [name]` | updates the daemon to the hub's version now; without a name, every online server whose daemon differs. See [Daemon updates](#daemon-updates) |
 | `moin servers auto-update [on\|off]` | shows or sets whether daemons update by themselves; on by default |
-| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached; prints what is on it, line by line. See [Security](/docs/guides/security) |
+| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached: without flags it only shows what is on it, line by line; with flags it sets it, then prints it. See [Security](/docs/guides/security) |
 | `moin servers rules <name>` | the server's own rules for moin, from `/etc/moin/rules` on it ([Rules](/docs/guides/security#rules)) |
 | `moin integrations` | whether Cloudflare is connected and which servers keep a Tailscale key, never the keys |
 | `moin integrations cloudflare` · `moin integrations tailscale [--server <server>]` | stores the Cloudflare API token in the hub, or hands a server the Tailscale auth key, which only it keeps; replaces it; the key comes on stdin. `--server` is needed with more than one server |

@@ -15,6 +15,7 @@ The CLI, the terminal UI and your own scripts use this API. Its OpenAPI 3.1 docu
 | Rights | each endpoint needs its [right](/docs/reference/rights), or all of several: read, deploy, env, delete or servers. Without it: `403` `missing_right` with the `right`. **no token** endpoints answer a signed-in browser only, or nobody signed in for the steps of signing in |
 | Session | people sign in in the browser with GitHub or a passkey and get a session cookie, never a bearer token; `GET /api/v1/csrf` gives the CSRF token a session sends with every change; the `Moin-Workspace` header names the workspace |
 | Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback`. A secret goes straight to a server: `409` `server_offline` when it is offline, `409` `secret_missing` when a server lacks a key a request needs |
+| Plan | on the hosted hub, after the trial a change answers `402` `trial_ended`: the workspace is read-only until it subscribes; reads, stop and start still work. Adding a server without a plan answers `402` `subscription_required` |
 | Confirm | what is big and cannot be undone takes the name, typed out, as `?confirm=`: removing a server, an app or a bucket, deleting a workspace. Without it or with another name: `422` `confirm_mismatch` |
 | Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place. The stream of a connection or CI token ends when its access token does, within the hour, with the event `reconnect`: open it again with a fresh token, so new rights and a removal count |
 | Limits | a connection or CI token sends at most 121 requests a minute, to the API and to MCP together. One more answers `429` `rate_limited` with `Retry-After`, the seconds to wait: "Too many requests: 121 a minute per connection or CI token. Try again in 20 seconds." A stream counts once, when it opens. It protects the hub, it is no plan limit; the browser is not counted |
@@ -133,7 +134,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `PUT` · `DELETE /api/v1/registries/{host}` | hands a server a login for a host like `ghcr.io`, `{"username", "password", "server"}`; the server keeps it, the hub only the host and username. `server` may be left out with one server. Removes it, also from the servers |
 | `GET /api/v1/github` · `GET /api/v1/github/repos` | GitHub installations with their `settings_url` and the install link; the repos moin may read |
 | `GET /api/v1/github/repos/{owner}/{repo}/branches` | the branches of a repo, the default first |
-| `PUT` · `DELETE /api/v1/apps/{app}/repo` | links a GitHub repo and branch; `auto_deploy` turns the deploy hook off; unlinks it |
+| `PUT` · `DELETE /api/v1/apps/{app}/repo` | links a GitHub repo and branch, with deploy on push unless `auto_deploy: false` or the app has a deploy hook; `auto_deploy: true` turns the hook off; unlinks it |
 
 ## Catalog
 

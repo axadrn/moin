@@ -93,6 +93,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | Backups | `enter` | goes back to the picked moment once you typed the app's name; **Before the restore at …** undoes a restore |
 | Backups | `t` | goes back to a time you type, in UTC, like `14:01`, then the app's name: the newest copy at or before it |
 | Backups | `c` | downloads the newest copy: it opens the 15 minute link to your bucket in the browser |
+| Backups | `w` | opens the picked database's page in the web, where how often and how long are set; the tab shows them with the last copy and the daily check |
 | Env | `a` · `enter` | sets `KEY=value`; sets the picked one again. Values are write-only: the tab shows names and when they changed |
 | Env | `x` | removes the picked one, after `y` |
 | Env | `E` | opens an empty `.env` in `$EDITOR` that replaces all env vars, and asks before it saves which names it adds, replaces and removes |
