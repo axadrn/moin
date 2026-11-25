@@ -23,7 +23,7 @@ services:
 - **`services`**: what runs. One of them gets the traffic: the only service, else the only one moin builds, else the one named `web`. None of these? The deploy stops and says so. Name that service `web`.
 - **`build` or `image`**: what moin builds on the server, or pulls.
 - **`ports` or `expose`**: the port a service listens on. Without them: its env `PORT`, then `EXPOSE` in the `Dockerfile`, then 8080.
-- **`healthcheck`**: when the service is ready. The deploy waits until Docker says it is healthy. A service without one counts once it runs 10 seconds without a restart.
+- **`healthcheck`**: when the service is ready. The deploy waits until Docker says it is healthy. The main service must also run 10 seconds without a restart, with or without one.
 - **`volumes`**: where the data is. moin keeps it outside each release, and [backs up](/docs/guides/backups) the databases it finds there.
 - **`${NAME}`**: an [env var](/docs/guides/env) from moin.
 

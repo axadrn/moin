@@ -260,7 +260,7 @@ You type the app's name to confirm, and the hub checks it. A script passes it as
 
 ## Good to know
 
-- Commands on an app take its name as the last word. Without it, moin uses the folder's name. `moin deploy` first takes the app that follows the folder's GitHub repo.
+- Commands on an app take its name as the last word. Without it, moin takes the app that follows the folder's GitHub repo, else the folder's name. Two apps follow it? Name one.
 - moin never stores your code. Your server downloads it from GitHub.
 - Your data survives every deploy: [how](/docs/concepts/how-moin-works#your-data-survives-every-deploy).
 - A deploy refuses settings that reach beyond the app, like `privileged: true` or a mount of `/var/run/docker.sock`. A normal app needs none of them. [Containers that reach into the server](/docs/guides/security#containers-that-reach-into-the-server)

@@ -646,6 +646,18 @@ func TestDeployTakesTheAppThatFollowsTheRepo(t *testing.T) {
 	if code != 0 || !api.seen(`POST /api/v1/apps/blog/deploys {"ref":"`+commit+`"}`) {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
+	// Every command finds it the same way.
+	api.answers["GET /api/v1/apps/blog/logs?tail=100"] = `{"lines":[]}`
+	runCLI(t, api, "logs")
+	if !api.seen("GET /api/v1/apps/blog/logs") {
+		t.Errorf("logs: requests %v", api.requests)
+	}
+	// Two apps that follow the repo: no command guesses.
+	api.answers["GET /api/v1/apps"] = `{"items":[{"name":"blog","repo":"me/shop"},{"name":"blog-staging","repo":"me/shop"}]}`
+	code, _, stderr = runCLI(t, api, "deploy", "--detach")
+	if code == 0 || !strings.Contains(stderr, "name one with --app") {
+		t.Errorf("two apps: code %d, stderr %q", code, stderr)
+	}
 }
 
 // TestInstantPassword: moin shows the password of the instant address

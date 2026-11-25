@@ -31,7 +31,7 @@ import (
 const (
 	maxSourceSize = 200 << 20
 	// waitTimeout is how long compose waits for the services to run and be
-	// healthy: a JVM app such as Metabase takes a minute or more on its
+	// healthy: a JVM app with a healthcheck takes a minute or more on its
 	// first start.
 	waitTimeout = 120 * time.Second
 )

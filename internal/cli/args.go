@@ -102,7 +102,8 @@ func (f *flagSet) confirmed() string {
 }
 
 // app picks the app the command works on: --app, then the argument, then
-// the directory name. A not found error names it and where it came from.
+// the app that follows the GitHub repo of this folder, then the folder's
+// name. A not found error names it and where it came from.
 func (f *flagSet) app(argument string) (string, error) {
 	flagValue := ""
 	if f.appFlag != nil {
@@ -118,6 +119,13 @@ func (f *flagSet) app(argument string) (string, error) {
 	name, source := client.PickApp(flagValue, ".")
 	if flagValue == "" {
 		from = source
+		followed, repo, err := repoApp()
+		if err != nil {
+			return "", err
+		}
+		if followed != "" {
+			name, from = followed, "the app that follows "+repo
+		}
 	}
 	if name == "" {
 		return "", errors.New("cannot tell the app: pass it with --app")

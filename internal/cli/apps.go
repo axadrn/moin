@@ -300,12 +300,6 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
-	if picked.from == client.FromDirectory {
-		name, err = repoApp(ctx, api, name)
-		if err != nil {
-			return err
-		}
-	}
 	if *ref != "" && !protocol.ValidRefName(*ref) {
 		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
@@ -343,16 +337,23 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 }
 
-// repoApp is the app moin deploy deploys when no app is named: the one app
-// that follows the GitHub repo of this folder, else the folder's name.
-func repoApp(ctx context.Context, api *client.Client, folderName string) (string, error) {
-	repo := client.OriginRepo(".")
+// repoApp is the app that follows the GitHub repo of this folder, with
+// the repo: "" when the folder has no GitHub repo or no app follows it. Two
+// apps that follow it are an error, so no command guesses.
+func repoApp() (name, repo string, err error) {
+	repo = client.OriginRepo(".")
 	if repo == "" {
-		return folderName, nil
+		return "", "", nil
 	}
+	api, err := apiClient()
+	if err != nil {
+		return "", "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	apps, err := api.Apps(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	following := []string{}
 	for _, app := range apps {
@@ -360,11 +361,13 @@ func repoApp(ctx context.Context, api *client.Client, folderName string) (string
 			following = append(following, app.Name)
 		}
 	}
-	if len(following) != 1 {
-		return folderName, nil
+	switch len(following) {
+	case 0:
+		return "", repo, nil
+	case 1:
+		return following[0], repo, nil
 	}
-	picked = pickedApp{name: following[0], from: "the app that follows " + repo}
-	return following[0], nil
+	return "", repo, fmt.Errorf("%s all follow %s: name one with --app", strings.Join(following, ", "), repo)
 }
 
 // printCommit names the GitHub commit a deploy came from, if any.

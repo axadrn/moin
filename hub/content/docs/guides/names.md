@@ -45,7 +45,7 @@ Nothing is lost:
 
 The app's ID is at the end of its **Settings**, with a copy button. Its folder in your bucket is named by it.
 
-`moin deploy` still finds it in a folder called `my-app`: it takes the app that follows the folder's repo.
+Every command still finds it in a folder called `my-app`: moin takes the app that follows the folder's repo.
 
 ## Rename the rest
 

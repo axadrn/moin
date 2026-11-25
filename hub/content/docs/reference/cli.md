@@ -209,7 +209,7 @@ These run on a server, as root.
 
 ## How commands find the app
 
-A command that works on an app takes it as an argument or as `--app`, then from the name of the directory. `moin deploy` first takes the app that follows the directory's GitHub repo.
+A command that works on an app takes it as an argument or as `--app`, then the app that follows the directory's GitHub repo, then the name of the directory. When two apps follow the repo, name one.
 
 Flags may come before or after the arguments: `moin rollback v3 --app my-app` is `moin rollback --app my-app v3`. Every command has one name, the one on this page.
 

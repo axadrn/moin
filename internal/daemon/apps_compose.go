@@ -579,8 +579,10 @@ func servicePort(src string, service any) int {
 			return port
 		}
 	}
-	if port := exposedPort(src); src != "" && port > 0 {
-		return port
+	if src != "" {
+		if port := exposedPort(src); port > 0 {
+			return port
+		}
 	}
 	return 8080
 }

@@ -6208,7 +6208,7 @@ components:
           type: string
         path:
           type: string
-          description: Where uptime visits: / unless set.
+          description: "Where uptime visits: / unless set."
         custom_path:
           type: boolean
         paused:

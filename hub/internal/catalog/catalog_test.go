@@ -25,7 +25,7 @@ func TestEntries(t *testing.T) {
 	}
 	for _, entry := range entries {
 		// compose.yml is plain Docker: the port of web comes from it.
-		if strings.HasPrefix(string(entry.Compose), "x-") || strings.Contains(string(entry.Compose), "\nx-") || !strings.Contains(string(entry.Compose), "\n    expose: [") {
+		if strings.HasPrefix(string(entry.Compose), "x-") || strings.Contains(string(entry.Compose), "\nx-") || !strings.Contains(string(entry.Compose), "\n  web:\n") || !strings.Contains(string(entry.Compose), "\n    expose: [") {
 			t.Errorf("%s: compose.yml needs expose on web and no x- block", entry.Slug)
 		}
 		// pgvector/pgvector is Postgres with vectors; the daemon backs it up

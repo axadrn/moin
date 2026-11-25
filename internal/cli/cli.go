@@ -157,9 +157,9 @@ Daemon
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then
-from the name of the current directory; deploy first takes the app that
-follows the GitHub repo of the directory. Flags may come before or after the arguments. Commands that remove or
-replace something ask first; --yes skips the question, and without a
+the app that follows the GitHub repo of the current directory, then the
+directory's name. Flags may come before or after the arguments. Commands
+that remove or replace something ask first; --yes skips the question, and without a
 terminal they need it. Every command shows its usage with --help.
 
 Docs: https://moin.run/docs, or /docs on your own hub.
