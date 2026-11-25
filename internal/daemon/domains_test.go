@@ -168,3 +168,15 @@ func TestRunningDomains(t *testing.T) {
 		t.Error("domains for a bad app name")
 	}
 }
+
+// TestCheckDomainServices: x-moin.domains for a service compose.yml does
+// not have, or with a name the hub would refuse, stops the deploy.
+func TestCheckDomainServices(t *testing.T) {
+	config := map[string]any{"services": map[string]any{"web": map[string]any{}, "api": map[string]any{}}}
+	for services, ok := range map[string]bool{"api": true, "worker": false, "API": false} {
+		release := &release{config: config, detected: protocol.Detected{Service: "web", Config: &protocol.Config{ServiceDomains: map[string][]string{services: {"x.example.net"}}}}}
+		if err := checkDomainServices(release); (err == nil) != ok {
+			t.Errorf("%s: err = %v", services, err)
+		}
+	}
+}

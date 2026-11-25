@@ -54,8 +54,7 @@ type DeployStart struct {
 // compose.yml has domains, exactly those count; otherwise these. Never a
 // mix. For protect and instant, the x-moin block wins for every field it
 // sets. Protect is an htpasswd line ("user:bcrypt hash") when password
-// protection is on. DeployStart carries it under the JSON key routing,
-// which daemons of protocol version 1 read.
+// protection is on. DeployStart carries it under the JSON key routing.
 type Domains struct {
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`

@@ -81,7 +81,6 @@ var (
 	imagePattern        = regexp.MustCompile(`^[a-z0-9][A-Za-z0-9._/:@-]{0,254}$`)
 	registryHostPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,252}[a-z0-9])?(:[0-9]{1,5})?$`)
 	appNamePattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
-	domainPattern       = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 	envKeyPattern       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,127}$`)
 )
 
@@ -1088,7 +1087,9 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 			slog.Warn("daemon reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
 		}
-		if done.Domains != nil {
+		// Only the newest deploy says what runs: a deploy.done that waited
+		// for a connection may come after a newer one.
+		if done.Domains != nil && deploy.Number == app.LatestNumber {
 			s.setComposeDomains(app, *done.Domains)
 		}
 		s.rememberDeploy(done.DeployID, done)
@@ -1142,9 +1143,7 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 				if app.InstantHost != done.Detected.Instant {
 					_ = s.apps.SetInstantHost(app.ID, done.Detected.Instant)
 				}
-				if len(done.Detected.Domains) > 0 {
-					s.syncTunnelOf(app)
-				}
+				s.syncTunnelOf(app)
 				if done.Detected.Config != nil && done.Detected.Config.Backups != nil {
 					s.applyScheduleInFile(app, *done.Detected.Config.Backups)
 				}

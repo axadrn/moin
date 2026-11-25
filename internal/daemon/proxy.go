@@ -21,8 +21,6 @@ import (
 // service.
 const proxyImage = "traefik:v3.6"
 
-var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
-
 // route settles the domains of a deploy. If compose.yml has domains,
 // exactly those count. Otherwise the ones entered in moin, which the hub
 // sends. Never a mix. Domains are the main service's; ServiceDomains
@@ -141,7 +139,7 @@ func cleanDomains(detected protocol.Detected) error {
 func cleanDomainList(list []string, seen map[string]bool) error {
 	for index, domain := range list {
 		domain = strings.ToLower(strings.TrimSpace(domain))
-		if !domainPattern.MatchString(domain) {
+		if !protocol.ValidDomain(domain) {
 			return fmt.Errorf("%q is not a domain name", domain)
 		}
 		if seen[domain] {

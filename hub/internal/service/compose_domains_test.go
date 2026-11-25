@@ -139,6 +139,23 @@ func TestComposeDomainsOfTheReleaseThatRuns(t *testing.T) {
 	if err != nil || !slices.Equal(domainRows(blog), []string{":blog.example.com compose"}) {
 		t.Fatalf("blog = %v, %v", domainRows(blog), err)
 	}
+	// A deploy.done that waited for a connection and comes after a newer
+	// deploy says nothing about what runs now.
+	older, err := deploySource(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finishDeploys(t, apps, blog.ID)
+	newer, err := deploySource(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: newer.ID, OK: true, Domains: &protocol.ComposeDomains{Domains: []string{"new.example.com"}}})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: older.ID, OK: true, Domains: &protocol.ComposeDomains{Domains: []string{"old.example.com"}}})
+	blog, err = apps.Get(owner.WorkspaceID, "blog")
+	if err != nil || !slices.Equal(domainRows(blog), []string{":new.example.com compose"}) {
+		t.Fatalf("blog after a late deploy.done = %v, %v", domainRows(blog), err)
+	}
 }
 
 // The hub checks the domains of compose.yml as it checks the ones entered

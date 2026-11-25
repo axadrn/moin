@@ -1787,7 +1787,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. If compose.yml has domains, exactly those count; otherwise the ones entered here. Never a mix.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of the app; another app may use it too. HTTPS is always on; Traefik gets certificates from Let''s Encrypt. If compose.yml has domains, exactly those count; otherwise the ones entered here. Never a mix.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]

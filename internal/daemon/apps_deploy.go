@@ -30,16 +30,22 @@ func (r *runner) deployStart(ctx context.Context, message protocol.Message, rule
 	}
 	if err := checkDeploy(rules, r.rulesFile, start); err != nil {
 		slog.Warn("deploy refused", "app", start.App, "number", start.Number, "error", err)
-		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
+		r.refuseDeploy(start, err)
 		return
 	}
 	slog.Info("deploy", "app", start.App, "number", start.Number)
 	if !r.beginWork() {
-		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: errUpdating.Error()})
+		r.refuseDeploy(start, errUpdating)
 		return
 	}
 	defer r.endWork()
 	r.apps.deploy(ctx, start, rules)
+}
+
+// refuseDeploy ends a deploy that never started with err. Like every
+// deploy.done it says the domains of the release that runs.
+func (r *runner) refuseDeploy(start protocol.DeployStart, err error) {
+	r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error(), Domains: r.apps.runningDomains(start.App)})
 }
 
 // deploy runs one deploy and always ends with deploy.done.
@@ -329,11 +335,35 @@ func (a *apps) reuseRunningRelease(ctx context.Context, release *release) error 
 	return a.rebuildMissing(ctx, release)
 }
 
+// checkDomainServices refuses x-moin.domains for a service the compose
+// file does not have, or with a name the hub would refuse: the deploy
+// stops before anything starts.
+func checkDomainServices(release *release) error {
+	config := release.detected.Config
+	if config == nil {
+		return nil
+	}
+	services, _ := release.config["services"].(map[string]any)
+	for service := range config.ServiceDomains {
+		if !protocol.ValidDomainService(service) {
+			return fmt.Errorf("x-moin.domains: %q: a service with domains is lowercase letters, digits, dashes, dots or underscores", service)
+		}
+		if _, ok := services[service]; !ok {
+			return fmt.Errorf("x-moin.domains names %s, which compose.yml has no service for", service)
+		}
+	}
+	return nil
+}
+
 // writeCompose routes the app, writes compose.json, pins its names and
 // makes sure the proxy runs when the app has an address.
 func (a *apps) writeCompose(ctx context.Context, release *release) error {
 	detected, err := route(release.start.App, release.detected, release.start.Domains)
 	release.detected = detected
+	if err != nil {
+		return err
+	}
+	err = checkDomainServices(release)
 	if err != nil {
 		return err
 	}

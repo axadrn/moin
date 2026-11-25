@@ -16,6 +16,21 @@ var appName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 // ValidAppName reports whether name is a valid app name.
 func ValidAppName(name string) bool { return appName.MatchString(name) }
 
+// domainName is a host name visitors reach an app on, lowercase, without
+// a port.
+var domainName = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
+
+// ValidDomain reports whether name is a domain moin routes: the hub and
+// the daemon refuse the same ones.
+func ValidDomain(name string) bool { return len(name) <= 253 && domainName.MatchString(name) }
+
+// domainService is the name of a compose service that has domains.
+var domainService = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,62}$`)
+
+// ValidDomainService reports whether name is a service that may have
+// domains: lowercase letters, digits, dashes, dots or underscores.
+func ValidDomainService(name string) bool { return domainService.MatchString(name) }
+
 // CopyIDLayout is the time a copy, or the state before a restore, was
 // taken. Its ID is that time and six random digits, like
 // 20261107T140000Z-482913: sorted by time, and two of the same second

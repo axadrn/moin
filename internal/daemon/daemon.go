@@ -336,7 +336,7 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		if message.Type == protocol.TypeDeployStart {
 			var start protocol.DeployStart
 			_ = message.Decode(&start)
-			r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
+			r.refuseDeploy(start, err)
 		} else if message.RequestID != "" {
 			r.fail(message, err)
 		}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"maps"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -22,9 +21,6 @@ var (
 	ErrInstantProvider  = errors.New("the instant address provider is sslip.io, nip.io or off")
 )
 
-// servicePattern is a compose service name.
-var servicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,62}$`)
-
 // InstantUser is the username in front of an instant address that has no
 // password of the app.
 const InstantUser = build.Name
@@ -37,7 +33,7 @@ func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, do
 		return false, err
 	}
 	service = strings.TrimSpace(service)
-	if !servicePattern.MatchString(service) {
+	if !protocol.ValidDomainService(service) {
 		return false, ErrService
 	}
 	if main := s.mainService(app); main != "" && main == service {
@@ -97,7 +93,7 @@ func composeDomainRows(reported protocol.ComposeDomains) ([]model.Domain, error)
 		rows = append(rows, model.Domain{Name: name, Main: name == canonical})
 	}
 	for _, service := range slices.Sorted(maps.Keys(reported.Services)) {
-		if !servicePattern.MatchString(service) {
+		if !protocol.ValidDomainService(service) {
 			return nil, ErrService
 		}
 		names, err := cleanDomains(reported.Services[service])
@@ -120,7 +116,7 @@ func cleanDomains(domains []string) ([]string, error) {
 		if domain == "" || slices.Contains(clean, domain) {
 			continue
 		}
-		if !domainPattern.MatchString(domain) || len(domain) > 253 {
+		if !protocol.ValidDomain(domain) {
 			return nil, ErrDomain
 		}
 		clean = append(clean, domain)
