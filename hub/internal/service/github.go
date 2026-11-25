@@ -75,14 +75,14 @@ func NewGitHub(appID, slug, privateKey, webhookSecret, clientID, clientSecret, a
 	}
 	block, _ := pem.Decode([]byte(strings.ReplaceAll(privateKey, `\n`, "\n")))
 	if block == nil {
-		return nil, errors.New("GITHUB_APP_PRIVATE_KEY is not a PEM key")
+		return nil, errors.New("the private key is not a PEM key")
 	}
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		parsed, pkcs8Err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		rsaKey, ok := parsed.(*rsa.PrivateKey)
 		if pkcs8Err != nil || !ok {
-			return nil, fmt.Errorf("GITHUB_APP_PRIVATE_KEY: %w", err)
+			return nil, fmt.Errorf("the private key: %w", err)
 		}
 		key = rsaKey
 	}
@@ -419,6 +419,11 @@ func (g *GitHub) call(ctx context.Context, method, path, authorization string, b
 // send sends body as JSON to a GitHub URL and decodes the answer into
 // target.
 func (g *GitHub) send(ctx context.Context, method, url, authorization string, body, target any) error {
+	return sendGitHub(ctx, g.http, method, url, authorization, body, target)
+}
+
+// sendGitHub is send with client, for the calls before there is an app.
+func sendGitHub(ctx context.Context, client *http.Client, method, url, authorization string, body, target any) error {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -439,7 +444,7 @@ func (g *GitHub) send(ctx context.Context, method, url, authorization string, bo
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	response, err := g.http.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		return err
 	}

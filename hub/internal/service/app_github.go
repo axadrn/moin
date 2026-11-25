@@ -32,9 +32,12 @@ var (
 	githubStateExpiry = time.Hour
 )
 
-// SetGitHub turns on the GitHub App. Without it the GitHub calls answer
-// ErrGitHubOff.
-func (s *AppService) SetGitHub(github *GitHub) { s.github = github }
+// UseGitHubApp turns on the GitHub App of the hub. While it has none the
+// GitHub calls answer ErrGitHubOff.
+func (s *AppService) UseGitHubApp(githubApp *GitHubAppService) { s.githubApp = githubApp }
+
+// gitHub is the hub's GitHub App, nil without one. Once there it stays.
+func (s *AppService) gitHub() *GitHub { return s.githubApp.GitHub() }
 
 // GitHubRepoOf is a repo with the installation that may read it.
 type GitHubRepoOf struct {
@@ -48,10 +51,10 @@ type GitHubRepoOf struct {
 // member, because GitHub sends them back to one setup URL for every
 // workspace.
 func (s *AppService) GitHubInstallURL(actor Actor) (string, error) {
-	if s.github == nil {
+	if s.gitHub() == nil {
 		return "", ErrGitHubOff
 	}
-	return s.github.InstallURL(s.gitHubState(actor)), nil
+	return s.gitHub().InstallURL(s.gitHubState(actor)), nil
 }
 
 // GitHubConnectURL is the link behind "Connect GitHub". The install link
@@ -61,13 +64,13 @@ func (s *AppService) GitHubInstallURL(actor Actor) (string, error) {
 // ConnectGitHub connects the installations they already have or sends them
 // on to install the app.
 func (s *AppService) GitHubConnectURL(actor Actor) (string, error) {
-	if s.github == nil {
+	if s.gitHub() == nil {
 		return "", ErrGitHubOff
 	}
-	if !s.github.ChecksInstaller() {
-		return s.github.InstallURL(s.gitHubState(actor)), nil
+	if !s.gitHub().ChecksInstaller() {
+		return s.gitHub().InstallURL(s.gitHubState(actor)), nil
 	}
-	return s.github.AuthorizeURL(s.gitHubState(actor), s.gitHubSetupURL()), nil
+	return s.gitHub().AuthorizeURL(s.gitHubState(actor), s.gitHubSetupURL()), nil
 }
 
 // gitHubSetupURL is where GitHub sends a member back after installing the
@@ -95,7 +98,7 @@ func (s *AppService) gitHubState(actor Actor) string {
 //
 // Without the app's OAuth, moin trusts the installation ID GitHub sent.
 func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installationID int64, state, code string) (string, error) {
-	if s.github == nil {
+	if s.gitHub() == nil {
 		return "", ErrGitHubOff
 	}
 	opened, err := s.box.Open(state, "github-state")
@@ -108,16 +111,16 @@ func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installatio
 		return "", ErrGitHubState
 	}
 	actor.WorkspaceID = parts[0]
-	if !s.github.ChecksInstaller() {
+	if !s.gitHub().ChecksInstaller() {
 		if installationID == 0 {
-			return s.github.InstallURL(state), nil
+			return s.gitHub().InstallURL(state), nil
 		}
 		return "", s.addGitHubInstallation(ctx, actor, installationID)
 	}
 	if code == "" {
-		return s.github.AuthorizeURL(state, s.gitHubSetupURL()), nil
+		return s.gitHub().AuthorizeURL(state, s.gitHubSetupURL()), nil
 	}
-	ids, err := s.github.UserInstallations(ctx, code, s.gitHubSetupURL())
+	ids, err := s.gitHub().UserInstallations(ctx, code, s.gitHubSetupURL())
 	if err != nil {
 		return "", err
 	}
@@ -144,14 +147,14 @@ func (s *AppService) ConnectGitHub(ctx context.Context, actor Actor, installatio
 		return "", repository.ErrGitHubInstallationTaken
 	}
 	if !connected {
-		return s.github.InstallURL(state), nil
+		return s.gitHub().InstallURL(state), nil
 	}
 	return "", nil
 }
 
 // addGitHubInstallation stores an installation in the actor's workspace.
 func (s *AppService) addGitHubInstallation(ctx context.Context, actor Actor, installationID int64) error {
-	account, settingsURL, err := s.github.Installation(ctx, installationID)
+	account, settingsURL, err := s.gitHub().Installation(ctx, installationID)
 	if err != nil {
 		return err
 	}
@@ -171,7 +174,7 @@ func (s *AppService) GitHubInstallations(workspaceID string) ([]model.GitHubInst
 
 // GitHubRepos lists every repo the user's installations may read.
 func (s *AppService) GitHubRepos(ctx context.Context, workspaceID string) ([]GitHubRepoOf, error) {
-	if s.github == nil {
+	if s.gitHub() == nil {
 		return nil, ErrGitHubOff
 	}
 	installations, err := s.apps.GitHubInstallations(workspaceID)
@@ -180,7 +183,7 @@ func (s *AppService) GitHubRepos(ctx context.Context, workspaceID string) ([]Git
 	}
 	repos := []GitHubRepoOf{}
 	for _, installation := range installations {
-		found, err := s.github.Repos(ctx, installation.InstallationID)
+		found, err := s.gitHub().Repos(ctx, installation.InstallationID)
 		if err != nil {
 			slog.Warn("list github repos failed", "installation_id", installation.InstallationID, "error", err)
 			continue
@@ -199,7 +202,7 @@ func (s *AppService) GitHubBranches(ctx context.Context, workspaceID, repo strin
 	if err != nil {
 		return nil, err
 	}
-	branches, err := s.github.Branches(ctx, found.InstallationID, found.FullName)
+	branches, err := s.gitHub().Branches(ctx, found.InstallationID, found.FullName)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +262,7 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 	}
 	// A branch GitHub does not have would never deploy.
 	if branch != found.DefaultBranch {
-		branches, err := s.github.Branches(ctx, found.InstallationID, found.FullName)
+		branches, err := s.gitHub().Branches(ctx, found.InstallationID, found.FullName)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +340,7 @@ func (s *AppService) DeployRef(ctx context.Context, actor Actor, idOrName, ref s
 	if ref != "" && !protocol.ValidRefName(ref) {
 		return nil, ErrRefName
 	}
-	if s.github == nil {
+	if s.gitHub() == nil {
 		return nil, ErrGitHubOff
 	}
 	app, err := s.ready(actor.WorkspaceID, idOrName)
@@ -356,7 +359,7 @@ func (s *AppService) DeployRef(ctx context.Context, actor Actor, idOrName, ref s
 // in between can't change what this deploy builds. With an image, the
 // main service runs it instead of a build, with the commit's compose file.
 func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.App, ref, at, image string) (*model.Deploy, error) {
-	commit, err := s.github.Commit(ctx, app.InstallationID, app.Repo, at)
+	commit, err := s.gitHub().Commit(ctx, app.InstallationID, app.Repo, at)
 	var githubErr *GitHubError
 	if errors.As(err, &githubErr) && (githubErr.Status == 404 || githubErr.Status == 422) {
 		return nil, ErrRef
@@ -368,7 +371,7 @@ func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.A
 	// commit, which GitHub serves through this repo too: it must be on the
 	// app's branch.
 	if commitPattern.MatchString(at) {
-		on, err := s.github.OnBranch(ctx, app.InstallationID, app.Repo, app.Branch, commit.SHA)
+		on, err := s.gitHub().OnBranch(ctx, app.InstallationID, app.Repo, app.Branch, commit.SHA)
 		if err != nil {
 			return nil, err
 		}
@@ -376,7 +379,7 @@ func (s *AppService) deployCommit(ctx context.Context, actor Actor, app *model.A
 			return nil, ErrNotOnBranch
 		}
 	}
-	url, authorization, err := s.github.Tarball(ctx, app.InstallationID, app.Repo, commit.SHA)
+	url, authorization, err := s.gitHub().Tarball(ctx, app.InstallationID, app.Repo, commit.SHA)
 	if err != nil {
 		return nil, err
 	}
@@ -439,18 +442,18 @@ func (s *AppService) GitHubUninstalled(installationID int64) error {
 
 // VerifyGitHubWebhook checks the signature of a webhook body.
 func (s *AppService) VerifyGitHubWebhook(body []byte, signature string) bool {
-	return s.github != nil && s.github.VerifyWebhook(body, signature)
+	return s.gitHub() != nil && s.gitHub().VerifyWebhook(body, signature)
 }
 
 // reportStatus writes the commit status of a deploy that came from GitHub.
 func (s *AppService) reportStatus(app *model.App, deploy *model.Deploy, state, description string) {
-	if s.github == nil || deploy.CommitSHA == "" || app.InstallationID == 0 {
+	if s.gitHub() == nil || deploy.CommitSHA == "" || app.InstallationID == 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	target := s.servers.appURL + model.Workspace{ID: app.WorkspaceID, Slug: app.WorkspaceSlug}.Path() + "/apps/" + app.Link()
-	err := s.github.SetStatus(ctx, app.InstallationID, app.Repo, deploy.CommitSHA, state, target, description)
+	err := s.gitHub().SetStatus(ctx, app.InstallationID, app.Repo, deploy.CommitSHA, state, target, description)
 	if err != nil {
 		slog.Warn("github commit status failed", "app_id", app.ID, "sha", deploy.CommitSHA, "error", err)
 	}

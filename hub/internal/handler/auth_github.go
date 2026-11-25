@@ -40,7 +40,7 @@ func (h *authHandler) ConnectGitHub(w http.ResponseWriter, r *http.Request) {
 // startGitHub redirects to GitHub with status: a 303 after a POST, so the
 // browser goes there with a GET.
 func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID string, status int) {
-	if !h.cfg.GitHubLogin() {
+	if !h.githubApp.SignsIn() {
 		redirect(w, r, "/auth", http.StatusSeeOther)
 		return
 	}
@@ -58,7 +58,7 @@ func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   600,
 	})
-	redirect(w, r, h.github.AuthorizeURL(state, h.githubCallbackURL()), status)
+	redirect(w, r, h.githubApp.GitHub().AuthorizeURL(state, h.githubCallbackURL()), status)
 }
 
 // githubCallbackURL is where GitHub sends people back, one of the app's
@@ -76,7 +76,7 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		expected, userID, _ = strings.Cut(cookie.Value, ".")
 	}
-	if !h.cfg.GitHubLogin() || state == "" || expected != state {
+	if !h.githubApp.SignsIn() || state == "" || expected != state {
 		slog.Warn("github sign-in state does not match", "error", err)
 		// A sign-in that came back after another one finished, from a
 		// second tab or the back button: this browser is signed in already.
@@ -89,7 +89,7 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: githubStateCookie, Value: "", Path: "/", MaxAge: -1})
 
-	account, err := h.github.Account(r.Context(), r.URL.Query().Get("code"), h.githubCallbackURL())
+	account, err := h.githubApp.GitHub().Account(r.Context(), r.URL.Query().Get("code"), h.githubCallbackURL())
 	if err != nil {
 		slog.Error("github sign-in failed", "error", err)
 		render(w, r, pages.AuthGitHubFailed("GitHub did not sign you in. Please try again."))
