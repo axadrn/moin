@@ -13,7 +13,7 @@ type SecurityHeadersConfig struct {
 	UmamiHost     string
 	PlausibleHost string
 	// GitHubURL is GitHub on the web, where a form creates the hub's
-	// GitHub App.
+	// GitHub App at /settings/apps/new.
 	GitHubURL string
 }
 
@@ -42,6 +42,15 @@ func AllowOwnFrames(w http.ResponseWriter) {
 	w.Header().Set("Content-Security-Policy", strings.Replace(policy, "frame-ancestors 'none'", "frame-ancestors 'self'", 1))
 }
 
+// githubAppForm is the one page of GitHub the form that creates the hub's
+// GitHub App posts to.
+func githubAppForm(cfg SecurityHeadersConfig) string {
+	if cfg.GitHubURL == "" {
+		return ""
+	}
+	return " " + strings.TrimRight(cfg.GitHubURL, "/") + "/settings/apps/new"
+}
+
 // contentSecurityPolicy says what a page may load and run. Scripts need the
 // nonce or one of the listed hosts, and nothing may frame the page.
 func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
@@ -57,7 +66,7 @@ func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
 		"connect-src 'self' " + umamiConnect + " https://" + plausibleHost + " https://*.google-analytics.com https://analytics.google.com",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
-		strings.TrimSpace("form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com " + cfg.GitHubURL),
+		"form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com" + githubAppForm(cfg),
 	}, "; ")
 }
 

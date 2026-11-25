@@ -327,6 +327,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrGitHubAppNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this hub, in ADMIN_EMAILS, create its GitHub App."},
 	{err: service.ErrGitHubAppExists, status: http.StatusConflict, code: "github_app_exists", message: "This hub has its GitHub App already."},
 	{err: service.ErrGitHubAppState, status: http.StatusBadRequest, code: "github_state", message: "The link from GitHub expired or belongs to another account. Create the GitHub App again."},
+	{err: service.ErrGitHubAppAnswer, status: http.StatusBadGateway, code: "github_app_answer", message: "GitHub did not hand over the new app. Delete it on GitHub, under Settings, Developer settings, GitHub Apps, then create it again."},
 	{err: repository.ErrGitHubInstallationTaken, status: http.StatusConflict, code: "github_taken", message: "This GitHub account is connected to another workspace. Disconnect it there first."},
 	{err: service.ErrRepo, field: "repo", message: "moin cannot read this repo. Install the moin GitHub App on its account and give it the repo."},
 	{err: service.ErrRepoName, field: "repo", message: "Name the repo as owner/name."},

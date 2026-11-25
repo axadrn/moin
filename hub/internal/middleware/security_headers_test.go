@@ -16,11 +16,14 @@ func TestPolicyLetsPagesPlayMedia(t *testing.T) {
 	}
 }
 
-// The form that creates the hub's GitHub App posts to GitHub; without it
-// in form-action the browser refuses to send it.
+// The form that creates the hub's GitHub App posts to GitHub; without that
+// one page in form-action the browser refuses to send it, and no other
+// page of GitHub gets a form.
 func TestPolicyLetsTheGitHubAppFormPost(t *testing.T) {
-	policy := contentSecurityPolicy(SecurityHeadersConfig{GitHubURL: "https://github.com"}, "nonce")
-	if !strings.Contains(policy, "form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com https://github.com") {
-		t.Fatalf("form-action misses GitHub: %s", policy)
+	for _, githubURL := range []string{"https://github.com", "https://github.com/"} {
+		policy := contentSecurityPolicy(SecurityHeadersConfig{GitHubURL: githubURL}, "nonce")
+		if !strings.HasSuffix(policy, "form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com https://github.com/settings/apps/new") {
+			t.Fatalf("form-action with GITHUB_URL %s: %s", githubURL, policy)
+		}
 	}
 }

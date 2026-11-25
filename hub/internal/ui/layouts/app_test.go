@@ -131,7 +131,7 @@ func TestTrialButtonAddsTheFirstServerThenSubscribes(t *testing.T) {
 // creates it on GitHub; everyone else sees nothing.
 func TestAppOffersTheGitHubAppToItsAdmin(t *testing.T) {
 	manifest := &model.GitHubAppManifest{Action: "https://github.com/settings/apps/new?state=s1", Manifest: `{"name":"moin-hub"}`}
-	page := renderApp(t, ctxkeys.WithGitHubAppManifest(appContext(model.WorkspaceRoleOwner, 1), manifest))
+	page := renderApp(t, ctxkeys.WithGitHubAppManifest(appContext(model.WorkspaceRoleOwner, 1), func() *model.GitHubAppManifest { return manifest }))
 	for _, want := range []string{"No GitHub App yet.", `method="post"`, `action="https://github.com/settings/apps/new?state=s1"`, `name="manifest"`, `value="{&#34;name&#34;:&#34;moin-hub&#34;}"`, `type="submit"`, "Create GitHub App"} {
 		if !strings.Contains(page, want) {
 			t.Fatalf("the GitHub App line lacks %s", want)

@@ -18,11 +18,13 @@ func NewHubAdmins(emails []string) HubAdmins {
 	return admins
 }
 
-// Has reports whether user is one of them.
+// Has reports whether user is one of them, with the address verified.
 func (a HubAdmins) Has(user *model.User) bool {
-	if user == nil || user.EmailVerifiedAt == nil {
-		return false
-	}
-	_, ok := a[strings.ToLower(user.Email)]
+	return user != nil && user.EmailVerifiedAt != nil && a.Listed(user.Email)
+}
+
+// Listed reports whether address is in ADMIN_EMAILS, verified or not.
+func (a HubAdmins) Listed(address string) bool {
+	_, ok := a[strings.ToLower(strings.TrimSpace(address))]
 	return ok
 }

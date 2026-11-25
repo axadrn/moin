@@ -9,16 +9,18 @@ import (
 // without a GitHub App: its button sends the manifest to GitHub, which
 // creates the app on the admin's account and sends them back with it.
 templ AppGitHubAppCard() {
-	if manifest := ctxkeys.GitHubAppManifest(ctx); manifest != nil && ctxkeys.Workspace(ctx) != nil {
-		@components.Card(components.CardProps{Attrs: templ.Attributes{"data-github-app-card": true}}) {
-			<form class="moin-row" data-gap="4" data-phone="stack" method="post" action={ templ.SafeURL(manifest.Action) }>
-				<input type="hidden" name="manifest" value={ manifest.Manifest }/>
-				<p class="moin-fill moin-text moin-strong">No GitHub App yet.</p>
-				@components.Button(components.ButtonProps{Type: "submit"}) {
-					@components.Icon("git-hub")
-					Create GitHub App
-				}
-			</form>
+	if ctxkeys.Workspace(ctx) != nil {
+		if manifest := ctxkeys.GitHubAppManifest(ctx); manifest != nil {
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-github-app-card": true}}) {
+				<form class="moin-row" data-gap="4" data-phone="stack" method="post" action={ templ.SafeURL(manifest.Action) }>
+					<input type="hidden" name="manifest" value={ manifest.Manifest }/>
+					<p class="moin-fill moin-text moin-strong">No GitHub App yet.</p>
+					@components.Button(components.ButtonProps{Type: "submit"}) {
+						@components.Icon("git-hub")
+						Create GitHub App
+					}
+				</form>
+			}
 		}
 	}
 }

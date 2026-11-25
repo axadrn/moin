@@ -85,16 +85,25 @@ func newGitHubAppTest(t *testing.T, env GitHubAppSettings) githubAppTest {
 		mu.Lock()
 		conversions = append(conversions, code)
 		mu.Unlock()
-		if code != "good" {
+		answer := map[string]any{
+			"id": 4242, "slug": "moin-hub-example-com", "name": "moin-hub-example-com", "client_id": "Iv23.app",
+			"client_secret": "client-secret-1", "webhook_secret": "webhook-secret-1", "pem": testGitHubKey(t),
+		}
+		switch code {
+		case "good":
+		case "no-hook-secret":
+			answer["webhook_secret"] = nil
+		case "empty-hook-secret":
+			answer["webhook_secret"] = ""
+		case "bad-key":
+			answer["pem"] = "not a key"
+		default:
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id": 4242, "slug": "moin-hub-example-com", "name": "moin-hub-example-com", "client_id": "Iv23.app",
-			"client_secret": "client-secret-1", "webhook_secret": "webhook-secret-1", "pem": testGitHubKey(t),
-		})
+		_ = json.NewEncoder(w).Encode(answer)
 	}))
 	t.Cleanup(github.Close)
 	service, err := NewGitHubAppService(env, repository.NewGitHubApps(database), box, repository.NewActivity(database), NewHubAdmins([]string{"Admin@example.com"}), "https://hub.example.com/", github.URL, "https://github.example")
@@ -123,8 +132,8 @@ func (g githubAppTest) actor() Actor {
 }
 
 // TestGitHubAppManifestAsksForWhatTheHubUses: the manifest names the
-// hub's URLs and exactly the permissions and events moin uses, for the
-// admin's own account, private.
+// hub's URLs and exactly the permissions and events moin uses, on the
+// admin's own account, public so teammates sign in with it.
 func TestGitHubAppManifestAsksForWhatTheHubUses(t *testing.T) {
 	g := newGitHubAppTest(t, GitHubAppSettings{})
 	form := g.service.Manifest(g.admin)
@@ -164,7 +173,7 @@ func TestGitHubAppManifestAsksForWhatTheHubUses(t *testing.T) {
 	if !slices.Equal(manifest.CallbackURLs, []string{"https://hub.example.com/app/github/setup", "https://hub.example.com/auth/github/callback"}) {
 		t.Errorf("callback_urls = %v, want the setup first, then the sign-in", manifest.CallbackURLs)
 	}
-	if manifest.Public == nil || *manifest.Public || !manifest.RequestOAuthOnInstall || !manifest.SetupOnUpdate {
+	if manifest.Public == nil || !*manifest.Public || !manifest.RequestOAuthOnInstall || !manifest.SetupOnUpdate {
 		t.Errorf("public, oauth on install, setup on update = %v, %v, %v", manifest.Public, manifest.RequestOAuthOnInstall, manifest.SetupOnUpdate)
 	}
 	want := map[string]string{"contents": "read", "metadata": "read", "statuses": "write", "email_addresses": "read"}
@@ -257,11 +266,45 @@ func TestGitHubAppStateBelongsToTheAdmin(t *testing.T) {
 		t.Errorf("an old state: err = %v, want ErrGitHubAppState", err)
 	}
 	g.service.now = time.Now
-	if err := g.service.Create(ctx, g.actor(), g.admin, "used", state); err == nil {
-		t.Error("a code GitHub does not know creates an app")
+	if err := g.service.Create(ctx, g.actor(), g.admin, "used", state); !errors.Is(err, ErrGitHubAppAnswer) {
+		t.Errorf("a code GitHub does not know: err = %v, want ErrGitHubAppAnswer", err)
 	}
 	if len(*g.conversions) != 1 || g.service.GitHub() != nil {
 		t.Fatalf("conversions = %v, app = %v: want one try and no app", *g.conversions, g.service.GitHub())
+	}
+}
+
+// TestGitHubAppIncompleteAnswer: an app GitHub hands over without its
+// webhook secret or with a broken key is not kept, and the error does not
+// send the admin to GITHUB_APP_*.
+func TestGitHubAppIncompleteAnswer(t *testing.T) {
+	g := newGitHubAppTest(t, GitHubAppSettings{})
+	for _, code := range []string{"no-hook-secret", "empty-hook-secret", "bad-key"} {
+		err := g.service.Create(context.Background(), g.actor(), g.admin, code, g.state(t, g.admin))
+		if !errors.Is(err, ErrGitHubAppAnswer) || strings.Contains(err.Error(), "GITHUB_APP") {
+			t.Errorf("%s: err = %v, want ErrGitHubAppAnswer without GITHUB_APP", code, err)
+		}
+	}
+	var stored int
+	if err := g.database.Get(&stored, `SELECT COUNT(*) FROM github_app`); err != nil || stored != 0 || g.service.GitHub() != nil {
+		t.Fatalf("stored = %d, %v, app = %v: want none", stored, err, g.service.GitHub())
+	}
+
+	// A stored app whose key does not parse stops the start, naming the
+	// database, not the env.
+	err := repository.NewGitHubApps(g.database).Create(&model.GitHubApp{
+		AppID: "5", Slug: "moin-broken", ClientID: "Iv23.broken",
+		ClientSecret:  g.box.Seal("s", "github_app/client_secret"),
+		WebhookSecret: g.box.Seal("w", "github_app/webhook_secret"),
+		PrivateKey:    g.box.Seal("not a key", "github_app/private_key"),
+		CreatedAt:     time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewGitHubAppService(GitHubAppSettings{}, repository.NewGitHubApps(g.database), g.box, nil, nil, "https://hub.example.com", g.apiURL, "")
+	if err == nil || strings.Contains(err.Error(), "GITHUB_APP_PRIVATE_KEY") || !strings.Contains(err.Error(), "database") {
+		t.Fatalf("a broken stored key: err = %v, want one naming the database", err)
 	}
 }
 

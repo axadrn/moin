@@ -45,7 +45,7 @@ func TestGitHubAppCreatedTakesTheAdminBack(t *testing.T) {
 	action, _ := url.Parse(githubApp.Manifest(admin.User).Action)
 	state := action.Query().Get("state")
 	handler := NewGitHubAppHandler(githubApp, workspaces)
-	back := func(user *model.User) *httptest.ResponseRecorder {
+	back := func(user *model.User, state string) *httptest.ResponseRecorder {
 		request := httptest.NewRequest(http.MethodGet, "/app/github/created?code=good&state="+url.QueryEscape(state), nil)
 		ctx := ctxkeys.WithUser(ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{}), user)
 		recorder := httptest.NewRecorder()
@@ -53,10 +53,13 @@ func TestGitHubAppCreatedTakesTheAdminBack(t *testing.T) {
 		return recorder
 	}
 
-	if response := back(member.User); response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "Only the admins of this hub") || githubApp.GitHub() != nil {
+	if response := back(member.User, state); response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), "Only the admins of this hub") || githubApp.GitHub() != nil {
 		t.Fatalf("a member: %d %s", response.Code, response.Body.String())
 	}
-	if response := back(admin.User); response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/app" {
+	if response := back(admin.User, "made-up"); response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "expired") || githubApp.GitHub() != nil {
+		t.Fatalf("a made up state: %d %s", response.Code, response.Body.String())
+	}
+	if response := back(admin.User, state); response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/app" {
 		t.Fatalf("the admin: %d %q %s", response.Code, response.Header().Get("Location"), response.Body.String())
 	}
 	if !githubApp.SignsIn() {
@@ -66,7 +69,7 @@ func TestGitHubAppCreatedTakesTheAdminBack(t *testing.T) {
 	if err != nil || len(events) == 0 || events[0].Action != "hub.github_app_created" {
 		t.Fatalf("activity = %+v, %v", events, err)
 	}
-	if response := back(admin.User); response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "has its GitHub App already") {
+	if response := back(admin.User, state); response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "has its GitHub App already") {
 		t.Fatalf("again: %d %s", response.Code, response.Body.String())
 	}
 }

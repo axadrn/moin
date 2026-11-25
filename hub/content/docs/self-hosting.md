@@ -173,11 +173,25 @@ People sign in with GitHub, and deploys come from GitHub, through one GitHub App
 
 Only the admins in `ADMIN_EMAILS` see the button, and only while the hub has no app. The app asks GitHub for what moin uses and nothing more: Contents read, Commit statuses read and write, Metadata read, and Email addresses read to sign people in; the events Push and Installation.
 
-The app belongs to your GitHub account and installs only there. For the repos of an organization, move it there on GitHub: the app's settings, **Advanced**, **Transfer ownership**. It keeps its keys, so the hub keeps working.
+The app is public on GitHub, so your team signs in with it and installs it on their own accounts and organizations. Sign-up stays as you set it: only invited people join, unless `SIGNUPS_OPEN` is on, and the hub checks who installed the app before a workspace uses an installation.
+
+### Start over
+
+1. Delete the app on GitHub: **Settings**, **Developer settings**, **GitHub Apps**, the app, **Advanced**, **Delete GitHub App**.
+2. Remove it from the hub, and restart the hub:
+
+   ```bash
+   docker compose -f /opt/moin/compose.yml exec hub sqlite3 data/app.db 'DELETE FROM github_app'
+   docker compose -f /opt/moin/compose.yml restart hub
+   ```
+
+3. Click **Create GitHub App** again, then **Connect GitHub** on each app.
+
+A create that stopped halfway can leave an app on GitHub the hub never got. Delete it the same way, as in step 1. It also frees its name.
 
 ### By hand
 
-Or create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**, with the permissions and events above. Callback URLs: first `{APP_URL}/app/github/setup`, then `{APP_URL}/auth/github/callback`, in that order, with **Request user authorization (OAuth) during installation** and **Redirect on update** ticked. Webhook URL: `{APP_URL}/webhooks/github`, with a secret of your own. Generate a private key and a client secret, put the key at `/etc/moin-hub/github-app.pem`, add the rest and run `update.sh` again:
+Or create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**, with the permissions and events above. Callback URLs: first `{APP_URL}/app/github/setup`, then `{APP_URL}/auth/github/callback`, in that order, with **Request user authorization (OAuth) during installation** and **Redirect on update** ticked. Webhook URL: `{APP_URL}/webhooks/github`, with a secret of your own. Installable on **Any account**. Generate a private key and a client secret, put the key at `/etc/moin-hub/github-app.pem`, add the rest and run `update.sh` again:
 
 ```bash
 GITHUB_APP_ID=

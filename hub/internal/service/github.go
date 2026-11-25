@@ -75,14 +75,14 @@ func NewGitHub(appID, slug, privateKey, webhookSecret, clientID, clientSecret, a
 	}
 	block, _ := pem.Decode([]byte(strings.ReplaceAll(privateKey, `\n`, "\n")))
 	if block == nil {
-		return nil, errors.New("GITHUB_APP_PRIVATE_KEY is not a PEM key")
+		return nil, errors.New("the private key is not a PEM key")
 	}
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		parsed, pkcs8Err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		rsaKey, ok := parsed.(*rsa.PrivateKey)
 		if pkcs8Err != nil || !ok {
-			return nil, fmt.Errorf("GITHUB_APP_PRIVATE_KEY: %w", err)
+			return nil, fmt.Errorf("the private key: %w", err)
 		}
 		key = rsaKey
 	}

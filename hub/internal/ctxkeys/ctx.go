@@ -115,12 +115,16 @@ func WithCSRFToken(ctx context.Context, token string) context.Context {
 }
 
 // GitHubAppManifest is the form that creates the hub's GitHub App, for an
-// admin of a hub without one; else nil.
+// admin of a hub without one; else nil. Only a page that shows it builds
+// it.
 func GitHubAppManifest(ctx context.Context) *model.GitHubAppManifest {
-	manifest, _ := ctx.Value(GitHubAppKey).(*model.GitHubAppManifest)
-	return manifest
+	manifest, _ := ctx.Value(GitHubAppKey).(func() *model.GitHubAppManifest)
+	if manifest == nil {
+		return nil
+	}
+	return manifest()
 }
 
-func WithGitHubAppManifest(ctx context.Context, manifest *model.GitHubAppManifest) context.Context {
+func WithGitHubAppManifest(ctx context.Context, manifest func() *model.GitHubAppManifest) context.Context {
 	return context.WithValue(ctx, GitHubAppKey, manifest)
 }

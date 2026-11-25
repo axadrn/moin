@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -35,6 +36,7 @@ var (
 	ErrGitHubAppNotAllowed = errors.New("only an admin of this hub creates its GitHub App")
 	ErrGitHubAppExists     = errors.New("this hub has its GitHub App already")
 	ErrGitHubAppState      = errors.New("the link from GitHub expired or belongs to another account: create the GitHub App again")
+	ErrGitHubAppAnswer     = errors.New("GitHub did not hand over the new app")
 	// githubAppCodePattern is the code GitHub sends back, checked before it
 	// goes into a path.
 	githubAppCodePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
@@ -77,8 +79,11 @@ func NewGitHubAppService(env GitHubAppSettings, apps *repository.GitHubApps, box
 		return nil, err
 	}
 	github, err := NewGitHub(settings.ID, settings.Slug, settings.PrivateKey, settings.WebhookSecret, settings.ClientID, settings.ClientSecret, s.apiURL, s.webURL)
+	if err != nil && env.ID != "" {
+		return nil, fmt.Errorf("GITHUB_APP_PRIVATE_KEY: %w", err)
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the GitHub App in the database: %w", err)
 	}
 	s.github.Store(github)
 	return s, nil
@@ -87,12 +92,21 @@ func NewGitHubAppService(env GitHubAppSettings, apps *repository.GitHubApps, box
 // settings answers which GitHub App the hub uses: env when it names one,
 // else the one in the database, else none.
 func (s *GitHubAppService) settings(env GitHubAppSettings) (GitHubAppSettings, error) {
-	if env.ID != "" || s.apps == nil {
+	if s.apps == nil {
 		return env, nil
 	}
 	stored, err := s.apps.Get()
-	if err != nil || stored == nil {
+	if err != nil {
 		return GitHubAppSettings{}, err
+	}
+	if env.ID != "" {
+		if stored != nil {
+			slog.Info("GITHUB_APP_ID is set: the hub uses that GitHub App, not the one created with one click", "github_app", stored.Slug)
+		}
+		return env, nil
+	}
+	if stored == nil {
+		return GitHubAppSettings{}, nil
 	}
 	settings := GitHubAppSettings{ID: stored.AppID, Slug: stored.Slug, ClientID: stored.ClientID}
 	for _, field := range []struct {
@@ -140,8 +154,10 @@ func (s *GitHubAppService) Manifest(user *model.User) *model.GitHubAppManifest {
 		"redirect_url":    s.appURL + "/app/github/created",
 		// GitHub sends an install back to the first, a sign-in to the
 		// second.
-		"callback_urls":            []string{s.appURL + "/app/github/setup", s.appURL + "/auth/github/callback"},
-		"public":                   false,
+		"callback_urls": []string{s.appURL + "/app/github/setup", s.appURL + "/auth/github/callback"},
+		// Public, so teammates on other GitHub accounts sign in and
+		// install it; the hub checks who installed it.
+		"public":                   true,
 		"request_oauth_on_install": true,
 		"setup_on_update":          true,
 		"default_permissions": map[string]string{
@@ -202,18 +218,15 @@ func (s *GitHubAppService) Create(ctx context.Context, actor Actor, user *model.
 	}
 	err = sendGitHub(ctx, s.http, http.MethodPost, s.apiURL+"/app-manifests/"+code+"/conversions", "", nil, &answer)
 	if err != nil {
-		return fmt.Errorf("GitHub did not hand over the app: %w", err)
+		return fmt.Errorf("%w: %w", ErrGitHubAppAnswer, err)
 	}
-	if answer.ID == 0 || answer.Slug == "" || answer.ClientID == "" || answer.ClientSecret == "" {
-		return errors.New("GitHub answered an app without its ID, slug or client")
+	if answer.ID == 0 || answer.Slug == "" || answer.ClientID == "" || answer.ClientSecret == "" || answer.WebhookSecret == nil || *answer.WebhookSecret == "" {
+		return fmt.Errorf("%w: its ID, slug, client or webhook secret is missing", ErrGitHubAppAnswer)
 	}
-	settings := GitHubAppSettings{ID: strconv.FormatInt(answer.ID, 10), Slug: answer.Slug, PrivateKey: answer.PEM, ClientID: answer.ClientID, ClientSecret: answer.ClientSecret}
-	if answer.WebhookSecret != nil {
-		settings.WebhookSecret = *answer.WebhookSecret
-	}
+	settings := GitHubAppSettings{ID: strconv.FormatInt(answer.ID, 10), Slug: answer.Slug, PrivateKey: answer.PEM, WebhookSecret: *answer.WebhookSecret, ClientID: answer.ClientID, ClientSecret: answer.ClientSecret}
 	github, err := NewGitHub(settings.ID, settings.Slug, settings.PrivateKey, settings.WebhookSecret, settings.ClientID, settings.ClientSecret, s.apiURL, s.webURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrGitHubAppAnswer, err)
 	}
 	now := s.now().UTC()
 	err = s.apps.Create(&model.GitHubApp{

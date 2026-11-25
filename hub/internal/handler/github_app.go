@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -31,9 +32,14 @@ func (h *GitHubAppHandler) Created(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	err := h.githubApp.Create(r.Context(), actor, user, query.Get("code"), query.Get("state"))
 	if err != nil {
-		slog.Warn("github app not created", "user_id", user.ID, "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		render(w, r, pages.ErrorPage(http.StatusBadRequest, "GitHub App not created", errorMessage(err)))
+		status, detail, known := api.ErrorFor(err)
+		if known {
+			slog.Warn("github app not created", "user_id", user.ID, "error", err)
+		} else {
+			slog.Error("github app not created", "user_id", user.ID, "error", err)
+		}
+		w.WriteHeader(status)
+		render(w, r, pages.ErrorPage(status, "GitHub App not created", detail.Message))
 		return
 	}
 	slog.Info("github app created", "user_id", user.ID)
