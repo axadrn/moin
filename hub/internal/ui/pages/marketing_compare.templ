@@ -9,18 +9,18 @@ import (
 )
 
 // ---------------------------------------------------------------- home
-// HomeCompare is the comparison on the home page: the seven tools, each
+// HomeCompare is the comparison on the home page: every tool, each
 // with how many facts moin wins, each a way to its page.
 templ HomeCompare() {
 	<section id="compare" class="moin-band">
 		<h2 class="moin-statement">Look at the score.</h2>
-		<p class="moin-lead">None of these seven documents a daily restore check. { brand.Name } runs one.</p>
+		<p class="moin-lead">None of them documents a daily restore check. { brand.Name } runs one.</p>
 		<div class="moin-bento">
 			for _, competitor := range Competitors {
 				@homeFeature(competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
 			}
 		</div>
-		<p class="moin-text moin-muted">Fact by fact, from each tool's own docs, read { compareRead }.</p>
+		<p class="moin-text moin-muted">Fact by fact, from each tool's own docs.</p>
 	</section>
 }
 
@@ -34,7 +34,7 @@ templ CompareIndex() {
 	}) {
 		<main class="moin-page moin-content">
 			@components.Header(components.HeaderProps{Title: brand.Name + " compared"})
-			<p class="moin-lead">Fact by fact, from each tool's own docs, read { compareRead }.</p>
+			<p class="moin-lead">Fact by fact, from each tool's own docs, each page with the day it was read.</p>
 			<div class="moin-bento">
 				for _, competitor := range Competitors {
 					@homeFeature(brand.Name+" vs "+competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
@@ -87,7 +87,7 @@ templ Compare(competitor Competitor) {
 				}
 			</div>
 			<p class="moin-text moin-muted">
-				From { competitor.Name }'s own docs, read { compareRead }. A check is the better answer, a dash a part of it, a cross not. "Not documented" means its docs say nothing, not that it cannot be done, and it is not counted.
+				From { competitor.Name }'s own docs, read { competitor.Read }. A check is the better answer, a dash a part of it, a cross not. "Not documented" means its docs say nothing, not that it cannot be done, and it is not counted.
 				<a href="/compare" class="moin-link moin-foreground">All comparisons</a>
 			</p>
 		</main>

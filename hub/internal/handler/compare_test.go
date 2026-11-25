@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -26,10 +27,13 @@ func serveCompare(path string) *httptest.ResponseRecorder {
 // TestComparePagesAnswer checks every competitor has its page and answers
 // every question, each with a source.
 func TestComparePagesAnswer(t *testing.T) {
-	if len(pages.Competitors) != 7 {
-		t.Fatalf("competitors = %d, want 7", len(pages.Competitors))
+	if len(pages.Competitors) != 12 {
+		t.Fatalf("competitors = %d, want 12", len(pages.Competitors))
 	}
 	for _, competitor := range pages.Competitors {
+		if _, err := time.Parse("January 2, 2006", competitor.Read); err != nil {
+			t.Errorf("%s: read %q, want a date", competitor.Name, competitor.Read)
+		}
 		if len(competitor.Cells) != len(pages.CompareRows) {
 			t.Errorf("%s answers %d of %d questions", competitor.Name, len(competitor.Cells), len(pages.CompareRows))
 		}
