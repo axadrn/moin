@@ -22,7 +22,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, newTool("create_app", "Create an app",
-		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. instant_password is the password of its instant address: the one time moin shows it, so give it to the user to keep. Needs a token with read and write access.",
+		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. A new app starts with its password on: every address of it asks for user moin and the password in password, the one time moin shows it, so give it to the user to keep. remove_protection turns it off. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.createApp)))
 	mcpsdk.AddTool(server, newTool("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
@@ -175,7 +175,7 @@ type CreatedApp struct {
 }
 
 func (a CreatedApp) Summary() string {
-	return fmt.Sprintf("Created %s on %s. Its instant address asks for user %s and the password in instant_password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, service.InstantUser, a.Name)
+	return fmt.Sprintf("Created %s on %s. Every address of it asks for user %s and the password in password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, service.PasswordUser, a.Name)
 }
 
 func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (CreatedApp, error) {
@@ -183,7 +183,7 @@ func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppIn
 	if err != nil {
 		return CreatedApp{}, err
 	}
-	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), InstantPassword: app.InstantPassword}}, nil
+	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), Password: app.Password}}, nil
 }
 
 func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {

@@ -56,7 +56,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `update_hub` | updates a self-hosted hub to the newest version, for its admins: first it returns the release notes, then it updates with `confirm` | write |
 | `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
-| `create_app` | creates an app on a server; returns the password of its instant address, this once | write |
+| `create_app` | creates an app on a server with its password on; returns the password, this once | write |
 | `remove_app` | stops and removes an app, keeps its data; `confirm` is its name | write, destructive |
 | `rename_app` | renames an app; links, data and backups stay | write |
 | `pin_app` | pins an app, or unpins it with `pinned` false | write |
@@ -71,7 +71,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `rollback_app` | starts an earlier deploy again | write, destructive |
 | `list_catalog` | the catalog with each app's newest version | read |
 | `get_catalog_app` | a catalog app with every version | read |
-| `install_catalog_app` | installs a catalog app on a server; returns the first sign-in password and the instant password, this once | write |
+| `install_catalog_app` | installs a catalog app on a server; returns the first sign-in password and the app's password, this once | write |
 | `update_app` | sets a catalog app to a version and deploys it | write |
 | `get_logs` | the last container lines | read |
 | `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin) | write |
@@ -94,11 +94,10 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `set_uptime` | the path uptime visits on a domain, or pauses and resumes it | write |
 | `get_metrics` | CPU, memory, disk and network of an app or a server, now and over 1h, 24h, 7d or 30d; for an app the deploys that went live, for a server its apps by memory | read |
 | `set_domains` | domains and the canonical one, or with `service` the domains of another service | write |
-| `get_instant` | the instant address and its user, or why the app has none | read |
-| `new_instant_password` | a new password for the instant address, returned this once; the next restart applies it | write |
-| `set_instant` | the provider of the instant address or off, and whether a password guards it | write |
-| `set_protection` | a password in front of the app | write |
-| `remove_protection` | makes the app public again | write, destructive |
+| `get_instant` | the instant address, or why the app has none | read |
+| `set_instant` | the provider of the instant address or off | write |
+| `set_protection` | turns the app's password on for every address: your own, or one moin makes and returns this once | write |
+| `remove_protection` | turns the app's password off: every address is open | write, destructive |
 | `restart_app` | starts the live deploy again with the current settings | write |
 | `stop_app` | takes the app offline; its data stays | write, destructive |
 | `start_app` | runs a stopped app again | write |

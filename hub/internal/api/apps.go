@@ -41,11 +41,10 @@ type App struct {
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
 	// Instant is the app's instant address, "" when it has none;
-	// InstantProvider its provider or off; InstantOpen says no password
-	// guards it.
+	// InstantProvider its provider or off. Protected says the app's
+	// password guards every address of it, the instant address too.
 	Instant         string `json:"instant"`
 	InstantProvider string `json:"instant_provider"`
-	InstantOpen     bool   `json:"instant_open"`
 	// Stopped is set when the app was stopped; a deploy, restart or start
 	// runs it again.
 	Stopped bool `json:"stopped"`
@@ -178,7 +177,6 @@ func NewApp(app model.App) App {
 		ServiceDomains:  app.ServiceDomains(),
 		Instant:         instantURL(app.InstantHost),
 		InstantProvider: app.Instant,
-		InstantOpen:     app.InstantOpen,
 		Stopped:         app.Stopped,
 		ChangesWaiting:  app.ChangesWaiting,
 		Repo:            app.Repo,
@@ -201,35 +199,31 @@ func instantURL(host string) string {
 	return "https://" + host
 }
 
-// Instant is the instant address of an app: its URL, or why it has none,
-// and the user of the password in front of it. moin shows the password
-// only once, when it makes it (InstantPassword). OwnPassword says the
-// app's own password, the one of its domains, guards it instead.
+// Instant is the instant address of an app: its URL, or why it has none.
+// The app's password guards it like every address of the app.
 type Instant struct {
-	URL         string `json:"url"`
-	Provider    string `json:"provider"`
-	Reason      string `json:"reason,omitempty"`
-	Open        bool   `json:"open"`
-	User        string `json:"user,omitempty"`
-	OwnPassword bool   `json:"own_password"`
+	URL      string `json:"url"`
+	Provider string `json:"provider"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 func NewInstant(instant service.Instant) Instant {
-	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason, Open: instant.Open, User: instant.User, OwnPassword: instant.OwnPassword}
+	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason}
 }
 
-// InstantPassword is a new password of an app's instant address: the one
-// time moin shows it. The app takes it on its next restart.
-type InstantPassword struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
-}
-
-// CreatedApp is the answer of POST /api/v1/apps: the app and the password
-// of its instant address, shown this once.
+// CreatedApp is the answer of POST /api/v1/apps: the app and its
+// password, user moin, which every address of it asks for: shown this
+// once.
 type CreatedApp struct {
 	App
-	InstantPassword string `json:"instant_password,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+// Protection is the answer of PUT /api/v1/apps/{app}/protection: the
+// change, and the password when moin made it, the one time moin shows it.
+type Protection struct {
+	Change
+	Password string `json:"password,omitempty"`
 }
 
 func NewDeploy(deploy model.Deploy) Deploy {
@@ -297,7 +291,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, CreatedApp{App: NewApp(*app), InstantPassword: app.InstantPassword})
+	JSON(w, http.StatusCreated, CreatedApp{App: NewApp(*app), Password: app.Password})
 }
 
 // Get returns an app with its newest deploys.
@@ -767,7 +761,6 @@ type domainsRequest struct {
 
 type instantRequest struct {
 	Provider string `json:"provider"`
-	Open     *bool  `json:"open"`
 }
 
 type protectionRequest struct {
@@ -870,26 +863,14 @@ func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewInstant(instant))
 }
 
-// NewInstantPassword makes a new password for the app's instant address
-// and answers it, the one time moin shows it.
-func (h *AppsHandler) NewInstantPassword(w http.ResponseWriter, r *http.Request) {
-	password, err := h.apps.NewInstantPassword(actor(r), r.PathValue("app"))
-	if err != nil {
-		ServiceError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, InstantPassword{User: service.InstantUser, Password: password})
-}
-
-// SetInstant picks the provider of the app's instant address, or off, and
-// whether a password guards it.
+// SetInstant picks the provider of the app's instant address, or off.
 func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	var request instantRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider, request.Open)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -897,29 +878,32 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
 }
 
-// SetProtection puts a password in front of the app.
+// SetProtection turns the app's password on for every address of it.
+// Without a password moin makes one and answers it, the one time it shows
+// it.
 func (h *AppsHandler) SetProtection(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	var request protectionRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	if request.Password == "" {
-		ValidationError(w, map[string]string{"password": "Enter a password of at least 8 characters."})
-		return
-	}
-	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
+	made, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	answer, err := NewChange(h.apps, workspace.ID, r.PathValue("app"), nil, changed)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, Protection{Change: answer, Password: made})
 }
 
-// DeleteProtection takes the password away.
+// DeleteProtection turns the app's password off: no address asks for one.
 func (h *AppsHandler) DeleteProtection(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	changed, err := h.apps.RemoveProtection(actor(r), r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return

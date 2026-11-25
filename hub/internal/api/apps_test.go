@@ -10,8 +10,9 @@ import (
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
 
-// A canonical domain is for the main service only, here as in MCP, and
-// a new password of an instant address needs a token that may write.
+// A canonical domain is for the main service only, here as in MCP; the
+// app's password needs a token that may write, and the instant address
+// has no password of its own any more.
 func TestAppDomainsRules(t *testing.T) {
 	// Self-hosted, so the free plan may change apps.
 	saved := access.Product
@@ -30,7 +31,8 @@ func TestAppDomainsRules(t *testing.T) {
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/domains", bearer: writer,
 		body: `{"service":"api","domains":["api.shop.example.com"]}`}), http.StatusNotFound, "not_found")
 
-	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/instant/password", bearer: reader}), http.StatusForbidden, "insufficient_scope")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: reader, body: `{}`}), http.StatusForbidden, "insufficient_scope")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: writer, body: `{}`}), http.StatusNotFound, "not_found")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/instant/password", bearer: writer}), http.StatusNotFound, "not_found")
 }
 

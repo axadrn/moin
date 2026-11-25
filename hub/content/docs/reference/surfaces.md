@@ -31,7 +31,8 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Env vars as one `.env` | ✓ | ✓ `env push` | ✓ in `$EDITOR` | ✓ | ✓ |
 | Domains and their DNS | ✓ | ✓ `domains` | ✓ | ✓ | ✓ |
 | Add, remove, canonical domain | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Password protection | ✓ | ✓ `protect` | ✓ `p` | ✓ | ✓ |
+| The app's password, on every address: on, off, your own | ✓ | ✓ `protect` | ✓ `p`, your own | ✓ | ✓ |
+| A password moin makes, shown once: a new app, or on again | ✓ | ✓ `apps add`, `deploy`, `protect` | Opens the web. | ✓ | ✓ |
 | Uptime and outages | ✓ | ✓ `uptime` | ✓ | ✓ | ✓ |
 | Uptime path, pause | ✓ | ✓ | ✓ | ✓ | ✓ |
 | App metrics, 1h to 30d | ✓ | ✓ `metrics` | ✓ | ✓ | ✓ |
@@ -67,8 +68,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Link or unlink a repo | ✓ | ✓ `link`, `unlink` | Opens the web. | ✓ | ✓ |
 | Deploy hook for CI, with image and commit | ✓ | ✓ `hook` | Opens the web. | ✓ | ✓ |
 | Registry logins, kept per server; which servers lack one | ✓ | ✓ `registry` | Opens the web. | ✓ | ✓ |
-| Instant address: provider, open | ✓ | ✓ `instant` | Shows it; change it in the web. | ✓ | ✓ |
-| Instant password: shown once when made, a new one | ✓ | ✓ `instant password` | Opens the web. | ✓ | ✓ |
+| Instant address: provider, off | ✓ | ✓ `instant` | Shows it; change it in the web. | ✓ | ✓ |
 | Buckets; the key kept per server, which servers lack it | ✓ | ✓ `buckets` | Opens the web. | ✓ | ✓ |
 | Give another server a bucket key | ✓ | ✓ `buckets key` | Opens the web. | ✓ | ✓ |
 | Move an app to another bucket | ✓ | ✓ `buckets use` | Opens the web. | ✓ | ✓ |

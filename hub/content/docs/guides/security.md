@@ -153,6 +153,7 @@ With the tunnel, moin sends every domain of the server's apps through it and poi
 - If the token cannot reach a domain's zone, a red line says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit, turn on **Always Use HTTPS** yourself.
 - Open again deletes the tunnel and the DNS records moin made. Point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
 - A server behind the tunnel has no [instant address](/docs/guides/domains#instant-address): it needs ports 80 and 443.
+- A new app starts with its [password](/docs/guides/domains#password) on, for every address of it. Nobody reaches it before you, also not a setup page where the first visitor becomes the admin. Turn it off when the app is ready for the world.
 
 ## SSH
 
@@ -217,7 +218,7 @@ Both are readable by root only. A secret goes to a server only while it is onlin
 - each bucket's endpoint, bucket, folder and access key ID
 - each registry's host and username
 - which server has which key
-- the instant address password as a hash only. moin shows it once, when it makes it
+- the app's password as a hash only. moin shows it once, when it makes it
 
 **What stays with the hub.** The hub uses these itself, so it has to keep them, encrypted with its own key:
 

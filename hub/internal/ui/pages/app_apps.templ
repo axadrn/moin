@@ -105,16 +105,15 @@ templ AppAddForm(servers []model.Server) {
 	</form>
 }
 
-// AppAdded takes the place of the add form when an app was added: the
-// password of its instant address, the one time moin shows it, with a
-// link to the app.
+// AppAdded takes the place of the add form when an app was added: its
+// password, the one time moin shows it, with a link to the app.
 templ AppAdded(appPath, name, password string) {
 	<div id="app-add-form" class="moin-stack" data-gap="4" data-app-added>
-		<p class="moin-text">{ name } is added. Its instant address asks for this password. Keep it now: moin shows it only this once.</p>
+		<p class="moin-text">{ name } is added. Every address of it asks for this password until you turn it off. Keep it now: moin shows it only this once.</p>
 		@components.List() {
 			@components.Item(components.ItemProps{}) {
-				<span class="moin-mono moin-text">{ service.InstantUser }</span>
-				<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ password }</span>
+				<span class="moin-mono moin-text">{ service.PasswordUser }</span>
+				<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ password }</span>
 				@copyButton(password, "", "Copy the password")
 			}
 		}

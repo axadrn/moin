@@ -59,9 +59,9 @@ func (r *Apps) Create(app *model.App) error {
 	if app.Folder == "" {
 		app.Folder = app.Name
 	}
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.CreatedAt)
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, protect, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.Protect, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
 	}
@@ -313,22 +313,15 @@ func (r *Apps) DeleteRegistry(workspaceID, host string) error {
 	return nil
 }
 
-// SetInstant stores the instant address provider and whether it is open.
-func (r *Apps) SetInstant(appID, provider string, open bool) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant = $1, instant_open = $2 WHERE id = $3`, provider, open, appID)
+// SetInstant stores the instant address provider.
+func (r *Apps) SetInstant(appID, provider string) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant = $1 WHERE id = $2`, provider, appID)
 	return err
 }
 
 // SetInstantHost stores the instant address the app is served at.
 func (r *Apps) SetInstantHost(appID, host string) error {
 	_, err := r.db.Exec(`UPDATE apps SET instant_host = $1 WHERE id = $2`, host, appID)
-	return err
-}
-
-// SetInstantPasswordHash stores the bcrypt hash of the password moin made
-// for the instant address.
-func (r *Apps) SetInstantPasswordHash(appID, hash string) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant_password_hash = $1 WHERE id = $2`, hash, appID)
 	return err
 }
 

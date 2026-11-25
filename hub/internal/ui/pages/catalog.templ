@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -171,17 +172,23 @@ templ CatalogInstall(view CatalogInstallView) {
 
 // CatalogInstalled takes the place of the install form: the secrets the
 // first sign-in needs that moin made, such as ADMIN_PASSWORD, and the
-// password of the instant address. moin keeps neither, so this is the one
-// time they are shown.
-templ CatalogInstalled(appPath string, login map[string]string, instantPassword string) {
+// app's password, which every address of it asks for. moin keeps neither,
+// so this is the one time they are shown.
+templ CatalogInstalled(appPath string, login map[string]string, password string) {
 	<div id="catalog-install-form" class="moin-stack" data-gap="4" data-catalog-installed>
-		<p class="moin-text">Installed. Keep this in your password manager now: it is shown only this once.</p>
+		<p class="moin-text">
+			Installed.
+			if password != "" {
+				Every address of the app asks for the password of { service.PasswordUser } until you turn it off.
+			}
+			Keep this in your password manager now: it is shown only this once.
+		</p>
 		@components.List() {
-			if instantPassword != "" {
+			if password != "" {
 				@components.Item(components.ItemProps{}) {
-					<span class="moin-mono moin-text">Instant address</span>
-					<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instantPassword }</span>
-					@copyButton(instantPassword, "", "Copy the password")
+					<span class="moin-mono moin-text">{ service.PasswordUser }</span>
+					<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ password }</span>
+					@copyButton(password, "", "Copy the password")
 				}
 			}
 			for _, key := range slices.Sorted(maps.Keys(login)) {
