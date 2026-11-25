@@ -15,19 +15,22 @@ import (
 // which was called the agent before (legacy.go); version 4 the command the
 // daemon masks for the activity (ExecDone.Command); version 5 secrets that
 // live only on the server (secrets.go); version 6 compose.yml as plain
-// Docker, with every setting from the hub.
-const Version = 6
+// Docker, with every setting from the hub; version 7 one password for
+// every address of an app (Domains.Protect).
+const Version = 7
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
 // sending it. Since version 5 backups and the server config take their
 // secrets from the server: an older daemon would run them without. Since
 // version 6 a deploy takes its domains only from the hub: an older daemon
-// would still let compose.yml change them.
+// would still let compose.yml change them. Since version 7 the app's
+// password guards its instant address too: an older daemon would leave it
+// open.
 func Needs(messageType MessageType) int {
 	switch messageType {
 	case TypeDeployStart:
-		return 6
+		return 7
 	case TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
 		return 5
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:

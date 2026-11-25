@@ -158,15 +158,14 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 }
 
 // instantCommands are the subcommands of instant; anything else is the app.
-var instantCommands = append([]string{"open", "protect", "password"}, append(slices.Clone(protocol.InstantProviders), "off")...)
+var instantCommands = append(slices.Clone(protocol.InstantProviders), "off")
 
-// instantUser is the username in front of an instant address.
-const instantUser = build.Name
+// passwordUser is the username of the password moin makes for an app.
+const passwordUser = build.Name
 
-// instant shows the app's instant address, picks its provider or off,
-// opens it or puts the password back, or makes a new password.
+// instant shows the app's instant address, or picks its provider or off.
 func instant(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("instant", "instant [app]; instant sslip.io|nip.io|off [app]; instant open|protect [app]; instant password [app]").withApp()
+	flags := newFlags("instant", "instant [app]; instant sslip.io|nip.io|off [app]").withApp()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -185,37 +184,15 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if command == "password" {
-		made, err := api.NewInstantPassword(ctx, name)
-		if err != nil {
-			return err
-		}
-		done(stdout, "A new password for the instant address of %s, shown only this once:", name)
-		table(stdout, []string{"", ""}, [][]string{{"user", made.User}, {"password", made.Password}})
-		hint(stdout, "The app takes it on its next restart:", build.Name+" restart "+name)
-		return nil
-	}
 	if command != "" {
-		var change client.Change
-		switch command {
-		case "open", "protect":
-			open := command == "open"
-			change, err = api.SetInstant(ctx, name, "", &open)
-		default:
-			change, err = api.SetInstant(ctx, name, command, nil)
-		}
+		change, err := api.SetInstant(ctx, name, command)
 		if err != nil {
 			return err
 		}
 		if !change.Unchanged {
-			switch command {
-			case "open":
-				done(stdout, "The instant address of %s is open to everyone now.", name)
-			case "protect":
-				done(stdout, "A password guards the instant address of %s again.", name)
-			case "off":
+			if command == "off" {
 				done(stdout, "%s has no instant address now.", name)
-			default:
+			} else {
 				done(stdout, "%s gets its instant address from %s now.", name, command)
 			}
 		}
@@ -232,26 +209,19 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	}
-	rows := [][]string{{"address", address.URL}, {"provider", address.Provider}}
-	switch {
-	case address.Open:
-		rows = append(rows, []string{"password", "none: open to everyone"})
-	case address.OwnPassword:
-		rows = append(rows, []string{"password", "the app's own, user " + address.User})
-	default:
-		rows = append(rows, []string{"user", address.User}, []string{"password", "shown once when it was made; a new one: " + build.Name + " instant password " + name})
-	}
-	table(stdout, []string{"", ""}, rows)
+	table(stdout, []string{"", ""}, [][]string{{"address", address.URL}, {"provider", address.Provider}})
 	if command == "" {
 		hint(stdout, "Another provider, if this one is down:", build.Name+" instant nip.io "+name)
 	}
 	return nil
 }
 
-// protect puts a password in front of an app, or takes it away with off.
+// protect turns the app's password on, for every address of the app, or
+// off with off. Without a password on stdin moin makes one and prints it
+// once.
 func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("protect", "protect [--user moin] [app], password on stdin; protect off [app] [--yes]").withApp().withYes()
-	user := flags.String("user", "moin", "username for the password prompt in the browser")
+	flags := newFlags("protect", "protect [--user moin] [app], a password on stdin or none to let moin make one; protect off [app] [--yes]").withApp().withYes()
+	user := flags.String("user", passwordUser, "username for the password prompt in the browser")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -280,7 +250,7 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			done(stdout, "Nothing changed: %s has no password.", name)
 			return nil
 		}
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Take the password away from %s? Anyone with the link can open it again.", name))
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Turn the password of %s off? Anyone with the link can open every address of it.", name))
 		if err != nil {
 			return err
 		}
@@ -292,12 +262,12 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			done(stdout, "Nothing changed: %s has no password.", name)
 			return nil
 		}
-		done(stdout, "%s is public again.", name)
+		done(stdout, "%s asks for no password now.", name)
 		reportChange(ctx, api, name, change, stdout)
 		return nil
 	}
 	if isTerminal(stdin) {
-		fmt.Fprintf(stdout, "Password for %s (user %s): ", name, *user)
+		fmt.Fprintf(stdout, "Password for %s (user %s), empty to let %s make one: ", name, *user, build.Name)
 	}
 	password, err := readSecret(stdin)
 	if isTerminal(stdin) {
@@ -306,16 +276,20 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
-	change, err := api.SetProtection(ctx, name, *user, password)
+	if *user == "" {
+		*user = passwordUser
+	}
+	answer, err := api.SetProtection(ctx, name, *user, password)
 	if err != nil {
 		return err
 	}
-	if change.Unchanged {
+	if answer.Unchanged {
 		done(stdout, "Nothing changed: %s asks for user %s and this password already.", name, *user)
 		return nil
 	}
-	done(stdout, "%s asks for user %s and the password now.", name, *user)
-	reportChange(ctx, api, name, change, stdout)
+	done(stdout, "Every address of %s asks for user %s and the password now.", name, *user)
+	printPassword(stdout, *user, answer.Password)
+	reportChange(ctx, api, name, answer.Change, stdout)
 	return nil
 }
 

@@ -247,19 +247,23 @@ func TestUptimeSwitch(t *testing.T) {
 	}
 }
 
-// The instant password switch answers the domains section as stored.
-func TestInstantPasswordSwitch(t *testing.T) {
+// The password switch answers the domains section as stored: off, then
+// on again with a password moin made, shown once.
+func TestPasswordSwitch(t *testing.T) {
 	s := newSwitches(t)
-	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/domains/instant-password"
-	pattern := "/app/{workspaceSlug}/apps/{app}/domains/instant-password"
+	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/domains/protect"
+	pattern := "/app/{workspaceSlug}/apps/{app}/domains/protect"
 	for _, on := range []bool{false, true} {
-		form := url.Values{"password": {"1"}}
+		form := url.Values{"switch": {"1"}}
 		if on {
 			form.Set("on", "1")
 		}
-		s.post(pattern, path, form, s.handler.SetInstantPassword)
-		if s.app().InstantOpen == on {
-			t.Fatalf("password on %v: open %v", on, s.app().InstantOpen)
+		body := s.post(pattern, path, form, s.handler.Protect)
+		if switchOn(t, body, "password-on") != on || (s.app().Protect != "") != on {
+			t.Fatalf("password on %v: protect %q, answer %s", on, s.app().Protect, body)
+		}
+		if strings.Contains(body, "data-new-password") != on {
+			t.Fatalf("password on %v: the new password shows %v", on, !on)
 		}
 	}
 }

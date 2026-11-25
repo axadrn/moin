@@ -75,7 +75,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | --- | --- |
 | `moin apps` | lists apps |
 | `moin apps <app>` | one app: its state, server, domains, password, repo and deploys, and "N changes waiting" with the restart that applies them |
-| `moin apps add --server <server> <name>` | adds an app and shows the password of its instant address, this once |
+| `moin apps add --server <server> <name>` | adds an app with its [password](/docs/guides/domains#password) on and shows the password, this once |
 | `moin apps rename <app> <new name>` | renames an app; its links, data, backups and instant address stay, the next restart gives its containers the name ([Names and links](/docs/guides/names)) |
 | `moin apps rm <app> [--confirm <app>]` | asks you to type its name and removes the app; its data stays on the server |
 | `moin apps pin [app]` · `moin apps unpin [app]` | keeps an app above the others that run fine, in every list |
@@ -84,7 +84,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 
 | Command | What it does |
 | --- | --- |
-| `moin deploy [--server <server>] [--detach] [--yes] [app]` | in the top folder of a GitHub repo, [deploys the commit you pushed](/docs/guides/deploy#deploy-what-you-pushed); refuses changes that are not committed or pushed. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts), and shows the password of its instant address once. An app that follows no repo is linked to this one. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
+| `moin deploy [--server <server>] [--detach] [--yes] [app]` | in the top folder of a GitHub repo, [deploys the commit you pushed](/docs/guides/deploy#deploy-what-you-pushed); refuses changes that are not committed or pushed. A new app asks `[y/N]` first, so a typo makes no new app (`--yes` in scripts), and shows its password once. An app that follows no repo is linked to this one. `--server` picks the server of a new app, `--detach` starts the deploy and does not wait |
 | `moin deploy --image <image> [--ref <ref>] [app]` | deploys an image built in CI as the main service, with the compose file of `--ref` in the linked repo, its branch by default. An app without a repo keeps the compose file it runs |
 | `moin deploy --ref <ref> [app]` | deploys a branch, tag or commit of the linked GitHub repo |
 | `moin redeploy [app]` | builds the newest source again, or pulls the image again, with the current env |
@@ -105,12 +105,10 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin domains add [--service <service>] <domain> ...` | adds domains; `--service` for a service of `compose.yml` other than the main one |
 | `moin domains rm [--service <service>] <domain> ... [--yes]` | removes domains |
 | `moin domains canonical <domain\|none>` | the domain the others redirect to, or none |
-| `moin instant [app]` | the [instant address](/docs/guides/domains#instant-address), `https://<app>.<ip>.sslip.io`, and its user |
-| `moin instant password [app]` | makes a new password for the instant address and shows it this once; the next restart applies it |
+| `moin instant [app]` | the [instant address](/docs/guides/domains#instant-address), `https://<app>.<ip>.sslip.io` |
 | `moin instant sslip.io\|nip.io\|off [app]` | picks the provider of the instant address, or turns it off |
-| `moin instant open\|protect [app]` | takes the password away from the instant address, or puts it back |
-| `moin protect [--user moin] [app]` | asks visitors for a password; the password comes on stdin, `--user` is the name the browser asks for |
-| `moin protect off [app] [--yes]` | makes the app public again |
+| `moin protect [--user moin] [app]` | turns the app's [password](/docs/guides/domains#password) on for every address. Your password comes on stdin; with nothing on stdin moin makes one and shows it this once. `--user` is the name the browser asks for |
+| `moin protect off [app] [--yes]` | turns the password off: every address is open |
 
 ## Uptime and metrics
 
@@ -143,7 +141,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | --- | --- |
 | `moin catalog` | the [catalog](/docs/guides/catalog), each app with its newest version |
 | `moin catalog <app>` | one catalog app with every version |
-| `moin catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy. `--version` defaults to the newest, `--name` to the catalog app's. A password the first sign-in needs shows once, at the end |
+| `moin catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]` | installs a catalog app and follows its first deploy. `--version` defaults to the newest, `--name` to the catalog app's. The app's password and one the first sign-in needs show once, at the end |
 | `moin update <app> [--version <tag>]` | sets a catalog app to a version, the newest by default, and deploys it; `moin backups` offers the copy before it |
 
 ## Env vars

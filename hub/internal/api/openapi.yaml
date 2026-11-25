@@ -1108,7 +1108,7 @@ paths:
       tags: [Apps]
       operationId: createApp
       summary: Add an app
-      description: The name is also the compose project on the server. The answer carries the password of the app's instant address, the one time moin shows it.
+      description: The name is also the compose project on the server. A new app starts with its password on, so every address of it asks for user `moin` and the password in the answer, the one time moin shows it. `DELETE /api/v1/apps/{app}/protection` turns it off.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1120,7 +1120,7 @@ paths:
               $ref: '#/components/schemas/CreateAppRequest'
       responses:
         '201':
-          description: The new app, with `instant_password`.
+          description: The new app, with `password`.
           content:
             application/json:
               schema:
@@ -1128,9 +1128,9 @@ paths:
                   - $ref: '#/components/schemas/App'
                   - type: object
                     properties:
-                      instant_password:
+                      password:
                         type: string
-                        description: The password of the instant address, user `moin`. The one time moin shows it; it keeps only its hash.
+                        description: The app's password, user `moin`, which every address of it asks for. The one time moin shows it; it keeps only its hash.
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
@@ -1828,7 +1828,7 @@ paths:
       tags: [Apps]
       operationId: getInstant
       summary: Get the instant address
-      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. A password guards it unless it is open: the app''s own one when it has one, else one moin made. moin showed that one once and keeps only its hash; `POST /api/v1/apps/{app}/instant/password` makes a new one.'
+      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. The app''s password guards it like every address of the app while `protected` is true.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [read]
@@ -1852,7 +1852,7 @@ paths:
       tags: [Apps]
       operationId: setInstant
       summary: Set the instant address
-      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`, and whether a password guards it. The change waits for the next restart. Empty `provider` keeps it; no `open` keeps the password as it is.'
+      description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`. The change waits for the next restart.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1886,42 +1886,14 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/apps/{app}/instant/password:
-    parameters:
-      - $ref: '#/components/parameters/AppName'
-    post:
-      tags: [Apps]
-      operationId: newInstantPassword
-      summary: Make a new instant password
-      description: 'Makes a new password for the app''s instant address and answers it: the one time moin shows it, it keeps only its hash. The app takes it on its next restart, start or deploy; until then the old one works.'
-      security:
-        - cookieAuth: []
-        - apiTokenAuth: [write]
-      responses:
-        '200':
-          description: The user and the new password.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InstantPassword'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/OnboardedForbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-          description: '`not_found`. No app with this ID or name belongs to the account.'
-        '500':
-          $ref: '#/components/responses/Internal'
-
   /api/v1/apps/{app}/protection:
     parameters:
       - $ref: '#/components/parameters/AppName'
     put:
       tags: [Apps]
       operationId: setProtection
-      summary: Protect with a password
-      description: Puts basic auth in front of the app. Only a bcrypt hash is stored.
+      summary: Turn the password on
+      description: 'Turns on the app''s one password: every address of the app, its domains and its instant address, asks for it with basic auth. With `password` it sets that one; without one moin makes one and answers it in `password`, the one time it shows it. `username` is `moin` when empty. Only a bcrypt hash is stored.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1937,7 +1909,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Change'
+                $ref: '#/components/schemas/Protection'
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
@@ -1951,13 +1923,14 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.password`.'
+          description: '`validation_failed` with `fields.password` or `fields.username`.'
         '500':
           $ref: '#/components/responses/Internal'
     delete:
       tags: [Apps]
       operationId: deleteProtection
-      summary: Remove the password
+      summary: Turn the password off
+      description: No address of the app asks for a password after its next restart, start or deploy.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -5093,7 +5066,7 @@ components:
           description: The domain the others redirect to. Empty for none.
         protected:
           type: boolean
-          description: A password guards the app.
+          description: The app's password is on. Every address of it asks for it, its domains and its instant address.
         service_domains:
           type: object
           description: The domains of the app's other services, by service.
@@ -5107,9 +5080,6 @@ components:
         instant_provider:
           type: string
           enum: [sslip.io, nip.io, 'off']
-        instant_open:
-          type: boolean
-          description: No password guards the instant address.
         stopped:
           type: boolean
           description: The app was stopped. A deploy, a restart or a start runs it again.
@@ -5284,7 +5254,7 @@ components:
           description: Set the domains of this service of compose.yml, not the main one. `canonical` is for the main service only.
     Instant:
       type: object
-      required: [url, provider, open, own_password]
+      required: [url, provider]
       properties:
         url:
           type: string
@@ -5295,24 +5265,6 @@ components:
         reason:
           type: string
           description: Why the app has no instant address.
-        open:
-          type: boolean
-          description: No password guards it.
-        user:
-          type: string
-          description: Who signs in with the password moin made. moin showed that password once, when it made it, and never again.
-        own_password:
-          type: boolean
-          description: The app's own password, the one of its domains, guards it.
-    InstantPassword:
-      type: object
-      required: [user, password]
-      properties:
-        user:
-          type: string
-        password:
-          type: string
-          description: The new password. The one time moin shows it; it keeps only its hash.
     SecretOn:
       type: object
       required: [server, updated_at]
@@ -5326,22 +5278,30 @@ components:
           description: When the server got it.
     InstantRequest:
       type: object
+      required: [provider]
       properties:
         provider:
           type: string
-          enum: ['', sslip.io, nip.io, 'off']
-        open:
-          type: boolean
+          enum: [sslip.io, nip.io, 'off']
     ProtectionRequest:
       type: object
-      required: [username, password]
       properties:
         username:
           type: string
+          description: Who signs in. `moin` when empty.
         password:
           type: string
           minLength: 8
           maxLength: 72
+          description: Your own password. Empty lets moin make one.
+    Protection:
+      allOf:
+        - $ref: '#/components/schemas/Change'
+        - type: object
+          properties:
+            password:
+              type: string
+              description: Only when moin made the password. The one time moin shows it; it keeps only its hash.
     DomainChecks:
       type: object
       required: [items]
@@ -5669,9 +5629,9 @@ components:
           additionalProperties:
             type: string
           description: Only on an install, for an app whose first sign-in needs a secret moin made, such as ADMIN_PASSWORD. The one time it is shown; keep it in your password manager.
-        instant_password:
+        password:
           type: string
-          description: Only on an install. The password of the app's instant address, the one time it is shown.
+          description: Only on an install. The app's password, user `moin`, which every address of it asks for. The one time it is shown.
     Databases:
       type: object
       required: [items]

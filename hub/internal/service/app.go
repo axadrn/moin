@@ -3,6 +3,7 @@ package service
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/secret"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/dotenv"
 	"github.com/axadrn/moin/protocol"
 	"github.com/google/uuid"
@@ -144,9 +146,9 @@ func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Bo
 	return service
 }
 
-// Create adds an app on one of the user's servers. The app it returns
-// carries the password of its instant address: the one time moin shows
-// it.
+// Create adds an app on one of the user's servers. A new app starts with
+// its password on, so nobody else can open it before its owner: the app it
+// returns carries the password moin made, the one time moin shows it.
 func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.App, error) {
 	name = strings.TrimSpace(name)
 	if !appNamePattern.MatchString(name) {
@@ -156,7 +158,11 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, CreatedAt: s.now().UTC()}
+	password, protect, err := newPassword(PasswordUser)
+	if err != nil {
+		return nil, err
+	}
+	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, Protect: protect, CreatedAt: s.now().UTC()}
 	// The folder is the name, unless an app renamed away from it still
 	// has it: then my-app-2, my-app-3 …
 	for number := 1; ; number++ {
@@ -177,11 +183,6 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	// The password of its instant address, shown this once.
-	password, err := s.newInstantPassword(app)
-	if err != nil {
-		return nil, err
-	}
 	s.servers.record(actor, "app.created", "app", name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
 	s.reconfigure(server.ID, actor.WorkspaceID)
@@ -189,7 +190,7 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	created.InstantPassword = password
+	created.Password = password
 	return created, nil
 }
 
@@ -615,50 +616,90 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 	return true, nil
 }
 
-// SetProtection puts a password in front of the app, or takes it away when
-// password is empty. The app takes it on its next restart. changed is false
-// when the app had this password, or none, already.
-func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (changed bool, err error) {
+// PasswordUser is the username of the password moin makes for an app.
+const PasswordUser = build.Name
+
+// SetProtection turns the app's password on: every address of the app
+// asks for it, its domains and its instant address. Without a password
+// moin makes one and returns it as made: the one time moin shows it, it
+// keeps only its hash. An empty username is PasswordUser. The app takes
+// it on its next restart. changed is false when the app had this password
+// already.
+func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (made string, changed bool, err error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return "", false, err
+	}
+	username = cmp.Or(strings.TrimSpace(username), PasswordUser)
+	if strings.ContainsAny(username, ": ,") {
+		return "", false, ErrProtectUser
+	}
+	// On already, and no password given: nothing changes. A new one is
+	// off, then on.
+	if password == "" && app.Protect != "" {
+		return "", false, nil
+	}
+	var protect string
+	if password == "" {
+		made, protect, err = newPassword(username)
+		if err != nil {
+			return "", false, err
+		}
+	} else {
+		if len(password) < 8 || len(password) > 72 {
+			return "", false, ErrProtect
+		}
+		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
+			return "", false, nil
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return "", false, err
+		}
+		protect = username + ":" + string(hash)
+	}
+	err = s.apps.SetProtect(app.ID, protect)
+	if err != nil {
+		return "", false, err
+	}
+	s.servers.record(actor, "app.protected", "app", app.Name, nil)
+	s.notify(actor.WorkspaceID)
+	return made, true, nil
+}
+
+// RemoveProtection turns the app's password off: no address of the app
+// asks for one after its next restart. changed is false when it was off.
+func (s *AppService) RemoveProtection(actor Actor, idOrName string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err
 	}
-	protect := ""
-	if password != "" {
-		username = strings.TrimSpace(username)
-		if username == "" || strings.ContainsAny(username, ": ") {
-			return false, ErrProtectUser
-		}
-		if len(password) < 8 || len(password) > 72 {
-			return false, ErrProtect
-		}
-		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
-			return false, nil
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		if err != nil {
-			return false, err
-		}
-		protect = username + ":" + string(hash)
-	} else if app.Protect == "" {
+	if app.Protect == "" {
 		return false, nil
 	}
-	err = s.apps.SetProtect(app.ID, protect)
+	err = s.apps.SetProtect(app.ID, "")
 	if err != nil {
 		return false, err
 	}
-	action := "app.protected"
-	if protect == "" {
-		action = "app.unprotected"
-	}
-	s.servers.record(actor, action, "app", app.Name, nil)
+	s.servers.record(actor, "app.unprotected", "app", app.Name, nil)
 	s.notify(actor.WorkspaceID)
 	return true, nil
 }
 
+// newPassword makes a password for user and its htpasswd line,
+// user:bcrypt hash.
+func newPassword(user string) (password, protect string, err error) {
+	password = rand.Text()[:20]
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", "", err
+	}
+	return password, user + ":" + string(hash), nil
+}
+
 // waitingActions are the changes an app takes only on its next restart,
 // start or deploy: saving never restarts it (DESIGN.md, Feedback).
-var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.instant_password", "app.bucket_set", "app.renamed"}
+var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set", "app.renamed"}
 
 // ChangesWaiting counts the changes made to an app since its live deploy
 // started, which its next restart applies. A stopped app or one never

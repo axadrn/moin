@@ -518,20 +518,14 @@ func (m model) domainsTab(u ui, w, h int, a client.App) string {
 	if in := m.app.instant; in != nil {
 		switch {
 		case in.URL != "":
-			v := u.text(in.URL)
-			if in.Open {
-				v += u.faint("  open")
-			} else {
-				v += u.faint("  behind a password")
-			}
-			body = append(body, kv("instant address", v))
+			body = append(body, kv("instant address", u.text(in.URL)))
 		case in.Reason != "":
 			body = append(body, kv("instant address", u.faint(in.Reason)))
 		}
 	}
-	prot := u.faint("off · p protects it")
+	prot := u.faint("off · p turns it on")
 	if a.Protected {
-		prot = u.warn("on") + u.faint(" · p removes it")
+		prot = u.warn("on") + u.faint(", every address · p turns it off")
 	}
 	body = append(body, kv("password", prot))
 	return u.panel("Domains", u.faint(fmt.Sprint(len(m.app.domains))), body, w, h, true)

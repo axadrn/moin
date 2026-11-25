@@ -384,7 +384,7 @@ func TestLinkUnreadableRepo(t *testing.T) {
 func TestNothingChanged(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","protected":false},"deploys":[]}`}}
 	code, stdout, stderr := runCLI(t, api, "protect", "off", "shop")
-	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "public again") || api.seen("DELETE") {
+	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "no password now") || api.seen("DELETE") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
@@ -660,25 +660,28 @@ func TestDeployTakesTheAppThatFollowsTheRepo(t *testing.T) {
 	}
 }
 
-// TestInstantPassword: moin shows the password of the instant address
-// once, when it makes the app or a new password, never again.
-func TestInstantPassword(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"POST /api/v1/apps": `{"name":"shop","server_name":"server-1","instant_password":"pw-shown-once"}`}}
+// TestPassword: moin shows the app's password once, when it makes the
+// app or turns the password on without one, never again. The instant
+// address has no password of its own.
+func TestPassword(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"POST /api/v1/apps": `{"name":"shop","server_name":"server-1","protected":true,"password":"pw-shown-once"}`}}
 	code, stdout, stderr := runCLI(t, api, "apps", "add", "--server", "server-1", "shop")
-	if code != 0 || !strings.Contains(stdout, "pw-shown-once") || !strings.Contains(stdout, "only this once") {
+	if code != 0 || !strings.Contains(stdout, "pw-shown-once") || !strings.Contains(stdout, "only this once") || !strings.Contains(stdout, "user moin") {
 		t.Fatalf("add: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	api = &fakeAPI{answers: map[string]string{"POST /api/v1/apps/shop/instant/password": `{"user":"moin","password":"pw-new"}`}}
-	code, stdout, stderr = runCLI(t, api, "instant", "password", "shop")
-	if code != 0 || !strings.Contains(stdout, "pw-new") || !strings.Contains(stdout, "restart shop") {
-		t.Fatalf("password: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	api = &fakeAPI{answers: map[string]string{"PUT /api/v1/apps/shop/protection": `{"app":{"name":"shop","protected":true},"deploy":null,"password":"pw-new"}`}}
+	code, stdout, stderr = runCLI(t, api, "protect", "shop")
+	if code != 0 || !strings.Contains(stdout, "pw-new") || !strings.Contains(stdout, "Every address of shop") {
+		t.Fatalf("protect: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/instant": `{"url":"https://shop.203-0-113-7.sslip.io","provider":"sslip.io","user":"moin"}`}}
+	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/instant": `{"url":"https://shop.203-0-113-7.sslip.io","provider":"sslip.io"}`}}
 	code, stdout, stderr = runCLI(t, api, "instant", "shop")
-	if code != 0 || !strings.Contains(stdout, "instant password shop") || strings.Contains(strings.Join(api.requests, " "), "show") {
+	if code != 0 || !strings.Contains(stdout, "sslip.io") || strings.Contains(stdout, "password") {
 		t.Fatalf("show: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
 	}
-	if code, _, _ := runCLI(t, api, "instant", "--show", "shop"); code == 0 {
-		t.Fatal("instant --show still runs")
+	for _, gone := range []string{"password", "open", "protect"} {
+		if code, _, _ := runCLI(t, &fakeAPI{}, "instant", gone, "shop"); code == 0 {
+			t.Errorf("instant %s still runs", gone)
+		}
 	}
 }

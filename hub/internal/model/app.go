@@ -24,19 +24,17 @@ type App struct {
 	// Domains are the domains of the app, oldest first, from the domains
 	// table.
 	Domains []Domain `db:"-"`
-	// Protect is an htpasswd line when a password protects the app.
+	// Protect is the app's password as an htpasswd line, user:bcrypt hash,
+	// empty when it is off. When it is on, every address of the app asks
+	// for it: its domains and its instant address.
 	Protect string `db:"protect"`
+	// Password is the password moin just made, only in the answer of
+	// Create: moin keeps its hash, never the password.
+	Password string `db:"-"`
 	// Instant is the provider of the instant address, such as sslip.io, or
-	// off; InstantHost the address the last deploy served it at. A password
-	// guards it unless InstantOpen: Protect when set, else the one moin made,
-	// shown once and kept as its bcrypt hash, InstantPasswordHash.
-	Instant             string `db:"instant"`
-	InstantHost         string `db:"instant_host"`
-	InstantOpen         bool   `db:"instant_open"`
-	InstantPasswordHash string `db:"instant_password_hash"`
-	// InstantPassword is the password moin just made, only in the answer
-	// of Create: moin keeps its hash, never the password.
-	InstantPassword string `db:"-"`
+	// off; InstantHost the address the last deploy served it at.
+	Instant     string `db:"instant"`
+	InstantHost string `db:"instant_host"`
 	// Repo is owner/name on GitHub when the app follows one, with its
 	// branch; AutoDeploy deploys every push to it.
 	Repo           string `db:"repo"`

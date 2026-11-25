@@ -10,8 +10,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/testutil"
 )
 
-// TestSecretsOnServersWeb: a new app shows its instant password once in
-// place of the form, New password shows another once, and the keys of
+// TestSecretsOnServersWeb: a new app shows its password once in place of
+// the form, the password switch on again shows another once, and the keys of
 // buckets and registries go to a server: the page says which keep them
 // and refuses an offline one in its own words.
 func TestSecretsOnServersWeb(t *testing.T) {
@@ -24,16 +24,18 @@ func TestSecretsOnServersWeb(t *testing.T) {
 	base := "/app/" + s.ada.Workspace.Slug
 
 	added := s.post("/app/{workspaceSlug}/apps", base+"/apps", url.Values{"name": {"shop"}, "server": {"web-1"}}, s.handler.Create)
-	if !strings.Contains(added, "data-app-added") || !strings.Contains(added, "data-instant-password") || !strings.Contains(added, "only this once") {
+	if !strings.Contains(added, "data-app-added") || !strings.Contains(added, "data-new-password") || !strings.Contains(added, "only this once") {
 		t.Fatalf("create: %s", added)
 	}
 
-	before := s.app().InstantPasswordHash
-	fresh := s.post("/app/{workspaceSlug}/apps/{app}/domains/instant-new-password", base+"/apps/blog/domains/instant-new-password", url.Values{}, s.handler.NewInstantPassword)
-	if !strings.Contains(fresh, "data-instant-password") || !strings.Contains(fresh, "Shown once.") || s.app().InstantPasswordHash == before {
+	// Off, then on: a new password, shown once.
+	s.post("/app/{workspaceSlug}/apps/{app}/domains/protect", base+"/apps/blog/domains/protect", url.Values{"switch": {"1"}}, s.handler.Protect)
+	before := s.app().Protect
+	fresh := s.post("/app/{workspaceSlug}/apps/{app}/domains/protect", base+"/apps/blog/domains/protect", url.Values{"switch": {"1"}, "on": {"1"}}, s.handler.Protect)
+	if !strings.Contains(fresh, "data-new-password") || !strings.Contains(fresh, "Shown once.") || s.app().Protect == before {
 		t.Fatalf("new password: %s", fresh)
 	}
-	if again := s.post("/app/{workspaceSlug}/apps/{app}/domains/detail", base+"/apps/blog/domains/detail", url.Values{}, s.handler.DomainsDetail); strings.Contains(again, "data-instant-password") {
+	if again := s.post("/app/{workspaceSlug}/apps/{app}/domains/detail", base+"/apps/blog/domains/detail", url.Values{}, s.handler.DomainsDetail); strings.Contains(again, "data-new-password") {
 		t.Fatalf("the password shows twice: %s", again)
 	}
 

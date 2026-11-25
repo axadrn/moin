@@ -27,10 +27,10 @@ type App struct {
 	Protected    bool     `json:"protected"`
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
-	// Instant is the instant address, "" when the app has none.
+	// Instant is the instant address, "" when the app has none. The
+	// app's password guards it like every address of the app.
 	Instant         string `json:"instant"`
 	InstantProvider string `json:"instant_provider"`
-	InstantOpen     bool   `json:"instant_open"`
 	Stopped         bool   `json:"stopped"`
 	// ChangesWaiting counts the changes saved since the live deploy
 	// started; a restart applies them. Only App fills it.
@@ -55,9 +55,9 @@ type App struct {
 	// an app of your own.
 	Catalog   string    `json:"catalog"`
 	CreatedAt time.Time `json:"created_at"`
-	// InstantPassword is the password of the instant address, only in the
-	// answer that created the app: the one time moin shows it.
-	InstantPassword string `json:"instant_password"`
+	// Password is the app's password, user moin, only in the answer that
+	// created the app: the one time moin shows it.
+	Password string `json:"password"`
 }
 
 // Deploy is one version of an app, v12.
@@ -370,56 +370,41 @@ func (c *Client) SetServiceDomains(ctx context.Context, app, service string, dom
 
 // Instant is the app's instant address, or why it has none.
 type Instant struct {
-	URL         string `json:"url"`
-	Provider    string `json:"provider"`
-	Reason      string `json:"reason"`
-	Open        bool   `json:"open"`
-	User        string `json:"user"`
-	OwnPassword bool   `json:"own_password"`
+	URL      string `json:"url"`
+	Provider string `json:"provider"`
+	Reason   string `json:"reason"`
 }
 
-// Instant reports the app's instant address. moin never shows its
-// password again: NewInstantPassword makes a new one.
+// Instant reports the app's instant address.
 func (c *Client) Instant(ctx context.Context, app string) (Instant, error) {
 	var response Instant
 	err := c.do(ctx, http.MethodGet, appPath(app, "instant"), nil, &response)
 	return response, err
 }
 
-// InstantPassword is a new password of the instant address, shown once.
-type InstantPassword struct {
-	User     string `json:"user"`
+// SetInstant picks the provider of the instant address, or off.
+func (c *Client) SetInstant(ctx context.Context, app, provider string) (Change, error) {
+	var response Change
+	err := c.do(ctx, http.MethodPut, appPath(app, "instant"), map[string]string{"provider": provider}, &response)
+	return response, err
+}
+
+// Protection is the answer of SetProtection: the change, and the password
+// moin made when none was given, the one time it shows it.
+type Protection struct {
+	Change
 	Password string `json:"password"`
 }
 
-// NewInstantPassword makes a new password for the instant address: the
-// one time moin shows it. The app takes it on its next restart.
-func (c *Client) NewInstantPassword(ctx context.Context, app string) (InstantPassword, error) {
-	var response InstantPassword
-	err := c.do(ctx, http.MethodPost, appPath(app, "instant", "password"), nil, &response)
-	return response, err
-}
-
-// SetInstant picks the provider of the instant address or off ("" keeps
-// it), and whether it is open (nil keeps it).
-func (c *Client) SetInstant(ctx context.Context, app, provider string, open *bool) (Change, error) {
-	var response Change
-	body := map[string]any{"provider": provider}
-	if open != nil {
-		body["open"] = *open
-	}
-	err := c.do(ctx, http.MethodPut, appPath(app, "instant"), body, &response)
-	return response, err
-}
-
-// SetProtection puts a password in front of the app.
-func (c *Client) SetProtection(ctx context.Context, app, username, password string) (Change, error) {
-	var response Change
+// SetProtection turns the app's password on for every address of it. An
+// empty password lets moin make one.
+func (c *Client) SetProtection(ctx context.Context, app, username, password string) (Protection, error) {
+	var response Protection
 	err := c.do(ctx, http.MethodPut, appPath(app, "protection"), map[string]string{"username": username, "password": password}, &response)
 	return response, err
 }
 
-// RemoveProtection takes the password away.
+// RemoveProtection turns the app's password off.
 func (c *Client) RemoveProtection(ctx context.Context, app string) (Change, error) {
 	var response Change
 	err := c.do(ctx, http.MethodDelete, appPath(app, "protection"), nil, &response)

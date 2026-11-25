@@ -372,14 +372,13 @@ func routeService(release *release, config map[string]any, name string, service 
 	domains := release.start.Domains
 	if name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != "") {
 		addRouters(config, service, routes{
-			app:            app,
-			router:         project(app),
-			domains:        detected.Domains,
-			canonical:      detected.Canonical,
-			port:           detected.Port,
-			protect:        protectHash(domains),
-			instant:        detected.Instant,
-			instantProtect: instantProtectHash(domains),
+			app:       app,
+			router:    project(app),
+			domains:   detected.Domains,
+			canonical: detected.Canonical,
+			port:      detected.Port,
+			protect:   protectHash(domains),
+			instant:   detected.Instant,
 		})
 		return
 	}

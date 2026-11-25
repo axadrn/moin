@@ -1,6 +1,6 @@
 ---
 title: "Domains"
-description: "The instant address, your own domains with HTTPS, the www redirect and a password"
+description: "The instant address, your own domains with HTTPS, the www redirect and the app's password"
 group: "Apps"
 order: 2
 ---
@@ -54,25 +54,15 @@ https://<app>.<ip-dashes>.sslip.io
 https://my-app.203-0-113-7.sslip.io
 ```
 
-The name carries the server's IP, so it needs no DNS. A password guards it by default, user `moin`: the app's own [password](#protect-with-a-password) when it has one, else one moin made.
+The name carries the server's IP, so it needs no DNS. The app's [password](#password) guards it, like every address of the app.
 
-moin shows its password once, when it makes the app: on the web, in `moin apps add` and `moin deploy`, in the API and MCP answer as `instant_password`. It keeps only a hash, so it can never show it again. Lost it? Make a new one. It is shown once too, and the app takes it on its next restart.
+`moin instant` shows the address, `GET /api/v1/apps/{app}/instant` and `get_instant` the same.
 
-```surfaces
-Web: the app, **Instant address**, **New password**
-CLI: moin instant password
-TUI: on the app, `o`: the instant address
-API: POST /api/v1/apps/{app}/instant/password
-MCP: new_instant_password
-```
-
-`moin instant` shows the address and its user, `GET /api/v1/apps/{app}/instant` and `get_instant` the same.
-
-Switch the provider, drop the password, or turn the address off:
+Switch the provider, or turn the address off:
 
 ```surfaces
-Web: the app, **Instant address**, **Provider** or the **Password** switch
-CLI: moin instant nip.io, moin instant open, moin instant protect, moin instant off
+Web: the app, **Instant address**, **Provider** or its switch
+CLI: moin instant nip.io, moin instant off
 TUI: on the app, `W`
 API: PUT /api/v1/apps/{app}/instant
 MCP: set_instant
@@ -122,27 +112,43 @@ MCP: set_domains
 
 `moin domains canonical none` turns the redirect off. The API and MCP take it as `canonical`.
 
-## Protect with a password
+## Password
 
-A username and password in front of the app, for staging or a preview. Visitors see their browser's sign-in box. moin stores only a hash.
+One rule: an app has one password. When it is on, every address of the app asks for it: the instant address, every domain and the domains of its other services. When it is off, none does. Visitors see their browser's sign-in box. moin stores only a hash.
 
-```surfaces
-Web: the app page, **Domains**, **Ask for a password**, then **Set password**
-CLI: moin protect --user <username>
-TUI: on the app, `o`, `p`, then type `<username>:<password>`
-API: PUT /api/v1/apps/{app}/protection
-MCP: set_protection
-```
+A new app starts with it on. So nobody else gets in before you, also not to the setup page of an app where the first visitor becomes the admin. moin makes the password, user `moin`, and shows it once: on the web, in `moin apps add`, `moin deploy` and `moin catalog install`, in the API and MCP answer as `password`. Keep it in your password manager.
 
-The username is `moin` unless you pick one. The CLI reads the password from stdin. To make the app public again:
+Turn it off for an app the world should see:
 
 ```surfaces
-Web: the app page, **Domains**, **Remove password**
+Web: the app page, **Domains**, the **Ask for a password** switch
 CLI: moin protect off
 TUI: on the app, `o`, `p`, then `y`
 API: DELETE /api/v1/apps/{app}/protection
 MCP: remove_protection
 ```
+
+Turn it on again. moin makes a new password and shows it once. When it is on already, this changes nothing: lost the password? Turn it off, then on, or set your own.
+
+```surfaces
+Web: the app page, **Domains**, the **Ask for a password** switch
+CLI: moin protect, with nothing on stdin
+TUI: opens the web
+API: PUT /api/v1/apps/{app}/protection with {}
+MCP: set_protection
+```
+
+Or set your own, also to replace a password you lost:
+
+```surfaces
+Web: the app page, **Domains**, **Use your own password**, then **Set password**
+CLI: moin protect --user <username>, the password on stdin
+TUI: on the app, `o`, `p`, then type `<username>:<password>`
+API: PUT /api/v1/apps/{app}/protection with {"username", "password"}
+MCP: set_protection with username and password
+```
+
+The username is `moin` unless you pick one. A password has 8 to 72 characters.
 
 ## Domains per service
 

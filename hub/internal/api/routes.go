@@ -152,7 +152,6 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"PUT /api/v1/apps/{app}/domains", m.InWorkspace(h.Apps.SetDomains), TokenWrite},
 		{"GET /api/v1/apps/{app}/instant", m.InWorkspace(h.Apps.GetInstant), TokenRead},
 		{"PUT /api/v1/apps/{app}/instant", m.InWorkspace(h.Apps.SetInstant), TokenWrite},
-		{"POST /api/v1/apps/{app}/instant/password", m.InWorkspace(h.Apps.NewInstantPassword), TokenWrite},
 		{"PUT /api/v1/apps/{app}/protection", m.InWorkspace(h.Apps.SetProtection), TokenWrite},
 		{"DELETE /api/v1/apps/{app}/protection", m.InWorkspace(h.Apps.DeleteProtection), TokenWrite},
 		{"GET /api/v1/registries", m.InWorkspace(h.Apps.Registries), TokenRead},
