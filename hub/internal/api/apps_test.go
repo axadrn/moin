@@ -38,7 +38,7 @@ func TestAppDomainsRules(t *testing.T) {
 // the domain, the same for the web, the API, the CLI and MCP.
 func TestDomainUsedNamesTheDomain(t *testing.T) {
 	status, detail, known := api.ErrorFor(&repository.DomainUsedError{Name: "example.com"})
-	if status != http.StatusUnprocessableEntity || !known || detail.Fields["domains"] != "example.com is already used by another app or service." {
+	if status != http.StatusUnprocessableEntity || !known || detail.Fields["domains"] != "example.com is already used by another service of this app." {
 		t.Fatalf("ErrorFor = %d, %+v, %v", status, detail, known)
 	}
 }

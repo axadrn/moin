@@ -1787,7 +1787,7 @@ paths:
       tags: [Apps]
       operationId: setDomains
       summary: Set domains
-      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of one app in the whole hub. HTTPS is always on; Traefik gets certificates from Let''s Encrypt.'
+      description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of the app; another app may use it too. HTTPS is always on; Traefik gets certificates from Let''s Encrypt.'
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -1817,7 +1817,7 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.domains`, also when another app or service uses a domain already, `fields.canonical` or `fields.service`.'
+          description: '`validation_failed` with `fields.domains`, also when another service of the app uses a domain already, `fields.canonical` or `fields.service`.'
         '500':
           $ref: '#/components/responses/Internal'
 
