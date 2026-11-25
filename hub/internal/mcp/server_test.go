@@ -382,7 +382,7 @@ func TestOpsToolsActAsMembersAndStopAfterRemoval(t *testing.T) {
 	upgrade(t, env, owner)
 	member := connectHTTP(t, env, addMember(t, env, owner, "dev", model.WorkspaceRoleMember, allRights...))
 
-	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"name": "mcp-1"}))
+	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"server": "mcp-1"}))
 	activity := output[mcp.Activity](t, call(t, member, "list_activity", nil))
 	if len(activity.Items) == 0 || activity.Items[0].Summary != "added the server mcp-1" || activity.Items[0].Via != "mcp" {
 		t.Fatalf("activity = %#v", activity.Items)
@@ -436,7 +436,9 @@ func TestOnlyQueryDatabaseTakesALimit(t *testing.T) {
 	}
 }
 
-func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
+// TestAppAndServerParameters: tools name the app app and the server
+// server; the old spelling name is gone.
+func TestAppAndServerParameters(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "names")
 	upgrade(t, env, owner)
@@ -444,11 +446,12 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	session := connectMemory(t, env.server, owner, token)
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
-	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"name": "box-2"}))
+	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-2"}))
 	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
-	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"name": "blog", "server": "box-1"}))
-	for _, input := range []map[string]any{{"app": "shop"}, {"name": "blog"}} {
-		output[mcp.AppDetail](t, call(t, session, "get_app", input))
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "blog", "server": "box-1"}))
+	output[mcp.AppDetail](t, call(t, session, "get_app", map[string]any{"app": "shop"}))
+	if result := call(t, session, "get_app", map[string]any{"name": "blog"}); !result.IsError {
+		t.Fatal("get_app took the old field name")
 	}
 	install := output[mcp.NewInstall](t, call(t, session, "new_install_command", map[string]any{"server": "box-2"}))
 	if !strings.Contains(install.InstallCommand, install.InstallToken) {
@@ -497,7 +500,7 @@ func TestExecCommandIsForOwnersAndAdmins(t *testing.T) {
 	owner := seedOwner(t, env, "execs")
 	upgrade(t, env, owner)
 	member := connectHTTP(t, env, addMember(t, env, owner, "runner", model.WorkspaceRoleMember, allRights...))
-	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"name": "exec-1"}))
+	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"server": "exec-1"}))
 	toolError(t, call(t, member, "exec_command", map[string]any{"app": "blog", "command": "ls /data"}), "forbidden")
 	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
@@ -545,7 +548,7 @@ func TestSecretsGoToServers(t *testing.T) {
 	if len(added.Servers) != 1 || added.Servers[0].Server != "server-1" || strings.Join(added.MissingOn, ",") != "server-2" {
 		t.Fatalf("add_bucket = %+v", added)
 	}
-	toolError(t, call(t, session, "set_bucket_key", map[string]any{"bucket": "main", "server": "server-2", "secret_key": "s"}), "server_offline")
+	toolError(t, call(t, session, "set_bucket_key", map[string]any{"name": "main", "server": "server-2", "secret_key": "s"}), "server_offline")
 	integrations := output[mcp.Integrations](t, call(t, session, "set_integrations", map[string]any{"tailscale_key": "tskey-auth-1", "server": "server-1"}))
 	if len(integrations.Tailscale.Servers) != 1 || strings.Join(integrations.Tailscale.MissingOn, ",") != "server-2" {
 		t.Fatalf("set_integrations = %+v", integrations)

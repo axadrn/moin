@@ -12,8 +12,9 @@ WHERE deploys.status = 'succeeded' AND json_valid(deploys.detected)
 
 -- The domains. Only the services whose domains the old block set change:
 -- their rows become what the live deploy served for them. Domains entered
--- in moin for the other services stay as they are. When two apps served
--- the same name, the older app keeps it, as in 052.
+-- in moin for the other services stay as they are. A domain is unique per
+-- app since 053, so a name another app has too never gets in the way; OR
+-- IGNORE only drops a name the app has twice.
 CREATE TEMP TABLE file_main AS
 SELECT app_id, detected FROM live
 WHERE json_array_length(detected, '$.config.domains') > 0

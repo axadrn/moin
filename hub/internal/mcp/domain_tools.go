@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -55,7 +54,7 @@ func (d DomainChecks) Summary() string {
 }
 
 func (t moinTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {
-	checks, err := t.services.Apps.CheckDomains(ctx, caller.Bearer.WorkspaceID, input.app())
+	checks, err := t.services.Apps.CheckDomains(ctx, caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return DomainChecks{}, err
 	}
@@ -79,14 +78,11 @@ func (c Change) Summary() string {
 	if c.Unchanged {
 		return "Nothing changed."
 	}
-	if c.Deploy == nil {
-		return "Saved. The app takes it with its next restart, start or deploy (restart_app)."
-	}
-	return fmt.Sprintf("Saved. Deploy v%d applies it now.", c.Deploy.Number)
+	return "Saved. The app takes it with its next restart, start or deploy (restart_app)."
 }
 
-func (t moinTools) change(caller Caller, app string, deploy *model.Deploy, changed bool) (Change, error) {
-	answer, err := api.NewChange(t.services.Apps, caller.Bearer.WorkspaceID, app, deploy, changed)
+func (t moinTools) change(caller Caller, app string, changed bool) (Change, error) {
+	answer, err := api.NewChange(t.services.Apps, caller.Bearer.WorkspaceID, app, changed)
 	return Change{answer}, err
 }
 
@@ -95,7 +91,7 @@ func (t moinTools) setDomains(_ context.Context, caller Caller, input DomainsInp
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, nil, changed)
+	return t.change(caller, input.App, changed)
 }
 
 // InstantInput is the input of get_instant.
@@ -134,7 +130,7 @@ func (t moinTools) setInstant(_ context.Context, caller Caller, input SetInstant
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.App, nil, changed)
+	return t.change(caller, input.App, changed)
 }
 
 // ProtectionInput is the input of set_protection.
@@ -162,14 +158,14 @@ func (t moinTools) setProtection(_ context.Context, caller Caller, input Protect
 	if err != nil {
 		return Protection{}, err
 	}
-	answer, err := t.change(caller, input.App, nil, changed)
+	answer, err := t.change(caller, input.App, changed)
 	return Protection{api.Protection{Change: answer.Change, Password: made}}, err
 }
 
 func (t moinTools) removeProtection(_ context.Context, caller Caller, input AppInput) (Change, error) {
-	changed, err := t.services.Apps.RemoveProtection(caller.actor(), input.app())
+	changed, err := t.services.Apps.RemoveProtection(caller.actor(), input.App)
 	if err != nil {
 		return Change{}, err
 	}
-	return t.change(caller, input.app(), nil, changed)
+	return t.change(caller, input.App, changed)
 }

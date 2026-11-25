@@ -21,7 +21,8 @@ func seedVerifiedUser(t *testing.T, environment *apiEnvironment, id, name string
 }
 
 // TestEmailChangeVerify: like the link on the web, verifying the new
-// address ends every session; a cookie caller gets a new one.
+// address ends every other session; a cookie caller keeps its own and
+// gets no new one, so the link never makes a session look fresh.
 func TestEmailChangeVerify(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	user := seedVerifiedUser(t, environment, "mover", "Mover")
@@ -38,15 +39,12 @@ func TestEmailChangeVerify(t *testing.T) {
 	if response.User.ID != user.ID || response.User.Email != "moved@example.com" {
 		t.Fatalf("response = %#v", response)
 	}
-	fresh := cookieValue(recorder, "session_token")
-	if fresh == "" || fresh == caller {
-		t.Fatalf("the cookie caller got no new session: %v", recorder.Result().Cookies())
+	if fresh := cookieValue(recorder, "session_token"); fresh != "" {
+		t.Fatalf("the cookie caller got a new session: %v", recorder.Result().Cookies())
 	}
-	for _, old := range []string{other, caller} {
-		stale := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: old})
-		expectError(t, stale, http.StatusUnauthorized, "unauthenticated")
-	}
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: fresh}), http.StatusOK)
+	stale := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: other})
+	expectError(t, stale, http.StatusUnauthorized, "unauthenticated")
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: caller}), http.StatusOK)
 
 	reused := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/email-change/verify", body: `{"token":"` + token + `"}`})
 	expectError(t, reused, http.StatusBadRequest, "invalid_token")

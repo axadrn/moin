@@ -139,7 +139,7 @@ func TestAutoDeploySwitch(t *testing.T) {
 		t.Fatalf("without a repo the switch went on: %s", body)
 	}
 
-	if _, err := s.apps.LinkRepo(context.Background(), s.actor(), "blog", "axadrn/blog", "main", true); err == nil {
+	if _, err := s.apps.LinkRepo(context.Background(), s.actor(), "blog", "axadrn/blog", "main", new(true)); err == nil {
 		t.Fatal("linked without GitHub")
 	}
 	// No GitHub is set up here: linking needs it, the switch must not.

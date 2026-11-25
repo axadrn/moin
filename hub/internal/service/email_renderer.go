@@ -50,7 +50,7 @@ var transactionalEmailTemplate = template.Must(template.New("transactional_email
               </p>
               {{end}}
               {{range .Outro}}<p style="margin:0 0 16px;font-size:16px;line-height:1.6;">{{.}}</p>{{end}}
-              <p style="margin:24px 0 0;font-size:16px;line-height:1.6;">Best,<br>The {{.AppName}} Team</p>
+              <p style="margin:24px 0 0;font-size:16px;line-height:1.6;">{{.AppName}}</p>
             </td>
           </tr>
         </table>
@@ -73,7 +73,7 @@ func renderEmail(content emailContent) (renderedEmail, error) {
 	for _, paragraph := range content.Outro {
 		blocks = appendEmailBlock(blocks, paragraph)
 	}
-	blocks = append(blocks, "Best,\nThe "+content.AppName+" Team")
+	blocks = append(blocks, content.AppName)
 
 	var html strings.Builder
 	if err := transactionalEmailTemplate.Execute(&html, content); err != nil {

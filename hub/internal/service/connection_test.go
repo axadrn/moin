@@ -261,6 +261,87 @@ func TestEndAllForUserEndsEveryConnection(t *testing.T) {
 	}
 }
 
+// TestRecoveryKeyEndsConnectionsAndCITokens: a recovery key throws out
+// what a stolen GitHub account let in. Every connection of the account,
+// an AI agent's OAuth grant included, and every CI token stop working, and
+// the activity says why. Those of another account stay.
+func TestRecoveryKeyEndsConnectionsAndCITokens(t *testing.T) {
+	e := newDeviceLoginEnvironment(t)
+	e.auth.UseBearers(e.connections, NewCITokenService(repository.NewCITokens(e.database), repository.NewApps(e.database, e.database), e.workspaceService))
+	ciTokens := e.auth.ciTokens
+	other := testutil.SeedUser(t, e.database, testutil.UserOptions{ID: "bob", Email: "bob@example.com", Name: "Bob", Verified: true})
+	cli := e.connect(t, model.DefaultRights)
+	agent, err := e.connections.Create(NewConnection{UserID: e.user.User.ID, WorkspaceID: e.user.Workspace.ID, ClientName: "Claude", Rights: model.DefaultRights, ClientID: "client-1", Resource: "/mcp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentTokens, err := e.connections.Issue(agent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ci, err := ciTokens.Create(Actor{WorkspaceID: e.user.Workspace.ID, UserID: e.user.User.ID}, NewCIToken{Name: "ci"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bobConnection, err := e.connections.Create(NewConnection{UserID: other.User.ID, WorkspaceID: other.Workspace.ID, ClientName: "moin CLI", Rights: model.DefaultRights})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bobTokens, err := e.connections.Issue(bobConnection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, bobCI, err := ciTokens.Create(Actor{WorkspaceID: other.Workspace.ID, UserID: other.User.ID}, NewCIToken{Name: "ci"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := e.auth.CreateRecoveryKey(e.user.User.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := e.auth.SignInWithRecoveryKey(key); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, access := range []string{cli.Access, agentTokens.Access} {
+		if _, err := e.connections.Authenticate(access); err == nil {
+			t.Error("a connection works after the recovery key")
+		}
+	}
+	if _, err := e.connections.Refresh(agentTokens.Refresh, "client-1"); err == nil {
+		t.Error("the AI agent refreshed its tokens after the recovery key")
+	}
+	if _, err := ciTokens.Authenticate(ci); err == nil {
+		t.Error("a CI token works after the recovery key")
+	}
+	if _, err := e.connections.Authenticate(bobTokens.Access); err != nil {
+		t.Errorf("the connection of another account ended: %v", err)
+	}
+	if _, err := ciTokens.Authenticate(bobCI); err != nil {
+		t.Errorf("the CI token of another account was removed: %v", err)
+	}
+	events, err := e.activity.ListByWorkspace(e.user.Workspace.ID, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ended, removed := 0, 0
+	for _, event := range events {
+		if !strings.Contains(event.Metadata, "a recovery key was used") {
+			continue
+		}
+		switch event.Action {
+		case "connection.ended":
+			ended++
+		case "ci_token.removed":
+			removed++
+		}
+	}
+	if ended != 2 || removed != 1 {
+		t.Fatalf("activity: %d connections ended, %d CI tokens removed, want 2 and 1", ended, removed)
+	}
+}
+
 // TestRightsMustExist and read is always in.
 func TestRightsMustExist(t *testing.T) {
 	e := newDeviceLoginEnvironment(t)

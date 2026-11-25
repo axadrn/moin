@@ -47,11 +47,12 @@ type GitHubRepo struct {
 	Account       string `json:"account"`
 }
 
-// RepoRequest is the body of PUT /api/v1/apps/{app}/repo.
+// RepoRequest is the body of PUT /api/v1/apps/{app}/repo. Without
+// auto_deploy, deploy on push is on, unless the app has a deploy hook.
 type RepoRequest struct {
 	Repo       string `json:"repo"`
 	Branch     string `json:"branch"`
-	AutoDeploy bool   `json:"auto_deploy"`
+	AutoDeploy *bool  `json:"auto_deploy"`
 }
 
 // GetGitHub returns the installations and the links that connect GitHub.

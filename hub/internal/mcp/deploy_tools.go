@@ -18,7 +18,7 @@ func registerDeployTools(server *mcpsdk.Server, services Services) {
 		"Returns one deploy with its full log. Poll it to follow a running deploy until the status is succeeded or failed.",
 		readOnly("")), model.RightRead, member(services, tools.getDeploy))
 	Add(server, newTool("rollback_app", "Roll back an app",
-		"Starts the images of an earlier successful deploy again, with the env it had. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. It replaces the live deploy, so ask the user first.",
+		"Starts the images of an earlier successful deploy again, with the env vars, the domains and the password as they are now. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. It replaces the live deploy, so ask the user first.",
 		change(true, false)), model.RightDeploy, changes(services, tools.rollback))
 	Add(server, newTool("redeploy_app", "Redeploy an app",
 		"Builds the source of the newest deploy again on the app's server, with the env as it is now. Returns the new deploy; follow it with get_deploy.",
@@ -99,7 +99,7 @@ func (t moinTools) rollback(_ context.Context, caller Caller, input RollbackInpu
 }
 
 func (t moinTools) redeploy(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Redeploy(caller.actor(), input.app())
+	deploy, err := t.services.Apps.Redeploy(caller.actor(), input.App)
 	if err != nil {
 		return Deploy{}, err
 	}
@@ -131,7 +131,7 @@ func (h DeployHook) Summary() string {
 }
 
 func (t moinTools) createDeployHook(_ context.Context, caller Caller, input AppInput) (DeployHook, error) {
-	url, err := t.services.Apps.RotateDeployHook(caller.actor(), input.app())
+	url, err := t.services.Apps.RotateDeployHook(caller.actor(), input.App)
 	if err != nil {
 		return DeployHook{}, err
 	}
@@ -139,14 +139,14 @@ func (t moinTools) createDeployHook(_ context.Context, caller Caller, input AppI
 }
 
 func (t moinTools) removeDeployHook(_ context.Context, caller Caller, input AppInput) (Done, error) {
-	removed, err := t.services.Apps.RemoveDeployHook(caller.actor(), input.app())
+	removed, err := t.services.Apps.RemoveDeployHook(caller.actor(), input.App)
 	if err != nil {
 		return Done{}, err
 	}
 	if !removed {
-		return Done{Message: input.app() + " has no deploy hook. Nothing changed."}, nil
+		return Done{Message: input.App + " has no deploy hook. Nothing changed."}, nil
 	}
-	return Done{Message: "Turned off the deploy hook of " + input.app() + ". Its URL no longer works."}, nil
+	return Done{Message: "Turned off the deploy hook of " + input.App + ". Its URL no longer works."}, nil
 }
 
 // RegistryList is the output of list_registries.

@@ -76,7 +76,7 @@ type UptimeInput struct {
 }
 
 func (t moinTools) getUptime(_ context.Context, caller Caller, input AppInput) (Uptime, error) {
-	app, uptime, err := t.services.Apps.Uptime(caller.Bearer.WorkspaceID, input.app())
+	app, uptime, err := t.services.Apps.Uptime(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Uptime{}, err
 	}

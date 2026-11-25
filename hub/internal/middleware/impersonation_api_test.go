@@ -96,15 +96,16 @@ func TestImpersonationCannotConnectGitHub(t *testing.T) {
 	}
 }
 
-// TestImpersonationHidesPrivateData: database rows and app logs stay hidden
-// from an operator, on the web and in the API. Env vars show only keys
-// anywhere, so they are not private.
+// TestImpersonationHidesPrivateData: database rows, database copies and app
+// logs stay hidden from an operator, on the web and in the API. Env vars
+// show only keys anywhere, so they are not private.
 func TestImpersonationHidesPrivateData(t *testing.T) {
 	operatorID := "operator"
 	for path, private := range map[string]bool{
 		"/app/acme/apps/blog/env":                     false,
 		"/app/acme/apps/blog/logs":                    true,
 		"/app/acme/apps/blog/data?db=app.db":          true,
+		"/app/acme/apps/blog/backups/download":        true,
 		"/app/acme/apps/blog/backups":                 false,
 		"/app/acme/apps/logs":                         false,
 		"/app/acme/apps/data/detail":                  false,

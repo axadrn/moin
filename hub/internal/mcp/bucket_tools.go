@@ -38,13 +38,13 @@ func registerBucketTools(server *mcpsdk.Server, services Services) {
 
 // RemoveBucketInput is the input of remove_bucket.
 type RemoveBucketInput struct {
-	Bucket  string `json:"bucket" jsonschema:"the bucket's name in moin"`
+	Name    string `json:"name" jsonschema:"the bucket's name in moin"`
 	Confirm string `json:"confirm" jsonschema:"the bucket's name, typed out, after the user agreed"`
 }
 
 // BucketNameInput names one bucket.
 type BucketNameInput struct {
-	Bucket string `json:"bucket" jsonschema:"the bucket's name in moin"`
+	Name string `json:"name" jsonschema:"the bucket's name in moin"`
 }
 
 // AddBucketInput is the input of add_bucket.
@@ -76,7 +76,7 @@ type EditBucketInput struct {
 
 // BucketKeyInput is the input of set_bucket_key.
 type BucketKeyInput struct {
-	Bucket    string `json:"bucket" jsonschema:"the bucket's name in moin"`
+	Name      string `json:"name" jsonschema:"the bucket's name in moin"`
 	Server    string `json:"server,omitempty" jsonschema:"the server that keeps the key; empty for the workspace's only server"`
 	SecretKey string `json:"secret_key" jsonschema:"the secret key; it goes to the server, never back"`
 }
@@ -134,7 +134,7 @@ func (t moinTools) editBucket(ctx context.Context, caller Caller, input EditBuck
 }
 
 func (t moinTools) setBucketKey(ctx context.Context, caller Caller, input BucketKeyInput) (Bucket, error) {
-	bucket, err := t.services.Apps.SetBucketKey(ctx, caller.actor(), input.Bucket, input.Server, input.SecretKey)
+	bucket, err := t.services.Apps.SetBucketKey(ctx, caller.actor(), input.Name, input.Server, input.SecretKey)
 	if err != nil {
 		return Bucket{}, err
 	}
@@ -142,7 +142,7 @@ func (t moinTools) setBucketKey(ctx context.Context, caller Caller, input Bucket
 }
 
 func (t moinTools) setDefaultBucket(ctx context.Context, caller Caller, input BucketNameInput) (Bucket, error) {
-	bucket, err := t.services.Apps.MakeDefaultBucket(ctx, caller.actor(), input.Bucket)
+	bucket, err := t.services.Apps.MakeDefaultBucket(ctx, caller.actor(), input.Name)
 	if err != nil {
 		return Bucket{}, err
 	}
@@ -150,7 +150,7 @@ func (t moinTools) setDefaultBucket(ctx context.Context, caller Caller, input Bu
 }
 
 func (t moinTools) removeBucket(_ context.Context, caller Caller, input RemoveBucketInput) (Done, error) {
-	bucket, err := t.services.Apps.Bucket(caller.Bearer.WorkspaceID, input.Bucket)
+	bucket, err := t.services.Apps.Bucket(caller.Bearer.WorkspaceID, input.Name)
 	if err != nil {
 		return Done{}, err
 	}

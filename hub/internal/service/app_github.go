@@ -236,8 +236,10 @@ func (s *AppService) gitHubRepo(ctx context.Context, workspaceID, repo string) (
 
 // LinkRepo makes an app follow a repo and branch. An empty branch is the
 // repo's default branch. One thing brings new versions: deploy on push
-// turns the deploy hook off.
-func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, branch string, autoDeploy bool) (*model.App, error) {
+// turns the deploy hook off. Without autoDeploy, deploy on push is on,
+// the same on every surface, unless the app has a deploy hook: then CI
+// keeps deploying, as on the web.
+func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, branch string, autoDeploy *bool) (*model.App, error) {
 	// The branch goes into GitHub URLs and the push matching; git's rules
 	// keep it a plain name. GitHub's default branch needs no check.
 	branch = strings.TrimSpace(branch)
@@ -248,10 +250,14 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 	if err != nil {
 		return nil, err
 	}
+	on := app.DeployHookHash == nil
+	if autoDeploy != nil {
+		on = *autoDeploy
+	}
 	// The repo and branch the app follows already: only deploy on push
 	// changes, and GitHub need not answer for that.
 	if app.Repo != "" && strings.EqualFold(repo, app.Repo) && branch == app.Branch {
-		return s.SetAutoDeploy(actor, app.ID, autoDeploy)
+		return s.SetAutoDeploy(actor, app.ID, on)
 	}
 	found, err := s.gitHubRepo(ctx, actor.WorkspaceID, repo)
 	if err != nil {
@@ -270,12 +276,12 @@ func (s *AppService) LinkRepo(ctx context.Context, actor Actor, idOrName, repo, 
 			return nil, ErrBranch
 		}
 	}
-	err = s.apps.SetRepo(app.ID, found.FullName, branch, autoDeploy, found.InstallationID)
+	err = s.apps.SetRepo(app.ID, found.FullName, branch, on, found.InstallationID)
 	if err != nil {
 		return nil, err
 	}
-	s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(autoDeploy)})
-	if autoDeploy {
+	s.servers.record(actor, "repo.linked", "app", app.Name, map[string]string{"repo": found.FullName, "branch": branch, "auto_deploy": strconv.FormatBool(on)})
+	if on {
 		if _, err := s.RemoveDeployHook(actor, app.ID); err != nil {
 			return nil, err
 		}

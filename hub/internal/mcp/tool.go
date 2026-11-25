@@ -81,7 +81,7 @@ func handler[In, Out any](right model.Rights, tool ToolFunc[In, Out]) mcpsdk.Too
 }
 
 const (
-	unauthenticated = "Send a CI token, which starts with pat_, as Authorization: Bearer <token>. Make one under Settings, Connections."
+	unauthenticated = "Sign in: add this URL to your AI agent, and it opens the browser. Without a browser, send a CI token (pat_…) as Authorization: Bearer <token>. Make one under Settings, Connections."
 	appOnly         = "This CI token works only for its app, through the API. MCP needs a CI token for every app."
 )
 

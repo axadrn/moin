@@ -18,7 +18,7 @@ func TestBadNamesStopBeforeTheServer(t *testing.T) {
 	if _, err := s.DeployRef(ctx, Actor{}, "blog", "--upload-pack=x"); !errors.Is(err, ErrRefName) {
 		t.Errorf("DeployRef: err = %v, want ErrRefName", err)
 	}
-	if _, err := s.LinkRepo(ctx, Actor{}, "blog", "acme/blog", "main..evil", true); !errors.Is(err, ErrRefName) {
+	if _, err := s.LinkRepo(ctx, Actor{}, "blog", "acme/blog", "main..evil", new(true)); !errors.Is(err, ErrRefName) {
 		t.Errorf("LinkRepo: err = %v, want ErrRefName", err)
 	}
 }

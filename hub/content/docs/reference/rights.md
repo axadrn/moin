@@ -19,7 +19,7 @@ Every client that acts for you has rights: the CLI and the TUI of a computer, an
 - Without the right, the API answers `403` `missing_right` with the `right`, and the CLI and MCP say: "This connection may not deploy and restart. Change it in Settings, Connections."
 - Removing a server needs servers and delete: an offline server takes its apps with it.
 - Domains are one list: setting it needs deploy, also when it drops a domain.
-- Rows, SQL and copies of a database are app data, as strong as secrets: they need env. SQL that writes (`write: true`) also needs delete.
+- Rows, SQL and copies of a database are app data, as strong as secrets: they need env. Changing rows and SQL that writes (`write: true`) also need delete.
 - Running a command in a container (`exec`) can do anything in the app, read its secrets and delete its data: it needs deploy, env and delete together.
 - Read removes your connections and your own CI tokens: taking your own access away never needs more. Removing another person's CI token, as the owner, needs servers.
 - **no token**: a connection or CI token never calls it, whatever its rights: your sessions, passkeys and email, rights themselves, new CI tokens, roles, leaving or deleting a workspace or the account, billing, admin. A signed-in browser does, and nobody needs to be signed in for the steps of signing in.
@@ -132,9 +132,9 @@ The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and a
 | `GET /api/v1/apps/{app}/databases` | read |
 | `GET /api/v1/apps/{app}/databases/tables` | read |
 | `GET /api/v1/apps/{app}/databases/rows` | env |
-| `POST /api/v1/apps/{app}/databases/rows` | delete |
-| `PATCH /api/v1/apps/{app}/databases/rows` | delete |
-| `DELETE /api/v1/apps/{app}/databases/rows` | delete |
+| `POST /api/v1/apps/{app}/databases/rows` | env, delete |
+| `PATCH /api/v1/apps/{app}/databases/rows` | env, delete |
+| `DELETE /api/v1/apps/{app}/databases/rows` | env, delete |
 | `POST /api/v1/apps/{app}/databases/query` | env |
 | `GET /api/v1/apps/{app}/backups` | read |
 | `PUT /api/v1/apps/{app}/backups` | deploy |
