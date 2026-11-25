@@ -316,7 +316,7 @@ templ HomePricing() {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$7</span><span class="moin-small moin-muted">a month per workspace</span></span>
-					<span class="moin-small moin-muted" data-yearly-deal>Or $49 a year. 30 days free, starting when you connect your first server. No card.</span>
+					<span class="moin-small moin-muted" data-yearly-deal>Or $49 a year. { layouts.TrialOffer() } No card.</span>
 				</div>
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 					{ homeStartLabel(ctx) }
@@ -408,7 +408,7 @@ templ HomeEnd() {
 			</div>
 			<p class="moin-small moin-muted">
 				if ctxkeys.RenderConfig(ctx).Billing {
-					30 days free, starting when you connect your first server. No card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
+					{ layouts.TrialOffer() } No card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
 				} else {
 					Free and open source.
 				}

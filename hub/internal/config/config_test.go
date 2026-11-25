@@ -332,16 +332,25 @@ func TestSelfHostedIsPrivateByDefault(t *testing.T) {
 	}
 }
 
-// TestProductionBillingNeedsTheProduct: the hosted product is required
-// where the two prices are.
-func TestProductionBillingNeedsTheProduct(t *testing.T) {
-	cfg := &Config{AppEnv: EnvironmentProduction, StripeSecretKey: "sk_test", StripeWebhookSecret: "whsec_test", StripePriceIDProMonthly: "price_month", StripePriceIDProYearly: "price_year"}
-	errs := cfg.validatePayments()
-	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "STRIPE_PRODUCT_ID_PRO") {
-		t.Fatalf("errors = %v, want STRIPE_PRODUCT_ID_PRO", errs)
+// TestAPriceNeedsTheProduct: the hosted product is required in production
+// and wherever a price is set, also in development.
+func TestAPriceNeedsTheProduct(t *testing.T) {
+	for _, cfg := range []*Config{
+		{AppEnv: EnvironmentProduction, StripePriceIDProMonthly: "price_month", StripePriceIDProYearly: "price_year"},
+		{AppEnv: EnvironmentDevelopment, StripePriceIDProMonthly: "price_month"},
+		{AppEnv: EnvironmentDevelopment, StripePriceIDProYearly: "price_year"},
+	} {
+		cfg.StripeSecretKey, cfg.StripeWebhookSecret = "sk_test", "whsec_test"
+		errs := cfg.validatePayments()
+		if len(errs) != 1 || !strings.Contains(errs[0].Error(), "STRIPE_PRODUCT_ID_PRO") {
+			t.Fatalf("%s: errors = %v, want STRIPE_PRODUCT_ID_PRO", cfg.AppEnv, errs)
+		}
+		cfg.StripeProductIDPro = "prod_hosted"
+		if errs := cfg.validatePayments(); len(errs) != 0 {
+			t.Fatalf("%s: errors = %v", cfg.AppEnv, errs)
+		}
 	}
-	cfg.StripeProductIDPro = "prod_hosted"
-	if errs := cfg.validatePayments(); len(errs) != 0 {
-		t.Fatalf("errors = %v", errs)
+	if errs := (&Config{AppEnv: EnvironmentDevelopment, StripeSecretKey: "sk_test", StripeWebhookSecret: "whsec_test"}).validatePayments(); len(errs) != 0 {
+		t.Fatalf("development without prices: errors = %v", errs)
 	}
 }

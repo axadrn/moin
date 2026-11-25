@@ -23,7 +23,7 @@ templ Auth(note, githubError string) {
 		if ctxkeys.RenderConfig(ctx).GitHubLogin {
 			if ctxkeys.RenderConfig(ctx).Billing {
 				@authLine() {
-					30 days free. No card.
+					{ layouts.TrialOffer() } No card.
 				}
 			}
 			if githubError != "" {

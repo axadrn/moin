@@ -81,7 +81,7 @@ func billingLine(subscription *model.Subscription) string {
 	date := func() string { return subscription.CurrentPeriodEnd.Format("Jan 2, 2006") }
 	switch {
 	case subscription.TrialWaits():
-		return "30 days free, starting when you connect your first server. No card."
+		return layouts.TrialOffer() + " No card."
 	case subscription.Status == model.SubscriptionStatusTrialing:
 		return "Everything works until " + date() + ". Then moin turns read-only until you subscribe."
 	case subscription.PlanID == model.SubscriptionPlanFree:

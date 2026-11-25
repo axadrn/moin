@@ -324,9 +324,12 @@ func (c *Config) validatePayments() []error {
 	require("STRIPE_SECRET_KEY", c.StripeSecretKey)
 	require("STRIPE_WEBHOOK_SECRET", c.StripeWebhookSecret)
 	if c.IsProduction() {
-		require("STRIPE_PRODUCT_ID_PRO", c.StripeProductIDPro)
 		require("STRIPE_PRICE_ID_PRO_MONTHLY", c.StripePriceIDProMonthly)
 		require("STRIPE_PRICE_ID_PRO_YEARLY", c.StripePriceIDProYearly)
+	}
+	// A price sells the product: without it, no subscription gets its plan.
+	if c.IsProduction() || c.StripePriceIDProMonthly != "" || c.StripePriceIDProYearly != "" {
+		require("STRIPE_PRODUCT_ID_PRO", c.StripeProductIDPro)
 	}
 
 	return errs

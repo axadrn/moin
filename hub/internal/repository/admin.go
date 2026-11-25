@@ -180,9 +180,14 @@ func (r *Admin) FirstWorkspace(userID string) (*model.Workspace, error) {
 	return &workspace, nil
 }
 
-// HasServer says whether the workspace has a server.
-func (r *Admin) HasServer(workspaceID string) (bool, error) {
-	var has bool
-	err := r.db.Get(&has, `SELECT EXISTS (SELECT 1 FROM servers WHERE workspace_id = $1)`, workspaceID)
-	return has, err
+// UsedServer says whether the workspace has used a server: one connected
+// at least once, or the activity says one was installed. A server added
+// but never connected does not count.
+func (r *Admin) UsedServer(workspaceID string) (bool, error) {
+	var used bool
+	err := r.db.Get(&used, `
+		SELECT EXISTS (SELECT 1 FROM servers WHERE workspace_id = $1 AND last_seen_at IS NOT NULL)
+		    OR EXISTS (SELECT 1 FROM activity_events WHERE workspace_id = $1 AND action = 'server.installed')
+	`, workspaceID)
+	return used, err
 }

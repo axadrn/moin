@@ -269,7 +269,7 @@ func (s *StripeProvider) handleSubscriptionCreated(data json.RawMessage, provide
 	productID := subscription.Items.Data[0].Price.Product
 	planID := s.planOfProduct(productID)
 	if planID == "" {
-		slog.Warn("stripe subscription has an unknown product, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "product_id", productID)
+		slog.Error("stripe subscription has an unknown product, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "product_id", productID)
 		return nil
 	}
 	sub.PlanID = planID
@@ -338,7 +338,7 @@ func (s *StripeProvider) handleSubscriptionUpdated(data json.RawMessage, provide
 		productID := subscription.Items.Data[0].Price.Product
 		planID := s.planOfProduct(productID)
 		if planID == "" {
-			slog.Warn("stripe subscription has an unknown product, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "product_id", productID)
+			slog.Error("stripe subscription has an unknown product, plan unchanged", "workspace_id", sub.WorkspaceID, "stripe_sub_id", subscription.ID, "product_id", productID)
 			return nil
 		}
 		sub.PlanID = planID

@@ -80,7 +80,11 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 		t.Fatalf("after making free forever: %+v", user)
 	}
 
-	// Ended before any server: the trial waits for the first one again.
+	// Ended before a server connected, even with one added: the trial
+	// waits for the first one again.
+	if _, err := database.Exec(`INSERT INTO servers (id, workspace_id, name, created_at) VALUES ('server-1', $1, 'web-1', $2)`, target.Workspace.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
 	if err := admin.SetForeverFree(operator.User, session, target.User.ID, false, target.User.Email); err != nil {
 		t.Fatal(err)
 	}
@@ -89,14 +93,14 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	if after.PlanID != model.SubscriptionPlanPro || !after.TrialWaits() {
-		t.Fatalf("ended before any server: %+v", after)
+		t.Fatalf("ended before a server connected: %+v", after)
 	}
 
-	// Ended with a server: the free plan, read-only.
+	// Ended after a server connected: the free plan, read-only.
 	if err := admin.SetForeverFree(operator.User, session, target.User.ID, true, target.User.Email); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.Exec(`INSERT INTO servers (id, workspace_id, name, created_at) VALUES ('server-1', $1, 'web-1', $2)`, target.Workspace.ID, time.Now()); err != nil {
+	if _, err := database.Exec(`UPDATE servers SET last_seen_at = $1 WHERE id = 'server-1'`, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if err := admin.SetForeverFree(operator.User, session, target.User.ID, false, target.User.Email); err != nil {
@@ -107,7 +111,7 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	if after.PlanID != model.SubscriptionPlanFree || after.Status != model.SubscriptionStatusActive || after.CurrentPeriodEnd != nil {
-		t.Fatalf("ended with a server: %+v", after)
+		t.Fatalf("ended after a server connected: %+v", after)
 	}
 
 	events, err := adminRepository.ListActivityEvents(10)

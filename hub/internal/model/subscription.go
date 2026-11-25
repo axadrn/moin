@@ -118,10 +118,10 @@ func (s *Subscription) StartOffer(days int, couponID string, now time.Time) {
 
 // EndForeverFree puts a forever free workspace back on what it would have
 // without it: the trial, waiting for the first server, while the workspace
-// has none; the free plan, read-only, once it has one.
-func (s *Subscription) EndForeverFree(hasServer bool, now time.Time) {
+// has used none; the free plan, read-only, once it has.
+func (s *Subscription) EndForeverFree(usedServer bool, now time.Time) {
 	initial := access.Initial()
-	if initial.Status == access.StatusTrialing && !hasServer {
+	if initial.Status == access.StatusTrialing && !usedServer {
 		s.PlanID, s.Status = initial.PlanID, initial.Status
 	} else {
 		s.PlanID, s.Status = SubscriptionPlanFree, SubscriptionStatusActive

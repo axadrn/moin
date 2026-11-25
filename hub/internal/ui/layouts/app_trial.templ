@@ -31,7 +31,7 @@ templ AppTrialCard() {
 				<div class="moin-row" data-gap="4" data-phone="stack">
 					<p class="moin-fill moin-text">
 						if current.State == access.StateTrial && current.TrialEndsAt == nil {
-							<span class="moin-strong">30 days free, starting when you connect your first server.</span>
+							<span class="moin-strong">{ TrialOffer() }</span>
 							<span class="moin-muted">No card.</span>
 						} else if current.State == access.StateTrial {
 							{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
@@ -53,6 +53,11 @@ templ AppTrialCard() {
 			}
 		}
 	}
+}
+
+// TrialOffer is the hosted trial in one sentence, the same on every page.
+func TrialOffer() string {
+	return strconv.Itoa(access.TrialDays) + " days free, starting when you connect your first server."
 }
 
 func trialLine(days int) string {
