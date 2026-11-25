@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -79,8 +81,8 @@ func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.PinSwitch(*stored))
 }
 
-// Create adds an app and shows the password of its instant address once,
-// with a link to its page.
+// Create adds an app and shows its password once, with a link to its
+// page.
 func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Create(actor(r), r.FormValue("name"), r.FormValue("server"))
 	if errors.Is(err, repository.ErrServerNotFound) {
@@ -95,7 +97,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Shown in place of the form: a new page would lose the password.
 	w.Header().Set("HX-Retarget", "#app-add-form")
 	w.Header().Set("HX-Reswap", "outerHTML")
-	render(w, r, pages.AppAdded(ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), app.Name, app.InstantPassword))
+	render(w, r, pages.AppAdded(ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), app.Name, app.Password))
 }
 
 // AppSection answers one section of an app (app, deploys, domains, logs
@@ -152,6 +154,12 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 				view.Logs.Message = errorMessage(err)
 			}
 		}
+	case "settings":
+		_, text, err := h.apps.ComposeFile(workspace.ID, app.ID)
+		view.ComposeFile = &pages.ComposeFileView{Text: text}
+		if err != nil {
+			view.ComposeFile.Message = errorMessage(err)
+		}
 	case "domains":
 		if domains, err := h.domainsView(r, ""); err == nil {
 			view.Domains = &domains
@@ -161,6 +169,24 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		}
 	}
 	render(w, r, pages.AppPage(view))
+}
+
+// ComposeFile downloads the compose file of the app's live deploy as
+// compose.yml.
+func (h *AppsHandler) ComposeFile(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	_, text, err := h.apps.ComposeFile(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		status, detail, known := api.ErrorFor(err)
+		if !known {
+			slog.Error("load the compose file failed", "error", err)
+		}
+		http.Error(w, detail.Message, status)
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="compose.yml"`)
+	_, _ = io.WriteString(w, text)
 }
 
 // Detail answers the state and the buttons of an app, after a change. The
@@ -577,7 +603,7 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 			provider = protocol.InstantProviders[0]
 		}
 	}
-	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider, nil)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider)
 	if err != nil {
 		if _, ok := h.renderDomains(w, r, ""); ok {
 			answerError(w, r, "Instant address not changed", errorMessage(err))
@@ -591,51 +617,23 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	h.domainsChanged(w, r, done, changed, "")
 }
 
-// SetInstantPassword is the switch that puts the password in front of the
-// instant address, or takes it away. It answers the panel as stored, so a
-// failed save flips the switch back.
-func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request) {
-	open := r.FormValue("on") != "1"
-	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), "", &open)
-	done := "Password on the instant address"
-	if open {
-		done = "Instant address open to everyone"
-	}
-	switch {
-	case err != nil:
-		if _, ok := h.renderDomains(w, r, ""); ok {
-			answerError(w, r, "Password not changed", errorMessage(err))
-		}
-	default:
-		h.domainsChanged(w, r, done, changed, "")
-	}
-}
-
-// NewInstantPassword makes a new password for the instant address and
-// shows it in the panel, the one time moin shows it.
-func (h *AppsHandler) NewInstantPassword(w http.ResponseWriter, r *http.Request) {
-	password, err := h.apps.NewInstantPassword(actor(r), r.PathValue("app"))
-	if err != nil {
-		failed(w, r, "No new password", err, nil)
-		return
-	}
-	view, err := h.domainsView(r, "")
-	if err != nil {
-		renderError(w, "load domains failed", err)
-		return
-	}
-	view.NewPassword = password
-	render(w, r, pages.AppDomains(view))
-	answerDone(w, r, "New password", "Shown once. "+view.App.Name+" takes it on its next restart.")
-}
-
-// Protect puts a password in front of the app. A wrong field says the
-// rule of its hint line again, in red.
+// Protect turns the app's password on or off. Its switch (switch=1) turns
+// it off, or on with a password moin makes and shows once; the fields set
+// one of your own. A wrong field says the rule of its hint line again, in
+// red; a failed switch flips back.
 func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
-	changed, err := false, service.ErrProtect
-	if r.FormValue("password") != "" {
-		changed, err = h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
+	if r.FormValue("switch") == "1" && r.FormValue("on") != "1" {
+		changed, err := h.apps.RemoveProtection(actor(r), r.PathValue("app"))
+		if err != nil {
+			if _, ok := h.renderDomains(w, r, ""); ok {
+				answerError(w, r, "Password not turned off", errorMessage(err))
+			}
+			return
+		}
+		h.domainsChanged(w, r, "Password off", changed, "")
+		return
 	}
+	made, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
 	switch {
 	case errors.Is(err, service.ErrProtectUser):
 		fieldError(w, "Password not set", "protect-user", "No spaces or colons.")
@@ -644,20 +642,23 @@ func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
 		fieldError(w, "Password not set", "protect-password", "Use 8 to 72 characters.")
 		return
 	case err != nil:
-		failed(w, r, "Password not set", err, nil)
+		if _, ok := h.renderDomains(w, r, ""); ok {
+			answerError(w, r, "Password not set", errorMessage(err))
+		}
 		return
 	}
-	h.domainsChanged(w, r, "Password set", changed, "")
-}
-
-// Unprotect makes the app public again.
-func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
-	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	if made == "" {
+		h.domainsChanged(w, r, "Password set", changed, "")
+		return
+	}
+	view, err := h.domainsView(r, "")
 	if err != nil {
-		failed(w, r, "Password not removed", err, nil)
+		renderError(w, "load domains failed", err)
 		return
 	}
-	h.domainsChanged(w, r, "Password removed", changed, "")
+	view.NewPassword = made
+	render(w, r, pages.AppDomains(view))
+	answerDone(w, r, "Password on", "Shown once. "+view.App.Name+" takes it on its next restart.")
 }
 
 // domainsChanged answers a saved change of the domains or the password: the

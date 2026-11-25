@@ -9,10 +9,10 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// A domain reaches one service in the whole hub: an app of another
-// workspace, or another service of the same app, cannot take it. Once
-// it is removed, it is free again.
-func TestADomainIsUsedOnce(t *testing.T) {
+// A domain reaches one service of an app: another service of the app
+// cannot take it. Another app may, also one of another workspace, so no
+// workspace can block a domain for another one.
+func TestADomainIsOncePerApp(t *testing.T) {
 	apps, servers, _, _ := newAppService(t)
 	connectServer(t, servers, other, "web-2")
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
@@ -24,24 +24,20 @@ func TestADomainIsUsedOnce(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com", "www.blog.example.com"}, "blog.example.com"); err != nil {
 		t.Fatal(err)
 	}
-
-	_, err := apps.SetDomains(other, "shop", "", []string{"shop.example.com", "Blog.example.com"}, "")
+	if _, err := apps.SetDomains(other, "shop", "", []string{"shop.example.com", "Blog.example.com"}, ""); err != nil {
+		t.Fatalf("another app sets blog.example.com: err = %v", err)
+	}
 	var used *repository.DomainUsedError
-	if !errors.As(err, &used) || used.Name != "blog.example.com" {
-		t.Fatalf("another app takes blog.example.com: err = %v", err)
-	}
-	if shop, err := apps.Get(other.WorkspaceID, "shop"); err != nil || len(shop.Domains) != 0 {
-		t.Fatalf("a refused change keeps nothing: %+v, %v", shop.Domains, err)
-	}
-	if _, err := apps.SetDomains(owner, "blog", "api", []string{"www.blog.example.com"}, ""); !errors.As(err, &used) {
+	if _, err := apps.SetDomains(owner, "blog", "api", []string{"www.blog.example.com"}, ""); !errors.As(err, &used) || used.Name != "www.blog.example.com" {
 		t.Fatalf("another service takes www.blog.example.com: err = %v", err)
 	}
-
-	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, "blog.example.com"); err != nil {
+	// Removing it from one app leaves the other app's.
+	if _, err := apps.SetDomains(other, "shop", "", []string{"shop.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetDomains(other, "shop", "", []string{"www.blog.example.com"}, ""); err != nil {
-		t.Fatalf("a removed domain is free again: err = %v", err)
+	blog, err := apps.Get(owner.WorkspaceID, "blog")
+	if domains, _ := blog.DomainsOf(""); err != nil || len(domains) != 2 {
+		t.Fatalf("blog domains = %v, %v", domains, err)
 	}
 }
 

@@ -19,6 +19,7 @@ var publicRoutes = []string{
 	"/ui",
 	"/ui/components",
 	"/ui/layout",
+	"/ui/stacks",
 	"/ui/blocks",
 	"/catalog",
 	"/roadmap",

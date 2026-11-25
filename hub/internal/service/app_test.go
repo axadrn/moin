@@ -281,7 +281,11 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	}
 	// Another server cannot end this deploy.
 	daemonSays(t, servers, "someone-else", protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: false})
-	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080}})
+	if _, _, err := apps.ComposeFile(owner.WorkspaceID, "blog"); !errors.Is(err, ErrNotLive) {
+		t.Fatalf("the compose file before the first deploy: err = %v", err)
+	}
+	composeFile := "name: blog\nservices:\n  web:\n    build:\n      context: .\n"
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: protocol.Detected{Kind: "go", Service: "web", Port: 8080}, ComposeFile: composeFile})
 	if _, open := <-changes; open {
 		t.Fatal("changes stays open after done")
 	}
@@ -298,10 +302,14 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: second.ID, Error: "build failed"})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: second.ID, Error: "build failed", ComposeFile: "name: failed\n"})
 	app, _ = apps.Get(owner.WorkspaceID, app.ID)
 	if app.LatestNumber != 2 || app.LatestStatus != model.DeployFailed || app.LiveNumber != 1 {
 		t.Fatalf("after a failed deploy: %+v", app)
+	}
+	// The compose file is the live deploy's, not the failed one's.
+	if number, text, err := apps.ComposeFile(owner.WorkspaceID, "blog"); err != nil || number != 1 || text != composeFile {
+		t.Fatalf("the compose file = v%d %q, %v", number, text, err)
 	}
 	if _, err := apps.Rollback(owner, "blog", 0); !errors.Is(err, ErrNoRollback) {
 		t.Fatalf("rollback with nothing before the live deploy: err = %v", err)
@@ -319,7 +327,11 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, OK: true})
+	// A compose file too big to keep is dropped.
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, OK: true, ComposeFile: strings.Repeat("x", maxComposeFile+1)})
+	if _, _, err := apps.ComposeFile(owner.WorkspaceID, "blog"); !errors.Is(err, ErrNoComposeFile) {
+		t.Fatalf("the compose file of a deploy with one too big: err = %v", err)
+	}
 	rollback, err := apps.Rollback(owner, "blog", 0)
 	if err != nil {
 		t.Fatal(err)
@@ -333,6 +345,10 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("rollback = %+v", rollback)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: rollback.ID, OK: true})
+	// A daemon from before compose files sends none.
+	if _, _, err := apps.ComposeFile(owner.WorkspaceID, "blog"); !errors.Is(err, ErrNoComposeFile) {
+		t.Fatalf("the compose file of a deploy without one: err = %v", err)
+	}
 
 	// A redeploy builds the newest source again, with the env as it is now.
 	_, err = apps.SetEnv(ctx, owner, "blog", map[string]string{"SECRET": "new"}, nil)
@@ -632,8 +648,11 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("set domains before a deploy = %v, %v", changed, err)
 	}
-	if changed, err := apps.SetProtection(owner, "blog", "", ""); err != nil || changed {
-		t.Fatalf("no password, taken away = %v, %v", changed, err)
+	if changed, err := apps.RemoveProtection(owner, "blog"); err != nil || !changed {
+		t.Fatalf("the password of a new app, turned off = %v, %v", changed, err)
+	}
+	if changed, err := apps.RemoveProtection(owner, "blog"); err != nil || changed {
+		t.Fatalf("no password, turned off = %v, %v", changed, err)
 	}
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
 		t.Fatalf("bad domain: err = %v", err)
@@ -647,7 +666,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.example.com" || start.Domains.Canonical != "blog.example.com" {
+	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.example.com" || start.Domains.Canonical != "blog.example.com" || start.Domains.Protect != "" {
 		t.Fatalf("domains = %+v", start.Domains)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
@@ -668,11 +687,11 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 
 	// With a live deploy, saving restarts nothing: the changes wait.
-	if _, err := apps.SetProtection(owner, "blog", "me", "short"); !errors.Is(err, ErrProtect) {
+	if _, _, err := apps.SetProtection(owner, "blog", "me", "short"); !errors.Is(err, ErrProtect) {
 		t.Fatalf("short password: err = %v", err)
 	}
 	sent := daemon.count(protocol.TypeDeployStart)
-	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || !changed {
+	if _, changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || !changed {
 		t.Fatalf("set protection = %v, %v", changed, err)
 	}
 	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil || !changed {
@@ -685,7 +704,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 		t.Fatalf("changes waiting = %d, want 2", n)
 	}
 	// The same password or the same domains change nothing.
-	if changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || changed {
+	if _, changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || changed {
 		t.Fatalf("the same password = %v, %v", changed, err)
 	}
 	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil || changed {

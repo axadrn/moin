@@ -1,16 +1,13 @@
 package service
 
 import (
-	"crypto/rand"
 	"errors"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -22,10 +19,6 @@ var (
 
 // servicePattern is a compose service name.
 var servicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,62}$`)
-
-// InstantUser is the username in front of an instant address that has no
-// password of the app.
-const InstantUser = build.Name
 
 // setServiceDomains replaces the domains of one of the app's services other
 // than the main one. An empty list removes the service's domains.
@@ -95,19 +88,13 @@ func (s *AppService) mainService(app *model.App) string {
 }
 
 // Instant is the instant address of an app: Host and URL when it has one,
-// else Reason says why not. Open is true when no password guards it; then
-// User is empty. moin never shows the password again after it made it
-// (NewInstantPassword).
+// else Reason says why not. The app's password guards it like every
+// address of the app.
 type Instant struct {
 	Provider string
 	Host     string
 	URL      string
 	Reason   string
-	Open     bool
-	User     string
-	// OwnPassword says the app's own password guards it, the one of its
-	// domains; moin shows no password then.
-	OwnPassword bool
 }
 
 // Instant reports the app's instant address.
@@ -121,7 +108,7 @@ func (s *AppService) Instant(workspaceID, idOrName string) (Instant, error) {
 		return Instant{}, err
 	}
 	provider := app.Instant
-	instant := Instant{Provider: provider, Open: app.InstantOpen}
+	instant := Instant{Provider: provider}
 	host := app.InstantHost
 	if app.LiveNumber == 0 {
 		host = s.instantHost(app, server)
@@ -140,58 +127,31 @@ func (s *AppService) Instant(workspaceID, idOrName string) (Instant, error) {
 			instant.Reason = "It comes on with the next restart."
 		}
 	}
-	if !instant.Open {
-		if app.Protect != "" {
-			instant.OwnPassword = true
-			instant.User, _, _ = strings.Cut(app.Protect, ":")
-		} else {
-			instant.User = InstantUser
-		}
-	}
 	return instant, nil
 }
 
-// SetInstant picks the provider of the app's instant address, or off, and
-// whether it is open to everyone; the app takes it on its next restart. An
-// empty provider keeps the one it has; open nil keeps the password as it is.
-func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bool) (changed bool, err error) {
+// SetInstant picks the provider of the app's instant address, or off; the
+// app takes it on its next restart.
+func (s *AppService) SetInstant(actor Actor, idOrName, provider string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err
 	}
 	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider == "" {
-		provider = app.Instant
-	}
 	if provider != "off" && !slices.Contains(protocol.InstantProviders, provider) {
 		return false, ErrInstantProvider
 	}
-	isOpen := app.InstantOpen
-	if open != nil {
-		isOpen = *open
-	}
-	if provider == app.Instant && isOpen == app.InstantOpen {
+	if provider == app.Instant {
 		return false, nil
 	}
-	err = s.apps.SetInstant(app.ID, provider, isOpen)
+	err = s.apps.SetInstant(app.ID, provider)
 	if err != nil {
 		return false, err
 	}
-	details := map[string]string{"from": app.Instant, "provider": provider}
-	if isOpen != app.InstantOpen {
-		details["open"] = boolWord(isOpen)
-	}
-	app.Instant, app.InstantOpen = provider, isOpen
-	s.servers.record(actor, "app.instant_set", "app", app.Name, details)
+	s.servers.record(actor, "app.instant_set", "app", app.Name, map[string]string{"from": app.Instant, "provider": provider})
+	app.Instant = provider
 	s.notify(actor.WorkspaceID)
 	return true, nil
-}
-
-func boolWord(value bool) string {
-	if value {
-		return "yes"
-	}
-	return "no"
 }
 
 // instantHost is the instant address the app gets on the server, from its
@@ -204,8 +164,8 @@ func (s *AppService) instantHost(app *model.App, server *model.Server) string {
 	return protocol.InstantHost(app.Folder, ipv4, app.Instant)
 }
 
-// fillInstant fills the instant address of a deploy: the provider, the
-// server's IPv4 and the password in front of it.
+// fillInstant fills the instant address of a deploy: the provider and the
+// server's IPv4.
 func (s *AppService) fillInstant(app *model.App, domains *protocol.Domains) error {
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
 	if err != nil {
@@ -219,57 +179,11 @@ func (s *AppService) fillInstant(app *model.App, domains *protocol.Domains) erro
 	if domains.InstantIP == "" {
 		return nil
 	}
-	switch {
-	case app.InstantOpen:
-	case app.Protect != "":
-		domains.InstantProtect = app.Protect
-	default:
-		// An app from before moin kept only the hash gets a password
-		// nobody knows: New password shows one.
-		if app.InstantPasswordHash == "" {
-			if _, err := s.newInstantPassword(app); err != nil {
-				return err
-			}
-		}
-		domains.InstantProtect = InstantUser + ":" + app.InstantPasswordHash
-	}
 	// The address the app gets, until the deploy reports the one it serves.
 	if host := protocol.InstantHost(app.Folder, domains.InstantIP, app.Instant); host != app.InstantHost && app.LiveNumber == 0 {
 		_ = s.apps.SetInstantHost(app.ID, host)
 	}
 	return nil
-}
-
-// NewInstantPassword makes a new password for the app's instant address
-// and returns it: this is the one time moin shows it, it keeps only its
-// hash. The app takes it on its next restart.
-func (s *AppService) NewInstantPassword(actor Actor, idOrName string) (string, error) {
-	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
-	if err != nil {
-		return "", err
-	}
-	password, err := s.newInstantPassword(app)
-	if err != nil {
-		return "", err
-	}
-	s.servers.record(actor, "app.instant_password", "app", app.Name, nil)
-	s.notify(actor.WorkspaceID)
-	return password, nil
-}
-
-// newInstantPassword makes a password for the app's instant address and
-// keeps its bcrypt hash.
-func (s *AppService) newInstantPassword(app *model.App) (string, error) {
-	password := rand.Text()[:20]
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	if err := s.apps.SetInstantPasswordHash(app.ID, string(hash)); err != nil {
-		return "", err
-	}
-	app.InstantPasswordHash = string(hash)
-	return password, nil
 }
 
 // serviceDomains is the domains of the app's other services for a deploy.

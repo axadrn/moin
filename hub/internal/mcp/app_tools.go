@@ -12,7 +12,8 @@ import (
 )
 
 // registerAppTools registers the tools of apps: listing, creating and
-// removing them, starting and stopping them, and their logs.
+// removing them, starting and stopping them, their logs and their compose
+// file.
 func registerAppTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, newTool("list_apps", "List apps",
@@ -22,7 +23,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres). Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getApp)))
 	mcpsdk.AddTool(server, newTool("create_app", "Create an app",
-		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. instant_password is the password of its instant address: the one time moin shows it, so give it to the user to keep. Needs a token with read and write access.",
+		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. A new app starts with its password on: every address of it asks for user moin and the password in password, the one time moin shows it, so give it to the user to keep. remove_protection turns it off. Needs a token with read and write access.",
 		change(false, false)), Write(changes(services, tools.createApp)))
 	mcpsdk.AddTool(server, newTool("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
@@ -45,6 +46,31 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, newTool("get_logs", "Get app logs",
 		"Returns the last lines of every container of an app, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getLogs)))
+	mcpsdk.AddTool(server, newTool("get_compose_file", "Get the compose file",
+		"Returns the compose file of the live deploy of an app, YAML: everything moin runs for it, the proxy with its domains and HTTPS too, written to run anywhere, without the instant address. It holds no secret value. image, ports, expose, volumes, user, the env PORT and the paths of a build show the values the deploy ran with; every other ${NAME} stays as written. Saved with a .env of the app's values next to it, docker compose up -d runs the app elsewhere. A live deploy without one answers no_compose_file: redeploy_app or restart_app makes one, and get_deploy's log says why if it stays empty. Needs the read scope.",
+		readOnly("")), Read(member(services, tools.getComposeFile)))
+}
+
+// ComposeFileInput is the input of get_compose_file.
+type ComposeFileInput struct {
+	App string `json:"app" jsonschema:"the app name or ID"`
+}
+
+// ComposeFile is the output of get_compose_file.
+type ComposeFile struct {
+	api.ComposeFile
+}
+
+func (f ComposeFile) Summary() string {
+	return fmt.Sprintf("The compose file of v%d:\n\n%s", f.Number, f.Text)
+}
+
+func (t moinTools) getComposeFile(_ context.Context, caller Caller, input ComposeFileInput) (ComposeFile, error) {
+	number, text, err := t.services.Apps.ComposeFile(caller.Token.WorkspaceID, input.App)
+	if err != nil {
+		return ComposeFile{}, err
+	}
+	return ComposeFile{api.ComposeFile{Number: number, Text: text}}, nil
 }
 
 // RemoveAppInput is the input of remove_app.
@@ -175,7 +201,7 @@ type CreatedApp struct {
 }
 
 func (a CreatedApp) Summary() string {
-	return fmt.Sprintf("Created %s on %s. Its instant address asks for user %s and the password in instant_password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, service.InstantUser, a.Name)
+	return fmt.Sprintf("Created %s on %s. Every address of it asks for user %s and the password in password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, service.PasswordUser, a.Name)
 }
 
 func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (CreatedApp, error) {
@@ -183,7 +209,7 @@ func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppIn
 	if err != nil {
 		return CreatedApp{}, err
 	}
-	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), InstantPassword: app.InstantPassword}}, nil
+	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), Password: app.Password}}, nil
 }
 
 func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {

@@ -72,13 +72,13 @@ type AppUpdateRequest struct {
 // CatalogDeploy is the answer of an install or an update: the app and
 // its new deploy, which streams like every deploy. Login, only on an
 // install, holds the secrets the first sign-in needs, such as
-// ADMIN_PASSWORD, and InstantPassword the password of its instant
-// address: the one time they are shown.
+// ADMIN_PASSWORD, and Password the app's password, user moin, which every
+// address of it asks for: the one time they are shown.
 type CatalogDeploy struct {
-	App             App               `json:"app"`
-	Deploy          Deploy            `json:"deploy"`
-	Login           map[string]string `json:"login,omitempty"`
-	InstantPassword string            `json:"instant_password,omitempty"`
+	App      App               `json:"app"`
+	Deploy   Deploy            `json:"deploy"`
+	Login    map[string]string `json:"login,omitempty"`
+	Password string            `json:"password,omitempty"`
 }
 
 func newCatalogVersion(version catalog.Version) CatalogVersion {
@@ -147,7 +147,7 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy), Login: login, InstantPassword: app.InstantPassword})
+	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy), Login: login, Password: app.Password})
 }
 
 // Update sets a catalog app to a version and deploys it.

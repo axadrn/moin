@@ -80,6 +80,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `*` | pins the app, or unpins it: pinned apps stay above the others that run fine |
 | `X` | [runs a command](/docs/guides/exec) in the main service, no shell; start the line with `@service` for another one |
 | `W` | opens the app in the web app |
+| `C` | opens the app's [compose file](/docs/guides/compose#the-compose-file-moin-runs) in the web app, to copy or download |
 
 ## App tabs
 
@@ -100,7 +101,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | Domains | `a` | adds a domain, or `service:domain` for another service of `compose.yml` |
 | Domains | `x` | removes the picked one, after `y` |
 | Domains | `c` | makes the picked domain the canonical one |
-| Domains | `p` | password protection: `user:password`, or removes it after `y` |
+| Domains | `p` | the app's password on every address: your own as `user:password`, or turns it off after `y` |
 | Uptime | `p` | pauses or resumes uptime of the picked domain |
 | Uptime | `c` | sets the path it visits, empty for the default |
 | Uptime | `r` | visits again |

@@ -220,7 +220,7 @@ MCP: start_app
 
 ## Roll back
 
-Starts an earlier good deploy again, with the env vars as they are now.
+Starts an earlier good deploy again: its code and images, with the env vars, the domains and the [password](/docs/guides/domains#password) as they are now.
 
 ```surfaces
 Web: the app, **Deploys**, **Roll back** on a deploy

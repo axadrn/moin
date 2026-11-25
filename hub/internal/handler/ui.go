@@ -43,7 +43,9 @@ func (h *UIHandler) Show(w http.ResponseWriter, r *http.Request) {
 	case address == "components":
 		render(w, r, pages.UIComponents(h.components()))
 	case address == "layout":
-		render(w, r, pages.UILayout(h.layout()))
+		render(w, r, pages.UILayout(h.group("Layout")))
+	case address == "stacks":
+		render(w, r, pages.UIStacks(h.group("Stacks")))
 	case address == "blocks":
 		h.blocks(w, r)
 	case strings.HasPrefix(address, "blocks/"):
@@ -53,20 +55,22 @@ func (h *UIHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// components are the groups on the Components tab: all but Start and Layout.
+// components are the groups on the Components tab: all but Start, Layout
+// and Stacks, which have tabs of their own.
 func (h *UIHandler) components() []model.DocGroup {
 	var groups []model.DocGroup
 	for _, group := range h.docs.Groups() {
-		if group.Title != "Start" && group.Title != "Layout" {
+		if group.Title != "Start" && group.Title != "Layout" && group.Title != "Stacks" {
 			groups = append(groups, group)
 		}
 	}
 	return groups
 }
 
-func (h *UIHandler) layout() []*model.DocPage {
+// group is the pages of one topic, for the Layout and Stacks tabs.
+func (h *UIHandler) group(title string) []*model.DocPage {
 	for _, group := range h.docs.Groups() {
-		if group.Title == "Layout" {
+		if group.Title == title {
 			return group.Pages
 		}
 	}

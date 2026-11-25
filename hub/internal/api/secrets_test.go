@@ -17,9 +17,11 @@ import (
 )
 
 // TestSecretsLiveOnServers: values go to a server and never come back.
-// A new app answers its instant password once; a new one comes from its
-// own route. Env and registry logins go to the server, which must be
-// online: an offline one answers 409 server_offline in its own words.
+// A new app answers its password once, with protected on; turning the
+// password off and on again without one answers a new one once. No route
+// for an instant password is left. Env and registry logins go to the
+// server, which must be online: an offline one answers 409 server_offline
+// in its own words.
 // Registries and integrations say which servers keep a secret.
 func TestSecretsLiveOnServers(t *testing.T) {
 	database := testutil.NewDatabase(t)
@@ -40,14 +42,15 @@ func TestSecretsLiveOnServers(t *testing.T) {
 	handler := NewAppsHandler(apps)
 	mux := http.NewServeMux()
 	for pattern, serve := range map[string]http.HandlerFunc{
-		"POST /api/v1/apps":                        handler.Create,
-		"GET /api/v1/apps/{app}/instant":           handler.GetInstant,
-		"POST /api/v1/apps/{app}/instant/password": handler.NewInstantPassword,
-		"PATCH /api/v1/apps/{app}/env":             handler.UpdateEnv,
-		"GET /api/v1/registries":                   handler.Registries,
-		"PUT /api/v1/registries/{host}":            handler.SetRegistry,
-		"GET /api/v1/integrations":                 handler.GetIntegrations,
-		"PUT /api/v1/integrations":                 handler.SetIntegrations,
+		"POST /api/v1/apps":                    handler.Create,
+		"GET /api/v1/apps/{app}/instant":       handler.GetInstant,
+		"PUT /api/v1/apps/{app}/protection":    handler.SetProtection,
+		"DELETE /api/v1/apps/{app}/protection": handler.DeleteProtection,
+		"PATCH /api/v1/apps/{app}/env":         handler.UpdateEnv,
+		"GET /api/v1/registries":               handler.Registries,
+		"PUT /api/v1/registries/{host}":        handler.SetRegistry,
+		"GET /api/v1/integrations":             handler.GetIntegrations,
+		"PUT /api/v1/integrations":             handler.SetIntegrations,
 	} {
 		mux.HandleFunc(pattern, serve)
 	}
@@ -70,16 +73,28 @@ func TestSecretsLiveOnServers(t *testing.T) {
 	}
 
 	status, answer, _ := send("POST", "/api/v1/apps", `{"name":"shop","server":"server-1"}`)
-	first, _ := answer["instant_password"].(string)
-	if status != http.StatusCreated || len(first) < 16 {
+	first, _ := answer["password"].(string)
+	if status != http.StatusCreated || len(first) < 16 || answer["protected"] != true || answer["instant_password"] != nil {
 		t.Fatalf("create: %d %v", status, answer)
 	}
-	if _, _, body := send("GET", "/api/v1/apps/shop/instant", ""); strings.Contains(body, first) || strings.Contains(body, `"password"`) {
+	if _, _, body := send("GET", "/api/v1/apps/shop/instant", ""); strings.Contains(body, first) || strings.Contains(body, `"password"`) || strings.Contains(body, `"open"`) {
 		t.Fatalf("the instant address shows a password: %s", body)
 	}
-	status, answer, _ = send("POST", "/api/v1/apps/shop/instant/password", "")
-	if status != http.StatusOK || answer["user"] != service.InstantUser || answer["password"] == first || answer["password"] == "" {
-		t.Fatalf("new password: %d %v", status, answer)
+	status, answer, _ = send("DELETE", "/api/v1/apps/shop/protection", "")
+	if app, _ := answer["app"].(map[string]any); status != http.StatusOK || app["protected"] != false {
+		t.Fatalf("off: %d %v", status, answer)
+	}
+	status, answer, _ = send("PUT", "/api/v1/apps/shop/protection", `{}`)
+	if app, _ := answer["app"].(map[string]any); status != http.StatusOK || app["protected"] != true || answer["password"] == first || len(answer["password"].(string)) < 16 {
+		t.Fatalf("on again: %d %v", status, answer)
+	}
+	status, answer, _ = send("PUT", "/api/v1/apps/shop/protection", `{"username":"ada","password":"my-own-password"}`)
+	if status != http.StatusOK || answer["password"] != nil {
+		t.Fatalf("own password: %d %v", status, answer)
+	}
+	// openapi_test.go keeps the document and the routes the same.
+	if document := string(OpenAPIDocument); strings.Contains(document, "/instant/password") || strings.Contains(document, "instant_password") || strings.Contains(document, "instant_open") {
+		t.Errorf("the API still has an instant password")
 	}
 
 	if status, answer, _ := send("PATCH", "/api/v1/apps/shop/env", `{"set":{"DATABASE_URL":"postgres://secret"}}`); status != http.StatusOK || len(answer["items"].([]any)) != 1 {

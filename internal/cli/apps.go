@@ -101,7 +101,7 @@ func appsAdd(ctx context.Context, call appsCall) error {
 		return err
 	}
 	done(call.stdout, "Added %s on %s", style.Bold.Render(app.Name), app.ServerName)
-	printInstantPassword(call.stdout, app.InstantPassword)
+	printPassword(call.stdout, passwordUser, app.Password)
 	hint(call.stdout, "Deploy it with", build.Name+" deploy "+app.Name)
 	return nil
 }
@@ -240,9 +240,6 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	instantText := "none"
 	if app.Instant != "" {
 		instantText = app.Instant
-		if !app.InstantOpen {
-			instantText += ", with a password"
-		}
 	} else if app.InstantProvider == "off" {
 		instantText = "off"
 	}
@@ -423,18 +420,18 @@ func createApp(ctx context.Context, api *client.Client, name, server string, std
 		return err
 	}
 	done(stdout, "Created app %s on %s", style.Bold.Render(app.Name), app.ServerName)
-	printInstantPassword(stdout, app.InstantPassword)
+	printPassword(stdout, passwordUser, app.Password)
 	return nil
 }
 
-// printInstantPassword shows the password of a new app's instant address,
-// the one time moin shows it.
-func printInstantPassword(stdout io.Writer, password string) {
+// printPassword shows the password moin made for an app, which every
+// address of it asks for: the one time moin shows it.
+func printPassword(stdout io.Writer, user, password string) {
 	if password == "" {
 		return
 	}
-	fmt.Fprintln(stdout, "  "+style.Warning.Render("The password of its instant address, shown only this once:"))
-	fmt.Fprintln(stdout, "  user "+instantUser+", password "+password)
+	fmt.Fprintln(stdout, "  "+style.Warning.Render("Every address asks for this password, shown only this once:"))
+	fmt.Fprintln(stdout, "  user "+user+", password "+password)
 }
 
 // follow prints the deploy log and fails when the deploy fails. what is
@@ -496,8 +493,8 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 }
 
 // printLive is the moin moment after a deploy: ✓ moin. and where the app
-// answers, its domains and its instant address, with how to get past its
-// password.
+// answers, its domains and its instant address, and whether they ask for
+// its password.
 func printLive(app client.App, checks []client.DomainCheck, took string, stdout io.Writer) {
 	urls := []string{}
 	for _, check := range checks {
@@ -514,8 +511,8 @@ func printLive(app client.App, checks []client.DomainCheck, took string, stdout 
 	if len(urls) > 1 {
 		fmt.Fprintln(stdout, "  also at "+strings.Join(urls[1:], ", "))
 	}
-	if app.Instant != "" && !app.InstantOpen && !app.Protected {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("A password guards "+app.Instant+", shown once when the app was made. A new one: "+build.Name+" instant password "+app.Name))
+	if app.Protected {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Every address asks for the app's password, shown once when it was made. Turn it off: "+build.Name+" protect off "+app.Name))
 	}
 }
 
@@ -928,6 +925,32 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, logLine(line))
 	}
 	return nil
+}
+
+// compose prints the compose file of the app's live deploy, as it is, so
+// it pipes to a file: compose > compose.yml.
+func compose(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("compose", "compose [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	file, err := api.ComposeFile(ctx, name)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(stdout, file.Text)
+	return err
 }
 
 // envCommands are the subcommands of env. Any other first argument is the

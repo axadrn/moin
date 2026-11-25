@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -132,14 +131,13 @@ func catalogInstall(ctx context.Context, args []string, stdout io.Writer) error 
 	err = follow(ctx, api, installed.App.Name, installed.Deploy, "Deploy", false, stdout)
 	// Env values are write-only: this is the one time these are shown, so
 	// they show also when the deploy failed.
-	instantPassword := cmp.Or(installed.InstantPassword, installed.App.InstantPassword)
-	if len(installed.Login) > 0 || instantPassword != "" {
+	if len(installed.Login) > 0 || installed.Password != "" {
 		fmt.Fprintln(stdout, "  "+style.Warning.Render("Keep this in your password manager now: it is shown only this once."))
+		if installed.Password != "" {
+			fmt.Fprintln(stdout, "  every address: user "+passwordUser+", password "+installed.Password)
+		}
 		for _, key := range slices.Sorted(maps.Keys(installed.Login)) {
 			fmt.Fprintln(stdout, "  "+key+style.Muted.Render("=")+installed.Login[key])
-		}
-		if instantPassword != "" {
-			fmt.Fprintln(stdout, "  instant address: user "+instantUser+", password "+instantPassword)
 		}
 	}
 	if err != nil {

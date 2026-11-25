@@ -49,9 +49,11 @@ type DeployStart struct {
 	Domains    *Domains `json:"routing,omitempty"`
 }
 
-// Domains is how visitors reach the main service, as set in web, CLI, TUI
-// or MCP: the only place they are set. Protect is an htpasswd line ("user:bcrypt hash") when password protection
-// is on. DeployStart carries it under the JSON key routing, which daemons of
+// Domains is how visitors reach the app, as set in web, CLI, TUI or MCP:
+// the only place they are set. Protect is an htpasswd line ("user:bcrypt
+// hash") when the app's password is on: every address of the app asks for
+// it, its domains, those of its other services and its instant address.
+// DeployStart carries it under the JSON key routing, which daemons of
 // protocol version 1 read.
 type Domains struct {
 	Domains   []string `json:"domains,omitempty"`
@@ -61,10 +63,8 @@ type Domains struct {
 	Services map[string][]string `json:"services,omitempty"`
 	// Instant is the provider of the app's instant address, such as
 	// sslip.io, "" for none; InstantIP the server's public IPv4 it names.
-	// InstantProtect is the htpasswd line in front of it, "" when open.
-	Instant        string `json:"instant,omitempty"`
-	InstantIP      string `json:"instant_ip,omitempty"`
-	InstantProtect string `json:"instant_protect,omitempty"`
+	Instant   string `json:"instant,omitempty"`
+	InstantIP string `json:"instant_ip,omitempty"`
 }
 
 // InstantProviders are the services that name an IP without any setup:
@@ -111,4 +111,11 @@ type DeployDone struct {
 	// Env names the env keys the app has after the deploy, which may have
 	// made the secrets of a catalog app: never a value.
 	Env *AppEnv `json:"env,omitempty"`
+	// ComposeFile is the compose file of a deploy that worked, YAML:
+	// everything the daemon runs for the app, written to run anywhere,
+	// without the instant address and with no value of the env. image,
+	// ports, expose, volumes, user, the env PORT and the paths of a build
+	// are as the deploy filled them in; every other ${NAME} stays as
+	// written. Daemons before it send none.
+	ComposeFile string `json:"compose_file,omitempty"`
 }

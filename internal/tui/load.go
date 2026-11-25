@@ -381,22 +381,26 @@ func (m model) setDomains(app, service string, domains []string, canonical strin
 	}
 }
 
+// protect turns the app's password on with the user's own. A password
+// moin makes is shown once, so the TUI leaves that to the web and the CLI.
 func (m model) protect(app, user, password string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		var err error
-		if user == "" {
-			_, err = api.RemoveProtection(ctx, app)
-		} else {
-			_, err = api.SetProtection(ctx, app, user, password)
-		}
-		if err != nil {
+		if _, err := api.SetProtection(ctx, app, user, password); err != nil {
 			return errMsg{err}
 		}
-		if user == "" {
-			return reloadMsg{notice: app + " is open again"}
+		return reloadMsg{notice: app + " asks for a password on every address now"}
+	}
+}
+
+// unprotect turns the app's password off.
+func (m model) unprotect(app string) tea.Cmd {
+	api, ctx := m.api, m.ctx
+	return func() tea.Msg {
+		if _, err := api.RemoveProtection(ctx, app); err != nil {
+			return errMsg{err}
 		}
-		return reloadMsg{notice: app + " asks for a password now"}
+		return reloadMsg{notice: app + " asks for no password now"}
 	}
 }
 

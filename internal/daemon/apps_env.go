@@ -16,7 +16,9 @@ import (
 
 // An app's env lives in one file on the server, apps/<app>/app.env, 0600,
 // with the values as they are now: the hub forwards a value once and
-// forgets it. Every release reads that file when it starts, a rollback
+// forgets it. No other file holds a value: the compose.json of a release
+// names it as ${NAME}, and Docker fills it in from app.env when it starts
+// the containers. Every release reads that file when it starts, a rollback
 // too, so a value replaced or removed is gone from the server.
 
 // envFile is the app's env file.
@@ -147,17 +149,21 @@ func writeEnv(file string, env map[string]string) error {
 	return writeWhole(file, []byte(dotenv.Format(env)))
 }
 
-// envArgs are the --env-file arguments compose reads a source's compose
-// file with, to fill its ${VAR}: the source's own .env first, when it has
-// one, then the app's env, whose values win.
+// envArgs are the --env-file arguments compose reads a compose file with,
+// to fill its ${NAME}: the .env in dir first, when there is one, then the
+// app's env, whose values win. dir is the source for the compose file of a
+// repo, and the release's folder for the compose.json moin runs, which
+// keeps a copy of the source's .env.
 //
 // The env goes to compose in a file, never in docker's own environment:
 // docker reads variables like DOCKER_CONFIG and DOCKER_HOST itself, so an
 // env var of the app could make it run another program, as root.
-func (a *apps) envArgs(app, src string) []string {
+func (a *apps) envArgs(app, dir string) []string {
 	var args []string
-	if dotEnv := filepath.Join(src, ".env"); exists(dotEnv) {
-		args = append(args, "--env-file", dotEnv)
+	for _, file := range []string{filepath.Join(dir, ".env"), a.envFile(app)} {
+		if exists(file) {
+			args = append(args, "--env-file", file)
+		}
 	}
-	return append(args, "--env-file", a.envFile(app))
+	return args
 }

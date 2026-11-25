@@ -40,13 +40,13 @@ func TestPostgresImage(t *testing.T) {
 // cannot be backed up.
 func TestDatabasesFindsPostgres(t *testing.T) {
 	dir := t.TempDir()
-	composeFile := filepath.Join(dir, "compose.json")
+	composeJSON := filepath.Join(dir, "compose.json")
 	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"legacy":{"image":"mysql:8"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
-	if err := os.WriteFile(composeFile, []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(composeJSON, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	a := newApps(dir, nil)
-	found, noBackup, err := a.scanDatabases(context.Background(), composeFile)
+	found, noBackup, err := a.scanDatabases(context.Background(), composeJSON)
 	if err != nil {
 		t.Fatal(err)
 	}

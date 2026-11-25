@@ -18,8 +18,8 @@ import (
 // execArgs is docker's argv for a run: compose exec in the app's live
 // release, without a TTY. The command follows the service as words of its
 // own, so no shell ever reads it.
-func execArgs(project, composeFile, service string, argv []string) []string {
-	return append([]string{"compose", "-p", project, "-f", composeFile, "exec", "-T", service}, argv...)
+func (a *apps) execArgs(app, composeJSON, service string, argv []string) []string {
+	return append(a.composeArgs(app, composeJSON, "exec", "-T", service), argv...)
 }
 
 // execTimeout is the run's timeout in seconds: the default when none is
@@ -72,10 +72,10 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 	if current == 0 {
 		return protocol.ExecDone{}, fmt.Errorf("%s has no live deploy: deploy it first", start.App)
 	}
-	composeFile := filepath.Join(a.releaseDir(start.App, current), "compose.json")
+	composeJSON := filepath.Join(a.releaseDir(start.App, current), "compose.json")
 	ctx, cancel := context.WithTimeout(ctx, execTimeout(start.Timeout))
 	defer cancel()
-	command := exec.CommandContext(ctx, "docker", execArgs(a.projectOf(start.App), composeFile, start.Service, start.Argv)...)
+	command := exec.CommandContext(ctx, "docker", a.execArgs(start.App, composeJSON, start.Service, start.Argv)...)
 	command.WaitDelay = 5 * time.Second
 	reader, writer := io.Pipe()
 	command.Stdout, command.Stderr = writer, writer

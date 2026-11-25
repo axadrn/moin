@@ -153,6 +153,7 @@ With the tunnel, moin sends every domain of the server's apps through it and poi
 - If the token cannot reach a domain's zone, a red line says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit, turn on **Always Use HTTPS** yourself.
 - Open again deletes the tunnel and the DNS records moin made. Point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
 - A server behind the tunnel has no [instant address](/docs/guides/domains#instant-address): it needs ports 80 and 443.
+- A new app starts with its [password](/docs/guides/domains#password) on, for every address of it. Nobody reaches it before you, also not a setup page where the first visitor becomes the admin. Turn it off when the app is ready for the world.
 
 ## SSH
 
@@ -207,9 +208,10 @@ On your server, and only there. The hub passes a value on once, the moment you e
 | File on the server | What is in it |
 | --- | --- |
 | `/var/lib/moin/apps/<app>/app.env` | the [env vars](/docs/guides/env) of one app |
+| `/var/lib/moin/apps/<app>/releases/<n>/htpasswd` | the hash of the app's [password](/docs/guides/domains#password), for deploy n |
 | `/var/lib/moin/server.json` | the secrets of the server: the secret keys of your [buckets](/docs/guides/bucket), the [registry logins](/docs/guides/ci#registry-logins), the Tailscale key and the token of the Cloudflare Tunnel |
 
-Both are readable by root only. A secret goes to a server only while it is online. When it is offline, moin says so and keeps nothing to send later.
+All are readable by root only. No other file of moin holds a value: not the compose file of a deploy, not its logs, not what the server tells the hub. A test proves it on every change. It deploys an app that uses a secret every way a compose file can, then searches every file of the daemon and every message it sends. Deploys from before moin 1.0.0-beta.35 wrote values into their compose file: that holds once an app deployed from its source again, and its old deploys are cleaned up after 5 builds. [In compose.yml](/docs/guides/env#in-composeyml) A secret goes to a server only while it is online. When it is offline, moin says so and keeps nothing to send later.
 
 **What the hub keeps.** Names and dates, never a value:
 
@@ -217,7 +219,7 @@ Both are readable by root only. A secret goes to a server only while it is onlin
 - each bucket's endpoint, bucket, folder and access key ID
 - each registry's host and username
 - which server has which key
-- the instant address password as a hash only. moin shows it once, when it makes it
+- the app's password as a hash only. moin shows it once, when it makes it
 
 **What stays with the hub.** The hub uses these itself, so it has to keep them, encrypted with its own key:
 
@@ -230,10 +232,11 @@ Both are readable by root only. A secret goes to a server only while it is onlin
 - The secrets of a [catalog app](/docs/guides/catalog) never pass the hub: the server makes them. Only the first sign-in password, which moin shows you once, passes it once.
 - The hub can still send what your [rules](#rules) allow. Without `exec: off`, a command in a container can print its env. Strict rules close that.
 - A server rebuilt from scratch starts without secrets. Enter them again, then deploy. A later server gets the bucket key, registry login and Tailscale key once more: the pages show which server lacks one.
-- `${NAME}` in your compose file is filled in by Docker Compose and written into the compose file of each deploy on the server, also an old value you replaced. It stays there until moin cleans that deploy up: moin keeps the last 5 builds. Let values reach the container as env vars instead where you can. [In compose.yml](/docs/guides/env#in-composeyml)
+- The proxy, Traefik, sees the apps folder read-only, to read the password's hash. So it can read every app's `app.env` too. We accept that: it runs with the Docker socket, which is as much as root on the server anyway. A bug in Traefik that reads files would expose them, so moin keeps Traefik current.
+- An app moin builds with [Railpack](/docs/concepts/how-moin-works) has a hash of its env in its compose file, so a changed value builds again. A hash, not a value.
 - The env names moin shows come from the server: each daemon reports which keys its apps have, never the values. A key the server does not have is not shown.
 
-**How Docker gets the env.** Each deploy hands the app's `app.env` to Docker Compose: as `env_file` of the app's services, and as `--env-file` to fill `${NAME}` in your compose file. Docker itself never sees them as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
+**How Docker gets the env.** Every Docker Compose command moin runs for an app gets its `app.env`: as `env_file` of the app's services, and as `--env-file` to fill `${NAME}` in the compose file the moment the containers start. The compose file itself keeps `${NAME}`. Docker never sees the values as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.
 
 ## Rules
 
@@ -276,6 +279,8 @@ An app is a guest in your house. It gets its own room and stays there. Some cont
 So moin does not list what is forbidden. It lists what a normal app needs, and refuses everything else, with or without a rules file. A setting Docker adds tomorrow is refused too, until it is on the list.
 
 The server checks the compose file as it will run, before anything builds or starts. That holds for every deploy: new code, a new image, new env and a rollback. A refused deploy says which setting: `service web: privileged is not allowed: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in /etc/moin/rules`.
+
+moin fills in `${NAME}` in the image, the ports, the volumes and the `build` paths when it reads the file, so it checks them as they will run. In another setting it checks, such as an `env_file` path or the name of a network, `${NAME}` is refused: it could become anything when the containers start.
 
 | Allowed | What for |
 | --- | --- |

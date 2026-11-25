@@ -62,6 +62,11 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart, rules *pr
 	} else {
 		done.OK = true
 		logf("v%d is live", start.Number)
+		var fileErr error
+		done.ComposeFile, fileErr = a.composeFile(start.App, start.Number)
+		if fileErr != nil {
+			logf("the compose file of v%d could not be made: %s", start.Number, fileErr)
+		}
 	}
 	// Last, so the keys are as fresh as they can be.
 	if protocol.ValidAppName(start.App) {
@@ -103,11 +108,16 @@ func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) proto
 	if current == note.Number {
 		done.OK = true
 		done.Detected, _ = a.live(app)
+		var err error
+		done.ComposeFile, err = a.composeFile(app, note.Number)
+		if err != nil {
+			slog.Warn("the compose file could not be made", "app", app, "number", note.Number, "error", err)
+		}
 		return done
 	}
 	a.markFailed(app, note.Number)
 	done.Error = "the daemon stopped during this deploy"
-	if current > 0 && a.compose(ctx, app, a.composeFile(app), func(string, ...any) {}, "up", "-d", "--remove-orphans") == nil {
+	if current > 0 && a.compose(ctx, app, a.composeJSON(app), func(string, ...any) {}, "up", "-d", "--remove-orphans") == nil {
 		done.Error += fmt.Sprintf("; v%d is running again", current)
 	}
 	return done
@@ -123,8 +133,8 @@ type release struct {
 	rules *protocol.Rules
 	// dir is the folder of this release.
 	dir string
-	// composeFile is the compose.json moin runs for this release.
-	composeFile string
+	// composeJSON is the compose.json moin runs for this release.
+	composeJSON string
 	// config is the compose file as moin read it, before finish filled it in.
 	config map[string]any
 	// detected is what moin found out about the app so far.
@@ -214,36 +224,35 @@ func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, log
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, rules: rules, dir: dir, composeFile: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
+	return &release{start: start, rules: rules, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
 }
 
-// rollBack copies the compose file of an older release into this one: the
-// same images, with the env as it is now.
+// rollBack runs an older release again: its compose file and images, with
+// the env, the domains and the password as they are now. An app has one
+// password, so a rollback never brings an old one back.
 func (a *apps) rollBack(ctx context.Context, release *release) error {
 	from := release.start.FromNumber
 	release.logf("rolling back to v%d", from)
 	old := a.releaseDir(release.start.App, from)
-	body, err := os.ReadFile(filepath.Join(old, "compose.json"))
-	if err != nil {
+	if !exists(filepath.Join(old, "compose.json")) {
 		return fmt.Errorf("v%d is no longer on the server", from)
 	}
-	detectedBody, _ := os.ReadFile(filepath.Join(old, "detected.json"))
-	_ = json.Unmarshal(detectedBody, &release.detected)
-	err = os.WriteFile(release.composeFile, body, 0o600)
+	err := loadBase(release, old)
 	if err != nil {
 		return err
 	}
-	base, err := os.ReadFile(filepath.Join(old, "base.json"))
-	if err == nil {
-		_ = os.WriteFile(filepath.Join(release.dir, "base.json"), base, 0o600)
+	if release.start.Image == "" {
+		release.start.Image = release.detected.Image
 	}
-	err = a.pinFile(ctx, release.start, release.composeFile)
+	release.detected.Image = release.start.Image
+	err = copyIfThere(filepath.Join(old, ".env"), filepath.Join(release.dir, ".env"))
 	if err != nil {
 		return err
 	}
+	saveJSON(filepath.Join(release.dir, "base.json"), release.config)
 	// An old release may come from before a rule, or its files may have
-	// changed since: check it as a new one.
-	return a.checkCompose(release)
+	// changed since: writeCompose checks it as a new one.
+	return a.writeCompose(ctx, release)
 }
 
 // prepareRelease fetches the source, routes the app, writes compose.json and
@@ -298,12 +307,33 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	default:
 		release.logf("building the source of v%d again", start.SourceNumber)
 		err = a.copySource(ctx, start.App, start.SourceNumber, src)
+		if err == nil {
+			err = a.dropGenerated(start.App, start.SourceNumber, src)
+		}
 	}
+	if err != nil {
+		return err
+	}
+	// The source's .env fills ${VAR} of the compose file too, when the
+	// containers start: it goes next to compose.json (envArgs).
+	err = copyIfThere(filepath.Join(src, ".env"), filepath.Join(release.dir, ".env"))
 	if err != nil {
 		return err
 	}
 	release.config, release.detected, err = a.resolve(ctx, start.App, src)
 	return err
+}
+
+// copyIfThere copies the file from to to, 0600, when from is there.
+func copyIfThere(from, to string) error {
+	body, err := os.ReadFile(from)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return writeWhole(to, body)
 }
 
 // catalogSource writes the compose file of the catalog app into src, from
@@ -327,7 +357,12 @@ func (a *apps) reuseRunningRelease(ctx context.Context, release *release) error 
 	if current == 0 {
 		return errors.New("no release to take the compose file from: link the app's repo, then deploy the image again")
 	}
-	err := loadBase(release, a.releaseDir(release.start.App, current))
+	dir := a.releaseDir(release.start.App, current)
+	err := loadBase(release, dir)
+	if err != nil {
+		return err
+	}
+	err = copyIfThere(filepath.Join(dir, ".env"), filepath.Join(release.dir, ".env"))
 	if err != nil {
 		return err
 	}
@@ -349,7 +384,7 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 	if err != nil {
 		return err
 	}
-	err = a.pinFile(ctx, release.start, release.composeFile)
+	err = a.pinFile(ctx, release.start, release.composeJSON)
 	if err != nil {
 		return err
 	}
@@ -399,8 +434,7 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	logf("building")
 	// A Railpack build reads the app's env as BuildKit secrets, from the
 	// env file, never from docker's own environment or its arguments.
-	args := []string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--env-file", release.envFile}
-	err := a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
+	err := a.run(ctx, logf, nil, a.composeArgs(start.App, release.composeJSON, "--progress", "plain", "build")...)
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
@@ -423,7 +457,7 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 	// A restart brings nothing new, so compose would leave the containers
 	// as they are: recreate them.
 	restart := start.SourceURL == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
-	err = a.start(ctx, start.App, release.composeFile, release.detected, restart, release.logf)
+	err = a.start(ctx, start.App, release.composeJSON, release.detected, restart, release.logf)
 	if err != nil {
 		return a.startPreviousAgain(ctx, release, previous, err)
 	}
@@ -449,7 +483,7 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 	start := release.start
 	// A release that did not come up stops all its containers, so none of
 	// them keeps writing while the next deploy checks its mounts.
-	stop := func() { _ = a.compose(ctx, start.App, release.composeFile, release.logf, "stop") }
+	stop := func() { _ = a.compose(ctx, start.App, release.composeJSON, release.logf, "stop") }
 	if previous <= 0 || previous == start.Number {
 		stop()
 		return startErr
@@ -468,7 +502,7 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 // afterStart notes the databases the running release has, has backups
 // follow them, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, release *release) {
-	databases, noBackup, err := a.scanDatabases(ctx, release.composeFile)
+	databases, noBackup, err := a.scanDatabases(ctx, release.composeJSON)
 	if err == nil {
 		release.detected.Databases = databases
 		release.detected.NoBackup = noBackup
@@ -502,12 +536,12 @@ func logDatabases(detected protocol.Detected, logf func(string, ...any)) {
 // start brings the release up and checks that it stays up. --wait waits
 // until every service runs, and one with a Docker healthcheck until Docker
 // says it is healthy; one that is not fails the start.
-func (a *apps) start(ctx context.Context, app, composeFile string, detected protocol.Detected, recreate bool, logf func(string, ...any)) error {
+func (a *apps) start(ctx context.Context, app, composeJSON string, detected protocol.Detected, recreate bool, logf func(string, ...any)) error {
 	args := []string{"up", "-d", "--remove-orphans", "--wait", "--wait-timeout", strconv.Itoa(int(waitTimeout.Seconds()))}
 	if recreate {
 		args = append(args, "--force-recreate")
 	}
-	err := a.compose(ctx, app, composeFile, logf, args...)
+	err := a.compose(ctx, app, composeJSON, logf, args...)
 	if err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
@@ -517,7 +551,7 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 	// fine: the service passes once it runs stableFor without a restart,
 	// and fails if it does not within startWindow.
 	running, err := a.stable(ctx, func() (bool, string) {
-		return a.serviceState(ctx, app, composeFile, detected.Service)
+		return a.serviceState(ctx, app, composeJSON, detected.Service)
 	})
 	if err != nil {
 		return err
@@ -526,7 +560,7 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 		// The rollback replaces these containers, and their logs with them:
 		// keep the crash in the deploy log.
 		logf("last logs of %s:", detected.Service)
-		_ = a.compose(ctx, app, composeFile, logf, "logs", "--no-color", "--tail", "20", detected.Service)
+		_ = a.compose(ctx, app, composeJSON, logf, "logs", "--no-color", "--tail", "20", detected.Service)
 		return fmt.Errorf("service %s keeps stopping right after it starts; see the deploy log", detected.Service)
 	}
 	return nil
@@ -534,22 +568,22 @@ func (a *apps) start(ctx context.Context, app, composeFile string, detected prot
 
 // serviceState says whether a service runs, and a fingerprint of its
 // restarts and containers for stable.
-func (a *apps) serviceState(ctx context.Context, app, composeFile, service string) (bool, string) {
-	ids, err := a.runningContainers(ctx, app, composeFile, service)
+func (a *apps) serviceState(ctx context.Context, app, composeJSON, service string) (bool, string) {
+	ids, err := a.runningContainers(ctx, app, composeJSON, service)
 	ids = strings.TrimSpace(ids)
 	running := err == nil && ids != ""
-	return running, a.restartCount(ctx, app, composeFile, service) + " " + ids
+	return running, a.restartCount(ctx, app, composeJSON, service) + " " + ids
 }
 
 // runningContainers lists the IDs of a service's running containers.
-func (a *apps) runningContainers(ctx context.Context, app, composeFile, service string) (string, error) {
-	return a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "--status", "running", "-q", service)
+func (a *apps) runningContainers(ctx context.Context, app, composeJSON, service string) (string, error) {
+	return a.output(ctx, "docker", a.composeArgs(app, composeJSON, "ps", "--status", "running", "-q", service)...)
 }
 
 // restartCount is how often the first container of a service restarted,
 // "" when it has none.
-func (a *apps) restartCount(ctx context.Context, app, composeFile, service string) string {
-	ids, _ := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "-a", "-q", service)
+func (a *apps) restartCount(ctx context.Context, app, composeJSON, service string) string {
+	ids, _ := a.output(ctx, "docker", a.composeArgs(app, composeJSON, "ps", "-a", "-q", service)...)
 	containers := strings.Fields(ids)
 	if len(containers) == 0 {
 		return ""
@@ -624,6 +658,24 @@ func (a *apps) rebuildMissing(ctx context.Context, release *release) error {
 	return nil
 }
 
+// dropGenerated takes the compose.yml moin wrote for a repo without one out
+// of the source it copied from release number, so resolve writes it again
+// and finds the repo as the first deploy did: how it builds, and for
+// Railpack a new plan next to src, with the env names as they are now.
+func (a *apps) dropGenerated(app string, number int, src string) error {
+	var detected protocol.Detected
+	body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "detected.json"))
+	_ = json.Unmarshal(body, &detected)
+	if detected.Kind == "" || detected.Kind == "compose" {
+		return nil
+	}
+	err := os.Remove(filepath.Join(src, "compose.yml"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
 // copySource copies the source a release kept into a new release.
 func (a *apps) copySource(ctx context.Context, app string, number int, target string) error {
 	source := filepath.Join(a.releaseDir(app, number), "src")
@@ -642,7 +694,7 @@ func (a *apps) copySource(ctx context.Context, app string, number int, target st
 // config, so Docker keeps no copy of it.
 func (a *apps) pull(ctx context.Context, release *release) error {
 	start := release.start
-	args := []string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--progress", "plain", "pull", release.detected.Service}
+	args := a.composeArgs(start.App, release.composeJSON, "--progress", "plain", "pull", release.detected.Service)
 	host := protocol.RegistryHost(start.Image)
 	login := a.registryLogin(host)
 	if login == "" {
@@ -691,6 +743,12 @@ func (a *apps) prune(ctx context.Context, app string) {
 		releases = append(releases, protocol.Release{Number: number, Build: build})
 	}
 	kept := protocol.KeptReleases(releases, current)
+	// An image deploy, a restart or a rollback runs from the source of an
+	// older release: its build, its env files and its mounts are there. That
+	// release stays while a kept one names it.
+	for _, number := range a.sourcesNamed(app, kept) {
+		kept[number] = true
+	}
 	used := map[string]bool{}
 	for _, release := range releases {
 		if !kept[release.Number] {
@@ -712,6 +770,21 @@ func (a *apps) prune(ctx context.Context, app string) {
 			_ = exec.CommandContext(ctx, "docker", "image", "rm", image).Run()
 		}
 	}
+}
+
+// sourcesNamed are the releases whose source the compose files of the
+// releases in numbers name, as releases/<n>/src.
+func (a *apps) sourcesNamed(app string, numbers map[int]bool) []int {
+	pattern := regexp.MustCompile(regexp.QuoteMeta(filepath.Join(a.appDir(app), "releases")+"/") + `([0-9]+)/src[/"]`)
+	found := []int{}
+	for number := range numbers {
+		body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "compose.json"))
+		for _, match := range pattern.FindAllStringSubmatch(string(body), -1) {
+			source, _ := strconv.Atoi(match[1])
+			found = append(found, source)
+		}
+	}
+	return found
 }
 
 // The kind file of a release says what it brought: a build (source or

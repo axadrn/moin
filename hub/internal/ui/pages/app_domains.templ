@@ -18,13 +18,13 @@ type DomainsView struct {
 	// Server runs the app.
 	Server  model.Server
 	Instant service.Instant
-	// NewPassword is the password of the instant address moin just made:
-	// the one time it shows it.
+	// NewPassword is the password of the app moin just made: the one time
+	// it shows it.
 	NewPassword string
 }
 
 // AppDomains is where an app is reached: its domains, the instant address
-// and the password in front of it. A domain says whether it points at the
+// and the one password every address asks for. A domain says whether it points at the
 // server once it was added or checked; opening the page waits on no DNS.
 templ AppDomains(view DomainsView) {
 	{{ domainsPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/domains" }}
@@ -45,8 +45,8 @@ templ AppDomains(view DomainsView) {
 				}
 			}
 		</section>
-		@instantSection(view, domainsPath)
-		@passwordSection(view.App, domainsPath)
+		@instantSection(view.Instant, domainsPath)
+		@passwordSection(view, domainsPath)
 	</div>
 }
 
@@ -139,9 +139,8 @@ templ addDomainRow(domainsPath string) {
 }
 
 // instantSection is the instant address: a switch, where it is or why the
-// app has none, its provider and its password.
-templ instantSection(view DomainsView, domainsPath string) {
-	{{ instant := view.Instant }}
+// app has none, and its provider.
+templ instantSection(instant service.Instant, domainsPath string) {
 	{{ on := instant.Provider != "" && instant.Provider != "off" }}
 	<section class="moin-section">
 		<div class="moin-section-head">
@@ -169,30 +168,6 @@ templ instantSection(view DomainsView, domainsPath string) {
 							@components.CSRF()
 							@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
 						}
-						if instant.URL != "" {
-							@components.Item(components.ItemProps{Form: true, For: "instant-password-on", Name: "Password", Note: instantSignIn(instant), Attrs: templ.Attributes{"hx-post": domainsPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
-								@components.CSRF()
-								<input type="hidden" name="password" value="1"/>
-								@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open}})
-							}
-							if !instant.Open && !instant.OwnPassword {
-								if view.NewPassword != "" {
-									@components.Item(components.ItemProps{Name: "New password", Note: "Shown once. " + view.App.Name + " takes it on its next restart."}) {
-										<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ view.NewPassword }</span>
-										@copyButton(view.NewPassword, "", "Copy the password")
-									}
-								} else {
-									@components.Item(components.ItemProps{Button: true, Name: "New password", Attrs: templ.Attributes{
-										"hx-post":          domainsPath + "/instant-new-password",
-										"hx-target":        "#app-domains",
-										"hx-swap":          "outerHTML",
-										"hx-disable":       "this",
-										"hx-confirm":       "Make a new password? moin shows it once. The old one works until the next restart.",
-										"data-instant-new": true,
-									}})
-								}
-							}
-						}
 					}
 				}
 			}
@@ -200,56 +175,59 @@ templ instantSection(view DomainsView, domainsPath string) {
 	</section>
 }
 
-// passwordSection is the password in front of the app: off, a switch
-// opens its fields; on, who signs in and Remove.
-templ passwordSection(app model.App, domainsPath string) {
+// passwordSection is the app's one password: a switch that every address
+// of the app, its domains and its instant address, asks for it. On, moin
+// makes the password and shows it once; the fields set one of your own.
+templ passwordSection(view DomainsView, domainsPath string) {
+	{{ on := view.App.Protect != "" }}
 	<section class="moin-section">
 		<div class="moin-section-head">
 			<h2>Password</h2>
 		</div>
-		if app.Protect != "" {
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					@components.Item(components.ItemProps{Name: "Sign in as " + protectUser(app)}) {
-						<span class="moin-small moin-muted" data-protected>On</span>
-					}
-					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
-						"hx-post":        domainsPath + "/unprotect",
-						"hx-target":      "#app-domains",
-						"hx-swap":        "outerHTML",
-						"hx-disable":     "this",
-						"hx-confirm":     "Remove the password? Anyone with the link can open " + app.Name + " after the next restart.",
-						"data-unprotect": true,
-					}})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Form: true, For: "password-on", Name: "Ask for a password", Note: passwordNote(view.App), Attrs: templ.Attributes{"hx-post": domainsPath + "/protect", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+					@components.CSRF()
+					<input type="hidden" name="switch" value="1"/>
+					@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "password-on", "name": "on", "value": "1", "checked": on, "data-password-switch": true}})
 				}
-			}
-		} else {
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					@components.Expand(components.ExpandProps{Name: "Ask for a password"}) {
-						@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"id": "protect-form", "hx-post": domainsPath + "/protect", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}}) {
-							@components.CSRF()
-							<div class="moin-stack moin-fill" data-gap="4">
-								<div class="moin-grid">
-									@components.Field(components.FieldProps{Label: "Username", For: "protect-user"}) {
-										@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-user", "name": "username", "type": "text", "value": "moin", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
-									}
-									@components.Field(components.FieldProps{Label: "Password", For: "protect-password"}) {
-										@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-password", "name": "password", "type": "password", "autocomplete": "new-password", "required": true, "minlength": "8", "maxlength": "72", "placeholder": "8 to 72 characters"}})
-									}
-								</div>
-								<div class="moin-row" data-end>
-									@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-protect": true}}) {
-										Set password
-									}
-								</div>
+				if view.NewPassword != "" {
+					@components.Item(components.ItemProps{Name: "New password", Note: "Shown once. " + view.App.Name + " takes it on its next restart."}) {
+						<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ view.NewPassword }</span>
+						@copyButton(view.NewPassword, "", "Copy the password")
+					}
+				}
+				@components.Expand(components.ExpandProps{Name: "Use your own password"}) {
+					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"id": "protect-form", "hx-post": domainsPath + "/protect", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}}) {
+						@components.CSRF()
+						<div class="moin-stack moin-fill" data-gap="4">
+							<div class="moin-grid">
+								@components.Field(components.FieldProps{Label: "Username", For: "protect-user"}) {
+									@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-user", "name": "username", "type": "text", "value": protectUser(view.App), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+								}
+								@components.Field(components.FieldProps{Label: "Password", For: "protect-password"}) {
+									@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-password", "name": "password", "type": "password", "autocomplete": "new-password", "required": true, "minlength": "8", "maxlength": "72", "placeholder": "8 to 72 characters"}})
+								}
 							</div>
-						}
+							<div class="moin-row" data-end>
+								@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-protect": true}}) {
+									Set password
+								}
+							</div>
+						</div>
 					}
 				}
 			}
 		}
 	</section>
+}
+
+// passwordNote says who signs in, or that anyone with the link gets in.
+func passwordNote(app model.App) string {
+	if app.Protect == "" {
+		return "Off. Anyone with the link opens " + app.Name + "."
+	}
+	return "Every address asks for it. Sign in as " + protectUser(app) + "."
 }
 
 // instantOptions are the providers of the instant address.
@@ -259,17 +237,6 @@ func instantOptions() []components.Option {
 		options = append(options, components.Option{Value: provider, Label: provider})
 	}
 	return options
-}
-
-// instantSignIn is who signs in on the instant address, and with what.
-func instantSignIn(instant service.Instant) string {
-	switch {
-	case instant.Open:
-		return ""
-	case instant.OwnPassword:
-		return "Sign in as " + instant.User + " with the app's password"
-	}
-	return "Sign in as " + instant.User
 }
 
 // domainNote is the quiet words under a domain: canonical, its service.
@@ -314,11 +281,11 @@ func orDash(value string) string {
 	return value
 }
 
+// protectUser is who signs in with the app's password, PasswordUser when
+// it has none.
 func protectUser(app model.App) string {
-	for index, char := range app.Protect {
-		if char == ':' {
-			return app.Protect[:index]
-		}
+	if user, _, found := strings.Cut(app.Protect, ":"); found {
+		return user
 	}
-	return "moin"
+	return service.PasswordUser
 }

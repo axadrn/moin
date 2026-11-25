@@ -264,7 +264,7 @@ func (e *postgresEngine) others() []string {
 	var config struct {
 		Services map[string]json.RawMessage `json:"services"`
 	}
-	body, _ := os.ReadFile(e.b.apps.composeFile(e.app))
+	body, _ := os.ReadFile(e.b.apps.composeJSON(e.app))
 	_ = json.Unmarshal(body, &config)
 	others := []string{}
 	for name := range config.Services {

@@ -90,7 +90,7 @@ Your app runs in containers, with Docker. You do not need to know Docker. For a 
 
 Saving a setting never restarts your app. The change waits for you. The app page says how many changes wait.
 
-A restart applies them all, without a build. A deploy or a start applies them too. A change to a variable used as `${NAME}` in `compose.yml` takes a deploy.
+A restart applies them all, without a build. A deploy or a start applies them too. That holds for a variable used as `${NAME}` in `compose.yml`, unless it sits in the image, the ports or the volumes: those take a deploy. [In compose.yml](/docs/guides/env#in-composeyml)
 
 ## Your data survives every deploy
 
@@ -138,7 +138,7 @@ The daemon downloads code from GitHub only. Your code never passes through moin.
 | --- | --- |
 | `compose.yml` | uses it (`compose.yaml` and `docker-compose.yml` work too) |
 | only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
-| a Go module | writes the Dockerfile too: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
+| a Go module | writes the Dockerfile too, into the compose file: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
 | none of these | builds it with [Railpack](https://railpack.com), the open source builder Railway made |
 
 Railpack finds the language, the version and the start command by itself. It covers Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more. Your env vars reach the build as secrets. They never land in the image or a log.
@@ -147,7 +147,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 
 1. Gets the code from GitHub, or the compose file of a catalog app, and keeps it with the deploy.
 2. Reads the [compose file](/docs/guides/compose): the services, the one that gets the traffic and its port.
-3. Tags the built images, points the app's services at its env file on the server and sets `restart: unless-stopped`.
+3. Tags the built images, points the app's services at its env file on the server and sets `restart: unless-stopped`. Every `${NAME}` stays a name: Docker fills it in from the env file when the containers start.
 4. Builds.
 5. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
 6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds. A service with a Docker `healthcheck` must be healthy too.
@@ -155,7 +155,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 
 If the start or the check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
 
-The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env as it is now.
+The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env, the domains and the password as they are now.
 
 ### How moin reads your database
 

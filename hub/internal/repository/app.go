@@ -59,9 +59,9 @@ func (r *Apps) Create(app *model.App) error {
 	if app.Folder == "" {
 		app.Folder = app.Name
 	}
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.CreatedAt)
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, protect, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.Protect, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
 	}
@@ -200,13 +200,22 @@ func (r *Apps) ListDeploys(appID string, limit int) ([]model.Deploy, error) {
 	return deploys, err
 }
 
-// FinishDeploy ends a running deploy. A deploy that already ended stays as it is.
-func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected string, at time.Time) error {
+// FinishDeploy ends a running deploy, with the compose file the daemon
+// made for it. A deploy that already ended stays as it is.
+func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected, composeFile string, at time.Time) error {
 	_, err := r.db.Exec(`
-		UPDATE deploys SET status = $1, error = $2, log = $3, detected = CASE WHEN $4 = '' THEN detected ELSE $4 END, finished_at = $5
-		WHERE id = $6 AND status = 'running'
-	`, status, errorMessage, log, detected, at, id)
+		UPDATE deploys SET status = $1, error = $2, log = $3, detected = CASE WHEN $4 = '' THEN detected ELSE $4 END, compose_file = $5, finished_at = $6
+		WHERE id = $7 AND status = 'running'
+	`, status, errorMessage, log, detected, composeFile, at, id)
 	return err
+}
+
+// ComposeFile is the compose file of deploy number of an app, "" when its
+// daemon sent none.
+func (r *Apps) ComposeFile(appID string, number int) (string, error) {
+	var text string
+	err := r.db.Get(&text, `SELECT compose_file FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
+	return text, err
 }
 
 // SetDeployDetected replaces what a deploy has in it.
@@ -313,22 +322,15 @@ func (r *Apps) DeleteRegistry(workspaceID, host string) error {
 	return nil
 }
 
-// SetInstant stores the instant address provider and whether it is open.
-func (r *Apps) SetInstant(appID, provider string, open bool) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant = $1, instant_open = $2 WHERE id = $3`, provider, open, appID)
+// SetInstant stores the instant address provider.
+func (r *Apps) SetInstant(appID, provider string) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant = $1 WHERE id = $2`, provider, appID)
 	return err
 }
 
 // SetInstantHost stores the instant address the app is served at.
 func (r *Apps) SetInstantHost(appID, host string) error {
 	_, err := r.db.Exec(`UPDATE apps SET instant_host = $1 WHERE id = $2`, host, appID)
-	return err
-}
-
-// SetInstantPasswordHash stores the bcrypt hash of the password moin made
-// for the instant address.
-func (r *Apps) SetInstantPasswordHash(appID, hash string) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant_password_hash = $1 WHERE id = $2`, hash, appID)
 	return err
 }
 

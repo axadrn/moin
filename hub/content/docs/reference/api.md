@@ -99,7 +99,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 
 | Endpoint | Token | What it does |
 | --- | --- | --- |
-| `GET /api/v1/apps` · `POST /api/v1/apps` | read · write | lists apps; adds one, and its answer holds `instant_password`, the password of its instant address, shown this once |
+| `GET /api/v1/apps` · `POST /api/v1/apps` | read · write | lists apps; adds one with its password on, and its answer holds `password`, user `moin`, shown this once |
 | `GET /api/v1/apps/{app}` · `DELETE /api/v1/apps/{app}?confirm=<app>` | read · write | one app, with `changes_waiting`: the changes the next restart applies; removes it, its data stays on the server |
 | `GET /api/v1/apps/events` | read | the app list as server-sent events |
 | `PATCH /api/v1/apps/{app}` | write | renames an app: `{"name": "…"}`; links, data, backups and the instant address stay, the next restart gives the containers the name |
@@ -107,6 +107,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `POST /api/v1/apps/{app}/restart` | write | starts the live deploy again with the current settings |
 | `POST /api/v1/apps/{app}/stop` · `POST /apps/{app}/start` | write | takes the app offline, its data stays; runs it again |
 | `GET /api/v1/apps/{app}/logs` | read | container logs |
+| `GET /api/v1/apps/{app}/compose` | read | the [compose file](/docs/guides/compose#the-compose-file-moin-runs) of the live deploy: `{"number": 12, "compose_file": "…"}`, YAML without secret values; `no_compose_file` for a live deploy without one |
 | `POST /api/v1/apps/{app}/exec` | write | [runs a command](/docs/guides/exec), answered as server-sent events: `output` pieces, then `done` with `exit_code`, `timed_out` and `truncated`. Takes `{"command": [...]}` or `{"line": "..."}`, `service` and `timeout` in seconds (owner or admin) |
 | `GET /api/v1/apps/{app}/metrics?range=1h` | read | CPU, memory and network now and over `1h`, `24h`, `7d` or `30d`, with the deploys that went live |
 
@@ -132,7 +133,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET /api/v1/catalog` · `GET /api/v1/catalog/{slug}` | read | the [catalog](/docs/guides/catalog) with each app's newest version; one app with every version |
-| `POST /api/v1/catalog/{slug}/install` | write | installs a catalog app: `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy, in `login` a password the first sign-in needs and in `instant_password` the password of the instant address, both shown this once |
+| `POST /api/v1/catalog/{slug}/install` | write | installs a catalog app: `{"server": "web-1", "version": "3.4.1", "name": "stats", "domain": "stats.example.com"}`; answers the app and its deploy, in `login` a password the first sign-in needs and in `password` the app's password, user `moin`, both shown this once |
 | `POST /api/v1/apps/{app}/update` | write | sets a catalog app to a version, `{"version": "3.4.1"}`, the newest when empty, and deploys it |
 
 ## Domains
@@ -140,9 +141,8 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | Endpoint | Token | What it does |
 | --- | --- | --- |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | read · write | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice` |
-| `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address, its provider and user; picks the provider or `off`, and `open` |
-| `POST /api/v1/apps/{app}/instant/password` | write | a new password for the instant address, `{"user", "password"}`, shown this once; the next restart applies it |
-| `PUT` · `DELETE /api/v1/apps/{app}/protection` | write | puts a password in front of the app; takes it away |
+| `GET` · `PUT /api/v1/apps/{app}/instant` | read · write | the instant address and its provider; picks the provider or `off` |
+| `PUT` · `DELETE /api/v1/apps/{app}/protection` | write | turns the app's [password](/docs/guides/domains#password) on for every address, with `{"username", "password"}`, or without a password moin makes one and answers it in `password`, this once; turns it off |
 | `GET /api/v1/apps/{app}/uptime` | read | uptime per domain: state, 24 hours, 7 and 30 days, the last visit, the last outages |
 | `PUT /api/v1/apps/{app}/uptime/{domain}` | write | the path uptime visits on a domain, `{"path": "/health"}`, or `{"paused": true}` |
 

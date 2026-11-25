@@ -794,7 +794,7 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 	}
 	// The switch is one step: whatever is live is whole, so the app
 	// starts either way.
-	startErr := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
+	startErr := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeJSON(mark.App), func(string, ...any) {}, "start")
 	if err != nil {
 		slog.Error("backup: how a restore the daemon stopped in ended is not known yet", "app", mark.App, "database", mark.Database, "error", err)
 		return

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -34,7 +35,7 @@ func databaseHolds(t *testing.T, database *sqlx.DB, value string) bool {
 }
 
 // TestSecretsNeverReachTheHubDatabase: env values, a registry password, a
-// bucket's secret key, a Tailscale key and the instant password go to the
+// bucket's secret key, a Tailscale key and the app's password go to the
 // server, or to the person once; the hub's database holds none of them,
 // only names and dates.
 func TestSecretsNeverReachTheHubDatabase(t *testing.T) {
@@ -45,12 +46,15 @@ func TestSecretsNeverReachTheHubDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	instant, err := apps.NewInstantPassword(owner, "blog")
-	if err != nil {
+	if _, err := apps.RemoveProtection(owner, "blog"); err != nil {
 		t.Fatal(err)
 	}
+	made, _, err := apps.SetProtection(owner, "blog", "", "")
+	if err != nil || made == "" {
+		t.Fatalf("a new password: %q, %v", made, err)
+	}
 	tailscale := "tskey-auth-5c2e91"
-	secrets := []string{"env-value-7f3a91", "registry-password-9c1d44", "s3-value-3e8b27", tailscale, app.InstantPassword, instant}
+	secrets := []string{"env-value-7f3a91", "registry-password-9c1d44", "s3-value-3e8b27", tailscale, app.Password, made}
 	if _, err := apps.SetEnv(ctx, owner, "blog", map[string]string{"DATABASE_URL": secrets[0]}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -187,34 +191,51 @@ func TestHelloSaysWhatTheServerKeeps(t *testing.T) {
 	}
 }
 
-// TestInstantPasswordShownOnce: moin shows the password of the instant
-// address when it makes it, at the app's start and with a new one, and
-// keeps only its bcrypt hash, which goes to the server.
-func TestInstantPasswordShownOnce(t *testing.T) {
-	apps, _, _, _ := newAppService(t)
+// TestPasswordShownOnce: a new app starts with its password on, user moin:
+// moin shows the password it made once and keeps only its bcrypt hash,
+// which every router of the app gets. Turned off, the deploy carries none;
+// on again without a password, moin makes a new one and shows it once.
+func TestPasswordShownOnce(t *testing.T) {
+	apps, _, _, daemon := newAppService(t)
 	app, err := apps.Create(owner, "blog", "web-1")
-	if err != nil || len(app.InstantPassword) != 20 {
+	if err != nil || len(app.Password) != 20 {
 		t.Fatalf("created %+v, %v", app, err)
 	}
 	stored, _ := apps.Get(owner.WorkspaceID, "blog")
-	if stored.InstantPassword != "" || bcrypt.CompareHashAndPassword([]byte(stored.InstantPasswordHash), []byte(app.InstantPassword)) != nil {
-		t.Fatalf("stored %q, hash %q", stored.InstantPassword, stored.InstantPasswordHash)
+	user, hash, _ := strings.Cut(stored.Protect, ":")
+	if stored.Password != "" || user != PasswordUser || bcrypt.CompareHashAndPassword([]byte(hash), []byte(app.Password)) != nil {
+		t.Fatalf("stored %q, protect %q", stored.Password, stored.Protect)
 	}
-	again, err := apps.NewInstantPassword(owner, "blog")
-	if err != nil || again == app.InstantPassword {
-		t.Fatalf("new password %q, %v", again, err)
-	}
-	renewed, _ := apps.Get(owner.WorkspaceID, "blog")
-	if bcrypt.CompareHashAndPassword([]byte(renewed.InstantPasswordHash), []byte(again)) != nil {
-		t.Fatal("the new hash does not take the new password")
-	}
-	// The deploy hands the server the hash, never the password.
-	start := protocol.Domains{}
-	if err := apps.fillInstant(renewed, &start); err != nil {
+	// The deploy hands the server the hash, never the password, for
+	// every address: one line, protect.
+	if _, err := deploySource(apps); err != nil {
 		t.Fatal(err)
 	}
-	if start.InstantProtect != "moin:"+renewed.InstantPasswordHash {
-		t.Fatalf("instant protect = %q", start.InstantProtect)
+	var start protocol.DeployStart
+	daemon.last(t, protocol.TypeDeployStart, &start)
+	if start.Domains.Protect != stored.Protect || strings.Contains(fmt.Sprint(start), app.Password) {
+		t.Fatalf("deploy.start = %+v", start.Domains)
+	}
+	if changed, err := apps.RemoveProtection(owner, "blog"); err != nil || !changed {
+		t.Fatalf("off: %v, %v", changed, err)
+	}
+	again, changed, err := apps.SetProtection(owner, "blog", "", "")
+	if err != nil || !changed || len(again) != 20 || again == app.Password {
+		t.Fatalf("on again: %q, %v, %v", again, changed, err)
+	}
+	renewed, _ := apps.Get(owner.WorkspaceID, "blog")
+	if _, hash, _ := strings.Cut(renewed.Protect, ":"); bcrypt.CompareHashAndPassword([]byte(hash), []byte(again)) != nil {
+		t.Fatal("the new hash does not take the new password")
+	}
+	// On while on changes nothing: no password is replaced by surprise.
+	if made, changed, err := apps.SetProtection(owner, "blog", "", ""); err != nil || changed || made != "" {
+		t.Fatalf("on while on: %q, %v, %v", made, changed, err)
+	}
+	if kept, _ := apps.Get(owner.WorkspaceID, "blog"); kept.Protect != renewed.Protect {
+		t.Fatal("on while on replaced the password")
+	}
+	if _, _, err := apps.SetProtection(owner, "blog", "a,b", "a-long-password"); !errors.Is(err, ErrProtectUser) {
+		t.Fatalf("a comma in the username: %v", err)
 	}
 }
 

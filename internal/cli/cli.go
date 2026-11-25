@@ -60,7 +60,7 @@ Servers
 
 Apps
   apps               List apps; one app with its domains and deploys: apps <app>
-  apps add           Add an app; shows its instant password once: apps add --server <server> <name>
+  apps add           Add an app; shows its password once: apps add --server <server> <name>
   apps rename        Rename an app; links, data and backups stay: apps rename my-app blog
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--confirm <app>]
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
@@ -77,6 +77,7 @@ Deploys
   rollback           Start an earlier deploy again: rollback [app] [v<number>] [--yes]
   logs               Show the last lines of the app: logs [--tail 200] [app]
   exec               Run a command in a container, no shell: exec [app] [--service web] -- rails db:migrate
+  compose            The compose file moin runs, without secret values, to run it elsewhere: compose [app] > compose.yml
 
 Domains
   domains            List domains and their DNS: domains [app]
@@ -84,11 +85,9 @@ Domains
   domains rm         Remove domains: domains rm www.my-app.example.com [--yes]
   domains canonical  Redirect the others to one: domains canonical my-app.example.com|none
   instant            The instant address, https://<app>.<ip>.sslip.io: instant [app]
-  instant password   A new password, shown once; the next restart applies it: instant password [app]
   instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
-  instant open       No password on the instant address; protect puts it back: instant open [app]
-  protect            Ask for a password: protect [--user moin], password on stdin
-  protect off        Make the app public again: protect off [app] [--yes]
+  protect            Every address asks for a password: protect [--user moin] [app], yours on stdin, or none and moin makes one
+  protect off        No address asks for a password: protect off [app] [--yes]
 
 Uptime
   uptime             Uptime of every domain that serves, 24 hours, 7 and 30 days, and the last outages: uptime [app]
@@ -275,6 +274,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return redeploy(ctx, rest, stdout)
 	case "logs":
 		return logs(ctx, rest, stdout)
+	case "compose":
+		return compose(ctx, rest, stdout)
 	case "db":
 		return db(ctx, rest, stdout)
 	case "sql":
