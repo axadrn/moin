@@ -33,7 +33,7 @@
     outline: none;
   }
   .moin-copy:hover {
-    background: color-mix(in oklab, var(--foreground) 5%, transparent);
+    background: var(--hover);
     color: var(--foreground);
   }
   .moin-copy[data-copied] { color: var(--live); }

@@ -32,7 +32,7 @@
     border-radius: var(--lit);
   }
   .moin-expand > summary:is(:hover, :focus-visible)::after {
-    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+    background: var(--hover);
   }
   .moin-expand > summary .moin-chevron { transition: rotate var(--fast) var(--ease); }
   .moin-expand[open] > summary .moin-chevron { rotate: 90deg; }
