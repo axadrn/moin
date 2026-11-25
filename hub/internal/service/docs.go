@@ -310,7 +310,7 @@ var docsGroups = []string{"Start", "Apps", "Every day", "Servers and data", "Tea
 
 // uiGroups are the topics of the docs of moin UI. Start holds the pages with
 // a tab of their own; the others are components, and Layout has a tab.
-var uiGroups = []string{"Start", "Forms", "Lists", "Status", "Content", "Charts", "Overlays", "Page", "Layout"}
+var uiGroups = []string{"Start", "Forms", "Lists", "Status", "Content", "Charts", "Overlays", "Page", "Layout", "Stacks"}
 
 // Groups are the pages of the docs home: every page under its topic, the
 // topics in the order of docsGroups, the pages by their order.
