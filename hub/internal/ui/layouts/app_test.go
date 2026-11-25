@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -100,5 +101,28 @@ func TestAppAsksForAPasskeyUntilThereIsOne(t *testing.T) {
 	}
 	if page := renderAppLayout(t, model.WorkspaceRoleOwner, 1); strings.Contains(page, "data-passkey-card") {
 		t.Fatal("the passkey card shows on a hub without passkeys")
+	}
+}
+
+// While the trial waits for the first server, its button adds that server,
+// for every member. Once the trial runs, it is Subscribe for the owner.
+func TestTrialButtonAddsTheFirstServerThenSubscribes(t *testing.T) {
+	trial := func(role string, ends *time.Time) string {
+		subscription := &model.Subscription{PlanID: model.SubscriptionPlanPro, Status: model.SubscriptionStatusTrialing, CurrentPeriodEnd: ends}
+		return renderApp(t, ctxkeys.WithSubscription(appContext(role, 1), subscription))
+	}
+	for _, role := range []string{model.WorkspaceRoleOwner, model.WorkspaceRoleMember} {
+		page := trial(role, nil)
+		if !strings.Contains(page, `href="/app/first-workspace/servers"`) || !strings.Contains(page, "Add server") {
+			t.Fatalf("a waiting trial has no Add server for the %s", role)
+		}
+		if strings.Contains(page, "Subscribe") || strings.Contains(page, "An owner can subscribe.") {
+			t.Fatalf("a waiting trial still asks the %s to subscribe", role)
+		}
+	}
+	ends := time.Now().Add(10 * 24 * time.Hour)
+	page := trial(model.WorkspaceRoleOwner, &ends)
+	if !strings.Contains(page, `href="/app/first-workspace/billing"`) || !strings.Contains(page, "Subscribe") || strings.Contains(page, "Add server") {
+		t.Fatal("a running trial lost Subscribe")
 	}
 }

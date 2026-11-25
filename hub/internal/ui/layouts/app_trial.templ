@@ -19,18 +19,19 @@ func trialDaysLeft(ends *time.Time, now time.Time) int {
 }
 
 // AppTrialCard is one quiet line over the page while the trial waits for
-// the first server, while it runs or after it ended, with Subscribe for
-// whoever may pay.
+// the first server, while it runs or after it ended. While it waits, its
+// button adds that server; after that, it is Subscribe for whoever may pay.
 templ AppTrialCard() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ member := ctxkeys.WorkspaceMember(ctx) }}
 	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
 		{{ current := subscription.Access() }}
+		{{ waits := current.State == access.StateTrial && current.TrialEndsAt == nil }}
 		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
 			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-trial": string(current.State)}}) {
 				<div class="moin-row" data-gap="4" data-phone="stack">
 					<p class="moin-fill moin-text">
-						if current.State == access.StateTrial && current.TrialEndsAt == nil {
+						if waits {
 							<span class="moin-strong">{ TrialOffer() }</span>
 							<span class="moin-muted">No card.</span>
 						} else if current.State == access.StateTrial {
@@ -42,7 +43,11 @@ templ AppTrialCard() {
 							<span class="moin-muted">Your apps keep running, and you can stop and start them.</span>
 						}
 					</p>
-					if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
+					if waits {
+						@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/servers"}) {
+							Add server
+						}
+					} else if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
 						@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/billing"}) {
 							Subscribe
 						}

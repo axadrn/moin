@@ -376,3 +376,9 @@ curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/moin-linux-a
 curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
 ```
+
+- The same signed `SHA256SUMS` names the hub image of the release by its digest, in the line `<digest>  ghcr.io/axadrn/moin:v1.2.3`. Pull exactly that image, by its digest:
+
+```
+docker pull "ghcr.io/axadrn/moin@sha256:$(awk '$2 == "ghcr.io/axadrn/moin:v1.2.3" { print $1 }' SHA256SUMS)"
+```
