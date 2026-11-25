@@ -6,6 +6,11 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
+// CompareIndex lists every tool at /compare.
+func CompareIndex(w http.ResponseWriter, r *http.Request) {
+	render(w, r, pages.CompareIndex())
+}
+
 // Compare shows one tool next to moin at /compare/{name}.
 func Compare(w http.ResponseWriter, r *http.Request) {
 	competitor, ok := pages.FindCompetitor(r.PathValue("name"))

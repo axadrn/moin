@@ -1,6 +1,6 @@
 ---
 title: "FAQ"
-description: "Common questions. Short answers."
+description: "Common questions about moin. Short answers: pricing, the license, security, backups and self-hosting."
 group: "Reference"
 order: 6
 ---

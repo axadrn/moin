@@ -1,6 +1,6 @@
 ---
 title: "Servers"
-description: "Add, watch, update and remove servers"
+description: "Add a server with one command, watch its CPU, memory and disk, update it and remove it."
 group: "Servers and data"
 order: 1
 ---

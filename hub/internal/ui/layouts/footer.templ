@@ -17,7 +17,10 @@ func footerColumns(billing bool) []components.FooterColumn {
 		{Label: "UI", Href: "/ui"},
 	}
 	if billing {
-		product = append(product, components.FooterLink{Label: "Pricing", Href: "/#pricing"})
+		product = append(product,
+			components.FooterLink{Label: "Pricing", Href: "/#pricing"},
+			components.FooterLink{Label: "Compare", Href: "/compare"},
+		)
 	}
 	product = append(product,
 		components.FooterLink{Label: "Changelog", Href: "/changelog"},

@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	catalogfiles "github.com/axadrn/moin/catalog"
+	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -14,9 +15,12 @@ import (
 type SEOHandler struct {
 	sitemapService *service.SitemapService
 	docsService    *service.DocsService
-	baseURL        string
-	files          fs.FS
-	robotsNoIndex  bool
+	// catalog and compare are listed in llms.txt like in the sitemap.
+	catalog       []catalog.Entry
+	compare       []pages.Competitor
+	baseURL       string
+	files         fs.FS
+	robotsNoIndex bool
 }
 
 func NewSEOHandler(
@@ -29,19 +33,27 @@ func NewSEOHandler(
 ) *SEOHandler {
 	sitemap := service.NewSitemapService(docsService, baseURL, legal)
 	sitemap.AddUI(uiDocs, uiFiles)
-	if entries, err := catalog.Load(catalogfiles.Files); err == nil {
+	entries, err := catalog.Load(catalogfiles.Files)
+	if err == nil {
 		slugs := make([]string, 0, len(entries))
 		for _, entry := range entries {
 			slugs = append(slugs, entry.Slug)
 		}
 		sitemap.AddCatalog(slugs)
 	}
+	var compare []pages.Competitor
 	if legal {
+		compare = pages.Competitors
 		sitemap.AddCompare(pages.CompareSlugs())
+	}
+	if releases, err := service.ChangelogReleases(files); err == nil && len(releases) > 0 {
+		sitemap.AddChangelog(releases[0].Date)
 	}
 	return &SEOHandler{
 		sitemapService: sitemap,
 		docsService:    docsService,
+		catalog:        entries,
+		compare:        compare,
 		baseURL:        strings.TrimSuffix(baseURL, "/"),
 		files:          files,
 		robotsNoIndex:  robotsNoIndex,
@@ -51,10 +63,10 @@ func NewSEOHandler(
 func (h *SEOHandler) Robots(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if h.robotsNoIndex {
-		_, _ = w.Write([]byte("User-daemon: *\nDisallow: /\n"))
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
 		return
 	}
-	fmt.Fprintf(w, "User-daemon: *\nAllow: /\nSitemap: %s/sitemap.xml\n", h.baseURL)
+	fmt.Fprintf(w, "User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", h.baseURL)
 }
 
 func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +89,18 @@ func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
 			description = "Product documentation"
 		}
 		_, _ = fmt.Fprintf(w, "- [%s](%s%s): %s\n", page.Title, h.baseURL, path, description)
+	}
+	if len(h.catalog) > 0 {
+		_, _ = fmt.Fprint(w, "\n## Catalog\n\n")
+		for _, entry := range h.catalog {
+			_, _ = fmt.Fprintf(w, "- [%s](%s/catalog/%s): %s\n", entry.Name, h.baseURL, entry.Slug, entry.Pitch)
+		}
+	}
+	if len(h.compare) > 0 {
+		_, _ = fmt.Fprint(w, "\n## Compare\n\n")
+		for _, competitor := range h.compare {
+			_, _ = fmt.Fprintf(w, "- [%s vs %s](%s/compare/%s): %s\n", brand.Name, competitor.Name, h.baseURL, competitor.Slug, competitor.Lead)
+		}
 	}
 }
 

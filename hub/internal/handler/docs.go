@@ -26,6 +26,9 @@ func NewDocsHandler(docsService *service.DocsService) *DocsHandler {
 // ShowDocs is the docs: /docs the topics with every page, /docs/<slug> one
 // page, and either with .md its Markdown. Every link is a full page load.
 func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
+	if redirectTrailingSlash(w, r) {
+		return
+	}
 	markdown := strings.HasSuffix(r.URL.Path, ".md")
 	slug := strings.Trim(strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, ".md"), "/docs"), "/")
 
@@ -44,8 +47,7 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 
 	if slug == "" {
 		if markdown {
-			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-			_, _ = w.Write([]byte(docsIndexMarkdown(groups)))
+			writeMarkdown(w, docsIndexMarkdown(groups))
 			return
 		}
 		render(w, r, pages.DocsHome(groups))
@@ -67,12 +69,37 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if markdown {
-		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-		_, _ = w.Write([]byte(page.Content))
+		writeMarkdown(w, page.Content)
 		return
 	}
 	_, next := h.docsService.PrevNextPages(page)
 	render(w, r, pages.Docs(page, groups, next))
+}
+
+// writeMarkdown answers with a page as Markdown, for AI agents. It is a copy
+// of the HTML page, so it stays out of search.
+func writeMarkdown(w http.ResponseWriter, content string) {
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("X-Robots-Tag", "noindex")
+	_, _ = w.Write([]byte(content))
+}
+
+// redirectTrailingSlash sends /docs/page/ to /docs/page, so every page has
+// one address.
+func redirectTrailingSlash(w http.ResponseWriter, r *http.Request) bool {
+	path := r.URL.Path
+	if len(path) < 2 || !strings.HasSuffix(path, "/") {
+		return false
+	}
+	target := strings.TrimRight(path, "/")
+	if target == "" {
+		target = "/"
+	}
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusMovedPermanently)
+	return true
 }
 
 // docsIndexMarkdown is /docs.md: every page under its topic, linked to its

@@ -1,6 +1,6 @@
 ---
 title: "Terminal UI"
-description: "Every view and key of moin without a command"
+description: "Every view and key of the moin terminal UI: your apps, deploys, logs and backups without a command."
 group: "Reference"
 order: 4
 ---

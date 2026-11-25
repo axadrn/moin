@@ -207,6 +207,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	// under its home page; a self-hosted hub answers them with not found.
 	if app.Cfg.Billing {
 		mux.HandleFunc("GET /legal/{page}", legal.ShowPage)
+		mux.HandleFunc("GET /compare", handler.CompareIndex)
 		mux.HandleFunc("GET /compare/{name}", handler.Compare)
 	}
 }

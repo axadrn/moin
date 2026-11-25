@@ -1,6 +1,6 @@
 ---
 title: "Run a command"
-description: "A one-off command in an app's container. No SSH."
+description: "Run a one-off command in an app's container, like a migration or a shell. No SSH, no open port."
 group: "Every day"
 order: 3
 ---

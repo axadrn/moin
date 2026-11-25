@@ -10,22 +10,18 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-var publicRoutes = []struct {
-	Path       string
-	Priority   string
-	ChangeFreq string
-}{
-	{"/", "1.0", "daily"},
-	{"/docs", "0.8", "weekly"},
-	{"/next", "0.7", "weekly"},
-	{"/ui", "0.8", "weekly"},
-	{"/ui/components", "0.7", "weekly"},
-	{"/ui/layout", "0.7", "weekly"},
-	{"/ui/blocks", "0.7", "weekly"},
-	{"/catalog", "0.8", "daily"},
-	{"/roadmap", "0.6", "weekly"},
-	{"/changelog", "0.6", "weekly"},
-	{"/auth", "0.3", "monthly"},
+// publicRoutes are the pages that are not docs, catalog apps or
+// comparisons. Sign-in is not one: it carries noindex.
+var publicRoutes = []string{
+	"/",
+	"/docs",
+	"/next",
+	"/ui",
+	"/ui/components",
+	"/ui/layout",
+	"/ui/blocks",
+	"/catalog",
+	"/roadmap",
 }
 
 // legalRoutes are the terms and privacy pages of the hosted service.
@@ -43,11 +39,20 @@ type SitemapService struct {
 	compare []string
 	// ui are the pages of moin UI.
 	ui []string
+	// changelog is the date of the newest release, the one page with a real
+	// date. Search engines ignore a lastmod that is always today, so no
+	// other page has one.
+	changelog time.Time
 }
 
 // AddCatalog lists a page for each catalog app.
 func (s *SitemapService) AddCatalog(slugs []string) {
 	s.catalog = slugs
+}
+
+// AddChangelog lists the changelog with the date of its newest release.
+func (s *SitemapService) AddChangelog(newest time.Time) {
+	s.changelog = newest
 }
 
 // AddCompare lists a page for each compared tool.
@@ -79,52 +84,44 @@ func (s *SitemapService) GenerateSitemap() ([]byte, error) {
 }
 
 func (s *SitemapService) staticURLs() []model.SitemapURL {
-	today := time.Now().Format("2006-01-02")
-	urls := make([]model.SitemapURL, 0, len(publicRoutes))
-	for _, route := range publicRoutes {
-		urls = append(urls, model.SitemapURL{
-			Loc: s.baseURL + route.Path, LastMod: today,
-			ChangeFreq: route.ChangeFreq, Priority: route.Priority,
-		})
-	}
-	for _, path := range s.ui {
-		urls = append(urls, model.SitemapURL{Loc: s.baseURL + path, LastMod: today, ChangeFreq: "weekly", Priority: "0.6"})
-	}
+	var paths []string
+	paths = append(paths, publicRoutes...)
+	paths = append(paths, s.ui...)
 	for _, slug := range s.catalog {
-		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/catalog/" + slug, LastMod: today, ChangeFreq: "daily", Priority: "0.7"})
+		paths = append(paths, "/catalog/"+slug)
+	}
+	if len(s.compare) > 0 {
+		paths = append(paths, "/compare")
 	}
 	for _, slug := range s.compare {
-		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/compare/" + slug, LastMod: today, ChangeFreq: "monthly", Priority: "0.6"})
+		paths = append(paths, "/compare/"+slug)
 	}
 	if s.legal {
-		for _, path := range legalRoutes {
-			urls = append(urls, model.SitemapURL{Loc: s.baseURL + path, LastMod: today, ChangeFreq: "yearly", Priority: "0.3"})
-		}
+		paths = append(paths, legalRoutes...)
 	}
-	return urls
+	urls := make([]model.SitemapURL, 0, len(paths)+1)
+	for _, path := range paths {
+		urls = append(urls, model.SitemapURL{Loc: s.baseURL + path})
+	}
+	changelog := model.SitemapURL{Loc: s.baseURL + "/changelog"}
+	if !s.changelog.IsZero() {
+		changelog.LastMod = s.changelog.Format("2006-01-02")
+	}
+	return append(urls, changelog)
 }
+
 func (s *SitemapService) docsURLs() []model.SitemapURL {
 	if err := s.docsService.BuildDocsTree(); err != nil {
 		slog.Warn("failed to build docs tree for sitemap", "error", err)
 		return nil
 	}
-	today := time.Now().Format("2006-01-02")
 	var urls []model.SitemapURL
 	for _, page := range s.docsService.FlatDocsList() {
 		// The roadmap's own page is /roadmap, in publicRoutes.
 		if page.Slug == "roadmap" {
 			continue
 		}
-		priority := "0.6"
-		if strings.Count(page.Slug, "/") == 0 {
-			priority = "0.8"
-		} else if strings.Count(page.Slug, "/") == 1 {
-			priority = "0.7"
-		}
-		urls = append(urls, model.SitemapURL{
-			Loc: s.baseURL + "/docs/" + page.Slug, LastMod: today,
-			ChangeFreq: "weekly", Priority: priority,
-		})
+		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/docs/" + page.Slug})
 	}
 	return urls
 }
