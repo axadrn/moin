@@ -18,8 +18,9 @@ import (
 type RateLimiter struct {
 	mu        sync.RWMutex
 	requests  map[string][]time.Time
-	limit     int           // Max requests allowed
-	window    time.Duration // Time window for rate limiting
+	limit     int              // Max requests allowed
+	window    time.Duration    // Time window for rate limiting
+	now       func() time.Time // time.Now, or a test's clock
 	done      chan struct{}
 	closeOnce sync.Once
 }
@@ -44,6 +45,7 @@ func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 		requests: make(map[string][]time.Time),
 		limit:    limit,
 		window:   window,
+		now:      time.Now,
 		done:     make(chan struct{}),
 	}
 
@@ -62,14 +64,21 @@ func (rl *RateLimiter) Close() {
 
 // Allow checks if request from IP should be allowed
 func (rl *RateLimiter) Allow(ip string) bool {
+	allowed, _ := rl.allow(ip)
+	return allowed
+}
+
+// allow is Allow, and when it says no, also how long until the oldest
+// request leaves the window and one more fits again.
+func (rl *RateLimiter) allow(key string) (bool, time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	now := time.Now()
+	now := rl.now()
 	cutoff := now.Add(-rl.window)
 
-	// Get requests for this IP
-	requests := rl.requests[ip]
+	// Get requests for this key
+	requests := rl.requests[key]
 
 	// Remove old requests outside time window
 	validRequests := []time.Time{}
@@ -81,15 +90,15 @@ func (rl *RateLimiter) Allow(ip string) bool {
 
 	// Check if limit exceeded
 	if len(validRequests) >= rl.limit {
-		rl.requests[ip] = validRequests
-		return false
+		rl.requests[key] = validRequests
+		return false, validRequests[0].Add(rl.window).Sub(now)
 	}
 
 	// Add current request
 	validRequests = append(validRequests, now)
-	rl.requests[ip] = validRequests
+	rl.requests[key] = validRequests
 
-	return true
+	return true, 0
 }
 
 // cleanupLoop periodically removes old entries to prevent memory leak
@@ -112,7 +121,7 @@ func (rl *RateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	now := time.Now()
+	now := rl.now()
 	cutoff := now.Add(-rl.window * 2) // Keep data for 2x window
 
 	for ip, requests := range rl.requests {

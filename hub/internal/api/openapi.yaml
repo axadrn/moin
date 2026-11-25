@@ -34,6 +34,10 @@ info:
     token and adding a right need the person to have confirmed in the last five minutes,
     else 403 `confirm_required`.
 
+    Limits: a connection or CI token sends at most 121 requests a minute, to this API and
+    to `/mcp` together. One more answers 429 `rate_limited` with `Retry-After`, the seconds
+    to wait. A stream counts once, when it opens. Cookie sessions are not counted.
+
     Errors: every non-2xx JSON answer is the `Error` envelope with a stable lowercase
     snake case `code`. `fields` is present only for `validation_failed`.
 

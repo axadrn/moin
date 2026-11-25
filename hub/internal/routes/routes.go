@@ -73,6 +73,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),
 		middleware.BearerAuth(app.ConnectionService, app.CITokenService, app.UserService),
+		middleware.RateLimitBearers(),
 		middleware.GitHubApp(app.GitHubAppService),
 		middleware.BlockImpersonatedWrites,
 		middleware.AdminContext(app.AdminService),
