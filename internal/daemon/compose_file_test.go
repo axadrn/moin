@@ -97,7 +97,7 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 		"networks": map[string]any{"default": map[string]any{"name": "moin-my-app_default"}},
 	}
 	hash := "ada:$2a$04$abcdefghijklmnopqrstuuJ0c7bQzZ1zCq3Yd0c6bVq1n8m9E2Qe"
-	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}, Canonical: "example.com", Protect: hash}
+	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}, Canonical: "example.com", Password: hash}
 	text := mustCompose(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, protocol.DeployStart{Domains: domains}, nil)
 
 	for _, leak := range []string{dir, "s3cret-value", "abcdefghijklmnopqrstuuJ0c7bQzZ1zCq3Yd0c6bVq1n8m9E2Qe", "external"} {

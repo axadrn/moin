@@ -26,7 +26,7 @@ func registerCatalogTools(server *mcpsdk.Server, services Services) {
 	install := change(false, false)
 	install.Title = "Install a catalog app"
 	Add(server, &mcpsdk.Tool{Name: "install_catalog_app", Title: install.Title, Annotations: install,
-		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. When the first sign-in needs a secret moin made, such as ADMIN_PASSWORD, login holds it, and password the app's password, user moin, which every address of it asks for: the one time they are shown, so hand them to the user to keep in their password manager.",
+		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. When the first sign-in needs a secret moin made, such as ADMIN_PASSWORD, login holds it, and password the app's password, user moin, which its domains and its instant address ask for: the one time they are shown, so hand them to the user to keep in their password manager.",
 	}, model.RightDeploy, changes(services, tools.install))
 	update := change(false, false)
 	update.Title = "Update a catalog app"
@@ -96,7 +96,7 @@ func (d CatalogDeploy) Summary() string {
 		summary += " The first sign-in needs " + strings.Join(slices.Sorted(maps.Keys(d.Login)), ", ") + ", in login: shown this once."
 	}
 	if d.Password != "" {
-		summary += " Every address of the app asks for user " + service.PasswordUser + " and the password in password: shown this once."
+		summary += " The app's domains and its instant address ask for user " + service.PasswordUser + " and the password in password: shown this once."
 	}
 	return summary
 }
@@ -124,7 +124,7 @@ func (t catalogTools) install(ctx context.Context, caller Caller, input CatalogI
 	if err != nil {
 		return CatalogDeploy{}, err
 	}
-	return CatalogDeploy{api.CatalogDeploy{App: api.NewApp(*app), Deploy: api.NewDeploy(*deploy), Login: login, Password: app.Password}}, nil
+	return CatalogDeploy{api.CatalogDeploy{App: api.NewApp(*app), Deploy: api.NewDeploy(*deploy), Login: login, Password: app.NewPassword}}, nil
 }
 
 func (t catalogTools) update(ctx context.Context, caller Caller, input AppUpdateInput) (CatalogDeploy, error) {

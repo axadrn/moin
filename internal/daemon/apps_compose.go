@@ -424,8 +424,8 @@ func finish(release *release) error {
 	if err != nil {
 		return err
 	}
-	if protect := protectHash(release.start.Domains); protect != "" {
-		err = writeWhole(filepath.Join(release.dir, "htpasswd"), []byte(protect+"\n"))
+	if line := passwordLine(release.start.Domains); line != "" {
+		err = writeWhole(filepath.Join(release.dir, "htpasswd"), []byte(line+"\n"))
 		if err != nil {
 			return err
 		}
@@ -506,7 +506,7 @@ func routeService(release *release, config map[string]any, name string, service 
 	app := release.start.App
 	detected := release.detected
 	usersFile := ""
-	if protectHash(release.start.Domains) != "" {
+	if passwordLine(release.start.Domains) != "" {
 		usersFile = proxyUsersFile(app, release.start.Number)
 	}
 	if name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != "") {

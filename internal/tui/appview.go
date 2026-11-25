@@ -524,8 +524,8 @@ func (m model) domainsTab(u ui, w, h int, a client.App) string {
 		}
 	}
 	prot := u.faint("off · p turns it on")
-	if a.Protected {
-		prot = u.warn("on") + u.faint(", every address · p turns it off")
+	if a.Password {
+		prot = u.warn("on") + u.faint(", domains and instant address · p turns it off")
 	}
 	body = append(body, kv("password", prot))
 	return u.panel("Domains", u.faint(fmt.Sprint(len(m.app.domains))), body, w, h, true)

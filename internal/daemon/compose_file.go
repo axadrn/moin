@@ -232,8 +232,8 @@ func takeEnvFile(services map[string]any) {
 
 // addProxy adds the proxy as moin runs it, on ports 80 and 443 with
 // certificates from Let's Encrypt, when a service of the app is on its
-// network. protected mounts the app's password.
-func addProxy(config map[string]any, protected bool) error {
+// network. password mounts the app's password.
+func addProxy(config map[string]any, password bool) error {
 	networks, _ := config["networks"].(map[string]any)
 	network, _ := networks[proxyNetwork].(map[string]any)
 	if network == nil {
@@ -249,7 +249,7 @@ func addProxy(config map[string]any, protected bool) error {
 		return fmt.Errorf("the app has services named %s and %s, so the proxy has no name: rename one", proxyService, proxyName)
 	}
 	volumes := []any{"/var/run/docker.sock:/var/run/docker.sock:ro", "./traefik:/data"}
-	if protected {
+	if password {
 		volumes = append(volumes, "./htpasswd:"+proxyUsers+":ro")
 	}
 	command := []any{}

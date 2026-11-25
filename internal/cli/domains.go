@@ -216,11 +216,11 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
-// protect turns the app's password on, for every address of the app, or
-// off with off. Without a password on stdin moin makes one and prints it
-// once.
-func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("protect", "protect [--user moin] [app], a password on stdin or none to let moin make one; protect off [app] [--yes]").withApp().withYes()
+// password turns the app's password on, for its domains and its instant
+// address, or off with off. Without a password on stdin moin makes one
+// and prints it once.
+func password(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("password", "password [--user moin] [app], a password on stdin or none to let moin make one; password off [app] [--yes]").withApp().withYes()
 	user := flags.String("user", passwordUser, "username for the password prompt in the browser")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -246,15 +246,15 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		if !detail.App.Protected {
+		if !detail.App.Password {
 			done(stdout, "Nothing changed: %s has no password.", name)
 			return nil
 		}
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Turn the password of %s off? Anyone with the link can open every address of it.", name))
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Turn the password of %s off? Anyone with the link can open its domains and its instant address.", name))
 		if err != nil {
 			return err
 		}
-		change, err := api.RemoveProtection(ctx, name)
+		change, err := api.RemovePassword(ctx, name)
 		if err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if isTerminal(stdin) {
 		fmt.Fprintf(stdout, "Password for %s (user %s), empty to let %s make one: ", name, *user, build.Name)
 	}
-	password, err := readSecret(stdin)
+	secret, err := readSecret(stdin)
 	if isTerminal(stdin) {
 		fmt.Fprintln(stdout)
 	}
@@ -279,7 +279,7 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if *user == "" {
 		*user = passwordUser
 	}
-	answer, err := api.SetProtection(ctx, name, *user, password)
+	answer, err := api.SetPassword(ctx, name, *user, secret)
 	if err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		done(stdout, "Nothing changed: %s asks for user %s and this password already.", name, *user)
 		return nil
 	}
-	done(stdout, "Every address of %s asks for user %s and the password now.", name, *user)
+	done(stdout, "The domains and the instant address of %s ask for user %s and the password now.", name, *user)
 	printPassword(stdout, *user, answer.Password)
 	reportChange(ctx, api, name, answer.Change, stdout)
 	return nil
@@ -358,15 +358,11 @@ func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 }
 
 // reportChange says when a saved change applies: saving never restarts an
-// app. An older hub that still restarts on its own is followed.
+// app.
 func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
 	switch {
 	case change.Unchanged:
 		done(stdout, "Nothing changed.")
-	case change.Deploy != nil:
-		if err := follow(ctx, api, name, *change.Deploy, "Restart", false, stdout); err != nil {
-			printError(stdout, err)
-		}
 	case change.App.Stopped:
 		hint(stdout, "It applies when the app starts:", build.Name+" start "+name)
 	case change.App.LiveNumber == 0:

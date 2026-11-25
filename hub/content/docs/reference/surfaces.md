@@ -32,8 +32,8 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Env vars as one `.env` | ✓ | ✓ `env push` | ✓ in `$EDITOR` | ✓ | ✓ |
 | Domains and their DNS | ✓ | ✓ `domains` | ✓ | ✓ | ✓ |
 | Add, remove, canonical domain | ✓ | ✓ | ✓ | ✓ | ✓ |
-| The app's password, on every domain: on, off, your own | ✓ | ✓ `protect` | ✓ `p`, your own | ✓ | ✓ |
-| A password moin makes, shown once: a new app, or on again | ✓ | ✓ `apps add`, `deploy`, `protect` | Opens the web. | ✓ | ✓ |
+| The app's password, on every domain: on, off, your own | ✓ | ✓ `password` | ✓ `p`, your own | ✓ | ✓ |
+| A password moin makes, shown once: a new app, or on again | ✓ | ✓ `apps add`, `deploy`, `password` | Opens the web. | ✓ | ✓ |
 | Uptime and outages | ✓ | ✓ `uptime` | ✓ | ✓ | ✓ |
 | Uptime path, pause | ✓ | ✓ | ✓ | ✓ | ✓ |
 | App metrics, 1h to 30d | ✓ | ✓ `metrics` | ✓ | ✓ | ✓ |

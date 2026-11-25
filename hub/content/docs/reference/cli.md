@@ -110,8 +110,8 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin domains canonical <domain\|none>` | the domain the others redirect to, or none |
 | `moin instant [app]` | the [instant address](/docs/guides/domains#instant-address), `https://<app>.<ip>.sslip.io` |
 | `moin instant sslip.io\|nip.io\|off [app]` | picks the provider of the instant address, or turns it off |
-| `moin protect [--user moin] [app]` | turns the app's [password](/docs/guides/domains#password) on for every domain. Your password comes on stdin; with nothing on stdin moin makes one and shows it this once. `--user` is the name the browser asks for |
-| `moin protect off [app] [--yes]` | turns the password off: every domain is open |
+| `moin password [--user moin] [app]` | turns the app's [password](/docs/guides/domains#password) on for its domains and its instant address. Your password comes on stdin; with nothing on stdin moin makes one and shows it this once. `--user` is the name the browser asks for |
+| `moin password off [app] [--yes]` | turns the password off: every domain is open |
 
 ## Uptime and metrics
 
@@ -219,7 +219,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app my-app` is
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type my-app to confirm:` |
-| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `connections rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `password off`, `registry rm`, `integrations rm`, `alerts rm`, `connections rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy` of an app that exists, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
 `--yes` skips the question. For `servers rm`, `apps rm`, `buckets rm` and `restore`, `--yes` is not enough: a script passes the name as `--confirm my-app`. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`.

@@ -53,8 +53,8 @@ var (
 	ErrRegistryLogin = errors.New("registry username and password are required")
 	ErrDomain        = errors.New("domains must be host names like my-app.example.com")
 	ErrCanonical     = errors.New("the canonical domain must be one of the domains")
-	ErrProtect       = errors.New("protection needs a password of 8 to 72 characters")
-	ErrProtectUser   = errors.New("protection needs a username without spaces or colons")
+	ErrPassword      = errors.New("the app's password needs 8 to 72 characters")
+	ErrPasswordUser  = errors.New("the app's password needs a username without spaces or colons")
 	ErrEnvKey        = errors.New("env keys are letters, digits and underscores and do not start with a digit")
 	ErrEnvValue      = errors.New("env values are at most 32 KB")
 	ErrEnvLimit      = errors.New("an app has at most 200 env vars")
@@ -161,11 +161,11 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	password, protect, err := newPassword(PasswordUser)
+	password, line, err := newPassword(PasswordUser)
 	if err != nil {
 		return nil, err
 	}
-	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, Protect: protect, CreatedAt: s.now().UTC()}
+	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, Password: line, CreatedAt: s.now().UTC()}
 	// The folder is the name, unless an app renamed away from it still
 	// has it: then my-app-2, my-app-3 …
 	for number := 1; ; number++ {
@@ -193,7 +193,7 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	created.Password = password
+	created.NewPassword = password
 	return created, nil
 }
 
@@ -622,76 +622,76 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 // PasswordUser is the username of the password moin makes for an app.
 const PasswordUser = build.Name
 
-// SetProtection turns the app's password on: every address of the app
-// asks for it, its domains and its instant address. Without a password
+// SetPassword turns the app's password on: the app's domains and its
+// instant address ask for it. Without a password
 // moin makes one and returns it as made: the one time moin shows it, it
 // keeps only its hash. An empty username is PasswordUser. The app takes
 // it on its next restart. changed is false when the app had this password
 // already.
-func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (made string, changed bool, err error) {
+func (s *AppService) SetPassword(actor Actor, idOrName, username, password string) (made string, changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return "", false, err
 	}
 	username = cmp.Or(strings.TrimSpace(username), PasswordUser)
 	if strings.ContainsAny(username, ": ,") {
-		return "", false, ErrProtectUser
+		return "", false, ErrPasswordUser
 	}
 	// On already, and no password given: nothing changes. A new one is
 	// off, then on.
-	if password == "" && app.Protect != "" {
+	if password == "" && app.Password != "" {
 		return "", false, nil
 	}
-	var protect string
+	var line string
 	if password == "" {
-		made, protect, err = newPassword(username)
+		made, line, err = newPassword(username)
 		if err != nil {
 			return "", false, err
 		}
 	} else {
 		if len(password) < 8 || len(password) > 72 {
-			return "", false, ErrProtect
+			return "", false, ErrPassword
 		}
-		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
+		if user, hash, _ := strings.Cut(app.Password, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
 			return "", false, nil
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
 			return "", false, err
 		}
-		protect = username + ":" + string(hash)
+		line = username + ":" + string(hash)
 	}
-	err = s.apps.SetProtect(app.ID, protect)
+	err = s.apps.SetPassword(app.ID, line)
 	if err != nil {
 		return "", false, err
 	}
-	s.servers.record(actor, "app.protected", "app", app.Name, nil)
+	s.servers.record(actor, "app.password_set", "app", app.Name, nil)
 	s.notify(actor.WorkspaceID)
 	return made, true, nil
 }
 
-// RemoveProtection turns the app's password off: no address of the app
+// RemovePassword turns the app's password off: no domain of the app
 // asks for one after its next restart. changed is false when it was off.
-func (s *AppService) RemoveProtection(actor Actor, idOrName string) (changed bool, err error) {
+func (s *AppService) RemovePassword(actor Actor, idOrName string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err
 	}
-	if app.Protect == "" {
+	if app.Password == "" {
 		return false, nil
 	}
-	err = s.apps.SetProtect(app.ID, "")
+	err = s.apps.SetPassword(app.ID, "")
 	if err != nil {
 		return false, err
 	}
-	s.servers.record(actor, "app.unprotected", "app", app.Name, nil)
+	s.servers.record(actor, "app.password_removed", "app", app.Name, nil)
 	s.notify(actor.WorkspaceID)
 	return true, nil
 }
 
 // newPassword makes a password for user and its htpasswd line,
 // user:bcrypt hash.
-func newPassword(user string) (password, protect string, err error) {
+func newPassword(user string) (password, line string, err error) {
 	password = rand.Text()[:20]
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -702,7 +702,7 @@ func newPassword(user string) (password, protect string, err error) {
 
 // waitingActions are the changes an app takes only on its next restart,
 // start or deploy: saving never restarts it (DESIGN.md, Feedback).
-var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set", "app.renamed"}
+var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.password_set", "app.password_removed", "app.instant_set", "app.bucket_set", "app.renamed"}
 
 // ChangesWaiting counts the changes made to an app since its live deploy
 // started, which its next restart applies. A stopped app or one never
@@ -1004,7 +1004,7 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	}
 	start.DeployID, start.App, start.Name, start.AppID, start.Number = deploy.ID, app.Folder, app.Name, app.ID, deploy.Number
 	domains, canonical := app.DomainsOf("")
-	start.Domains = &protocol.Domains{Domains: domains, Canonical: canonical, Protect: app.Protect, Services: serviceDomains(app)}
+	start.Domains = &protocol.Domains{Domains: domains, Canonical: canonical, Password: app.Password, Services: serviceDomains(app)}
 	err = s.fillInstant(app, start.Domains)
 	if err != nil {
 		return nil, err

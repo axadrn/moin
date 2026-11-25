@@ -144,11 +144,13 @@ type Recovered struct {
 
 // UseRecoveryKey clears the recovery key with this hash, if it has not
 // expired at now, disconnects the user's GitHub account, ends their
-// sessions and connections, deletes their passkeys and CI tokens and
-// returns what it ended. One transaction, so a key works only once, a lost
-// or hijacked GitHub account or passkey no longer signs in, nothing it
-// let in keeps working, and no old session adds a passkey after it
-// (Passkeys.Create). An OAuth grant is a connection: it ends with it.
+// sessions and connections, deletes their passkeys and CI tokens, drops a
+// pending email change with its link and returns what it ended. One
+// transaction, so a key works only once, a lost or hijacked GitHub account
+// or passkey no longer signs in, nothing it let in keeps working, no old
+// session adds a passkey after it (Passkeys.Create) and no email change
+// asked for before it moves the account to another address. An OAuth
+// grant is a connection: it ends with it.
 func (r *Users) UseRecoveryKey(hash string, now time.Time) (Recovered, error) {
 	var recovered Recovered
 	tx, err := r.db.Beginx()
@@ -158,7 +160,7 @@ func (r *Users) UseRecoveryKey(hash string, now time.Time) (Recovered, error) {
 	defer func() {
 		_ = tx.Rollback()
 	}()
-	err = tx.Get(&recovered.UserID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2 WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
+	err = tx.Get(&recovered.UserID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2, pending_email = NULL WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
 	if err == sql.ErrNoRows {
 		return recovered, ErrUserNotFound
 	}
@@ -170,6 +172,9 @@ func (r *Users) UseRecoveryKey(hash string, now time.Time) (Recovered, error) {
 		return recovered, err
 	}
 	if _, err := tx.Exec(`DELETE FROM passkeys WHERE user_id = $1`, userID); err != nil {
+		return recovered, err
+	}
+	if _, err := tx.Exec(`DELETE FROM tokens WHERE user_id = $1 AND type = $2`, userID, model.TokenTypeEmailChange); err != nil {
 		return recovered, err
 	}
 	if err := tx.Select(&recovered.Connections, `SELECT * FROM connections WHERE user_id = $1 AND ended_at IS NULL`, userID); err != nil {

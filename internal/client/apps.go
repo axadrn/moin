@@ -25,11 +25,13 @@ type App struct {
 	LiveNumber   int      `json:"live_number"`
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
-	Protected    bool     `json:"protected"`
+	// Password says the app's password is on: its domains and its
+	// instant address ask for it.
+	Password bool `json:"password"`
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
 	// Instant is the instant address, "" when the app has none. The
-	// app's password guards it like every address of the app.
+	// app's password guards it like the app's domains.
 	Instant         string `json:"instant"`
 	InstantProvider string `json:"instant_provider"`
 	Stopped         bool   `json:"stopped"`
@@ -56,8 +58,12 @@ type App struct {
 	// an app of your own.
 	Catalog   string    `json:"catalog"`
 	CreatedAt time.Time `json:"created_at"`
-	// Password is the app's password, user moin, only in the answer that
-	// created the app: the one time moin shows it.
+}
+
+// CreatedApp is the answer of AddApp: the app and its password, user
+// moin, the one time moin shows it.
+type CreatedApp struct {
+	App      App    `json:"app"`
 	Password string `json:"password"`
 }
 
@@ -116,8 +122,8 @@ func (c *Client) RenameApp(ctx context.Context, app, name string) (App, error) {
 }
 
 // AddApp creates an app on a server.
-func (c *Client) AddApp(ctx context.Context, name, server string) (App, error) {
-	var response App
+func (c *Client) AddApp(ctx context.Context, name, server string) (CreatedApp, error) {
+	var response CreatedApp
 	err := c.do(ctx, http.MethodPost, "/api/v1/apps", map[string]string{"name": name, "server": server}, &response)
 	return response, err
 }
@@ -362,11 +368,10 @@ type DomainCheck struct {
 	Service string `json:"service"`
 }
 
-// Change is the app after a change of the domains, and the deploy that applies it,
-// nil when the next deploy will.
+// Change is the app after a change of its settings. Saving never restarts
+// it: the next restart, start or deploy applies the change.
 type Change struct {
-	App    App     `json:"app"`
-	Deploy *Deploy `json:"deploy"`
+	App App `json:"app"`
 	// Unchanged is set when the app had it so already; nothing restarts.
 	Unchanged bool `json:"unchanged"`
 }
@@ -415,25 +420,25 @@ func (c *Client) SetInstant(ctx context.Context, app, provider string) (Change, 
 	return response, err
 }
 
-// Protection is the answer of SetProtection: the change, and the password
+// NewPassword is the answer of SetPassword: the change, and the password
 // moin made when none was given, the one time it shows it.
-type Protection struct {
+type NewPassword struct {
 	Change
 	Password string `json:"password"`
 }
 
-// SetProtection turns the app's password on for every address of it. An
-// empty password lets moin make one.
-func (c *Client) SetProtection(ctx context.Context, app, username, password string) (Protection, error) {
-	var response Protection
-	err := c.do(ctx, http.MethodPut, appPath(app, "protection"), map[string]string{"username": username, "password": password}, &response)
+// SetPassword turns the app's password on for its domains and its
+// instant address. An empty password lets moin make one.
+func (c *Client) SetPassword(ctx context.Context, app, username, password string) (NewPassword, error) {
+	var response NewPassword
+	err := c.do(ctx, http.MethodPut, appPath(app, "password"), map[string]string{"username": username, "password": password}, &response)
 	return response, err
 }
 
-// RemoveProtection turns the app's password off.
-func (c *Client) RemoveProtection(ctx context.Context, app string) (Change, error) {
+// RemovePassword turns the app's password off.
+func (c *Client) RemovePassword(ctx context.Context, app string) (Change, error) {
 	var response Change
-	err := c.do(ctx, http.MethodDelete, appPath(app, "protection"), nil, &response)
+	err := c.do(ctx, http.MethodDelete, appPath(app, "password"), nil, &response)
 	return response, err
 }
 

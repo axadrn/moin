@@ -69,7 +69,7 @@ You sign in with GitHub or a passkey. Like a club that lets you in when a friend
 - **Every passkey sign-in is checked in full.** The challenge is random, kept on the hub, works once and for five minutes. The signature, the origin, the domain and the flags are checked by go-webauthn, a maintained WebAuthn library, never by code of our own. A sign counter that goes back means a copied passkey: refused. 30 tries per 15 minutes per address.
 - **A new passkey sends you an email**, so one you did not add does not go unseen. An operator impersonating you can neither add nor remove one.
 - **The last way in stays.** Without GitHub, your last passkey cannot be removed. Add another first.
-- **Recovery key.** Lost your GitHub account or your passkey? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It resets every way in: it signs the account out everywhere, ends its connections and CI tokens, disconnects its GitHub account and deletes its passkeys, so a stolen GitHub account or device no longer gets in. Then you connect your GitHub and add a passkey again.
+- **Recovery key.** Lost your GitHub account or your passkey? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It resets every way in: it signs the account out everywhere, ends its connections and CI tokens, disconnects its GitHub account, deletes its passkeys and drops an email change still waiting for its link, so a stolen GitHub account or device no longer gets in. Then you connect your GitHub and add a passkey again.
 - **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
 - **Connecting GitHub and adding a passkey need a CSRF token**, so no other site can start them. [Recovery key](/docs/self-hosting#recovery-key)
 - **The CLI, the TUI and AI agents** are connections: you let each one in from the browser with your passkey and pick its [rights](/docs/reference/rights). CI uses a CI token. Neither can ever change how you sign in or give itself more rights. [Account and connections](/docs/guides/account)
@@ -413,7 +413,7 @@ A daemon only updates to a release we signed. Think of a stamp: we stamp every r
 4. It downloads its binary from the same release and checks it against the signed SHA-256.
 5. It runs the new binary once, which has to say `moin v1.2.3`, and only then swaps itself.
 
-- It never goes back to an older release, and never installs a build that is not a release.
+- It never installs a build that is not a release. A release never goes back to an older one. A build between releases, a `main-…` one, can go to any signed release.
 - The signing key never touches the hub. Someone who takes over the hub cannot sign, so they cannot hand your server a daemon.
 - In GitHub the key sits in a protected environment. Only a release tag reaches it, and only after a maintainer approves. A workflow or an action someone slipped in cannot sign.
 - A daemon without systemd cannot restart itself, so it does not update itself. Update it by hand: take the binary from the release and check it first (below).

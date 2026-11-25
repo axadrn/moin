@@ -70,10 +70,10 @@ var appSummaries = map[string]summarize{
 		return "stopped " + target
 	},
 	"app.domains_set": domainsSetSummary,
-	"app.protected": func(target string, d map[string]string) string {
+	"app.password_set": func(target string, d map[string]string) string {
 		return "put a password in front of " + target
 	},
-	"app.unprotected": func(target string, d map[string]string) string {
+	"app.password_removed": func(target string, d map[string]string) string {
 		return "took the password away from " + target
 	},
 	"app.hook_rotated": func(target string, d map[string]string) string {

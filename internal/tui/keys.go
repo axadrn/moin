@@ -465,16 +465,16 @@ func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 		}
 		return m.ask1("Remove "+dc.Domain+" from "+a.Name+"?", "It stops answering there.", "remove", true, m.setDomains(a.Name, "", rest, canonical)), nil
 	case "p":
-		if a.Protected {
-			return m.ask1("Turn the password of "+a.Name+" off?", "Anyone with the link can open every address of it.", "turn off", true, m.unprotect(a.Name)), nil
+		if a.Password {
+			return m.ask1("Turn the password of "+a.Name+" off?", "Anyone with the link can open its domains and its instant address.", "turn off", true, m.removePassword(a.Name)), nil
 		}
-		return m.input("Ask for a password on every address of "+a.Name, "user:password", "", func(m model, v string) (model, tea.Cmd) {
+		return m.input("Ask for a password on the domains and the instant address of "+a.Name, "user:password", "", func(m model, v string) (model, tea.Cmd) {
 			user, pw, ok := strings.Cut(v, ":")
 			if !ok || user == "" || pw == "" {
 				m.fail(fmt.Errorf("type user:password"))
 				return m, nil
 			}
-			return m, m.protect(m.cur.app, user, pw)
+			return m, m.setPassword(m.cur.app, user, pw)
 		}), nil
 	}
 	return m, nil

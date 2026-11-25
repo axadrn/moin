@@ -71,7 +71,7 @@ func TestJournalShowsNoValue(t *testing.T) {
 			DeployID: "d1", App: "my-app", Number: 12,
 			SourceURL:           "https://api.github.com/repos/acme/blog/tarball/abc123?token=" + secret,
 			SourceAuthorization: "Bearer " + secret,
-			Domains:             &protocol.Domains{Protect: "me:" + secret},
+			Domains:             &protocol.Domains{Password: "me:" + secret},
 		}, "app=my-app deploy=d1 number=12 source=api.github.com/repos/acme/blog/tarball/abc123"},
 	}
 	for _, request := range requests {

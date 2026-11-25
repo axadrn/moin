@@ -105,8 +105,8 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 | `set_domains` | domains and the canonical one, or with `service` the domains of another service | deploy |
 | `get_instant` | the instant address, or why the app has none | read |
 | `set_instant` | the provider of the instant address or off | deploy |
-| `set_protection` | turns the app's password on for every domain: your own, or one moin makes and returns this once | env |
-| `remove_protection` | turns the app's password off: every domain is open | env, destructive |
+| `set_password` | turns the app's password on for every domain: your own, or one moin makes and returns this once | env |
+| `remove_password` | turns the app's password off: every domain is open | env, destructive |
 | `restart_app` | starts the live deploy again with the current settings | deploy |
 | `stop_app` | takes the app offline; its data stays | deploy, destructive |
 | `start_app` | runs a stopped app again | deploy |

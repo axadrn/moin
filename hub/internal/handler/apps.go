@@ -97,7 +97,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Shown in place of the form: a new page would lose the password.
 	w.Header().Set("HX-Retarget", "#app-add-form")
 	w.Header().Set("HX-Reswap", "outerHTML")
-	render(w, r, pages.AppAdded(ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), app.Name, app.Password))
+	render(w, r, pages.AppAdded(ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), app.Name, app.NewPassword))
 }
 
 // AppSection answers one section of an app (app, deploys, domains, logs
@@ -617,13 +617,13 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	h.domainsChanged(w, r, done, changed, "")
 }
 
-// Protect turns the app's password on or off. Its switch (switch=1) turns
+// Password turns the app's password on or off. Its switch (switch=1) turns
 // it off, or on with a password moin makes and shows once; the fields set
 // one of your own. A wrong field says the rule of its hint line again, in
 // red; a failed switch flips back.
-func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
+func (h *AppsHandler) Password(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("switch") == "1" && r.FormValue("on") != "1" {
-		changed, err := h.apps.RemoveProtection(actor(r), r.PathValue("app"))
+		changed, err := h.apps.RemovePassword(actor(r), r.PathValue("app"))
 		if err != nil {
 			if _, ok := h.renderDomains(w, r, ""); ok {
 				answerError(w, r, "Password not turned off", errorMessage(err))
@@ -633,13 +633,13 @@ func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
 		h.domainsChanged(w, r, "Password off", changed, "")
 		return
 	}
-	made, changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
+	made, changed, err := h.apps.SetPassword(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
 	switch {
-	case errors.Is(err, service.ErrProtectUser):
-		fieldError(w, "Password not set", "protect-user", "No spaces or colons.")
+	case errors.Is(err, service.ErrPasswordUser):
+		fieldError(w, "Password not set", "password-user", "No spaces or colons.")
 		return
-	case errors.Is(err, service.ErrProtect):
-		fieldError(w, "Password not set", "protect-password", "Use 8 to 72 characters.")
+	case errors.Is(err, service.ErrPassword):
+		fieldError(w, "Password not set", "password-value", "Use 8 to 72 characters.")
 		return
 	case err != nil:
 		if _, ok := h.renderDomains(w, r, ""); ok {

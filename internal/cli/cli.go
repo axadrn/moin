@@ -87,8 +87,8 @@ Domains
   domains canonical  Redirect the others to one: domains canonical my-app.example.com|none
   instant            The instant address, https://<app>.<ip>.sslip.io: instant [app]
   instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
-  protect            Every address asks for a password: protect [--user moin] [app], yours on stdin, or none and moin makes one
-  protect off        No address asks for a password: protect off [app] [--yes]
+  password           The app's domains and its instant address ask for a password: password [--user moin] [app], yours on stdin, or none and moin makes one
+  password off       No domain asks for a password: password off [app] [--yes]
 
 Uptime
   uptime             Uptime of every domain that serves, 24 hours, 7 and 30 days, and the last outages: uptime [app]
@@ -299,8 +299,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return domains(ctx, rest, stdin, stdout)
 	case "instant":
 		return instant(ctx, rest, stdout)
-	case "protect":
-		return protect(ctx, rest, stdin, stdout)
+	case "password":
+		return password(ctx, rest, stdin, stdout)
 	case "catalog":
 		return catalog(ctx, rest, stdout)
 	case "uptime":

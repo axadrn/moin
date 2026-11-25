@@ -31,8 +31,8 @@ func TestAppDomainsRules(t *testing.T) {
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/domains", bearer: writer,
 		body: `{"service":"api","domains":["api.shop.example.com"]}`}), http.StatusNotFound, "not_found")
 
-	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: reader, body: `{}`}), http.StatusForbidden, "missing_right")
-	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: writer, body: `{}`}), http.StatusNotFound, "not_found")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/password", bearer: reader, body: `{}`}), http.StatusForbidden, "missing_right")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/password", bearer: writer, body: `{}`}), http.StatusNotFound, "not_found")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/instant/password", bearer: writer}), http.StatusNotFound, "not_found")
 }
 

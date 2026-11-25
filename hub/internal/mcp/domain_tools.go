@@ -20,17 +20,17 @@ func registerDomainTools(server *mcpsdk.Server, services Services) {
 		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on.",
 		change(false, true)), model.RightDeploy, changes(services, tools.setDomains))
 	Add(server, newTool("get_instant", "Get the instant address",
-		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. The app's one password guards it like every address of the app while protected is true (get_app).",
+		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. The app's password guards it like the app's domains while password is true (get_app).",
 		readOnly("")), model.RightRead, member(services, tools.getInstant))
 	Add(server, newTool("set_instant", "Set the instant address",
 		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off. The change waits for restart_app, a start or a deploy.",
 		change(false, true)), model.RightDeploy, changes(services, tools.setInstant))
-	Add(server, newTool("set_protection", "Turn the password on",
-		"Turns on the app's one password: every address of the app, its domains and its instant address, asks for it with basic auth. With a password of 8 to 72 characters it sets that one; without one moin makes one and returns it in password: the one time moin shows it, so give it to the user right away. username is moin when empty. The change waits for restart_app, a start or a deploy.",
-		change(false, true)), model.RightEnv, changes(services, tools.setProtection))
-	Add(server, newTool("remove_protection", "Turn the password off",
-		"Turns off the app's password: no address of the app asks for one after restart_app, a start or a deploy, so anyone with the link opens it. Ask the user first.",
-		change(true, true)), model.RightEnv, changes(services, tools.removeProtection))
+	Add(server, newTool("set_password", "Turn the password on",
+		"Turns on the app's one password: its domains and its instant address ask for it with basic auth. With a password of 8 to 72 characters it sets that one; without one moin makes one and returns it in password: the one time moin shows it, so give it to the user right away. username is moin when empty. The change waits for restart_app, a start or a deploy.",
+		change(false, true)), model.RightEnv, changes(services, tools.setPassword))
+	Add(server, newTool("remove_password", "Turn the password off",
+		"Turns off the app's password: no domain of the app asks for one after restart_app, a start or a deploy, so anyone with the link opens it. Ask the user first.",
+		change(true, true)), model.RightEnv, changes(services, tools.removePassword))
 }
 
 // DomainChecks is the output of check_domains.
@@ -133,19 +133,19 @@ func (t moinTools) setInstant(_ context.Context, caller Caller, input SetInstant
 	return t.change(caller, input.App, changed)
 }
 
-// ProtectionInput is the input of set_protection.
-type ProtectionInput struct {
+// PasswordInput is the input of set_password.
+type PasswordInput struct {
 	App      string `json:"app" jsonschema:"the app name or ID"`
 	Username string `json:"username,omitempty" jsonschema:"who signs in; moin when empty"`
 	Password string `json:"password,omitempty" jsonschema:"8 to 72 characters; empty lets moin make one"`
 }
 
-// Protection is the output of set_protection.
-type Protection struct {
-	api.Protection
+// NewPassword is the output of set_password.
+type NewPassword struct {
+	api.NewPassword
 }
 
-func (p Protection) Summary() string {
+func (p NewPassword) Summary() string {
 	summary := Change{p.Change}.Summary()
 	if p.Password != "" {
 		summary += " The password moin made is in password: shown this once, give it to the user now."
@@ -153,17 +153,17 @@ func (p Protection) Summary() string {
 	return summary
 }
 
-func (t moinTools) setProtection(_ context.Context, caller Caller, input ProtectionInput) (Protection, error) {
-	made, changed, err := t.services.Apps.SetProtection(caller.actor(), input.App, input.Username, input.Password)
+func (t moinTools) setPassword(_ context.Context, caller Caller, input PasswordInput) (NewPassword, error) {
+	made, changed, err := t.services.Apps.SetPassword(caller.actor(), input.App, input.Username, input.Password)
 	if err != nil {
-		return Protection{}, err
+		return NewPassword{}, err
 	}
 	answer, err := t.change(caller, input.App, changed)
-	return Protection{api.Protection{Change: answer.Change, Password: made}}, err
+	return NewPassword{api.NewPassword{Change: answer.Change, Password: made}}, err
 }
 
-func (t moinTools) removeProtection(_ context.Context, caller Caller, input AppInput) (Change, error) {
-	changed, err := t.services.Apps.RemoveProtection(caller.actor(), input.App)
+func (t moinTools) removePassword(_ context.Context, caller Caller, input AppInput) (Change, error) {
+	changed, err := t.services.Apps.RemovePassword(caller.actor(), input.App)
 	if err != nil {
 		return Change{}, err
 	}

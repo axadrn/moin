@@ -107,7 +107,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 
 | Endpoint | What it does |
 | --- | --- |
-| `GET /api/v1/apps` · `POST /api/v1/apps` | lists apps; adds one with its password on, and its answer holds `password`, user `moin`, shown this once |
+| `GET /api/v1/apps` · `POST /api/v1/apps` | lists apps; adds one with its password on and answers `app` and `password`, user `moin`, shown this once. In an app, `password` is `true` or `false`: on or off, never the value |
 | `GET /api/v1/apps/{app}` · `DELETE /api/v1/apps/{app}?confirm=<app>` | one app, with `changes_waiting`: the changes the next restart applies; removes it, its data stays on the server |
 | `GET /api/v1/apps/events` | the app list as server-sent events |
 | `PATCH /api/v1/apps/{app}` | renames an app: `{"name": "…"}`; links, data, backups and the instant address stay, the next restart gives the containers the name |
@@ -150,7 +150,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | --- | --- |
 | `GET` · `PUT /api/v1/apps/{app}/domains` | the domains and canonical; with `service`, those of another service. `GET` answers DNS checks with the server's `ipv4`, `ipv6` and the record to set as `advice` |
 | `GET` · `PUT /api/v1/apps/{app}/instant` | the instant address and its provider; picks the provider or `off` |
-| `PUT` · `DELETE /api/v1/apps/{app}/protection` | turns the app's [password](/docs/guides/domains#password) on for every domain, with `{"username", "password"}`, or without a password moin makes one and answers it in `password`, this once; turns it off |
+| `PUT` · `DELETE /api/v1/apps/{app}/password` | turns the app's [password](/docs/guides/domains#password) on for every domain, with `{"username", "password"}`, or without a password moin makes one and answers it in `password`, this once; turns it off |
 | `GET /api/v1/apps/{app}/uptime` | uptime per domain: state, 24 hours, 7 and 30 days, the last visit, the last outages |
 | `PUT /api/v1/apps/{app}/uptime/{domain}` | the path uptime visits on a domain, `{"path": "/health"}`, or `{"paused": true}` |
 

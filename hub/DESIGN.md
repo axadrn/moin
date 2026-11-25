@@ -317,6 +317,7 @@ notes say it under Changed.
 | deploy | one version of an app, v12; also the verb | release (in copy), build, rollout |
 | restart | start the live deploy again, applying the changes that wait | apply, reload |
 | domain | a name the app answers on, the instant address included | address, route, routing (in copy) |
+| password | the one password of an app; its domains and its instant address ask for it | protection, protect |
 | backup | a copy of an app's database in your bucket, on the schedule you pick | snapshot, dump, history, point in time |
 | restore | going back to a copy; it can be undone as long as the copies are kept | rollback (that is for deploys), recover |
 | check | only the daily test that the newest copy restores | drill, verification, restore check; never for uptime |

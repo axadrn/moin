@@ -24,13 +24,13 @@ type App struct {
 	// Domains are the domains of the app, oldest first, from the domains
 	// table.
 	Domains []Domain `db:"-"`
-	// Protect is the app's password as an htpasswd line, user:bcrypt hash,
-	// empty when it is off. When it is on, every address of the app asks
-	// for it: its domains and its instant address.
-	Protect string `db:"protect"`
-	// Password is the password moin just made, only in the answer of
+	// Password is the app's password as an htpasswd line, user:bcrypt
+	// hash, empty when it is off. When it is on, its domains and its
+	// instant address ask for it.
+	Password string `db:"password"`
+	// NewPassword is the password moin just made, only in the answer of
 	// Create: moin keeps its hash, never the password.
-	Password string `db:"-"`
+	NewPassword string `db:"-"`
 	// Instant is the provider of the instant address, such as sslip.io, or
 	// off; InstantHost the address the last deploy served it at.
 	Instant     string `db:"instant"`
