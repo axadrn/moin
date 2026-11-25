@@ -55,7 +55,7 @@ func registerUpdateTools(server *mcpsdk.Server, services Services) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:  "set_daemon_updates",
 		Title: "Turn automatic daemon updates on or off",
-		Description: "With auto true, every daemon of the workspace older than the hub updates by itself when it connects, one server at a time, never during a deploy and never on a server with rules. On by default. " +
+		Description: "With auto true, every daemon of the workspace older than the hub updates by itself when it connects, one server at a time, never during a deploy. On by default. " +
 			"update_daemon updates one daemon by hand. Needs a token with read and write access.",
 		Annotations: change(false, true),
 	}, Write(member(services, tools.setDaemonUpdates)))
