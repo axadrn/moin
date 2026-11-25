@@ -39,10 +39,10 @@ The server writes and deletes a test file first, so a wrong key fails at once. T
 
 ## Give another server the key
 
-Each server keeps its own copy of the key. A server added later has none, and its backups to this bucket wait. The bucket's list names it: `web-2 has no key for the bucket default`. Enter the key for that server:
+Each server keeps its own copy of the key. A server added later has none, and its backups to this bucket wait. The bucket's list names it: `web-2 has no key for this bucket`. Enter the key for that server:
 
 ```surfaces
-Web: **Settings**, **Bucket**, **Enter key** next to the server
+Web: **Settings**, **Bucket**: the secret key in the server's row, then **Save**
 CLI: moin buckets key default --server web-2
 TUI: opens the web: `w`, then `k`
 API: PUT /api/v1/buckets/{name}/key

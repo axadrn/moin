@@ -17,7 +17,7 @@ No. Builds run on your server. [How moin works](/docs/concepts/how-moin-works).
 
 ## How is moin different from Coolify, Kamal or Heroku?
 
-moin holds no SSH key to your servers. Your code and backups stay in your own bucket. Every day moin checks that a copy restores. [Why moin](/docs/why-moin).
+moin holds no SSH key to your servers. moin never stores your code, and your backups stay in your own bucket. Every day moin checks that a copy restores. [Why moin](/docs/why-moin).
 
 ## Do I need a domain?
 

@@ -33,7 +33,7 @@ Postgres: pg_dump
   (nothing waits on the disk)
 ```
 
-**SQLite.** `VACUUM INTO` makes a clean copy while your app keeps running. It can only write into a file, like a photocopier that needs paper. So the copy is a file next to the database for a moment, and the disk needs room for it. moin looks first.
+**SQLite.** `VACUUM INTO` makes a clean copy while your app keeps running. It can only write into a file, like a photocopier that needs paper. So the copy is a file in moin's own folder on the server for a moment, and the disk needs room for it. moin looks first.
 
 **Postgres.** `pg_dump` makes a clean copy while your app keeps running. It writes a stream, like water from a tap. moin points the tap straight at your bucket. It runs inside your Postgres container, so no password leaves it. It copies every database in it, each into a file of its own.
 

@@ -86,12 +86,12 @@ var Rows = []Row{
 	{"Your data", "Database backups", yes("SQLite and Postgres", "On your schedule, in your own bucket: every 15 minutes, hourly or daily.", "")},
 	{"Your data", "Restore tested every day", yes("Yes", "A real restore into a throwaway database, every day.", "")},
 	{"Your data", "Browse and edit live data", yes("Yes", "SQLite and Postgres. Read, edit, run SQL.", "")},
-	{"Every day", "Uptime checks", yes("Every minute", "Built in, with alerts.", "")},
+	{"Every day", "Uptime", yes("Every minute", "Built in, with alerts.", "")},
 	{"Every day", "Deploy from", yes("GitHub, image, catalog", "A GitHub push, a CI image or an app from the catalog.", "")},
 	{"Every day", "Ways in", yes("All five", "Web, CLI, terminal UI, API and MCP.", "")},
-	{"Every day", "Activity log", yes("Yes", "Who did what, when, in every workspace.", "")},
+	{"Every day", "Activity", yes("Yes", "Who did what, when, in every workspace.", "")},
 	{"Price", "Host it yourself, free", yes("Yes", "All of it.", "")},
-	{"Price", "You pay", plain("$7 per workspace", "Unlimited servers, apps and team. $49 a year. The tenth server costs the same as the first, the whole team is included and every feature is in.", "")},
+	{"Price", "You pay", plain("$7 a month per workspace", "Or $49 a year. Unlimited servers, apps and team. The tenth server costs the same as the first. Every feature is in.", "")},
 }
 
 // hasNoServer is the answer on a row about your server for a tool that runs
@@ -297,7 +297,7 @@ var Competitors = []Competitor{
 			notDocumented("https://render.com/docs/postgresql-backups"),
 			no("No", "Render recommends a third-party monitor.", "https://render.com/docs/uptime-best-practices"),
 			part("Git or an image", "A linked Git branch or a prebuilt image.", "https://render.com/docs/deploying-an-image"),
-			yes("All five", "Web, CLI with terminal menus, API and MCP.", "https://render.com/docs/cli"),
+			yes("All five", "Web, CLI, terminal menus, API and MCP.", "https://render.com/docs/cli"),
 			part("Pro and up", "Audit logs from the Pro workspace plan.", "https://render.com/docs/audit-logs"),
 			no("No", "Hosted only.", "https://render.com/pricing"),
 			plain("From $7 a web service", "Postgres from $6. Free plans with limits.", "https://render.com/pricing"),

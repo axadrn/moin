@@ -21,7 +21,7 @@ MCP: list_tables
 
 ## Browse rows
 
-Newest first, at most 1000 rows. `--limit` (CLI) or `limit` (API, MCP) chooses fewer.
+Newest first. `moin db rows` shows 20 rows; `--limit` (CLI) or `limit` (API) takes up to 500. `query_database` (MCP) and `moin sql` return up to 1000.
 
 ```surfaces
 Web: the app page, **Data**, a database, a table

@@ -54,7 +54,7 @@ https://<app>.<ip-dashes>.sslip.io
 https://my-app.203-0-113-7.sslip.io
 ```
 
-The name carries the server's IP, so it needs no DNS. The app's [password](#password) guards it, like every address of the app.
+The name carries the server's IP, so it needs no DNS. The app's [password](#password) guards it, like every domain of the app.
 
 `moin instant` shows the address, `GET /api/v1/apps/{app}/instant` and `get_instant` the same.
 
@@ -114,7 +114,7 @@ MCP: set_domains
 
 ## Password
 
-One rule: an app has one password. When it is on, every address of the app asks for it: the instant address, every domain and the domains of its other services. When it is off, none does. Visitors see their browser's sign-in box. moin stores only a hash.
+One rule: an app has one password. When it is on, every domain of the app asks for it: the instant address, the app's own domains and those of its other services. When it is off, none does. Visitors see their browser's sign-in box. moin stores only a hash.
 
 A new app starts with it on. So nobody else gets in before you, also not to the setup page of an app where the first visitor becomes the admin. moin makes the password, user `moin`, and shows it once: on the web, in `moin apps add`, `moin deploy` and `moin catalog install`, in the API and MCP answer as `password`. Keep it in your password manager.
 
@@ -133,7 +133,7 @@ Turn it on again. moin makes a new password and shows it once. When it is on alr
 ```surfaces
 Web: the app page, **Domains**, the **Ask for a password** switch
 CLI: moin protect, with nothing on stdin
-TUI: opens the web
+TUI: opens the web: on the app, `W`, then **Domains**
 API: PUT /api/v1/apps/{app}/protection with {}
 MCP: set_protection
 ```

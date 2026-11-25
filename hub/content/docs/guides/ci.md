@@ -61,7 +61,7 @@ moin shows the URL once. Store it as a CI secret, for example `MOIN_DEPLOY_HOOK`
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from**, **CI**, **Turn on**
 CLI: moin hook <app-name>
-TUI: on the app, `W` opens its Deploys tab in the web
+TUI: on the app, `W` opens it in the web, then **Deploys**
 API: POST /api/v1/apps/{app}/hook
 MCP: create_deploy_hook
 ```
@@ -149,7 +149,7 @@ The repo stays linked. Pushes still do not deploy until you turn **Deploy every 
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from**, **CI**, **Turn off**
 CLI: moin hook off <app-name>
-TUI: on the app, `W` opens its Deploys tab in the web
+TUI: on the app, `W` opens it in the web, then **Deploys**
 API: DELETE /api/v1/apps/{app}/hook
 MCP: remove_deploy_hook
 ```

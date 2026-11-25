@@ -41,7 +41,7 @@ Each role can do everything inside it.
 | --- | --- | --- | --- |
 | Deploy, roll back, edit data, restore, servers, domains, env | ✓ | ✓ | ✓ |
 | See the activity | ✓ | ✓ | ✓ |
-| Invite people, rename the workspace | | ✓ | ✓ |
+| Invite people, rename the workspace, alert destinations, run commands in a container | | ✓ | ✓ |
 | Make someone a member or an admin, remove members and admins | | ✓ | ✓ |
 | Make someone an owner, remove an owner, billing, delete the workspace | | | ✓ |
 

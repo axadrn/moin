@@ -153,7 +153,7 @@ The card shows **Connected as** and your GitHub login once it is done. `github_l
 
 Sign in the other way, if you have one. Else ask the admin of your hub for a recovery key. They run `./main recovery-key <email>` on the server. Enter the key at `/auth/key`. It works once, for an hour.
 
-The key resets every way in. It signs you out everywhere, disconnects GitHub and deletes your passkeys, so a lost GitHub account or device no longer gets in. Then connect your GitHub and add a passkey again under **Settings**, **Account**, **Security**. [Recovery key](/docs/self-hosting#recovery-key)
+The key resets every way in. It signs you out everywhere, ends your connections and CI tokens, disconnects GitHub and deletes your passkeys, so a lost GitHub account or device no longer gets in. Then connect your GitHub and add a passkey again under **Settings**, **Account**, **Security**. [Recovery key](/docs/self-hosting#recovery-key)
 
 ```surfaces
 Web: `/auth/key`, **Key from the terminal**, **Sign in**
@@ -178,7 +178,7 @@ API: POST /api/v1/account/avatar
 
 ## Change your email
 
-Links and notices go to the new address once you click the link moin sends there. The link signs you out everywhere. A browser signed in to this account stays in; anywhere else, sign in again with GitHub or a passkey. The link never signs anyone in.
+Notices and alerts go to the new address once you click the link moin sends there. The link signs you out everywhere. A browser signed in to this account stays in; anywhere else, sign in again with GitHub or a passkey. The link never signs anyone in.
 
 ```surfaces
 Web: **Settings**, **Account**, **Profile** tab, **Email**, **Save**

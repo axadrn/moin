@@ -8,7 +8,7 @@ inputs:
     description: The hub URL.
     required: true
   token:
-    description: A personal API token with write access. Store it as a secret.
+    description: A CI token with the deploy right, best limited to the app. Store it as a secret.
     required: true
   app:
     description: The app to deploy. Default the app that follows the repo, else the repo name.

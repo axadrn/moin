@@ -100,6 +100,6 @@ This is a real deploy, and many apps run like this for years. But it leaves a fe
 
 ## How moin does it
 
-[moin](/) takes the same `compose.yml` and does the rest: deploys on every push or with one command, HTTPS from the first deploy, backups of SQLite and Postgres with a daily restore check, uptime checks with alerts, and rollback to any earlier deploy. Its daemon dials out, so your server keeps every port closed.
+[moin](/) takes the same `compose.yml` and does the rest: deploys on every push or with one command, HTTPS from the first deploy, backups of SQLite and Postgres with a check every day that a copy restores, uptime with alerts, and rollback to an earlier deploy. Its daemon dials out, so your server keeps every port closed.
 
 [Get started](/docs/getting-started) takes a fresh server to a live app in four steps.

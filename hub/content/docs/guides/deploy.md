@@ -71,11 +71,12 @@ moin deploy --server <server-name> <app-name>  # a new app on that server
 
 moin reads the repo through the moin GitHub App. [Connect GitHub](/docs/guides/github#connect-github) once.
 
-Before a deploy, moin checks three things. If one fails, it says what to do.
+Before a deploy, moin checks four things. If one fails, it says what to do.
 
 - You are in the top folder of the repo, and its `origin` is on GitHub.
 - Everything is committed. `git status` shows nothing.
 - The commit is pushed. `git push` first.
+- The commit is on the app's branch. Another branch? `moin deploy --ref <branch>`, or link that branch with `moin link`.
 
 The first deploy links the app to the repo, without deploys on push. Turn those on with [`moin link`](/docs/guides/github#link-a-repo). An app linked to another repo deploys nothing from this one.
 
@@ -139,7 +140,7 @@ MCP: list_apps
 An empty app on a [server](/docs/guides/servers), ready for its first deploy.
 
 ```surfaces
-Web: **Apps**, **Add app**
+Web: **Apps**, **New app**, a name and a server, **Add**
 CLI: moin apps add --server <server-name> <app-name>
 TUI: opens the web: `w`, then `p`
 API: POST /api/v1/apps
@@ -178,7 +179,7 @@ MCP: get_deploy
 Builds the newest code again, with the env vars as they are now. The server builds the code it kept. An image deploy pulls the image again.
 
 ```surfaces
-Web: the app, **Redeploy**
+Web: the app, **Deploy**
 CLI: moin redeploy <app-name>
 TUI: on the app, `R`, then `y`
 API: POST /api/v1/apps/{app}/redeploy
@@ -208,7 +209,7 @@ Stop takes the app offline. It stays off, also after a reboot. Its data and sett
 Start runs it again. A deploy starts it too.
 
 ```surfaces
-Web: the app, **Stop** or **Start**
+Web: the app's **Settings** tab, **Stop my-app**; **Start** at the top of the app
 CLI: moin stop <app-name>
 CLI: moin start <app-name>
 TUI: on the app, `S` (stop asks `y`)
@@ -237,7 +238,7 @@ A rollback is a new deploy, such as v4 with the note *rollback to v3*. Without a
 Pinned apps stay at the top of the overview, right under what needs you. A pin is for the whole workspace.
 
 ```surfaces
-Web: the star next to the app's name
+Web: the app's **Settings** tab, **Pin to the top**
 CLI: moin apps pin <app-name>, moin apps unpin <app-name>
 TUI: on the app, `*`
 API: PUT /api/v1/apps/{app}/pin {"pinned": true}
@@ -249,7 +250,7 @@ MCP: pin_app
 Stops the app and removes its containers and images. Its volumes and data stay on the server. Its backups stay in your bucket until you delete them: [How long things stay](/docs/concepts/backups#how-long-things-stay).
 
 ```surfaces
-Web: the app, **Remove app**
+Web: the app's **Settings** tab, **Remove my-app**
 CLI: moin apps rm <app-name>
 TUI: opens the web: `w`, then `p`
 API: DELETE /api/v1/apps/{app}

@@ -18,7 +18,7 @@ addresses, personal details.
 - The license is explained once, in the FAQ of the docs. `LICENSE` and `ui/LICENSE` are the texts; everywhere else says "open source" without a license name.
 - The product name lives only in `internal/build.Name`. One exception: moin UI in `ui/`, whose `moin-` classes and `moin.css` and `moin.js` have no Go to ask.
 - Words: one thing, one word, in every layer, from the list in `hub/DESIGN.md` (Words): hub, daemon, server, app, deploy, backup, check, uptime, AI agent. Not "node", "host" or "control plane".
-- Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `coder/websocket`, `x/term`, and `yaml.v3`, with which the daemon reads a compose file before Docker does. Add one only when the standard library does not solve it well.
+- Standard library first. Current dependencies: Bubble Tea v2, Lip Gloss v2, `colorprofile`, `coder/websocket`, `x/term`, the AWS S3 SDK for the bucket, `modernc.org/sqlite` for backups and data, and `yaml.v3`, with which the daemon reads a compose file before Docker does. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
 - Formatted (`cd hub && task fmt`, a test checks it), `go vet ./...` clean.
 - How a change ships, from the pull request to the release, is in `hub/content/docs/reference/shipping.md`, the one source for it. Change how moin ships and change that page in the same pull request.

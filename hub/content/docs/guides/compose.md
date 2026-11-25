@@ -29,7 +29,7 @@ services:
 
 ## Everything else is in moin
 
-Domains, the instant address, the password, backups, uptime and env vars live in moin. Set them on the web, in the CLI, the TUI, the API or MCP. There is no second place, so nothing in the repo overrides them.
+Domains, the instant address, the password, backups, uptime and env vars live in moin. Set them on the web, in the CLI, the TUI, the API or MCP. There is no second place, so nothing in the repo overrides them. A `compose.yml` that still has an `x-moin` block fails the deploy: remove the block and set those things in moin.
 
 The app's name is in moin too. `moin deploy` finds it on its own: the app that follows the repo of the folder, else the folder's name.
 

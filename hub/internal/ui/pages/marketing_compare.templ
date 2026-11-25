@@ -15,7 +15,7 @@ import (
 templ HomeCompare() {
 	<section id="compare" class="moin-band">
 		<h2 class="moin-statement">Look at the score.</h2>
-		<p class="moin-lead">None of them documents a daily restore check. { brand.Name } runs one.</p>
+		<p class="moin-lead">None of them documents a daily check that a backup restores. { brand.Name } runs one.</p>
 		<div class="moin-bento">
 			for _, competitor := range compare.Competitors {
 				@homeFeature(competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
