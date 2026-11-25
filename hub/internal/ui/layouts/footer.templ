@@ -21,6 +21,7 @@ func footerColumns(billing bool) []components.FooterColumn {
 		product = append(product, components.FooterLink{Label: "Pricing", Href: "/#pricing"})
 	}
 	product = append(product,
+		components.FooterLink{Label: "Blog", Href: "/blog"},
 		components.FooterLink{Label: "Changelog", Href: "/changelog"},
 		components.FooterLink{Label: "Roadmap", Href: "/roadmap"},
 		components.FooterLink{Label: "Next", Href: "/next"},
