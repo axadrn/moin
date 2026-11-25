@@ -39,15 +39,22 @@ type SitemapService struct {
 	compare []string
 	// ui are the pages of moin UI.
 	ui []string
-	// changelog is the date of the newest release, the one page with a real
-	// date. Search engines ignore a lastmod that is always today, so no
-	// other page has one.
+	// blog are the posts, each with its date.
+	blog []BlogPost
+	// changelog is the date of the newest release. With the blog posts it
+	// is the only real date: search engines ignore a lastmod that is always
+	// today, so no other page has one.
 	changelog time.Time
 }
 
 // AddCatalog lists a page for each catalog app.
 func (s *SitemapService) AddCatalog(slugs []string) {
 	s.catalog = slugs
+}
+
+// AddBlog lists the blog and each post with its date.
+func (s *SitemapService) AddBlog(posts []BlogPost) {
+	s.blog = posts
 }
 
 // AddChangelog lists the changelog with the date of its newest release.
@@ -99,9 +106,15 @@ func (s *SitemapService) staticURLs() []model.SitemapURL {
 	if s.legal {
 		paths = append(paths, legalRoutes...)
 	}
-	urls := make([]model.SitemapURL, 0, len(paths)+1)
+	urls := make([]model.SitemapURL, 0, len(paths)+len(s.blog)+2)
 	for _, path := range paths {
 		urls = append(urls, model.SitemapURL{Loc: s.baseURL + path})
+	}
+	if len(s.blog) > 0 {
+		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/blog", LastMod: s.blog[0].Date.Format("2006-01-02")})
+		for _, post := range s.blog {
+			urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/blog/" + post.Slug, LastMod: post.Date.Format("2006-01-02")})
+		}
 	}
 	changelog := model.SitemapURL{Loc: s.baseURL + "/changelog"}
 	if !s.changelog.IsZero() {

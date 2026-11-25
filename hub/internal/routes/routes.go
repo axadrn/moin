@@ -176,7 +176,7 @@ func versioned(mux *http.ServeMux, prefix string, development bool) http.Handler
 }
 
 // siteRoutes are the public site: assets, the home page, docs, search, the
-// changelog, the catalog and the legal pages.
+// changelog, the blog, the catalog and the legal pages.
 func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, catalogPages *handler.CatalogHandler) {
 	seo := handler.NewSEOHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.Cfg.AppURL, app.Texts, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
@@ -199,6 +199,9 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /roadmap", handler.Roadmap(app.Texts))
 	mux.HandleFunc("GET /changelog", handler.Changelog(app.Texts))
 	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(app.Texts, app.Cfg.AppURL, build.Name))
+	mux.HandleFunc("GET /blog", handler.Blog(app.Texts))
+	mux.HandleFunc("GET /blog/{slug}", handler.BlogPost(app.Texts))
+	mux.HandleFunc("GET /blog.xml", handler.BlogFeed(app.Texts, app.Cfg.AppURL, build.Name))
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
