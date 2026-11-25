@@ -17,9 +17,11 @@ import (
 )
 
 // resolve reads the compose file of a release's source through `docker
-// compose config` and moves the data mounts out of the release. It reports
-// what it found. The app's env vars fill ${VAR} in the file, as a .env
-// next to it would, so a service like postgres gets its password.
+// compose config` and moves the data mounts out of the release. It returns
+// the compose file as moin keeps it and reports what it found. The app's
+// env vars fill ${VAR} in the file, as a .env next to it would, so a
+// service like postgres gets its password, but only when Docker starts the
+// containers: the file moin keeps names them (readComposeConfig).
 func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, protocol.Detected, error) {
 	detected := protocol.Detected{Kind: "compose"}
 	if composePath(src) == "" {
@@ -32,11 +34,11 @@ func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, pr
 			return nil, detected, err
 		}
 	}
-	config, err := a.readComposeConfig(ctx, app, src)
+	config, filled, err := a.readComposeConfig(ctx, app, src)
 	if err != nil {
 		return nil, detected, err
 	}
-	services, _ := config["services"].(map[string]any)
+	services, _ := filled["services"].(map[string]any)
 	if len(services) == 0 {
 		return nil, detected, errors.New("compose.yml has no services")
 	}
@@ -48,7 +50,8 @@ func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, pr
 		return nil, detected, errors.New("which service gets the traffic? Name it web")
 	}
 	detected.Port = servicePort(src, services[detected.Service])
-	err = a.keepDataOutsideRelease(app, src, services)
+	kept, _ := config["services"].(map[string]any)
+	err = a.keepDataOutsideRelease(app, src, kept)
 	if err != nil {
 		return nil, detected, err
 	}
@@ -69,17 +72,48 @@ func (a *apps) generateCompose(ctx context.Context, app, src string, env map[str
 	return kind, builder, err
 }
 
-// readComposeConfig has docker compose read the compose file of a source.
-// The app's env fills ${VAR} through its env file (envArgs).
-func (a *apps) readComposeConfig(ctx context.Context, app, src string) (map[string]any, error) {
-	envFiles := a.envArgs(app, src)
-	// Before compose reads any file the compose file names into it.
-	err := a.checkSourceFiles(ctx, app, src, envFiles)
+// readComposeConfig has docker compose read the compose file of a source
+// twice, with the env files of envArgs:
+//
+//   - filled, with each ${VAR} filled in, is what will run. moin checks it
+//     and finds the main service and its port in it, in memory only.
+//   - config, as written, keeps each ${VAR}. It is the file moin edits and
+//     keeps, so no value of the env ends up in it: Docker fills them in when
+//     it starts the containers.
+//
+// The settings that say where a service runs are the exception: config
+// takes them as filled (takePlaces).
+//
+// The env files a service names stay files it reads when it starts, so
+// checkSourceFiles checks them in config: compose 2.38 drops them from the
+// filled read, even with --no-env-resolution.
+func (a *apps) readComposeConfig(ctx context.Context, app, src string) (config, filled map[string]any, err error) {
+	err = refuseIncludes(composePath(src))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	args := append([]string{"compose", "-p", project(app), "--project-directory", src, "-f", composePath(src)}, envFiles...)
-	raw, err := a.output(ctx, "docker", append(args, "config", "--format", "json")...)
+	config, err = a.composeConfig(ctx, app, src, "--no-interpolate")
+	if err != nil {
+		return nil, nil, err
+	}
+	err = checkSourceFiles(src, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	filled, err = a.composeConfig(ctx, app, src, "--no-env-resolution")
+	if err != nil {
+		return nil, nil, err
+	}
+	mapLists(config)
+	takePlaces(config, filled)
+	return config, filled, nil
+}
+
+// composeConfig runs docker compose config on the compose file of a source.
+func (a *apps) composeConfig(ctx context.Context, app, src, mode string) (map[string]any, error) {
+	args := []string{"compose", "-p", project(app), "--project-directory", src, "-f", composePath(src)}
+	args = append(args, a.envArgs(app, src)...)
+	raw, err := a.output(ctx, "docker", append(args, "config", "--format", "json", mode)...)
 	if err != nil {
 		return nil, fmt.Errorf("compose.yml: %w", err)
 	}
@@ -89,6 +123,100 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string) (map[stri
 		return nil, fmt.Errorf("compose config: %w", err)
 	}
 	return config, nil
+}
+
+// placeKeys are the settings of a service that say where it runs: its
+// image, its ports, its user and its folders on the server. compose cannot
+// read a mount with ${VAR} in it unfilled, moin checks these as they run,
+// moves data mounts and hands them to the user, and none of them holds a
+// secret. They stay as the deploy filled them: a rollback runs the same
+// images and folders.
+var placeKeys = []string{"image", "ports", "expose", "volumes", "user"}
+
+// topParts are the parts of a compose file whose entries services use.
+var topParts = []string{"services", "networks", "volumes", "configs", "secrets"}
+
+// takePlaces makes config hold only what runs and takes its places from
+// filled. What filled lacks does not run, such as a service of a profile
+// nobody turned on, or version: config drops it, so the server checks and
+// keeps only what runs. Every service takes its place settings, its env
+// PORT, which tells moin its port, and the folder and Dockerfile of its
+// build.
+func takePlaces(config, filled map[string]any) {
+	for key := range config {
+		if _, ok := filled[key]; !ok {
+			delete(config, key)
+		}
+	}
+	for _, part := range topParts {
+		entries, _ := config[part].(map[string]any)
+		filledEntries, _ := filled[part].(map[string]any)
+		for name := range entries {
+			if _, ok := filledEntries[name]; !ok {
+				delete(entries, name)
+			}
+		}
+	}
+	services, _ := config["services"].(map[string]any)
+	filledServices, _ := filled["services"].(map[string]any)
+	for name, item := range services {
+		service, _ := item.(map[string]any)
+		from, _ := filledServices[name].(map[string]any)
+		copyKeys(service, from, placeKeys...)
+		environment, _ := service["environment"].(map[string]any)
+		fromEnvironment, _ := from["environment"].(map[string]any)
+		if port, ok := fromEnvironment["PORT"]; ok && environment != nil {
+			environment["PORT"] = port
+		}
+		build, _ := service["build"].(map[string]any)
+		fromBuild, _ := from["build"].(map[string]any)
+		if build != nil {
+			copyKeys(build, fromBuild, "context", "dockerfile")
+		}
+	}
+}
+
+// copyKeys sets keys of to as they are in from, and removes those from
+// lacks.
+func copyKeys(to, from map[string]any, keys ...string) {
+	for _, key := range keys {
+		if value, ok := from[key]; ok {
+			to[key] = value
+		} else {
+			delete(to, key)
+		}
+	}
+}
+
+// mapLists writes as maps the settings moin edits or checks that the
+// compose file wrote as lists: labels, environment and sysctls as
+// KEY=value, networks as names. compose does it only when it fills the
+// file in.
+func mapLists(config map[string]any) {
+	services, _ := config["services"].(map[string]any)
+	for _, item := range services {
+		service, _ := item.(map[string]any)
+		for _, key := range []string{"labels", "environment", "sysctls", "networks"} {
+			if list, ok := service[key].([]any); ok {
+				service[key] = listToMap(list)
+			}
+		}
+	}
+}
+
+// listToMap reads KEY=value items as a map, and an item without = as a key
+// without a value, as compose does.
+func listToMap(list []any) map[string]any {
+	values := map[string]any{}
+	for _, item := range list {
+		key, value, found := strings.Cut(fmt.Sprint(item), "=")
+		if found {
+			values[key] = value
+		} else {
+			values[key] = nil
+		}
+	}
+	return values
 }
 
 // oldBlock is the block of compose.yml moin read its settings from before.
@@ -288,12 +416,19 @@ func imagesOfRelease(dir string) map[string]string {
 // finish writes compose.json for a release: built services get an image tag
 // per deploy, or keep their running image when there is no source; the main
 // service runs start.Image when set; the app's services read the env file;
-// the main service gets the router labels; every service restarts unless
-// stopped. release.config stays as it is.
+// the main service gets the router labels, and the app's password goes in
+// the release's htpasswd; every service restarts unless stopped.
+// release.config stays as it is.
 func finish(release *release) error {
 	config, err := copyConfig(release.config)
 	if err != nil {
 		return err
+	}
+	if protect := protectHash(release.start.Domains); protect != "" {
+		err = writeWhole(filepath.Join(release.dir, "htpasswd"), []byte(protect+"\n"))
+		if err != nil {
+			return err
+		}
 	}
 	detected := release.detected
 	env := release.env
@@ -352,16 +487,17 @@ func setImage(release *release, name string, service map[string]any) {
 	}
 }
 
-// addEnv has a service read the app's env file when it starts, so no
-// value is in compose.json. A key the compose file sets too goes from its
-// environment: the app's env wins, and compose would let environment win
-// over env_file.
+// addEnv has a service read the app's env file when it starts, after the
+// env files the compose file names, so no value is in compose.json. A key
+// the compose file sets too goes from its environment: the app's env wins,
+// and compose would let environment win over env_file.
 func addEnv(service map[string]any, file string, env map[string]string) {
 	environment, _ := service["environment"].(map[string]any)
 	for key := range env {
 		delete(environment, key)
 	}
-	service["env_file"] = []any{file}
+	files, _ := service["env_file"].([]any)
+	service["env_file"] = append(files, file)
 }
 
 // routeService puts a service on the proxy when it has an address: the
@@ -369,7 +505,10 @@ func addEnv(service map[string]any, file string, env map[string]string) {
 func routeService(release *release, config map[string]any, name string, service map[string]any) {
 	app := release.start.App
 	detected := release.detected
-	domains := release.start.Domains
+	usersFile := ""
+	if protectHash(release.start.Domains) != "" {
+		usersFile = proxyUsersFile(app, release.start.Number)
+	}
 	if name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != "") {
 		addRouters(config, service, routes{
 			app:       app,
@@ -377,7 +516,7 @@ func routeService(release *release, config map[string]any, name string, service 
 			domains:   detected.Domains,
 			canonical: detected.Canonical,
 			port:      detected.Port,
-			protect:   protectHash(domains),
+			usersFile: usersFile,
 			instant:   detected.Instant,
 		})
 		return
@@ -396,7 +535,7 @@ func routeService(release *release, config map[string]any, name string, service 
 		domains:   serviceDomains,
 		canonical: canonical,
 		port:      servicePort("", service),
-		protect:   protectHash(domains),
+		usersFile: usersFile,
 	})
 }
 

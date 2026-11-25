@@ -279,7 +279,7 @@ func TestRouterLabels(t *testing.T) {
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port, protect: "me:$2y$05$abc"})
+	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port, usersFile: proxyUsersFile("blog", 2)})
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
@@ -287,8 +287,8 @@ func TestRouterLabels(t *testing.T) {
 	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical,moin-blog-auth" {
 		t.Fatalf("middlewares = %v", labels["traefik.http.routers.moin-blog.middlewares"])
 	}
-	if labels["traefik.http.middlewares.moin-blog-auth.basicauth.users"] != "me:$$2y$$05$$abc" {
-		t.Fatalf("auth = %v", labels["traefik.http.middlewares.moin-blog-auth.basicauth.users"])
+	if labels["traefik.http.middlewares.moin-blog-auth.basicauth.usersfile"] != "/apps/blog/releases/2/htpasswd" {
+		t.Fatalf("auth = %v", labels["traefik.http.middlewares.moin-blog-auth.basicauth.usersfile"])
 	}
 	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.example\.com)(:[0-9]+)?(.*)` {
 		t.Fatalf("regex = %v", labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"])
@@ -426,5 +426,138 @@ func TestStartWaitsForTheHealthcheck(t *testing.T) {
 	body, _ := os.ReadFile(calls)
 	if !strings.Contains(string(body), " up -d --remove-orphans --wait --wait-timeout 120") {
 		t.Fatalf("calls = %s, want up with --wait", body)
+	}
+}
+
+// TestComposeJSONKeepsNames: the compose.json of a release names each env
+// value as ${NAME} and holds no password hash: those live in app.env and
+// in the release's htpasswd. The places are as the deploy filled them in,
+// and labels a compose file wrote as a list keep their values.
+func TestComposeJSONKeepsNames(t *testing.T) {
+	config := map[string]any{"services": map[string]any{"web": map[string]any{
+		"build":       map[string]any{"context": "/src/${CTX}", "args": map[string]any{"TOKEN": "${TOKEN}"}},
+		"image":       "${IMAGE}",
+		"environment": []any{"DATABASE_URL=postgres://u:${DB_PASSWORD}@db/x", "KEEP"},
+		"labels":      []any{"team=${TEAM}"},
+		"volumes":     []any{map[string]any{"type": "volume", "source": "${DATA}", "target": "/data"}},
+	}}}
+	filled := map[string]any{"services": map[string]any{"web": map[string]any{
+		"build":       map[string]any{"context": "/src/app", "args": map[string]any{"TOKEN": "t0ken"}},
+		"image":       "shop:1",
+		"environment": map[string]any{"DATABASE_URL": "postgres://u:s3cret@db/x"},
+		"volumes":     []any{map[string]any{"type": "bind", "source": "/src/data", "target": "/data"}},
+	}}}
+	mapLists(config)
+	takePlaces(config, filled)
+	dir := t.TempDir()
+	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}, Protect: "ada:$2y$05$hash"}}
+	release := &release{start: start, dir: dir, config: config, composeFile: filepath.Join(dir, "compose.json"), envFile: "/state/apps/shop/app.env", env: map[string]string{"DB_PASSWORD": "s3cret"}}
+	release.detected, _ = route("shop", protocol.Detected{Service: "web", Port: 8080}, start.Domains)
+	if err := finish(release); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(release.composeFile)
+	for _, leak := range []string{"s3cret", "t0ken", "$2y$05$hash"} {
+		if strings.Contains(string(body), leak) {
+			t.Errorf("compose.json holds %q:\n%s", leak, body)
+		}
+	}
+	var stored struct {
+		Services map[string]struct {
+			Build       map[string]any    `json:"build"`
+			Image       string            `json:"image"`
+			Environment map[string]any    `json:"environment"`
+			Labels      map[string]string `json:"labels"`
+			Volumes     []composeMount    `json:"volumes"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(body, &stored); err != nil {
+		t.Fatal(err)
+	}
+	web := stored.Services["web"]
+	if web.Environment["DATABASE_URL"] != "postgres://u:${DB_PASSWORD}@db/x" || web.Build["args"].(map[string]any)["TOKEN"] != "${TOKEN}" || web.Labels["team"] != "${TEAM}" {
+		t.Errorf("names: %+v", web)
+	}
+	if _, ok := web.Environment["KEEP"]; !ok {
+		t.Errorf("a name without a value is gone: %v", web.Environment)
+	}
+	if web.Build["context"] != "/src/app" || web.Image != "moin-shop-web:2" || web.Volumes[0].Source != "/src/data" || web.Volumes[0].Type != "bind" {
+		t.Errorf("places: %+v", web)
+	}
+	if web.Labels["traefik.http.middlewares.moin-shop-auth.basicauth.usersfile"] != "/apps/shop/releases/2/htpasswd" {
+		t.Errorf("labels: %v", web.Labels)
+	}
+	hash, _ := os.ReadFile(filepath.Join(dir, "htpasswd"))
+	info, err := os.Stat(filepath.Join(dir, "htpasswd"))
+	if string(hash) != "ada:$2y$05$hash\n" || err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("htpasswd = %q, %v", hash, err)
+	}
+}
+
+// TestTakePlaces: the kept compose file holds only what runs, as the filled
+// read has it: no service of a profile nobody turned on, no version. A
+// service takes its user and its env PORT filled in, so moin hands it its
+// data folders and routes its domain to the right port.
+func TestTakePlaces(t *testing.T) {
+	config := map[string]any{
+		"version":  "3.8",
+		"networks": map[string]any{"default": map[string]any{}, "debug": map[string]any{}},
+		"services": map[string]any{
+			"web":   map[string]any{"image": "shop", "user": "${UID:-1000}:${GID:-1000}"},
+			"api":   map[string]any{"image": "api", "environment": map[string]any{"PORT": "${API_PORT}", "TOKEN": "${TOKEN}"}},
+			"debug": map[string]any{"image": "busybox", "profiles": []any{"debug"}},
+		},
+	}
+	filled := map[string]any{
+		"networks": map[string]any{"default": map[string]any{}},
+		"services": map[string]any{
+			"web": map[string]any{"image": "shop", "user": "1000:1000"},
+			"api": map[string]any{"image": "api", "environment": map[string]any{"PORT": "9000", "TOKEN": "t0ken"}},
+		},
+	}
+	takePlaces(config, filled)
+	services := config["services"].(map[string]any)
+	if _, ok := services["debug"]; ok || config["version"] != nil || config["networks"].(map[string]any)["debug"] != nil {
+		t.Errorf("kept what does not run: %v", config)
+	}
+	if user := services["web"].(map[string]any)["user"]; user != "1000:1000" {
+		t.Errorf("user = %v", user)
+	}
+	api := services["api"].(map[string]any)
+	environment := api["environment"].(map[string]any)
+	if environment["PORT"] != "9000" || environment["TOKEN"] != "${TOKEN}" {
+		t.Errorf("environment = %v", environment)
+	}
+	if port := servicePort("", api); port != 9000 {
+		t.Errorf("port of api = %d", port)
+	}
+}
+
+// TestPruneKeepsNamedSources: image deploys run from the source of the
+// release they took the compose file from. prune keeps that release while
+// a kept one names its source, also past the last builds it keeps.
+func TestPruneKeepsNamedSources(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	app := "prune-sources"
+	source := filepath.Join(a.releaseDir(app, 1), "src")
+	for number := 1; number <= protocol.KeepReleases+2; number++ {
+		dir := a.releaseDir(app, number)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		compose := `{"services": {"web": {"image": "ghcr.io/me/shop:` + strconv.Itoa(number) + `", "env_file": ["` + source + `/web.env"]}}}`
+		os.WriteFile(filepath.Join(dir, "compose.json"), []byte(compose), 0o600)
+		os.WriteFile(filepath.Join(dir, "kind"), []byte(releaseBuild), 0o600)
+	}
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(a.appDir(app), "current"), []byte(strconv.Itoa(protocol.KeepReleases+2)), 0o600)
+	a.prune(context.Background(), app)
+	if _, err := os.Stat(source); err != nil {
+		t.Fatalf("the source the kept releases name is gone: %v", err)
+	}
+	if _, err := os.Stat(a.releaseDir(app, 2)); err == nil {
+		t.Fatal("a release nobody names is still there")
 	}
 }

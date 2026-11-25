@@ -1,56 +1,72 @@
 package daemon
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
-	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 // checkSourceFiles refuses a compose file that would read files of the
-// server into the app before the server sees what runs.
+// server into the app.
 //
 //   - include, extends with a file and label_file read other files, which
-//     could be anywhere on the server, so they are refused. Put the services
-//     in one compose file.
-//   - env_file is read into the compose file, so its path must be in the
-//     source. compose itself says where it points: after ~, ${VAR} and the
-//     project folder, which a second guess here would get wrong.
-//
-// envFiles are the --env-file arguments the deploy reads the file with.
-func (a *apps) checkSourceFiles(ctx context.Context, app, src string, envFiles []string) error {
-	if err := refuseIncludes(composePath(src)); err != nil {
-		return err
-	}
-	args := append([]string{"compose", "-p", project(app), "--project-directory", src, "-f", composePath(src)}, envFiles...)
-	raw, err := a.output(ctx, "docker", append(args, "config", "--format", "json", "--no-env-resolution")...)
-	if err != nil {
-		return fmt.Errorf("compose.yml: %w", err)
-	}
-	var config struct {
-		Services map[string]struct {
-			EnvFile []struct {
-				Path string `json:"path"`
-			} `json:"env_file"`
-		} `json:"services"`
-	}
-	if err := json.Unmarshal([]byte(raw), &config); err != nil {
-		return fmt.Errorf("compose config: %w", err)
-	}
-	for _, name := range slices.Sorted(maps.Keys(config.Services)) {
-		for _, file := range config.Services[name].EnvFile {
-			if !within(resolved(src), resolved(file.Path)) {
-				return fmt.Errorf("service %s: env_file %s is not in the app's source, so the server refuses it", name, file.Path)
+//     could be anywhere on the server, so refuseIncludes refuses them before
+//     compose reads the file. Put the services in one compose file.
+//   - env_file is read when the containers start, so its path must be in
+//     the source. compose itself says where it points, in config, the
+//     compose file as moin keeps it (readComposeConfig): after ~ and the
+//     project folder, which a second guess here would get wrong. A path
+//     with ${VAR} in it would point elsewhere once the env changes, so it
+//     is refused.
+func checkSourceFiles(src string, config map[string]any) error {
+	services, _ := config["services"].(map[string]any)
+	for _, name := range sortedKeys(services) {
+		service, _ := services[name].(map[string]any)
+		files, ok := envFilePaths(service)
+		if !ok {
+			return fmt.Errorf("service %s: env_file is not a list of files, so the server refuses it", name)
+		}
+		for _, file := range files {
+			if strings.Contains(file, "$") {
+				return fmt.Errorf("service %s: env_file %s takes a variable, so the server refuses it: name the file", name, file)
+			}
+			if !within(resolved(src), resolved(file)) {
+				return fmt.Errorf("service %s: env_file %s is not in the app's source, so the server refuses it", name, file)
 			}
 		}
 	}
 	return nil
+}
+
+// envFilePaths are the env files a service reads. compose writes each as
+// {path, required}; moin adds the app's env file as a path. It reports
+// false for any other shape, which the checks refuse.
+func envFilePaths(service map[string]any) ([]string, bool) {
+	value, found := service["env_file"]
+	items, isList := value.([]any)
+	if found && !isList {
+		return nil, false
+	}
+	paths := []string{}
+	for _, item := range items {
+		switch file := item.(type) {
+		case string:
+			paths = append(paths, file)
+		case map[string]any:
+			path, ok := file["path"].(string)
+			if !ok {
+				return nil, false
+			}
+			paths = append(paths, path)
+		default:
+			return nil, false
+		}
+	}
+	return paths, true
 }
 
 // refuseIncludes refuses include, extends with a file and label_file, in any

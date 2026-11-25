@@ -34,14 +34,14 @@ func TestEnvNeverReachesDocker(t *testing.T) {
 	if _, err := a.setEnv(protocol.EnvSet{App: "web", Set: env}); err != nil {
 		t.Fatal(err)
 	}
-	config, _, err := a.resolve(context.Background(), "web", src)
+	_, filled, err := a.readComposeConfig(context.Background(), "web", src)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(marker); err == nil {
 		t.Fatal("docker ran the program the app's env pointed at")
 	}
-	got := config["services"].(map[string]any)["web"].(map[string]any)["environment"].(map[string]any)["GREETING"]
+	got := filled["services"].(map[string]any)["web"].(map[string]any)["environment"].(map[string]any)["GREETING"]
 	if got != "it's $$5\nnow" {
 		t.Fatalf("GREETING = %q", got)
 	}

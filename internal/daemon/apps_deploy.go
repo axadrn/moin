@@ -217,33 +217,32 @@ func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, log
 	return &release{start: start, rules: rules, dir: dir, composeFile: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
 }
 
-// rollBack copies the compose file of an older release into this one: the
-// same images, with the env as it is now.
+// rollBack runs an older release again: its compose file and images, with
+// the env, the domains and the password as they are now. An app has one
+// password, so a rollback never brings an old one back.
 func (a *apps) rollBack(ctx context.Context, release *release) error {
 	from := release.start.FromNumber
 	release.logf("rolling back to v%d", from)
 	old := a.releaseDir(release.start.App, from)
-	body, err := os.ReadFile(filepath.Join(old, "compose.json"))
-	if err != nil {
+	if !exists(filepath.Join(old, "compose.json")) {
 		return fmt.Errorf("v%d is no longer on the server", from)
 	}
-	detectedBody, _ := os.ReadFile(filepath.Join(old, "detected.json"))
-	_ = json.Unmarshal(detectedBody, &release.detected)
-	err = os.WriteFile(release.composeFile, body, 0o600)
+	err := loadBase(release, old)
 	if err != nil {
 		return err
 	}
-	base, err := os.ReadFile(filepath.Join(old, "base.json"))
-	if err == nil {
-		_ = os.WriteFile(filepath.Join(release.dir, "base.json"), base, 0o600)
+	if release.start.Image == "" {
+		release.start.Image = release.detected.Image
 	}
-	err = a.pinFile(ctx, release.start, release.composeFile)
+	release.detected.Image = release.start.Image
+	err = copyIfThere(filepath.Join(old, ".env"), filepath.Join(release.dir, ".env"))
 	if err != nil {
 		return err
 	}
+	saveJSON(filepath.Join(release.dir, "base.json"), release.config)
 	// An old release may come from before a rule, or its files may have
-	// changed since: check it as a new one.
-	return a.checkCompose(release)
+	// changed since: writeCompose checks it as a new one.
+	return a.writeCompose(ctx, release)
 }
 
 // prepareRelease fetches the source, routes the app, writes compose.json and
@@ -302,8 +301,26 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	if err != nil {
 		return err
 	}
+	// The source's .env fills ${VAR} of the compose file too, when the
+	// containers start: it goes next to compose.json (envArgs).
+	err = copyIfThere(filepath.Join(src, ".env"), filepath.Join(release.dir, ".env"))
+	if err != nil {
+		return err
+	}
 	release.config, release.detected, err = a.resolve(ctx, start.App, src)
 	return err
+}
+
+// copyIfThere copies the file from to to, 0600, when from is there.
+func copyIfThere(from, to string) error {
+	body, err := os.ReadFile(from)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return writeWhole(to, body)
 }
 
 // catalogSource writes the compose file of the catalog app into src, from
@@ -327,7 +344,12 @@ func (a *apps) reuseRunningRelease(ctx context.Context, release *release) error 
 	if current == 0 {
 		return errors.New("no release to take the compose file from: link the app's repo, then deploy the image again")
 	}
-	err := loadBase(release, a.releaseDir(release.start.App, current))
+	dir := a.releaseDir(release.start.App, current)
+	err := loadBase(release, dir)
+	if err != nil {
+		return err
+	}
+	err = copyIfThere(filepath.Join(dir, ".env"), filepath.Join(release.dir, ".env"))
 	if err != nil {
 		return err
 	}
@@ -399,8 +421,7 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	logf("building")
 	// A Railpack build reads the app's env as BuildKit secrets, from the
 	// env file, never from docker's own environment or its arguments.
-	args := []string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--env-file", release.envFile}
-	err := a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
+	err := a.run(ctx, logf, nil, a.composeArgs(start.App, release.composeFile, "--progress", "plain", "build")...)
 	if err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
@@ -543,13 +564,13 @@ func (a *apps) serviceState(ctx context.Context, app, composeFile, service strin
 
 // runningContainers lists the IDs of a service's running containers.
 func (a *apps) runningContainers(ctx context.Context, app, composeFile, service string) (string, error) {
-	return a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "--status", "running", "-q", service)
+	return a.output(ctx, "docker", a.composeArgs(app, composeFile, "ps", "--status", "running", "-q", service)...)
 }
 
 // restartCount is how often the first container of a service restarted,
 // "" when it has none.
 func (a *apps) restartCount(ctx context.Context, app, composeFile, service string) string {
-	ids, _ := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", composeFile, "ps", "-a", "-q", service)
+	ids, _ := a.output(ctx, "docker", a.composeArgs(app, composeFile, "ps", "-a", "-q", service)...)
 	containers := strings.Fields(ids)
 	if len(containers) == 0 {
 		return ""
@@ -642,7 +663,7 @@ func (a *apps) copySource(ctx context.Context, app string, number int, target st
 // config, so Docker keeps no copy of it.
 func (a *apps) pull(ctx context.Context, release *release) error {
 	start := release.start
-	args := []string{"compose", "-p", a.projectOf(start.App), "-f", release.composeFile, "--progress", "plain", "pull", release.detected.Service}
+	args := a.composeArgs(start.App, release.composeFile, "--progress", "plain", "pull", release.detected.Service)
 	host := protocol.RegistryHost(start.Image)
 	login := a.registryLogin(host)
 	if login == "" {
@@ -691,6 +712,12 @@ func (a *apps) prune(ctx context.Context, app string) {
 		releases = append(releases, protocol.Release{Number: number, Build: build})
 	}
 	kept := protocol.KeptReleases(releases, current)
+	// An image deploy, a restart or a rollback runs from the source of an
+	// older release: its build, its env files and its mounts are there. That
+	// release stays while a kept one names it.
+	for _, number := range a.sourcesNamed(app, kept) {
+		kept[number] = true
+	}
 	used := map[string]bool{}
 	for _, release := range releases {
 		if !kept[release.Number] {
@@ -712,6 +739,21 @@ func (a *apps) prune(ctx context.Context, app string) {
 			_ = exec.CommandContext(ctx, "docker", "image", "rm", image).Run()
 		}
 	}
+}
+
+// sourcesNamed are the releases whose source the compose files of the
+// releases in numbers name, as releases/<n>/src.
+func (a *apps) sourcesNamed(app string, numbers map[int]bool) []int {
+	pattern := regexp.MustCompile(regexp.QuoteMeta(filepath.Join(a.appDir(app), "releases")+"/") + `([0-9]+)/src[/"]`)
+	found := []int{}
+	for number := range numbers {
+		body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "compose.json"))
+		for _, match := range pattern.FindAllStringSubmatch(string(body), -1) {
+			source, _ := strconv.Atoi(match[1])
+			found = append(found, source)
+		}
+	}
+	return found
 }
 
 // The kind file of a release says what it brought: a build (source or

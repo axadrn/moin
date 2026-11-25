@@ -25,7 +25,7 @@ services:
 - **`ports` or `expose`**: the port a service listens on. Without them: its env `PORT`, then `EXPOSE` in the `Dockerfile`, then 8080.
 - **`healthcheck`**: when the service is ready. The deploy waits until Docker says it is healthy. The main service must also run 10 seconds without a restart, with or without one.
 - **`volumes`**: where the data is. moin keeps it outside each release, and [backs up](/docs/guides/backups) the databases it finds there.
-- **`${NAME}`**: an [env var](/docs/guides/env) from moin.
+- **`${NAME}`**: an [env var](/docs/guides/env) from moin, else from a `.env` in your repo. Docker fills it in when the containers start. The compose file moin keeps names it, never the value. [In compose.yml](/docs/guides/env#in-composeyml)
 
 ## Everything else is in moin
 

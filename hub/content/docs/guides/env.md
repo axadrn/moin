@@ -104,9 +104,13 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 ```
 
-A change to such a variable takes a deploy, not just a restart.
+**The value stays in `app.env`.** The compose file moin keeps for each deploy names the variable, `${DB_PASSWORD}`, never its value. Docker fills it in from `app.env` when it starts the containers. So a restart applies a new value, like any env var. A value you replace or remove is gone from the server.
 
-**`${NAME}` writes the value into a file.** Docker Compose fills it in when moin reads your compose file, and the result is the compose file of that deploy on the server. Every deploy moin keeps holds it there, also an old value you replaced, until moin cleans that deploy up. moin keeps the last 5 builds. Where you can, let a value reach the container as an env var instead: the services moin builds and the main one get them straight from `app.env`, and nothing writes them anywhere else.
+Deploys from before moin 1.0.0-beta.35 wrote the values into their compose file. An app's next deploy from its source writes a clean one; a restart or an image deploy keeps the old one until then. The old deploys go when moin cleans them up, after 5 builds.
+
+One exception: the settings that say where a service runs. moin fills in `${NAME}` in `image`, `ports`, `expose`, `volumes`, and the folder and `Dockerfile` of `build`, when it reads your compose file. It checks them as they will run, and a rollback runs the same image. A change there takes a deploy. Keep secrets out of them.
+
+An `env_file` of your repo works the same: it may hold `${NAME}`, and Docker fills it in when the service starts. Its path takes no `${NAME}`: name the file.
 
 ## Good to know
 

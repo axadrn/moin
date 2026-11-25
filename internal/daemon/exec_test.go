@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,14 +13,26 @@ import (
 
 // TestExecArgs: the command follows the service as its own words, so
 // nothing in it reaches a shell, and a word that looks like a flag of
-// compose is the command's.
+// compose is the command's. compose reads the env files that fill the
+// compose file, the release's .env and then the app's env.
 func TestExecArgs(t *testing.T) {
-	got := execArgs(project("shop"), "/var/lib/moin/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
-	want := []string{"compose", "-p", "moin-shop", "-f", "/var/lib/moin/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
+	a := newApps(t.TempDir(), nil)
+	release := a.releaseDir("shop", 3)
+	if err := os.MkdirAll(release, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range []string{filepath.Join(release, ".env"), a.envFile("shop")} {
+		if err := os.WriteFile(file, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	composeFile := filepath.Join(release, "compose.json")
+	got := a.execArgs("shop", composeFile, "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
+	want := []string{"compose", "-p", "moin-shop", "-f", composeFile, "--env-file", filepath.Join(release, ".env"), "--env-file", a.envFile("shop"), "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("execArgs = %q", got)
 	}
-	got = execArgs("shop", "c.json", "web", []string{"--help"})
+	got = a.execArgs("shop", "c.json", "web", []string{"--help"})
 	if got[len(got)-2] != "web" || got[len(got)-1] != "--help" {
 		t.Errorf("a flag-like command moved: %q", got)
 	}
