@@ -134,35 +134,60 @@ func (r *Users) SetRecoveryKey(userID, hash string, expiresAt time.Time) error {
 	return nil
 }
 
+// Recovered is what a recovery key ended besides the sessions and the
+// passkeys: the connections and CI tokens of its user, for the activity.
+type Recovered struct {
+	UserID      string
+	Connections []model.Connection
+	CITokens    []model.CIToken
+}
+
 // UseRecoveryKey clears the recovery key with this hash, if it has not
 // expired at now, disconnects the user's GitHub account, ends their
-// sessions, deletes their passkeys and returns the id of the user. One
-// transaction, so a key works only once, a lost or hijacked GitHub account
-// or passkey no longer signs in, and no old session adds a passkey after
-// it (Passkeys.Create).
-func (r *Users) UseRecoveryKey(hash string, now time.Time) (string, error) {
+// sessions and connections, deletes their passkeys and CI tokens and
+// returns what it ended. One transaction, so a key works only once, a lost
+// or hijacked GitHub account or passkey no longer signs in, nothing it
+// let in keeps working, and no old session adds a passkey after it
+// (Passkeys.Create). An OAuth grant is a connection: it ends with it.
+func (r *Users) UseRecoveryKey(hash string, now time.Time) (Recovered, error) {
+	var recovered Recovered
 	tx, err := r.db.Beginx()
 	if err != nil {
-		return "", err
+		return recovered, err
 	}
 	defer func() {
 		_ = tx.Rollback()
 	}()
-	var userID string
-	err = tx.Get(&userID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2 WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
+	err = tx.Get(&recovered.UserID, `UPDATE users SET recovery_key_hash = NULL, recovery_key_expires_at = NULL, github_id = NULL, github_login = '', github_disconnected_at = $2 WHERE recovery_key_hash = $1 AND recovery_key_expires_at > $2 RETURNING id`, hash, now)
 	if err == sql.ErrNoRows {
-		return "", ErrUserNotFound
+		return recovered, ErrUserNotFound
 	}
 	if err != nil {
-		return "", err
+		return recovered, err
 	}
+	userID := recovered.UserID
 	if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id = $1 OR impersonator_user_id = $1`, userID); err != nil {
-		return "", err
+		return recovered, err
 	}
 	if _, err := tx.Exec(`DELETE FROM passkeys WHERE user_id = $1`, userID); err != nil {
-		return "", err
+		return recovered, err
 	}
-	return userID, tx.Commit()
+	if err := tx.Select(&recovered.Connections, `SELECT * FROM connections WHERE user_id = $1 AND ended_at IS NULL`, userID); err != nil {
+		return recovered, err
+	}
+	if _, err := tx.Exec(`DELETE FROM connection_tokens WHERE connection_id IN (SELECT id FROM connections WHERE user_id = $1)`, userID); err != nil {
+		return recovered, err
+	}
+	if _, err := tx.Exec(`UPDATE connections SET ended_at = $2 WHERE user_id = $1 AND ended_at IS NULL`, userID, now); err != nil {
+		return recovered, err
+	}
+	if err := tx.Select(&recovered.CITokens, ciTokenSelect+` WHERE t.user_id = $1`, userID); err != nil {
+		return recovered, err
+	}
+	if _, err := tx.Exec(`DELETE FROM ci_tokens WHERE user_id = $1`, userID); err != nil {
+		return recovered, err
+	}
+	return recovered, tx.Commit()
 }
 
 func (r *Users) UpdateName(userID, name string, updatedAt time.Time) error {

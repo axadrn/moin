@@ -52,9 +52,9 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // VerifyEmailChange takes the link sent to a new address. It changes the
 // email and signs the user out everywhere; only a browser signed in as
-// that user stays in, with a new session. Anyone else goes to sign in.
+// that user stays in, with the session it had. Anyone else goes to sign in.
 func (h *authHandler) VerifyEmailChange(w http.ResponseWriter, r *http.Request) {
-	user, signedIn, err := h.authService.ConfirmEmailChange(w, r, r.PathValue("token"))
+	user, signedIn, err := h.authService.ConfirmEmailChange(r, r.PathValue("token"))
 	if user == nil {
 		slog.Warn("email change verification failed", "error", err)
 		render(w, r, pages.VerifyEmailError("It expired or was used already."))

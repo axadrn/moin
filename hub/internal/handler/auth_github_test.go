@@ -358,7 +358,9 @@ func TestSignInPageHasOneWayIn(t *testing.T) {
 
 // TestEmailChangeLinkSignsNobodyIn: the link changes the email and ends
 // every session of the account. Only a browser signed in as that account
-// stays in; anyone else, or another account, goes to sign in.
+// stays in, with the session it had: the link never makes a session, so it
+// cannot make an old one look freshly signed in. Anyone else, or another
+// account, goes to sign in.
 func TestEmailChangeLinkSignsNobodyIn(t *testing.T) {
 	for _, test := range []struct {
 		name     string
@@ -426,11 +428,11 @@ func TestEmailChangeLinkSignsNobodyIn(t *testing.T) {
 				}
 				return
 			}
-			if recorder.Code != http.StatusOK || newSession == "" || newSession == browser {
-				t.Fatalf("status = %d, new session %q, want this browser signed in anew", recorder.Code, newSession)
+			if recorder.Code != http.StatusOK || newSession != "" {
+				t.Fatalf("status = %d, new session %q, want this browser to keep its session", recorder.Code, newSession)
 			}
-			if _, err := g.auth.AuthenticateSession(newSession); err != nil {
-				t.Errorf("the new session does not work: %v", err)
+			if _, err := g.auth.AuthenticateSession(browser); err != nil {
+				t.Errorf("the session of this browser ended: %v", err)
 			}
 		})
 	}

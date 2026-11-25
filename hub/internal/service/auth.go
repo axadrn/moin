@@ -384,21 +384,19 @@ func (s *AuthService) RequestEmailChange(userID, newEmail string) error {
 }
 
 // ConfirmEmailChange moves the pending address of the token's user to the
-// account and ends every session of that user. The link is no way to sign
-// in: only a browser signed in as that user, not impersonating, gets a new
-// session, and signedIn says so. user is nil when the token is wrong, used
-// or expired.
-func (s *AuthService) ConfirmEmailChange(w http.ResponseWriter, r *http.Request, token string) (user *model.User, signedIn bool, err error) {
+// account and ends every session of that user but the one of this
+// request, when it is that user's, not impersonating: that browser stays
+// in, with the session it had, and signedIn says so. The link never makes
+// a session, so it is no way to sign in or to look freshly signed in.
+// user is nil when the token is wrong, used or expired.
+func (s *AuthService) ConfirmEmailChange(r *http.Request, token string) (user *model.User, signedIn bool, err error) {
 	user, err = s.verifyEmailChange(token)
 	if err != nil {
 		return nil, false, err
 	}
 	session := ctxkeys.Session(r.Context())
 	if session != nil && session.UserID == user.ID && !session.IsImpersonating() {
-		if _, err := s.StartFreshSession(w, r, user.ID); err != nil {
-			return user, false, err
-		}
-		return user, true, nil
+		return user, true, s.RevokeOtherSessions(user.ID, session.ID)
 	}
 	return user, false, s.RevokeAllSessions(user.ID)
 }

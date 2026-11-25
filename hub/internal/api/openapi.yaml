@@ -203,9 +203,9 @@ paths:
       operationId: verifyEmailChange
       summary: Confirm an email change
       description: |
-        Moves the pending address to the account, signs out every session of the account, and
-        returns the user. Only a caller signed in as that user gets a new session cookie: the
-        token never signs anyone in. The link in the email points to
+        Moves the pending address to the account, signs out every other session of the account,
+        and returns the user. A caller signed in as that user keeps its session; every other
+        caller signs in again. The token never makes a session. The link in the email points to
         `APP_URL/auth/verify-email-change/{token}`.
       security: []
       requestBody:

@@ -4,10 +4,12 @@ name: Deploy
 # workflow):
 #   1. test: the same checks as CI.
 #   2. box: build the hub image, ghcr.io/axadrn/moin, which
-#      the hosted hub and every self-hoster runs.
-#   3. release: for a tag, the GitHub release with its notes from
-#      hub/content/changelog.md, the signed binaries and the signed
-#      digest of the hub image.
+#      the hosted hub and every self-hoster runs. For a tag only as a
+#      candidate, which no hub pulls.
+#   3. release: for a tag, after a maintainer approves, the GitHub release
+#      with its notes from hub/content/changelog.md, the signed binaries
+#      and the signed digest of the hub image; then the image gets its
+#      version, stable and latest.
 #   4. deploy: through Tailscale, the hosted hub gets the deploy
 #      files of this commit and runs update.sh with the new box.
 # Only main and tags ship: run by hand on another branch, it does nothing.
@@ -51,9 +53,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # A release is its version here; it becomes stable and latest only
-      # once its signed release is complete (release, below). A deploy by
-      # hand is main-<commit> alone. hub/content/docs/reference/shipping.md
+      # A release is pushed as candidate-<commit> here; it gets its version,
+      # stable and latest only once its signed release is complete
+      # (release, below), so no hub pulls a build nobody approved. A deploy
+      # by hand is main-<commit> alone. image is the name the release and
+      # the deploy use. hub/content/docs/reference/shipping.md
       - name: Tags
         id: tags
         run: |
@@ -61,7 +65,7 @@ jobs:
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "tags=${image}:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "tags=${image}:candidate-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           else
             echo "version=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
             echo "image=${image}:main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -131,23 +135,25 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 && gh release edit "$TAG" --notes-file notes.md || gh release create "$TAG" --title "$TAG" --notes-file notes.md --draft
           gh release upload "$TAG" downloads/* --clobber
           gh release edit "$TAG" --draft=false --latest
-      # Only now hubs see the new version: the image of this release
-      # becomes stable and latest, the same image by its signed digest,
-      # not built again. A plain docker login: the job that holds the
-      # signing key runs no action but checkout.
+      # Only now hubs see the new version: the image of this release gets
+      # its version, stable and latest, the same image by its signed
+      # digest, not built again. A plain docker login: the job that holds
+      # the signing key runs no action but checkout.
       - name: Stable
         env:
+          IMAGE: ${{ needs.box.outputs.image }}
           DIGEST: ${{ needs.box.outputs.digest }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           printf '%s\n' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          docker buildx imagetools create --tag ghcr.io/axadrn/moin:stable --tag ghcr.io/axadrn/moin:latest "ghcr.io/axadrn/moin@$DIGEST"
+          docker buildx imagetools create --tag "$IMAGE" --tag ghcr.io/axadrn/moin:stable --tag ghcr.io/axadrn/moin:latest "ghcr.io/axadrn/moin@$DIGEST"
 
   # After the release: the hub tells the daemons to update to it, and they
   # take it from there.
   deploy:
     needs: [box, release]
-    if: github.repository == 'axadrn/moin' && !cancelled() && needs.box.result == 'success' && needs.release.result != 'failure'
+    # A tag deploys only after its release: before, its version has no image.
+    if: github.repository == 'axadrn/moin' && !cancelled() && needs.box.result == 'success' && (needs.release.result == 'success' || github.ref_type != 'tag')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
