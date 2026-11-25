@@ -84,38 +84,6 @@ func (a *apps) serviceImage(app, service string) string {
 	return config.Services[service].Image
 }
 
-// serviceEnv is the environment of a service in the app's live release,
-// as KEY=value lines; compose files give it as a map or a list.
-func (a *apps) serviceEnv(app, service string) []string {
-	body, err := os.ReadFile(filepath.Join(a.releaseDir(app, a.current(app)), "compose.json"))
-	if err != nil {
-		return nil
-	}
-	var config struct {
-		Services map[string]struct {
-			Environment json.RawMessage `json:"environment"`
-		} `json:"services"`
-	}
-	if json.Unmarshal(body, &config) != nil {
-		return nil
-	}
-	raw := config.Services[service].Environment
-	var list []string
-	if json.Unmarshal(raw, &list) == nil {
-		return list
-	}
-	var values map[string]*string
-	if json.Unmarshal(raw, &values) != nil {
-		return nil
-	}
-	for name, value := range values {
-		if value != nil {
-			list = append(list, name+"="+*value)
-		}
-	}
-	return list
-}
-
 // errPostgresDown is a Postgres service that is not running, such as one
 // that restarts over and over.
 var errPostgresDown = errors.New("not running")

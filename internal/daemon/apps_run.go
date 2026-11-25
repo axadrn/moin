@@ -9,14 +9,25 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
+// composeArgs are docker's arguments for compose on a compose file of the
+// app: its project, the file, and the env files that fill each ${NAME} in
+// it (envArgs). Every compose command on a release goes through here, so a
+// value is filled in the same way for up, stop, ps, exec and the rest.
+func (a *apps) composeArgs(app, composeFile string, args ...string) []string {
+	base := []string{"compose", "-p", a.projectOf(app), "-f", composeFile}
+	base = append(base, a.envArgs(app, filepath.Dir(composeFile))...)
+	return append(base, args...)
+}
+
 // compose runs docker compose on a release and streams its output as log
 // lines.
 func (a *apps) compose(ctx context.Context, app, composeFile string, logf func(string, ...any), args ...string) error {
-	return a.run(ctx, logf, nil, append([]string{"compose", "-p", a.projectOf(app), "-f", composeFile, "--progress", "plain"}, args...)...)
+	return a.run(ctx, logf, nil, a.composeArgs(app, composeFile, append([]string{"--progress", "plain"}, args...)...)...)
 }
 
 // run runs docker with extra environment and streams its output as log lines.

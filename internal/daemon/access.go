@@ -25,7 +25,7 @@ var serviceKeys = map[string]string{
 	"command":           "what the container runs",
 	"entrypoint":        "what the container runs",
 	"environment":       "its env vars",
-	"env_file":          "checked: only the app's own env file",
+	"env_file":          "checked: the app's env file and files of its source",
 	"working_dir":       "its folder inside the container",
 	"user":              "the user inside the container",
 	"healthcheck":       "how moin sees it is up",
@@ -122,7 +122,8 @@ type appRoom struct {
 	volumes []string
 	// project names the app's networks: <project>_<network>.
 	project string
-	// envFile is the app's env file, the only one a service may read.
+	// envFile is the app's env file. A service may read it and env files
+	// of its source.
 	envFile string
 	// mounts are the folders of the server its rules allow, with mounts:.
 	mounts []string
@@ -136,7 +137,10 @@ type appRoom struct {
 // checkCompose refuses a release whose compose file reaches beyond its
 // app, unless the server's rules allow it with server-access: on. It reads
 // the compose file as it will run, after moin filled it in, so it holds for
-// every deploy: new source, an image, new env or a rollback.
+// every deploy: new source, an image, new env or a rollback. Its places,
+// the settings that say where a service runs, are filled in already
+// (takePlaces); a ${VAR} Docker would fill in in another setting it checks
+// fails the check, as it could become anything.
 func (a *apps) checkCompose(release *release) error {
 	if release.rules != nil && release.rules.ServerAccess {
 		return nil
@@ -270,10 +274,9 @@ func (r appRoom) checkService(service map[string]any) string {
 			return "build: " + reason
 		}
 	}
-	envFiles, _ := service["env_file"].([]any)
-	for _, item := range envFiles {
-		if file, _ := item.(string); file != r.envFile {
-			return fmt.Sprintf("env_file %v is not the app's env file", item)
+	for _, file := range envFilePaths(service) {
+		if file != r.envFile && !r.inSource(resolved(file)) {
+			return "env_file " + file + " is neither the app's env file nor in its source"
 		}
 	}
 	mounts, _ := service["volumes"].([]any)

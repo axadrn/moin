@@ -19,15 +19,20 @@ import (
 //
 //	app.env                    the app's env, the values as they are now, 0600
 //	releases/<n>/src           the source of deploy n
-//	releases/<n>/compose.json  the resolved compose project moin runs, 0600
+//	releases/<n>/compose.json  the compose project moin runs, 0600
+//	releases/<n>/.env          a copy of the source's .env, when it has one
+//	releases/<n>/htpasswd      the app's password, when it has one, 0600
 //	releases/<n>/kind          build, apply or failed, for prune
 //	current                    the number of the running release
 //	volumes/                   bind mounts that are not part of the repo
 //
 // compose.json is the user's compose.yml after `docker compose config`, with
-// image tags per release and the data mounts filled in; the services that
-// get the env read app.env. Starting an old compose.json again is a
-// rollback: same images, the env as it is now.
+// each ${VAR} kept, image tags per release and the data mounts filled in;
+// the services that get the env read app.env. Every compose command on it
+// reads .env and app.env (composeArgs), so Docker fills in ${VAR} when it
+// starts the containers, and no file but app.env holds a value of the env.
+// Starting an old compose.json again is a rollback: same images, the env
+// as it is now.
 const (
 	maxSourceSize = 200 << 20
 	// waitTimeout is how long compose waits for the services to run and be
@@ -182,7 +187,7 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	defer a.lock(app)()
 	args := []string{"compose", "-p", a.projectOf(app)}
 	if current := a.current(app); current > 0 {
-		args = append(args, "-f", filepath.Join(a.releaseDir(app, current), "compose.json"))
+		args = a.composeArgs(app, a.composeFile(app))
 	}
 	_, err := a.output(ctx, "docker", append(args, "down", "--rmi", "all", "--remove-orphans")...)
 	if err != nil {
@@ -223,7 +228,7 @@ func (a *apps) stop(ctx context.Context, app string) error {
 	if current == 0 {
 		return errors.New("the app has no release on this server")
 	}
-	_, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", filepath.Join(a.releaseDir(app, current), "compose.json"), "stop")
+	_, err := a.output(ctx, "docker", a.composeArgs(app, a.composeFile(app), "stop")...)
 	return err
 }
 

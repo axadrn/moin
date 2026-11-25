@@ -52,17 +52,17 @@ func TestRouteInstant(t *testing.T) {
 func TestDomainsByService(t *testing.T) {
 	config := map[string]any{}
 	web := map[string]any{}
-	addRouters(config, web, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.net"}, port: 3000, instant: "shop.203-0-113-7.sslip.io", protect: "moin:$2y$05$abc"})
+	addRouters(config, web, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.net"}, port: 3000, instant: "shop.203-0-113-7.sslip.io", usersFile: proxyUsersFile("shop", 3)})
 	labels := web["labels"].(map[string]any)
 	for key, want := range map[string]string{
-		"traefik.http.routers.moin-shop.rule":                      "Host(`shop.example.net`)",
-		"traefik.http.routers.moin-shop.middlewares":               "moin-shop-auth",
-		"traefik.http.routers.moin-shop-tunnel.middlewares":        "moin-shop-auth",
-		"traefik.http.routers.moin-shop-instant.rule":              "Host(`shop.203-0-113-7.sslip.io`)",
-		"traefik.http.routers.moin-shop-instant.service":           "moin-shop",
-		"traefik.http.routers.moin-shop-instant.middlewares":       "moin-shop-auth",
-		"traefik.http.middlewares.moin-shop-auth.basicauth.users":  "moin:$$2y$$05$$abc",
-		"traefik.http.services.moin-shop.loadbalancer.server.port": "3000",
+		"traefik.http.routers.moin-shop.rule":                         "Host(`shop.example.net`)",
+		"traefik.http.routers.moin-shop.middlewares":                  "moin-shop-auth",
+		"traefik.http.routers.moin-shop-tunnel.middlewares":           "moin-shop-auth",
+		"traefik.http.routers.moin-shop-instant.rule":                 "Host(`shop.203-0-113-7.sslip.io`)",
+		"traefik.http.routers.moin-shop-instant.service":              "moin-shop",
+		"traefik.http.routers.moin-shop-instant.middlewares":          "moin-shop-auth",
+		"traefik.http.middlewares.moin-shop-auth.basicauth.usersfile": "/apps/shop/releases/3/htpasswd",
+		"traefik.http.services.moin-shop.loadbalancer.server.port":    "3000",
 	} {
 		if labels[key] != want {
 			t.Errorf("%s = %v, want %s", key, labels[key], want)
@@ -80,13 +80,13 @@ func TestDomainsByService(t *testing.T) {
 	// An app with only its instant address has no router for domains, and
 	// its password still guards the instant address.
 	only := map[string]any{}
-	addRouters(config, only, routes{app: "idea", router: project("idea"), port: 8080, instant: "idea.203-0-113-7.sslip.io", protect: "moin:$2y$05$abc"})
+	addRouters(config, only, routes{app: "idea", router: project("idea"), port: 8080, instant: "idea.203-0-113-7.sslip.io", usersFile: proxyUsersFile("idea", 1)})
 	labels = only["labels"].(map[string]any)
-	if labels["traefik.http.routers.moin-idea.rule"] != nil || labels["traefik.http.routers.moin-idea-instant.rule"] != "Host(`idea.203-0-113-7.sslip.io`)" || labels["traefik.http.routers.moin-idea-instant.middlewares"] != "moin-idea-auth" || labels["traefik.http.middlewares.moin-idea-auth.basicauth.users"] != "moin:$$2y$$05$$abc" {
+	if labels["traefik.http.routers.moin-idea.rule"] != nil || labels["traefik.http.routers.moin-idea-instant.rule"] != "Host(`idea.203-0-113-7.sslip.io`)" || labels["traefik.http.routers.moin-idea-instant.middlewares"] != "moin-idea-auth" || labels["traefik.http.middlewares.moin-idea-auth.basicauth.usersfile"] != "/apps/idea/releases/1/htpasswd" {
 		t.Errorf("instant only: %v", labels)
 	}
 	api := map[string]any{}
-	addRouters(config, api, routes{app: "shop", router: serviceRouter("shop", "api"), domains: []string{"api.shop.example.net"}, port: 9000, protect: "me:$2y$05$x"})
+	addRouters(config, api, routes{app: "shop", router: serviceRouter("shop", "api"), domains: []string{"api.shop.example.net"}, port: 9000, usersFile: proxyUsersFile("shop", 3)})
 	labels = api["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.example.net`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" || labels["traefik.http.routers.moin-shop-svc-api.middlewares"] != "moin-shop-svc-api-auth" {
 		t.Errorf("api labels: %v", labels)

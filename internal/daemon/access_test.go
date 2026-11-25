@@ -219,15 +219,21 @@ func TestDataFolderThroughLink(t *testing.T) {
 	}
 }
 
-// TestAppRoomEnvFile: a service reads the app's own env file and no other.
+// TestAppRoomEnvFile: a service reads the app's own env file and env files
+// of its source, as compose writes them, and no other.
 func TestAppRoomEnvFile(t *testing.T) {
-	room := appRoom{project: "web", envFile: "/var/lib/moin/apps/web/app.env"}
-	own := map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx", "env_file": []any{"/var/lib/moin/apps/web/app.env"}}}}
+	room := appRoom{project: "web", envFile: "/var/lib/moin/apps/web/app.env", releasesDir: "/var/lib/moin/apps/web/releases"}
+	own := map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx", "env_file": []any{
+		map[string]any{"path": "/var/lib/moin/apps/web/releases/2/src/web.env", "required": true},
+		"/var/lib/moin/apps/web/app.env",
+	}}}}
 	if reason := room.check(own); reason != "" {
-		t.Fatalf("the app's own env file: %s", reason)
+		t.Fatalf("the app's own env files: %s", reason)
 	}
-	other := map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx", "env_file": []any{"/var/lib/moin/apps/shop/app.env"}}}}
-	if reason := room.check(other); !strings.Contains(reason, "not the app's env file") {
-		t.Fatalf("another app's env file: %q", reason)
+	for _, file := range []any{"/var/lib/moin/apps/shop/app.env", map[string]any{"path": "/var/lib/moin/apps/web/releases/2/compose.json"}} {
+		other := map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx", "env_file": []any{file}}}}
+		if reason := room.check(other); !strings.Contains(reason, "neither the app's env file nor in its source") {
+			t.Fatalf("%v: %q", file, reason)
+		}
 	}
 }
