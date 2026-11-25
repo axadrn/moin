@@ -310,9 +310,9 @@ type renameAppRequest struct {
 	Name string `json:"name"`
 }
 
-// Rename gives an app a new name and answers it. Links count its ID, so
-// they keep working; its data, backups and instant address stay, and the
-// next restart names its containers after it.
+// Rename gives an app a new name and answers it. Links name the app by its
+// name, so they follow it; its data, backups and instant address stay, and
+// the next restart names its containers after it.
 func (h *AppsHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	var request renameAppRequest
 	if !Decode(w, r, &request) {
@@ -761,13 +761,12 @@ func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// Change is the answer to a change of the domains: the app, and the deploy that
-// applies it to the live deploy, or null when the next deploy will.
-// Unchanged is set when the app had it so already; nothing restarts.
+// Change is the answer to a change of the domains: the app as it is now.
+// The app takes it with its next restart, start or deploy. Unchanged is set
+// when the app had it so already.
 type Change struct {
-	App       App     `json:"app"`
-	Deploy    *Deploy `json:"deploy"`
-	Unchanged bool    `json:"unchanged,omitempty"`
+	App       App  `json:"app"`
+	Unchanged bool `json:"unchanged,omitempty"`
 }
 
 type domainsRequest struct {
@@ -820,23 +819,17 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 	return out
 }
 
-// NewChange is the answer to a change of app: the app as it is now, and
-// the deploy that applies it, if one does.
-func NewChange(apps *service.AppService, workspaceID, app string, deploy *model.Deploy, changed bool) (Change, error) {
+// NewChange is the answer to a change of app: the app as it is now.
+func NewChange(apps *service.AppService, workspaceID, app string, changed bool) (Change, error) {
 	current, err := apps.Get(workspaceID, app)
 	if err != nil {
 		return Change{}, err
 	}
-	answer := Change{App: NewApp(*current), Unchanged: !changed}
-	if deploy != nil {
-		applied := NewDeploy(*deploy)
-		answer.Deploy = &applied
-	}
-	return answer, nil
+	return Change{App: NewApp(*current), Unchanged: !changed}, nil
 }
 
-func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, deploy *model.Deploy, changed bool) {
-	answer, err := NewChange(h.apps, workspaceID, app, deploy, changed)
+func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, changed bool) {
+	answer, err := NewChange(h.apps, workspaceID, app, changed)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -867,7 +860,7 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), changed)
 }
 
 // GetInstant answers the app's instant address, without the password.
@@ -893,7 +886,7 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), changed)
 }
 
 // SetProtection turns the app's password on for every address of it.
@@ -910,7 +903,7 @@ func (h *AppsHandler) SetProtection(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	answer, err := NewChange(h.apps, workspace.ID, r.PathValue("app"), nil, changed)
+	answer, err := NewChange(h.apps, workspace.ID, r.PathValue("app"), changed)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -926,7 +919,7 @@ func (h *AppsHandler) DeleteProtection(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), changed)
 }
 
 // Restart starts the live deploy again with the env and domains as they

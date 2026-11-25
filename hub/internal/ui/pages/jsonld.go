@@ -2,7 +2,9 @@ package pages
 
 import (
 	"encoding/json"
+	"fmt"
 
+	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
@@ -17,8 +19,8 @@ func jsonLD(data any) string {
 }
 
 // homeJSONLD says what the home page is about: the product, free to host
-// yourself, and who makes it.
-func homeJSONLD(appURL string) string {
+// yourself and, on a hub with billing, its hosted prices, and who makes it.
+func homeJSONLD(appURL string, billing bool) string {
 	return jsonLD([]map[string]any{
 		{
 			"@context":            "https://schema.org",
@@ -28,7 +30,7 @@ func homeJSONLD(appURL string) string {
 			"applicationCategory": "DeveloperApplication",
 			"operatingSystem":     "Linux",
 			"url":                 appURL,
-			"offers":              map[string]any{"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+			"offers":              homeOffers(billing),
 		},
 		{
 			"@context": "https://schema.org",
@@ -39,6 +41,26 @@ func homeJSONLD(appURL string) string {
 			"email":    brand.SupportEmail,
 		},
 	})
+}
+
+// homeOffers are the prices the home page shows: self-hosted for free and,
+// with billing, the hosted plan by the month and by the year.
+func homeOffers(billing bool) []map[string]any {
+	offers := []map[string]any{offer("Self-hosted", 0)}
+	if !billing {
+		return offers
+	}
+	for _, plan := range access.Product.Plans {
+		if plan.Purchasable {
+			offers = append(offers, offer("Hosted, a month per workspace", plan.MonthlyPrice), offer("Hosted, a year per workspace", plan.YearlyPrice))
+		}
+	}
+	return offers
+}
+
+// offer is one price in US cents.
+func offer(name string, cents int) map[string]any {
+	return map[string]any{"@type": "Offer", "name": name, "price": fmt.Sprintf("%d.%02d", cents/100, cents%100), "priceCurrency": "USD"}
 }
 
 // blogJSONLD says what a post is, who wrote it and when.

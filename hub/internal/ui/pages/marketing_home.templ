@@ -23,7 +23,7 @@ templ Home(network model.Network, open HomeOpen) {
 		Description: brand.Description,
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
-		@templ.Raw(homeJSONLD(ctxkeys.RenderConfig(ctx).AppURL))
+		@templ.Raw(homeJSONLD(ctxkeys.RenderConfig(ctx).AppURL, ctxkeys.RenderConfig(ctx).Billing))
 		<main>
 			@HomeHero()
 			<div class="moin-page">

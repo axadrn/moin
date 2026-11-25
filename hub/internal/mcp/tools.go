@@ -66,7 +66,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	Add(server, &mcpsdk.Tool{
 		Name:        "rename_workspace",
 		Title:       "Rename a workspace",
-		Description: "Changes the name of a workspace (2 to 80 characters). Its slug, the name in its links, follows; links count the ID, so every old link keeps working. Only owners and admins may rename.",
+		Description: "Changes the name of a workspace (2 to 80 characters). Its slug, the name in its links, follows: links inside moin follow, an old bookmark finds nothing. Only owners and admins may rename.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Rename a workspace", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
 	}, model.RightServers, tools.renameWorkspace)
 	Add(server, &mcpsdk.Tool{
@@ -391,7 +391,7 @@ type RenamedWorkspace struct {
 }
 
 func (r RenamedWorkspace) Summary() string {
-	return fmt.Sprintf("Renamed the workspace to %s, slug %s. Old links keep working.", r.Workspace.Name, r.Workspace.Slug)
+	return fmt.Sprintf("Renamed the workspace to %s, slug %s. Links inside moin follow.", r.Workspace.Name, r.Workspace.Slug)
 }
 
 func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input RenameInput) (RenamedWorkspace, error) {

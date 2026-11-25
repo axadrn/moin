@@ -25,7 +25,7 @@ func registerGitHubTools(server *mcpsdk.Server, services Services) {
 		"Lists the branches of a repo the moin GitHub App may read, the default branch first.",
 		readOnly("")), model.RightRead, member(services, tools.listBranches))
 	Add(server, newTool("link_repo", "Link a repo",
-		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): auto_deploy turns the app's deploy hook off, so CI can no longer deploy; ask the user first when get_app says hook. Without auto_deploy the hook stays, and its deploys take the repo's compose file. A branch the repo does not have on GitHub is refused; list_branches lists them.",
+		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. Left out, auto_deploy is on, unless the app has a deploy hook. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): auto_deploy true turns the app's deploy hook off, so CI can no longer deploy; ask the user first when get_app says hook. With auto_deploy false, or left out on an app with a hook, the hook stays, and its deploys take the repo's compose file. A branch the repo does not have on GitHub is refused; list_branches lists them.",
 		change(true, true)), model.RightDeploy, changes(services, tools.linkRepo))
 	Add(server, newTool("unlink_repo", "Unlink the repo",
 		"Stops an app from following its GitHub repo.",
@@ -40,7 +40,7 @@ type RepoInput struct {
 	App        string `json:"app" jsonschema:"the app name or ID"`
 	Repo       string `json:"repo" jsonschema:"owner/name on GitHub"`
 	Branch     string `json:"branch,omitempty" jsonschema:"the branch to follow; empty for the default branch"`
-	AutoDeploy bool   `json:"auto_deploy,omitempty" jsonschema:"deploy every push to the branch"`
+	AutoDeploy *bool  `json:"auto_deploy,omitempty" jsonschema:"deploy every push to the branch; left out, on unless the app has a deploy hook"`
 }
 
 // RefInput is the input of deploy_ref.
@@ -154,18 +154,18 @@ func (t moinTools) linkRepo(ctx context.Context, caller Caller, input RepoInput)
 }
 
 func (t moinTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (Done, error) {
-	app, err := t.services.Apps.Get(caller.Bearer.WorkspaceID, input.app())
+	app, err := t.services.Apps.Get(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Done{}, err
 	}
 	if app.Repo == "" {
-		return Done{Message: input.app() + " follows no repo. Nothing changed."}, nil
+		return Done{Message: input.App + " follows no repo. Nothing changed."}, nil
 	}
-	err = t.services.Apps.UnlinkRepo(caller.actor(), input.app())
+	err = t.services.Apps.UnlinkRepo(caller.actor(), input.App)
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: input.app() + " follows no repo now."}, nil
+	return Done{Message: input.App + " follows no repo now."}, nil
 }
 
 func (t moinTools) deployRef(ctx context.Context, caller Caller, input RefInput) (Deploy, error) {

@@ -41,6 +41,12 @@ info:
     Errors: every non-2xx JSON answer is the `Error` envelope with a stable lowercase
     snake case `code`. `fields` is present only for `validation_failed`.
 
+    Plan: after the trial, a workspace without a subscription is read-only. Every
+    operation that changes something answers 402 `trial_ended`, except stopping and
+    starting an app, turning its deploy hook off, read-only SQL, alert destinations, the
+    account, the team and billing. Reads keep working. `POST /api/v1/servers` answers 402
+    `subscription_required` when the plan allows no more servers.
+
     Times are RFC 3339 in UTC. Lists answer `{"items": [...]}`. Request bodies are
     `application/json` unless an endpoint says otherwise, at most 1 MiB, and unknown
     fields are rejected.
@@ -175,7 +181,7 @@ paths:
       tags: [Meta]
       operationId: updateHub
       summary: Update the hub to the newest release
-      description: For an admin of a self-hosted hub. The updater next to it pulls the new image and restarts the hub, which copies its database and migrates it. If the new version does not answer within two minutes, the updater starts the old one again. Follow `update.state` with `GET /api/v1/version`: `requested`, `updating`, then `done`, `rolled_back` or `failed` with a `reason`. The activity of the workspace notes the start and the end.
+      description: 'For an admin of a self-hosted hub. The updater next to it pulls the new image and restarts the hub, which copies its database and migrates it. If the new version does not answer within two minutes, the updater starts the old one again. Follow `update.state` with `GET /api/v1/version`: `requested`, `updating`, then `done`, `rolled_back` or `failed` with a `reason`. The activity of the workspace notes the start and the end.'
       security:
         - cookieAuth: []
         - bearerAuth: [servers]
@@ -704,7 +710,7 @@ paths:
       tags: [Passkeys]
       operationId: removePasskey
       summary: Remove a passkey
-      description: The passkey no longer signs in. The last way in stays: an account without GitHub keeps its last passkey.
+      description: 'The passkey no longer signs in. The last way in stays: an account without GitHub keeps its last passkey.'
       responses:
         '204':
           description: The passkey is removed.
@@ -1026,6 +1032,12 @@ paths:
           $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
+        '402':
+          description: '`subscription_required` when the plan allows no more servers, `trial_ended` after the trial.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
         '415':
@@ -1163,7 +1175,7 @@ paths:
       tags: [Servers]
       operationId: updateDaemon
       summary: Update the daemon of a server
-      description: The daemon downloads the binary this hub serves for its OS and CPU, from the hub URL it is registered with, checks it against the SHA-256 the hub sends, swaps it in and restarts through systemd. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs and without systemd; daemons older than the update say so with the command that updates them on the server.
+      description: The daemon downloads the release of the hub's version for its OS and CPU from GitHub, checks its signature and its SHA-256, swaps it in and restarts through systemd. Servers with rules update the same way. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs and without systemd; a daemon from before signed updates says so with the command that updates it on the server.
       security:
         - cookieAuth: []
         - bearerAuth: [servers]
@@ -1471,7 +1483,7 @@ paths:
       tags: [Apps]
       operationId: renameApp
       summary: Rename an app
-      description: The same rules as creating one. Links count its ID and keep working. On its server the app keeps its folder, so its data, its backups and its instant address stay; the next restart or deploy gives its containers the new name.
+      description: 'The same rules as creating one. Links name the app by its name: links inside moin follow, an old bookmark finds nothing. On its server the app keeps its folder, so its data, its backups and its instant address stay; the next restart or deploy gives its containers the new name.'
       requestBody:
         required: true
         content:
@@ -1646,7 +1658,7 @@ paths:
       tags: [Apps]
       operationId: rollbackApp
       summary: Roll back
-      description: Starts the images of an earlier successful deploy again, with the env it had. Number 0 or none means the one before the live deploy. The server keeps the last 5 deploys.
+      description: Starts the images of an earlier successful deploy again, with the env vars, the domains and the password as they are now. Number 0 or none means the one before the live deploy. The server keeps the last 5 deploys.
       security:
         - cookieAuth: []
         - bearerAuth: [deploy]
@@ -2025,7 +2037,7 @@ paths:
               $ref: '#/components/schemas/DomainsRequest'
       responses:
         '200':
-          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (hubs before saving waited could answer the restart they started).
+          description: 'The app. Saving never restarts it: the change waits for a restart, start or deploy.'
           content:
             application/json:
               schema:
@@ -2090,7 +2102,7 @@ paths:
               $ref: '#/components/schemas/InstantRequest'
       responses:
         '200':
-          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (hubs before saving waited could answer the restart they started).
+          description: 'The app. Saving never restarts it: the change waits for a restart, start or deploy.'
           content:
             application/json:
               schema:
@@ -2131,7 +2143,7 @@ paths:
               $ref: '#/components/schemas/ProtectionRequest'
       responses:
         '200':
-          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (hubs before saving waited could answer the restart they started).
+          description: 'The app. Saving never restarts it: the change waits for a restart, start or deploy.'
           content:
             application/json:
               schema:
@@ -2162,7 +2174,7 @@ paths:
         - bearerAuth: [env]
       responses:
         '200':
-          description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (hubs before saving waited could answer the restart they started).
+          description: 'The app. Saving never restarts it: the change waits for a restart, start or deploy.'
           content:
             application/json:
               schema:
@@ -2307,6 +2319,8 @@ paths:
             text/event-stream:
               schema:
                 type: string
+        '400':
+          $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2318,6 +2332,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`server_offline`, or `not_live` when no service is named and the app has no live deploy.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.command` or `fields.line`.'
@@ -2462,7 +2478,7 @@ paths:
               $ref: '#/components/schemas/InsertRequest'
       security:
         - cookieAuth: []
-        - bearerAuth: [delete]
+        - bearerAuth: [env, delete]
       responses:
         '201':
           description: The row is added.
@@ -2496,7 +2512,7 @@ paths:
               $ref: '#/components/schemas/RowRequest'
       security:
         - cookieAuth: []
-        - bearerAuth: [delete]
+        - bearerAuth: [env, delete]
       responses:
         '204':
           description: The row changed.
@@ -2530,7 +2546,7 @@ paths:
               $ref: '#/components/schemas/RowRequest'
       security:
         - cookieAuth: []
-        - bearerAuth: [delete]
+        - bearerAuth: [env, delete]
       responses:
         '204':
           description: The row is gone.
@@ -2559,7 +2575,7 @@ paths:
       tags: [Data]
       operationId: queryDatabase
       summary: Run SQL
-      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. Rows are app data: a connection or CI token needs the env right. With `write` it runs in one transaction and returns `changes`; a connection or CI token then needs the delete right too, else 403 `missing_right`.
+      description: 'Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. Rows are app data: a connection or CI token needs the env right. With `write` it runs in one transaction and returns `changes`; a connection or CI token then needs the delete right too, else 403 `missing_right`.'
       requestBody:
         required: true
         content:
@@ -2648,6 +2664,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackupSchedule'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2655,6 +2673,8 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No app with this ID or name belongs to the account.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '500':
@@ -2684,6 +2704,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackupDownload'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2694,6 +2716,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`no_backups` without a bucket, `no_copy` before the first copy, `server_offline`.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '500':
@@ -2757,6 +2781,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UptimeDomain'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2764,6 +2790,8 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No app with this ID or name belongs to the account.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `domain` when the app has no such domain, or `path` when it does not start with /.'
@@ -2809,7 +2837,7 @@ paths:
       tags: [Backups]
       operationId: restoreApp
       summary: Restore a database
-      description: Puts a database back to a moment from getAppBackups, by its id or label, or to a time, the newest copy at or before it. moin checks the moment, answers 202 and the daemon runs the restore on its own; follow it with getRestore until `state` is `done` or `failed`. The daemon builds the restored database beside the live one while the app runs, then stops the app, switches in one step and starts the app again, also when something failed. The state before stays on the server as long as the app keeps copies, so the restore can be undone: a restore to an `undo-` moment switches back to it. `state` is `unknown` while the server is offline during the restore; moin asks it every minute once it is back. A label two moments share needs the moment's id.
+      description: 'Puts a database back to a moment from getAppBackups, by its id or label, or to a time, the newest copy at or before it. moin checks the moment, answers 202 and the daemon runs the restore on its own; follow it with getRestore until `state` is `done` or `failed`. The daemon builds the restored database beside the live one while the app runs, then stops the app, switches in one step and starts the app again, also when something failed. The state before stays on the server as long as the app keeps copies, so the restore can be undone: a restore to an `undo-` moment switches back to it. `state` is `unknown` while the server is offline during the restore; moin asks it every minute once it is back. A label two moments share needs the moment''s id.'
       requestBody:
         required: true
         content:
@@ -2826,6 +2854,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Restore'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2836,6 +2866,8 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: '`no_backups` without a bucket, `server_offline`, `daemon_outdated`, `restore_running` while a restore of the app runs.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
           description: '`validation_failed` with `fields.moment` (unknown, or a label several moments share), `fields.at` older than every copy, or `fields.database` when the app has several; `confirm_mismatch` when `confirm` is not the app''s name.'
@@ -3375,7 +3407,7 @@ paths:
       tags: [GitHub]
       operationId: setAppRepo
       summary: Link a repo
-      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`; it turns the deploy hook off. One thing brings new versions, so it turns the app's deploy hook off.
+      description: The app follows a repo and branch; an empty branch is the repo's default branch. With `auto_deploy` every push to the branch deploys, and moin writes the result as the commit status `moin/deploy`. One thing brings new versions, so it turns the app's deploy hook off. Without `auto_deploy` it is on, as on the web and in the CLI, unless the app has a deploy hook; then CI keeps deploying.
       requestBody:
         required: true
         content:
@@ -3391,6 +3423,7 @@ paths:
                   type: string
                 auto_deploy:
                   type: boolean
+                  description: Deploy every push to the branch. Left out, it is on, unless the app has a deploy hook.
       security:
         - cookieAuth: []
         - bearerAuth: [deploy]
@@ -3461,7 +3494,7 @@ paths:
                   type: boolean
                 ssh:
                   type: string
-                  enum: [tailscale, everyone, off]
+                  enum: [tailscale, everyone, 'off']
                 firewall:
                   type: boolean
       security:
@@ -3651,7 +3684,7 @@ paths:
       tags: [Apps]
       operationId: getAppEnv
       summary: List env vars
-      description: The keys and when each changed. Values are write-only: moin never answers one.
+      description: 'The keys and when each changed. Values are write-only: moin never answers one.'
       security:
         - cookieAuth: []
         - bearerAuth: [read]
@@ -3865,7 +3898,7 @@ paths:
       tags: [Workspaces]
       operationId: renameWorkspace
       summary: Rename a workspace
-      description: The slug, the name in the workspace's links, follows the name. Links count the ID, so old ones keep working.
+      description: The slug, the name in the workspace's links, follows the name. Links inside moin follow, an old bookmark finds nothing.
       security:
         - cookieAuth: []
         - bearerAuth: [servers]
@@ -4152,7 +4185,7 @@ paths:
       tags: [Workspaces]
       operationId: listActivity
       summary: List activity
-      description: What happened in the workspace of the connection or CI token, newest first, the same as listWorkspaceActivity, for the CLI: deploys, rollbacks, restores, SQL writes, env, domains, servers, security and team changes. Pass `next_cursor` as `cursor` to read the next page.
+      description: 'What happened in the workspace of the connection or CI token, newest first, the same as listWorkspaceActivity, for the CLI: deploys, rollbacks, restores, SQL writes, env, domains, servers, security and team changes. Pass `next_cursor` as `cursor` to read the next page.'
       parameters:
         - name: limit
           in: query
@@ -4904,7 +4937,7 @@ components:
           properties:
             state:
               type: string
-              enum: [on, off, late]
+              enum: ['on', 'off', late]
               description: '`late` when no copy reached the bucket for two minutes.'
             bucket:
               type: string
@@ -4922,9 +4955,9 @@ components:
           description: Daemons older than the hub update by themselves.
     EmailAlerts:
       type: object
-      required: [on]
+      required: ['on']
       properties:
-        on:
+        'on':
           type: boolean
           description: Mail the user when a site or a server goes down or comes back, or a deploy fails.
     EmailRequest:
@@ -5350,7 +5383,7 @@ components:
           description: Set to bring visitors through a Cloudflare Tunnel; no port is open.
         ssh:
           type: string
-          enum: [tailscale, everyone, off]
+          enum: [tailscale, everyone, 'off']
           description: Who SSH should answer.
         firewall:
           type: boolean
@@ -5367,7 +5400,7 @@ components:
               description: The server's address in a tailnet, also one joined by hand.
             ssh:
               type: string
-              enum: [tailscale, everyone, off]
+              enum: [tailscale, everyone, 'off']
               description: Who reaches SSH now.
             firewall:
               type: boolean
@@ -5377,6 +5410,11 @@ components:
                 type: string
             problems:
               type: array
+              items:
+                type: string
+            fixed:
+              type: array
+              description: What the daemon put back since its last report, in words.
               items:
                 type: string
         rules:
@@ -5402,6 +5440,18 @@ components:
             network_locked:
               type: boolean
               description: The tunnel, Tailscale and firewall cannot be changed.
+            exec_off:
+              type: boolean
+              description: Commands in containers are refused.
+            mounts:
+              type: array
+              description: Folders of the server an app may mount. Without them an app mounts only its own folders.
+              items:
+                type: string
+                example: /mnt/media
+            server_access:
+              type: boolean
+              description: Compose settings that reach beyond the app are allowed, such as privileged containers or a mount of the Docker socket.
         created_at:
           type: string
           format: date-time
@@ -5628,44 +5678,54 @@ components:
           description: What the repo brought. railpack means it had no compose.yml, Dockerfile or go.mod and moin built it with Railpack.
         builder:
           type: string
-          description: What Railpack found, for kind railpack, like "Node 24.22.1, start: npm run start".
+          description: 'What Railpack found, for kind railpack, like "Node 24.22.1, start: npm run start".'
         service:
           type: string
           description: The service that gets the traffic.
         port:
           type: integer
+        image:
+          type: string
+          description: The image of the main service, when it came from CI.
+        domains:
+          type: array
+          description: The domains the main service answers on.
+          items:
+            type: string
+        canonical:
+          type: string
+          description: The domain the others of the main service redirect to.
+        protected:
+          type: boolean
+          description: Whether a password guards the app.
+        service_domains:
+          type: object
+          description: The domains of the other services, by service.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        instant:
+          type: string
+          description: The main service's instant address, absent when it has none.
         databases:
           type: array
           items:
-            type: object
-            required: [path, host_path]
-            properties:
-              path:
-                type: string
-                description: A SQLite file inside the container, or `postgres-<service>` for a Postgres service.
-              host_path:
-                type: string
-                description: The SQLite file on the server, empty for Postgres.
-              kind:
-                type: string
-                enum: [postgres]
-                description: '`postgres` for a Postgres service; absent for SQLite.'
-              service:
-                type: string
-                description: The compose service that runs Postgres.
+            $ref: '#/components/schemas/Database'
+        no_backup:
+          type: array
+          description: What looks like a database but moin cannot back up.
+          items:
+            $ref: '#/components/schemas/Database'
     Change:
       type: object
-      required: [app, deploy]
+      required: [app]
       properties:
         app:
           $ref: '#/components/schemas/App'
-        deploy:
-          oneOf:
-            - $ref: '#/components/schemas/Deploy'
-            - type: 'null'
         unchanged:
           type: boolean
-          description: true when the app had it so already; nothing restarts
+          description: true when the app had it so already
     DomainsRequest:
       type: object
       required: [domains]
@@ -6085,10 +6145,23 @@ components:
       properties:
         path:
           type: string
-          description: Path in the container.
+          description: A SQLite file inside the container, `postgres-<service>` for a Postgres service, or `postgres-<service>/<name>` for another database of that service.
         host_path:
           type: string
-          description: Path on the server.
+          description: The SQLite file on the server, empty for Postgres.
+        host_folder:
+          type: string
+          description: The mount of the app on the server the SQLite file was found in.
+        kind:
+          type: string
+          enum: [postgres]
+          description: '`postgres` for a Postgres service; absent for SQLite.'
+        service:
+          type: string
+          description: The compose service that runs Postgres.
+        name:
+          type: string
+          description: A database of a Postgres service besides the one POSTGRES_DB names, which backups copy too.
     DBTables:
       type: object
       required: [database, tables]
@@ -6243,6 +6316,10 @@ components:
           type: boolean
         changes:
           type: integer
+        before:
+          type: string
+          format: date-time
+          description: When the server took the copy just before a write. Backups name it "Before your edit".
     Bucket:
       type: object
       required: [id, name, default, endpoint, region, bucket, path, folder, access_key, apps, older_backups, created_at, servers, missing_on]
@@ -6354,11 +6431,11 @@ components:
           description: The database's path in the container; needed when the app has several.
         moment:
           type: string
-          description: The id or the label of a moment from getAppBackups, like `before-v12`, `20261107T140000Z`, `Before your SQL change` or `undo-20261107T140200Z`.
+          description: The id or the label of a moment from getAppBackups, like `before-v12`, `20261107T140000Z-482913`, `Before your SQL change` or `undo-20261107T140200Z-105277`.
         at:
           type: string
           format: date-time
-          description: A time instead of a moment: the newest copy at or before it.
+          description: 'A time instead of a moment: the newest copy at or before it.'
         confirm:
           type: string
           description: The app's name, typed out by the user. A restore replaces the live data; without the exact name it answers 422 `confirm_mismatch`.
@@ -6751,7 +6828,7 @@ components:
                   properties:
                     id:
                       type: string
-                      description: What restoreApp takes, like 1h, before-v12, edit-37, 20261107T140000Z or undo-20261107T140200Z.
+                      description: What restoreApp takes, like 1h, before-v12, edit-37, 20261107T140000Z-482913 or undo-20261107T140200Z-105277.
                     label:
                       type: string
                       description: Like "At 14:00", "Before v12", "Before your SQL change", "Before the restore at 14:02".

@@ -239,8 +239,8 @@ func NewWorkspaceDetail(workspaces *service.WorkspaceService, workspace *model.W
 	return detail, nil
 }
 
-// UpdateName renames the workspace. Its slug follows the name; links
-// count the ID, so the old ones keep working.
+// UpdateName renames the workspace. Its slug follows the name, and so do
+// the links inside moin.
 func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	workspace := ctxkeys.Workspace(r.Context())

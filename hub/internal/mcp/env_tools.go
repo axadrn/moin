@@ -46,7 +46,7 @@ type Env struct {
 func (e Env) Summary() string { return count(len(e.Items), "env var") + "." }
 
 func (t moinTools) listEnv(_ context.Context, caller Caller, input AppInput) (Env, error) {
-	vars, err := t.services.Apps.EnvVars(caller.Bearer.WorkspaceID, input.app())
+	vars, err := t.services.Apps.EnvVars(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Env{}, err
 	}

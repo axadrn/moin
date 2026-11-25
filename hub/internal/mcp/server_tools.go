@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"github.com/axadrn/moin/hub/internal/model"
@@ -32,7 +31,7 @@ func registerServerTools(server *mcpsdk.Server, services Services) {
 		"Gives a server a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Its apps stay on it.",
 		change(false, true)), model.RightServers, changes(services, tools.renameServer))
 	Add(server, newTool("update_daemon", "Update the daemon of a server",
-		"Has the daemon of a server download the moin binary this hub serves, check its SHA-256, swap it in and restart, and returns the server once the new daemon is back, within three minutes. list_servers shows each daemon's version; get it to the hub's. The daemon refuses while a deploy runs and when the server has rules; then the owner updates it on the server.",
+		"Has the daemon of a server download the release of the hub's version from GitHub, check its signature and its SHA-256, swap it in and restart, and returns the server once the new daemon is back, within three minutes. list_servers shows each daemon's version; get it to the hub's. Servers with rules update the same way. The daemon refuses while a deploy runs; a daemon from before signed updates, or one without systemd, is updated on the server.",
 		change(false, true)), model.RightServers, changes(services, tools.updateDaemon))
 	Add(server, newTool("get_integrations", "Get integrations",
 		"Says whether Cloudflare is connected (an API token for tunnels, which the hub keeps), and which servers keep a Tailscale auth key (tailscale.servers) and which do not (tailscale.missing_on), as in Settings, Integrations; the keys never come back.",
@@ -51,14 +50,10 @@ type RemoveServerInput struct {
 	Confirm string `json:"confirm" jsonschema:"the server's name, typed out, after the user agreed"`
 }
 
-// ServerInput names one server. name is the old spelling of server, still
-// accepted.
+// ServerInput names one server.
 type ServerInput struct {
-	Server string `json:"server,omitempty" jsonschema:"the server name or ID"`
-	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
+	Server string `json:"server" jsonschema:"the server name or ID"`
 }
-
-func (i ServerInput) server() string { return cmp.Or(i.Server, i.Name) }
 
 // RenameServerInput is the input of rename_server.
 type RenameServerInput struct {
@@ -69,7 +64,6 @@ type RenameServerInput struct {
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
 	Server string `json:"server,omitempty" jsonschema:"the server name: lowercase letters, digits and dashes; empty gets the next free web-1, web-2 …"`
-	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
 }
 
 // IntegrationsInput is the input of set_integrations.
@@ -149,7 +143,7 @@ func (n NewInstall) Summary() string {
 }
 
 func (t moinTools) newInstallCommand(_ context.Context, caller Caller, input ServerInput) (NewInstall, error) {
-	server, installToken, err := t.services.Servers.NewInstallToken(caller.actor(), input.server())
+	server, installToken, err := t.services.Servers.NewInstallToken(caller.actor(), input.Server)
 	if err != nil {
 		return NewInstall{}, err
 	}
@@ -162,7 +156,7 @@ func (t moinTools) newInstallCommand(_ context.Context, caller Caller, input Ser
 }
 
 func (t moinTools) addServer(_ context.Context, caller Caller, input AddServerInput) (CreatedServer, error) {
-	server, installToken, err := t.services.Servers.Create(caller.actor(), cmp.Or(input.Server, input.Name))
+	server, installToken, err := t.services.Servers.Create(caller.actor(), input.Server)
 	if err != nil {
 		return CreatedServer{}, err
 	}
@@ -217,7 +211,7 @@ func (t moinTools) renameServer(_ context.Context, caller Caller, input RenameSe
 }
 
 func (t moinTools) updateDaemon(ctx context.Context, caller Caller, input ServerInput) (ServerOutput, error) {
-	server, err := t.services.Servers.UpdateDaemon(ctx, caller.actor(), input.server())
+	server, err := t.services.Servers.UpdateDaemon(ctx, caller.actor(), input.Server)
 	if err != nil {
 		return ServerOutput{}, err
 	}

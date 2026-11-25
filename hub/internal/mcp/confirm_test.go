@@ -28,7 +28,7 @@ func TestRemoveToolsNeedTheName(t *testing.T) {
 	// The app goes first: the bucket is the default every app uses.
 	for _, thing := range []struct{ tool, field, name string }{
 		{"remove_app", "app", "shop"},
-		{"remove_bucket", "bucket", "spare"},
+		{"remove_bucket", "name", "spare"},
 		{"remove_server", "server", "box-1"},
 	} {
 		for _, confirm := range []string{"", "blog"} {
