@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/axadrn/moin/hub/internal/catalog"
@@ -37,7 +38,8 @@ func TestCatalogInstall(t *testing.T) {
 		t.Errorf("app %s catalog %q, deploy %d, login %v", app.Name, app.Catalog, deploy.Number, login)
 	}
 	env := daemon.env(t, app.Folder)
-	if env["VERSION"] != "3.4.1" || len(env["DB_PASSWORD"]) != 43 || len(env["APP_SECRET"]) != 43 || env["DB_PASSWORD"] == env["APP_SECRET"] {
+	// The server makes the secrets (EnvSet.Generate).
+	if env["VERSION"] != "3.4.1" || env["DB_PASSWORD"] == "" || env["APP_SECRET"] == "" {
 		t.Errorf("env = %v", env)
 	}
 	var start protocol.DeployStart
@@ -53,7 +55,8 @@ func TestCatalogInstall(t *testing.T) {
 }
 
 // TestCatalogInstallShowsTheLogin: the secret the first sign-in needs comes
-// back once, from the install; the others never do.
+// back once, from the install. The server makes the others, so the hub
+// never sends or sees them.
 func TestCatalogInstallShowsTheLogin(t *testing.T) {
 	catalogs, _, daemon := newCatalogService(t)
 	app, _, login, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "miniflux", Server: "web-1", Version: "2.2.0"})
@@ -63,6 +66,11 @@ func TestCatalogInstallShowsTheLogin(t *testing.T) {
 	env := daemon.env(t, app.Folder)
 	if len(login) != 1 || login["ADMIN_PASSWORD"] == "" || login["ADMIN_PASSWORD"] != env["ADMIN_PASSWORD"] || env["DB_PASSWORD"] == "" {
 		t.Errorf("login = %v", login)
+	}
+	var set protocol.EnvSet
+	daemon.last(t, protocol.TypeEnvSet, &set)
+	if _, sent := set.Set["DB_PASSWORD"]; sent || !slices.Contains(set.Generate, "DB_PASSWORD") {
+		t.Errorf("env.set = %+v, want DB_PASSWORD made on the server", set)
 	}
 }
 

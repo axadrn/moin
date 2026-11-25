@@ -37,7 +37,8 @@ func (a *apps) env(app string) (map[string]string, error) {
 	return env, nil
 }
 
-// setEnv sets and removes env values of an app (EnvSet) and answers the
+// setEnv sets and removes env values of an app, makes a random value for
+// each key of Generate the app has none for (EnvSet), and answers the
 // keys the file has now. The file is replaced in one step, so a deploy
 // reads it whole, before or after.
 func (a *apps) setEnv(request protocol.EnvSet) (protocol.AppEnv, error) {
@@ -59,10 +60,18 @@ func (a *apps) setEnv(request protocol.EnvSet) (protocol.AppEnv, error) {
 	for _, key := range request.Remove {
 		delete(env, key)
 	}
+	for _, key := range request.Generate {
+		if !envNamePattern.MatchString(key) {
+			return protocol.AppEnv{}, fmt.Errorf("invalid env key %q", key)
+		}
+		if _, ok := env[key]; !ok {
+			env[key] = protocol.NewSecret(key)
+		}
+	}
 	if err := writeEnv(a.envFile(request.App), env); err != nil {
 		return protocol.AppEnv{}, err
 	}
-	slog.Info("env set", "app", request.App, "set", slices.Sorted(maps.Keys(request.Set)), "removed", request.Remove)
+	slog.Info("env set", "app", request.App, "set", slices.Sorted(maps.Keys(request.Set)), "removed", request.Remove, "generated", request.Generate)
 	return a.envKeys(request.App), nil
 }
 

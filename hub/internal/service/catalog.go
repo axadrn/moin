@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"regexp"
@@ -150,15 +147,19 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 		return app, nil, nil, err
 	}
 	app.Catalog, app.CatalogVersion = entry.Slug, version
+	// The server makes the secrets itself, so the hub never sees them. The
+	// password to log in with is the one it sees: it shows it once.
 	env := map[string]string{catalog.VersionVar: version}
-	for _, name := range entry.Secrets {
-		env[name] = newSecret(name)
+	login = map[string]string{}
+	for _, name := range entry.LoginSecrets() {
+		login[name] = protocol.NewSecret(name)
+		env[name] = login[name]
 	}
 	if entry.NeedsURL() {
 		env[catalog.URLVar] = "https://" + domain
 		env[catalog.DomainVar] = domain
 	}
-	_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
+	_, err = s.apps.changeEnv(ctx, actor, app.ID, protocol.EnvSet{Set: env, Generate: entry.Secrets})
 	if err != nil {
 		return app, nil, nil, err
 	}
@@ -171,10 +172,6 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	deploy, err = s.deploy(ctx, actor, "app.installed", app, entry, version)
 	if err != nil {
 		return app, nil, nil, err
-	}
-	login = map[string]string{}
-	for _, name := range entry.LoginSecrets() {
-		login[name] = env[name]
 	}
 	return app, deploy, login, nil
 }
@@ -198,27 +195,20 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 	if err != nil {
 		return app, nil, err
 	}
-	vars, err := s.apps.EnvVars(actor.WorkspaceID, app.ID)
+	// A newer compose.yml may ask for a secret the app does not have yet:
+	// the server makes it, and keeps the ones the app has.
+	change := protocol.EnvSet{Generate: entry.Secrets}
+	if app.CatalogVersion != version {
+		change.Set = map[string]string{catalog.VersionVar: version}
+	}
+	_, err = s.apps.changeEnv(ctx, actor, app.ID, change)
+	if err == nil {
+		err = s.apps.apps.SetCatalogVersion(app.ID, version)
+	}
 	if err != nil {
 		return app, nil, err
 	}
-	env := map[string]string{catalog.VersionVar: version}
-	// A newer compose.yml may ask for a secret the app does not have yet.
-	for _, name := range entry.Secrets {
-		if !slices.ContainsFunc(vars, func(envVar model.EnvVar) bool { return envVar.Key == name }) {
-			env[name] = newSecret(name)
-		}
-	}
-	if app.CatalogVersion != version || len(env) > 1 {
-		_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
-		if err == nil {
-			err = s.apps.apps.SetCatalogVersion(app.ID, version)
-		}
-		if err != nil {
-			return app, nil, err
-		}
-		app.CatalogVersion = version
-	}
+	app.CatalogVersion = version
 	deploy, err := s.deploy(ctx, actor, "app.updated", app, entry, version)
 	if err == nil {
 		s.apps.markUpdate(deploy.ID, version)
@@ -303,20 +293,4 @@ func (s *CatalogService) Info(app *model.App) (CatalogApp, bool) {
 		info.Newer = info.Version != "" && catalog.Compare(latest.Tag, info.Version) > 0
 	}
 	return info, true
-}
-
-// newSecret is 32 random bytes as URL-safe text: fine in a database URL,
-// a header or YAML. Some apps want a key in hex: a name that ends in _HEX
-// gets 32 bytes as 64 hex digits, one that ends in _HEX16 16 bytes as 32.
-func newSecret(name string) string {
-	size, encode := 32, base64.RawURLEncoding.EncodeToString
-	switch {
-	case strings.HasSuffix(name, "_HEX16"):
-		size, encode = 16, hex.EncodeToString
-	case strings.HasSuffix(name, "_HEX"):
-		encode = hex.EncodeToString
-	}
-	buffer := make([]byte, size)
-	_, _ = rand.Read(buffer)
-	return encode(buffer)
 }
