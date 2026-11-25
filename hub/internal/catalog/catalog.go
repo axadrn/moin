@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/markdown"
 )
 
@@ -58,31 +59,17 @@ type Entry struct {
 var Categories = []string{"AI", "Analytics", "Automation", "Monitoring", "Communication", "Websites", "Productivity", "Documents", "Reading", "Developer tools", "Security", "Marketing", "Finance", "Media"}
 
 var (
-	slugPattern     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
-	variablePattern = regexp.MustCompile(`\$\{([A-Z][A-Z0-9_]*)(:?[-?][^}]*)?\}`)
-	imagePattern    = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$|^[a-z0-9._-]+(/[a-z0-9._-]+)*$`)
+	slugPattern  = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
+	imagePattern = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$|^[a-z0-9._-]+(/[a-z0-9._-]+)*$`)
 	// defaultFilter takes 1.2.3 and v1.2.3: releases, not latest, nightly,
 	// rc or a commit.
 	defaultFilter = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+$`)
 )
 
-// VersionVar is the env var that holds the version: compose.yml uses it as
-// the image tag.
-const VersionVar = "VERSION"
-
-// URLVar is the app's own address, https://<its domain>, which moin sets on
-// install for an app whose compose.yml uses it: links, redirects and
-// cookies of such an app need it, so it needs a domain.
-const URLVar = "APP_URL"
-
-// DomainVar is the app's domain alone, without https://, for an app that
-// asks for its host name rather than its address.
-const DomainVar = "APP_DOMAIN"
-
 // NeedsURL reports whether the app needs its own address or domain, and so
 // a domain.
 func (e Entry) NeedsURL() bool {
-	return strings.Contains(string(e.Compose), "${"+URLVar+"}") || strings.Contains(string(e.Compose), "${"+DomainVar+"}")
+	return strings.Contains(string(e.Compose), "${"+catalogfiles.URLVar+"}") || strings.Contains(string(e.Compose), "${"+catalogfiles.DomainVar+"}")
 }
 
 // Load reads every entry of files, a folder each, sorted by name.
@@ -151,7 +138,7 @@ func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, e
 		entry.Logo, entry.LogoType = body, logo.kind
 		break
 	}
-	entry.Secrets = Secrets(entry.Compose)
+	entry.Secrets = catalogfiles.Secrets(entry.Compose)
 	return entry, entry.validate()
 }
 
@@ -163,8 +150,8 @@ func (e Entry) validate() error {
 		return fmt.Errorf("category %q is none of %s", e.Category, strings.Join(Categories, ", "))
 	case !imagePattern.MatchString(e.Image):
 		return fmt.Errorf("image %q is not an image without a tag", e.Image)
-	case !strings.Contains(string(e.Compose), e.Image+":${"+VersionVar+"}"):
-		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, VersionVar)
+	case !strings.Contains(string(e.Compose), e.Image+":${"+catalogfiles.VersionVar+"}"):
+		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, catalogfiles.VersionVar)
 	case e.Database != "" && databaseNames[e.Database] == "":
 		return errors.New("database is postgres, sqlite, mysql, mongodb, clickhouse or empty")
 	case !strings.HasPrefix(e.Website, "https://"):
@@ -229,21 +216,4 @@ func Similar(entries []Entry, e Entry, n int) []Entry {
 		}
 	}
 	return similar
-}
-
-// Secrets lists the ${NAME}s compose uses, except VERSION and those with a
-// default, sorted: moin generates a value for each on install.
-func Secrets(compose []byte) []string {
-	var names []string
-	for _, match := range variablePattern.FindAllStringSubmatch(string(compose), -1) {
-		name, rest := match[1], match[2]
-		if name == VersionVar || name == URLVar || name == DomainVar || strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, ":-") {
-			continue
-		}
-		if !slices.Contains(names, name) {
-			names = append(names, name)
-		}
-	}
-	slices.Sort(names)
-	return names
 }

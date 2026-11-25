@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/internal/dotenv"
 	"github.com/axadrn/moin/protocol"
 )
@@ -66,6 +67,39 @@ func (a *apps) setEnv(request protocol.EnvSet) (protocol.AppEnv, error) {
 	return a.envKeys(request.App), nil
 }
 
+// makeSecrets gives each secret the compose file of the catalog app slug
+// needs a random value, when the app has none yet. The server makes them,
+// so they never pass the hub, and a newer version that asks for a new one
+// gets it on its update.
+func (a *apps) makeSecrets(app, slug string) error {
+	compose, ok := catalog.Compose(slug)
+	if !ok {
+		return fmt.Errorf("the catalog of this daemon has no %s: update the daemon", slug)
+	}
+	a.envMu.Lock()
+	defer a.envMu.Unlock()
+	env, err := a.env(app)
+	if err != nil {
+		return err
+	}
+	made := []string{}
+	for _, name := range catalog.Secrets(compose) {
+		if _, ok := env[name]; !ok {
+			env[name] = catalog.NewSecret(name)
+			made = append(made, name)
+		}
+	}
+	if len(made) == 0 {
+		return nil
+	}
+	err = writeEnv(a.envFile(app), env)
+	if err != nil {
+		return err
+	}
+	slog.Info("secrets made", "app", app, "keys", made)
+	return nil
+}
+
 // envKeys names the keys of the app's env file and when it last changed,
 // never a value. An app without one, or with one moin cannot read, has
 // none.
@@ -100,11 +134,11 @@ func (a *apps) allEnvKeys() map[string]protocol.AppEnv {
 // ensureEnv makes an empty env file for an app that has none, so every
 // release can name it.
 func (a *apps) ensureEnv(app string) error {
+	a.envMu.Lock()
+	defer a.envMu.Unlock()
 	if exists(a.envFile(app)) {
 		return nil
 	}
-	a.envMu.Lock()
-	defer a.envMu.Unlock()
 	return writeEnv(a.envFile(app), map[string]string{})
 }
 

@@ -1066,6 +1066,14 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 			slog.Warn("daemon reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
 		}
+		// The env keys the deploy left: it may have made the secrets of
+		// a catalog app.
+		if done.Env != nil {
+			err := s.apps.KeepEnv(app.ID, cleanEnvKeys(done.Env.Keys), s.now().UTC())
+			if err != nil {
+				slog.Error("store the env keys of a deploy failed", "app_id", app.ID, "error", err)
+			}
+		}
 		s.rememberDeploy(done.DeployID, done)
 		s.finish(done.DeployID, done)
 	}

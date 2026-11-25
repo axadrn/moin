@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"regexp"
@@ -12,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/internal/build"
@@ -30,8 +28,8 @@ var (
 
 // CatalogService installs the apps of the catalog and updates them. An
 // install is an ordinary app: its compose.yml from the catalog goes to
-// the server like a deploy from the CLI, its secrets are env vars, and
-// VERSION picks the image tag. moin keeps the version in the app too, as
+// the server like a deploy from the CLI, its secrets are env vars the
+// server makes itself, and VERSION picks the image tag. moin keeps the version in the app too, as
 // env values are write-only.
 type CatalogService struct {
 	store *catalog.Store
@@ -103,10 +101,11 @@ type CatalogApp struct {
 	Newer bool
 }
 
-// Install creates the app on a server, gives it its secrets and VERSION,
-// and deploys it. login are the values of the secrets the first sign-in
-// needs (Entry.LoginSecrets), for the person who installs: env values are
-// write-only, so this is the one time they are shown.
+// Install creates the app on a server, sets VERSION and deploys it; the
+// server makes the other secrets. login are the values of the secrets the
+// first sign-in needs (Entry.LoginSecrets), which the hub makes for the
+// person who installs: env values are write-only, so this is the one time
+// they are shown.
 func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (app *model.App, deploy *model.Deploy, login map[string]string, err error) {
 	entry, ok := s.store.Entry(strings.TrimSpace(input.Slug))
 	if !ok {
@@ -150,13 +149,18 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 		return app, nil, nil, err
 	}
 	app.Catalog, app.CatalogVersion = entry.Slug, version
-	env := map[string]string{catalog.VersionVar: version}
-	for _, name := range entry.Secrets {
-		env[name] = newSecret(name)
+	// The server makes the secrets itself when it deploys, so the hub never
+	// sees them. The password to log in with is the one the hub makes: it
+	// shows it once.
+	env := map[string]string{catalogfiles.VersionVar: version}
+	login = map[string]string{}
+	for _, name := range entry.LoginSecrets() {
+		login[name] = catalogfiles.NewSecret(name)
+		env[name] = login[name]
 	}
 	if entry.NeedsURL() {
-		env[catalog.URLVar] = "https://" + domain
-		env[catalog.DomainVar] = domain
+		env[catalogfiles.URLVar] = "https://" + domain
+		env[catalogfiles.DomainVar] = domain
 	}
 	_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
 	if err != nil {
@@ -171,10 +175,6 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 	deploy, err = s.deploy(ctx, actor, "app.installed", app, entry, version)
 	if err != nil {
 		return app, nil, nil, err
-	}
-	login = map[string]string{}
-	for _, name := range entry.LoginSecrets() {
-		login[name] = env[name]
 	}
 	return app, deploy, login, nil
 }
@@ -198,19 +198,10 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 	if err != nil {
 		return app, nil, err
 	}
-	vars, err := s.apps.EnvVars(actor.WorkspaceID, app.ID)
-	if err != nil {
-		return app, nil, err
-	}
-	env := map[string]string{catalog.VersionVar: version}
-	// A newer compose.yml may ask for a secret the app does not have yet.
-	for _, name := range entry.Secrets {
-		if !slices.ContainsFunc(vars, func(envVar model.EnvVar) bool { return envVar.Key == name }) {
-			env[name] = newSecret(name)
-		}
-	}
-	if app.CatalogVersion != version || len(env) > 1 {
-		_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
+	// A newer compose.yml may ask for a secret the app does not have yet:
+	// the server makes it when it deploys.
+	if app.CatalogVersion != version {
+		_, err = s.apps.SetEnv(ctx, actor, app.ID, map[string]string{catalogfiles.VersionVar: version}, nil)
 		if err == nil {
 			err = s.apps.apps.SetCatalogVersion(app.ID, version)
 		}
@@ -303,20 +294,4 @@ func (s *CatalogService) Info(app *model.App) (CatalogApp, bool) {
 		info.Newer = info.Version != "" && catalog.Compare(latest.Tag, info.Version) > 0
 	}
 	return info, true
-}
-
-// newSecret is 32 random bytes as URL-safe text: fine in a database URL,
-// a header or YAML. Some apps want a key in hex: a name that ends in _HEX
-// gets 32 bytes as 64 hex digits, one that ends in _HEX16 16 bytes as 32.
-func newSecret(name string) string {
-	size, encode := 32, base64.RawURLEncoding.EncodeToString
-	switch {
-	case strings.HasSuffix(name, "_HEX16"):
-		size, encode = 16, hex.EncodeToString
-	case strings.HasSuffix(name, "_HEX"):
-		encode = hex.EncodeToString
-	}
-	buffer := make([]byte, size)
-	_, _ = rand.Read(buffer)
-	return encode(buffer)
 }

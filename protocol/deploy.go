@@ -108,4 +108,7 @@ type DeployDone struct {
 	// release started over an older one, the time in their IDs: the hub
 	// names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`
+	// Env names the env keys the app has after the deploy, which may have
+	// made the secrets of a catalog app: never a value.
+	Env *AppEnv `json:"env,omitempty"`
 }
