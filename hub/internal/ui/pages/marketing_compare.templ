@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/compare"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 
 	"github.com/axadrn/moin/hub/internal/brand"
@@ -16,7 +17,7 @@ templ HomeCompare() {
 		<h2 class="moin-statement">Look at the score.</h2>
 		<p class="moin-lead">None of them documents a daily restore check. { brand.Name } runs one.</p>
 		<div class="moin-bento">
-			for _, competitor := range Competitors {
+			for _, competitor := range compare.Competitors {
 				@homeFeature(competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
 			}
 		</div>
@@ -36,7 +37,7 @@ templ CompareIndex() {
 			@components.Header(components.HeaderProps{Title: brand.Name + " compared"})
 			<p class="moin-lead">Fact by fact, from each tool's own docs, each page with the day it was read.</p>
 			<div class="moin-bento">
-				for _, competitor := range Competitors {
+				for _, competitor := range compare.Competitors {
 					@homeFeature(brand.Name+" vs "+competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
 				}
 			</div>
@@ -56,7 +57,7 @@ templ compareLine(name, note string) {
 // ---------------------------------------------------------------- page
 // Compare is one tool next to this one: what differs, the score, and the
 // same facts for both, grouped, each answer with its mark and its source.
-templ Compare(competitor Competitor) {
+templ Compare(competitor compare.Competitor) {
 	{{ score := competitor.Score() }}
 	@layouts.Home(layouts.SEOProps{
 		Title:       brand.Name + " vs " + competitor.Name,
@@ -69,14 +70,14 @@ templ Compare(competitor Competitor) {
 			<p class="moin-title moin-digits">{ competitor.ScoreLine() }</p>
 			<div class="moin-stack" data-gap="6">
 				@compareHeader(competitor.Name, score)
-				for _, group := range compareGroups {
+				for _, group := range compare.Groups {
 					<section class="moin-section">
 						<div class="moin-section-head">
 							<h2>{ group }</h2>
 						</div>
 						@components.Card(components.CardProps{}) {
 							@components.List() {
-								for i, row := range CompareRows {
+								for i, row := range compare.Rows {
 									if row.Group == group {
 										@compareFact(row, competitor.Name, competitor.Cells[i])
 									}
@@ -97,7 +98,7 @@ templ Compare(competitor Competitor) {
 // compareHeader names the two columns over the table, each with its score,
 // in line with the rows. A phone has no columns to name, and every answer
 // says whose it is; the score over the table is there for it.
-templ compareHeader(name string, score CompareScore) {
+templ compareHeader(name string, score compare.Score) {
 	<div aria-hidden="true" class="moin-hidden-phone">
 		@components.List(templ.Attributes{"style": "--item-edge:var(--pad)"}) {
 			@components.Item(components.ItemProps{}) {
@@ -111,7 +112,7 @@ templ compareHeader(name string, score CompareScore) {
 	</div>
 }
 
-templ compareFact(row CompareRow, name string, cell CompareCell) {
+templ compareFact(row compare.Row, name string, cell compare.Cell) {
 	@components.Item(components.ItemProps{}) {
 		<div class="moin-grid moin-fill" data-cols="2-3-3">
 			<span class="moin-strong">{ row.Label }</span>
@@ -123,7 +124,7 @@ templ compareFact(row CompareRow, name string, cell CompareCell) {
 
 // compareAnswer is one side of a fact: its mark, its words, the line under
 // them and where it says so.
-templ compareAnswer(whose string, cell CompareCell) {
+templ compareAnswer(whose string, cell compare.Cell) {
 	<div class="moin-row" data-gap="2" data-top>
 		@compareMarkIcon(cell.Mark)
 		<div class="moin-stack moin-text" style="--gap:2px">
@@ -140,21 +141,21 @@ templ compareAnswer(whose string, cell CompareCell) {
 
 // compareMarkIcon is a mark in the ink of the page: a filled check, a
 // dash, a cross, a question mark, or a blank that keeps the words in line.
-templ compareMarkIcon(mark compareMark) {
+templ compareMarkIcon(mark compare.Mark) {
 	switch mark {
-		case markYes:
+		case compare.Yes:
 			<span role="img" aria-label="Yes" class="moin-mark" data-kind="yes">
 				@components.Icon("check")
 			</span>
-		case markPart:
+		case compare.Part:
 			<span role="img" aria-label="Partly" class="moin-mark" data-kind="part">
 				<svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
 			</span>
-		case markNo:
+		case compare.No:
 			<span role="img" aria-label="No" class="moin-mark" data-kind="no">
 				@components.Icon("x")
 			</span>
-		case markUnknown:
+		case compare.Unknown:
 			<span role="img" aria-label="Not documented" class="moin-mark" data-kind="no">?</span>
 		default:
 			<span aria-hidden="true" class="moin-mark"></span>

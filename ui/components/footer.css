@@ -50,7 +50,12 @@
     .moin-footer-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
   @media (min-width: 64rem) {
-    .moin-footer-columns { grid-template-columns: 1.6fr repeat(4, minmax(0, 1fr)); }
+    /* The brand, then one column for each column of links, however many. */
+    .moin-footer-columns {
+      grid-template-columns: 1.6fr;
+      grid-auto-columns: minmax(0, 1fr);
+      grid-auto-flow: column;
+    }
     .moin-footer-brand { grid-column: auto; }
   }
 }

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/compare"
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
 func serveCompare(path string) *httptest.ResponseRecorder {
@@ -27,19 +27,19 @@ func serveCompare(path string) *httptest.ResponseRecorder {
 // TestComparePagesAnswer checks every competitor has its page and answers
 // every question, each with a source.
 func TestComparePagesAnswer(t *testing.T) {
-	if len(pages.Competitors) != 12 {
-		t.Fatalf("competitors = %d, want 12", len(pages.Competitors))
+	if len(compare.Competitors) != 12 {
+		t.Fatalf("competitors = %d, want 12", len(compare.Competitors))
 	}
-	for _, competitor := range pages.Competitors {
+	for _, competitor := range compare.Competitors {
 		if _, err := time.Parse("January 2, 2006", competitor.Read); err != nil {
 			t.Errorf("%s: read %q, want a date", competitor.Name, competitor.Read)
 		}
-		if len(competitor.Cells) != len(pages.CompareRows) {
-			t.Errorf("%s answers %d of %d questions", competitor.Name, len(competitor.Cells), len(pages.CompareRows))
+		if len(competitor.Cells) != len(compare.Rows) {
+			t.Errorf("%s answers %d of %d questions", competitor.Name, len(competitor.Cells), len(compare.Rows))
 		}
 		for i, cell := range competitor.Cells {
 			if cell.Short == "" || !strings.HasPrefix(cell.Source, "https://") {
-				t.Errorf("%s, %s: answer %q, source %q", competitor.Name, pages.CompareRows[i].Label, cell.Short, cell.Source)
+				t.Errorf("%s, %s: answer %q, source %q", competitor.Name, compare.Rows[i].Label, cell.Short, cell.Source)
 			}
 		}
 		response := serveCompare("/compare/" + competitor.Slug)
