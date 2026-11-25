@@ -126,3 +126,22 @@ func TestTrialButtonAddsTheFirstServerThenSubscribes(t *testing.T) {
 		t.Fatal("a running trial lost Subscribe")
 	}
 }
+
+// An admin of a hub without a GitHub App sees one line with the form that
+// creates it on GitHub; everyone else sees nothing.
+func TestAppOffersTheGitHubAppToItsAdmin(t *testing.T) {
+	manifest := &model.GitHubAppManifest{Action: "https://github.com/settings/apps/new?state=s1", Manifest: `{"name":"moin-hub"}`}
+	page := renderApp(t, ctxkeys.WithGitHubAppManifest(appContext(model.WorkspaceRoleOwner, 1), func() *model.GitHubAppManifest { return manifest }))
+	for _, want := range []string{"No GitHub App yet.", `method="post"`, `action="https://github.com/settings/apps/new?state=s1"`, `name="manifest"`, `value="{&#34;name&#34;:&#34;moin-hub&#34;}"`, `type="submit"`, "Create GitHub App"} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the GitHub App line lacks %s", want)
+		}
+	}
+	card := page[strings.Index(page, "data-github-app-card"):]
+	if card = card[:strings.Index(card, "</form>")]; strings.Contains(card, "csrf_token") {
+		t.Fatal("the form to GitHub carries the CSRF token")
+	}
+	if page := renderAppLayout(t, model.WorkspaceRoleOwner, 1); strings.Contains(page, "data-github-app-card") {
+		t.Fatal("the GitHub App line shows without a manifest")
+	}
+}

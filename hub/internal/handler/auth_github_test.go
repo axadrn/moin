@@ -35,7 +35,7 @@ var (
 // fakeGitHub signs in the account whose login is the code: the code
 // "stranger" is the GitHub account stranger with the verified primary email
 // stranger@example.com.
-func fakeGitHub(t *testing.T, ids map[string]int64) *service.GitHub {
+func fakeGitHub(t *testing.T, ids map[string]int64) *service.GitHubAppService {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		login := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ghu_")
@@ -57,6 +57,16 @@ func fakeGitHub(t *testing.T, ids map[string]int64) *service.GitHub {
 		}
 	}))
 	t.Cleanup(server.Close)
+	github, err := service.NewGitHubAppService(service.GitHubAppSettings{ID: "1", Slug: "moin-test", PrivateKey: githubKeyForTests(t), ClientID: "Iv1.test", ClientSecret: "secret"}, nil, nil, nil, nil, "https://moin.example.com", server.URL, server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return github
+}
+
+// githubKeyForTests is a private key of a GitHub App, made once.
+func githubKeyForTests(t *testing.T) string {
+	t.Helper()
 	githubKeyOnce.Do(func() {
 		key, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
@@ -64,11 +74,7 @@ func fakeGitHub(t *testing.T, ids map[string]int64) *service.GitHub {
 		}
 		githubKey = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
 	})
-	github, err := service.NewGitHub("1", "moin-test", githubKey, "", "Iv1.test", "secret", server.URL, server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return github
+	return githubKey
 }
 
 type githubSignInTest struct {
@@ -124,7 +130,9 @@ func (g githubSignInTest) callback(t *testing.T, state *http.Cookie, code string
 	for _, cookie := range cookies {
 		request.AddCookie(cookie)
 	}
-	ctx := ctxkeys.WithRenderConfig(request.Context(), githubAppConfig.Render())
+	render := githubAppConfig.Render()
+	render.GitHubLogin = true
+	ctx := ctxkeys.WithRenderConfig(request.Context(), render)
 	if user != nil {
 		ctx = ctxkeys.WithUser(ctx, user)
 	}
@@ -147,7 +155,7 @@ func TestGitHubAuthNeedsTheApp(t *testing.T) {
 func TestGitHubAuthUsesOneTimeStateCookie(t *testing.T) {
 	cfg := githubAppConfig
 	cfg.AppEnv = config.EnvironmentProduction
-	handler := &authHandler{cfg: &cfg, github: fakeGitHub(t, nil)}
+	handler := &authHandler{cfg: &cfg, githubApp: fakeGitHub(t, nil)}
 	response := httptest.NewRecorder()
 
 	handler.GitHubAuth(response, httptest.NewRequest(http.MethodGet, "/auth/github", nil))

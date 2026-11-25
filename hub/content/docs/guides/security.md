@@ -226,6 +226,7 @@ All are readable by root only. No other file of moin holds a value: not the comp
 
 - The Cloudflare API token. With it, someone who breaks into the hub can change the DNS of your zones and your tunnels. Give the token only the zones your apps use.
 - Alert targets: Slack and Discord webhooks, Telegram bot tokens, webhook URLs, and the webhook signing secret. With them, someone can post in your channels as moin, or sign fake alerts. Use a channel or bot made only for moin.
+- On a self-hosted hub, the GitHub App it created: its private key, client secret and webhook secret. With them, someone can read the repos you gave the app and set their commit statuses. Give the app only the repos you deploy.
 
 **What stays honest.**
 

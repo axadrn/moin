@@ -18,17 +18,18 @@ import (
 type authHandler struct {
 	authService      *service.AuthService
 	workspaceService *service.WorkspaceService
-	// github signs people in, nil without the GitHub App.
-	github   *service.GitHub
-	passkeys *service.PasskeyService
-	cfg      *config.Config
+	// githubApp signs people in; nil, or without an app, nobody signs in
+	// with GitHub.
+	githubApp *service.GitHubAppService
+	passkeys  *service.PasskeyService
+	cfg       *config.Config
 }
 
-func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, github *service.GitHub, passkeys *service.PasskeyService, cfg *config.Config) *authHandler {
+func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, githubApp *service.GitHubAppService, passkeys *service.PasskeyService, cfg *config.Config) *authHandler {
 	return &authHandler{
 		authService:      authService,
 		workspaceService: workspaceService,
-		github:           github,
+		githubApp:        githubApp,
 		passkeys:         passkeys,
 		cfg:              cfg,
 	}

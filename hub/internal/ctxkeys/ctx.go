@@ -21,6 +21,7 @@ const (
 	RenderConfigKey    contextKey = "render_config"
 	CSRFTokenKey       contextKey = "csrf_token"
 	AdminKey           contextKey = "admin"
+	GitHubAppKey       contextKey = "github_app_manifest"
 )
 
 func User(ctx context.Context) *model.User {
@@ -111,4 +112,19 @@ func CSRFToken(ctx context.Context) string {
 
 func WithCSRFToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, CSRFTokenKey, token)
+}
+
+// GitHubAppManifest is the form that creates the hub's GitHub App, for an
+// admin of a hub without one; else nil. Only a page that shows it builds
+// it.
+func GitHubAppManifest(ctx context.Context) *model.GitHubAppManifest {
+	manifest, _ := ctx.Value(GitHubAppKey).(func() *model.GitHubAppManifest)
+	if manifest == nil {
+		return nil
+	}
+	return manifest()
+}
+
+func WithGitHubAppManifest(ctx context.Context, manifest func() *model.GitHubAppManifest) context.Context {
+	return context.WithValue(ctx, GitHubAppKey, manifest)
 }

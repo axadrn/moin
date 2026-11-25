@@ -34,10 +34,10 @@ var (
 )
 
 type AdminService struct {
-	repository  *repository.Admin
-	users       *repository.Users
-	auth        *AuthService
-	adminEmails map[string]struct{}
+	repository *repository.Admin
+	users      *repository.Users
+	auth       *AuthService
+	admins     HubAdmins
 	// network, when set, counts what moin runs everywhere (UseNetwork).
 	network func() model.Network
 	// subscriptions and activity, when set, show and change who is free
@@ -50,11 +50,7 @@ type AdminService struct {
 }
 
 func NewAdminService(repo *repository.Admin, users *repository.Users, auth *AuthService, adminEmails []string) *AdminService {
-	allowed := make(map[string]struct{}, len(adminEmails))
-	for _, email := range adminEmails {
-		allowed[strings.ToLower(strings.TrimSpace(email))] = struct{}{}
-	}
-	return &AdminService{repository: repo, users: users, auth: auth, adminEmails: allowed}
+	return &AdminService{repository: repo, users: users, auth: auth, admins: NewHubAdmins(adminEmails)}
 }
 
 // UseOffers lets an operator add and apply offers. The hosted hub sets it.
@@ -70,11 +66,7 @@ func (s *AdminService) UsePlans(subscriptions *repository.Subscriptions, activit
 }
 
 func (s *AdminService) IsAdmin(user *model.User, session *model.Session) bool {
-	if user == nil || user.EmailVerifiedAt == nil || session == nil || session.IsImpersonating() {
-		return false
-	}
-	_, ok := s.adminEmails[strings.ToLower(user.Email)]
-	return ok
+	return session != nil && !session.IsImpersonating() && s.admins.Has(user)
 }
 
 // UseOldDomain has the overview show the traffic on the old domains.
@@ -111,7 +103,7 @@ func (s *AdminService) Overview(user *model.User, session *model.Session, query 
 		return nil, err
 	}
 	for i := range users {
-		_, users[i].IsAdmin = s.adminEmails[strings.ToLower(users[i].Email)]
+		users[i].IsAdmin = s.admins.Listed(users[i].Email)
 		if err := s.describePlan(&users[i], now); err != nil {
 			return nil, err
 		}
@@ -148,7 +140,7 @@ func (s *AdminService) User(actor *model.User, actorSession *model.Session, user
 	if err != nil {
 		return nil, err
 	}
-	_, user.IsAdmin = s.adminEmails[strings.ToLower(user.Email)]
+	user.IsAdmin = s.admins.Listed(user.Email)
 	if err := s.describePlan(user, now); err != nil {
 		return nil, err
 	}
@@ -191,7 +183,7 @@ func (s *AdminService) StartImpersonation(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return err
 	}
-	if _, isAdmin := s.adminEmails[strings.ToLower(target.Email)]; isAdmin {
+	if s.admins.Listed(target.Email) {
 		return ErrAdminTargetIsOperator
 	}
 	impersonationSession, err := s.auth.StartImpersonation(w, r, actor.ID, target.ID)

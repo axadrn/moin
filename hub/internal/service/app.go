@@ -93,7 +93,7 @@ type AppService struct {
 	apps       *repository.Apps
 	servers    *ServerService
 	box        *secret.Box
-	github     *GitHub
+	githubApp  *GitHubAppService
 	cloudflare *Cloudflare
 	now        func() time.Time
 	// publicOnly has uptime checks refuse private or local addresses.
@@ -305,7 +305,7 @@ func (s *AppService) Deploy(ctx context.Context, actor Actor, idOrName, image, r
 		return nil, err
 	}
 	if app.Repo != "" {
-		if s.github == nil {
+		if s.gitHub() == nil {
 			return nil, ErrGitHubOff
 		}
 		ref = cmp.Or(ref, app.Branch)
