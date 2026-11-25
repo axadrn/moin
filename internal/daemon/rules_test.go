@@ -106,7 +106,15 @@ func TestSourcesComeOnlyFromGitHub(t *testing.T) {
 	if name, err := sourceName("https://api.github.com/repos/acme/blog/tarball/abc123"); err != nil || name != "github.com/acme/blog" {
 		t.Fatalf("the GitHub tarball = %q, %v", name, err)
 	}
-	for _, raw := range []string{"https://bucket.example/acme/uploads/x.tar.gz", "https://api.github.com/repos/acme/blog/zipball/abc123"} {
+	for _, raw := range []string{
+		"https://bucket.example/acme/uploads/x.tar.gz",
+		"https://api.github.com/repos/acme/blog/zipball/abc123",
+		"https://evil.example/repos/acme/blog/tarball/abc123",
+		"http://api.github.com/repos/acme/blog/tarball/abc123",
+		"https://api.github.com.evil.example/repos/acme/blog/tarball/abc123",
+		"https://api.github.com:8443/repos/acme/blog/tarball/abc123",
+		"file:///repos/acme/blog/tarball/abc123",
+	} {
 		err := download(context.Background(), protocol.DeployStart{SourceURL: raw}, t.TempDir())
 		if err == nil || !strings.Contains(err.Error(), "only from a GitHub repo") {
 			t.Errorf("%s: err = %v", raw, err)

@@ -13,8 +13,8 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// secure sets how a server is reached; flags it does not get keep their
-// value.
+// secure shows how a server is reached, or sets it; flags it does not
+// get keep their value. Without flags it only shows.
 func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]").withYes()
 	tunnel := flags.String("tunnel", "", "on: visitors come through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
@@ -39,6 +39,10 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return fmt.Errorf("no server %s", flags.Arg(0))
 	}
 	server := servers[index]
+	if *tunnel == "" && *ssh == "" && *firewall == "" {
+		printSecurity(stdout, server)
+		return nil
+	}
 	now := client.Security{Tunnel: server.Tunnel, SSH: server.SSH, Firewall: server.Firewall}
 	security := now
 	for _, setting := range []struct {

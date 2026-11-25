@@ -63,8 +63,8 @@ func (m model) appActions(name string) []action {
 		out = append(out, action{"D", "deploy this dir's commit", func(m model) (tea.Model, tea.Cmd) { return m.confirmDeployDir() }})
 	}
 	if a.Catalog != "" {
-		out = append(out, action{"U", "update release", func(m model) (tea.Model, tea.Cmd) {
-			return m.ask1("Update "+name+"?", "It installs the newest release of "+a.Catalog+". A restore can go back to before it.", "update", false, m.updateCatalogApp(name)), nil
+		out = append(out, action{"U", "update version", func(m model) (tea.Model, tea.Cmd) {
+			return m.ask1("Update "+name+"?", "It installs the newest version of "+a.Catalog+". A restore can go back to before it.", "update", false, m.updateCatalogApp(name)), nil
 		}})
 	}
 	pinWord := "pin"
@@ -94,8 +94,8 @@ func (m model) webPages() []page {
 		data = page{"d", "Data of " + app, "Browse and edit the rows of its databases.", "/apps/" + m.appLink(app) + "/data"}
 	}
 	out := []page{
-		{"a", "Servers", "Add, rename, order and remove servers.", "/servers"},
-		{"p", "Apps", "Create, order and remove apps.", "/apps"},
+		{"a", "Servers", "Add, rename and remove servers.", "/servers"},
+		{"p", "Apps", "Create and remove apps.", "/apps"},
 		{"c", "Catalog", "Pick an app and fill in its form once.", "/catalog"},
 		{"t", "Team", "Invite people and change roles.", "/workspace"},
 		{"g", "Connect GitHub", "GitHub asks for a browser to install the app.", "/github/install"},

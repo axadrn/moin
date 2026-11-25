@@ -350,7 +350,7 @@ func (m model) setEnv(app string, set map[string]string, unset []string) tea.Cmd
 		}
 		return tea.BatchMsg{
 			func() tea.Msg { return envMsg{app, env} },
-			func() tea.Msg { return noticeMsg("Saved. The next deploy of " + app + " gets it; R redeploys now") },
+			func() tea.Msg { return noticeMsg("Saved. " + app + " gets it when it restarts; T restarts now") },
 		}
 	}
 }

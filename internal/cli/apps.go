@@ -216,7 +216,7 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 			domainText += " (canonical " + app.Canonical + ")"
 		}
 	}
-	from := "your folder, " + build.Name + " deploy"
+	from := "neither yet: " + build.Name + " link follows a repo, " + build.Name + " hook turns on CI"
 	switch app.DeployFrom {
 	case "github":
 		auto := "every push"

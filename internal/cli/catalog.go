@@ -15,7 +15,7 @@ import (
 	"github.com/axadrn/moin/internal/style"
 )
 
-// catalog lists the catalog, shows one app with its releases, or installs
+// catalog lists the catalog, shows one app with its versions, or installs
 // one: catalog, catalog <app>, catalog install <app> --server <server>.
 func catalog(ctx context.Context, args []string, stdout io.Writer) error {
 	if len(args) > 0 && args[0] == "install" {
@@ -61,7 +61,7 @@ func catalog(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
-// printCatalogApp shows a catalog app and its releases, newest first.
+// printCatalogApp shows a catalog app and its versions, newest first.
 func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 	fmt.Fprintln(stdout, style.Bold.Render(entry.Name)+" "+entry.Pitch)
 	fmt.Fprintln(stdout, style.Muted.Render(entry.Website+" · "+entry.License+" · "+entry.Image))
@@ -93,7 +93,7 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 		rows = append(rows, []string{version.Tag, date})
 	}
 	if len(rows) == 0 {
-		fmt.Fprintln(stdout, style.Muted.Render("No releases read from the registry yet. Try again in a minute."))
+		fmt.Fprintln(stdout, style.Muted.Render("No versions read from the registry yet. Try again in a minute."))
 	} else {
 		table(stdout, []string{"VERSION", "RELEASED"}, rows)
 		if more := len(entry.Versions) - len(shown); more > 0 {
@@ -111,7 +111,7 @@ func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
 func catalogInstall(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("catalog install", "catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]")
 	server := flags.String("server", "", "the server to install it on")
-	version := flags.String("version", "", "a release from moin catalog <app>; default the newest")
+	version := flags.String("version", "", "a version from moin catalog <app>; default the newest")
 	name := flags.String("name", "", "the app name; default the catalog app's")
 	domain := flags.String("domain", "", "a domain for the app")
 	if err := flags.parse(args); err != nil {
