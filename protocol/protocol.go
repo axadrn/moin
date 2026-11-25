@@ -14,21 +14,16 @@ import (
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
 // which was called the agent before (legacy.go); version 4 the command the
 // daemon masks for the activity (ExecDone.Command); version 5 secrets that
-// live only on the server (secrets.go); version 6 the secrets the server
-// makes itself (EnvSet.Generate).
-const Version = 6
+// live only on the server (secrets.go).
+const Version = 5
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
 // sending it. Since version 5 deploys, backups and the server config take
 // their secrets from the server: an older daemon would run them without.
-// Since version 6 the server makes the secrets of a catalog app: an
-// older daemon would make none.
 func Needs(messageType MessageType) int {
 	switch messageType {
-	case TypeEnvSet:
-		return 6
-	case TypeDeployStart, TypeBackupConfig, TypeServerConfig, TypeSecretSet, TypeBucketSet, TypeBackupLink:
+	case TypeDeployStart, TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
 		return 5
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2

@@ -95,13 +95,6 @@ func (f *fakeDaemon) envOf(app string) map[string]string {
 		for _, key := range set.Remove {
 			delete(env, key)
 		}
-		// As the daemon does: a key it has keeps its value. The value
-		// names the message, so a test sees which one made it.
-		for _, key := range set.Generate {
-			if _, ok := env[key]; !ok {
-				env[key] = "made by " + message.RequestID
-			}
-		}
 	}
 	return env
 }

@@ -3,28 +3,41 @@ package daemon
 import (
 	"testing"
 
+	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestGenerateEnv: the server makes a value for each key of Generate the
-// app has none for, and keeps the ones it has, so the hub never sees them.
-func TestGenerateEnv(t *testing.T) {
+// TestMakeSecrets: a catalog deploy makes a value for each secret its
+// compose file needs that the app lacks, and keeps the ones it has.
+func TestMakeSecrets(t *testing.T) {
 	a := newApps(t.TempDir(), nil)
-	if _, err := a.setEnv(protocol.EnvSet{App: "web", Set: map[string]string{"DB_PASSWORD": "kept"}}); err != nil {
+	if _, err := a.setEnv(protocol.EnvSet{App: "flux", Set: map[string]string{"VERSION": "2.2.0", "ADMIN_PASSWORD": "kept"}}); err != nil {
 		t.Fatal(err)
 	}
-	kept, err := a.setEnv(protocol.EnvSet{App: "web", Generate: []string{"DB_PASSWORD", "APP_SECRET"}})
+	if err := a.makeSecrets("flux", "miniflux"); err != nil {
+		t.Fatal(err)
+	}
+	env, err := a.env("flux")
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := a.env("web")
-	if err != nil {
+	compose, _ := catalog.Compose("miniflux")
+	for _, name := range catalog.Secrets(compose) {
+		if env[name] == "" {
+			t.Errorf("%s was not made", name)
+		}
+	}
+	if env["ADMIN_PASSWORD"] != "kept" || env["VERSION"] != "2.2.0" {
+		t.Errorf("env = %v", env)
+	}
+	made := env["DB_PASSWORD"]
+	if err := a.makeSecrets("flux", "miniflux"); err != nil {
 		t.Fatal(err)
 	}
-	if env["DB_PASSWORD"] != "kept" || len(env["APP_SECRET"]) != 43 || len(kept.Keys) != 2 {
-		t.Errorf("env = %v, keys %v", env, kept.Keys)
+	if again, _ := a.env("flux"); again["DB_PASSWORD"] != made {
+		t.Error("a second deploy made the secret again")
 	}
-	if _, err := a.setEnv(protocol.EnvSet{App: "web", Generate: []string{"bad key"}}); err == nil {
-		t.Error("a bad key was made")
+	if err := a.makeSecrets("flux", "no-such-app"); err == nil {
+		t.Error("an app the catalog lacks made secrets")
 	}
 }

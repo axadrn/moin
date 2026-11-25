@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	catalogfiles "github.com/axadrn/moin/catalog"
 )
 
 // TestEntries: every entry in catalog/ loads and is valid, so a
@@ -72,13 +74,6 @@ func TestLoginSecrets(t *testing.T) {
 	entry := Entry{Login: "Sign in as admin with the password in ADMIN_PASSWORD.", Secrets: []string{"ADMIN_PASSWORD", "DB_PASSWORD"}}
 	if got := entry.LoginSecrets(); !slices.Equal(got, []string{"ADMIN_PASSWORD"}) {
 		t.Errorf("LoginSecrets = %v", got)
-	}
-}
-
-func TestSecrets(t *testing.T) {
-	compose := []byte("image: a:${VERSION}\nA: ${DB_PASSWORD}\nB: ${APP_SECRET}\nC: ${DB_PASSWORD}\nD: ${OPTIONAL:-x}\nE: $PLAIN\n")
-	if got := Secrets(compose); !slices.Equal(got, []string{"APP_SECRET", "DB_PASSWORD"}) {
-		t.Errorf("Secrets = %v", got)
 	}
 }
 
@@ -202,7 +197,7 @@ func TestAppDomain(t *testing.T) {
 	if !entry.NeedsURL() {
 		t.Error("APP_DOMAIN needs no domain")
 	}
-	if got := Secrets(entry.Compose); !slices.Equal(got, []string{"KEY"}) {
+	if got := catalogfiles.Secrets(entry.Compose); !slices.Equal(got, []string{"KEY"}) {
 		t.Errorf("secrets = %v", got)
 	}
 }

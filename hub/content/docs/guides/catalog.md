@@ -19,9 +19,9 @@ API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
 
-It creates the app, sets `VERSION` and deploys. The server makes every secret itself, as an env var, so the hub never sees it. Without a version it takes the newest. The server must be online.
+It creates the app, sets `VERSION` and deploys. The server makes every secret itself when it deploys, as an env var, so the hub never sees it. Without a version it takes the newest. The server must be online.
 
-Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password, such as `ADMIN_PASSWORD`, the hub makes that one, passes it to the server once and shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. The password of the app's [instant address](/docs/guides/domains#instant-address) shows the same way, once. Keep them in your password manager. Env values are write-only, so moin never shows it again.
+Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password, such as `ADMIN_PASSWORD`, the hub makes that one, passes it to the server once and shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. The password of the app's [instant address](/docs/guides/domains#instant-address) shows the same way, once. Keep them in your password manager. Env values are write-only, so moin never shows it again. A sign-in password a later version asks for is made by the server and never shown: set your own with `moin env set`.
 
 ## See the catalog
 

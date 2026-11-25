@@ -1,9 +1,6 @@
 package protocol
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"strings"
 	"time"
 )
@@ -22,26 +19,6 @@ type EnvSet struct {
 	App    string            `json:"app"`
 	Set    map[string]string `json:"set,omitempty"`
 	Remove []string          `json:"remove,omitempty"`
-	// Generate names the keys the server gives a random value
-	// (NewSecret) when app.env has none yet, such as the database password
-	// of a catalog app. The hub never sees those values.
-	Generate []string `json:"generate,omitempty"`
-}
-
-// NewSecret is 32 random bytes as URL-safe text: fine in a database URL,
-// a header or YAML. Some apps want a key in hex: a name that ends in _HEX
-// gets 32 bytes as 64 hex digits, one that ends in _HEX16 16 bytes as 32.
-func NewSecret(name string) string {
-	size, encode := 32, base64.RawURLEncoding.EncodeToString
-	switch {
-	case strings.HasSuffix(name, "_HEX16"):
-		size, encode = 16, hex.EncodeToString
-	case strings.HasSuffix(name, "_HEX"):
-		encode = hex.EncodeToString
-	}
-	buffer := make([]byte, size)
-	_, _ = rand.Read(buffer)
-	return encode(buffer)
 }
 
 // AppEnv names the env keys an app has on the server, from its app.env,

@@ -1108,6 +1108,14 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 			slog.Warn("daemon reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
 		}
+		// The env keys the deploy left: it may have made the secrets of
+		// a catalog app.
+		if done.Env != nil {
+			err := s.apps.KeepEnv(app.ID, cleanEnvKeys(done.Env.Keys), s.now().UTC())
+			if err != nil {
+				slog.Error("store the env keys of a deploy failed", "app_id", app.ID, "error", err)
+			}
+		}
 		s.rememberDeploy(done.DeployID, done)
 		s.finish(done.DeployID, done)
 	}
@@ -1294,14 +1302,6 @@ func (s *AppService) EnvVars(workspaceID, idOrName string) ([]model.EnvVar, erro
 // when they changed. They take effect with the next deploy. removed are
 // the keys of unset the app had; the others were not set.
 func (s *AppService) SetEnv(ctx context.Context, actor Actor, idOrName string, set map[string]string, unset []string) (removed []string, err error) {
-	return s.changeEnv(ctx, actor, idOrName, protocol.EnvSet{Set: set, Remove: unset})
-}
-
-// changeEnv sets, removes and generates env vars (EnvSet): the server
-// makes a value for each key of Generate the app has none for, so the hub
-// never sees it. removed are the keys of Remove the app had.
-func (s *AppService) changeEnv(ctx context.Context, actor Actor, idOrName string, change protocol.EnvSet) (removed []string, err error) {
-	set, unset := change.Set, change.Remove
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -1332,17 +1332,11 @@ func (s *AppService) changeEnv(ctx context.Context, actor Actor, idOrName string
 		}
 		delete(current, key)
 	}
-	for _, key := range change.Generate {
-		if !envKeyPattern.MatchString(key) {
-			return nil, ErrEnvKey
-		}
-		current[key] = true
-	}
 	if len(current) > maxEnvVars {
 		return nil, ErrEnvLimit
 	}
 	keys := slices.Sorted(maps.Keys(set))
-	if len(keys) == 0 && len(removed) == 0 && len(change.Generate) == 0 {
+	if len(keys) == 0 && len(removed) == 0 {
 		return nil, nil
 	}
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
@@ -1352,7 +1346,7 @@ func (s *AppService) changeEnv(ctx context.Context, actor Actor, idOrName string
 	ctx, cancel := context.WithTimeout(ctx, secretTimeout)
 	defer cancel()
 	var kept protocol.AppEnv
-	err = s.servers.Request(ctx, server.ID, protocol.TypeEnvSet, protocol.EnvSet{App: app.Folder, Set: set, Remove: removed, Generate: change.Generate}, &kept)
+	err = s.servers.Request(ctx, server.ID, protocol.TypeEnvSet, protocol.EnvSet{App: app.Folder, Set: set, Remove: removed}, &kept)
 	if errors.Is(err, ErrServerOffline) {
 		return nil, &OfflineError{Server: server.Name}
 	}

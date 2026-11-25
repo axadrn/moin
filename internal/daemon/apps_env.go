@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/internal/dotenv"
 	"github.com/axadrn/moin/protocol"
 )
@@ -37,8 +38,7 @@ func (a *apps) env(app string) (map[string]string, error) {
 	return env, nil
 }
 
-// setEnv sets and removes env values of an app, makes a random value for
-// each key of Generate the app has none for (EnvSet), and answers the
+// setEnv sets and removes env values of an app (EnvSet) and answers the
 // keys the file has now. The file is replaced in one step, so a deploy
 // reads it whole, before or after.
 func (a *apps) setEnv(request protocol.EnvSet) (protocol.AppEnv, error) {
@@ -60,19 +60,44 @@ func (a *apps) setEnv(request protocol.EnvSet) (protocol.AppEnv, error) {
 	for _, key := range request.Remove {
 		delete(env, key)
 	}
-	for _, key := range request.Generate {
-		if !envNamePattern.MatchString(key) {
-			return protocol.AppEnv{}, fmt.Errorf("invalid env key %q", key)
-		}
-		if _, ok := env[key]; !ok {
-			env[key] = protocol.NewSecret(key)
-		}
-	}
 	if err := writeEnv(a.envFile(request.App), env); err != nil {
 		return protocol.AppEnv{}, err
 	}
-	slog.Info("env set", "app", request.App, "set", slices.Sorted(maps.Keys(request.Set)), "removed", request.Remove, "generated", request.Generate)
+	slog.Info("env set", "app", request.App, "set", slices.Sorted(maps.Keys(request.Set)), "removed", request.Remove)
 	return a.envKeys(request.App), nil
+}
+
+// makeSecrets gives each secret the compose file of the catalog app slug
+// needs a random value, when the app has none yet. The server makes them,
+// so they never pass the hub, and a newer version that asks for a new one
+// gets it on its update.
+func (a *apps) makeSecrets(app, slug string) error {
+	compose, ok := catalog.Compose(slug)
+	if !ok {
+		return fmt.Errorf("the catalog of this daemon has no %s: update the daemon", slug)
+	}
+	a.envMu.Lock()
+	defer a.envMu.Unlock()
+	env, err := a.env(app)
+	if err != nil {
+		return err
+	}
+	made := []string{}
+	for _, name := range catalog.Secrets(compose) {
+		if _, ok := env[name]; !ok {
+			env[name] = catalog.NewSecret(name)
+			made = append(made, name)
+		}
+	}
+	if len(made) == 0 {
+		return nil
+	}
+	err = writeEnv(a.envFile(app), env)
+	if err != nil {
+		return err
+	}
+	slog.Info("secrets made", "app", app, "keys", made)
+	return nil
 }
 
 // envKeys names the keys of the app's env file and when it last changed,
@@ -109,11 +134,11 @@ func (a *apps) allEnvKeys() map[string]protocol.AppEnv {
 // ensureEnv makes an empty env file for an app that has none, so every
 // release can name it.
 func (a *apps) ensureEnv(app string) error {
+	a.envMu.Lock()
+	defer a.envMu.Unlock()
 	if exists(a.envFile(app)) {
 		return nil
 	}
-	a.envMu.Lock()
-	defer a.envMu.Unlock()
 	return writeEnv(a.envFile(app), map[string]string{})
 }
 

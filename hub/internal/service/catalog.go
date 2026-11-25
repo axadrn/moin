@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/internal/build"
@@ -27,8 +28,8 @@ var (
 
 // CatalogService installs the apps of the catalog and updates them. An
 // install is an ordinary app: its compose.yml from the catalog goes to
-// the server like a deploy from the CLI, its secrets are env vars, and
-// VERSION picks the image tag. moin keeps the version in the app too, as
+// the server like a deploy from the CLI, its secrets are env vars the
+// server makes itself, and VERSION picks the image tag. moin keeps the version in the app too, as
 // env values are write-only.
 type CatalogService struct {
 	store *catalog.Store
@@ -100,10 +101,11 @@ type CatalogApp struct {
 	Newer bool
 }
 
-// Install creates the app on a server, gives it its secrets and VERSION,
-// and deploys it. login are the values of the secrets the first sign-in
-// needs (Entry.LoginSecrets), for the person who installs: env values are
-// write-only, so this is the one time they are shown.
+// Install creates the app on a server, sets VERSION and deploys it; the
+// server makes the other secrets. login are the values of the secrets the
+// first sign-in needs (Entry.LoginSecrets), which the hub makes for the
+// person who installs: env values are write-only, so this is the one time
+// they are shown.
 func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (app *model.App, deploy *model.Deploy, login map[string]string, err error) {
 	entry, ok := s.store.Entry(strings.TrimSpace(input.Slug))
 	if !ok {
@@ -147,19 +149,20 @@ func (s *CatalogService) Install(ctx context.Context, actor Actor, input Catalog
 		return app, nil, nil, err
 	}
 	app.Catalog, app.CatalogVersion = entry.Slug, version
-	// The server makes the secrets itself, so the hub never sees them. The
-	// password to log in with is the one it sees: it shows it once.
-	env := map[string]string{catalog.VersionVar: version}
+	// The server makes the secrets itself when it deploys, so the hub never
+	// sees them. The password to log in with is the one the hub makes: it
+	// shows it once.
+	env := map[string]string{catalogfiles.VersionVar: version}
 	login = map[string]string{}
 	for _, name := range entry.LoginSecrets() {
-		login[name] = protocol.NewSecret(name)
+		login[name] = catalogfiles.NewSecret(name)
 		env[name] = login[name]
 	}
 	if entry.NeedsURL() {
-		env[catalog.URLVar] = "https://" + domain
-		env[catalog.DomainVar] = domain
+		env[catalogfiles.URLVar] = "https://" + domain
+		env[catalogfiles.DomainVar] = domain
 	}
-	_, err = s.apps.changeEnv(ctx, actor, app.ID, protocol.EnvSet{Set: env, Generate: entry.Secrets})
+	_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
 	if err != nil {
 		return app, nil, nil, err
 	}
@@ -196,19 +199,17 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 		return app, nil, err
 	}
 	// A newer compose.yml may ask for a secret the app does not have yet:
-	// the server makes it, and keeps the ones the app has.
-	change := protocol.EnvSet{Generate: entry.Secrets}
+	// the server makes it when it deploys.
 	if app.CatalogVersion != version {
-		change.Set = map[string]string{catalog.VersionVar: version}
+		_, err = s.apps.SetEnv(ctx, actor, app.ID, map[string]string{catalogfiles.VersionVar: version}, nil)
+		if err == nil {
+			err = s.apps.apps.SetCatalogVersion(app.ID, version)
+		}
+		if err != nil {
+			return app, nil, err
+		}
+		app.CatalogVersion = version
 	}
-	_, err = s.apps.changeEnv(ctx, actor, app.ID, change)
-	if err == nil {
-		err = s.apps.apps.SetCatalogVersion(app.ID, version)
-	}
-	if err != nil {
-		return app, nil, err
-	}
-	app.CatalogVersion = version
 	deploy, err := s.deploy(ctx, actor, "app.updated", app, entry, version)
 	if err == nil {
 		s.apps.markUpdate(deploy.ID, version)

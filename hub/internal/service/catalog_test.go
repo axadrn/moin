@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,8 +25,8 @@ func newCatalogService(t *testing.T) (*CatalogService, *AppService, *fakeDaemon)
 	return NewCatalogService(store, apps), apps, daemon
 }
 
-// TestCatalogInstall: an install creates the app, gives it VERSION and a
-// fresh secret for every ${NAME} of its compose.yml, and has the daemon
+// TestCatalogInstall: an install creates the app, gives it VERSION, leaves
+// the secrets of its compose.yml to the server, and has the daemon
 // deploy the app by name, from its own catalog: no bucket, no compose file
 // from the hub.
 func TestCatalogInstall(t *testing.T) {
@@ -37,9 +38,10 @@ func TestCatalogInstall(t *testing.T) {
 	if app.Name != "umami" || app.Catalog != "umami" || deploy.Number != 1 || len(login) != 0 {
 		t.Errorf("app %s catalog %q, deploy %d, login %v", app.Name, app.Catalog, deploy.Number, login)
 	}
+	// The hub sets the version; the server makes the secrets when it
+	// deploys, so the hub never sends one.
 	env := daemon.env(t, app.Folder)
-	// The server makes the secrets (EnvSet.Generate).
-	if env["VERSION"] != "3.4.1" || env["DB_PASSWORD"] == "" || env["APP_SECRET"] == "" {
+	if env["VERSION"] != "3.4.1" || env["DB_PASSWORD"] != "" || env["APP_SECRET"] != "" {
 		t.Errorf("env = %v", env)
 	}
 	var start protocol.DeployStart
@@ -64,13 +66,27 @@ func TestCatalogInstallShowsTheLogin(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := daemon.env(t, app.Folder)
-	if len(login) != 1 || login["ADMIN_PASSWORD"] == "" || login["ADMIN_PASSWORD"] != env["ADMIN_PASSWORD"] || env["DB_PASSWORD"] == "" {
-		t.Errorf("login = %v", login)
+	if len(login) != 1 || login["ADMIN_PASSWORD"] == "" || login["ADMIN_PASSWORD"] != env["ADMIN_PASSWORD"] {
+		t.Errorf("login = %v, env %v", login, env)
 	}
-	var set protocol.EnvSet
-	daemon.last(t, protocol.TypeEnvSet, &set)
-	if _, sent := set.Set["DB_PASSWORD"]; sent || !slices.Contains(set.Generate, "DB_PASSWORD") {
-		t.Errorf("env.set = %+v, want DB_PASSWORD made on the server", set)
+	// Only the version and the sign-in password go to the server.
+	if keys := slices.Sorted(maps.Keys(env)); !slices.Equal(keys, []string{"ADMIN_PASSWORD", "VERSION"}) {
+		t.Errorf("the hub sent %v", keys)
+	}
+}
+
+// TestDeployDoneKeepsTheEnvKeys: the secrets the server made on a deploy
+// show as keys in moin, never as values.
+func TestDeployDoneKeepsTheEnvKeys(t *testing.T) {
+	catalogs, apps, _ := newCatalogService(t)
+	app, deploy, _, err := catalogs.Install(context.Background(), owner, CatalogInstall{Slug: "miniflux", Server: "web-1", Version: "2.2.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, apps.servers, app.ServerID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Env: &protocol.AppEnv{Keys: []string{"ADMIN_PASSWORD", "DB_PASSWORD", "VERSION"}}})
+	vars, err := apps.EnvVars(owner.WorkspaceID, app.ID)
+	if err != nil || len(vars) != 3 || vars[1].Key != "DB_PASSWORD" {
+		t.Fatalf("env vars = %+v, %v", vars, err)
 	}
 }
 
