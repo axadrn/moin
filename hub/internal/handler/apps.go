@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -152,6 +154,12 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 				view.Logs.Message = errorMessage(err)
 			}
 		}
+	case "settings":
+		_, text, err := h.apps.ComposeFile(workspace.ID, app.ID)
+		view.ComposeFile = &pages.ComposeFileView{Text: text}
+		if err != nil {
+			view.ComposeFile.Message = errorMessage(err)
+		}
 	case "domains":
 		if domains, err := h.domainsView(r, ""); err == nil {
 			view.Domains = &domains
@@ -161,6 +169,24 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		}
 	}
 	render(w, r, pages.AppPage(view))
+}
+
+// ComposeFile downloads the compose file of the app's live deploy as
+// compose.yml.
+func (h *AppsHandler) ComposeFile(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	_, text, err := h.apps.ComposeFile(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		status, detail, known := api.ErrorFor(err)
+		if !known {
+			slog.Error("load the compose file failed", "error", err)
+		}
+		http.Error(w, detail.Message, status)
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="compose.yml"`)
+	_, _ = io.WriteString(w, text)
 }
 
 // Detail answers the state and the buttons of an app, after a change. The

@@ -62,15 +62,15 @@ func TestRailpackDocker(t *testing.T) {
 				t.Fatalf("detected = %+v", detected)
 			}
 			t.Logf("Railpack: %s", detected.Builder)
-			composeFile := filepath.Join(releaseDir, "compose.json")
+			composeJSON := filepath.Join(releaseDir, "compose.json")
 			start := protocol.DeployStart{App: app, Number: 1}
-			err = finish(&release{start: start, config: config, detected: detected, composeFile: composeFile, envFile: a.envFile(app), env: env})
+			err = finish(&release{start: start, config: config, detected: detected, composeJSON: composeJSON, envFile: a.envFile(app), env: env})
 			if err != nil {
 				t.Fatal(err)
 			}
 			// The container reads the values from the env file, as for every
 			// app; the build and its secrets only name them.
-			body, _ := os.ReadFile(composeFile)
+			body, _ := os.ReadFile(composeJSON)
 			var written map[string]any
 			json.Unmarshal(body, &written)
 			build, _ := json.Marshal(written["services"].(map[string]any)["web"].(map[string]any)["build"])
@@ -80,7 +80,7 @@ func TestRailpackDocker(t *testing.T) {
 			}
 			var log strings.Builder
 			logf := func(format string, args ...any) { fmt.Fprintf(&log, format+"\n", args...) }
-			args := []string{"compose", "-p", project(app), "-f", composeFile, "--env-file", a.envFile(app)}
+			args := []string{"compose", "-p", project(app), "-f", composeJSON, "--env-file", a.envFile(app)}
 			err = a.run(ctx, logf, nil, append(args, "--progress", "plain", "build")...)
 			if err != nil {
 				t.Fatalf("build: %v\n%s", err, tail(log.String(), 40))

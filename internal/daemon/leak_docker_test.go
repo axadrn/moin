@@ -29,7 +29,7 @@ import (
 // see the secret, and the proxy asks for the app's one password, through a
 // restart with a new password and rollbacks with it on and off. Yet no file of the daemon but app.env
 // and the htpasswd files holds the secret or a password hash, and neither
-// does any message the daemon sends.
+// does any message the daemon sends, the compose file of each deploy too.
 func TestNoEnvValueLeaks(t *testing.T) {
 	if exec.Command("docker", "inspect", proxyName).Run() == nil {
 		t.Skipf("a %s runs on this machine: the test would replace it", proxyName)
@@ -127,7 +127,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 			t.Errorf("worker lacks its env_file:\n%s", worker)
 		}
 		if t.Failed() {
-			body, _ := os.ReadFile(a.composeFile(app))
+			body, _ := os.ReadFile(a.composeJSON(app))
 			version, _ := exec.Command("docker", "compose", "version").CombinedOutput()
 			t.Fatalf("%s%s", version, body)
 		}
@@ -181,6 +181,23 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
+	// Every deploy sends its compose file, with ${DB_PASSWORD} as written.
+	// The scan of the messages below covers it, and docker compose reads
+	// it as it is, next to a .env, the repo's env file and a password.
+	for _, value := range done {
+		if !strings.Contains(value.ComposeFile, "${DB_PASSWORD}") {
+			t.Errorf("deploy %s sent the compose file:\n%s", value.DeployID, value.ComposeFile)
+		}
+	}
+	elsewhere := t.TempDir()
+	for name, body := range map[string]string{"compose.yml": done[2].ComposeFile, ".env": "DB_PASSWORD=x\nREPO_VAR=y\n", "worker.env": "WORKER_PASSWORD=${DB_PASSWORD}\n", "htpasswd": "ada:x\n"} {
+		if err := os.WriteFile(filepath.Join(elsewhere, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if out, err := exec.Command("docker", "compose", "--project-directory", elsewhere, "-f", filepath.Join(elsewhere, "compose.yml"), "config", "-q").CombinedOutput(); err != nil {
+		t.Errorf("docker compose does not read the compose file: %v %s\n%s", err, out, done[2].ComposeFile)
+	}
 	for _, body := range sent {
 		for _, leak := range leaks {
 			// JSON writes $ as it is; a hash has no characters it escapes.

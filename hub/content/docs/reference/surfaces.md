@@ -27,6 +27,7 @@ Everything works in the web app, the [CLI](/docs/reference/cli), the [API](/docs
 | Restart, stop, start | ✓ | ✓ | ✓ `T`, `S` | ✓ | ✓ |
 | Container logs | ✓ | ✓ `logs` | ✓ live, with a filter | ✓ | ✓ |
 | Run a command in a container | ✓ | ✓ `exec` | ✓ `X` | ✓ | ✓ |
+| The compose file moin runs, to run it elsewhere | ✓ copy, download | ✓ `compose` | ✓ `C` opens the web | ✓ | ✓ `get_compose_file` |
 | Env vars: names and dates, set, remove; values are write-only and live only on the server | ✓ | ✓ `env` | ✓ | ✓ | ✓ |
 | Env vars as one `.env` | ✓ | ✓ `env push` | ✓ in `$EDITOR` | ✓ | ✓ |
 | Domains and their DNS | ✓ | ✓ `domains` | ✓ | ✓ | ✓ |

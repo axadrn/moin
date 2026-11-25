@@ -227,12 +227,12 @@ func (a *apps) stop(ctx context.Context, app string) error {
 	if current == 0 {
 		return errors.New("the app has no release on this server")
 	}
-	_, err := a.output(ctx, "docker", a.composeArgs(app, a.composeFile(app), "stop")...)
+	_, err := a.output(ctx, "docker", a.composeArgs(app, a.composeJSON(app), "stop")...)
 	return err
 }
 
-// composeFile is the compose file of the app's live deploy.
-func (a *apps) composeFile(app string) string {
+// composeJSON is the compose.json moin runs for the app's live deploy.
+func (a *apps) composeJSON(app string) string {
 	return filepath.Join(a.releaseDir(app, a.current(app)), "compose.json")
 }
 

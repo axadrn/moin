@@ -927,6 +927,32 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
+// compose prints the compose file of the app's live deploy, as it is, so
+// it pipes to a file: compose > compose.yml.
+func compose(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("compose", "compose [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	file, err := api.ComposeFile(ctx, name)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(stdout, file.Text)
+	return err
+}
+
 // envCommands are the subcommands of env. Any other first argument is the
 // app whose env vars to list.
 var envCommands = []string{"set", "rm", "push"}

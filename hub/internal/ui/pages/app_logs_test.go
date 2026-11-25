@@ -53,3 +53,27 @@ func TestAppRepoLoadsOnlyTheRepos(t *testing.T) {
 		t.Errorf("linked: no repo or Unlink: %s", page)
 	}
 }
+
+// Settings shows the compose file of the live deploy to copy and download,
+// or why there is none.
+func TestAppComposeFile(t *testing.T) {
+	app := model.App{Name: "shop", LiveNumber: 3, LatestNumber: 3}
+	render := func(file *ComposeFileView) string {
+		var html strings.Builder
+		view := AppPageView{App: app, Section: "settings", ComposeFile: file}
+		if err := AppPage(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop/settings"), &html); err != nil {
+			t.Fatal(err)
+		}
+		return html.String()
+	}
+	page := render(&ComposeFileView{Text: "name: shop\nservices:\n  web:\n    image: ghcr.io/me/shop:1\n"})
+	for _, want := range []string{`id="compose-file"`, `data-copy-target="#compose-file-text"`, "image: ghcr.io/me/shop:1", `href="/app/tiny-rocket-co/apps/shop/compose.yml"`, `download="compose.yml"`, "docker compose up -d"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the compose file lacks %s", want)
+		}
+	}
+	page = render(&ComposeFileView{Message: "Deploy again to see the file."})
+	if !strings.Contains(page, "Deploy again to see the file.") || strings.Contains(page, "data-compose-download") {
+		t.Error("without a file: no reason, or a Download")
+	}
+}

@@ -479,6 +479,24 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, Logs{Lines: lines})
 }
 
+// ComposeFile is the compose file of an app's live deploy, YAML: everything
+// moin runs for the app, without a secret value.
+type ComposeFile struct {
+	Number int    `json:"number"`
+	Text   string `json:"compose_file"`
+}
+
+// ComposeFile answers the compose file of the app's live deploy.
+func (h *AppsHandler) ComposeFile(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	number, text, err := h.apps.ComposeFile(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, ComposeFile{Number: number, Text: text})
+}
+
 // GetEnv lists the env vars by key, without their values.
 func (h *AppsHandler) GetEnv(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())

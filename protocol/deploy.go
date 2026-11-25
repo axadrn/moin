@@ -111,4 +111,11 @@ type DeployDone struct {
 	// Env names the env keys the app has after the deploy, which may have
 	// made the secrets of a catalog app: never a value.
 	Env *AppEnv `json:"env,omitempty"`
+	// ComposeFile is the compose file of a deploy that worked, YAML:
+	// everything the daemon runs for the app, written to run anywhere,
+	// without the instant address and with no value of the env. image,
+	// ports, expose, volumes, user, the env PORT and the paths of a build
+	// are as the deploy filled them in; every other ${NAME} stays as
+	// written. Daemons before it send none.
+	ComposeFile string `json:"compose_file,omitempty"`
 }

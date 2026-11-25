@@ -95,6 +95,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin deploys [app] v<number>` | one deploy with its whole log |
 | `moin rollback [app] [v<number>] [--yes]` | starts an earlier deploy again; without a number, the one before the live one |
 | `moin logs [--tail 200] [app]` | the last lines of the app's containers, `--tail` per container |
+| `moin compose [app]` | prints the [compose file](/docs/guides/compose#the-compose-file-moin-runs) moin runs, without secret values: `moin compose > compose.yml` |
 | `moin exec [app] [--service <service>] [--timeout 10m] -- <command>` | [runs a command](/docs/guides/exec) in a container, no shell. The main service by default, `--timeout` at most `1h`. Exits with its code, `124` after the timeout. Owners and admins |
 
 ## Domains

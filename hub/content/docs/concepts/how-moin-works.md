@@ -138,7 +138,7 @@ The daemon downloads code from GitHub only. Your code never passes through moin.
 | --- | --- |
 | `compose.yml` | uses it (`compose.yaml` and `docker-compose.yml` work too) |
 | only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
-| a Go module | writes the Dockerfile too: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
+| a Go module | writes the Dockerfile too, into the compose file: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
 | none of these | builds it with [Railpack](https://railpack.com), the open source builder Railway made |
 
 Railpack finds the language, the version and the start command by itself. It covers Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more. Your env vars reach the build as secrets. They never land in the image or a log.

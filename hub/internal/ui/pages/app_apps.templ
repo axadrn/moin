@@ -164,6 +164,15 @@ type AppPageView struct {
 	// Logs is the container logs of the Logs section; nil when the daemon
 	// did not answer in time, and the section loads them itself.
 	Logs *AppLogsView
+	// ComposeFile is the compose file of the live deploy (Settings).
+	ComposeFile *ComposeFileView
+}
+
+// ComposeFileView is the compose file of the live deploy, or why there is
+// none.
+type ComposeFileView struct {
+	Text    string
+	Message string
 }
 
 // AppPage is an app: the head stays, the section under it answers one
@@ -182,7 +191,7 @@ templ AppPage(view AppPageView) {
 					case "logs":
 						@appLogsSection(app, view.Deploys, view.Logs)
 					case "settings":
-						@appSettingsSection(app, view.Env)
+						@appSettingsSection(app, view.Env, view.ComposeFile)
 					default:
 						@appHomeSection(view)
 				}
@@ -328,7 +337,7 @@ type AppLogsView struct {
 
 // appSettingsSection answers "how is it set up?": its name, its env, the
 // pin, and at the end what stops or removes it.
-templ appSettingsSection(app model.App, env []model.EnvVar) {
+templ appSettingsSection(app model.App, env []model.EnvVar, composeFile *ComposeFileView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	@components.Card(components.CardProps{Title: "Name"}) {
 		<form
@@ -350,6 +359,9 @@ templ appSettingsSection(app model.App, env []model.EnvVar) {
 		</form>
 	}
 	@AppEnv(app.Link(), env)
+	if composeFile != nil {
+		@appComposeFile(appPath, *composeFile)
+	}
 	@components.Card(components.CardProps{}) {
 		@components.List() {
 			@PinSwitch(app)
@@ -381,6 +393,30 @@ templ appSettingsSection(app model.App, env []model.EnvVar) {
 		}
 	}
 	@idLine(app.ID)
+}
+
+// appComposeFile is the compose file of the live deploy, read only: what
+// moin runs for the app, to copy or download and run elsewhere.
+templ appComposeFile(appPath string, file ComposeFileView) {
+	<section id="compose-file" class="moin-section">
+		<div class="moin-section-head">
+			<h2>Compose file</h2>
+			if file.Text != "" {
+				@components.Button(components.ButtonProps{Href: appPath + "/compose.yml", Attrs: templ.Attributes{"download": "compose.yml", "data-compose-download": true}}) {
+					Download
+				}
+			}
+		</div>
+		<p class="moin-small moin-muted">Everything moin runs for this app, without your secret values.</p>
+		<p class="moin-small moin-muted">To run it elsewhere: save it, put a .env with your values next to it, run docker compose up -d.</p>
+		if file.Text != "" {
+			@components.Code(components.CodeProps{ID: "compose-file-text", Text: file.Text})
+		} else {
+			@components.Card(components.CardProps{}) {
+				<p class="moin-text moin-muted">{ file.Message }</p>
+			}
+		}
+	</section>
 }
 
 // idLine is the ID of a workspace, an app or a server, quietly at the end

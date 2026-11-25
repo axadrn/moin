@@ -75,6 +75,9 @@ func (m model) appActions(name string) []action {
 	out = append(out,
 		action{"X", "run a command", func(m model) (tea.Model, tea.Cmd) { return m.openExec(name) }},
 		action{"W", "open in web", func(m model) (tea.Model, tea.Cmd) { return m.browse("/apps/" + m.appLink(name)) }},
+		action{"C", "compose file in web", func(m model) (tea.Model, tea.Cmd) {
+			return m.browse("/apps/" + m.appLink(name) + "/settings#compose-file")
+		}},
 	)
 	return out
 }

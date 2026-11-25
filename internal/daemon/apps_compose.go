@@ -295,7 +295,7 @@ func (a *apps) ownVolumes(ctx context.Context, release *release) {
 		return
 	}
 	var config composeConfig
-	body, err := os.ReadFile(release.composeFile)
+	body, err := os.ReadFile(release.composeJSON)
 	if err != nil || json.Unmarshal(body, &config) != nil {
 		return
 	}
@@ -454,7 +454,7 @@ func finish(release *release) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(release.composeFile, body, 0o600)
+	return os.WriteFile(release.composeJSON, body, 0o600)
 }
 
 // copyConfig makes a copy of a compose file that shares nothing with it.
@@ -563,11 +563,13 @@ func composePath(src string) string {
 	return ""
 }
 
-// generate writes what a repo without compose.yml needs: a compose.yml with
-// one service and, for a Go module without Dockerfile, the Dockerfile too.
-// A repo with none of these builds with Railpack, from a plan resolve has it
-// write next to src.
+// generate writes the compose.yml of a repo without one: one service, built
+// from the repo's Dockerfile, or for a Go module without one from the
+// Dockerfile moin writes into the compose file, so every release keeps it.
+// A repo with none of these builds with Railpack, from a plan resolve has
+// it write next to src.
 func generate(src, app string) (string, error) {
+	build := "build: ."
 	kind := "dockerfile"
 	if _, err := os.Stat(filepath.Join(src, "Dockerfile")); err != nil {
 		goMod, err := os.ReadFile(filepath.Join(src, "go.mod"))
@@ -575,10 +577,8 @@ func generate(src, app string) (string, error) {
 			return "railpack", os.WriteFile(filepath.Join(src, "compose.yml"), []byte(railpackCompose(app)), 0o644)
 		}
 		kind = "go"
-		err = os.WriteFile(filepath.Join(src, "Dockerfile"), []byte(goDockerfile(src, goMod)), 0o644)
-		if err != nil {
-			return "", err
-		}
+		dockerfile := strings.TrimSuffix(goDockerfile(src, goMod), "\n")
+		build = "build:\n      context: .\n      dockerfile_inline: |\n        " + strings.ReplaceAll(dockerfile, "\n", "\n        ")
 	}
 	port := exposedPort(src)
 	if port == 0 {
@@ -586,13 +586,13 @@ func generate(src, app string) (string, error) {
 	}
 	compose := fmt.Sprintf(`services:
   web:
-    build: .
+    %s
     environment:
       PORT: "%d"
       DATA_DIR: /data
     volumes:
       - ./data:/data
-`, port)
+`, build, port)
 	return kind, os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644)
 }
 

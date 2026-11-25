@@ -119,7 +119,7 @@ func TestMetricsMarkDeploysThatWentLive(t *testing.T) {
 		if err := apps.apps.CreateDeploy(deploy); err != nil {
 			t.Fatal(err)
 		}
-		if err := apps.apps.FinishDeploy(deploy.ID, status, "", "", "", now.Add(-30*time.Minute)); err != nil {
+		if err := apps.apps.FinishDeploy(deploy.ID, status, "", "", "", "", now.Add(-30*time.Minute)); err != nil {
 			t.Fatal(err)
 		}
 	}

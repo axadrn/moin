@@ -188,6 +188,20 @@ func (c *Client) Logs(ctx context.Context, app string, tail int) ([]string, erro
 	return response.Lines, err
 }
 
+// ComposeFile is the compose file of an app's live deploy, YAML: everything
+// moin runs for it, without a secret value.
+type ComposeFile struct {
+	Number int    `json:"number"`
+	Text   string `json:"compose_file"`
+}
+
+// ComposeFile answers the compose file of the app's live deploy.
+func (c *Client) ComposeFile(ctx context.Context, app string) (ComposeFile, error) {
+	var response ComposeFile
+	err := c.do(ctx, http.MethodGet, appPath(app, "compose"), nil, &response)
+	return response, err
+}
+
 // EnvVar is an env var of an app: its key and when it changed. Values are
 // write-only: the hub never answers one.
 type EnvVar struct {

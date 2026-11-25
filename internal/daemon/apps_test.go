@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -60,12 +62,26 @@ func TestGenerateFindsTheMainPackage(t *testing.T) {
 	if err != nil || kind != "go" {
 		t.Fatalf("generate = %q, %v", kind, err)
 	}
-	dockerfile, _ := os.ReadFile(filepath.Join(src, "Dockerfile"))
-	if !strings.Contains(string(dockerfile), "golang:1.26-bookworm") || !strings.Contains(string(dockerfile), "go build -o /app ./cmd/web") {
-		t.Fatalf("Dockerfile:\n%s", dockerfile)
+	// The Dockerfile moin writes lives in the compose file, so every
+	// release built from this source keeps it.
+	if _, err := os.Stat(filepath.Join(src, "Dockerfile")); err == nil {
+		t.Fatal("generate wrote a Dockerfile into the source")
 	}
-	if composePath(src) == "" {
-		t.Fatal("generate wrote no compose.yml")
+	body, _ := os.ReadFile(composePath(src))
+	var compose struct {
+		Services map[string]struct {
+			Build struct {
+				Context    string `yaml:"context"`
+				Dockerfile string `yaml:"dockerfile_inline"`
+			} `yaml:"build"`
+		} `yaml:"services"`
+	}
+	if err := yaml.Unmarshal(body, &compose); err != nil {
+		t.Fatal(err)
+	}
+	build := compose.Services["web"].Build
+	if build.Context != "." || build.Dockerfile != goDockerfile(src, []byte("module x\n\ngo 1.26.3\n")) || !strings.Contains(build.Dockerfile, "go build -o /app ./cmd/web") {
+		t.Fatalf("compose.yml:\n%s", body)
 	}
 }
 
@@ -183,7 +199,7 @@ func TestFinishImageDeployKeepsTheOtherImages(t *testing.T) {
 	start := protocol.DeployStart{App: "blog", Number: 4, Image: "ghcr.io/me/blog:abc"}
 	running := map[string]string{"web": "ghcr.io/me/blog:old", "worker": "moin-blog-worker:3", "redis": "redis:7"}
 	env := map[string]string{"KEY": "a$b"}
-	err := finish(&release{start: start, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeFile: file, envFile: "/state/apps/blog/app.env", env: env})
+	err := finish(&release{start: start, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeJSON: file, envFile: "/state/apps/blog/app.env", env: env})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +257,7 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	file := filepath.Join(t.TempDir(), "compose.json")
-	if err := finish(&release{start: protocol.DeployStart{App: "blog", Number: 5}, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeFile: file}); err != nil {
+	if err := finish(&release{start: protocol.DeployStart{App: "blog", Number: 5}, config: base, detected: protocol.Detected{Service: "web"}, running: running, composeJSON: file}); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(file)
@@ -451,12 +467,12 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 	takePlaces(config, filled)
 	dir := t.TempDir()
 	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}, Protect: "ada:$2y$05$hash"}}
-	release := &release{start: start, dir: dir, config: config, composeFile: filepath.Join(dir, "compose.json"), envFile: "/state/apps/shop/app.env", env: map[string]string{"DB_PASSWORD": "s3cret"}}
+	release := &release{start: start, dir: dir, config: config, composeJSON: filepath.Join(dir, "compose.json"), envFile: "/state/apps/shop/app.env", env: map[string]string{"DB_PASSWORD": "s3cret"}}
 	release.detected, _ = route("shop", protocol.Detected{Service: "web", Port: 8080}, start.Domains)
 	if err := finish(release); err != nil {
 		t.Fatal(err)
 	}
-	body, _ := os.ReadFile(release.composeFile)
+	body, _ := os.ReadFile(release.composeJSON)
 	for _, leak := range []string{"s3cret", "t0ken", "$2y$05$hash"} {
 		if strings.Contains(string(body), leak) {
 			t.Errorf("compose.json holds %q:\n%s", leak, body)
