@@ -2,46 +2,13 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/protocol"
 )
-
-// daemonReports sends the domains of compose.yml as a daemon does before a
-// release starts, and returns the hub's answer.
-func daemonReports(t *testing.T, servers *ServerService, serverID string, daemon *fakeDaemon, domains protocol.DeployDomains) protocol.Message {
-	t.Helper()
-	message, err := protocol.NewMessage(protocol.TypeDeployDomains, domains)
-	if err != nil {
-		t.Fatal(err)
-	}
-	message.RequestID = rand.Text()
-	servers.Receive(serverID, message)
-	daemon.mu.Lock()
-	defer daemon.mu.Unlock()
-	for _, sent := range daemon.sent {
-		if sent.RequestID == message.RequestID {
-			return sent
-		}
-	}
-	t.Fatal("the hub did not answer")
-	return protocol.Message{}
-}
-
-// hubError is the message of an error answer, "" for ok.
-func hubError(answer protocol.Message) string {
-	if answer.Type != protocol.TypeError {
-		return ""
-	}
-	var refused protocol.Error
-	_ = answer.Decode(&refused)
-	return refused.Message
-}
 
 // domainRows are the domains of an app as rows say them: service, name, main
 // and from compose.yml.
@@ -62,7 +29,8 @@ func domainRows(app *model.App) []string {
 }
 
 // If compose.yml has domains, exactly those count. Otherwise the ones
-// entered in moin. A deploy replaces the entered ones with the ones of
+// entered in moin. deploy.done says the domains of the release that runs.
+// A deploy replaces the entered ones with the ones of
 // compose.yml, a line taken out of the file goes, and the whole block
 // taken out leaves none; while they come from compose.yml, moin refuses
 // to change them on every surface.
@@ -77,17 +45,13 @@ func TestComposeDomainsFollowEachDeploy(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "admin", []string{"admin.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
-	deployWith := func(domains protocol.DeployDomains) {
+	deployWith := func(domains protocol.ComposeDomains) {
 		t.Helper()
 		deploy, err := deploySource(apps)
 		if err != nil {
 			t.Fatal(err)
 		}
-		domains.DeployID = deploy.ID
-		if answer := daemonReports(t, servers, server.ID, daemon, domains); answer.Type != protocol.TypeOK {
-			t.Fatalf("report %+v: %s", domains, hubError(answer))
-		}
-		daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{Kind: "compose", Service: "web"}})
+		daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Detected: protocol.Detected{Kind: "compose", Service: "web"}, Domains: &domains})
 	}
 	rows := func() []string {
 		t.Helper()
@@ -99,7 +63,7 @@ func TestComposeDomainsFollowEachDeploy(t *testing.T) {
 	}
 
 	// The first deploy with x-moin.domains replaces the ones entered in moin.
-	deployWith(protocol.DeployDomains{Domains: []string{"Shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Services: map[string][]string{"api": {"api.shop.example.com"}}})
+	deployWith(protocol.ComposeDomains{Domains: []string{"Shop.example.com", "www.shop.example.com"}, Canonical: "shop.example.com", Services: map[string][]string{"api": {"api.shop.example.com"}}})
 	want := []string{":shop.example.com main compose", ":www.shop.example.com compose", "api:api.shop.example.com compose"}
 	if got := rows(); !slices.Equal(got, want) {
 		t.Fatalf("after the first deploy = %v, want %v", got, want)
@@ -128,16 +92,13 @@ func TestComposeDomainsFollowEachDeploy(t *testing.T) {
 	}
 
 	// A line taken out of compose.yml goes.
-	if answer := daemonReports(t, servers, server.ID, daemon, protocol.DeployDomains{DeployID: next.ID, Domains: []string{"shop.example.com"}, Canonical: "shop.example.com"}); answer.Type != protocol.TypeOK {
-		t.Fatal(hubError(answer))
-	}
-	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: next.ID, OK: true})
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: next.ID, OK: true, Domains: &protocol.ComposeDomains{Domains: []string{"shop.example.com"}, Canonical: "shop.example.com"}})
 	if got := rows(); !slices.Equal(got, []string{":shop.example.com main compose"}) {
 		t.Fatalf("after a line went = %v", got)
 	}
 
 	// The whole block taken out leaves none, and moin decides again.
-	deployWith(protocol.DeployDomains{})
+	deployWith(protocol.ComposeDomains{})
 	if got := rows(); len(got) != 0 {
 		t.Fatalf("after the block went = %v", got)
 	}
@@ -145,20 +106,48 @@ func TestComposeDomainsFollowEachDeploy(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A deploy without x-moin.domains keeps the ones entered in moin.
-	deployWith(protocol.DeployDomains{})
+	deployWith(protocol.ComposeDomains{})
 	if got := rows(); !slices.Equal(got, []string{":blog.example.com"}) {
 		t.Fatalf("entered domains after a deploy without x-moin = %v", got)
 	}
 }
 
+// When the new release does not come up and the one before runs again,
+// deploy.done says the domains of the one before: the app keeps them. A
+// deploy that ends with no release running changes nothing.
+func TestComposeDomainsOfTheReleaseThatRuns(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := deploySource(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Domains: &protocol.ComposeDomains{Domains: []string{"blog.example.com"}}})
+	second, err := deploySource(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: second.ID, Error: "web did not come up; v1 is running again", Domains: &protocol.ComposeDomains{Domains: []string{"blog.example.com"}}})
+	third, err := deploySource(apps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, Error: "build failed"})
+	blog, err := apps.Get(owner.WorkspaceID, "blog")
+	if err != nil || !slices.Equal(domainRows(blog), []string{":blog.example.com compose"}) {
+		t.Fatalf("blog = %v, %v", domainRows(blog), err)
+	}
+}
+
 // The hub checks the domains of compose.yml as it checks the ones entered
-// in moin: a name another app uses, one with a port or a canonical one
-// outside the list is refused, which stops the deploy, and the app keeps
-// the domains it had. Only the daemon of the app's server reports, and
-// only for a deploy that runs.
+// in moin and keeps none it would refuse: one with a port, a canonical one
+// outside the list, a bad service name. Another app may set the same
+// domain. Only the daemon of the app's server reports.
 func TestComposeDomainsAreChecked(t *testing.T) {
-	apps, servers, server, daemon := newAppService(t)
-	otherServer, otherDaemon := connectServer(t, servers, other, "web-2")
+	apps, servers, server, _ := newAppService(t)
+	otherServer, _ := connectServer(t, servers, other, "web-2")
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
@@ -171,37 +160,38 @@ func TestComposeDomainsAreChecked(t *testing.T) {
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil {
 		t.Fatal(err)
 	}
+	for _, refused := range []protocol.ComposeDomains{
+		{Domains: []string{"blog.example.com:8080"}},
+		{Services: map[string][]string{"api": {"localhost:3000"}}},
+		{Domains: []string{"blog.example.com"}, Canonical: "www.blog.example.com"},
+		{Services: map[string][]string{"API!": {"api.blog.example.com"}}},
+		{Domains: []string{"blog.example.com"}, Services: map[string][]string{"api": {"blog.example.com"}}},
+	} {
+		deploy, err := deploySource(apps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Domains: &refused})
+		blog, err := apps.Get(owner.WorkspaceID, "blog")
+		if err != nil || !slices.Equal(domainRows(blog), []string{":blog.example.com"}) {
+			t.Fatalf("%+v kept: %v, %v", refused, domainRows(blog), err)
+		}
+	}
+	// Another server's daemon cannot set the domains of this app.
 	deploy, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, test := range []struct {
-		domains protocol.DeployDomains
-		refusal string
-	}{
-		{protocol.DeployDomains{Domains: []string{"blog.example.com", "shop.example.com"}}, "shop.example.com is already used by another app"},
-		{protocol.DeployDomains{Domains: []string{"blog.example.com:8080"}}, "domains must be host names"},
-		{protocol.DeployDomains{Services: map[string][]string{"api": {"localhost:3000"}}}, "domains must be host names"},
-		{protocol.DeployDomains{Domains: []string{"blog.example.com"}, Canonical: "www.blog.example.com"}, "canonical domain must be one of the domains"},
-		{protocol.DeployDomains{Services: map[string][]string{"API!": {"api.blog.example.com"}}}, "a service name is"},
-	} {
-		test.domains.DeployID = deploy.ID
-		if refusal := hubError(daemonReports(t, servers, server.ID, daemon, test.domains)); !strings.Contains(refusal, test.refusal) {
-			t.Errorf("%+v: refusal %q, want %q", test.domains, refusal, test.refusal)
-		}
-	}
-	// Another server's daemon cannot set the domains of this deploy.
-	if refusal := hubError(daemonReports(t, servers, otherServer.ID, otherDaemon, protocol.DeployDomains{DeployID: deploy.ID, Domains: []string{"taken.example.com"}})); refusal != ErrNotDeploying.Error() {
-		t.Errorf("another server: refusal %q", refusal)
-	}
-	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, Error: "domains: shop.example.com is already used by another app or service"})
-	// Nor can a deploy that ended.
-	if refusal := hubError(daemonReports(t, servers, server.ID, daemon, protocol.DeployDomains{DeployID: deploy.ID, Domains: []string{"late.example.com"}})); refusal != ErrNotDeploying.Error() {
-		t.Errorf("an ended deploy: refusal %q", refusal)
-	}
+	daemonSays(t, servers, otherServer.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Domains: &protocol.ComposeDomains{Domains: []string{"taken.example.com"}}})
 	blog, err := apps.Get(owner.WorkspaceID, "blog")
 	if err != nil || !slices.Equal(domainRows(blog), []string{":blog.example.com"}) {
-		t.Fatalf("blog after refusals = %v, %v", domainRows(blog), err)
+		t.Fatalf("blog after another server = %v, %v", domainRows(blog), err)
+	}
+	// The domain of another app is fine: whoever set it twice sorts it out.
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true, Domains: &protocol.ComposeDomains{Domains: []string{"shop.example.com"}}})
+	blog, err = apps.Get(owner.WorkspaceID, "blog")
+	if err != nil || !slices.Equal(domainRows(blog), []string{":shop.example.com compose"}) {
+		t.Fatalf("blog with the shop's domain = %v, %v", domainRows(blog), err)
 	}
 }
 

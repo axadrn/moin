@@ -67,11 +67,29 @@ func route(app string, detected protocol.Detected, domains *protocol.Domains) (p
 	return detected, nil
 }
 
+// runningDomains are the domains compose.yml of the release of the app
+// that runs sets, for deploy.done: nil when no release runs.
+func (a *apps) runningDomains(app string) *protocol.ComposeDomains {
+	if !protocol.ValidAppName(app) {
+		return nil
+	}
+	detected, _ := a.live(app)
+	if detected.Kind == "" {
+		return nil
+	}
+	config := detected.Config
+	if config == nil {
+		config = &protocol.Config{}
+	}
+	domains := composeDomains(detected.Service, config)
+	return &domains
+}
+
 // composeDomains are the domains x-moin.domains sets, all empty when it
 // sets none. The map form may name the main service: those are its
 // domains, not another service's.
-func composeDomains(mainName string, config *protocol.Config) protocol.DeployDomains {
-	domains := protocol.DeployDomains{Domains: config.Domains, Canonical: config.Canonical}
+func composeDomains(mainName string, config *protocol.Config) protocol.ComposeDomains {
+	domains := protocol.ComposeDomains{Domains: config.Domains, Canonical: config.Canonical}
 	if len(domains.Domains) == 0 {
 		domains.Domains = config.ServiceDomains[mainName]
 	}

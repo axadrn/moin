@@ -95,13 +95,11 @@ func RegistryHost(image string) string {
 	return "docker.io"
 }
 
-// DeployDomains are the domains x-moin.domains in the compose.yml of a
-// release sets, which the daemon reports before the release starts
-// (TypeDeployDomains). Domains and Canonical are the main service's,
+// ComposeDomains are the domains x-moin.domains in the compose.yml of the
+// release that runs sets. Domains and Canonical are the main service's,
 // Services the other services' domains by service. All empty when
 // compose.yml sets none: then the domains entered in moin count.
-type DeployDomains struct {
-	DeployID  string              `json:"deploy_id"`
+type ComposeDomains struct {
 	Domains   []string            `json:"domains,omitempty"`
 	Canonical string              `json:"canonical,omitempty"`
 	Services  map[string][]string `json:"services,omitempty"`
@@ -123,4 +121,9 @@ type DeployDone struct {
 	// release started over an older one, the time in their IDs: the hub
 	// names them "Before v12".
 	Before *time.Time `json:"before,omitempty"`
+	// Domains are the domains of the compose.yml of the release that runs
+	// after the deploy: the new one, or the one before it when the new one
+	// did not come up. nil when no release runs. The hub keeps them as the
+	// app's domains.
+	Domains *ComposeDomains `json:"domains,omitempty"`
 }

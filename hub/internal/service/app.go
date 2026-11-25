@@ -1074,13 +1074,6 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 		if message.Decode(&backups) == nil {
 			s.receiveBackupStatus(serverID, backups)
 		}
-	case protocol.TypeDeployDomains:
-		var reported protocol.DeployDomains
-		err := message.Decode(&reported)
-		if err == nil {
-			err = s.setComposeDomains(serverID, reported)
-		}
-		s.servers.Answer(serverID, message.RequestID, err)
 	case protocol.TypeDeployDone:
 		var done protocol.DeployDone
 		if message.Decode(&done) != nil {
@@ -1094,6 +1087,9 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 		if err != nil || app.ServerID != serverID {
 			slog.Warn("daemon reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
+		}
+		if done.Domains != nil {
+			s.setComposeDomains(app, *done.Domains)
 		}
 		s.rememberDeploy(done.DeployID, done)
 		s.finish(done.DeployID, done)

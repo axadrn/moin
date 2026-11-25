@@ -39,7 +39,7 @@ MCP: set_domains
 
 Then, where you bought the domain, add an **A record**: the domain as the name, the server's IPv4 address as the value. If the server has IPv6, add an **AAAA record** too.
 
-A domain belongs to one app in the whole hub. moin refuses one another app uses already.
+One app may use a domain once. Two apps may use the same one: then both ask for the same visitors, so give each app its own.
 
 moin says whether the domain already points at the server. **Check** asks again later. Once DNS points at the server, the domain gets HTTPS by itself.
 
@@ -184,10 +184,10 @@ x-moin:
 
 One rule: if `compose.yml` has domains, exactly those count. Otherwise the ones entered in moin. Never a mix.
 
-- Each deploy reads the domains in the file before the new version starts. They replace the ones entered in moin, also those of other services.
+- Each deploy ends by telling moin the domains of the version that runs. They replace the ones entered in moin, also those of other services. When the new version does not come up and the old one runs again, moin keeps the old one's.
 - Take a line out of the file, and the next deploy drops that domain. Take the whole `domains` out, and the app has none until you enter some in moin.
 - They show **from compose.yml** and change only in the file. Trying it in moin says so (API code `domains_from_compose`).
-- A domain another app uses, or one that is no host name like `my-app.example.com:8080`, stops the deploy before the new version starts. The running version keeps running.
+- One that is no host name, like `my-app.example.com:8080`, or `canonical` without `domains` stops the deploy before the new version starts. The running version keeps running.
 
 [Who decides](/docs/guides/config#who-decides).
 

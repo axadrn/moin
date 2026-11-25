@@ -1820,7 +1820,7 @@ paths:
           description: '`domains_from_compose`. x-moin.domains in compose.yml sets the app''s domains; change them there and deploy.'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.domains`, also when another app or service uses a domain already, `fields.canonical` or `fields.service`.'
+          description: '`validation_failed` with `fields.domains`, also when another service of the app uses a domain already, `fields.canonical` or `fields.service`.'
         '500':
           $ref: '#/components/responses/Internal'
 

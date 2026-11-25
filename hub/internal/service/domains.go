@@ -3,7 +3,7 @@ package service
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
+	"log/slog"
 	"maps"
 	"regexp"
 	"slices"
@@ -20,7 +20,6 @@ var (
 	ErrMainService      = errors.New("this is the app's main service: set its domains without --service")
 	ErrServiceCanonical = errors.New("canonical is for the main service only")
 	ErrInstantProvider  = errors.New("the instant address provider is sslip.io, nip.io or off")
-	ErrNotDeploying     = errors.New("no deploy of this server runs with this ID")
 )
 
 // servicePattern is a compose service name.
@@ -65,36 +64,26 @@ func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, do
 	return true, nil
 }
 
-// setComposeDomains makes the domains a daemon reports from the
-// compose.yml of a release the app's domains, before the release starts.
-// If compose.yml has domains, exactly those count. Otherwise the ones
-// entered in moin. The hub checks them as it checks the ones entered in
-// moin, so no daemon sets a domain moin would refuse. An error stops the
-// deploy, and the release that runs keeps running.
-func (s *AppService) setComposeDomains(serverID string, reported protocol.DeployDomains) error {
-	deploy, err := s.apps.DeployByID(reported.DeployID)
-	if err != nil {
-		return ErrNotDeploying
-	}
-	app, err := s.apps.ByID(deploy.AppID)
-	if err != nil || app.ServerID != serverID || deploy.Status != model.DeployRunning {
-		return ErrNotDeploying
-	}
+// setComposeDomains makes the domains compose.yml of the release that
+// runs sets the app's domains, from deploy.done. If compose.yml has
+// domains, exactly those count. Otherwise the ones entered in moin. The
+// hub checks them as it checks the ones entered in moin and keeps none it
+// would refuse: the daemon refused them before the release started.
+func (s *AppService) setComposeDomains(app *model.App, reported protocol.ComposeDomains) {
 	domains, err := composeDomainRows(reported)
-	if err != nil {
-		return fmt.Errorf("x-moin.domains in compose.yml: %w", err)
+	if err == nil {
+		err = s.apps.SetComposeDomains(app.ID, domains)
 	}
-	err = s.apps.SetComposeDomains(app.ID, domains)
 	if err != nil {
-		return err
+		slog.Warn("keep the domains of compose.yml failed", "app_id", app.ID, "error", err)
+		return
 	}
 	s.notify(app.WorkspaceID)
-	return nil
 }
 
 // composeDomainRows are the rows of the domains compose.yml sets, cleaned
 // and checked like the ones entered in moin. None when it sets none.
-func composeDomainRows(reported protocol.DeployDomains) ([]model.Domain, error) {
+func composeDomainRows(reported protocol.ComposeDomains) ([]model.Domain, error) {
 	main, err := cleanDomains(reported.Domains)
 	if err != nil {
 		return nil, err

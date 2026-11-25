@@ -1,10 +1,9 @@
 package daemon
 
 import (
-	"context"
-	"errors"
+	"os"
+	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/protocol"
@@ -142,34 +141,30 @@ func TestDomainsByService(t *testing.T) {
 	}
 }
 
-// TestReportDomains: the daemon tells the hub the domains of compose.yml
-// with the deploy's ID, and a refusal of the hub stops the deploy with the
-// hub's words.
-func TestReportDomains(t *testing.T) {
+// TestRunningDomains: deploy.done carries the domains of compose.yml of
+// the release that runs, empty when it sets none, and none at all when no
+// release runs.
+func TestRunningDomains(t *testing.T) {
 	a := newApps(t.TempDir(), nil)
-	var asked protocol.DeployDomains
-	a.ask = func(_ context.Context, messageType protocol.MessageType, data any) error {
-		if messageType != protocol.TypeDeployDomains {
-			t.Errorf("asked %s", messageType)
-		}
-		asked = data.(protocol.DeployDomains)
-		return errors.New("shop.example.net is already used by another app or service")
+	if a.runningDomains("shop") != nil {
+		t.Error("domains without a release")
 	}
-	refused := &release{start: protocol.DeployStart{DeployID: "d1"}, detected: protocol.Detected{Service: "web", Config: &protocol.Config{Domains: []string{"shop.example.net"}}}}
-	err := a.reportDomains(context.Background(), refused)
-	if err == nil || !strings.Contains(err.Error(), "shop.example.net is already used by another app") {
-		t.Errorf("err = %v", err)
+	if err := os.MkdirAll(a.releaseDir("shop", 1), 0o700); err != nil {
+		t.Fatal(err)
 	}
-	if asked.DeployID != "d1" || !slices.Equal(asked.Domains, []string{"shop.example.net"}) {
-		t.Errorf("asked %+v", asked)
+	saveJSON(filepath.Join(a.releaseDir("shop", 1), "detected.json"), protocol.Detected{Kind: "compose", Service: "web", Config: &protocol.Config{Domains: []string{"shop.example.net"}, Canonical: "shop.example.net"}})
+	if err := os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	// Without x-moin the report says none, so the hub drops the ones
-	// compose.yml set before.
-	a.ask = func(_ context.Context, _ protocol.MessageType, data any) error {
-		asked = data.(protocol.DeployDomains)
-		return nil
+	domains := a.runningDomains("shop")
+	if domains == nil || !slices.Equal(domains.Domains, []string{"shop.example.net"}) || domains.Canonical != "shop.example.net" {
+		t.Errorf("domains = %+v", domains)
 	}
-	if err := a.reportDomains(context.Background(), &release{start: protocol.DeployStart{DeployID: "d2"}, detected: protocol.Detected{Service: "web"}}); err != nil || asked.DeployID != "d2" || len(asked.Domains) != 0 || asked.Services != nil {
-		t.Errorf("no x-moin: %+v %v", asked, err)
+	saveJSON(filepath.Join(a.releaseDir("shop", 1), "detected.json"), protocol.Detected{Kind: "compose", Service: "web"})
+	if domains := a.runningDomains("shop"); domains == nil || len(domains.Domains) != 0 || domains.Services != nil {
+		t.Errorf("no x-moin: %+v", domains)
+	}
+	if a.runningDomains("../shop") != nil {
+		t.Error("domains for a bad app name")
 	}
 }

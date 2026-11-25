@@ -149,11 +149,10 @@ Railpack finds the language, the version and the start command by itself. It cov
 2. Reads the compose file and the [x-moin block](/docs/guides/config).
 3. Tags the built images, points the app's services at its env file on the server and sets `restart: unless-stopped`.
 4. Builds.
-5. Tells moin the domains in the compose file, none when it sets none. moin keeps them as the app's domains, or refuses one another app uses: then the deploy stops here and the running version stays. [Domains in the repo](/docs/guides/domains#in-the-repo).
-6. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
-7. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds.
-8. Calls the health path, if x-moin sets one, until it answers below 500.
-9. Reports the databases it found and what it detected. The app page, `moin deploy`, the TUI, the API and `get_app` show it.
+5. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
+6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds.
+7. Calls the health path, if x-moin sets one, until it answers below 500.
+8. Reports the databases it found, what it detected and the domains in the compose file of the version that runs. moin keeps those as the app's domains, none when the file sets none. [Domains in the repo](/docs/guides/domains#in-the-repo). The app page, `moin deploy`, the TUI, the API and `get_app` show it.
 
 If the start or the health check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
 
