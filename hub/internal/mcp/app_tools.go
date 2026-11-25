@@ -30,7 +30,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out.",
 		change(true, true)), model.RightDelete, changes(services, tools.removeApp))
 	Add(server, newTool("rename_app", "Rename an app",
-		"Gives an app a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Links count its ID, so they keep working; its data, backups and instant address stay. The next restart or deploy gives its containers the new name.",
+		"Gives an app a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Links name the app by its name: links inside moin follow, an old bookmark finds nothing. Its data, backups and instant address stay. The next restart or deploy gives its containers the new name.",
 		change(false, true)), model.RightDeploy, changes(services, tools.renameApp))
 	Add(server, newTool("pin_app", "Pin or unpin an app",
 		"Pins an app, or unpins it with pinned false, and returns it. Every list of the workspace shows pinned apps above the others that run fine, on every surface.",
@@ -82,8 +82,7 @@ type RemoveAppInput struct {
 
 // CreateAppInput is the input of create_app.
 type CreateAppInput struct {
-	App    string `json:"app,omitempty" jsonschema:"the app name: lowercase letters, digits and dashes; also the compose project on the server"`
-	Name   string `json:"name,omitempty" jsonschema:"the old name of the app field; use app"`
+	App    string `json:"app" jsonschema:"the app name: lowercase letters, digits and dashes; also the compose project on the server"`
 	Server string `json:"server" jsonschema:"the server name or ID"`
 }
 
@@ -159,7 +158,7 @@ type RenamedApp struct {
 }
 
 func (a RenamedApp) Summary() string {
-	return fmt.Sprintf("Renamed the app to %s. Its links keep working; restart it to give its containers the name.", a.Name)
+	return fmt.Sprintf("Renamed the app to %s. Links inside moin follow; restart it to give its containers the name.", a.Name)
 }
 
 func (t moinTools) renameApp(_ context.Context, caller Caller, input RenameAppInput) (RenamedApp, error) {
@@ -180,7 +179,7 @@ func (d AppDetail) Summary() string {
 }
 
 func (t moinTools) getApp(_ context.Context, caller Caller, input AppInput) (AppDetail, error) {
-	app, deploys, err := t.services.Apps.Deploys(caller.Bearer.WorkspaceID, input.app(), 20)
+	app, deploys, err := t.services.Apps.Deploys(caller.Bearer.WorkspaceID, input.App, 20)
 	if err != nil {
 		return AppDetail{}, err
 	}
@@ -206,7 +205,7 @@ func (a CreatedApp) Summary() string {
 }
 
 func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (CreatedApp, error) {
-	app, err := t.services.Apps.Create(caller.actor(), cmp.Or(input.App, input.Name), input.Server)
+	app, err := t.services.Apps.Create(caller.actor(), input.App, input.Server)
 	if err != nil {
 		return CreatedApp{}, err
 	}
@@ -226,7 +225,7 @@ func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveApp
 }
 
 func (t moinTools) restart(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Restart(caller.actor(), input.app())
+	deploy, err := t.services.Apps.Restart(caller.actor(), input.App)
 	if err != nil {
 		return Deploy{}, err
 	}
@@ -234,7 +233,7 @@ func (t moinTools) restart(_ context.Context, caller Caller, input AppInput) (De
 }
 
 func (t moinTools) start(_ context.Context, caller Caller, input AppInput) (Deploy, error) {
-	deploy, err := t.services.Apps.Start(caller.actor(), input.app())
+	deploy, err := t.services.Apps.Start(caller.actor(), input.App)
 	if err != nil {
 		return Deploy{}, err
 	}
@@ -242,11 +241,11 @@ func (t moinTools) start(_ context.Context, caller Caller, input AppInput) (Depl
 }
 
 func (t moinTools) stop(ctx context.Context, caller Caller, input AppInput) (Done, error) {
-	err := t.services.Apps.Stop(ctx, caller.actor(), input.app())
+	err := t.services.Apps.Stop(ctx, caller.actor(), input.App)
 	if err != nil {
 		return Done{}, err
 	}
-	return Done{Message: "Stopped " + input.app() + ". Its data stays; start_app runs it again."}, nil
+	return Done{Message: "Stopped " + input.App + ". Its data stays; start_app runs it again."}, nil
 }
 
 // Logs is the output of get_logs.

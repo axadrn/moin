@@ -29,7 +29,7 @@ type semver struct {
 }
 
 func parseVersion(value string) *semver {
-	value, ok := strings.CutPrefix(strings.TrimSpace(value), "v")
+	value, ok := strings.CutPrefix(value, "v")
 	if !ok {
 		return nil
 	}

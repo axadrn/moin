@@ -31,7 +31,8 @@ func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 
 // BlockImpersonatedWrites keeps an impersonation read-only, and keeps the
 // user's data private: an operator sees how the account looks, not its
-// database rows or app logs. Env values no page shows at all.
+// database rows, its database copies or app logs. Env values no page
+// shows at all.
 func BlockImpersonatedWrites(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session := ctxkeys.Session(r.Context())
@@ -89,7 +90,8 @@ func allowedDuringImpersonation(r *http.Request) bool {
 }
 
 // privateDuringImpersonation names the reads that show what a user keeps
-// private: database rows and app logs. The web paths are
+// private: database rows, copies of a database and app logs. The web
+// paths are
 // /app/{workspace}/apps/{app}/..., the API paths /api/v1/apps/{app}/...,
 // so the app's sub page is the sixth segment in both.
 func privateDuringImpersonation(r *http.Request) bool {
@@ -106,6 +108,10 @@ func privateDuringImpersonation(r *http.Request) bool {
 		return true
 	case parts[5] == "data":
 		return web
+	case parts[5] == "backups":
+		// The download is a GET on the web; the API's is a POST, which the
+		// read-only rule refuses anyway.
+		return web && len(parts) > 6 && parts[6] == "download"
 	case parts[5] == "databases":
 		return api && len(parts) > 6 && (parts[6] == "rows" || parts[6] == "query")
 	}

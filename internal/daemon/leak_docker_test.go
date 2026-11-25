@@ -67,6 +67,8 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		".env":        "REPO_VAR=from-the-repo\n",
 	})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
+	defer func(old string) { githubAPI = old }(githubAPI)
+	githubAPI = server.URL
 	defer server.Close()
 
 	var mu sync.Mutex
@@ -271,6 +273,8 @@ func TestRemoveWithoutVariable(t *testing.T) {
 	compose := "services:\n  web:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n  db:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n    environment:\n      NEED: ${NEED:?set NEED}\n"
 	source := tarball(t, map[string]string{"compose.yml": compose})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
+	defer func(old string) { githubAPI = old }(githubAPI)
+	githubAPI = server.URL
 	defer server.Close()
 	var done protocol.DeployDone
 	a := newApps(t.TempDir(), func(_ protocol.MessageType, _ string, data any) {

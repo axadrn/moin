@@ -51,17 +51,29 @@ func (s *AuthService) CreateRecoveryKey(email string) (string, error) {
 }
 
 // SignInWithRecoveryKey uses up a recovery key and returns its user, whose
-// GitHub account it disconnects and whose passkeys it deletes: they connect
-// their GitHub and add a passkey again.
+// GitHub account it disconnects, whose passkeys it deletes and whose
+// connections and CI tokens it ends: they connect their GitHub, add a
+// passkey and let their CLI and AI agents in again.
 func (s *AuthService) SignInWithRecoveryKey(key string) (*model.User, error) {
-	userID, err := s.userRepository.UseRecoveryKey(recoveryKeyHash(key), s.now().UTC())
+	recovered, err := s.userRepository.UseRecoveryKey(recoveryKeyHash(key), s.now().UTC())
 	if errors.Is(err, repository.ErrUserNotFound) {
 		return nil, ErrRecoveryKeyInvalid
 	}
 	if err != nil {
 		return nil, err
 	}
-	return s.userRepository.ByID(userID)
+	const reason = "a recovery key was used"
+	if s.connections != nil {
+		for _, connection := range recovered.Connections {
+			s.connections.record(connection, Source{Via: ViaSystem}, "connection.ended", map[string]string{"reason": reason})
+		}
+	}
+	if s.ciTokens != nil {
+		for _, token := range recovered.CITokens {
+			s.ciTokens.record(Actor{WorkspaceID: token.WorkspaceID, UserID: token.UserID, Source: Source{Via: ViaSystem}}, "ci_token.removed", token, map[string]string{"prefix": token.Prefix, "reason": reason})
+		}
+	}
+	return s.userRepository.ByID(recovered.UserID)
 }
 
 // recoveryKeyHash is the hash of a key as it is typed: case, spaces and

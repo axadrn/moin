@@ -44,7 +44,7 @@ templ Catalog(view CatalogView) {
 templ CatalogApp(view CatalogEntryView, appURL string) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Self-host " + view.Entry.Name + " with Docker Compose",
-		Description: view.Entry.Name + ": " + view.Entry.Pitch + " One click to your own server, its data backed up.",
+		Description: catalogDescription(view.Entry),
 		Path:        "/catalog/" + view.Entry.Slug,
 	}) {
 		@templ.Raw(catalogJSONLD(view, appURL+"/catalog/"+view.Entry.Slug))
@@ -376,7 +376,7 @@ templ CatalogUpdate(view CatalogUpdateView) {
 					hx-post={ basePath + "/apps/" + view.App.Link() + "/update" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
-					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }
+					hx-confirm={ catalogUpdateConfirm(view.Entry) }
 				>
 					@components.CSRF()
 					<div class="moin-width" style="--width:9rem">
@@ -407,6 +407,25 @@ func catalogUpdateLine(view CatalogUpdateView) string {
 }
 
 // catalogUpdateKind makes Update the primary button: it is the thing to do.
+// catalogDescription is what search shows for an app's page. It promises
+// a backup only for an app whose database moin backs up.
+func catalogDescription(entry catalog.Entry) string {
+	if entry.BackedUp() {
+		return entry.Name + ": " + entry.Pitch + " One click to your own server. Its database backed up."
+	}
+	return entry.Name + ": " + entry.Pitch + " One click to your own server, with HTTPS."
+}
+
+// catalogUpdateConfirm asks before a version switch. It names the copy
+// before the deploy only for an app whose database moin backs up.
+func catalogUpdateConfirm(entry catalog.Entry) string {
+	confirm := "Deploy " + entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one."
+	if entry.BackedUp() {
+		confirm += " " + brand.Name + " backs it up first."
+	}
+	return confirm
+}
+
 func catalogUpdateKind(newer bool) components.Kind {
 	if newer {
 		return components.Primary

@@ -33,7 +33,7 @@ func registerBackupTools(server *mcpsdk.Server, services Services) {
 type RestoreInput struct {
 	App      string  `json:"app" jsonschema:"the app name or ID"`
 	Database string  `json:"database,omitempty" jsonschema:"the database's path in the container; needed when the app has several"`
-	Moment   string  `json:"moment,omitempty" jsonschema:"the id or label of a moment from get_backups, like before-v12, 20261107T140000Z or undo-20261107T140200Z"`
+	Moment   string  `json:"moment,omitempty" jsonschema:"the id or label of a moment from get_backups, like before-v12, 20261107T140000Z-482913 or undo-20261107T140200Z-105277"`
 	At       *string `json:"at,omitempty" jsonschema:"a time instead of a moment, RFC 3339: the newest copy at or before it"`
 	Confirm  string  `json:"confirm" jsonschema:"the app's name, typed out, after the user agreed"`
 	ID       string  `json:"id,omitempty" jsonschema:"the id of a restore this tool started, to see how it stands; then only app is needed"`
@@ -74,7 +74,7 @@ type DownloadOutput struct {
 }
 
 func (t moinTools) getBackups(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
-	app, backups, err := t.services.Apps.Backups(ctx, caller.Bearer.WorkspaceID, input.app())
+	app, backups, err := t.services.Apps.Backups(ctx, caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Backups{}, err
 	}

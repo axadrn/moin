@@ -30,11 +30,11 @@ func TestSetAutoDeployNeedsNoGitHub(t *testing.T) {
 		t.Fatal("another workspace turned it on")
 	}
 	// No GitHub is set up: a link of the same repo and branch only flips it.
-	app, err = apps.LinkRepo(context.Background(), owner, "blog", "AxAdrn/Blog", "main", true)
+	app, err = apps.LinkRepo(context.Background(), owner, "blog", "AxAdrn/Blog", "main", new(true))
 	if err != nil || !app.AutoDeploy {
 		t.Fatalf("link the same repo = %+v, %v", app, err)
 	}
-	if _, err := apps.LinkRepo(context.Background(), owner, "blog", "axadrn/blog", "dev", true); err == nil {
+	if _, err := apps.LinkRepo(context.Background(), owner, "blog", "axadrn/blog", "dev", new(true)); err == nil {
 		t.Fatal("another branch linked without GitHub")
 	}
 	if _, err := apps.SetAutoDeploy(owner, "blog", true); err != nil {

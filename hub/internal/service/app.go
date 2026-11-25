@@ -197,8 +197,8 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	return created, nil
 }
 
-// Rename gives an app a new name under the rules of Create. Links to it
-// keep working, since they count its ID. Its server keeps it under its
+// Rename gives an app a new name under the rules of Create. Links name an
+// app by its name, so they follow the new one. Its server keeps it under its
 // folder, so its data, its backups and its instant address stay; the
 // containers take the new name on the next deploy or restart.
 func (s *AppService) Rename(actor Actor, idOrName, name string) (*model.App, error) {

@@ -31,15 +31,15 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // VerifyEmailChange consumes an email change token, moves the pending
 // address to the account and returns the user. Like the link on the web,
-// it ends every session of the user; only a caller signed in as that user
-// gets a new one in its cookie.
+// it ends every session of the user but the caller's own, when the caller
+// is signed in as that user.
 func (h *AuthHandler) VerifyEmailChange(w http.ResponseWriter, r *http.Request) {
 	var request tokenRequest
 	if !Decode(w, r, &request) {
 		return
 	}
 
-	user, _, err := h.authService.ConfirmEmailChange(w, r, request.Token)
+	user, _, err := h.authService.ConfirmEmailChange(r, request.Token)
 	if user == nil {
 		slog.Warn("email change verification failed", "error", err)
 		invalidToken(w)

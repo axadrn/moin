@@ -11,6 +11,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/model"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -230,4 +231,25 @@ func TestRightsFollowTheMethod(t *testing.T) {
 			t.Errorf("%s changes data with the read right", route.Pattern)
 		}
 	}
+}
+
+// TestOpenAPIIsValidYAML: generators and viewers read the document with
+// strict parsers. It parses, and no plain value is a word a YAML 1.1
+// parser reads as a boolean, like on and off: those are quoted.
+func TestOpenAPIIsValidYAML(t *testing.T) {
+	var document yaml.Node
+	if err := yaml.Unmarshal(api.OpenAPIDocument, &document); err != nil {
+		t.Fatalf("openapi.yaml is not valid YAML: %v", err)
+	}
+	booleans := []string{"y", "n", "yes", "no", "on", "off"}
+	var walk func(node *yaml.Node)
+	walk = func(node *yaml.Node) {
+		if node.Kind == yaml.ScalarNode && node.Style == 0 && slices.Contains(booleans, strings.ToLower(node.Value)) {
+			t.Errorf("openapi.yaml line %d: quote %q, a YAML 1.1 parser reads it as a boolean", node.Line, node.Value)
+		}
+		for _, child := range node.Content {
+			walk(child)
+		}
+	}
+	walk(&document)
 }

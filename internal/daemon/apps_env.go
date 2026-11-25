@@ -133,15 +133,60 @@ func (a *apps) allEnvKeys() map[string]protocol.AppEnv {
 	return all
 }
 
-// ensureEnv makes an empty env file for an app that has none, so every
-// release can name it.
+// ensureEnv makes the env file for an app that has none, so every release
+// can name it: the one of the running release when there is one
+// (moveOldEnv), else an empty one.
 func (a *apps) ensureEnv(app string) error {
 	a.envMu.Lock()
 	defer a.envMu.Unlock()
-	if exists(a.envFile(app)) {
-		return nil
+	err := a.moveOldEnv(app)
+	if err != nil || exists(a.envFile(app)) {
+		return err
 	}
 	return writeEnv(a.envFile(app), map[string]string{})
+}
+
+// Up to v1.0.0-beta.34 the daemon wrote the env into the folder of each
+// release, releases/<n>/app.env, and the hub kept the values. Now the hub
+// keeps none, so the running release's file is the only copy. moveOldEnv
+// copies it to apps/<app>/app.env when the app has no env file yet: the
+// app keeps its values, a catalog app its passwords and keys. It runs when
+// the daemon starts (moveOldEnvs) and before every deploy (ensureEnv). The
+// caller holds envMu. Remove this once no server runs beta.34.
+func (a *apps) moveOldEnv(app string) error {
+	current := a.current(app)
+	if current == 0 || exists(a.envFile(app)) {
+		return nil
+	}
+	body, err := os.ReadFile(filepath.Join(a.releaseDir(app, current), "app.env"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	err = writeWhole(a.envFile(app), body)
+	if err != nil {
+		return err
+	}
+	slog.Info("env taken from the running release", "app", app, "release", current)
+	return nil
+}
+
+// moveOldEnvs runs moveOldEnv for every app on the server.
+func (a *apps) moveOldEnvs() {
+	entries, _ := os.ReadDir(a.dir)
+	for _, entry := range entries {
+		if !entry.IsDir() || !protocol.ValidAppName(entry.Name()) {
+			continue
+		}
+		a.envMu.Lock()
+		err := a.moveOldEnv(entry.Name())
+		a.envMu.Unlock()
+		if err != nil {
+			slog.Warn("take the env of the running release", "app", entry.Name(), "error", err)
+		}
+	}
 }
 
 // writeEnv replaces the env file with env, 0600, whole (writeWhole).

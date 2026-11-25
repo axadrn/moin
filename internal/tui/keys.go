@@ -7,6 +7,7 @@ package tui
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -359,6 +360,16 @@ func (m model) backupsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 			database = moments[m.at("moments", len(moments))].db
 		}
 		return m, m.downloadCopy(a.Name, database)
+	case "w":
+		// How often and how long are set on the web, on the database's
+		// page in Data.
+		path := "/apps/" + m.appLink(a.Name) + "/data"
+		if len(moments) > 0 {
+			path += "?db=" + url.QueryEscape(moments[m.at("moments", len(moments))].db)
+		} else if m.app.backups != nil && len(m.app.backups.Databases) > 0 {
+			path += "?db=" + url.QueryEscape(m.app.backups.Databases[0].Database)
+		}
+		return m.browse(path)
 	}
 	return m, nil
 }
@@ -376,7 +387,7 @@ func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 		if s == "enter" && len(keys) > 0 {
 			value = keys[m.at("env", len(keys))] + "="
 		}
-		return m.input("Set an env var of "+a.Name, "KEY=value · the next deploy gets it", value, func(m model, v string) (model, tea.Cmd) {
+		return m.input("Set an env var of "+a.Name, "KEY=value · the app gets it when it restarts", value, func(m model, v string) (model, tea.Cmd) {
 			key, val, ok := strings.Cut(v, "=")
 			key = strings.TrimSpace(key)
 			if !ok || key == "" {
@@ -392,7 +403,7 @@ func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 	case "x":
 		if len(keys) > 0 {
 			k := keys[m.at("env", len(keys))]
-			return m.ask1("Remove "+k+" from "+a.Name+"?", "The next deploy runs without it.", "remove", true, func() tea.Msg {
+			return m.ask1("Remove "+k+" from "+a.Name+"?", "The app runs without it once it restarts.", "remove", true, func() tea.Msg {
 				return optimisticMsg{do: func(m model) model {
 					if m.app.name != a.Name {
 						return m
@@ -491,7 +502,7 @@ func (m model) uptimeTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) 
 		m.app.uptime = &up
 		return m, m.setUptime(a.Name, ud.Domain, nil, &paused)
 	case "c":
-		return m.input("Check path of "+ud.Domain, "like /health · empty goes back to the default", ud.Path, func(m model, v string) (model, tea.Cmd) {
+		return m.input("Path uptime visits on "+ud.Domain, "like /health · empty goes back to the default", ud.Path, func(m model, v string) (model, tea.Cmd) {
 			path := v
 			return m, m.setUptime(m.cur.app, ud.Domain, &path, nil)
 		}), nil

@@ -89,7 +89,7 @@ func printUpdate(stdout io.Writer, info client.Version) {
 // follows it until it is back.
 func update(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("update", "update [--yes], or update <app> [--version <tag>] for an app from the catalog").withYes()
-	appVersion := flags.String("version", "", "with an app: a release from moin catalog; default the newest")
+	appVersion := flags.String("version", "", "with an app: a version from moin catalog; default the newest")
 	if err := flags.parse(args); err != nil {
 		return err
 	}

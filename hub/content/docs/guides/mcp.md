@@ -40,7 +40,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 - A connection or CI token sends at most 121 requests a minute, MCP and API together; one more answers `rate_limited` with the seconds to wait. [API](/docs/reference/api#basics)
 - Tools that remove, replace or stop something are marked destructive, so clients ask first.
 - Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it or with another name: `confirm_mismatch`, the same check as on the web and in the API.
-- Tools take the app as `app` and the server as `server`; the older `name` still works for both, for now.
+- Tools take the app as `app` and the server as `server`.
 
 ## Tools
 

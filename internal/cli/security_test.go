@@ -28,3 +28,23 @@ func TestSecureSetsSSHAndShowsWhatDiffers(t *testing.T) {
 		t.Error("--ssh open passed")
 	}
 }
+
+// servers secure without flags only shows: it sends nothing, so a read
+// connection may run it.
+func TestSecureWithoutFlagsOnlyShows(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/servers": `{"items":[{"id":"s1","name":"web-1","online":true,"tunnel":false,"ssh":"tailscale","firewall":true,"security":{"proxy":"direct","ssh":"tailscale","firewall":true,"open_ports":["80/tcp","443/tcp"]}}]}`,
+	}}
+	code, stdout, stderr := runCLI(t, api, "servers", "secure", "web-1")
+	if code != 0 || stderr != "" {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+	for _, request := range api.requests {
+		if strings.HasPrefix(request, "PUT ") {
+			t.Fatalf("it sent %s", request)
+		}
+	}
+	if !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "open to everyone: 80, 443") {
+		t.Errorf("stdout %q", stdout)
+	}
+}

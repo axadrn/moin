@@ -38,6 +38,8 @@ func TestRenameDocker(t *testing.T) {
 	compose := "services:\n  web:\n    image: alpine:latest\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    volumes:\n      - data:/data\nvolumes:\n  data: {}\n"
 	source := tarball(t, map[string]string{"compose.yml": compose})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
+	defer func(old string) { githubAPI = old }(githubAPI)
+	githubAPI = server.URL
 	defer server.Close()
 
 	docker := func(args ...string) string {

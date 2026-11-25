@@ -503,6 +503,11 @@ func TestAppsWithANameShowsTheApp(t *testing.T) {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
 		}
 	}
+	// An app that follows no repo and has no hook says so.
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","server_name":"web-1"},"deploys":[]}`}}
+	if code, stdout, _ := runCLI(t, api, "apps", "shop"); code != 0 || !strings.Contains(stdout, "deploy from") || !strings.Contains(stdout, "neither yet") {
+		t.Errorf("neither: code %d, stdout %q", code, stdout)
+	}
 	code, _, stderr := runCLI(t, &fakeAPI{}, "apps", "lsit")
 	if code != 1 || !strings.Contains(stderr, `No app or command "lsit"`) || !strings.Contains(stderr, "moin apps") {
 		t.Errorf("typo: code %d, stderr %q", code, stderr)

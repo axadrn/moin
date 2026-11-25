@@ -228,16 +228,16 @@ func TestGitHubDeploys(t *testing.T) {
 	if events, _ := servers.activity.ListPage(owner.WorkspaceID, model.ActivityFilter{}, "", 50); slices.ContainsFunc(events, func(e model.ActivityEvent) bool { return e.Action == "repo.unlinked" }) {
 		t.Fatal("unlink without a repo shows in the activity")
 	}
-	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", true); !errors.Is(err, ErrRepo) {
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", new(true)); !errors.Is(err, ErrRepo) {
 		t.Fatalf("link a repo moin cannot read: err = %v", err)
 	}
-	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "nope", true); !errors.Is(err, ErrBranch) {
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "nope", new(true)); !errors.Is(err, ErrBranch) {
 		t.Fatalf("link a branch GitHub does not have: err = %v", err)
 	}
-	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", false); err != nil || app.Branch != "dev" {
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", new(false)); err != nil || app.Branch != "dev" {
 		t.Fatalf("link dev = %+v, %v", app, err)
 	}
-	app, err := apps.LinkRepo(ctx, owner, "blog", "https://github.com/axadrn/blog.git", "", true)
+	app, err := apps.LinkRepo(ctx, owner, "blog", "https://github.com/axadrn/blog.git", "", new(true))
 	if err != nil || app.Repo != "axadrn/blog" || app.Branch != "main" || !app.AutoDeploy || app.InstallationID != 7 {
 		t.Fatalf("link = %+v, %v", app, err)
 	}
@@ -250,9 +250,25 @@ func TestGitHubDeploys(t *testing.T) {
 	if hooked, _ := apps.Get(owner.WorkspaceID, "blog"); hooked.Repo != "axadrn/blog" || hooked.AutoDeploy || hooked.DeployHookHash == nil || hooked.DeployFrom() != "ci" {
 		t.Fatalf("a deploy hook: %+v", hooked)
 	}
-	app, err = apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", true)
+	// Without a word on deploy on push, an app with a deploy hook keeps it:
+	// CI keeps deploying, as on the web.
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", nil); err != nil || app.AutoDeploy || app.DeployHookHash == nil {
+		t.Fatalf("link without auto_deploy, with a hook: %+v, %v", app, err)
+	}
+	app, err = apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", new(true))
 	if err != nil || app.Repo != "axadrn/blog" || !app.AutoDeploy || app.DeployHookHash != nil || app.DeployFrom() != "github" {
 		t.Fatalf("deploy on push kept the deploy hook: %+v, %v", app, err)
+	}
+	// Without a word on deploy on push and without a hook, it is on, as on
+	// the web and in the CLI.
+	if _, err := apps.SetAutoDeploy(owner, "blog", false); err != nil {
+		t.Fatal(err)
+	}
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", nil); err != nil || !app.AutoDeploy || app.Branch != "dev" {
+		t.Fatalf("link without auto_deploy: %+v, %v", app, err)
+	}
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", new(true)); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := apps.DeployRef(ctx, owner, "blog", "nope"); !errors.Is(err, ErrRef) {
 		t.Fatalf("deploy an unknown ref: err = %v", err)
@@ -441,7 +457,7 @@ func TestImageDeploysTakeTheCommit(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", true); err != nil {
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", new(true)); err != nil {
 		t.Fatal(err)
 	}
 	hook, err := apps.RotateDeployHook(owner, "blog")

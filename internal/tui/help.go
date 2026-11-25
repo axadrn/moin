@@ -50,13 +50,13 @@ func (m model) helpGroups() []keyGroup {
 		case tLogs:
 			here = []kb{{"/", "filter while you type"}, {"c", "clear the filter"}, {"p", "pause, resume"}, {"↑↓", "scroll back"}, {"G", "follow the end"}}
 		case tBackups:
-			here = []kb{{"↑↓", "pick a moment"}, {"enter", "go back to it"}, {"t", "go back to a time"}, {"c", "download a copy"}}
+			here = []kb{{"↑↓", "pick a moment"}, {"enter", "go back to it"}, {"t", "go back to a time"}, {"c", "download a copy"}, {"w", "how often and how long, on the web"}}
 		case tEnv:
 			here = []kb{{"↑↓", "pick a var"}, {"a", "set KEY=value"}, {"enter", "set the picked one again"}, {"x", "remove it"}, {"E", "replace all in $EDITOR"}}
 		case tDomains:
 			here = []kb{{"↑↓", "pick a domain"}, {"a", "add one"}, {"x", "remove it"}, {"c", "make it canonical"}, {"p", "password"}}
 		case tUptime:
-			here = []kb{{"↑↓", "pick a domain"}, {"p", "pause, resume"}, {"c", "the path it visits"}, {"r", "visit again"}}
+			here = []kb{{"↑↓", "pick a domain"}, {"p", "pause, resume"}, {"c", "the path it visits"}, {"r", "load the tab again"}}
 		case tMetrics:
 			here = []kb{{"[  ]", "range: 1h to 30d"}}
 		}

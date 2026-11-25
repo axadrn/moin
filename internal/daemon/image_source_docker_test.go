@@ -33,6 +33,8 @@ func TestImageWithSource(t *testing.T) {
 	compose := "services:\n  web:\n    build: .\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    labels:\n      from-commit: \"yes\"\n"
 	source := tarball(t, map[string]string{"compose.yml": compose, "Dockerfile": "FROM scratch\nRUN false\n"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
+	defer func(old string) { githubAPI = old }(githubAPI)
+	githubAPI = server.URL
 	defer server.Close()
 	t.Cleanup(func() {
 		_ = exec.Command("docker", "compose", "-p", app, "down", "--volumes", "--remove-orphans").Run()
