@@ -227,6 +227,7 @@ Both are readable by root only. A secret goes to a server only while it is onlin
 **What stays honest.**
 
 - A value you type in after someone broke into the hub passes through it once. They could read that one.
+- The secrets of a [catalog app](/docs/guides/catalog) never pass the hub: the server makes them. Only the first sign-in password, which moin shows you once, passes it once.
 - The hub can still send what your [rules](#rules) allow. Without `exec: off`, a command in a container can print its env. Strict rules close that.
 - A server rebuilt from scratch starts without secrets. Enter them again, then deploy. A later server gets the bucket key, registry login and Tailscale key once more: the pages show which server lacks one.
 - `${NAME}` in your compose file is filled in by Docker Compose and written into the compose file of each deploy on the server, also an old value you replaced. It stays there until moin cleans that deploy up: moin keeps the last 5 builds. Let values reach the container as env vars instead where you can. [In compose.yml](/docs/guides/env#in-composeyml)

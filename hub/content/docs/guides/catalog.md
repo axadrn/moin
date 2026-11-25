@@ -19,9 +19,9 @@ API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
 
-It creates the app, makes every secret as an env var on the server, sets `VERSION` and deploys. Without a version it takes the newest. The server must be online.
+It creates the app, sets `VERSION` and deploys. The server makes every secret itself when it deploys, as an env var, so the hub never sees it. Without a version it takes the newest. The server must be online.
 
-Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password moin made, such as `ADMIN_PASSWORD`, the install shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. The password of the app's [instant address](/docs/guides/domains#instant-address) shows the same way, once. Keep them in your password manager. Env values are write-only, so moin never shows it again.
+Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password, such as `ADMIN_PASSWORD`, the hub makes that one, passes it to the server once and shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. The password of the app's [instant address](/docs/guides/domains#instant-address) shows the same way, once. Keep them in your password manager. Env values are write-only, so moin never shows it again. A sign-in password a later version asks for is made by the server and never shown: set your own with `moin env set`.
 
 ## See the catalog
 
@@ -110,7 +110,7 @@ The rules, which a test checks:
 | Rule | |
 | --- | --- |
 | Image | on Docker Hub or `ghcr.io`, for `amd64` and `arm64`, run as `<image>:${VERSION}` |
-| Secrets | every one a `${NAME}`, made on install: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
+| Secrets | every one a `${NAME}`, made by the server on install, and on an update that asks for a new one: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
 | First sign-in | a secret the person needs to sign in, named in `login:` like `ADMIN_PASSWORD`, is the one the install shows once |
 | Its own domain | `${APP_URL}` is `https://<its domain>`, `${APP_DOMAIN}` the domain alone; an app that uses either needs a domain on install |
 | Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data` |
