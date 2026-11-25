@@ -257,7 +257,7 @@ func TestAdminAppliesAnOfferOfAnotherAddress(t *testing.T) {
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "target", Email: "other@example.com", Verified: true})
 	addOffer(t, database, "bought@example.com", nil)
 	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour)
-	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
+	auth.UseBearers(&ConnectionService{connections: repository.NewConnections(database), now: time.Now}, &CITokenService{tokens: repository.NewCITokens(database), now: time.Now})
 	admin := NewAdminService(repository.NewAdmin(database), repository.NewUsers(database), auth, []string{"operator@example.com"})
 	admin.UseOffers(newOffers(database))
 	session, err := auth.StartSession(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)

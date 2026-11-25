@@ -19,11 +19,13 @@ type ErrorBody struct {
 }
 
 // ErrorDetail carries a stable lowercase snake case code, a message for
-// humans, and per-field messages for validation errors.
+// humans, per-field messages for validation errors, and for missing_right
+// the right that is missing.
 type ErrorDetail struct {
 	Code    string            `json:"code"`
 	Message string            `json:"message"`
 	Fields  map[string]string `json:"fields,omitempty"`
+	Right   string            `json:"right,omitempty"`
 }
 
 // JSON writes value as a JSON response with the given status.
@@ -194,12 +196,15 @@ var serviceErrors = []serviceError{
 	{err: repository.ErrPasskeyNotFound, status: http.StatusNotFound, code: "not_found", message: "The passkey was not found."},
 	{err: repository.ErrPasskeyLastWayIn, status: http.StatusConflict, code: "last_way_in", message: "This is your last way in. Add another first."},
 	{err: service.ErrImpersonating, status: http.StatusForbidden, code: "impersonation_read_only", message: "Impersonation is read-only. Return to Admin before making changes."},
-	{err: repository.ErrAPITokenNotFound, status: http.StatusNotFound, code: "not_found", message: "The API token was not found."},
-	{err: service.ErrAPITokenName, field: "name", message: "Name must contain between 1 and 64 characters."},
-	{err: service.ErrAPITokenScope, field: "scopes", message: "Choose read, or read and write."},
-	{err: service.ErrAPITokenExpiry, field: "expires_in_days", message: "Choose between 1 and 365 days, or no expiry."},
-	{err: service.ErrAPITokenLimit, status: http.StatusConflict, code: "token_limit", message: "You have reached the limit of 50 API tokens. Revoke one first."},
-	{err: service.ErrAPITokenWorkspace, field: "workspace_id", message: "Choose one of your workspaces."},
+	{err: repository.ErrConnectionNotFound, status: http.StatusNotFound, code: "not_found", message: "The connection was not found."},
+	{err: repository.ErrCITokenNotFound, status: http.StatusNotFound, code: "not_found", message: "The CI token was not found."},
+	{err: service.ErrCITokenName, field: "name", message: "Name must contain between 1 and 64 characters."},
+	{err: service.ErrRightsUnknown, field: "rights", message: "Choose from read, deploy, env, delete and servers."},
+	{err: service.ErrCITokenExpiry, field: "expires_in_days", message: "Choose between 1 and 365 days, or no expiry."},
+	{err: service.ErrCITokenLimit, status: http.StatusConflict, code: "token_limit", message: "You have reached the limit of 50 CI tokens. Remove one first."},
+	{err: service.ErrCITokenMaker, status: http.StatusForbidden, code: "forbidden", message: "Only the person who made this CI token changes it."},
+	{err: service.ErrConnectionLimit, status: http.StatusConflict, code: "connection_limit", message: "You have reached the limit of 50 connections. Remove one first."},
+	{err: service.ErrConnectionWorkspace, field: "workspace_id", message: "Choose one of your workspaces."},
 	{err: service.ErrAdminPermission, status: http.StatusForbidden, code: "forbidden", message: "Admin access is required."},
 	{err: service.ErrAdminSelfAction, status: http.StatusConflict, code: "admin_self_action", message: "This action is not available for your own account."},
 	{err: service.ErrAdminTargetIsOperator, status: http.StatusForbidden, code: "forbidden", message: "This action is not available for operator accounts."},

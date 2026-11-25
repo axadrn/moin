@@ -76,6 +76,7 @@ templ SettingsHome(view SettingsHomeView) {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
 						@components.Item(components.ItemProps{Href: base + "/settings/account", Name: user.Name, Note: user.Email, Lead: components.Avatar(components.AvatarProps{URL: user.AvatarURL, Name: user.Name, Initials: user.Initials()})})
+						@components.Item(components.ItemProps{Href: base + "/settings/connections", Name: "Connections"})
 					}
 				}
 			</section>

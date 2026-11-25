@@ -2,7 +2,7 @@
 title: "How moin ships"
 description: "From a change to your server: pull requests, deploys, releases, versions and updates"
 group: "Reference"
-order: 6
+order: 7
 ---
 
 This page is the one place that says how a change gets from the code to your server. When that changes, this page changes in the same pull request.

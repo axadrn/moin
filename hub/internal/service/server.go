@@ -755,5 +755,5 @@ func clip(value string) string {
 func randomToken() string {
 	secret := make([]byte, 32)
 	_, _ = rand.Read(secret)
-	return strings.ToLower(apiTokenEncoding.EncodeToString(secret))
+	return strings.ToLower(tokenEncoding.EncodeToString(secret))
 }

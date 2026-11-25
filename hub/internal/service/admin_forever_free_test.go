@@ -31,7 +31,7 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 	}
 
 	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, time.Hour, time.Hour, time.Hour)
-	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
+	auth.UseBearers(&ConnectionService{connections: repository.NewConnections(database), now: time.Now}, &CITokenService{tokens: repository.NewCITokens(database), now: time.Now})
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{"operator@example.com"})
 	admin.UsePlans(subscriptions, repository.NewActivity(database))
 	session, err := auth.StartSession(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth", nil), operator.User.ID)

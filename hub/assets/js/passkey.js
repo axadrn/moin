@@ -1,9 +1,11 @@
-// passkey.js: adds a passkey and signs in with one. A button with
-// data-passkey ("add" or "sign-in") and data-passkey-url asks the hub for
-// the options at <url>/options, lets the browser make or use the passkey,
-// and sends its answer to <url>. The hub checks everything; this only
-// carries the JSON both ways, with the browser's own PublicKeyCredential
-// methods. On success the hub answers where to go, like any sign-in.
+// passkey.js: adds a passkey, signs in with one, and confirms an approval
+// with one. A button with data-passkey ("add", "sign-in" or "confirm") and
+// data-passkey-url asks the hub for the options at <url>/options, lets the
+// browser make or use the passkey, and sends its answer to <url>. The hub
+// checks everything; this only carries the JSON both ways, with the
+// browser's own PublicKeyCredential methods. On success the hub answers
+// where to go, like any sign-in. "confirm" puts the answer into the
+// button's form, in its passkey field, and sends the form.
 (() => {
   if (window.moinPasskey) return;
   window.moinPasskey = true;
@@ -51,6 +53,10 @@
         button.dataset.passkey === "add"
           ? await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(json) })
           : await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(json) });
+      if (button.dataset.passkey === "confirm") {
+        button.form.elements.passkey.value = JSON.stringify(credential.toJSON());
+        return button.form.submit();
+      }
       const answer = await post(url, JSON.stringify(credential.toJSON()));
       if (answer.type === "opaqueredirect") return location.reload();
       if (!answer.ok) return say(await reason(answer));

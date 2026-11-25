@@ -20,7 +20,8 @@ type bearerTestEnvironment struct {
 	database     *sqlx.DB
 	auth         *service.AuthService
 	authenticate func(http.Handler) http.Handler
-	tokens       *service.APITokenService
+	connections  *service.ConnectionService
+	ciTokens     *service.CITokenService
 	tokenAuth    func(http.Handler) http.Handler
 
 	workspaces    *service.WorkspaceService
@@ -55,13 +56,15 @@ func newBearerTestEnvironment(t *testing.T) bearerTestEnvironment {
 	)
 	files := service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage())
 	userService := service.NewUserService(users, files, email, workspaces)
-	tokens := service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
+	connections := service.NewConnectionService(repository.NewConnections(database), workspaces)
+	ciTokens := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), workspaces)
 	return bearerTestEnvironment{
 		database:      database,
 		auth:          auth,
 		authenticate:  AuthMiddleware(auth, userService),
-		tokens:        tokens,
-		tokenAuth:     APITokenAuth(tokens, userService),
+		connections:   connections,
+		ciTokens:      ciTokens,
+		tokenAuth:     BearerAuth(connections, ciTokens, userService),
 		workspaces:    workspaces,
 		subscriptions: subscriptions,
 	}
@@ -285,7 +288,7 @@ func TestWithWorkspaceAPIAnswersJSONNotFound(t *testing.T) {
 func TestBearerRequestSkipsCSRFAndCookieRequestNeedsIt(t *testing.T) {
 	environment := newBearerTestEnvironment(t)
 	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "chain-user", Name: "Chain User", Verified: true})
-	_, token, err := environment.tokens.Create(fixture.User.ID, service.CreateAPITokenInput{Name: "Script", WorkspaceID: fixture.Workspace.ID})
+	_, token, err := environment.ciTokens.Create(service.Actor{UserID: fixture.User.ID, WorkspaceID: fixture.Workspace.ID}, service.NewCIToken{Name: "Script"})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}

@@ -2,28 +2,27 @@ package service
 
 import "errors"
 
-var errAPITokensNotConfigured = errors.New("api token revocation is not configured")
+var errBearersNotConfigured = errors.New("connections and ci tokens are not configured")
 
-// UseAPITokens lets RevokeAllAccess revoke the personal API tokens of a
+// UseBearers lets RevokeAllAccess end the connections and CI tokens of a
 // user. The application wires it once at startup.
-func (s *AuthService) UseAPITokens(tokens *APITokenService) {
-	s.apiTokens = tokens
+func (s *AuthService) UseBearers(connections *ConnectionService, ciTokens *CITokenService) {
+	s.connections, s.ciTokens = connections, ciTokens
 }
 
-// RevokeAllAccess ends every session and revokes every personal API token of
-// the user. The admin kill switch calls it. Signing out
-// everywhere ends sessions only and keeps the tokens.
+// RevokeAllAccess ends every session, connection and CI token of the user.
+// The admin kill switch calls it. Signing out everywhere ends sessions only
+// and keeps the rest.
 func (s *AuthService) RevokeAllAccess(userID string) error {
 	err := s.RevokeAllSessions(userID)
 	if err != nil {
 		return err
 	}
-	return s.revokeAPITokens(userID)
-}
-
-func (s *AuthService) revokeAPITokens(userID string) error {
-	if s.apiTokens == nil {
-		return errAPITokensNotConfigured
+	if s.connections == nil || s.ciTokens == nil {
+		return errBearersNotConfigured
 	}
-	return s.apiTokens.RevokeAllForUser(userID)
+	if err := s.connections.EndAllForUser(userID); err != nil {
+		return err
+	}
+	return s.ciTokens.DeleteAllForUser(userID)
 }

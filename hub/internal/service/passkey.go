@@ -103,23 +103,137 @@ func (s *PasskeyService) SignIn(ceremony string, answer io.Reader) (*model.User,
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrPasskeyRefused, err)
 	}
+	if err := s.used(user, passkeys, credential); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// used stores the new sign counter of the passkey that just answered. It
+// refuses a passkey whose counter went back, a copy of it, and one the user
+// does not have.
+func (s *PasskeyService) used(user *model.User, passkeys []model.Passkey, credential *webauthn.Credential) error {
 	if credential.Authenticator.CloneWarning {
 		slog.Warn("passkey sign counter went back: refused as a copy", "user_id", user.ID)
-		return nil, fmt.Errorf("%w: the sign counter went back", ErrPasskeyRefused)
+		return fmt.Errorf("%w: the sign counter went back", ErrPasskeyRefused)
 	}
 	stored, err := json.Marshal(credential)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, passkey := range passkeys {
 		if bytes.Equal(passkey.CredentialID, credential.ID) {
-			if err := s.passkeys.Used(passkey.ID, string(stored), s.now().UTC()); err != nil {
-				return nil, err
-			}
-			return user, nil
+			return s.passkeys.Used(passkey.ID, string(stored), s.now().UTC())
 		}
 	}
-	return nil, ErrPasskeyRefused
+	return ErrPasskeyRefused
+}
+
+// FreshSignIn is how recent a sign-in must be to approve a connection
+// without a passkey.
+const FreshSignIn = 5 * time.Minute
+
+var (
+	// ErrPresencePasskey asks for the passkey: the account has one, so
+	// an approval needs it, right then.
+	ErrPresencePasskey = errors.New("approve with your passkey")
+	// ErrPresenceSignIn asks to sign in again: the account has no passkey
+	// and its sign-in is older than FreshSignIn.
+	ErrPresenceSignIn = errors.New("sign in again to approve")
+)
+
+// Presence is the proof that the person is at the browser now, for an
+// approval: the browser's answer to a passkey ceremony begun for it, or
+// nothing when the account has no passkey and signed in just now.
+type Presence struct {
+	Session  *model.Session
+	Ceremony string
+	Answer   []byte
+}
+
+// NeedsPasskey says whether the user approves with a passkey: they have
+// one and this hub has passkeys.
+func (s *PasskeyService) NeedsPasskey(userID string) (bool, error) {
+	if s.webAuthn == nil {
+		return false, nil
+	}
+	passkeys, err := s.passkeys.ByUser(userID)
+	return len(passkeys) > 0, err
+}
+
+// BeginConfirm starts a ceremony in which the user of session confirms
+// they are there: only their own passkeys answer, unlocked with a face, a
+// finger or the screen lock.
+func (s *PasskeyService) BeginConfirm(session *model.Session) (*protocol.PublicKeyCredentialRequestOptions, string, error) {
+	if session == nil || session.IsImpersonating() {
+		return nil, "", ErrImpersonating
+	}
+	if s.webAuthn == nil {
+		return nil, "", ErrPasskeysOff
+	}
+	user, err := s.users.ByID(session.UserID)
+	if err != nil {
+		return nil, "", err
+	}
+	owner, _, err := s.owner(user)
+	if err != nil {
+		return nil, "", err
+	}
+	assertion, data, err := s.webAuthn.BeginLogin(owner, webauthn.WithUserVerification(protocol.VerificationRequired))
+	if err != nil {
+		return nil, "", err
+	}
+	ceremony, err := s.startCeremony(data)
+	if err != nil {
+		return nil, "", err
+	}
+	return &assertion.Response, ceremony, nil
+}
+
+// ConfirmPresence checks that the person of an approval is at the browser
+// now. An account with a passkey answers a ceremony from BeginConfirm with
+// it; go-webauthn checks the answer, the user and user verification. An
+// account without one, or on a hub without passkeys, must have signed in
+// less than FreshSignIn ago. Impersonation never approves.
+func (s *PasskeyService) ConfirmPresence(presence Presence) error {
+	session := presence.Session
+	if session == nil || session.IsImpersonating() {
+		return ErrImpersonating
+	}
+	needs, err := s.NeedsPasskey(session.UserID)
+	if err != nil {
+		return err
+	}
+	if !needs {
+		if s.now().Sub(session.CreatedAt) > FreshSignIn {
+			return ErrPresenceSignIn
+		}
+		return nil
+	}
+	if len(presence.Answer) == 0 {
+		return ErrPresencePasskey
+	}
+	data, err := s.takeCeremony(presence.Ceremony)
+	if err != nil {
+		return err
+	}
+	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(presence.Answer))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrPasskeyRefused, err)
+	}
+	user, err := s.users.ByID(session.UserID)
+	if err != nil {
+		return err
+	}
+	owner, passkeys, err := s.owner(user)
+	if err != nil {
+		return err
+	}
+	credential, err := s.webAuthn.ValidateLogin(owner, *data, parsed)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrPasskeyRefused, err)
+	}
+	return s.used(user, passkeys, credential)
 }
 
 // BeginAdd starts adding a passkey to the user of session. It returns the

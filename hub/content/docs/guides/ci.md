@@ -116,7 +116,7 @@ The hook takes `?image=` and `&commit=`, or the JSON body `{"image": "...", "com
 
 ## Or use the moin action
 
-The action installs `moin` from your hub and runs `moin deploy --yes`. It needs an [API token](/docs/guides/account#create-an-api-token) with **Read and write**, saved in the repo as `MOIN_TOKEN`.
+The action installs `moin` from your hub and runs `moin deploy --yes`. It needs a [CI token](/docs/guides/account#make-a-ci-token) with the deploy right, saved in the repo as `MOIN_TOKEN`. Limit it to the app it deploys, and name that app in `app:`: a token for one app cannot list the others to find it.
 
 With `image` it deploys that image, with the `compose.yml` of the job's commit. Set `commit: ''` for an app that follows no repo. Without `image`, your server builds the commit of the job from GitHub, as [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) does. The job fails when the deploy fails.
 

@@ -80,7 +80,8 @@ The first five are in [moin in five words](/docs/moin-in-five-words). The rest:
 | **restore** | going back to a copy. It can be undone |
 | **health check** | after a deploy, moin checks that the app starts and stays up |
 | **catalog** | the place with apps you install in one click |
-| **API token** | a key for the CLI, scripts and AI agents, for one workspace |
+| **Connection** | a client you let in from the browser, like the CLI of your laptop, with the rights you picked, for one workspace |
+| **CI token** | a key you make by hand for CI and scripts, with its own rights |
 | **MCP** | the way AI agents use moin |
 | **activity** | who did what, and when |
 

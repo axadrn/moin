@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/protocol"
 )
@@ -167,6 +168,11 @@ func (h *AppsHandler) Query(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.Limit < 0 || request.Limit > MaxQueryLimit {
 		ValidationError(w, map[string]string{"limit": QueryLimitMessage})
+		return
+	}
+	// The route needs read; SQL that writes changes data, which needs
+	// delete.
+	if request.Write && !Allowed(w, r, model.RightDelete) {
 		return
 	}
 	result, err := h.apps.Query(r.Context(), actor(r), r.PathValue("app"), request.Database, request.SQL, request.Params, request.Write, request.Limit)

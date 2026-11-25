@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/api"
+	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/middleware"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/secret"
@@ -29,17 +30,19 @@ var testCSRFToken = strings.Repeat("c", 43)
 // apiEnvironment runs API requests through the same middleware the router
 // uses, against a fresh database.
 type apiEnvironment struct {
-	database   *sqlx.DB
-	mailer     *testutil.MemoryMailer
-	auth       *service.AuthService
-	users      *service.UserService
-	workspaces *service.WorkspaceService
-	tokens     *service.APITokenService
-	devices    *service.DeviceLoginService
-	files      *service.FileService
-	storage    *testutil.MemoryStorage
-	admin      *service.AdminService
-	payments   *paymentStub
+	database    *sqlx.DB
+	mailer      *testutil.MemoryMailer
+	auth        *service.AuthService
+	users       *service.UserService
+	workspaces  *service.WorkspaceService
+	connections *service.ConnectionService
+	ciTokens    *service.CITokenService
+	passkeys    *service.PasskeyService
+	devices     *service.DeviceLoginService
+	files       *service.FileService
+	storage     *testutil.MemoryStorage
+	admin       *service.AdminService
+	payments    *paymentStub
 	// updates is a hosted hub's: no release, no update.
 	updates *service.UpdateService
 	routes  []api.Route
@@ -87,10 +90,12 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	billingHandler := api.NewBillingHandler(environment.payments, environment.workspaces)
 	accountHandler := api.NewAccountHandler(environment.auth, environment.users, environment.files)
 	sessionsHandler := api.NewSessionsHandler(environment.auth)
-	environment.tokens = service.NewAPITokenService(repository.NewAPITokens(database), environment.workspaces)
-	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users)
-	environment.auth.UseAPITokens(environment.tokens)
-	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.tokens)
+	environment.connections = service.NewConnectionService(repository.NewConnections(database), environment.workspaces)
+	environment.ciTokens = service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), environment.workspaces)
+	tokenAuth := middleware.BearerAuth(environment.connections, environment.ciTokens, environment.users)
+	environment.auth.UseBearers(environment.connections, environment.ciTokens)
+	environment.passkeys = service.NewPasskeyService(repository.NewPasskeys(database), userRepository, email, nil)
+	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.connections, environment.passkeys)
 	environment.admin = service.NewAdminService(repository.NewAdmin(database), userRepository, environment.auth, []string{testAdminEmail})
 	adminHandler := api.NewAdminHandler(environment.admin)
 
@@ -110,8 +115,10 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Auth:        authHandler,
 		Account:     accountHandler,
 		Sessions:    sessionsHandler,
-		Passkeys:    api.NewPasskeysHandler(service.NewPasskeyService(repository.NewPasskeys(database), userRepository, email, nil)),
-		Tokens:      api.NewAPITokensHandler(environment.tokens),
+		Passkeys:    api.NewPasskeysHandler(environment.passkeys),
+		Connections: api.NewConnectionsHandler(environment.connections),
+		CITokens:    api.NewCITokensHandler(environment.ciTokens),
+		Token:       api.NewTokenHandler(environment.devices, environment.connections),
 		Billing:     billingHandler,
 		Admin:       adminHandler,
 		Workspaces:  api.NewWorkspaceHandler(environment.workspaces),
@@ -120,6 +127,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Apps:        api.NewAppsHandler(apps),
 		Servers:     api.NewServersHandler(servers),
 		Status:      api.NewStatusHandler(service.NewStatusService(apps, servers, nil)),
+		Catalog:     api.NewCatalogHandler(service.NewCatalogService(catalog.NewStore(nil, catalog.Registry{}), apps)),
 		Device:      api.NewDeviceHandler(environment.devices, "https://app.example.com"),
 	}
 	routeMiddleware := api.Middleware{
@@ -136,6 +144,13 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		},
 		RateLimitDevice:     middleware.RateLimitDeviceLogin(clientIPs),
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
+		AppID: func(workspaceID, name string) (string, error) {
+			app, err := apps.Get(workspaceID, name)
+			if err != nil {
+				return "", err
+			}
+			return app.ID, nil
+		},
 	}
 	environment.routes = api.Routes(handlers, routeMiddleware)
 	mux := http.NewServeMux()
@@ -156,14 +171,18 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 }
 
 // apiRequest describes one call. Bearer sends an Authorization header, such
-// as a personal API token; Cookie sends a session cookie together with a
-// valid CSRF token.
+// as a CI token; Cookie sends a session cookie together with a valid CSRF
+// token. Form sends the body as a form, as OAuth does.
 type apiRequest struct {
 	method string
 	path   string
 	body   string
 	bearer string
 	cookie string
+	form   bool
+	// workspace names the workspace of a session, as the Moin-Workspace
+	// header does.
+	workspace string
 	// cookies are sent as they are, for example an impersonation cookie.
 	cookies []*http.Cookie
 }
@@ -176,10 +195,16 @@ func (e *apiEnvironment) send(t *testing.T, request apiRequest) *httptest.Respon
 	} else {
 		httpRequest = httptest.NewRequest(request.method, request.path, strings.NewReader(request.body))
 		httpRequest.Header.Set("Content-Type", "application/json")
+		if request.form {
+			httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
 	}
 	httpRequest.Header.Set("User-Agent", "moin-test/1.0")
 	if request.bearer != "" {
 		httpRequest.Header.Set("Authorization", "Bearer "+request.bearer)
+	}
+	if request.workspace != "" {
+		httpRequest.Header.Set("Moin-Workspace", request.workspace)
 	}
 	if request.cookie != "" {
 		httpRequest.AddCookie(&http.Cookie{Name: "session_token", Value: request.cookie})

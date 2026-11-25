@@ -30,13 +30,30 @@ const DefaultURL = "https://moin.run"
 // ErrNotLoggedIn means there is no token in the environment or config file.
 var ErrNotLoggedIn = errors.New("not logged in: run `" + build.Name + " login`")
 
-// Config is what `moin login` saves.
+// Config is what `moin login` saves. A login in the browser keeps the
+// access token of its connection in Token, the refresh token and when the
+// access token ends; the client refreshes them by itself. A CI token has
+// only Token.
 type Config struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
+	// RefreshToken gets the next pair once ExpiresAt comes.
+	RefreshToken string     `json:"refresh_token,omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	// Connection is the ID of the connection the login made.
+	Connection string `json:"connection,omitempty"`
 	// TokenFromEnv is true when the token came from MOIN_TOKEN.
 	TokenFromEnv bool `json:"-"`
 	urlFromEnv   bool
+}
+
+// Login names the login for the TUI's cache: the connection, or a CI token
+// itself.
+func (c Config) Login() string {
+	if c.Connection != "" {
+		return "connection:" + c.Connection
+	}
+	return c.Token
 }
 
 func configPath() (string, error) {
@@ -72,7 +89,7 @@ func LoadConfig() (Config, error) {
 		config.urlFromEnv = true
 	}
 	if value := build.Getenv("TOKEN"); value != "" {
-		config.Token, config.TokenFromEnv = value, true
+		config = Config{URL: config.URL, Token: value, TokenFromEnv: true, urlFromEnv: config.urlFromEnv}
 	}
 	if config.URL == "" {
 		config.URL = DefaultURL
@@ -81,8 +98,8 @@ func LoadConfig() (Config, error) {
 	return config, nil
 }
 
-// loadSaved reads the saved config alone, without the environment.
-func loadSaved() (Config, error) {
+// LoadSaved reads the saved config alone, without the environment.
+func LoadSaved() (Config, error) {
 	var config Config
 	path, err := configPath()
 	if err != nil {
@@ -241,11 +258,14 @@ type Account struct {
 	EmailAlerts bool `json:"email_alerts"`
 }
 
-// Client calls the hub with a personal API token.
+// Client calls the hub as a connection or with a CI token.
 type Client struct {
 	url          string
-	token        string
 	tokenFromEnv bool
+	// login is the token and, for a connection, how to refresh it. mu
+	// guards it: the TUI sends requests at once.
+	mu    sync.Mutex
+	login Config
 	// config is the config the client came from; moved keeps a move to a
 	// new address to once.
 	config Config
@@ -267,7 +287,7 @@ func New(config Config) (*Client, error) {
 	if config.Token == "" {
 		return nil, ErrNotLoggedIn
 	}
-	return &Client{url: config.URL, token: config.Token, tokenFromEnv: config.TokenFromEnv, config: config, http: &http.Client{}, surface: "cli"}, nil
+	return &Client{url: config.URL, login: config, tokenFromEnv: config.TokenFromEnv, config: config, http: &http.Client{}, surface: "cli"}, nil
 }
 
 // Account returns the user the token belongs to.
@@ -457,8 +477,10 @@ func (c *Client) request(ctx context.Context, method, path string, body any) (*h
 	if err != nil {
 		return nil, err
 	}
-	if c.token != "" {
-		request.Header.Set("Authorization", "Bearer "+c.token)
+	if token, err := c.token(ctx); err != nil {
+		return nil, err
+	} else if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
 	request.Header.Set("User-Agent", build.Name+"-"+c.surface+"/"+build.Version)
 	if body != nil {
@@ -468,6 +490,12 @@ func (c *Client) request(ctx context.Context, method, path string, body any) (*h
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body, target any) error {
+	return c.send(ctx, method, path, body, target, true)
+}
+
+// send is do; retry refreshes the login once when the hub no longer takes
+// the access token.
+func (c *Client) send(ctx context.Context, method, path string, body, target any, retry bool) error {
 	request, err := c.request(ctx, method, path, body)
 	if err != nil {
 		return err
@@ -477,6 +505,18 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any) 
 		return err
 	}
 	defer response.Body.Close()
+	// An access token the hub no longer takes, before its time: refresh
+	// once and send again.
+	if response.StatusCode == http.StatusUnauthorized && retry && c.refreshable() {
+		err := c.refresh(ctx, request.Header.Get("Authorization"))
+		if err == nil {
+			response.Body.Close()
+			return c.send(ctx, method, path, body, target, false)
+		}
+		if errors.Is(err, ErrLoginEnded) {
+			return err
+		}
+	}
 	c.follow(response)
 	if response.StatusCode >= 300 {
 		return c.responseError(response)
@@ -500,7 +540,7 @@ func (c *Client) follow(response *http.Response) {
 		return
 	}
 	c.moved.Do(func() {
-		saved, err := loadSaved()
+		saved, err := LoadSaved()
 		if err != nil || saved.Token == "" {
 			return
 		}

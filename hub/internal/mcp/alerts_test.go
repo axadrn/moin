@@ -18,7 +18,7 @@ import (
 func TestEmailAlertsTool(t *testing.T) {
 	env := newEnvironment(t)
 	ada := seedOwner(t, env, "ada")
-	token, _ := createToken(t, env, ada, "read", "write")
+	token, _ := createToken(t, env, ada, allRights...)
 	session := connectMemory(t, env.server, ada, token)
 
 	if who := output[mcp.WhoAmI](t, call(t, session, "whoami", nil)); !who.User.EmailAlerts {
@@ -30,7 +30,7 @@ func TestEmailAlertsTool(t *testing.T) {
 	if who := output[mcp.WhoAmI](t, call(t, session, "whoami", nil)); who.User.EmailAlerts {
 		t.Fatal("email alerts still on")
 	}
-	readToken, _ := createToken(t, env, ada, "read")
+	readToken, _ := createToken(t, env, ada)
 	if result := call(t, connectMemory(t, env.server, ada, readToken), "set_email_alerts", map[string]any{"on": true}); !result.IsError {
 		t.Fatal("a read-only token turned the alerts on")
 	}
@@ -41,7 +41,7 @@ func TestEmailAlertsTool(t *testing.T) {
 func TestAlertDestinationTools(t *testing.T) {
 	env := newEnvironment(t)
 	ada := seedOwner(t, env, "ada")
-	token, _ := createToken(t, env, ada, "read", "write")
+	token, _ := createToken(t, env, ada, allRights...)
 	session := connectMemory(t, env.server, ada, token)
 	var mu sync.Mutex
 	var body, signature string
@@ -77,10 +77,10 @@ func TestAlertDestinationTools(t *testing.T) {
 	mu.Unlock()
 	toolError(t, call(t, session, "test_alert_destination", map[string]any{"name": "ci"}), "alert_send_failed")
 
-	readToken, _ := createToken(t, env, ada, "read")
+	readToken, _ := createToken(t, env, ada)
 	reader := connectMemory(t, env.server, ada, readToken)
 	output[mcp.AlertDestinationList](t, call(t, reader, "list_alert_destinations", nil))
-	toolError(t, call(t, reader, "remove_alert_destination", map[string]any{"name": "ci"}), "insufficient_scope")
+	toolError(t, call(t, reader, "remove_alert_destination", map[string]any{"name": "ci"}), "missing_right")
 
 	output[mcp.Done](t, call(t, session, "remove_alert_destination", map[string]any{"name": "ci"}))
 	toolError(t, call(t, session, "remove_alert_destination", map[string]any{"name": "ci"}), "not_found")

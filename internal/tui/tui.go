@@ -46,7 +46,7 @@ func Run(ctx context.Context, opts Options) error {
 		if err != nil {
 			return err
 		}
-		m = m.connect(api, cacheKey(opts.Config.URL, opts.Config.Token)).restoreCache()
+		m = m.connect(api, cacheKey(opts.Config.URL, opts.Config.Login())).restoreCache()
 	}
 	final, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
 	if last, ok := final.(model); ok {

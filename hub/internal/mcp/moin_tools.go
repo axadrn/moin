@@ -41,7 +41,7 @@ func member[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In,
 			return empty, err
 		}
 		for _, membership := range memberships {
-			if membership.ID == caller.Token.WorkspaceID {
+			if membership.ID == caller.Bearer.WorkspaceID {
 				return tool(ctx, caller, input)
 			}
 		}
@@ -54,7 +54,7 @@ func member[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In,
 func changes[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In, Out] {
 	return member(services, func(ctx context.Context, caller Caller, input In) (Out, error) {
 		var empty Out
-		if err := services.Servers.RequireChanges(caller.Token.WorkspaceID); err != nil {
+		if err := services.Servers.RequireChanges(caller.Bearer.WorkspaceID); err != nil {
 			return empty, err
 		}
 		return tool(ctx, caller, input)

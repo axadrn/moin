@@ -51,8 +51,9 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 
 - JSON handlers live in `internal/api` and call the same services as the HTML handlers. Never duplicate a rule or a permission check there.
 - Every route under `/api/v1` is listed once in `api.Routes` in `internal/api/routes.go`. `internal/api/openapi.yaml` documents each one and is served at `GET /api/v1/openapi.yaml`. `internal/api/openapi_test.go` fails when the two drift.
-- People sign in in the browser, with GitHub through the moin GitHub App or with a passkey, and get the `session_token` cookie; a hub without the app takes a recovery key from `./main recovery-key <email>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`. Scripts, the CLI and AI agents send a personal API token as `Authorization: Bearer pat_...`; a session is never a bearer token.
-- Personal API tokens (`pat_...`) let scripts and AI agents act for a user. Each route in `api.Routes` declares `TokenRead`, `TokenWrite` or the default `TokenDenied`. Open a new route to tokens only when an AI agent should reach it, and update its `apiTokenAuth` entry in `openapi.yaml`. A token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
+- People sign in in the browser, with GitHub through the moin GitHub App or with a passkey, and get the `session_token` cookie; a hub without the app takes a recovery key from `./main recovery-key <email>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`. The CLI, the TUI and AI agents are connections (`at_...` access tokens from `POST /api/v1/auth/token`); CI sends a CI token (`pat_...`); both as `Authorization: Bearer`. A session is never a bearer token.
+- A connection is a client the person let in from the browser (`service.ConnectionService`), a CI token one made by hand (`service.CITokenService`); both act with rights: read, deploy, env, delete, servers (`model.Rights`). Each route in `api.Routes` names the right it needs, or `api.NoToken` to keep them out; that table is the one place, and `content/docs/reference/rights.md` and the `bearerAuth` roles in `openapi.yaml` are checked against it. A right a handler can only tell from the body, like SQL that writes, is asked with `api.Allowed`. Rights never add to a role. A connection or CI token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
+- `POST /api/v1/auth/token` and `/api/v1/auth/revoke` follow OAuth (RFC 6749, 8628, 7009): forms in, `{"error", "error_description"}` out, not the envelope.
 - Every non-2xx answer is the envelope `{"error":{"code","message","fields"}}`. Codes are stable lowercase snake case. `fields` appears only for `validation_failed`.
 - `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards.
 - Email change emails link to the HTML route under `APP_URL/auth/...`. An API client that receives the token another way calls `POST /api/v1/auth/email-change/verify`.
@@ -60,9 +61,9 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 ## MCP server
 
 - `internal/mcp` serves an MCP server at `/mcp`: Streamable HTTP, stateless, `POST` only. It is a third transport next to the HTML handlers and the JSON API. Tools call the same services and never repeat a rule or a permission check.
-- AI agents authenticate with a personal API token as `Authorization: Bearer pat_...`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, revoked or expired tokens.
+- AI agents authenticate as a connection or with a CI token, `Authorization: Bearer`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, removed or expired tokens, and 403 `app_only` to a CI token for one app.
 - Built-in tools: `whoami`, `list_workspaces`, `get_workspace`, `list_activity`, `get_billing`, `invite_member`, `rename_workspace`. `registerTools` in `internal/mcp/tools.go` registers them in one place.
-- Wrap a tool body in `mcp.Read` when it only reads and in `mcp.Write` when it changes data. A read-only token gets `insufficient_scope` from a `Write` tool. Workspace tools take an optional `workspace` slug, default to the token's workspace, and answer `not_found` for every other workspace.
+- Register every tool with `mcp.Add` and the right it needs. Add ends the description with "Needs the deploy right.", puts the rights in the tool's `_meta`, and answers `missing_right` without them. The Right column of the tools table in `content/docs/guides/mcp.md` is checked against it. Workspace tools take an optional `workspace` slug, default to the connection's workspace, and answer `not_found` for every other workspace.
 - Failed calls return the JSON API error envelope as the tool result. Return service errors unchanged; `api.ErrorFor` maps them to the same codes as the API. Use `mcp.InvalidField` for a `validation_failed` field.
 - Tools are a curated list for AI agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, sign-in, or email.
 - `mcp.Services` in `internal/mcp/server.go` lists the services tools may call. Add your service there and pass it where `internal/routes/routes.go` calls `mcp.NewServer`.
@@ -76,10 +77,10 @@ type nameInput struct {
 }
 
 func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	mcp.Add(server, &mcpsdk.Tool{
 		Name:        "set_display_name",
-		Description: "Changes the display name of the user this token acts for. Needs a token with read and write access.",
-	}, mcp.Write(func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
+		Description: "Changes the display name of the user this connection acts for.",
+	}, model.RightServers, func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
 		err := validation.ValidateName(input.Name)
 		if err != nil {
 			return api.UserResponse{}, mcp.InvalidField("name", api.FieldMessage(err))
@@ -89,13 +90,13 @@ func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
 			return api.UserResponse{}, err
 		}
 		return api.UserResponse{User: api.NewUser(user)}, nil
-	}))
+	})
 }
 ```
 
-The description tells the AI agent what the tool returns or changes and which scope it needs. Add a test with the in-memory transport like `TestAddedToolRunsWithTheTokenScopes`.
+The description tells the AI agent what the tool returns or changes; Add says the right. Add a test with the in-memory transport like `TestAddedToolRunsWithItsRight`.
 
-Client setup, with a token from Settings, Tokens and the public URL of this server:
+Client setup, with a CI token from Settings, Connections and the public URL of this server:
 
 - Claude Code: `claude mcp add --transport http app https://example.com/mcp --header "Authorization: Bearer pat_..."`
 - Claude Desktop and claude.ai: Customize, Connectors, Add custom connector, the `/mcp` URL, Authentication "No sign in", and the request header `Authorization: Bearer pat_...`. Claude connects from Anthropic's cloud, so the URL must be public. Request headers on custom connectors are in beta and not available to every organization yet. For a local server, or when your organization has no Request headers field, use the local `mcp-remote` bridge: run `npx mcp-remote http://localhost:8090/mcp --header Authorization:${AUTH_HEADER}` from `claude_desktop_config.json` with `AUTH_HEADER` set to `Bearer pat_...`.

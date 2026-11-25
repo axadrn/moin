@@ -31,7 +31,7 @@ func TestPasskeysListAndRemove(t *testing.T) {
 	expectStatus(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/passkeys/p1", cookie: owner.session}), http.StatusNoContent)
 	expectError(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/passkeys/p1", cookie: owner.session}), http.StatusNotFound, "not_found")
 
-	created := createAPIToken(t, environment, owner, `"name":"Agent","scopes":["read","write"]`)
+	created := createCIToken(t, environment, owner, `"name":"Agent","rights":["deploy","env","delete","servers"]`)
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/passkeys", bearer: created.Token}), http.StatusForbidden, "forbidden")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/passkeys/p2", bearer: created.Token}), http.StatusForbidden, "forbidden")
 }

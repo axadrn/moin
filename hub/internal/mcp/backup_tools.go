@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"github.com/axadrn/moin/hub/internal/model"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -14,18 +15,18 @@ import (
 // the schedule, restoring and downloading a copy.
 func registerBackupTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("get_backups", "List backups",
-		"Lists how an app is backed up: the schedule (every_minutes, keep_days) and for every database its copies in the user's bucket, copied_at the newest, checked_at the newest daily check (check_error when it failed), problem in one short sentence when the backup does not work, and the moments a restore can go back to: the copies newest first, named before-v12 and the like when moin took one before a deploy, a data edit or a catalog update, and the state before each restore (undo-...). Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getBackups)))
-	mcpsdk.AddTool(server, newTool("set_backups", "Set the backup schedule",
-		"Sets how often moin copies the databases of an app into the user's bucket (every_minutes: 15, 60 or 1440), and how many days it keeps each copy (keep_days: 1, 3, 7 or 30). Returns the schedule. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.setBackups)))
-	mcpsdk.AddTool(server, newTool("restore_app", "Restore a database",
-		"Puts a database of an app back to a moment from get_backups, by its id or label, or to a time (RFC 3339): the newest copy at or before it. moin builds the restored database beside the live one and switches in one step; the state before stays as long as the app keeps copies, so the restore can be undone with its undo- moment. The app stops for the switch and starts again. It runs on its own and returns its state: running; unknown when the server went offline during it, until the server is back and says how it ended; then done, or failed with error. Call it again with id until it is done or failed; when it stays unknown, tell the user to check the app once the server is back. A moment two moments share as a label needs its id. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
-		change(true, false)), Write(changes(services, tools.restoreApp)))
-	mcpsdk.AddTool(server, newTool("download_backup", "Download a copy",
-		"Returns link, a signed link to a copy of a database of an app in the app's own bucket, never through moin, valid 15 minutes: the newest copy, or the one moment names (a copy from get_backups). SQLite is gzipped, Postgres a pg_dump in its custom format. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.downloadBackup)))
+	Add(server, newTool("get_backups", "List backups",
+		"Lists how an app is backed up: the schedule (every_minutes, keep_days) and for every database its copies in the user's bucket, copied_at the newest, checked_at the newest daily check (check_error when it failed), problem in one short sentence when the backup does not work, and the moments a restore can go back to: the copies newest first, named before-v12 and the like when moin took one before a deploy, a data edit or a catalog update, and the state before each restore (undo-...).",
+		readOnly("")), model.RightRead, member(services, tools.getBackups))
+	Add(server, newTool("set_backups", "Set the backup schedule",
+		"Sets how often moin copies the databases of an app into the user's bucket (every_minutes: 15, 60 or 1440), and how many days it keeps each copy (keep_days: 1, 3, 7 or 30). Returns the schedule.",
+		change(true, true)), model.RightDeploy, changes(services, tools.setBackups))
+	Add(server, newTool("restore_app", "Restore a database",
+		"Puts a database of an app back to a moment from get_backups, by its id or label, or to a time (RFC 3339): the newest copy at or before it. moin builds the restored database beside the live one and switches in one step; the state before stays as long as the app keeps copies, so the restore can be undone with its undo- moment. The app stops for the switch and starts again. It runs on its own and returns its state: running; unknown when the server went offline during it, until the server is back and says how it ended; then done, or failed with error. Call it again with id until it is done or failed; when it stays unknown, tell the user to check the app once the server is back. A moment two moments share as a label needs its id. Ask the user first: confirm must be the app's name, typed out.",
+		change(true, false)), model.RightDelete, changes(services, tools.restoreApp))
+	Add(server, newTool("download_backup", "Download a copy",
+		"Returns link, a signed link to a copy of a database of an app in the app's own bucket, never through moin, valid 15 minutes: the newest copy, or the one moment names (a copy from get_backups). SQLite is gzipped, Postgres a pg_dump in its custom format.",
+		readOnly("")), model.RightRead, changes(services, tools.downloadBackup))
 }
 
 // RestoreInput is the input of restore_app.
@@ -73,7 +74,7 @@ type DownloadOutput struct {
 }
 
 func (t moinTools) getBackups(ctx context.Context, caller Caller, input AppInput) (Backups, error) {
-	app, backups, err := t.services.Apps.Backups(ctx, caller.Token.WorkspaceID, input.app())
+	app, backups, err := t.services.Apps.Backups(ctx, caller.Bearer.WorkspaceID, input.app())
 	if err != nil {
 		return Backups{}, err
 	}
@@ -82,7 +83,7 @@ func (t moinTools) getBackups(ctx context.Context, caller Caller, input AppInput
 
 func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreInput) (RestoreOutput, error) {
 	if input.ID != "" {
-		restore, err := t.services.Apps.RestoreOf(caller.Token.WorkspaceID, input.App, input.ID)
+		restore, err := t.services.Apps.RestoreOf(caller.Bearer.WorkspaceID, input.App, input.ID)
 		if err != nil {
 			return RestoreOutput{}, err
 		}
@@ -96,7 +97,7 @@ func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreI
 		}
 		at = &parsed
 	}
-	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.App)
+	app, err := t.services.Apps.Get(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return RestoreOutput{}, err
 	}
@@ -112,7 +113,7 @@ func (t moinTools) restoreApp(ctx context.Context, caller Caller, input RestoreI
 			return RestoreOutput{api.NewRestore(restore)}, nil
 		case <-time.After(500 * time.Millisecond):
 		}
-		latest, err := t.services.Apps.RestoreOf(caller.Token.WorkspaceID, app.ID, restore.ID)
+		latest, err := t.services.Apps.RestoreOf(caller.Bearer.WorkspaceID, app.ID, restore.ID)
 		if err != nil {
 			return RestoreOutput{}, err
 		}
