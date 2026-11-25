@@ -124,8 +124,8 @@ The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and a
 | `PUT /api/v1/apps/{app}/domains` | deploy |
 | `GET /api/v1/apps/{app}/instant` | read |
 | `PUT /api/v1/apps/{app}/instant` | deploy |
-| `PUT /api/v1/apps/{app}/protection` | env |
-| `DELETE /api/v1/apps/{app}/protection` | env |
+| `PUT /api/v1/apps/{app}/password` | env |
+| `DELETE /api/v1/apps/{app}/password` | env |
 | `GET /api/v1/registries` | read |
 | `PUT /api/v1/registries/{host}` | servers |
 | `DELETE /api/v1/registries/{host}` | servers |

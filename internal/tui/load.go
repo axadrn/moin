@@ -370,34 +370,31 @@ func (m model) setDomains(app, service string, domains []string, canonical strin
 		if err != nil {
 			return errMsg{err}
 		}
-		notice := "Saved. " + app + " takes it with its next deploy or start"
-		switch {
-		case change.Unchanged:
-			notice = "Nothing changed"
-		case change.Deploy != nil:
-			notice = fmt.Sprintf("Saved. v%d of %s applies it now", change.Deploy.Number, app)
+		if change.Unchanged {
+			return reloadMsg{notice: "Nothing changed"}
 		}
-		return reloadMsg{notice: notice}
+		return reloadMsg{notice: "Saved. " + app + " takes it with its next deploy or start"}
 	}
 }
 
-// protect turns the app's password on with the user's own. A password
-// moin makes is shown once, so the TUI leaves that to the web and the CLI.
-func (m model) protect(app, user, password string) tea.Cmd {
+// setPassword turns the app's password on with the user's own. A
+// password moin makes is shown once, so the TUI leaves that to the web and
+// the CLI.
+func (m model) setPassword(app, user, password string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		if _, err := api.SetProtection(ctx, app, user, password); err != nil {
+		if _, err := api.SetPassword(ctx, app, user, password); err != nil {
 			return errMsg{err}
 		}
-		return reloadMsg{notice: app + " asks for a password on every address now"}
+		return reloadMsg{notice: app + " asks for a password on its domains and its instant address now"}
 	}
 }
 
-// unprotect turns the app's password off.
-func (m model) unprotect(app string) tea.Cmd {
+// removePassword turns the app's password off.
+func (m model) removePassword(app string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		if _, err := api.RemoveProtection(ctx, app); err != nil {
+		if _, err := api.RemovePassword(ctx, app); err != nil {
 			return errMsg{err}
 		}
 		return reloadMsg{notice: app + " asks for no password now"}

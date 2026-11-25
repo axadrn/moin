@@ -134,7 +134,7 @@ func catalogInstall(ctx context.Context, args []string, stdout io.Writer) error 
 	if len(installed.Login) > 0 || installed.Password != "" {
 		fmt.Fprintln(stdout, "  "+style.Warning.Render("Keep this in your password manager now: it is shown only this once."))
 		if installed.Password != "" {
-			fmt.Fprintln(stdout, "  every address: user "+passwordUser+", password "+installed.Password)
+			fmt.Fprintln(stdout, "  the app's password: user "+passwordUser+", password "+installed.Password)
 		}
 		for _, key := range slices.Sorted(maps.Keys(installed.Login)) {
 			fmt.Fprintln(stdout, "  "+key+style.Muted.Render("=")+installed.Login[key])

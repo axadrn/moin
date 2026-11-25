@@ -396,8 +396,8 @@ func TestLinkUnreadableRepo(t *testing.T) {
 // TestNothingChanged: a change the app had already says so and follows no
 // restart.
 func TestNothingChanged(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","protected":false},"deploys":[]}`}}
-	code, stdout, stderr := runCLI(t, api, "protect", "off", "shop")
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","password":false},"deploys":[]}`}}
+	code, stdout, stderr := runCLI(t, api, "password", "off", "shop")
 	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "no password now") || api.seen("DELETE") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -407,17 +407,17 @@ func TestNothingChanged(t *testing.T) {
 // or --yes, and change nothing without them.
 func TestAsksFirst(t *testing.T) {
 	answers := map[string]string{
-		"GET /api/v1/apps/shop":                         `{"app":{"name":"shop","protected":true,"hook":true},"deploys":[]}`,
+		"GET /api/v1/apps/shop":                         `{"app":{"name":"shop","password":true,"hook":true},"deploys":[]}`,
 		"GET /api/v1/servers":                           `{"items":[{"id":"s1","name":"web-1"}]}`,
 		"GET /api/v1/workspaces":                        `{"items":[{"workspace":{"slug":"acme"}}]}`,
 		"GET /api/v1/workspaces/acme":                   `{"workspace":{"name":"Acme","slug":"acme"},"invitations":[{"id":"i1","email":"ada@example.com","role":"member"}]}`,
-		"DELETE /api/v1/apps/shop/protection":           `{"app":{"name":"shop"},"deploy":null,"unchanged":true}`,
+		"DELETE /api/v1/apps/shop/password":             `{"app":{"name":"shop"},"unchanged":true}`,
 		"DELETE /api/v1/apps/shop/hook":                 ``,
 		"DELETE /api/v1/workspaces/acme/invitations/i1": ``,
 		"PUT /api/v1/servers/s1/security":               `{"id":"s1","name":"web-1","firewall":true}`,
 	}
 	for _, args := range [][]string{
-		{"protect", "off", "shop"},
+		{"password", "off", "shop"},
 		{"hook", "off", "shop"},
 		{"rollback", "shop"},
 		{"team", "revoke", "ada@example.com"},
@@ -683,15 +683,18 @@ func TestDeployTakesTheAppThatFollowsTheRepo(t *testing.T) {
 // app or turns the password on without one, never again. The instant
 // address has no password of its own.
 func TestPassword(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"POST /api/v1/apps": `{"name":"shop","server_name":"server-1","protected":true,"password":"pw-shown-once"}`}}
+	api := &fakeAPI{answers: map[string]string{"POST /api/v1/apps": `{"app":{"name":"shop","server_name":"server-1","password":true},"password":"pw-shown-once"}`}}
 	code, stdout, stderr := runCLI(t, api, "apps", "add", "--server", "server-1", "shop")
-	if code != 0 || !strings.Contains(stdout, "pw-shown-once") || !strings.Contains(stdout, "only this once") || !strings.Contains(stdout, "user moin") {
+	if code != 0 || !strings.Contains(stdout, "pw-shown-once") || !strings.Contains(stdout, "only this once") || !strings.Contains(stdout, "user moin") || !strings.Contains(stdout, "Added shop on server-1") {
 		t.Fatalf("add: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	api = &fakeAPI{answers: map[string]string{"PUT /api/v1/apps/shop/protection": `{"app":{"name":"shop","protected":true},"deploy":null,"password":"pw-new"}`}}
-	code, stdout, stderr = runCLI(t, api, "protect", "shop")
-	if code != 0 || !strings.Contains(stdout, "pw-new") || !strings.Contains(stdout, "Every address of shop") {
-		t.Fatalf("protect: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	api = &fakeAPI{answers: map[string]string{"PUT /api/v1/apps/shop/password": `{"app":{"name":"shop","password":true},"password":"pw-new"}`}}
+	code, stdout, stderr = runCLI(t, api, "password", "shop")
+	if code != 0 || !strings.Contains(stdout, "pw-new") || !strings.Contains(stdout, "instant address of shop") {
+		t.Fatalf("password: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if code, _, _ := runCLI(t, &fakeAPI{}, "protect", "shop"); code == 0 {
+		t.Error("protect still runs")
 	}
 	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/instant": `{"url":"https://shop.203-0-113-7.sslip.io","provider":"sslip.io"}`}}
 	code, stdout, stderr = runCLI(t, api, "instant", "shop")

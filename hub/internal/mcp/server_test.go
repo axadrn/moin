@@ -51,7 +51,7 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"add_alert_destination", "add_bucket", "add_server", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "download_backup", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_compose_file", "get_deploy", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_env", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "pin_app", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_protection", "remove_registry", "remove_server", "rename_app", "rename_server", "rename_workspace", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_app_bucket", "set_backups", "set_bucket_key", "set_daemon_updates", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_protection", "set_registry", "set_server_security", "set_uptime", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_app", "update_daemon", "update_hub", "whoami"}
+	want := []string{"add_alert_destination", "add_bucket", "add_server", "check_domains", "create_app", "create_deploy_hook", "deploy_image", "deploy_ref", "download_backup", "edit_bucket", "exec_command", "execute_sql", "get_app", "get_backups", "get_billing", "get_catalog_app", "get_compose_file", "get_deploy", "get_github", "get_instant", "get_integrations", "get_logs", "get_metrics", "get_status", "get_uptime", "get_version", "get_workspace", "install_catalog_app", "invite_member", "link_repo", "list_activity", "list_alert_destinations", "list_apps", "list_branches", "list_buckets", "list_catalog", "list_env", "list_registries", "list_repos", "list_servers", "list_tables", "list_workspaces", "new_install_command", "pin_app", "query_database", "redeploy_app", "remove_alert_destination", "remove_app", "remove_bucket", "remove_deploy_hook", "remove_password", "remove_registry", "remove_server", "rename_app", "rename_server", "rename_workspace", "replace_env", "resend_invitation", "restart_app", "restore_app", "revoke_invitation", "rollback_app", "set_app_bucket", "set_backups", "set_bucket_key", "set_daemon_updates", "set_default_bucket", "set_domains", "set_email_alerts", "set_env", "set_instant", "set_integrations", "set_password", "set_registry", "set_server_security", "set_uptime", "start_app", "stop_app", "test_alert_destination", "unlink_repo", "update_app", "update_daemon", "update_hub", "whoami"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
 	}
@@ -511,7 +511,7 @@ func TestExecCommandIsForOwnersAndAdmins(t *testing.T) {
 }
 
 // TestSecretsGoToServers: create_app shows the app's password once,
-// remove_protection and set_protection without a password make another;
+// remove_password and set_password without a password make another;
 // a registry login, a bucket key and
 // the Tailscale key go to the server named, and the lists say which
 // servers keep them and which do not.
@@ -527,15 +527,15 @@ func TestSecretsGoToServers(t *testing.T) {
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "server-1"}))
 	online(t, env, owner, "server-1")
 	created := output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "server-1"}))
-	if created.Password == "" || !created.Protected {
+	if created.Password == "" || !created.App.Password {
 		t.Fatalf("create_app = %+v", created)
 	}
-	if off := output[mcp.Change](t, call(t, session, "remove_protection", map[string]any{"app": "shop"})); off.App.Protected {
-		t.Fatalf("remove_protection = %+v", off)
+	if off := output[mcp.Change](t, call(t, session, "remove_password", map[string]any{"app": "shop"})); off.App.Password {
+		t.Fatalf("remove_password = %+v", off)
 	}
-	fresh := output[mcp.Protection](t, call(t, session, "set_protection", map[string]any{"app": "shop"}))
-	if fresh.Password == "" || fresh.Password == created.Password || !fresh.App.Protected || strings.Contains(fresh.Summary(), fresh.Password) {
-		t.Fatalf("set_protection = %+v", fresh)
+	fresh := output[mcp.NewPassword](t, call(t, session, "set_password", map[string]any{"app": "shop"}))
+	if fresh.Password == "" || fresh.Password == created.Password || !fresh.App.Password || strings.Contains(fresh.Summary(), fresh.Password) {
+		t.Fatalf("set_password = %+v", fresh)
 	}
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "server-2"}))

@@ -122,30 +122,30 @@ Turn it off for an app the world should see:
 
 ```surfaces
 Web: the app page, **Domains**, the **Ask for a password** switch
-CLI: moin protect off
+CLI: moin password off
 TUI: on the app, `o`, `p`, then `y`
-API: DELETE /api/v1/apps/{app}/protection
-MCP: remove_protection
+API: DELETE /api/v1/apps/{app}/password
+MCP: remove_password
 ```
 
 Turn it on again. moin makes a new password and shows it once. When it is on already, this changes nothing: lost the password? Turn it off, then on, or set your own.
 
 ```surfaces
 Web: the app page, **Domains**, the **Ask for a password** switch
-CLI: moin protect, with nothing on stdin
+CLI: moin password, with nothing on stdin
 TUI: opens the web: on the app, `W`, then **Domains**
-API: PUT /api/v1/apps/{app}/protection with {}
-MCP: set_protection
+API: PUT /api/v1/apps/{app}/password with {}
+MCP: set_password
 ```
 
 Or set your own, also to replace a password you lost:
 
 ```surfaces
 Web: the app page, **Domains**, **Use your own password**, then **Set password**
-CLI: moin protect --user <username>, the password on stdin
+CLI: moin password --user <username>, the password on stdin
 TUI: on the app, `o`, `p`, then type `<username>:<password>`
-API: PUT /api/v1/apps/{app}/protection with {"username", "password"}
-MCP: set_protection with username and password
+API: PUT /api/v1/apps/{app}/password with {"username", "password"}
+MCP: set_password with username and password
 ```
 
 The username is `moin` unless you pick one. A password has 8 to 72 characters.

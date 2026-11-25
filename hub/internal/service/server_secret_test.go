@@ -46,15 +46,15 @@ func TestSecretsNeverReachTheHubDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.RemoveProtection(owner, "blog"); err != nil {
+	if _, err := apps.RemovePassword(owner, "blog"); err != nil {
 		t.Fatal(err)
 	}
-	made, _, err := apps.SetProtection(owner, "blog", "", "")
+	made, _, err := apps.SetPassword(owner, "blog", "", "")
 	if err != nil || made == "" {
 		t.Fatalf("a new password: %q, %v", made, err)
 	}
 	tailscale := "tskey-auth-5c2e91"
-	secrets := []string{"env-value-7f3a91", "registry-password-9c1d44", "s3-value-3e8b27", tailscale, app.Password, made}
+	secrets := []string{"env-value-7f3a91", "registry-password-9c1d44", "s3-value-3e8b27", tailscale, app.NewPassword, made}
 	if _, err := apps.SetEnv(ctx, owner, "blog", map[string]string{"DATABASE_URL": secrets[0]}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -198,43 +198,43 @@ func TestHelloSaysWhatTheServerKeeps(t *testing.T) {
 func TestPasswordShownOnce(t *testing.T) {
 	apps, _, _, daemon := newAppService(t)
 	app, err := apps.Create(owner, "blog", "web-1")
-	if err != nil || len(app.Password) != 20 {
+	if err != nil || len(app.NewPassword) != 20 {
 		t.Fatalf("created %+v, %v", app, err)
 	}
 	stored, _ := apps.Get(owner.WorkspaceID, "blog")
-	user, hash, _ := strings.Cut(stored.Protect, ":")
-	if stored.Password != "" || user != PasswordUser || bcrypt.CompareHashAndPassword([]byte(hash), []byte(app.Password)) != nil {
-		t.Fatalf("stored %q, protect %q", stored.Password, stored.Protect)
+	user, hash, _ := strings.Cut(stored.Password, ":")
+	if stored.NewPassword != "" || user != PasswordUser || bcrypt.CompareHashAndPassword([]byte(hash), []byte(app.NewPassword)) != nil {
+		t.Fatalf("stored %q, password %q", stored.NewPassword, stored.Password)
 	}
 	// The deploy hands the server the hash, never the password, for
-	// every address: one line, protect.
+	// its domains and its instant address: one line, password.
 	if _, err := deploySource(apps); err != nil {
 		t.Fatal(err)
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Domains.Protect != stored.Protect || strings.Contains(fmt.Sprint(start), app.Password) {
+	if start.Domains.Password != stored.Password || strings.Contains(fmt.Sprint(start), app.NewPassword) {
 		t.Fatalf("deploy.start = %+v", start.Domains)
 	}
-	if changed, err := apps.RemoveProtection(owner, "blog"); err != nil || !changed {
+	if changed, err := apps.RemovePassword(owner, "blog"); err != nil || !changed {
 		t.Fatalf("off: %v, %v", changed, err)
 	}
-	again, changed, err := apps.SetProtection(owner, "blog", "", "")
-	if err != nil || !changed || len(again) != 20 || again == app.Password {
+	again, changed, err := apps.SetPassword(owner, "blog", "", "")
+	if err != nil || !changed || len(again) != 20 || again == app.NewPassword {
 		t.Fatalf("on again: %q, %v, %v", again, changed, err)
 	}
 	renewed, _ := apps.Get(owner.WorkspaceID, "blog")
-	if _, hash, _ := strings.Cut(renewed.Protect, ":"); bcrypt.CompareHashAndPassword([]byte(hash), []byte(again)) != nil {
+	if _, hash, _ := strings.Cut(renewed.Password, ":"); bcrypt.CompareHashAndPassword([]byte(hash), []byte(again)) != nil {
 		t.Fatal("the new hash does not take the new password")
 	}
 	// On while on changes nothing: no password is replaced by surprise.
-	if made, changed, err := apps.SetProtection(owner, "blog", "", ""); err != nil || changed || made != "" {
+	if made, changed, err := apps.SetPassword(owner, "blog", "", ""); err != nil || changed || made != "" {
 		t.Fatalf("on while on: %q, %v, %v", made, changed, err)
 	}
-	if kept, _ := apps.Get(owner.WorkspaceID, "blog"); kept.Protect != renewed.Protect {
+	if kept, _ := apps.Get(owner.WorkspaceID, "blog"); kept.Password != renewed.Password {
 		t.Fatal("on while on replaced the password")
 	}
-	if _, _, err := apps.SetProtection(owner, "blog", "a,b", "a-long-password"); !errors.Is(err, ErrProtectUser) {
+	if _, _, err := apps.SetPassword(owner, "blog", "a,b", "a-long-password"); !errors.Is(err, ErrPasswordUser) {
 		t.Fatalf("a comma in the username: %v", err)
 	}
 }

@@ -25,7 +25,7 @@ func TestGetComposeFile(t *testing.T) {
 		server := decodeBody[api.CreatedServer](t, created).Server
 		answer := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps", bearer: token, body: `{"name":"` + name + `","server":"` + server.ID + `"}`})
 		expectStatus(t, answer, http.StatusCreated)
-		return decodeBody[api.App](t, answer)
+		return decodeBody[api.CreatedApp](t, answer).App
 	}
 	adaWriter := environment.token(t, "ada", ada.Workspace.ID, allRights...)
 	bobWriter := environment.token(t, "bob", bob.Workspace.ID, allRights...)

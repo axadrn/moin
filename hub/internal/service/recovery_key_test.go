@@ -96,3 +96,37 @@ func TestRecoveryKeyDisconnectsGitHub(t *testing.T) {
 		t.Fatalf("the new GitHub account = %v, %v", user, err)
 	}
 }
+
+// A recovery key drops an email change asked for before it: its link no
+// longer moves the account to the other address.
+func TestRecoveryKeyDropsAPendingEmailChange(t *testing.T) {
+	environment := newAuthFlowEnvironment(t)
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Verified: true})
+	if err := environment.auth.RequestEmailChange("ada", "mallory@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	var link string
+	for _, message := range environment.mailer.Messages() {
+		if _, token, found := strings.Cut(message.Text, "/auth/verify-email-change/"); found && message.To == "mallory@example.com" {
+			link = strings.Fields(token)[0]
+		}
+	}
+	if link == "" {
+		t.Fatal("no email change link was sent")
+	}
+	key, err := environment.auth.CreateRecoveryKey("ada@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := environment.auth.SignInWithRecoveryKey(key); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := environment.auth.verifyEmailChange(link); err == nil {
+		t.Fatal("the link of the email change still works")
+	}
+	user, err := environment.userRepository.ByID("ada")
+	if err != nil || user.Email != "ada@example.com" || user.PendingEmail != nil {
+		t.Fatalf("after the key = %+v, %v, want ada@example.com and no pending email", user, err)
+	}
+}

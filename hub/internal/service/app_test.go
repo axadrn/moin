@@ -638,7 +638,7 @@ func TestImageDeploysHooksAndRegistries(t *testing.T) {
 	}
 }
 
-func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
+func TestDomainsAndPasswordWaitForARestart(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
 	_, err := apps.Create(owner, "blog", "web-1")
 	if err != nil {
@@ -648,10 +648,10 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("set domains before a deploy = %v, %v", changed, err)
 	}
-	if changed, err := apps.RemoveProtection(owner, "blog"); err != nil || !changed {
+	if changed, err := apps.RemovePassword(owner, "blog"); err != nil || !changed {
 		t.Fatalf("the password of a new app, turned off = %v, %v", changed, err)
 	}
-	if changed, err := apps.RemoveProtection(owner, "blog"); err != nil || changed {
+	if changed, err := apps.RemovePassword(owner, "blog"); err != nil || changed {
 		t.Fatalf("no password, turned off = %v, %v", changed, err)
 	}
 	if _, err := apps.SetDomains(owner, "blog", "", []string{"not a domain"}, ""); !errors.Is(err, ErrDomain) {
@@ -666,7 +666,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 	var start protocol.DeployStart
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.example.com" || start.Domains.Canonical != "blog.example.com" || start.Domains.Protect != "" {
+	if start.Domains == nil || len(start.Domains.Domains) != 2 || start.Domains.Domains[0] != "blog.example.com" || start.Domains.Canonical != "blog.example.com" || start.Domains.Password != "" {
 		t.Fatalf("domains = %+v", start.Domains)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true})
@@ -687,12 +687,12 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 
 	// With a live deploy, saving restarts nothing: the changes wait.
-	if _, _, err := apps.SetProtection(owner, "blog", "me", "short"); !errors.Is(err, ErrProtect) {
+	if _, _, err := apps.SetPassword(owner, "blog", "me", "short"); !errors.Is(err, ErrPassword) {
 		t.Fatalf("short password: err = %v", err)
 	}
 	sent := daemon.count(protocol.TypeDeployStart)
-	if _, changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || !changed {
-		t.Fatalf("set protection = %v, %v", changed, err)
+	if _, changed, err := apps.SetPassword(owner, "blog", "me", "a long password"); err != nil || !changed {
+		t.Fatalf("set password = %v, %v", changed, err)
 	}
 	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil || !changed {
 		t.Fatalf("set domains = %v, %v", changed, err)
@@ -704,7 +704,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 		t.Fatalf("changes waiting = %d, want 2", n)
 	}
 	// The same password or the same domains change nothing.
-	if _, changed, err := apps.SetProtection(owner, "blog", "me", "a long password"); err != nil || changed {
+	if _, changed, err := apps.SetPassword(owner, "blog", "me", "a long password"); err != nil || changed {
 		t.Fatalf("the same password = %v, %v", changed, err)
 	}
 	if changed, err := apps.SetDomains(owner, "blog", "", []string{"blog.example.com"}, ""); err != nil || changed {
@@ -718,7 +718,7 @@ func TestDomainsAndProtectionWaitForARestart(t *testing.T) {
 	}
 	start = protocol.DeployStart{}
 	daemon.last(t, protocol.TypeDeployStart, &start)
-	if start.SourceURL != "" || start.Image != "" || !strings.HasPrefix(start.Domains.Protect, "me:$2a$") || len(start.Domains.Domains) != 1 {
+	if start.SourceURL != "" || start.Image != "" || !strings.HasPrefix(start.Domains.Password, "me:$2a$") || len(start.Domains.Domains) != 1 {
 		t.Fatalf("restart deploy.start = %+v", start)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: restarted.ID, OK: true})

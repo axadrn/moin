@@ -89,13 +89,13 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		t.Fatal(err)
 	}
 	hashes := []string{}
-	protect := func(password string) *protocol.Domains {
+	withPassword := func(password string) *protocol.Domains {
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 		if err != nil {
 			t.Fatal(err)
 		}
 		hashes = append(hashes, string(hash))
-		return &protocol.Domains{Domains: []string{app + ".example.net"}, Protect: "ada:" + string(hash)}
+		return &protocol.Domains{Domains: []string{app + ".example.net"}, Password: "ada:" + string(hash)}
 	}
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
@@ -135,7 +135,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		}
 	}
 
-	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceURL: server.URL + "/repos/me/leak/tarball/abc123", Domains: protect("first-password")})
+	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceURL: server.URL + "/repos/me/leak/tarball/abc123", Domains: withPassword("first-password")})
 	seesValues(secret)
 	asks(t, app, "first-password")
 	// A restart with a new value and a new password: Docker fills in the
@@ -143,12 +143,12 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"DB_PASSWORD": changed}}); err != nil {
 		t.Fatal(err)
 	}
-	deploy(protocol.DeployStart{DeployID: "2", Number: 2, Domains: protect("second-password")})
+	deploy(protocol.DeployStart{DeployID: "2", Number: 2, Domains: withPassword("second-password")})
 	seesValues(changed)
 	asks(t, app, "second-password")
 	// A rollback to v1 runs v1 again, with the env and the password as they
 	// are now: an app has one password.
-	deploy(protocol.DeployStart{DeployID: "3", Number: 3, FromNumber: 1, Domains: protect("third-password")})
+	deploy(protocol.DeployStart{DeployID: "3", Number: 3, FromNumber: 1, Domains: withPassword("third-password")})
 	seesValues(changed)
 	asks(t, app, "third-password")
 	// With the password off, a rollback asks for none.

@@ -59,9 +59,9 @@ func TestDomainsInstantAndServices(t *testing.T) {
 	}
 }
 
-// The password is one switch for every address: off says anyone gets in,
-// on who signs in; a password moin just made shows once. The fields set
-// your own.
+// The password is one switch for the domains and the instant address:
+// off says anyone gets in, on who signs in; a password moin just made
+// shows once. The fields set your own.
 func TestDomainsPasswordSwitch(t *testing.T) {
 	render := func(view DomainsView) string {
 		t.Helper()
@@ -75,11 +75,11 @@ func TestDomainsPasswordSwitch(t *testing.T) {
 	if !strings.Contains(off, "data-password-switch") || strings.Contains(off, "checked") || !strings.Contains(off, "Anyone with the link") || !strings.Contains(off, "Use your own password") {
 		t.Errorf("off: %s", off)
 	}
-	on := render(DomainsView{App: model.App{Name: "shop", Protect: "ada:$2a$10$hash"}})
+	on := render(DomainsView{App: model.App{Name: "shop", Password: "ada:$2a$10$hash"}})
 	if !strings.Contains(on, "checked") || !strings.Contains(on, "Sign in as ada") || strings.Contains(on, "data-new-password") || strings.Contains(on, "unprotect") {
 		t.Errorf("on: %s", on)
 	}
-	made := render(DomainsView{App: model.App{Name: "shop", Protect: "moin:$2a$10$hash"}, NewPassword: "fresh-password-123"})
+	made := render(DomainsView{App: model.App{Name: "shop", Password: "moin:$2a$10$hash"}, NewPassword: "fresh-password-123"})
 	if !strings.Contains(made, "fresh-password-123") || !strings.Contains(made, "Shown once.") || !strings.Contains(made, "data-new-password") {
 		t.Errorf("the new password is not shown once: %s", made)
 	}

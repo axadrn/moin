@@ -286,11 +286,11 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com", Protect: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com", Password: "me:$2y$05$abc"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" || !detected.Protected {
+	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" || !detected.Password {
 		t.Fatalf("detected = %+v", detected)
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
@@ -466,7 +466,7 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 	mapLists(config)
 	takePlaces(config, filled)
 	dir := t.TempDir()
-	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}, Protect: "ada:$2y$05$hash"}}
+	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}, Password: "ada:$2y$05$hash"}}
 	release := &release{start: start, dir: dir, config: config, composeJSON: filepath.Join(dir, "compose.json"), envFile: "/state/apps/shop/app.env", env: map[string]string{"DB_PASSWORD": "s3cret"}}
 	release.detected, _ = route("shop", protocol.Detected{Service: "web", Port: 8080}, start.Domains)
 	if err := finish(release); err != nil {

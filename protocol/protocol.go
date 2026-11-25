@@ -15,8 +15,8 @@ import (
 // which was called the agent before (legacy.go); version 4 the command the
 // daemon masks for the activity (ExecDone.Command); version 5 secrets that
 // live only on the server (secrets.go); version 6 compose.yml as plain
-// Docker, with every setting from the hub; version 7 one password for
-// every address of an app (Domains.Protect).
+// Docker, with every setting from the hub; version 7 one password for an
+// app's domains and its instant address (Domains.Password).
 const Version = 7
 
 // Needs is the protocol version a daemon must speak for a request: the

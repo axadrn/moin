@@ -714,14 +714,14 @@ func TestInstantAndPasswordChangeAfterADeploy(t *testing.T) {
 	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := apps.SetProtection(owner, "blog", "moin", "a-long-password"); err != nil {
+	if _, _, err := apps.SetPassword(owner, "blog", "moin", "a-long-password"); err != nil {
 		t.Fatal(err)
 	}
 	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
-	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Protected: true}
+	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080, Password: true}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: first.ID, OK: true, Detected: detected})
 	if _, err := apps.SetInstant(owner, "blog", "nip.io"); err != nil {
 		t.Fatalf("instant: %v", err)
@@ -730,7 +730,7 @@ func TestInstantAndPasswordChangeAfterADeploy(t *testing.T) {
 	if err != nil || instant.Provider != "nip.io" {
 		t.Fatalf("the provider shown: %q, %v", instant.Provider, err)
 	}
-	if _, err := apps.RemoveProtection(owner, "blog"); err != nil {
+	if _, err := apps.RemovePassword(owner, "blog"); err != nil {
 		t.Fatalf("remove the password: %v", err)
 	}
 }

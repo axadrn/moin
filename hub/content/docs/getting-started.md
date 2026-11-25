@@ -78,21 +78,25 @@ The app does not exist yet, so moin asks first. Answer `y`.
 
 ```text
 ? App my-app does not exist. Create it? [y/N] y
-Created app my-app on web-1
-  Every address asks for this password, shown only this once:
+✓ Created app my-app on web-1
+  The app's domains and its instant address ask for this password. Shown only this once:
   user moin, password 7f3k…
-my-app follows me/my-app@main
-Deploying me/my-app from GitHub
-commit 3f2a9c1 First version
-Deploy v1 of my-app started
-  detected go, service web on port 8080
-  v1 is live
-✓ moin. my-app is live at https://my-app.203-0-113-7.sslip.io
+✓ my-app follows me/my-app@main
+→ Deploying me/my-app from GitHub
+→ commit 3f2a9c1 First version
+→ Deploy v1 of my-app started
+→ downloading the source
+→ detected go, service web on port 8080
+→ building
+→ starting
+✓ moin. my-app is live at https://my-app.203-0-113-7.sslip.io v1 in 48s
+  Its domains and its instant address ask for the app's password, shown once when it was made. Turn it off: moin password off my-app
+  See it run with moin logs my-app
 ```
 
 You need no Dockerfile. moin builds Node, Bun, Python, Ruby, PHP, Go and more. It also uses your `Dockerfile` or `compose.yml` if you have one.
 
-The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a [password](/docs/guides/domains#password). moin prints the password once, when it makes the app. Keep it in your password manager. `moin protect off` opens the app to everyone.
+The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a [password](/docs/guides/domains#password). moin prints the password once, when it makes the app. Keep it in your password manager. `moin password off` opens the app to everyone.
 
 This page deploys what you pushed. You can also deploy every push, or an image from CI. It all comes down to [three questions](/docs/guides/deploy#three-questions).
 

@@ -29,10 +29,10 @@ func TestSecretsOnServersWeb(t *testing.T) {
 	}
 
 	// Off, then on: a new password, shown once.
-	s.post("/app/{workspaceSlug}/apps/{app}/domains/protect", base+"/apps/blog/domains/protect", url.Values{"switch": {"1"}}, s.handler.Protect)
-	before := s.app().Protect
-	fresh := s.post("/app/{workspaceSlug}/apps/{app}/domains/protect", base+"/apps/blog/domains/protect", url.Values{"switch": {"1"}, "on": {"1"}}, s.handler.Protect)
-	if !strings.Contains(fresh, "data-new-password") || !strings.Contains(fresh, "Shown once.") || s.app().Protect == before {
+	s.post("/app/{workspaceSlug}/apps/{app}/domains/password", base+"/apps/blog/domains/password", url.Values{"switch": {"1"}}, s.handler.Password)
+	before := s.app().Password
+	fresh := s.post("/app/{workspaceSlug}/apps/{app}/domains/password", base+"/apps/blog/domains/password", url.Values{"switch": {"1"}, "on": {"1"}}, s.handler.Password)
+	if !strings.Contains(fresh, "data-new-password") || !strings.Contains(fresh, "Shown once.") || s.app().Password == before {
 		t.Fatalf("new password: %s", fresh)
 	}
 	if again := s.post("/app/{workspaceSlug}/apps/{app}/domains/detail", base+"/apps/blog/domains/detail", url.Values{}, s.handler.DomainsDetail); strings.Contains(again, "data-new-password") {

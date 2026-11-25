@@ -147,7 +147,7 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy), Login: login, Password: app.Password})
+	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy), Login: login, Password: app.NewPassword})
 }
 
 // Update sets a catalog app to a version and deploys it.

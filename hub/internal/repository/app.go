@@ -59,9 +59,9 @@ func (r *Apps) Create(app *model.App) error {
 	if app.Folder == "" {
 		app.Folder = app.Name
 	}
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, protect, created_at)
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, password, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.Protect, app.CreatedAt)
+		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.Password, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
 	}
@@ -334,9 +334,9 @@ func (r *Apps) SetInstantHost(appID, host string) error {
 	return err
 }
 
-// SetProtect stores the htpasswd line, or clears it.
-func (r *Apps) SetProtect(appID, protect string) error {
-	_, err := r.db.Exec(`UPDATE apps SET protect = $1 WHERE id = $2`, protect, appID)
+// SetPassword stores the htpasswd line, or clears it.
+func (r *Apps) SetPassword(appID, password string) error {
+	_, err := r.db.Exec(`UPDATE apps SET password = $1 WHERE id = $2`, password, appID)
 	return err
 }
 

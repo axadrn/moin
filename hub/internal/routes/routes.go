@@ -397,7 +397,7 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/add", workspace(apps.AddDomain))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/remove", workspace(apps.RemoveDomain))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/canonical", workspace(apps.MakeCanonical))
-	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/protect", workspace(apps.Protect))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/password", workspace(apps.Password))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/instant", workspace(apps.SetInstant))
 	mux.HandleFunc("GET /app/{workspaceSlug}/registries", workspace(apps.Registries))
 	mux.HandleFunc("POST /app/{workspaceSlug}/registries", workspace(apps.SetRegistry))

@@ -53,7 +53,8 @@ type CatalogDeploy struct {
 	// needs, such as ADMIN_PASSWORD: the one time they are shown.
 	Login map[string]string `json:"login"`
 	// Password, only from an install, is the app's password, user moin,
-	// which every address of it asks for: the one time moin shows it.
+	// which its domains and its instant address ask for: the one time
+	// moin shows it.
 	Password string `json:"password"`
 }
 

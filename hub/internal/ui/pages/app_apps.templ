@@ -109,7 +109,7 @@ templ AppAddForm(servers []model.Server) {
 // password, the one time moin shows it, with a link to the app.
 templ AppAdded(appPath, name, password string) {
 	<div id="app-add-form" class="moin-stack" data-gap="4" data-app-added>
-		<p class="moin-text">{ name } is added. Every address of it asks for this password until you turn it off. Keep it now: moin shows it only this once.</p>
+		<p class="moin-text">{ name } is added. Its domains and its instant address ask for this password until you turn it off. Keep it now: moin shows it only this once.</p>
 		@components.List() {
 			@components.Item(components.ItemProps{}) {
 				<span class="moin-mono moin-text">{ service.PasswordUser }</span>

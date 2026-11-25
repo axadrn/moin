@@ -1346,7 +1346,7 @@ paths:
       tags: [Apps]
       operationId: createApp
       summary: Add an app
-      description: The name is also the compose project on the server. A new app starts with its password on, so every address of it asks for user `moin` and the password in the answer, the one time moin shows it. `DELETE /api/v1/apps/{app}/protection` turns it off.
+      description: The name is also the compose project on the server. A new app starts with its password on, so its domains and its instant address ask for user `moin` and the password in the answer, the one time moin shows it. `DELETE /api/v1/apps/{app}/password` turns it off.
       security:
         - cookieAuth: []
         - bearerAuth: [deploy]
@@ -1358,17 +1358,11 @@ paths:
               $ref: '#/components/schemas/CreateAppRequest'
       responses:
         '201':
-          description: The new app, with `password`.
+          description: The new app, and its password.
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/App'
-                  - type: object
-                    properties:
-                      password:
-                        type: string
-                        description: The app's password, user `moin`, which every address of it asks for. The one time moin shows it; it keeps only its hash.
+                $ref: '#/components/schemas/CreatedApp'
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
@@ -1910,7 +1904,7 @@ paths:
       tags: [Apps]
       operationId: restartApp
       summary: Restart an app
-      description: Starts the live deploy again with the env vars, domains and protection as they are now, without a build. A stopped app runs again.
+      description: Starts the live deploy again with the env vars, domains and password as they are now, without a build. A stopped app runs again.
       security:
         - cookieAuth: []
         - bearerAuth: [deploy]
@@ -1941,7 +1935,7 @@ paths:
       tags: [Apps]
       operationId: startApp
       summary: Start an app
-      description: Runs a stopped app again. Like a restart, it takes the env vars, domains and protection as they are now.
+      description: Runs a stopped app again. Like a restart, it takes the env vars, domains and password as they are now.
       security:
         - cookieAuth: []
         - bearerAuth: [deploy]
@@ -1972,7 +1966,7 @@ paths:
       tags: [Apps]
       operationId: stopApp
       summary: Stop an app
-      description: Stops the containers of the app. They stay stopped, also after a reboot of the server, until a deploy, a restart or a start. Data and settings stay. Changes to domains and protection wait for the start.
+      description: Stops the containers of the app. They stay stopped, also after a reboot of the server, until a deploy, a restart or a start. Data and settings stay. Changes to domains and the password wait for the start.
       security:
         - cookieAuth: []
         - bearerAuth: [deploy]
@@ -2066,7 +2060,7 @@ paths:
       tags: [Apps]
       operationId: getInstant
       summary: Get the instant address
-      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. The app''s password guards it like every address of the app while `protected` is true.'
+      description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. The app''s password guards it like the app''s domains while `password` is true.'
       security:
         - cookieAuth: []
         - bearerAuth: [read]
@@ -2124,14 +2118,14 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/apps/{app}/protection:
+  /api/v1/apps/{app}/password:
     parameters:
       - $ref: '#/components/parameters/AppName'
     put:
       tags: [Apps]
-      operationId: setProtection
+      operationId: setPassword
       summary: Turn the password on
-      description: 'Turns on the app''s one password: every address of the app, its domains and its instant address, asks for it with basic auth. With `password` it sets that one; without one moin makes one and answers it in `password`, the one time it shows it. `username` is `moin` when empty. Only a bcrypt hash is stored.'
+      description: 'Turns on the app''s one password: its domains and its instant address ask for it with basic auth. With `password` it sets that one; without one moin makes one and answers it in `password`, the one time it shows it. `username` is `moin` when empty. Only a bcrypt hash is stored.'
       security:
         - cookieAuth: []
         - bearerAuth: [env]
@@ -2140,14 +2134,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProtectionRequest'
+              $ref: '#/components/schemas/PasswordRequest'
       responses:
         '200':
           description: 'The app. Saving never restarts it: the change waits for a restart, start or deploy.'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Protection'
+                $ref: '#/components/schemas/NewPassword'
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
@@ -2166,9 +2160,9 @@ paths:
           $ref: '#/components/responses/Internal'
     delete:
       tags: [Apps]
-      operationId: deleteProtection
+      operationId: deletePassword
       summary: Turn the password off
-      description: No address of the app asks for a password after its next restart, start or deploy.
+      description: No domain of the app asks for a password after its next restart, start or deploy.
       security:
         - cookieAuth: []
         - bearerAuth: [env]
@@ -5515,7 +5509,7 @@ components:
           description: Run it on the server as root, or with sudo in front, to remove the daemon, its binary and state. The apps keep running with their data; add `--apps` to remove them too. Empty when no daemon ever connected, so nothing is installed there.
     App:
       type: object
-      required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, protected, stopped, created_at]
+      required: [id, name, server_id, server_name, latest_number, latest_status, live_number, domains, canonical, password, stopped, created_at]
       properties:
         id:
           type: string
@@ -5543,9 +5537,9 @@ components:
         canonical:
           type: string
           description: The domain the others redirect to. Empty for none.
-        protected:
+        password:
           type: boolean
-          description: The app's password is on. Every address of it asks for it, its domains and its instant address.
+          description: The app's password is on. Its domains and its instant address ask for it. The password itself is never here.
         service_domains:
           type: object
           description: The domains of the app's other services, by service.
@@ -5695,9 +5689,9 @@ components:
         canonical:
           type: string
           description: The domain the others of the main service redirect to.
-        protected:
+        password:
           type: boolean
-          description: Whether a password guards the app.
+          description: Whether the app's password guards it.
         service_domains:
           type: object
           description: The domains of the other services, by service.
@@ -5782,7 +5776,7 @@ components:
         provider:
           type: string
           enum: [sslip.io, nip.io, 'off']
-    ProtectionRequest:
+    PasswordRequest:
       type: object
       properties:
         username:
@@ -5793,7 +5787,16 @@ components:
           minLength: 8
           maxLength: 72
           description: Your own password. Empty lets moin make one.
-    Protection:
+    CreatedApp:
+      type: object
+      required: [app]
+      properties:
+        app:
+          $ref: '#/components/schemas/App'
+        password:
+          type: string
+          description: The app's password, user `moin`, which its domains and its instant address ask for. The one time moin shows it; it keeps only its hash.
+    NewPassword:
       allOf:
         - $ref: '#/components/schemas/Change'
         - type: object
@@ -6130,7 +6133,7 @@ components:
           description: Only on an install, for an app whose first sign-in needs a secret moin made, such as ADMIN_PASSWORD. The one time it is shown; keep it in your password manager.
         password:
           type: string
-          description: Only on an install. The app's password, user `moin`, which every address of it asks for. The one time it is shown.
+          description: Only on an install. The app's password, user `moin`, which its domains and its instant address ask for. The one time it is shown.
     Databases:
       type: object
       required: [items]

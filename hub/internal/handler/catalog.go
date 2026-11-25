@@ -175,7 +175,7 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 	// Shown in place of the form: a new page would lose it.
 	w.Header().Set("HX-Retarget", "#catalog-install-form")
 	w.Header().Set("HX-Reswap", "outerHTML")
-	render(w, r, pages.CatalogInstalled(appPath, login, app.Password))
+	render(w, r, pages.CatalogInstalled(appPath, login, app.NewPassword))
 }
 
 // UpdatePanel is the catalog panel of an installed app; nothing for an

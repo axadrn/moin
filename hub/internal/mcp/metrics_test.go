@@ -20,7 +20,7 @@ func TestMetricsTool(t *testing.T) {
 	session := connectMemory(t, env.server, owner, token)
 
 	server := output[mcp.CreatedServer](t, call(t, admin, "add_server", map[string]any{"server": "box-1"}))
-	output[mcp.App](t, call(t, admin, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	output[mcp.CreatedApp](t, call(t, admin, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
 
 	empty := output[mcp.Metrics](t, call(t, session, "get_metrics", map[string]any{"app": "shop"}))
 	if empty.App == nil || empty.App.Now != nil || len(empty.App.Points) != 0 || empty.App.Range != "1h" {

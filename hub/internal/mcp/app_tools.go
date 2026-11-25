@@ -24,7 +24,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres).",
 		readOnly("")), model.RightRead, member(services, tools.getApp))
 	Add(server, newTool("create_app", "Create an app",
-		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. A new app starts with its password on: every address of it asks for user moin and the password in password, the one time moin shows it, so give it to the user to keep. remove_protection turns it off.",
+		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. A new app starts with its password on: its domains and its instant address ask for user moin and the password in password, the one time moin shows it, so give it to the user to keep. remove_password turns it off.",
 		change(false, false)), model.RightDeploy, changes(services, tools.createApp))
 	Add(server, newTool("remove_app", "Remove an app",
 		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out.",
@@ -36,13 +36,13 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Pins an app, or unpins it with pinned false, and returns it. Every list of the workspace shows pinned apps above the others that run fine, on every surface.",
 		change(false, true)), model.RightDeploy, changes(services, tools.pinApp))
 	Add(server, newTool("restart_app", "Restart an app",
-		"Starts the live deploy of an app again with its env vars, domains and protection as they are now, without a build. Use it after set_env. A stopped app runs again. Returns the deploy; follow it with get_deploy.",
+		"Starts the live deploy of an app again with its env vars, domains and password as they are now, without a build. Use it after set_env. A stopped app runs again. Returns the deploy; follow it with get_deploy.",
 		change(false, false)), model.RightDeploy, changes(services, tools.restart))
 	Add(server, newTool("stop_app", "Stop an app",
 		"Stops the containers of an app. It stays offline, also after a reboot of the server, until start_app, restart_app or a deploy. Its data and settings stay.",
 		change(true, true)), model.RightDeploy, member(services, tools.stop))
 	Add(server, newTool("start_app", "Start an app",
-		"Runs a stopped app again, with its env vars, domains and protection as they are now. An app that runs already answers already_running and nothing changes. Returns the deploy; follow it with get_deploy.",
+		"Runs a stopped app again, with its env vars, domains and password as they are now. An app that runs already answers already_running and nothing changes. Returns the deploy; follow it with get_deploy.",
 		change(false, false)), model.RightDeploy, member(services, tools.start))
 	Add(server, newTool("get_logs", "Get app logs",
 		"Returns the last lines of every container of an app, read from its server.",
@@ -201,7 +201,7 @@ type CreatedApp struct {
 }
 
 func (a CreatedApp) Summary() string {
-	return fmt.Sprintf("Created %s on %s. Every address of it asks for user %s and the password in password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.Name, a.ServerName, service.PasswordUser, a.Name)
+	return fmt.Sprintf("Created %s on %s. Its domains and its instant address ask for user %s and the password in password: shown this once. Link its GitHub repo, or run `moin deploy %s` in the pushed repo.", a.App.Name, a.App.ServerName, service.PasswordUser, a.App.Name)
 }
 
 func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppInput) (CreatedApp, error) {
@@ -209,7 +209,7 @@ func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppIn
 	if err != nil {
 		return CreatedApp{}, err
 	}
-	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), Password: app.Password}}, nil
+	return CreatedApp{api.CreatedApp{App: api.NewApp(*app), Password: app.NewPassword}}, nil
 }
 
 func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {

@@ -32,7 +32,7 @@ func route(app string, detected protocol.Detected, domains *protocol.Domains) (p
 	detected.Domains = slices.Clone(domains.Domains)
 	detected.ServiceDomains = otherServiceDomains(detected.Service, domains)
 	detected.Canonical = domains.Canonical
-	detected.Protected = domains.Protect != ""
+	detected.Password = domains.Password != ""
 	err := cleanDomains(detected)
 	if err != nil {
 		return detected, err
@@ -92,12 +92,12 @@ func cleanDomainList(list []string, seen map[string]bool) error {
 	return nil
 }
 
-// protectHash is the app's password as an htpasswd line, "" for none.
-func protectHash(domains *protocol.Domains) string {
+// passwordLine is the app's password as an htpasswd line, "" for none.
+func passwordLine(domains *protocol.Domains) string {
 	if domains == nil {
 		return ""
 	}
-	return domains.Protect
+	return domains.Password
 }
 
 // routes says how the proxy reaches one service of an app.
@@ -109,8 +109,7 @@ type routes struct {
 	canonical string
 	port      int
 	// usersFile is where the proxy reads the app's password, "" for none:
-	// every address of the service asks for it, its domains and the
-	// instant address.
+	// the service's domains and the instant address ask for it.
 	usersFile string
 	// instant is the instant address, "" for none, on a router of its own.
 	instant string

@@ -251,16 +251,16 @@ func TestUptimeSwitch(t *testing.T) {
 // on again with a password moin made, shown once.
 func TestPasswordSwitch(t *testing.T) {
 	s := newSwitches(t)
-	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/domains/protect"
-	pattern := "/app/{workspaceSlug}/apps/{app}/domains/protect"
+	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/domains/password"
+	pattern := "/app/{workspaceSlug}/apps/{app}/domains/password"
 	for _, on := range []bool{false, true} {
 		form := url.Values{"switch": {"1"}}
 		if on {
 			form.Set("on", "1")
 		}
-		body := s.post(pattern, path, form, s.handler.Protect)
-		if switchOn(t, body, "password-on") != on || (s.app().Protect != "") != on {
-			t.Fatalf("password on %v: protect %q, answer %s", on, s.app().Protect, body)
+		body := s.post(pattern, path, form, s.handler.Password)
+		if switchOn(t, body, "password-on") != on || (s.app().Password != "") != on {
+			t.Fatalf("password on %v: password %q, answer %s", on, s.app().Password, body)
 		}
 		if strings.Contains(body, "data-new-password") != on {
 			t.Fatalf("password on %v: the new password shows %v", on, !on)

@@ -23,7 +23,7 @@ MCP: get_uptime
 
 | State | Means |
 | --- | --- |
-| **up** | any answer below 500: a page, a redirect, a `404` or the password prompt of a protected app. Behind the password, uptime sees the prompt, not the app |
+| **up** | any answer below 500: a page, a redirect, a `404` or the prompt of an app's password. Behind the password, uptime sees the prompt, not the app |
 | **down** | 3 visits in a row without an answer: a `5xx`, no answer within 10 seconds, a refused connection, a name that does not resolve or a bad certificate |
 | **pending** | not visited yet |
 | **paused** | uptime of the domain is paused, or the app is stopped |
