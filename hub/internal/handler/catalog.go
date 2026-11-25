@@ -96,6 +96,7 @@ func (h *CatalogHandler) Show(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.NotFound())
 		return
 	}
+	view.Similar = catalog.Similar(h.catalog.Store().Entries(), view.Entry, 4)
 	render(w, r, pages.CatalogApp(view, h.appURL))
 }
 
