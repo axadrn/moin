@@ -223,6 +223,8 @@ var summaryCases = []struct{ action, target, metadata, want string }{
 		"turned automatic daemon updates on"},
 	{"workspace.daemon_updates", "", `{"on":"false"}`,
 		"turned automatic daemon updates off"},
+	{"hub.github_app_created", "moin-hub", `{}`,
+		"created the GitHub App moin-hub of the hub"},
 	{"hub.update_started", "", `{"from":"1.0.0","to":"1.1.0"}`,
 		"started the update of the hub from 1.0.0 to 1.1.0"},
 	{"hub.updated", "", `{"from":"1.0.0","to":"1.1.0"}`,

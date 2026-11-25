@@ -15,3 +15,12 @@ func TestPolicyLetsPagesPlayMedia(t *testing.T) {
 		t.Fatalf("media-src misses %s: %s", brand.Media, policy)
 	}
 }
+
+// The form that creates the hub's GitHub App posts to GitHub; without it
+// in form-action the browser refuses to send it.
+func TestPolicyLetsTheGitHubAppFormPost(t *testing.T) {
+	policy := contentSecurityPolicy(SecurityHeadersConfig{GitHubURL: "https://github.com"}, "nonce")
+	if !strings.Contains(policy, "form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com https://github.com") {
+		t.Fatalf("form-action misses GitHub: %s", policy)
+	}
+}

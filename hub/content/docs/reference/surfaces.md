@@ -65,6 +65,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Create, remove an app | ✓ | ✓ `apps add`, `deploy` asks first | Opens the web; `moin deploy` creates one too. | ✓ | ✓ |
 | Rename an app | ✓ | ✓ `apps rename` | Opens the web. | ✓ | ✓ |
 | Catalog: browse and install | ✓ | ✓ `catalog` | A form wants a page: opens the web. | ✓ | ✓ |
+| Create the GitHub App of a self-hosted hub, for its admins | ✓ one click | GitHub needs a browser. | Opens the web. | GitHub needs a browser. | GitHub needs a browser. |
 | Connect GitHub | ✓ | Shows the link: GitHub needs a browser. | GitHub needs a browser. | Gives the link: GitHub needs a browser. | Gives the link: GitHub needs a browser. |
 | Link or unlink a repo | ✓ | ✓ `link`, `unlink` | Opens the web. | ✓ | ✓ |
 | Deploy hook for CI, with image and commit | ✓ | ✓ `hook` | Opens the web. | ✓ | ✓ |

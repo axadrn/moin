@@ -56,6 +56,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		S3Endpoint:    app.Cfg.S3Endpoint,
 		UmamiHost:     app.Cfg.UmamiHost,
 		PlausibleHost: app.Cfg.PlausibleHost,
+		GitHubURL:     app.Cfg.GitHubURL,
 	}
 	securityHeaders := func(next http.Handler) http.Handler {
 		return middleware.SecurityHeaders(securityHeaderConfig, next)
@@ -72,6 +73,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),
 		middleware.APITokenAuth(app.APITokenService, app.UserService),
+		middleware.GitHubApp(app.GitHubAppService),
 		middleware.BlockImpersonatedWrites,
 		middleware.AdminContext(app.AdminService),
 		middleware.WithURLPath,
@@ -218,7 +220,7 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 // authRoutes sign people in and out, start a workspace, take an invitation
 // and approve moin login in the browser.
 func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, githubLimiter, passkeyLimiter limiter) {
-	auth := handler.NewAuthHandler(app.AuthService, app.WorkspaceService, app.GitHub, app.Passkeys, app.Cfg)
+	auth := handler.NewAuthHandler(app.AuthService, app.WorkspaceService, app.GitHubAppService, app.Passkeys, app.Cfg)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
 	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
 	mux.HandleFunc("GET /auth", middleware.RequireGuest(auth.AuthPage))
@@ -381,6 +383,8 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/name", workspace(apps.RenameServer))
 	mux.HandleFunc("GET /app/{workspaceSlug}/github/install", workspace(apps.GitHubInstall))
 	mux.HandleFunc("GET /app/github/setup", middleware.RequireAuth(apps.GitHubSetup))
+	githubApp := handler.NewGitHubAppHandler(app.GitHubAppService, app.WorkspaceService)
+	mux.HandleFunc("GET /app/github/created", middleware.RequireAuth(githubApp.Created))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.Repo))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.LinkRepo))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo/branches", workspace(apps.RepoBranches))

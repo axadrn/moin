@@ -188,24 +188,6 @@ func TestLoadParsesTrustedProxyCIDRsWithLoopbackDefaults(t *testing.T) {
 	}
 }
 
-// GitHubLogin needs the GitHub App with its client ID and secret: the
-// button never leads to a broken GitHub page.
-func TestGitHubLoginNeedsTheWholeApp(t *testing.T) {
-	app := Config{GitHubAppID: "1", GitHubAppClientID: "Iv1.test", GitHubAppClientSecret: "secret"}
-	if !app.GitHubLogin() || !app.Render().GitHubLogin {
-		t.Fatal("the whole GitHub App does not sign in")
-	}
-	for _, partial := range []Config{
-		{GitHubAppClientID: "Iv1.test", GitHubAppClientSecret: "secret"},
-		{GitHubAppID: "1", GitHubAppClientID: "Iv1.test"},
-		{GitHubAppID: "1", GitHubAppClientSecret: "secret"},
-	} {
-		if partial.GitHubLogin() {
-			t.Errorf("%+v signs in with GitHub", partial)
-		}
-	}
-}
-
 func TestRenderIncludesOnlyPublicValues(t *testing.T) {
 	cfg := &Config{
 		AppEnv:            EnvironmentProduction,

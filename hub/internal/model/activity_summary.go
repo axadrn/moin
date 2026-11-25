@@ -314,6 +314,9 @@ var settingsSummaries = map[string]summarize{
 	"workspace.daemon_updates": func(target string, d map[string]string) string {
 		return onOff(d, "turned automatic daemon updates %s")
 	},
+	"hub.github_app_created": func(target string, d map[string]string) string {
+		return "created the GitHub App " + target + " of the hub"
+	},
 	"hub.update_started": func(target string, d map[string]string) string {
 		return "started the update of the hub from " + d["from"] + " to " + d["to"]
 	},

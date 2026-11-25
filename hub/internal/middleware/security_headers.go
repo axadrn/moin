@@ -12,6 +12,9 @@ type SecurityHeadersConfig struct {
 	S3Endpoint    string
 	UmamiHost     string
 	PlausibleHost string
+	// GitHubURL is GitHub on the web, where a form creates the hub's
+	// GitHub App.
+	GitHubURL string
 }
 
 // SecurityHeaders adds the security headers to all responses. The nonce
@@ -54,7 +57,7 @@ func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
 		"connect-src 'self' " + umamiConnect + " https://" + plausibleHost + " https://*.google-analytics.com https://analytics.google.com",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
-		"form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com",
+		strings.TrimSpace("form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com " + cfg.GitHubURL),
 	}, "; ")
 }
 
