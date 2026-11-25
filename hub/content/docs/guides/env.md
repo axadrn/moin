@@ -33,7 +33,7 @@ They go to the services moin builds and the main one. An image you do not build,
 ## Set an env var
 
 ```surfaces
-Web: the app, **Environment**, **Set**
+Web: the app's **Settings** tab, **Environment**, **Set**
 CLI: moin env set KEY=value
 TUI: on the app, `e`, `a`, then type `KEY=value`
 API: PATCH /api/v1/apps/{app}/env
@@ -83,7 +83,7 @@ The API and MCP take the names as `unset`.
 All env vars as one `.env` file, `KEY=value` per line. Saving replaces all of them. A key missing from the text is removed. The text starts empty: paste your whole `.env`. moin first shows which names it adds, replaces and removes, and asks.
 
 ```surfaces
-Web: the app, **Environment**, switch **Fields** to **Text**, then **Review changes**
+Web: the app's **Settings** tab, **Environment**, switch **Fields** to **Text**, then **Review changes**
 CLI: moin env push [file]
 TUI: on the app, `e`, then `E`: an empty text opens in `$EDITOR`
 API: PUT /api/v1/apps/{app}/env
@@ -108,7 +108,7 @@ services:
 
 Deploys from before moin 1.0.0-beta.35 wrote the values into their compose file. An app's next deploy from its source writes a clean one; a restart or an image deploy keeps the old one until then. The old deploys go when moin cleans them up, after 5 builds.
 
-One exception: the settings that say where a service runs. moin fills in `${NAME}` in `image`, `ports`, `expose`, `volumes`, and the folder and `Dockerfile` of `build`, when it reads your compose file. It checks them as they will run, and a rollback runs the same image. A change there takes a deploy. Keep secrets out of them.
+One exception: the settings that say where a service runs. moin fills in `${NAME}` in `image`, `ports`, `expose`, `volumes`, `user`, the env `PORT`, and the folder and `Dockerfile` of `build`, when it reads your compose file. It checks them as they will run, and a rollback runs the same image. A change there takes a deploy. Keep secrets out of them.
 
 An `env_file` of your repo works the same: it may hold `${NAME}`, and Docker fills it in when the service starts. Its path takes no `${NAME}`: name the file.
 
@@ -120,4 +120,4 @@ An `env_file` of your repo works the same: it may hold `${NAME}`, and Docker fil
 - A rollback runs with the env vars as they are now, not as they were then.
 - A rebuilt server starts without env. Set the values again, then deploy.
 - A removed app takes its env file with it.
-- Commands take the app from `--app`, or from the folder name.
+- Commands take the app as an argument or from `--app`, then the app that follows the folder's GitHub repo, then the folder's name.

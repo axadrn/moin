@@ -22,6 +22,9 @@ Every client that acts for you has rights: the CLI and the TUI of a computer, an
 - Rows, SQL and copies of a database are app data, as strong as secrets: they need env. Changing rows and SQL that writes (`write: true`) also need delete.
 - Running a command in a container (`exec`) can do anything in the app, read its secrets and delete its data: it needs deploy, env and delete together.
 - Read removes your connections and your own CI tokens: taking your own access away never needs more. Removing another person's CI token, as the owner, needs servers.
+- Deploy runs new code in an app, and that code sees the app's secrets and data. Give it with care. On the server, [`deploy-from`](/docs/guides/security#rules) limits what code may come.
+- With Postgres, SQL that writes can run commands in the database container.
+- Servers can invite a member, and a member deploys, sets env and runs SQL. Give it only to a client you would let into the team.
 - **no token**: a connection or CI token never calls it, whatever its rights: your sessions, passkeys and email, rights themselves, new CI tokens, roles, leaving or deleting a workspace or the account, billing, admin. A signed-in browser does, and nobody needs to be signed in for the steps of signing in.
 - A CI token for one app reaches only the endpoints of that app, `GET /api/v1/account` and `GET /api/v1/meta`. Everything else answers `403` `app_only`, MCP too.
 

@@ -21,7 +21,7 @@ Then four steps, and your app is live.
 moin login --url https://moin.example.com
 ```
 
-Your browser opens and shows a code. Check that it is the same code as in your terminal. Press **Approve**.
+Your browser opens and shows a code. Check that it is the same code as in your terminal. Pick the rights. Press **Allow with passkey**, or **Allow** without a passkey.
 
 No account yet? The same page signs you up, with GitHub.
 
@@ -79,6 +79,8 @@ The app does not exist yet, so moin asks first. Answer `y`.
 ```text
 ? App my-app does not exist. Create it? [y/N] y
 Created app my-app on web-1
+  Every address asks for this password, shown only this once:
+  user moin, password 7f3k…
 my-app follows me/my-app@main
 Deploying me/my-app from GitHub
 commit 3f2a9c1 First version

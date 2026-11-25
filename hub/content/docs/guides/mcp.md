@@ -34,7 +34,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 
 - An agent you let in works only at `/mcp` of your hub, never in the JSON API. Its access lasts an hour and renews by itself; unused for 90 days, the connection ends. `whoami` tells it its rights.
 - The approval page shows the agent's name as the agent gave it, and where it sends you back, like claude.ai or localhost. Nobody checked the name, so allow only an agent you just added. Settings, Connections shows both too: "Claude · claude.ai".
-- Each tool needs one right, named in the table below and at the end of its description. Without it the tool answers `missing_right` with the right, and the agent says: "This connection may not deploy and restart. Change it in Settings, Connections." [Rights](/docs/reference/rights)
+- Each tool needs its right, or all of several, named in the table below and at the end of its description. Without it the tool answers `missing_right` with the right, and the agent says: "This connection may not deploy and restart. Change it in Settings, Connections." [Rights](/docs/reference/rights)
 - Rights never add to your role: a member's agent cannot invite, whatever its rights.
 - A CI token for one app does not reach MCP.
 - A connection or CI token sends at most 121 requests a minute, MCP and API together; one more answers `rate_limited` with the seconds to wait. [API](/docs/reference/api#basics)
@@ -46,7 +46,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 
 | Tool | Does | Right |
 | --- | --- | --- |
-| `whoami` | the account and token, with `email_alerts` | read |
+| `whoami` | the account and the connection or CI token with its rights, with `email_alerts` | read |
 | `set_email_alerts` | turns your [email alerts](/docs/guides/alerts) on or off | servers |
 | `list_alert_destinations` | where [alerts](/docs/guides/alerts#slack-discord-telegram-and-webhooks) go besides email, without URLs or tokens, and which fail | read |
 | `add_alert_destination` | adds Slack, Discord, Telegram or a webhook; a webhook returns its `signing_secret` once | servers |
@@ -105,8 +105,8 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 | `set_domains` | domains and the canonical one, or with `service` the domains of another service | deploy |
 | `get_instant` | the instant address, or why the app has none | read |
 | `set_instant` | the provider of the instant address or off | deploy |
-| `set_protection` | turns the app's password on for every address: your own, or one moin makes and returns this once | env |
-| `remove_protection` | turns the app's password off: every address is open | env, destructive |
+| `set_protection` | turns the app's password on for every domain: your own, or one moin makes and returns this once | env |
+| `remove_protection` | turns the app's password off: every domain is open | env, destructive |
 | `restart_app` | starts the live deploy again with the current settings | deploy |
 | `stop_app` | takes the app offline; its data stays | deploy, destructive |
 | `start_app` | runs a stopped app again | deploy |
@@ -123,7 +123,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 | `set_integrations` | stores the Cloudflare token in the hub; hands `server` the Tailscale key, which only it keeps | servers |
 | `set_server_security` | visitors through a Cloudflare Tunnel, SSH for everyone, only through Tailscale or off, the firewall | servers, destructive |
 | `get_billing` | the subscription; on a self-hosted hub it says billing is off | read |
-| `list_workspaces` · `get_workspace` | the token's workspace with its team | read |
+| `list_workspaces` · `get_workspace` | the workspace of the connection or CI token, with its team | read |
 | `list_activity` | who did what, newest first, to the second; filter by `app`, `server` or `user` | read |
 | `invite_member` | invites someone by email, as member; an admin is invited in the web | servers |
 | `resend_invitation` | sends an invitation again | servers |

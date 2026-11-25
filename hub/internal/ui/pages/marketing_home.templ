@@ -96,7 +96,7 @@ templ HomeHero() {
 // wide everywhere else. The files live in the media bucket, not here; a new
 // cut gets a new date in its name.
 templ homeVideo() {
-	<video autoplay muted loop playsinline controls preload="metadata" poster={ homeVideoURL + "-poster.jpg" } aria-label="moin in 83 seconds">
+	<video autoplay muted loop playsinline controls preload="metadata" poster={ homeVideoURL + "-poster.jpg" } aria-label={ brand.Name + " in 83 seconds" }>
 		<source src={ homeVideoURL + "-1x1.mp4" } type="video/mp4" media="(max-width: 40rem)"/>
 		<source src={ homeVideoURL + "-16x9.mp4" } type="video/mp4"/>
 	</video>
@@ -132,7 +132,7 @@ templ HomeLive(network model.Network) {
 		</h2>
 		<dl class="moin-grid" data-fit style="--min:9rem">
 			@homeLiveNumber(network.SelfHosted, "self-hosted hubs", "self-hosted")
-			@homeLiveNumber(network.HostedWorkspaces, "teams on hosted moin", "hosted")
+			@homeLiveNumber(network.HostedWorkspaces, "teams on hosted "+brand.Name, "hosted")
 			@homeLiveNumber(network.Servers, "servers", "servers")
 			@homeLiveNumber(network.Apps, "apps live", "apps")
 			@homeLiveNumber(network.Deploys, "deploys so far", "deploys")
@@ -276,7 +276,7 @@ templ HomeDoes() {
 					@homeInk("Your rules.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
 				</div>
 			}
-			@homeFeature("Deploy", "Any repo. A compose.yml. An image.", "/docs/guides/deploy")
+			@homeFeature("Deploy", "Any GitHub repo. A compose.yml. An image.", "/docs/guides/deploy")
 			@homeFeature("Domains", "HTTPS from the first deploy.", "/docs/guides/domains")
 			@homeFeature("GitHub", "Every push. Or one commit.", "/docs/guides/github")
 			@homeFeature("Catalog", "n8n. Umami. Open WebUI. And more.", "/catalog")
@@ -327,7 +327,7 @@ templ HomePricing() {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Self-hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever</span></span>
-					<span class="moin-small moin-muted">Your own moin hub. On your server. Open source.</span>
+					<span class="moin-small moin-muted">Your own { brand.Name } hub. On your server. Open source.</span>
 				</div>
 				@components.Button(components.ButtonProps{Href: "/docs/self-hosting"}) {
 					Host it yourself

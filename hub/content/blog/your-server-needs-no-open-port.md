@@ -38,7 +38,7 @@ ufw enable
 
 Every inbound port is closed now. Only the Tailscale network gets in.
 
-Most hosts also have a firewall in front of the server, like Hetzner's Cloud Firewall. Use it as a second lock: no inbound rule at all.
+Most providers also have a firewall in front of the server, like Hetzner's Cloud Firewall. Use it as a second lock: no inbound rule at all.
 
 ## Step 3: visitors without port 80 and 443
 

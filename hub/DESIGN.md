@@ -281,7 +281,7 @@ Every status shows as a colored dot or symbol plus a word, everywhere:
 
 ## Activity
 
-Every change in a workspace goes through one helper, `record` in `internal/service/activity.go`, with a `service.Actor`: the member, how it came in (`Source`: web, cli, tui, api, mcp, hook, github or system, the API token by name, the client IP and user agent) and what it touched. moin itself acts as `service.System(workspaceID)`.
+Every change in a workspace goes through one helper, `record` in `internal/service/activity.go`, with a `service.Actor`: the member, how it came in (`Source`: web, cli, tui, api, mcp, hook, github or system, the connection or CI token by name, the client IP and user agent) and what it touched. moin itself acts as `service.System(workspaceID)`.
 
 - **What we log:** the exact time in UTC, who, how, the app and server, and the settings before and after: names, on and off, domains, branches, roles, counts, durations, versions, release numbers, exit codes and error messages.
 - **What we never log:** env var values, secrets, tokens, passwords, SQL text, row contents or cell values, file contents and app log lines. A SQL write keeps the kind of statement, its tables and the row count; a row edit the table, row and column names.
@@ -310,7 +310,7 @@ notes say it under Changed.
 
 | Word | Means | Not |
 | --- | --- | --- |
-| hub | the moin web app and API every server reports to; "moin hub", or your own when you self-host | hub, dashboard, panel, backend, console |
+| hub | the moin web app and API every server reports to; "moin hub", or your own when you self-host | control plane, dashboard, panel, backend, console |
 | daemon | the moin process on a server (`moin daemon`, service `moin-daemon`); it only dials out | agent, node agent, connector |
 | server | a machine with the daemon; named `web-1`, `web-2` … unless you name it | node, host, machine (in copy) |
 | app | what you deploy | project, service (a service is one container of an app's compose file) |

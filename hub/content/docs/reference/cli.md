@@ -59,7 +59,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin servers rm <name> [--confirm <name>]` | asks you to type its name, removes the server and prints the command that removes its daemon there |
 | `moin servers update [name]` | updates the daemon to the hub's version now; without a name, every online server whose daemon differs. See [Daemon updates](#daemon-updates) |
 | `moin servers auto-update [on\|off]` | shows or sets whether daemons update by themselves; on by default |
-| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached; prints what is on it, line by line. See [Security](/docs/guides/security) |
+| `moin servers secure <server> [--tunnel on\|off] [--ssh tailscale\|everyone\|off] [--firewall on\|off] [--yes]` | how the server is reached: without flags it only shows what is on it, line by line; with flags it sets it, then prints it. See [Security](/docs/guides/security) |
 | `moin servers rules <name>` | the server's own rules for moin, from `/etc/moin/rules` on it ([Rules](/docs/guides/security#rules)) |
 | `moin integrations` | whether Cloudflare is connected and which servers keep a Tailscale key, never the keys |
 | `moin integrations cloudflare` · `moin integrations tailscale [--server <server>]` | stores the Cloudflare API token in the hub, or hands a server the Tailscale auth key, which only it keeps; replaces it; the key comes on stdin. `--server` is needed with more than one server |
@@ -110,8 +110,8 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin domains canonical <domain\|none>` | the domain the others redirect to, or none |
 | `moin instant [app]` | the [instant address](/docs/guides/domains#instant-address), `https://<app>.<ip>.sslip.io` |
 | `moin instant sslip.io\|nip.io\|off [app]` | picks the provider of the instant address, or turns it off |
-| `moin protect [--user moin] [app]` | turns the app's [password](/docs/guides/domains#password) on for every address. Your password comes on stdin; with nothing on stdin moin makes one and shows it this once. `--user` is the name the browser asks for |
-| `moin protect off [app] [--yes]` | turns the password off: every address is open |
+| `moin protect [--user moin] [app]` | turns the app's [password](/docs/guides/domains#password) on for every domain. Your password comes on stdin; with nothing on stdin moin makes one and shows it this once. `--user` is the name the browser asks for |
+| `moin protect off [app] [--yes]` | turns the password off: every domain is open |
 
 ## Uptime and metrics
 
@@ -174,7 +174,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | --- | --- |
 | `moin backups [app]` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to |
 | `moin backups [app] --every 15m\|1h\|1d --keep 1d\|3d\|7d\|30d` | sets how often the app is copied and how long each copy stays; one of them or both |
-| `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`before-v12`, `undo-20261107T140200Z`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. A time takes the newest copy at or before it. Keeps the database before, so it can be undone as long as the copies are kept, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
+| `moin restore [app] --to <moment> [--db <path>] [--confirm <app>]` | goes back to a moment from `moin backups`, by its ID or label (`before-v12`, `undo-20261107T140200Z-482913`), or to a time in UTC to the minute: `14:01` for today, `"2026-11-07 14:01"`, RFC 3339. A time takes the newest copy at or before it. Keeps the database before, so it can be undone as long as the copies are kept, and waits until the restore is done, at most 10 minutes while the server is offline. It asks you to type the app's name; scripts pass it with `--confirm <app>`, `--yes` is not enough |
 | `moin backup download [app] [--db <path>] [--to <moment>] [--link]` | saves a copy of a database in the current folder, straight from your bucket: the newest, or the one `--to` names; `--link` prints its 15 minute link instead |
 
 ## Bucket
@@ -219,7 +219,7 @@ Flags may come before or after the arguments: `moin rollback v3 --app my-app` is
 | | Commands | Asks |
 | --- | --- | --- |
 | Big, cannot be undone | `servers rm`, `apps rm`, `buckets rm`, `restore` | type the name: `Type my-app to confirm:` |
-| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
+| Small or reversible | `deploy` of a new app, `update`, `stop`, `rollback`, `env rm`, `domains rm`, `protect off`, `registry rm`, `integrations rm`, `alerts rm`, `connections rm`, `unlink`, `link`, `hook`, `hook off`, `team revoke`, `servers secure`, `daemon uninstall`, `env push`, `sql --write` with DROP or DELETE | `[y/N]` |
 | Harmless | `deploy` of an app that exists, `redeploy`, `restart`, `start`, `backup download`, `backups --every`, adding and setting things | nothing |
 
 `--yes` skips the question. For `servers rm`, `apps rm`, `buckets rm` and `restore`, `--yes` is not enough: a script passes the name as `--confirm my-app`. Without a terminal, as in CI, these commands refuse without `--yes` or `--confirm`.

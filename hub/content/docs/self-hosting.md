@@ -30,7 +30,7 @@ The rest of these docs apply as they are.
 - Keep a copy of `SECRETS_KEY`. It seals the Cloudflare token, the alert targets and the keys of the GitHub App the hub keeps. Without it you enter them again, and the hub starts only with the old key back or `GITHUB_APP_*` set. Env values, bucket keys and registry logins live on your servers, never in the hub.
 - Email and a bucket can come later. Until email is set up, invitations go to the hub's log.
 - A new key any time: `docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com`. [Recovery key](#recovery-key)
-- Add `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the hub's own backup, then run `sh /opt/moin/update.sh`.
+- Add `CLOUDFLARE_*` for email and `S3_*` for the hub's own backup, then run `sh /opt/moin/update.sh`.
 - Run the install command again any time: it keeps your settings and data.
 
 | | Self-hosted | Hosted |
@@ -101,7 +101,7 @@ The files are in the repo, in `hub/deploy/`:
    # You: the first admin. Your GitHub account's primary email, or a recovery key.
    ADMIN_EMAILS=you@example.com
    DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
-   # openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
+   # openssl rand -base64 32. Keep a copy: it seals the Cloudflare token, the alert targets and the GitHub App's keys.
    SECRETS_KEY=
    EMAIL_FROM=hello@example.com
    CLOUDFLARE_ACCOUNT_ID=
@@ -113,12 +113,12 @@ The files are in the repo, in `hub/deploy/`:
    S3_SECRET_KEY=
    ```
 
-3. Start it with `sh update.sh`. It listens on `127.0.0.1:8090`. Put it on your domain with a **Cloudflare Tunnel** (no open port: a tunnel in Zero Trust, Networks, Tunnels, with a public hostname for your domain and the service `http://hub:8090`, then `TUNNEL_TOKEN=` and `TRUSTED_PROXY_CIDRS=172.16.0.0/12` in the settings and `update.sh` again) or **a proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`.
-4. Make a [recovery key](#recovery-key) for your address in `ADMIN_EMAILS`, sign in with it and click **Create GitHub App** ([Your own GitHub App](#your-own-github-app)).
+3. Start it with `sh update.sh`. It listens on `127.0.0.1:8090`. Put it on your domain with a **Cloudflare Tunnel** (no open port: a tunnel in Zero Trust, Networks, Tunnels, with a public hostname for your domain and the service `http://hub:8090`, then `TUNNEL_TOKEN=` and `TRUSTED_PROXY_CIDRS=172.16.0.0/12` in the settings and `update.sh` again) or **a proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`. Behind your own proxy, set `TRUSTED_PROXY_CIDRS` to the network it comes from too. Without it every visitor counts as one address, and five wrong recovery keys lock everyone out for 15 minutes.
+4. Make a [recovery key](#recovery-key) for your address in `ADMIN_EMAILS`, sign in with it and click **Create GitHub App** ([Your own GitHub App](#your-own-github-app)). From the clone, in `moin/hub/deploy`, the command is `docker compose -f compose.yml exec hub ./main recovery-key you@example.com`.
 
 ### Settings
 
-`hub/.env.example` lists every setting. The ones these docs use:
+`hub/.env.example` lists the settings of the hub. The ones these docs use:
 
 | Setting | What it does |
 | --- | --- |
@@ -156,7 +156,7 @@ Your apps stay public through their own tunnel or ports 80 and 443. GitHub and C
 
 ### Move from one server to two
 
-1. Turn on the hub's backup: `S3_*`, `BACKUP_DATABASE=true`, `sh /opt/moin/update.sh`. Use a bucket no other hub backs up to (folder `hub/litestream`).
+1. Turn on the hub's backup: set `S3_*`, then `sh /opt/moin/update.sh`. Use a bucket no other hub backs up to (folder `hub/litestream`).
 2. Wait a few seconds, then on the old server stop the hub and its updater: `docker compose -f /opt/moin/compose.yml --profile '*' down`. Your apps keep running.
 3. On the new server, [run it](#run-it) with the same settings, without `SAME_SERVER`, and above all the same `SECRETS_KEY`. It restores its database from the bucket on its first start. Point the domain at it.
 4. On the old server, run a new install command from `moin servers install-command <server>`: its daemon now dials your domain, as the same server.
@@ -223,7 +223,7 @@ A key from the server signs one account in, once, within an hour. It is the way 
 docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com
 ```
 
-It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. It resets every way in: it signs the account out everywhere, disconnects its GitHub and deletes its passkeys. After it, connect GitHub and add a passkey again under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page, next to **Sign in with a passkey**.
+It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. It resets every way in: it signs the account out everywhere, ends its connections and CI tokens, disconnects its GitHub and deletes its passkeys. After it, connect GitHub and add a passkey again under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page, next to **Sign in with a passkey**.
 
 A self-hosted hub has no Admin. Its admins, the addresses in `ADMIN_EMAILS`, get the note with **Update now** at the top of the web ([Updates](#updates)) and see the hub backup in **Settings** ([Database backup](#database-backup)). Your team is in **Settings**, **Team**.
 

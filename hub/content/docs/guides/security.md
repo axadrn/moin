@@ -42,7 +42,7 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 
 **New versions carry a seal.** A messenger cannot slip your server a fake daemon.
 
-- Every release is signed with Ed25519. The daemon takes it from GitHub, not from the hub, and checks the seal first. [Updates](#updates)
+- Every release is signed with Ed25519. An update comes from GitHub, not from the hub, and the daemon checks the seal first. The first install trusts the hub you install from. [Updates](#updates)
 
 **Every guest stays in its room.** An app gets its own folders and nothing else of the house. A container that asks for the master key is turned away at the door.
 
@@ -52,7 +52,7 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 
 - Sign-in is GitHub, with two-factor as your GitHub account has it, or a passkey. [Sign in](#sign-in)
 
-**What stays honest.** A messenger that someone bought can still bring letters your rules allow. Strict rules leave it nothing that hurts.
+**What stays honest.** A messenger that someone bought can still bring letters your rules allow. It cannot take the house. With the default rules it can still empty the rooms: your apps, their secrets and their data. Strict rules leave it much less, not nothing. [If someone breaks into the hub](#if-someone-breaks-into-the-hub)
 
 ## Sign in
 
@@ -69,7 +69,7 @@ You sign in with GitHub or a passkey. Like a club that lets you in when a friend
 - **Every passkey sign-in is checked in full.** The challenge is random, kept on the hub, works once and for five minutes. The signature, the origin, the domain and the flags are checked by go-webauthn, a maintained WebAuthn library, never by code of our own. A sign counter that goes back means a copied passkey: refused. 30 tries per 15 minutes per address.
 - **A new passkey sends you an email**, so one you did not add does not go unseen. An operator impersonating you can neither add nor remove one.
 - **The last way in stays.** Without GitHub, your last passkey cannot be removed. Add another first.
-- **Recovery key.** Lost your GitHub account or your passkey? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It resets every way in: it signs the account out everywhere, disconnects its GitHub account and deletes its passkeys, so a stolen GitHub account or device no longer gets in. Then you connect your GitHub and add a passkey again.
+- **Recovery key.** Lost your GitHub account or your passkey? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It resets every way in: it signs the account out everywhere, ends its connections and CI tokens, disconnects its GitHub account and deletes its passkeys, so a stolen GitHub account or device no longer gets in. Then you connect your GitHub and add a passkey again.
 - **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
 - **Connecting GitHub and adding a passkey need a CSRF token**, so no other site can start them. [Recovery key](/docs/self-hosting#recovery-key)
 - **The CLI, the TUI and AI agents** are connections: you let each one in from the browser with your passkey and pick its [rights](/docs/reference/rights). CI uses a CI token. Neither can ever change how you sign in or give itself more rights. [Account and connections](/docs/guides/account)
@@ -155,7 +155,7 @@ With the tunnel, moin sends every domain of the server's apps through it and poi
 - If the token cannot reach a domain's zone, a red line says so: point the domain at `<tunnel>.cfargotunnel.com` yourself. Without Zone Settings Edit, turn on **Always Use HTTPS** yourself.
 - Open again deletes the tunnel and the DNS records moin made. Point your domains back at the server with an A record ([Add a domain](/docs/guides/domains#add-a-domain)).
 - A server behind the tunnel has no [instant address](/docs/guides/domains#instant-address): it needs ports 80 and 443.
-- A new app starts with its [password](/docs/guides/domains#password) on, for every address of it. Nobody reaches it before you, also not a setup page where the first visitor becomes the admin. Turn it off when the app is ready for the world.
+- A new app starts with its [password](/docs/guides/domains#password) on, for every domain of it. Nobody reaches it before you, also not a setup page where the first visitor becomes the admin. Turn it off when the app is ready for the world.
 
 ## SSH
 
@@ -201,7 +201,7 @@ API: GET /api/v1/servers
 MCP: list_servers
 ```
 
-The CLI shows it in the ACCESS column, and `servers secure` line by line. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
+The CLI shows it in the ACCESS column, and `servers secure` without flags line by line. The API has what is set in `tunnel`, `ssh` and `firewall`, and what is on the server in `security`. Without the firewall, every port that listens is open.
 
 ## Where your secrets live
 
@@ -222,6 +222,7 @@ All are readable by root only. No other file of moin holds a value: not the comp
 - each registry's host and username
 - which server has which key
 - the app's password as a hash only. moin shows it once, when it makes it
+- the command line of a [command in a container](/docs/guides/exec), with the app's env values masked. Do not type a secret into it
 
 **What stays with the hub.** The hub uses these itself, so it has to keep them, encrypted with its own key:
 
@@ -233,7 +234,8 @@ All are readable by root only. No other file of moin holds a value: not the comp
 
 - A value you type in after someone broke into the hub passes through it once. They could read that one.
 - The secrets of a [catalog app](/docs/guides/catalog) never pass the hub: the server makes them. Only the first sign-in password, which moin shows you once, passes it once.
-- The hub can still send what your [rules](#rules) allow. Without `exec: off`, a command in a container can print its env. Strict rules close that.
+- The hub can still send what your [rules](#rules) allow. With the default rules it reads every secret of an app three ways: a command in a container prints the env (`exec: off` closes it), new code deployed over the app gets the env (`deploy-from` narrows it), and SQL that writes runs commands in a Postgres container (`data: off` closes it). [If someone breaks into the hub](#if-someone-breaks-into-the-hub)
+- A variable used in `image`, `ports`, `expose`, `volumes` or `user` is filled in before the hub sees the compose file, so its value is not secret. Keep secrets in `environment`.
 - A server rebuilt from scratch starts without secrets. Enter them again, then deploy. A later server gets the bucket key, registry login and Tailscale key once more: the pages show which server lacks one.
 - The proxy, Traefik, sees the apps folder read-only, to read the password's hash. So it can read every app's `app.env` too. We accept that: it runs with the Docker socket, which is as much as root on the server anyway. A bug in Traefik that reads files would expose them, so moin keeps Traefik current.
 - An app moin builds with [Railpack](/docs/concepts/how-moin-works) has a hash of its env in its compose file, so a changed value builds again. A hash, not a value.
@@ -286,7 +288,7 @@ network: locked
 
 | Rule | What it stops |
 | --- | --- |
-| `data: off` | reading tables, running SQL, editing rows and downloading backups through moin |
+| `data: off` | reading tables, running SQL, editing rows and downloading backups through moin. With Postgres, SQL that writes can run commands in the database container, so this one matters next to `exec: off`. The copies still go to any bucket: set `backups-to` too |
 | `logs: off` | reading container logs through moin; logs often hold what your users sent |
 | `exec: off` | [running commands](/docs/guides/exec) in containers through moin |
 | `deploy-from: <sources>` | deploys from anywhere else |
@@ -295,7 +297,7 @@ network: locked
 | `mounts: <folders>` | nothing: it lets apps mount these folders of the server, like `/mnt/media`, which moin refuses without it |
 | `server-access: on` | nothing: it allows [containers that reach beyond the app](#containers-that-reach-into-the-server), which moin refuses without it |
 
-- A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `catalog` for the apps of the [catalog](/docs/guides/catalog), whose compose files come with the signed daemon. `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. An image deploy of an app that follows a repo brings both, the image and the commit for its `compose.yml`, so `deploy-from` must list both. A commit named by its SHA must be on the app's branch, so a fork's commit, which GitHub also serves through the repo, never deploys. A redeploy or a rollback brings no new code, so it is always allowed.
+- A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `catalog` for the apps of the [catalog](/docs/guides/catalog), whose compose files come with the signed daemon. `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. An image deploy of an app that follows a repo brings both, the image and the commit for its `compose.yml`, so `deploy-from` must list both. The hub deploys a commit named by its SHA only when it is on the app's branch, as a fork's commit is not. That check is the hub's. Against a hacked hub, `deploy-from` holds for private repos. For a public repo, a fork's commit, which GitHub also serves through the repo, passes. `deploy-from` is per server, not per app: an allowed source can be deployed over any app of the server. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
 - No file, as on a server installed before the install wrote one: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
@@ -362,6 +364,25 @@ MCP: list_servers
 
 `moin servers` shows them in its RULES column; the API in the `rules` field.
 
+## If someone breaks into the hub
+
+A messenger someone bought cannot take your house: it never becomes root on the server, never changes the rules, never hides from the journal and never installs a daemon we did not sign. But it can still bring every letter your rules allow. With the default rules, that is everything your apps hold.
+
+| | With the default rules a hacked hub can | With strict rules it still can |
+| --- | --- | --- |
+| Commands | run any command in any app's container: it sees the env and the data | nothing, with `exec: off` |
+| Deploys | deploy any image or repo over any app. The new code starts with that app's env and data | deploy a source `deploy-from` allows over any app of the server, like a catalog app over your shop. For a public repo, also a fork's commit |
+| Databases | read and write every database. With Postgres, SQL that writes runs commands in the database container (`COPY … TO PROGRAM`) and reads its files | nothing, with `data: off` |
+| Backups | send every copy to a bucket of its own, or restore one of its own. Also with `data: off` | nothing, with `backups-to` |
+| Env vars | set and remove them, like a proxy or a database host of its own | the same: no rule covers env vars |
+| Password and domains | turn the app's password off, put a domain on a service you never published | the same: no rule covers them |
+| Logs | read every container's logs | nothing, with `logs: off` |
+| Web, SSH, firewall | open them | nothing, with `network: locked` |
+| Stop, remove, restore | stop and remove apps, restore an older copy. A remove keeps the volumes | the same |
+
+- The journal shows each request, with the env keys it set: [See what the hub asked](#see-what-the-hub-asked).
+- The same holds for a stolen [connection or CI token](/docs/reference/rights), within its rights. The deploy right runs new code in an app, and new code sees the app's env and data. The servers right can invite a person, and a member deploys, sets env and runs SQL.
+
 ## See what the hub asked
 
 Your server keeps a diary. Every letter the messenger brings goes in it: what it asked, and whether the daemon did it or said no, and why. The messenger cannot tear out a page: the diary is on your server.
@@ -384,7 +405,7 @@ Nov 25 09:20:45 server-1 moin[812]: 2026/11/25 09:20:45 WARN not done request=r-
 
 ## Updates
 
-A daemon only runs a release we signed. Think of a stamp: we stamp every release, and every daemon carries a photo of the stamp. It compares the two before it installs anything. The photo cannot stamp, so it can be public.
+A daemon only updates to a release we signed. Think of a stamp: we stamp every release, and every daemon carries a photo of the stamp. It compares the two before it installs anything. The photo cannot stamp, so it can be public.
 
 1. The hub tells the daemon: update to `v1.2.3`. It names the version and nothing else.
 2. The daemon downloads `SHA256SUMS` and `SHA256SUMS.sig` of that release from GitHub, `github.com/axadrn/moin/releases`.
@@ -395,17 +416,28 @@ A daemon only runs a release we signed. Think of a stamp: we stamp every release
 - It never goes back to an older release, and never installs a build that is not a release.
 - The signing key never touches the hub. Someone who takes over the hub cannot sign, so they cannot hand your server a daemon.
 - In GitHub the key sits in a protected environment. Only a release tag reaches it, and only after a maintainer approves. A workflow or an action someone slipped in cannot sign.
-- A daemon without systemd cannot restart itself, so it does not update itself. Update it by hand from the release, and check the download against its checksums first (below).
+- A daemon without systemd cannot restart itself, so it does not update itself. Update it by hand: take the binary from the release and check it first (below).
+- The first install trusts the hub you install from. The install script and the binary come from it, and nothing checks them. To trust only our signature, take the binary from the release and check it (below).
+- A hub update pulls the image by its version tag. Nothing checks its signature. To be sure, check `SHA256SUMS` and pull the image by its digest (below).
 - There are two keys: one signs every release, a spare stays offline. If the first ever leaks, a release signed with the spare drops it, and every daemon stops trusting it.
 - The keys are Ed25519, in `releaseKeys` in `internal/daemon/update.go`. Forging a signature without the private key is not possible with today's computers. What matters is that nobody steals the key.
 - Your servers need to reach `github.com` and `release-assets.githubusercontent.com`, where GitHub sends the downloads, to update. Your apps do not.
-- Check a download by hand against its checksums:
+- Check a download by hand: the signature of the checksums with our public key, then the binary against the checksums.
 
 ```
 curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/moin-linux-amd64
 curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS
+curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS.sig
+cat > moin-release.pem <<'KEY'
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAdkwXdu3Ecl8Rs4tfXxIrvipOfRa5R61tfWEdKISw3LA=
+-----END PUBLIC KEY-----
+KEY
+openssl pkeyutl -verify -pubin -inkey moin-release.pem -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
 sha256sum --check --ignore-missing SHA256SUMS
 ```
+
+- `Signature Verified Successfully`, then `OK` next to the binary. Anything else: do not run it. The key is the first of `releaseKeys`.
 
 - The same signed `SHA256SUMS` names the hub image of the release by its digest, in the line `<digest>  ghcr.io/axadrn/moin:v1.2.3`. Pull exactly that image, by its digest:
 

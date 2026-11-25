@@ -16,7 +16,7 @@ Each domain has its own visitor. A domain that hangs never slows down another.
 ```surfaces
 Web: the app, **Domains**, a domain under **Uptime**
 CLI: moin uptime <app-name>
-TUI: on the app, `u`; `r` visits again
+TUI: on the app, `u`; `r` reads it again
 API: GET /api/v1/apps/{app}/uptime
 MCP: get_uptime
 ```

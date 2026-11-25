@@ -82,6 +82,10 @@ services:
     expose: ["8080"]
     environment:
       DATABASE_URL: postgres://miniflux:${DB_PASSWORD}@db/miniflux?sslmode=disable
+      RUN_MIGRATIONS: "1"
+      CREATE_ADMIN: "1"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
@@ -109,7 +113,7 @@ The rules, which a test checks:
 | Secrets | every one a `${NAME}`, made by the server on install, and on an update that asks for a new one: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
 | First sign-in | a secret the person needs to sign in, named in `login:` like `ADMIN_PASSWORD`, is the one the install shows once |
 | Its own domain | `${APP_URL}` is `https://<its domain>`, `${APP_DOMAIN}` the domain alone; an app that uses either needs a domain on install |
-| Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data` |
+| Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data`. MySQL, MongoDB and ClickHouse run too, but moin does not back them up yet |
 | Versions | only tags like `1.2.3` or `v1.2.3` count, unless `versions:` sets a regular expression. A project that tags betas like versions sets `stable:` to its channel tag, such as `stable` |
 | Category | AI, Analytics, Automation, Monitoring, Communication, Websites, Productivity, Documents, Reading, Developer tools, Security, Marketing, Finance or Media |
 
