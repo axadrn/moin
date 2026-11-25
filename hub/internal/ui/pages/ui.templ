@@ -12,6 +12,7 @@ const (
 	uiBlocksTab  = "Blocks"
 	uiComponents = "Components"
 	uiLayoutTab  = "Layout"
+	uiStacksTab  = "Stacks"
 	uiThemeTab   = "Theme"
 )
 
@@ -21,6 +22,7 @@ func uiTabs(active string) []components.Tab {
 		{Label: uiBlocksTab, Href: "/ui/blocks"},
 		{Label: uiComponents, Href: "/ui/components"},
 		{Label: uiLayoutTab, Href: "/ui/layout"},
+		{Label: uiStacksTab, Href: "/ui/stacks"},
 		{Label: uiThemeTab, Href: "/ui/theme"},
 	}
 	for i := range tabs {
@@ -95,6 +97,14 @@ templ UILayout(pages []*model.DocPage) {
 	}
 }
 
+// UIStacks is /ui/stacks: moin UI in each stack, one page each.
+templ UIStacks(pages []*model.DocPage) {
+	@uiPage(layouts.SEOProps{Title: "Stacks · moin UI", Description: "moin UI in Go, templ, Rails, Laravel, Django, Phoenix, React, Vue, Svelte, Astro and more. Plain HTML and CSS, for any stack.", Path: "/ui/stacks"}) {
+		@uiHead(uiStacksTab)
+		@uiPages("", pages)
+	}
+}
+
 templ uiPages(title string, pages []*model.DocPage) {
 	<div class="moin-section">
 		if title != "" {
@@ -124,6 +134,9 @@ func uiURL(page *model.DocPage) string {
 func uiBack(page *model.DocPage) components.Back {
 	if page.Group == "Layout" {
 		return components.Back{Label: "Layout", Href: "/ui/layout"}
+	}
+	if page.Group == "Stacks" {
+		return components.Back{Label: "Stacks", Href: "/ui/stacks"}
 	}
 	return components.Back{Label: "Components", Href: "/ui/components"}
 }
