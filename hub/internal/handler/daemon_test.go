@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +37,44 @@ func TestInstallScriptReplacesTheAgent(t *testing.T) {
 	}
 	if output, err := exec.Command("sh", "-n", "-c", script).CombinedOutput(); err != nil {
 		t.Fatalf("install.sh is no valid sh: %v %s", err, output)
+	}
+}
+
+// TestInstallScriptWritesTheRules: the install script writes the rules
+// file of a new server, root only, and keeps one the owner wrote.
+func TestInstallScriptWritesTheRules(t *testing.T) {
+	daemons := NewDaemonHandler(nil, "https://moin.example.com", middleware.NewClientIPResolver(nil), nil)
+	recorder := httptest.NewRecorder()
+	daemons.InstallScript(recorder, httptest.NewRequest(http.MethodGet, "/install.sh", nil))
+	script := recorder.Body.String()
+	start := strings.Index(script, "if [ ! -e /etc/moin/rules ]")
+	end := strings.Index(script[max(start, 0):], "\nfi\n")
+	if start < 0 || end < 0 {
+		t.Fatalf("install.sh writes no rules:\n%s", script)
+	}
+	dir := t.TempDir()
+	block := strings.ReplaceAll(script[start:start+end+len("\nfi\n")], "/etc/moin", dir+"/etc/moin")
+	file := filepath.Join(dir, "etc", "moin", "rules")
+
+	if output, err := exec.Command("sh", "-eu", "-c", block).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, output)
+	}
+	written, err := os.ReadFile(file)
+	if err != nil || string(written) != protocol.DaemonRules("moin") {
+		t.Fatalf("rules = %q, %v", written, err)
+	}
+	if info, _ := os.Stat(file); info.Mode().Perm() != 0o600 {
+		t.Errorf("rules are %v, want root only", info.Mode().Perm())
+	}
+
+	if err := os.WriteFile(file, []byte("exec: off\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("sh", "-eu", "-c", block).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, output)
+	}
+	if kept, _ := os.ReadFile(file); string(kept) != "exec: off\n" {
+		t.Errorf("a second install changed the rules to %q", kept)
 	}
 }
 

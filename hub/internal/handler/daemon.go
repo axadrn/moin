@@ -43,8 +43,8 @@ func NewDaemonHandler(servers *service.ServerService, appURL string, clientIPs m
 
 // installScript installs the daemon as a systemd service. %[1]s is the
 // hub URL, %[2]s the name, %[3]s its unit, %[4]s the name in
-// capitals for the environment. The binary comes from /download, which
-// serves the downloads directory.
+// capitals for the environment, %[5]s the rules file of a new server. The
+// binary comes from /download, which serves the downloads directory.
 const installScript = `#!/bin/sh
 # Installs the %[2]s daemon. Usage, as root (or with sudo before sh): curl -fsSL %[1]s/install.sh | sh -s -- <install token>
 # %[4]s_URL dials the hub at another address, such as
@@ -74,6 +74,14 @@ mv /usr/local/bin/%[2]s.new /usr/local/bin/%[2]s
 if [ -f /etc/systemd/system/%[2]s-agent.service ]; then
 	systemctl disable --now %[2]s-agent >/dev/null 2>&1 || true
 	rm -f /etc/systemd/system/%[2]s-agent.service
+fi
+# A new server gets its rules file with every rule and the value it has
+# without the file. One that is there stays as the owner wrote it.
+if [ ! -e /etc/%[2]s/rules ]; then
+	mkdir -p /etc/%[2]s
+	cat > /etc/%[2]s/rules <<'RULES'
+%[5]sRULES
+	chmod 600 /etc/%[2]s/rules
 fi
 cat > /etc/systemd/system/%[2]s-daemon.service <<'UNIT'
 %[3]sUNIT
@@ -126,7 +134,7 @@ func (h *DaemonHandler) CLIScript(w http.ResponseWriter, _ *http.Request) {
 func (h *DaemonHandler) InstallScript(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = fmt.Fprintf(w, installScript, h.appURL, build.Name, protocol.DaemonUnit(build.Name), strings.ToUpper(build.Name))
+	_, _ = fmt.Fprintf(w, installScript, h.appURL, build.Name, protocol.DaemonUnit(build.Name), strings.ToUpper(build.Name), protocol.DaemonRules(build.Name))
 }
 
 // Register trades the install token in the Authorization header for a daemon token.

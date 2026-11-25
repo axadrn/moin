@@ -244,6 +244,33 @@ A file on your server, `/etc/moin/rules`, says what moin may do there. Only you,
 
 Nobody can change it through moin: not us, not your team, not someone who breaks into moin.
 
+A new server gets the file when you install the daemon. Every rule is in it, with the value moin takes without the file, so you see what moin may do there. A second install keeps your file.
+
+```
+# What moin may do on this server. Only root can change this file, the hub cannot.
+# The daemon checks every request against it, at once. A mistake refuses everything until it is fixed.
+# These are the values moin takes without the file. Docs: Security, Rules.
+
+# off: no tables, SQL, row edits or backup downloads through moin.
+data: on
+# off: no container logs through moin.
+logs: on
+# off: no commands in containers through moin.
+exec: on
+# locked: no changes to web, SSH and the firewall through moin.
+network: open
+# on: containers may reach beyond the app, like privileged ones or the Docker socket.
+server-access: off
+# Deploys only from these sources. Without it: from anywhere.
+# deploy-from: github.com/<owner>/*, ghcr.io/<owner>/*, catalog
+# Backups and restores only with this bucket. Without it: any bucket.
+# backups-to: <endpoint-host>/<bucket-name>
+# Folders of the server that apps may mount. Without it: none.
+# mounts: /mnt/media
+```
+
+Lock it down by changing a value, or by writing a rule without its `#`:
+
 ```
 # /etc/moin/rules
 data: off
@@ -267,7 +294,7 @@ network: locked
 
 - A `deploy-from` source is a GitHub repo `github.com/<owner>/<repo>`, an image without its tag like `ghcr.io/<owner>/<image>`, or `catalog` for the apps of the [catalog](/docs/guides/catalog), whose compose files come with the signed daemon. `*` stands for one part: `github.com/<owner>/*` allows every repo of that owner. An image deploy of an app that follows a repo brings both, the image and the commit for its `compose.yml`, so `deploy-from` must list both. A commit named by its SHA must be on the app's branch, so a fork's commit, which GitHub also serves through the repo, never deploys. A redeploy or a rollback brings no new code, so it is always allowed.
 - The `backups-to` host is your [bucket's](/docs/guides/bucket#add-it) endpoint without `https://`, like `<account-id>.r2.cloudflarestorage.com`; for AWS S3 `s3.<region>.amazonaws.com`.
-- No file: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
+- No file, as on a server installed before the install wrote one: moin may do everything, except [containers that reach into the server](#containers-that-reach-into-the-server). A rule left out allows what it covers. A file with a mistake, such as an unknown rule, refuses everything until you fix it.
 - Rules apply at once. After a change, `systemctl restart moin-daemon` shows them everywhere.
 - A server with rules updates its daemon like any other ([Updates](#updates)). Each release carries our signature, so a new daemon cannot drop the rules.
 - A refused request says why: `refused by the rules of this server (/etc/moin/rules): data: off`.

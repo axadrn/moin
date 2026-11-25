@@ -61,7 +61,7 @@ MCP: add_server
 curl -fsSL https://moin.example.com/install.sh | sh -s -- ins_…
 ```
 
-It installs Docker if it is missing. It installs the daemon as the `moin-daemon` service and connects it.
+It installs Docker if it is missing. It installs the daemon as the `moin-daemon` service and connects it. It writes `/etc/moin/rules` with every rule and what moin may do, unless the file is there. [Rules](/docs/guides/security#rules)
 
 - The name: 1 to 63 lowercase letters, digits or dashes, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …
 - Not root? Put `sudo` before `sh`. The command works once. If the install stops halfway, get [a new install command](#a-new-install-command).
