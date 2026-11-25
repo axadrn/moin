@@ -23,6 +23,9 @@ func NewUIHandler(docs *service.DocsService, files fs.FS) *UIHandler {
 // Show answers everything under /ui: the tabs, one block, one component, and
 // a page with .md as its Markdown.
 func (h *UIHandler) Show(w http.ResponseWriter, r *http.Request) {
+	if redirectTrailingSlash(w, r) {
+		return
+	}
 	address := strings.Trim(strings.TrimPrefix(r.URL.Path, "/ui"), "/")
 	if _, err := h.docs.DocsTree(); err != nil {
 		renderError(w, "docs of the UI unavailable", err)
@@ -97,8 +100,7 @@ func (h *UIHandler) markdown(w http.ResponseWriter, slug string) {
 		http.Error(w, "Page not found", http.StatusNotFound)
 		return
 	}
-	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	_, _ = w.Write([]byte(page.Content))
+	writeMarkdown(w, page.Content)
 }
 
 func (h *UIHandler) blocks(w http.ResponseWriter, r *http.Request) {

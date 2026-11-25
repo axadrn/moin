@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/axadrn/moin/hub/internal/brand"
 )
@@ -220,7 +221,7 @@ var Competitors = []Competitor{
 	{
 		Slug: "heroku",
 		Name: "Heroku",
-		Lead: "Heroku runs your apps on its own dynos. In February 2026 it moved to sustaining engineering, with no new features and no end date named. " + brand.Name + " runs your apps on servers you bring.",
+		Lead: "Heroku runs your apps on its own dynos, and since February 2026 it gets no new features. " + brand.Name + " runs your apps on servers you bring.",
 		Cells: []CompareCell{
 			hasNoServer("Heroku", "https://www.heroku.com/pricing"),
 			hasNoServer("Heroku", "https://www.heroku.com/pricing"),
@@ -285,6 +286,16 @@ func FindCompetitor(slug string) (Competitor, bool) {
 		}
 	}
 	return Competitor{}, false
+}
+
+// compareIndexDescription names every tool, for /compare in search.
+func compareIndexDescription() string {
+	names := make([]string, len(Competitors))
+	for i, competitor := range Competitors {
+		names[i] = competitor.Name
+	}
+	last := len(names) - 1
+	return brand.Name + " next to " + strings.Join(names[:last], ", ") + " and " + names[last] + ". Fact by fact, from each tool's own docs."
 }
 
 // CompareSlugs are the slugs of every competitor, for the sitemap.

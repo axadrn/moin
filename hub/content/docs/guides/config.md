@@ -1,6 +1,6 @@
 ---
 title: "Config in the repo"
-description: "The x-moin block in compose.yml"
+description: "The x-moin block in compose.yml: what moin backs up, checks and opens to the web, next to your services."
 group: "Apps"
 order: 7
 ---

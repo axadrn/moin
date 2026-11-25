@@ -1,6 +1,6 @@
 ---
 title: "Logs"
-description: "The output of an app's containers"
+description: "The output of an app's containers, live or from the last hours, in the web, the CLI and the terminal UI."
 group: "Every day"
 order: 2
 ---

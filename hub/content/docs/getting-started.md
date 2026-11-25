@@ -1,6 +1,6 @@
 ---
 title: "Get started"
-description: "From a fresh server to a live app. Four steps."
+description: "From a fresh server to a live app in four steps. Connect it, deploy, add a domain and back it up."
 group: "Start"
 order: 2
 ---

@@ -77,7 +77,7 @@ templ UIStart(page *model.DocPage) {
 
 // UIComponents is /ui/components: every component under its topic.
 templ UIComponents(groups []model.DocGroup) {
-	@uiPage(layouts.SEOProps{Title: "Components · moin UI", Description: "Every component of moin UI.", Path: "/ui/components"}) {
+	@uiPage(layouts.SEOProps{Title: "Components · moin UI", Description: "Every component of moin UI: buttons, lists, charts, dialogs and more. Plain HTML and CSS, open source.", Path: "/ui/components"}) {
 		@uiHead(uiComponents)
 		<div class="moin-columns">
 			for _, group := range groups {
@@ -89,7 +89,7 @@ templ UIComponents(groups []model.DocGroup) {
 
 // UILayout is /ui/layout.
 templ UILayout(pages []*model.DocPage) {
-	@uiPage(layouts.SEOProps{Title: "Layout · moin UI", Description: "Where things stand: stacks, rows and grids.", Path: "/ui/layout"}) {
+	@uiPage(layouts.SEOProps{Title: "Layout · moin UI", Description: "Where things stand in moin UI: stacks, rows and grids. Plain HTML and CSS, open source.", Path: "/ui/layout"}) {
 		@uiHead(uiLayoutTab)
 		@uiPages("", pages)
 	}
@@ -110,6 +110,12 @@ templ uiPages(title string, pages []*model.DocPage) {
 	</div>
 }
 
+// uiDescription is a component's line for search: its own words, and what
+// moin UI is, since a search result stands without the site around it.
+func uiDescription(description string) string {
+	return description + " Part of moin UI: plain HTML and CSS."
+}
+
 func uiURL(page *model.DocPage) string {
 	return "/ui/" + page.Slug
 }
@@ -124,7 +130,7 @@ func uiBack(page *model.DocPage) components.Back {
 
 // UIDoc is one component.
 templ UIDoc(page *model.DocPage, next *model.DocPage) {
-	@uiPage(layouts.SEOProps{Title: page.Title + " · moin UI", Description: page.Description, Path: ctxkeys.URLPath(ctx), MarkdownPath: uiURL(page) + ".md"}) {
+	@uiPage(layouts.SEOProps{Title: page.Title + " · moin UI", Description: uiDescription(page.Description), Path: ctxkeys.URLPath(ctx), MarkdownPath: uiURL(page) + ".md"}) {
 		@components.Header(components.HeaderProps{Back: uiBack(page), Title: page.Title}) {
 			@uiReset()
 		}
@@ -154,7 +160,7 @@ templ UITheme(page *model.DocPage) {
 
 // UIBlocks is /ui/blocks.
 templ UIBlocks(groups []model.UIBlockGroup) {
-	@uiPage(layouts.SEOProps{Title: "Blocks · moin UI", Description: "Whole pages to copy.", Path: "/ui/blocks"}) {
+	@uiPage(layouts.SEOProps{Title: "Blocks · moin UI", Description: "Whole pages to copy: sign in, billing, dashboards, deploys, chat and more. Plain HTML and CSS, open source.", Path: "/ui/blocks"}) {
 		@uiHead(uiBlocksTab)
 		<div class="moin-columns">
 			for _, group := range groups {
@@ -175,7 +181,7 @@ templ UIBlocks(groups []model.UIBlockGroup) {
 
 // UIBlock is one block, in a frame of its own: it is a whole page.
 templ UIBlock(block *model.UIBlock) {
-	@uiPage(layouts.SEOProps{Title: block.Title + " · moin UI", Description: "A whole page to copy.", Path: "/ui/blocks/" + block.Slug}) {
+	@uiPage(layouts.SEOProps{Title: block.Title + " block · moin UI", Description: block.Description, Path: "/ui/blocks/" + block.Slug}) {
 		@components.Header(components.HeaderProps{Back: components.Back{Label: "Blocks", Href: "/ui/blocks"}, Title: block.Title}) {
 			@components.Button(components.ButtonProps{Href: "/assets/ui/blocks/" + block.Slug + ".html", Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
 				Full screen

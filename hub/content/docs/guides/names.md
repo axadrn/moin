@@ -1,6 +1,6 @@
 ---
 title: "Names and links"
-description: "Rename apps, servers, buckets and the workspace"
+description: "Rename apps, servers, buckets and the workspace. What changes with the name, and what keeps working."
 group: "Apps"
 order: 8
 ---

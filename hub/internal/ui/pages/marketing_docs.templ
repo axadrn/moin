@@ -49,6 +49,7 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 		Path:         ctxkeys.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(page),
 	}) {
+		@templ.Raw(docsJSONLD(page, ctxkeys.RenderConfig(ctx).AppURL))
 		<main class="moin-page moin-narrow moin-content">
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Docs", Href: "/docs"}, Title: page.Title})
 			<article>

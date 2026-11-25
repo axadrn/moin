@@ -32,6 +32,8 @@ type DocGroup struct {
 type UIBlock struct {
 	Slug  string
 	Title string
+	// Description is the block's own line, from its meta description.
+	Description string
 	// Code is the file, with the links as they are after copying the folder.
 	Code string
 }

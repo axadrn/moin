@@ -24,6 +24,26 @@ templ HomeCompare() {
 	</section>
 }
 
+// CompareIndex is /compare: every tool with its score, each a way to its
+// page.
+templ CompareIndex() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       brand.Name + " compared",
+		Description: compareIndexDescription(),
+		Path:        "/compare",
+	}) {
+		<main class="moin-page moin-content">
+			@components.Header(components.HeaderProps{Title: brand.Name + " compared"})
+			<p class="moin-lead">Fact by fact, from each tool's own docs, read { compareRead }.</p>
+			<div class="moin-bento">
+				for _, competitor := range Competitors {
+					@homeFeature(brand.Name+" vs "+competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
+				}
+			</div>
+		</main>
+	}
+}
+
 // compareLine is the words of a row: unlike an Item's Name and Note they
 // wrap, so a sentence is never cut on a phone.
 templ compareLine(name, note string) {
@@ -68,7 +88,7 @@ templ Compare(competitor Competitor) {
 			</div>
 			<p class="moin-text moin-muted">
 				From { competitor.Name }'s own docs, read { compareRead }. A check is the better answer, a dash a part of it, a cross not. "Not documented" means its docs say nothing, not that it cannot be done, and it is not counted.
-				<a href="/#compare" class="moin-link moin-foreground">All seven</a>
+				<a href="/compare" class="moin-link moin-foreground">All comparisons</a>
 			</p>
 		</main>
 	}

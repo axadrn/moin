@@ -1,6 +1,6 @@
 ---
 title: "CLI"
-description: "Every moin command, its flags and what it does"
+description: "Every moin command, its flags and what it does. Deploy, back up, restore and check from your terminal."
 group: "Reference"
 order: 2
 ---

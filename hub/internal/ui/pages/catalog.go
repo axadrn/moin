@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"encoding/json"
 	"net/url"
 	"slices"
 	"strings"
@@ -208,8 +207,7 @@ func catalogJSONLD(view CatalogEntryView, url string) string {
 	if latest, ok := view.Latest(); ok {
 		data["softwareVersion"] = strings.TrimPrefix(latest.Tag, "v")
 	}
-	body, _ := json.Marshal(data)
-	return `<script type="application/ld+json">` + string(body) + `</script>`
+	return jsonLD(data)
 }
 
 // versionOptions are the releases for the version select, newest first.
