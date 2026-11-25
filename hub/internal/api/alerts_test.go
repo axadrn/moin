@@ -33,14 +33,23 @@ func (f *fakeWebhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (e *apiEnvironment) token(t *testing.T, userID, workspaceID string, scopes ...string) string {
+// token is a CI token of the user with the rights named, read alone
+// without any.
+func (e *apiEnvironment) token(t *testing.T, userID, workspaceID string, rights ...string) string {
 	t.Helper()
-	_, raw, err := e.tokens.Create(userID, service.CreateAPITokenInput{Name: "cli", Scopes: scopes, WorkspaceID: workspaceID})
+	parsed, ok := model.ParseRights(rights...)
+	if !ok {
+		t.Fatalf("rights %v", rights)
+	}
+	_, raw, err := e.ciTokens.Create(service.Actor{UserID: userID, WorkspaceID: workspaceID}, service.NewCIToken{Name: "cli", Rights: parsed})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return raw
 }
+
+// allRights are every right a CI token can have.
+var allRights = []string{"deploy", "env", "delete", "servers"}
 
 // TestAlertDestinations: owners and admins add, test and remove alert
 // destinations; members only list them; the URL never comes back.
@@ -51,9 +60,9 @@ func TestAlertDestinations(t *testing.T) {
 	if _, err := environment.database.Exec(`INSERT INTO workspace_members (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, $5)`, "bob-in-ada", ada.Workspace.ID, "bob", model.WorkspaceRoleMember, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	owner := environment.token(t, "ada", ada.Workspace.ID, "read", "write")
-	reader := environment.token(t, "ada", ada.Workspace.ID, "read")
-	member := environment.token(t, "bob", ada.Workspace.ID, "read", "write")
+	owner := environment.token(t, "ada", ada.Workspace.ID, allRights...)
+	reader := environment.token(t, "ada", ada.Workspace.ID)
+	member := environment.token(t, "bob", ada.Workspace.ID, allRights...)
 	hook := &fakeWebhook{}
 	server := httptest.NewServer(hook)
 	defer server.Close()
@@ -73,7 +82,7 @@ func TestAlertDestinations(t *testing.T) {
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/alert-destinations", bearer: member,
 		body: `{"kind":"webhook","name":"mine","url":"https://example.com/hook"}`}), http.StatusForbidden, "forbidden")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/alert-destinations", bearer: reader,
-		body: `{"kind":"webhook","name":"mine","url":"https://example.com/hook"}`}), http.StatusForbidden, "insufficient_scope")
+		body: `{"kind":"webhook","name":"mine","url":"https://example.com/hook"}`}), http.StatusForbidden, "missing_right")
 
 	list := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/alert-destinations", bearer: member})
 	expectStatus(t, list, http.StatusOK)

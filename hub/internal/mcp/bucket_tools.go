@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"github.com/axadrn/moin/hub/internal/model"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/service"
@@ -12,27 +13,27 @@ import (
 // to.
 func registerBucketTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("list_buckets", "List buckets",
-		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that back up there now), older_backups (apps that moved to another bucket and left what they had there), servers (the servers that keep its secret key) and missing_on (the servers that do not: their apps make no backups until set_bucket_key gives them the key). Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listBuckets)))
-	mcpsdk.AddTool(server, newTool("add_bucket", "Add a bucket",
-		"Adds an S3-compatible bucket under a name (lowercase letters, digits, dashes). The secret key goes to server (empty for the workspace's only server), which writes a test file and keeps the key; moin keeps everything but the secret key, which it never shows again. Other servers get it with set_bucket_key. The first bucket is the default; default true makes this one the default, so every app without a bucket of its own backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.addBucket)))
-	mcpsdk.AddTool(server, newTool("edit_bucket", "Change a bucket",
-		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, default true makes it the default. A new place is checked by server (empty for the workspace's only server) with the secret_key sent, or the key it keeps when empty. A new access key or secret key leaves the other servers without one: give it to them with set_bucket_key. A new place starts with a full copy; the old place keeps what it has. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.editBucket)))
-	mcpsdk.AddTool(server, newTool("set_bucket_key", "Give a server a bucket's key",
-		"Gives one more server the secret key of a bucket, such as a server in missing_on of list_buckets: it writes a test file with it and keeps it. The key goes to the server only. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setBucketKey)))
-	mcpsdk.AddTool(server, newTool("set_default_bucket", "Make a bucket the default",
-		"Makes a bucket the workspace's default: apps without a bucket of their own back up there from now on; their copies start again there; what is in the old default stays. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setDefaultBucket)))
-	mcpsdk.AddTool(server, newTool("remove_bucket", "Remove a bucket",
-		"Removes a bucket from moin; what is in it stays. A bucket that apps use, or that apps left their copies in, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.removeBucket)))
-	mcpsdk.AddTool(server, newTool("set_app_bucket", "Choose an app's bucket",
-		"Moves an app's backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its copies start again in the new bucket; what is in the old one stays. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setAppBucket)))
+	Add(server, newTool("list_buckets", "List buckets",
+		"Lists the workspace's S3-compatible buckets, the default first, without their secret keys: where each is, folder (path, then the workspace ID), apps (the apps that back up there now), older_backups (apps that moved to another bucket and left what they had there), servers (the servers that keep its secret key) and missing_on (the servers that do not: their apps make no backups until set_bucket_key gives them the key).",
+		readOnly("")), model.RightRead, member(services, tools.listBuckets))
+	Add(server, newTool("add_bucket", "Add a bucket",
+		"Adds an S3-compatible bucket under a name (lowercase letters, digits, dashes). The secret key goes to server (empty for the workspace's only server), which writes a test file and keeps the key; moin keeps everything but the secret key, which it never shows again. Other servers get it with set_bucket_key. The first bucket is the default; default true makes this one the default, so every app without a bucket of its own backs up there. path is an optional folder inside the bucket, only for a bucket that holds other files too.",
+		change(false, false)), model.RightServers, changes(services, tools.addBucket))
+	Add(server, newTool("edit_bucket", "Change a bucket",
+		"Changes the bucket named name: send every field as it should be (get them from list_buckets); rename renames it, default true makes it the default. A new place is checked by server (empty for the workspace's only server) with the secret_key sent, or the key it keeps when empty. A new access key or secret key leaves the other servers without one: give it to them with set_bucket_key. A new place starts with a full copy; the old place keeps what it has.",
+		change(false, true)), model.RightServers, changes(services, tools.editBucket))
+	Add(server, newTool("set_bucket_key", "Give a server a bucket's key",
+		"Gives one more server the secret key of a bucket, such as a server in missing_on of list_buckets: it writes a test file with it and keeps it. The key goes to the server only.",
+		change(false, true)), model.RightServers, changes(services, tools.setBucketKey))
+	Add(server, newTool("set_default_bucket", "Make a bucket the default",
+		"Makes a bucket the workspace's default: apps without a bucket of their own back up there from now on; their copies start again there; what is in the old default stays.",
+		change(false, true)), model.RightServers, changes(services, tools.setDefaultBucket))
+	Add(server, newTool("remove_bucket", "Remove a bucket",
+		"Removes a bucket from moin; what is in it stays. A bucket that apps use, or that apps left their copies in, is refused with bucket_in_use, naming the apps. Ask the user first: confirm must be the bucket's name, typed out.",
+		change(true, true)), model.RightDelete, changes(services, tools.removeBucket))
+	Add(server, newTool("set_app_bucket", "Choose an app's bucket",
+		"Moves an app's backups to a bucket of the workspace; an empty bucket follows the workspace's default. Its copies start again in the new bucket; what is in the old one stays.",
+		change(false, true)), model.RightDeploy, changes(services, tools.setAppBucket))
 }
 
 // RemoveBucketInput is the input of remove_bucket.
@@ -102,7 +103,7 @@ type Bucket struct {
 type bucket = api.Bucket
 
 func (t moinTools) listBuckets(_ context.Context, caller Caller, _ struct{}) (BucketList, error) {
-	buckets, err := t.services.Apps.Buckets(caller.Token.WorkspaceID)
+	buckets, err := t.services.Apps.Buckets(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return BucketList{}, err
 	}
@@ -149,7 +150,7 @@ func (t moinTools) setDefaultBucket(ctx context.Context, caller Caller, input Bu
 }
 
 func (t moinTools) removeBucket(_ context.Context, caller Caller, input RemoveBucketInput) (Done, error) {
-	bucket, err := t.services.Apps.Bucket(caller.Token.WorkspaceID, input.Bucket)
+	bucket, err := t.services.Apps.Bucket(caller.Bearer.WorkspaceID, input.Bucket)
 	if err != nil {
 		return Done{}, err
 	}

@@ -39,7 +39,8 @@ type AuthService struct {
 	tokenEmailChangeExpiry time.Duration
 	sessionCleanupMu       sync.Mutex
 	lastSessionCleanup     time.Time
-	apiTokens              *APITokenService
+	connections            *ConnectionService
+	ciTokens               *CITokenService
 	now                    func() time.Time
 }
 

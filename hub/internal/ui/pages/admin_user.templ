@@ -46,11 +46,11 @@ templ AdminUser(user *model.AdminUser) {
 			if !self {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
-						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Revoke sessions", Note: "Signs them out everywhere. Their API tokens stop working.", Attrs: templ.Attributes{
+						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Revoke sessions", Note: "Signs them out everywhere. Their connections and CI tokens stop working.", Attrs: templ.Attributes{
 							"hx-post":    "/admin/users/" + user.ID + "/sessions/revoke",
 							"hx-swap":    "none",
 							"hx-disable": "this",
-							"hx-confirm": "Revoke every session of " + user.Email + "? They are signed out everywhere, and their API tokens stop working.",
+							"hx-confirm": "Revoke every session of " + user.Email + "? They are signed out everywhere, and their connections and CI tokens stop working.",
 						}})
 					}
 				}

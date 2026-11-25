@@ -14,24 +14,24 @@ import (
 // its domains, its instant address and its one password.
 func registerDomainTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("check_domains", "Check domains",
-		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.checkDomains)))
-	mcpsdk.AddTool(server, newTool("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setDomains)))
-	mcpsdk.AddTool(server, newTool("get_instant", "Get the instant address",
-		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. The app's one password guards it like every address of the app while protected is true (get_app). Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getInstant)))
-	mcpsdk.AddTool(server, newTool("set_instant", "Set the instant address",
-		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off. The change waits for restart_app, a start or a deploy. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setInstant)))
-	mcpsdk.AddTool(server, newTool("set_protection", "Turn the password on",
-		"Turns on the app's one password: every address of the app, its domains and its instant address, asks for it with basic auth. With a password of 8 to 72 characters it sets that one; without one moin makes one and returns it in password: the one time moin shows it, so give it to the user right away. username is moin when empty. The change waits for restart_app, a start or a deploy. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setProtection)))
-	mcpsdk.AddTool(server, newTool("remove_protection", "Turn the password off",
-		"Turns off the app's password: no address of the app asks for one after restart_app, a start or a deploy, so anyone with the link opens it. Ask the user first. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.removeProtection)))
+	Add(server, newTool("check_domains", "Check domains",
+		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at.",
+		readOnly("")), model.RightRead, member(services, tools.checkDomains))
+	Add(server, newTool("set_domains", "Set domains",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on.",
+		change(false, true)), model.RightDeploy, changes(services, tools.setDomains))
+	Add(server, newTool("get_instant", "Get the instant address",
+		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. The app's one password guards it like every address of the app while protected is true (get_app).",
+		readOnly("")), model.RightRead, member(services, tools.getInstant))
+	Add(server, newTool("set_instant", "Set the instant address",
+		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off. The change waits for restart_app, a start or a deploy.",
+		change(false, true)), model.RightDeploy, changes(services, tools.setInstant))
+	Add(server, newTool("set_protection", "Turn the password on",
+		"Turns on the app's one password: every address of the app, its domains and its instant address, asks for it with basic auth. With a password of 8 to 72 characters it sets that one; without one moin makes one and returns it in password: the one time moin shows it, so give it to the user right away. username is moin when empty. The change waits for restart_app, a start or a deploy.",
+		change(false, true)), model.RightEnv, changes(services, tools.setProtection))
+	Add(server, newTool("remove_protection", "Turn the password off",
+		"Turns off the app's password: no address of the app asks for one after restart_app, a start or a deploy, so anyone with the link opens it. Ask the user first.",
+		change(true, true)), model.RightEnv, changes(services, tools.removeProtection))
 }
 
 // DomainChecks is the output of check_domains.
@@ -55,7 +55,7 @@ func (d DomainChecks) Summary() string {
 }
 
 func (t moinTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {
-	checks, err := t.services.Apps.CheckDomains(ctx, caller.Token.WorkspaceID, input.app())
+	checks, err := t.services.Apps.CheckDomains(ctx, caller.Bearer.WorkspaceID, input.app())
 	if err != nil {
 		return DomainChecks{}, err
 	}
@@ -86,7 +86,7 @@ func (c Change) Summary() string {
 }
 
 func (t moinTools) change(caller Caller, app string, deploy *model.Deploy, changed bool) (Change, error) {
-	answer, err := api.NewChange(t.services.Apps, caller.Token.WorkspaceID, app, deploy, changed)
+	answer, err := api.NewChange(t.services.Apps, caller.Bearer.WorkspaceID, app, deploy, changed)
 	return Change{answer}, err
 }
 
@@ -116,7 +116,7 @@ func (i Instant) Summary() string {
 }
 
 func (t moinTools) getInstant(_ context.Context, caller Caller, input InstantInput) (Instant, error) {
-	instant, err := t.services.Apps.Instant(caller.Token.WorkspaceID, input.App)
+	instant, err := t.services.Apps.Instant(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Instant{}, err
 	}

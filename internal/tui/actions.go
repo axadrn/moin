@@ -103,7 +103,8 @@ func (m model) webPages() []page {
 		{"r", "Registries", "Logins for private images.", "/registries"},
 		{"n", "Alerts", "Slack, Discord, Telegram and webhooks.", "/alerts"},
 		data,
-		{"s", "Settings", "Your account and API tokens.", "/settings"},
+		{"s", "Settings", "Your account and connections.", "/settings"},
+		{"l", "Connections", "What each login may do, and CI tokens.", "/settings/connections"},
 	}
 	if !m.ws.selfHosted {
 		out = append(out, page{"b", "Billing", "Your card belongs to Stripe, not your terminal.", "/billing"})

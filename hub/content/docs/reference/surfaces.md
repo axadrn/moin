@@ -85,7 +85,7 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 
 ## Account, roles and money
 
-These stay in the web on purpose: they move money or decide who is in charge, so they want you signed in with GitHub or a passkey, not a token. "With a session" means the endpoint answers a signed-in browser and refuses API tokens; the [API reference](/docs/reference/api) marks each one.
+These stay in the web on purpose: they move money or decide who is in charge, so they want you signed in with GitHub or a passkey, not a token. "With a session" means the endpoint answers a signed-in browser and refuses connections and CI tokens; [Rights](/docs/reference/rights) marks each one.
 
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
@@ -94,7 +94,11 @@ These stay in the web on purpose: they move money or decide who is in charge, so
 | Recovery key | ✓ `/auth/key` | The operator makes it on the server with `./main recovery-key <email>`. | Web only. | Browser only. | Never. |
 | Email | ✓ | Web only. | Web only. | ✓ with a session | Never. |
 | Sessions | ✓ | A token can't see your sessions. | Web only. | ✓ with a session | Web only. |
-| API tokens | ✓ | A token can't make tokens. | A token can't make tokens. | ✓ with a session | A token can't make tokens. |
+| Connect a computer, pick its rights, allow with a passkey | ✓ `/device` | ✓ `login` | ✓ shows the code, opens the browser | ✓ `POST /api/v1/auth/device`, `/auth/token` | AI agents use a CI token. |
+| Connections: see, remove | ✓ Settings, Connections | ✓ `connections`, `connections rm`; `logout` ends this computer's | Shows who is logged in; `l` opens the web. | ✓ | ✓ `whoami` shows its own rights |
+| Change the rights of a connection or CI token | ✓ | No login gives itself more: the web, signed in. | Opens the web. | ✓ with a session | Never. |
+| CI tokens: make one | ✓ Settings, Connections | A token can't make tokens. | Opens the web. | ✓ with a session | A token can't make tokens. |
+| CI tokens: see, remove | ✓ | ✓ `connections`, `connections rm` | Opens the web. | ✓ | Web or CLI. |
 | Name, picture | ✓ | Set it in the web. | Set it in the web. | ✓ | Set it in the web. |
 | Change roles, remove someone, leave, delete the workspace | ✓ | Who is in charge is decided signed in on the web. | Web only. | ✓ with a session | Web only. |
 | Create a workspace, accept an invitation | ✓ | It starts with a signed-in browser. | Web only. | ✓ with a session | Web only. |

@@ -14,7 +14,8 @@ import (
 
 // Event is one thing that happened in the workspace. Actor and Summary read
 // as a sentence: "Ada Lovelace deployed blog v12". Via is web, cli, tui,
-// api, mcp, hook, github or system, Token the API token by name. IP and
+// api, mcp, hook, github or system, Token the connection or CI token by
+// name. IP and
 // UserAgent are there for admins only.
 type Event struct {
 	ID        string    `json:"id"`
@@ -31,8 +32,8 @@ type Event struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ViaLabel names how a change came in, with the API token it came with:
-// "CLI, token ci". The web shows the same label as the CLI.
+// ViaLabel names how a change came in, with the connection or CI token it
+// came with: "CLI, token ci". The web shows the same label as the CLI.
 func ViaLabel(via, token string) string {
 	label := ""
 	switch via {
@@ -144,7 +145,7 @@ func (c *Client) Team(ctx context.Context) (Team, error) {
 		return Team{}, err
 	}
 	if len(list.Items) == 0 {
-		return Team{}, errors.New("this token reaches no workspace: log in with a token of your team")
+		return Team{}, errors.New("this login reaches no workspace: run `" + build.Name + " login` and pick your team's")
 	}
 	var team Team
 	err = c.do(ctx, http.MethodGet, "/api/v1/workspaces/"+cmp.Or(list.Items[0].Workspace.ID, list.Items[0].Workspace.Slug), nil, &team)

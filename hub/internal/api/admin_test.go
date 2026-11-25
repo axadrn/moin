@@ -91,11 +91,11 @@ func TestAdminRevokeUserSessions(t *testing.T) {
 	}
 }
 
-func TestAdminRevokeUserSessionsRevokesAPITokens(t *testing.T) {
+func TestAdminRevokeUserSessionsRevokesCITokens(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	operatorToken := environment.signIn(t, seedOperator(t, environment))
 	target := seedTokenOwner(t, environment, "compromised")
-	created := createAPIToken(t, environment, target, `"name":"Script"`)
+	created := createCIToken(t, environment, target, `"name":"Script"`)
 
 	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/admin/users/" + target.id + "/sessions/revoke", cookie: operatorToken})
 	expectStatus(t, recorder, http.StatusNoContent)

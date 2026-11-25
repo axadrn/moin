@@ -10,7 +10,7 @@ func TestUptimeTools(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "uptime")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
@@ -34,8 +34,8 @@ func TestUptimeTools(t *testing.T) {
 		t.Fatalf("activity = %+v", activity.Items)
 	}
 
-	readOnly, _ := createToken(t, env, owner, "read")
+	readOnly, _ := createToken(t, env, owner)
 	reader := connectMemory(t, env.server, owner, readOnly)
 	output[mcp.Uptime](t, call(t, reader, "get_uptime", map[string]any{"app": "shop"}))
-	toolError(t, call(t, reader, "set_uptime", map[string]any{"app": "shop", "domain": "shop.example.com", "paused": false}), "insufficient_scope")
+	toolError(t, call(t, reader, "set_uptime", map[string]any{"app": "shop", "domain": "shop.example.com", "paused": false}), "missing_right")
 }

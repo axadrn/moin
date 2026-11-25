@@ -25,7 +25,7 @@ func TestAdminServiceAccessMetricsAndImpersonation(t *testing.T) {
 		nil, nil, sessions, nil, nil,
 		false, 7*24*time.Hour, time.Hour, time.Hour,
 	)
-	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
+	auth.UseBearers(&ConnectionService{connections: repository.NewConnections(database), now: time.Now}, &CITokenService{tokens: repository.NewCITokens(database), now: time.Now})
 	adminRepository := repository.NewAdmin(database)
 	admin := NewAdminService(adminRepository, repository.NewUsers(database), auth, []string{"operator@example.com"})
 
@@ -137,7 +137,7 @@ func TestAdminSessionRevocationIncludesIssuedImpersonationSessions(t *testing.T)
 	securityOperator := testutil.SeedUser(t, database, testutil.UserOptions{ID: "security-operator", Email: "security@example.com", Verified: true})
 	target := testutil.SeedUser(t, database, testutil.UserOptions{ID: "impersonated-target"})
 	auth := NewAuthService(nil, nil, repository.NewSessions(database), nil, nil, false, 7*24*time.Hour, time.Hour, time.Hour)
-	auth.UseAPITokens(&APITokenService{tokens: repository.NewAPITokens(database), now: time.Now})
+	auth.UseBearers(&ConnectionService{connections: repository.NewConnections(database), now: time.Now}, &CITokenService{tokens: repository.NewCITokens(database), now: time.Now})
 	admin := NewAdminService(
 		repository.NewAdmin(database),
 		repository.NewUsers(database),

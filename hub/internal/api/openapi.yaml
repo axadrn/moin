@@ -13,20 +13,26 @@ info:
 
     Authentication: people sign in in the browser, with GitHub at `/auth/github`, and get
     the `session_token` cookie. Cookie requests that change state need the `X-CSRF-Token`
-    header with the token from `GET /api/v1/csrf`. Scripts, the CLI and AI agents use a
-    personal API token instead. Requests with an `Authorization: Bearer` header never use
+    header with the token from `GET /api/v1/csrf`. The CLI, the TUI and AI agents are
+    connections: a person lets them in from the browser, with a passkey, and picks their
+    rights; they get an access token (`at_...`) for an hour and a refresh token from
+    `POST /api/v1/auth/token`. CI and scripts use a CI token (`pat_...`) made under
+    Settings, Connections. Requests with an `Authorization: Bearer` header never use
     cookies and need no CSRF token. Other schemes, such as Basic auth added by a proxy,
     keep the cookie and its CSRF check.
 
-    Personal API tokens: a signed-in user creates them with `POST /api/v1/account/tokens`,
-    or a CLI gets one by logging in through the browser (`POST /api/v1/auth/device`), and sends one as `Authorization: Bearer pat_...` from scripts, integrations and AI agents.
-    A token acts for its user on the operations that list `apiTokenAuth`, with the scope the
-    operation names: `read` for reads, `write` for changes. A token without that scope gets
-    403 `insufficient_scope`, and a token on any other operation gets 403 `forbidden`.
-    Tokens never manage sessions, tokens, email, billing, admin or deletions.
-    Tokens never change member roles or remove members.
-    Each token is bound to one workspace: other workspaces answer 404 and are left out of
-    lists.
+    Rights: a connection or CI token acts for its person on the operations that list
+    `bearerAuth`, with the rights the operation names there: `read`, `deploy`, `env`,
+    `delete` or `servers`, and all of several. Without one it gets 403 `missing_right` with the
+    missing `right`. Every other operation answers it 403 `forbidden`: sessions, passkeys,
+    email, billing, admin, roles, deletions of the account or the workspace, and changing
+    rights. A CI token for one app reaches only the operations of that app. Each
+    connection and CI token is bound to one workspace: other workspaces answer 404 and are
+    left out of lists. Rights never add to a role: a connection or CI token invites only
+    members. Streams of a connection or CI token end when its access token does, within
+    the hour, with the event `reconnect`: open them again with a fresh token. Making a CI
+    token and adding a right need the person to have confirmed in the last five minutes,
+    else 403 `confirm_required`.
 
     Errors: every non-2xx JSON answer is the `Error` envelope with a stable lowercase
     snake case `code`. `fields` is present only for `validation_failed`.
@@ -52,8 +58,10 @@ tags:
     description: Active sessions of the signed-in account.
   - name: Passkeys
     description: Passkeys of the signed-in account. Only a signed-in session lists and removes them. Adding one is a ceremony in the browser, so only the web adds passkeys.
-  - name: API tokens
-    description: Personal API tokens of the signed-in account. Only a signed-in session manages them. An admin signing the user out everywhere revokes every token. Signing out other sessions keeps them.
+  - name: Connections
+    description: The clients the person let in from the browser, each with its rights. Only a signed-in browser changes rights. An admin signing the user out everywhere ends every connection. Signing out other sessions keeps them.
+  - name: CI tokens
+    description: Tokens made by hand for CI and scripts, with rights and maybe one app. Only a signed-in browser makes one or changes its rights.
   - name: Workspaces
     description: Workspaces, the team, invitations and activity.
   - name: Invitations
@@ -65,7 +73,7 @@ tags:
   - name: Catalog
     description: 'Open source apps moin installs in one click, such as Umami or n8n. Each entry is a compose.yml that ships with moin; its versions are the releases in the image registry, read once an hour. An installed app is an ordinary app: its secrets are env vars and VERSION picks the image tag.'
   - name: Apps
-    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, builds, starts and checks it. compose.yml is plain Docker: every moin setting is set here. Env values are write-only and live only on the app''s server: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the API token.'
+    description: 'Apps are Docker Compose projects on a server. A deploy sends the source; the daemon detects compose.yml, a Dockerfile or a Go module, builds, starts and checks it. compose.yml is plain Docker: every moin setting is set here. Env values are write-only and live only on the app''s server: the API answers keys, never a value. Everything in the moin endpoints belongs to the workspace of the connection or CI token.'
   - name: Data
     description: Browse, edit and query the databases of an app on its server, SQLite and Postgres.
   - name: Backups
@@ -145,7 +153,7 @@ paths:
       description: The hub's version for everyone. A self-hosted hub (`self_hosted`) also answers the newest release on GitHub, which it asks once a day unless `UPDATE_CHECK=false`, with its "In short" line as `summary`, the notes and their URL, and the update under way or of the past day. `can_update` is true for an admin in `ADMIN_EMAILS` while a newer release is out and the updater runs. The hosted hub updates with every release and leaves these fields empty. `hub_backup` is how the backup of the hub's own database stands, for an admin in `ADMIN_EMAILS` on every hub.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The version.
@@ -166,7 +174,7 @@ paths:
       description: For an admin of a self-hosted hub. The updater next to it pulls the new image and restarts the hub, which copies its database and migrates it. If the new version does not answer within two minutes, the updater starts the old one again. Follow `update.state` with `GET /api/v1/version`: `requested`, `updating`, then `done`, `rolled_back` or `failed` with a `reason`. The activity of the workspace notes the start and the end.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '202':
           description: The update is requested.
@@ -232,8 +240,9 @@ paths:
         `moin login` without a token: the device authorization grant of RFC 8628. The answer
         has the `device_code` the client keeps secret and the `user_code` the user confirms at
         `verification_uri`, or opens `verification_uri_complete` directly. The page signs the
-        user in first with any sign-in method. Then poll `POST /api/v1/auth/device/token`
-        every `interval` seconds until it answers a token, or `expires_in` seconds pass.
+        user in first, then asks for the workspace, the rights and their passkey. Poll
+        `POST /api/v1/auth/token` with the device code every `interval` seconds until it
+        answers the tokens, or `expires_in` seconds pass.
       security: []
       requestBody:
         required: true
@@ -259,55 +268,97 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/auth/device/token:
+  /api/v1/auth/token:
     post:
       tags: [Auth]
-      operationId: pollDeviceLogin
-      summary: Poll a login in the browser for its token
+      operationId: token
+      summary: Get tokens of a connection
       description: |
-        Answers the token once the user approved the login, exactly once. The token is a
-        personal API token of the kind `device`, read and write, bound to the workspace the
-        user picked, named after the computer ("CLI on <computer name>"). It expires 90 days after its
-        last use; each use extends it. It shows under Settings, Tokens and is revoked there.
-        Until then the answer is 400 with a code of RFC 8628, section 3.5:
-        `authorization_pending` (poll again after `interval`), `slow_down` (add 5 seconds to
-        the interval, then poll again), `access_denied` (the user denied it),
-        `expired_token` (start again) or `invalid_grant` (an unknown code, or one that got its
-        token already).
+        The OAuth token endpoint (RFC 6749). It takes a form, `application/x-www-form-urlencoded`,
+        and answers as RFC 6749 says, not with the API's `Error` envelope.
+        `grant_type=urn:ietf:params:oauth:grant-type:device_code` with `device_code` polls a login in
+        the browser (RFC 8628): once the user approved it with their passkey and picked the rights,
+        it answers the first tokens of the new connection, exactly once.
+        `grant_type=refresh_token` with `refresh_token` exchanges a refresh token for a new pair.
+        A refresh token works once: showing it again ends the whole connection.
+        The access token works for `expires_in` seconds (an hour); the refresh token for 90 days.
+        A connection unused for 90 days ends. `scope` names the connection's rights.
+        Errors are 400 with `error`: `authorization_pending` (poll again after `interval`),
+        `slow_down` (add 5 seconds to the interval), `access_denied` (the user said no),
+        `expired_token` (start again), `invalid_grant` (an unknown, used or expired code or
+        refresh token, or a connection that ended), `unsupported_grant_type` or `invalid_request`.
       security: []
       requestBody:
         required: true
         content:
-          application/json:
+          application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DeviceTokenRequest'
+              $ref: '#/components/schemas/TokenRequest'
       responses:
         '200':
-          description: The login is approved. `access_token` is shown this one time only.
+          description: The tokens, shown this one time only.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DeviceToken'
+                $ref: '#/components/schemas/TokenResponse'
         '400':
-          description: '`authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`, `unsupported_grant_type` or `invalid_body`.'
+          description: An OAuth error.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/OAuthError'
         '403':
           $ref: '#/components/responses/Forbidden'
-        '409':
-          description: '`token_limit`. The user has 50 API tokens; they revoke one and log in again.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
-          $ref: '#/components/responses/Internal'
+          description: '`server_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+  /api/v1/auth/revoke:
+    post:
+      tags: [Auth]
+      operationId: revoke
+      summary: End a connection
+      description: |
+        The OAuth revocation endpoint (RFC 7009), a form with `token`: an access or refresh token
+        of a connection. The whole connection ends, with every token of it. A token the hub does
+        not know answers 200 too: there is nothing left to end. `moin logout` calls it.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                token_type_hint:
+                  type: string
+      responses:
+        '200':
+          description: The connection ended, or there was none.
+        '400':
+          description: '`invalid_request` without a token.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          description: '`server_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
 
   /api/v1/auth/onboarding:
     post:
@@ -367,7 +418,7 @@ paths:
       description: Works before onboarding and reports `onboarding_required`.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The account.
@@ -417,7 +468,7 @@ paths:
       summary: Change the display name
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -453,7 +504,7 @@ paths:
       description: With `on`, the signed-in user gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; `email_alerts` in `GET /api/v1/account` says how it is set.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -540,7 +591,7 @@ paths:
       tags: [Sessions]
       operationId: revokeOtherSessions
       summary: Sign out every other session
-      description: Personal API tokens stay valid. Revoke them one by one with `DELETE /api/v1/account/tokens/{id}`.
+      description: Connections and CI tokens stay valid. Remove them one by one in Settings, Connections.
       responses:
         '204':
           description: Only the current session is left.
@@ -589,7 +640,7 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
-          description: '`onboarding_required`, `forbidden` for a personal API token.'
+          description: '`onboarding_required`, `forbidden` for a connection or CI token.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -608,7 +659,7 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
-          description: '`onboarding_required`, `forbidden` for a personal API token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+          description: '`onboarding_required`, `forbidden` for a connection or CI token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
         '404':
           $ref: '#/components/responses/NotFound'
           description: '`not_found`. No passkey with this ID belongs to the account.'
@@ -618,81 +669,84 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
-  /api/v1/account/tokens:
+  /api/v1/account/connections:
     get:
-      tags: [API tokens]
-      operationId: listAPITokens
-      summary: List personal API tokens
-      description: Newest first. Expired tokens stay listed with `expired` set until they are revoked. The token itself is never shown again.
+      tags: [Connections]
+      operationId: listConnections
+      summary: List connections
+      description: The clients you let in from the browser, newest first, with their rights. A connection sees those of its own workspace; `current` marks itself.
+      security:
+        - cookieAuth: []
+        - bearerAuth: [read]
       responses:
         '200':
-          description: Every token of the account.
+          description: The live connections.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APITokenList'
+                $ref: '#/components/schemas/ConnectionList'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
-          description: '`onboarding_required`, `forbidden` for a personal API token.'
         '500':
           $ref: '#/components/responses/Internal'
-    post:
-      tags: [API tokens]
-      operationId: createAPIToken
-      summary: Create a personal API token
-      description: Answers the token once. Store it right away; only its hash is kept. An account holds at most 50 tokens.
+
+  /api/v1/account/connections/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ConnectionID'
+    patch:
+      tags: [Connections]
+      operationId: setConnectionRights
+      summary: Change what a connection may do
+      description: '`{"rights": ["deploy", "env"]}`. Read is always in. It counts from the connection''s next request. Only a signed-in browser changes rights, so no connection gives itself more.'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateAPITokenRequest'
+              $ref: '#/components/schemas/RightsRequest'
       responses:
-        '201':
-          description: The new token and its raw value.
+        '200':
+          description: The connection as it is now.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreatedAPIToken'
+                $ref: '#/components/schemas/Connection'
         '400':
           $ref: '#/components/responses/InvalidBody'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
-          description: '`onboarding_required`, `forbidden` for a personal API token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
-        '409':
-          $ref: '#/components/responses/Conflict'
-          description: '`token_limit`. Revoke a token first.'
+          description: '`onboarding_required`, `forbidden` for a connection or CI token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/ValidationFailed'
-          description: '`validation_failed` with `fields.name`, `fields.scopes`, `fields.expires_in_days` or `fields.workspace_id`.'
+          description: '`validation_failed` with `fields.rights`.'
         '500':
           $ref: '#/components/responses/Internal'
-
-  /api/v1/account/tokens/{id}:
-    parameters:
-      - $ref: '#/components/parameters/APITokenID'
     delete:
-      tags: [API tokens]
-      operationId: revokeAPIToken
-      summary: Revoke a personal API token
-      description: Requests with the token answer 401 from now on.
+      tags: [Connections]
+      operationId: removeConnection
+      summary: Remove a connection
+      description: The connection ends with every token of it, at once. A connection may remove one too, itself included; taking access away needs no more than read.
+      security:
+        - cookieAuth: []
+        - bearerAuth: [read]
       responses:
         '204':
-          description: The token is revoked.
+          description: The connection ended.
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
-          description: '`onboarding_required`, `forbidden` for a personal API token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
         '404':
           $ref: '#/components/responses/NotFound'
-          description: '`not_found`. No token with this ID belongs to the account.'
+          description: '`not_found`. No live connection with this ID is yours.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -704,7 +758,7 @@ paths:
       description: Replaces the avatar. The request is `multipart/form-data` with the image in the field `file`, at most 10 MB.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -742,7 +796,7 @@ paths:
       summary: Remove the avatar
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '204':
           description: The avatar is removed.
@@ -750,6 +804,125 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/ci-tokens:
+    get:
+      tags: [CI tokens]
+      operationId: listCITokens
+      summary: List CI tokens
+      description: The CI tokens of the workspace you see, newest first. A member sees their own; the owner every one. The token itself is never shown again.
+      security:
+        - cookieAuth: []
+        - bearerAuth: [read]
+      responses:
+        '200':
+          description: The CI tokens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CITokenList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+    post:
+      tags: [CI tokens]
+      operationId: createCIToken
+      summary: Make a CI token
+      description: '`{"name": "shop deploy", "rights": ["deploy"], "app": "shop", "expires_in_days": 90}`. `rights` default to read, deploy and env; `app` limits it to one app; no `expires_in_days` never expires. Answers the token once; only its hash is kept. An account holds at most 50. Only a signed-in browser makes one.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCITokenRequest'
+      responses:
+        '201':
+          description: The new token and its raw value.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedCIToken'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a connection or CI token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this name.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`token_limit`. Remove a CI token first.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`, `fields.rights` or `fields.expires_in_days`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/v1/ci-tokens/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CITokenID'
+    patch:
+      tags: [CI tokens]
+      operationId: setCITokenRights
+      summary: Change what a CI token may do
+      description: '`{"rights": ["deploy"]}`. Read is always in. Only its maker changes it, signed in in the browser.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RightsRequest'
+      responses:
+        '200':
+          description: The token as it is now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CIToken'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a connection or CI token, for a token someone else made, or a cookie request without a valid `X-CSRF-Token` header.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.rights`.'
+        '500':
+          $ref: '#/components/responses/Internal'
+    delete:
+      tags: [CI tokens]
+      operationId: removeCIToken
+      summary: Remove a CI token
+      description: Your own, or as the workspace's owner any. Requests with it answer 401 from now on.
+      security:
+        - cookieAuth: []
+        - bearerAuth: [read]
+      responses:
+        '204':
+          description: The token is removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No CI token with this ID that you see.'
         '500':
           $ref: '#/components/responses/Internal'
 
@@ -761,7 +934,7 @@ paths:
       description: By name.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: Every server of the account.
@@ -782,7 +955,7 @@ paths:
       description: Answers the install command once. Its install token connects one daemon within an hour. An empty name gets the next free web-1, web-2 …
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -818,7 +991,7 @@ paths:
       description: 'Server-sent events. Each `servers` event carries the full `ServerList`: once on connect and again after every change. Comment lines keep the stream open.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The event stream.
@@ -849,7 +1022,7 @@ paths:
               $ref: '#/components/schemas/RenameServerRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The renamed server.
@@ -876,7 +1049,7 @@ paths:
       description: Disconnects its daemon. The daemon token stops working. The daemon stays installed on the server until you run `uninstall_command` there; it is empty when no daemon ever connected. `confirm` is the server's name.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete, servers]
       parameters:
         - $ref: '#/components/parameters/Confirm'
       responses:
@@ -912,7 +1085,7 @@ paths:
       description: A new install token and command for the server, shown this once, for one hour; moin stores only a fingerprint of it. The old install command stops working. A daemon that registers with it takes over the server, and the daemon token of the old one stops working.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '201':
           description: The server and its new install command.
@@ -937,10 +1110,10 @@ paths:
       tags: [Servers]
       operationId: updateDaemon
       summary: Update the daemon of a server
-      description: The daemon downloads the binary this hub serves for its OS and CPU, from the hub URL it is registered with, checks it against the SHA-256 the hub sends, swaps it in and restarts through systemd. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs, without systemd, and when its server has rules in `/etc/moin/rules`; daemons older than the update say so with the command that updates them on the server.
+      description: The daemon downloads the binary this hub serves for its OS and CPU, from the hub URL it is registered with, checks it against the SHA-256 the hub sends, swaps it in and restarts through systemd. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs and without systemd; daemons older than the update say so with the command that updates them on the server.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The server with the new daemon version.
@@ -972,7 +1145,7 @@ paths:
       description: What needs you, most urgent first, each with the path of the web page to fix it under the workspace; catalog apps a newer release is out for; and counts of what runs well. `ok` is false when an issue needs you; updates never make it false.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The workspace now.
@@ -995,7 +1168,7 @@ paths:
       description: Every app of the catalog with its newest release. `latest` is null until the image registry answered.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The catalog, by name.
@@ -1020,7 +1193,7 @@ paths:
       description: One app of the catalog with every release, newest first. A release from GHCR has no date.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The catalog app.
@@ -1048,7 +1221,7 @@ paths:
       description: Creates the app on the server, sets VERSION and deploys it. The server makes every secret its compose.yml needs as an env var, so the hub never sees them. An empty version takes the newest release, an empty name the slug. The answer holds the secret the first sign-in needs, such as ADMIN_PASSWORD, in `login`; it is never shown again.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1090,7 +1263,7 @@ paths:
       description: What needs you first (a failed deploy, an offline server), then what deploys, then pinned apps, then the rest by name, with the newest and the live deploy of each.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: Every app of the account.
@@ -1111,7 +1284,7 @@ paths:
       description: The name is also the compose project on the server. A new app starts with its password on, so every address of it asks for user `moin` and the password in the answer, the one time moin shows it. `DELETE /api/v1/apps/{app}/protection` turns it off.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1156,7 +1329,7 @@ paths:
       description: With `pinned` true, every list of the workspace shows the app above the others that run fine, on every surface. The activity records it.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       parameters:
         - $ref: '#/components/parameters/AppName'
       requestBody:
@@ -1199,7 +1372,7 @@ paths:
       description: 'Server-sent events. Each `apps` event carries the full `AppList`: once on connect and again after every change. Comment lines keep the stream open.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The event stream.
@@ -1224,7 +1397,7 @@ paths:
       description: The app and its 20 newest deploys, without logs.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The app.
@@ -1254,7 +1427,7 @@ paths:
               $ref: '#/components/schemas/RenameAppRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '200':
           description: The renamed app.
@@ -1281,7 +1454,7 @@ paths:
       description: The daemon stops the app and removes its containers and images. Volumes and data stay on the server. `confirm` is the app's name.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete]
       parameters:
         - $ref: '#/components/parameters/Confirm'
       responses:
@@ -1314,7 +1487,7 @@ paths:
       description: 'Starts a deploy. `{"image": "..."}` deploys an image built elsewhere as the main service. For an app that follows a GitHub repo, the compose file comes from `ref` there, a branch, tag or commit, the linked branch without one; an app without a repo keeps the compose file of the live deploy and answers `no_repo` to a `ref`. `{"ref": "main"}` alone has the server download that branch, tag or commit of the linked GitHub repo; `{}` deploys the linked branch. moin never stores your code. Follow the deploy with its events.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1366,7 +1539,7 @@ paths:
       description: With its log so far.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The deploy.
@@ -1395,7 +1568,7 @@ paths:
       description: 'Server-sent events. A `line` event `{"line": "..."}` per log line, then one `done` event with the `Deploy`. A finished deploy streams its whole log, then `done`.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The event stream.
@@ -1423,7 +1596,7 @@ paths:
       description: Starts the images of an earlier successful deploy again, with the env it had. Number 0 or none means the one before the live deploy. The server keeps the last 5 deploys.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1464,7 +1637,7 @@ paths:
       description: Sets VERSION to the version, the newest release when empty, and deploys the app's compose.yml from the catalog. moin remembers the moment before, so a restore can go back to it. An older version goes too, but its migrations may not go back.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1508,7 +1681,7 @@ paths:
       description: Builds the source of the newest deploy that had one again, with the env as it is now.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '202':
           description: The started deploy.
@@ -1539,7 +1712,7 @@ paths:
       description: 'Gives the app a new secret deploy hook URL and answers it once; the old URL stops working. One thing brings new versions: it turns deploy on push off and keeps the linked GitHub repo, whose compose file each hook deploy takes. CI calls `POST <url>` after pushing an image, with `{"image": "ghcr.io/me/app:tag", "commit": "<sha>"}` or `?image=&commit=`, the commit the image was built from; without a commit, the head of the linked branch. An app without a repo keeps the compose file of the live deploy and refuses a commit with `409` `no_repo`. The hook deploys only new tags or digests of the image running now, `hook_image` of the app; another image, or any while the app runs a build of its repo, gets `422` `validation_failed` on `image`. A commit that is no name or that GitHub does not know gets `422` on `commit`.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '200':
           description: The hook URL, shown once.
@@ -1563,7 +1736,7 @@ paths:
       description: The hook URL stops working and CI can no longer deploy the app. A new hook can be made again later. Answers 204 also when the app had no hook. Works while the plan allows no changes.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '204':
           description: The app has no deploy hook.
@@ -1585,7 +1758,7 @@ paths:
       description: The logins servers pull private images with, without passwords, each with the servers that keep it and those that do not.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: Every registry login of the account.
@@ -1615,7 +1788,7 @@ paths:
       description: 'Hands the login to `server`, which keeps it in its server.json and pulls image deploys from this host with it. moin keeps the host and the username, never the password. Set it once per server.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -1651,7 +1824,7 @@ paths:
       summary: Remove a registry login
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '204':
           description: The login is removed.
@@ -1675,7 +1848,7 @@ paths:
       description: Starts the live deploy again with the env vars, domains and protection as they are now, without a build. A stopped app runs again.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '202':
           description: The started deploy.
@@ -1706,7 +1879,7 @@ paths:
       description: Runs a stopped app again. Like a restart, it takes the env vars, domains and protection as they are now.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '202':
           description: The started deploy.
@@ -1737,7 +1910,7 @@ paths:
       description: Stops the containers of the app. They stay stopped, also after a reboot of the server, until a deploy, a restart or a start. Data and settings stay. Changes to domains and protection wait for the start.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '204':
           description: The app is stopped.
@@ -1766,7 +1939,7 @@ paths:
       description: Looks up every domain of the app and says whether it points at the address its server's daemon connects from.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: One check per domain.
@@ -1790,7 +1963,7 @@ paths:
       description: 'Replaces the domains and the canonical one, which the others redirect to (empty for none). With `service`, replaces the domains of that service of compose.yml instead of the main one''s. A domain reaches one service of the app; another app may use it too. HTTPS is always on; Traefik gets certificates from Let''s Encrypt.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1831,7 +2004,7 @@ paths:
       description: 'The app''s instant address, `<app>.<server IPv4 with dashes>.<provider>`, with HTTPS: or why it has none, such as a server behind a Cloudflare Tunnel. The app''s password guards it like every address of the app while `protected` is true.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The instant address.
@@ -1855,7 +2028,7 @@ paths:
       description: 'Picks the provider of the instant address, `sslip.io`, `nip.io` or `off`. The change waits for the next restart.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       requestBody:
         required: true
         content:
@@ -1896,7 +2069,7 @@ paths:
       description: 'Turns on the app''s one password: every address of the app, its domains and its instant address, asks for it with basic auth. With `password` it sets that one; without one moin makes one and answers it in `password`, the one time it shows it. `username` is `moin` when empty. Only a bcrypt hash is stored.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       requestBody:
         required: true
         content:
@@ -1933,7 +2106,7 @@ paths:
       description: No address of the app asks for a password after its next restart, start or deploy.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The app. Saving never restarts it: the change waits for a restart, start or deploy, and `deploy` is null (hubs before saving waited could answer the restart they started).
@@ -1961,7 +2134,7 @@ paths:
       description: 'The compose file of the live deploy, YAML: everything moin runs for the app, the proxy with its domains and HTTPS too, written to run anywhere, without the instant address. It holds no secret value and no password hash. `image`, `ports`, `expose`, `volumes`, `user`, the env `PORT` and the paths of a `build` show the values the deploy ran with; every other `${NAME}` stays as written. Save it, put a `.env` with your values next to it, run `docker compose up -d`.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The compose file.
@@ -2000,7 +2173,7 @@ paths:
             maximum: 1000
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The lines, oldest first.
@@ -2045,7 +2218,7 @@ paths:
         the output. A server with `exec: off` in its rules refuses it.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy, env, delete]
       requestBody:
         required: true
         content:
@@ -2111,7 +2284,7 @@ paths:
       description: The databases of the live deploy, SQLite files the daemon found on its volumes and services that run Postgres.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The databases.
@@ -2145,7 +2318,7 @@ paths:
             type: string
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The tables.
@@ -2175,7 +2348,7 @@ paths:
       tags: [Data]
       operationId: getTableRows
       summary: Browse rows
-      description: One page of a table, newest rowid first. When the table has a rowid it is the first column. Rows are app data, so tokens need the write scope.
+      description: One page of a table, newest rowid first. When the table has a rowid it is the first column. Rows are app data, as strong as secrets; a connection reads them with the env right.
       parameters:
         - name: database
           in: query
@@ -2201,7 +2374,7 @@ paths:
             maximum: 500
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The rows.
@@ -2236,7 +2409,7 @@ paths:
               $ref: '#/components/schemas/InsertRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete]
       responses:
         '201':
           description: The row is added.
@@ -2270,7 +2443,7 @@ paths:
               $ref: '#/components/schemas/RowRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete]
       responses:
         '204':
           description: The row changed.
@@ -2304,7 +2477,7 @@ paths:
               $ref: '#/components/schemas/RowRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete]
       responses:
         '204':
           description: The row is gone.
@@ -2333,7 +2506,7 @@ paths:
       tags: [Data]
       operationId: queryDatabase
       summary: Run SQL
-      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. With `write` it runs in one transaction and returns `changes`.
+      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. Rows are app data: a connection or CI token needs the env right. With `write` it runs in one transaction and returns `changes`; a connection or CI token then needs the delete right too, else 403 `missing_right`.
       requestBody:
         required: true
         content:
@@ -2342,7 +2515,7 @@ paths:
               $ref: '#/components/schemas/QueryRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The result.
@@ -2378,7 +2551,7 @@ paths:
       description: How the app is backed up (how often, how long) and for every database its copies in your bucket, the states before restores, the newest daily check and the moments a restore can go back to. The copies and the undos come newest first; a copy moin took before a deploy, a data edit or a catalog update is named after it, like "Before v12". Read from the server and the bucket.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The backups.
@@ -2414,7 +2587,7 @@ paths:
               $ref: '#/components/schemas/BackupSchedule'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '200':
           description: The schedule.
@@ -2450,7 +2623,7 @@ paths:
               $ref: '#/components/schemas/DownloadRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The link.
@@ -2483,7 +2656,7 @@ paths:
       description: The state of the app as a whole and, per domain, the path uptime visits, its state, the last visit with the HTTP status, response time and certificate expiry, uptime over 24 hours, 7 and 30 days, the average response time and the last outages.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The uptime.
@@ -2523,7 +2696,7 @@ paths:
               $ref: '#/components/schemas/UptimeRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '200':
           description: The domain with its new settings.
@@ -2555,7 +2728,7 @@ paths:
       description: 'CPU, memory and network of the app''s running containers added up: the newest sample, the points over the range, and the deploys that went live in it, to mark on a chart. CPU is the app''s share of the whole server in percent. `now` is null when the daemon sent nothing for two minutes, such as for a stopped app or a daemon before metrics.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The metrics.
@@ -2592,7 +2765,7 @@ paths:
               $ref: '#/components/schemas/RestoreRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete]
       responses:
         '202':
           description: The restore runs.
@@ -2634,7 +2807,7 @@ paths:
       description: How a restore stands, `running` (or `unknown` while its server is offline), then `done` or `failed` with `error`. moin keeps it a week, also across restarts of the hub.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The restore.
@@ -2660,7 +2833,7 @@ paths:
       description: The workspace's buckets, the default first, without their secret keys, each with the apps that use it.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The buckets.
@@ -2687,7 +2860,7 @@ paths:
               $ref: '#/components/schemas/BucketRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '201':
           description: The new bucket.
@@ -2721,7 +2894,7 @@ paths:
       description: One bucket, without its secret key.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The bucket.
@@ -2751,7 +2924,7 @@ paths:
               $ref: '#/components/schemas/BucketRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The bucket.
@@ -2784,7 +2957,7 @@ paths:
       description: Forgets a bucket. A bucket that apps use, or that keeps older backups of an app, is refused. What is in the bucket stays. `confirm` is the bucket's name.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [delete]
       parameters:
         - $ref: '#/components/parameters/Confirm'
       responses:
@@ -2821,7 +2994,7 @@ paths:
               $ref: '#/components/schemas/BucketKeyRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The bucket.
@@ -2866,7 +3039,7 @@ paths:
               $ref: '#/components/schemas/AppBucketRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '200':
           description: The app.
@@ -2895,7 +3068,7 @@ paths:
       description: Every alert destination of the workspace, without its URL, bot token or signing secret. `hint` shows the host and the last characters. `failing` says sends to it fail since `failing_since`, with `last_error`. Every member may list them.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The alert destinations by name.
@@ -2922,7 +3095,7 @@ paths:
               $ref: '#/components/schemas/AlertDestinationRequest'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '201':
           description: The new destination, with `signing_secret` for a webhook.
@@ -2958,7 +3131,7 @@ paths:
       description: Only owners and admins.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '204':
           description: The destination is removed.
@@ -2983,7 +3156,7 @@ paths:
       description: Sends a test alert to the destination and waits up to 10 seconds for it to take it. A webhook gets `"event":"test"`. Only owners and admins.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The destination took the test.
@@ -3016,7 +3189,7 @@ paths:
       description: Where the moin GitHub App is installed, the link that connects GitHub, and the link that installs it on another account or organization.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The installations.
@@ -3062,7 +3235,7 @@ paths:
       description: Every repo the user's installations of the moin GitHub App may read.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The repos.
@@ -3115,7 +3288,7 @@ paths:
       description: The branches of a repo moin may read, the default branch first.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The branch names.
@@ -3167,7 +3340,7 @@ paths:
                   type: boolean
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '200':
           description: The app.
@@ -3196,7 +3369,7 @@ paths:
       summary: Unlink the repo
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [deploy]
       responses:
         '204':
           description: The app follows no repo.
@@ -3240,7 +3413,7 @@ paths:
                   type: boolean
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The server with what its daemon set up.
@@ -3280,7 +3453,7 @@ paths:
       description: 'CPU, memory, the disk that holds the apps'' data, network and load of a server: the newest sample, the points over the range, and every app on it with its newest sample, the one with the most memory first. `now` is null when the daemon sent nothing for two minutes.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The metrics.
@@ -3309,7 +3482,7 @@ paths:
       description: Whether the hub keeps a Cloudflare API token, and which servers keep a Tailscale auth key. The keys never come back.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The integrations.
@@ -3344,7 +3517,7 @@ paths:
                   description: The server that keeps the Tailscale key. Empty for the workspace's only server.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The integrations.
@@ -3373,7 +3546,7 @@ paths:
       description: Whether the daemons of the workspace update to the hub's version by themselves. On by default.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The setting.
@@ -3391,7 +3564,7 @@ paths:
       tags: [Servers]
       operationId: setDaemonUpdates
       summary: Turn automatic daemon updates on or off
-      description: With `auto` on, a daemon older than the hub updates when it connects, one server at a time, never during a deploy and never on a server with rules. A daemon that does not come back stops it for the workspace, and the activity says so; an update by hand starts it again.
+      description: With `auto` on, a daemon older than the hub updates when it connects, one server at a time, never during a deploy. A daemon that does not come back stops it for the workspace, and the activity says so; an update by hand starts it again.
       requestBody:
         required: true
         content:
@@ -3400,7 +3573,7 @@ paths:
               $ref: '#/components/schemas/DaemonUpdates'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '200':
           description: The setting.
@@ -3428,7 +3601,7 @@ paths:
       description: The keys and when each changed. Values are write-only: moin never answers one.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The env vars, by key.
@@ -3452,7 +3625,7 @@ paths:
       description: 'Sets and removes env vars. The values go to the app''s server, which keeps them in the app''s env file; moin keeps only the keys and when they changed, and never shows a value. The server must be online. They take effect with the next deploy, restart or start; a rollback runs with them too.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       requestBody:
         required: true
         content:
@@ -3494,7 +3667,7 @@ paths:
       description: 'Makes the sent env vars the app''s, all at once, like one .env file. Every key sent is set, keys not sent are removed. The values go to the app''s server, which must be online. Answers what changed, by key. They take effect with the next deploy.'
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [env]
       requestBody:
         required: true
         content:
@@ -3537,7 +3710,7 @@ paths:
       summary: List workspaces
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The workspaces of the account with its role in each.
@@ -3592,7 +3765,7 @@ paths:
       description: The workspace, the role and permissions of the caller, members, pending invitations for members who may manage them, and seats.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: The workspace.
@@ -3642,7 +3815,7 @@ paths:
       description: The slug, the name in the workspace's links, follows the name. Links count the ID, so old ones keep working.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -3682,7 +3855,7 @@ paths:
       description: Emails an invitation link to `APP_URL/workspaces/invitations/{token}`. The invitation appears in `GET /api/v1/workspaces/{workspaceSlug}`.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       requestBody:
         required: true
         content:
@@ -3723,7 +3896,7 @@ paths:
       summary: Revoke an invitation
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '204':
           description: The invitation is revoked.
@@ -3748,7 +3921,7 @@ paths:
       description: Revokes the invitation and sends a new one, so the invitation ID changes.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [write]
+        - bearerAuth: [servers]
       responses:
         '202':
           description: The new invitation is on its way.
@@ -3895,7 +4068,7 @@ paths:
             type: string
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: One page of events.
@@ -3926,7 +4099,7 @@ paths:
       tags: [Workspaces]
       operationId: listActivity
       summary: List activity
-      description: What happened in the workspace of the API token, newest first, the same as listWorkspaceActivity, for the CLI: deploys, rollbacks, restores, SQL writes, env, domains, servers, security and team changes. Pass `next_cursor` as `cursor` to read the next page.
+      description: What happened in the workspace of the connection or CI token, newest first, the same as listWorkspaceActivity, for the CLI: deploys, rollbacks, restores, SQL writes, env, domains, servers, security and team changes. Pass `next_cursor` as `cursor` to read the next page.
       parameters:
         - name: limit
           in: query
@@ -3958,7 +4131,7 @@ paths:
             type: string
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           description: One page of events.
@@ -3994,7 +4167,7 @@ paths:
       description: Only members who may manage billing.
       security:
         - cookieAuth: []
-        - apiTokenAuth: [read]
+        - bearerAuth: [read]
       responses:
         '200':
           $ref: '#/components/responses/Billing'
@@ -4184,10 +4357,10 @@ paths:
       tags: [Admin]
       operationId: revokeUserSessions
       summary: Sign a user out everywhere
-      description: Revokes every session and every personal API token of the user.
+      description: Revokes every session, connection and CI token of the user.
       responses:
         '204':
-          description: Every session and personal API token of the user is revoked.
+          description: Every session, connection and CI token of the user is revoked.
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -4296,11 +4469,10 @@ components:
       in: cookie
       name: session_token
       description: The session cookie of a same-site browser frontend. Requests that change state also need the `X-CSRF-Token` header.
-    apiTokenAuth:
+    bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: pat_
-      description: 'A personal API token from `POST /api/v1/account/tokens`, sent as `Authorization: Bearer pat_...`. The role in the security entry of an operation is the scope it needs.'
+      description: 'An access token of a connection (`at_...`, from `POST /api/v1/auth/token`) or a CI token (`pat_...`), sent as `Authorization: Bearer <token>`. The roles in the security entry of an operation are the rights it needs.'
 
   parameters:
     Confirm:
@@ -4339,11 +4511,18 @@ components:
       description: The passkey ID from `GET /api/v1/account/passkeys`.
       schema:
         type: string
-    APITokenID:
+    ConnectionID:
       name: id
       in: path
       required: true
-      description: The token ID from `GET /api/v1/account/tokens`.
+      description: The connection ID from `GET /api/v1/account/connections`.
+      schema:
+        type: string
+    CITokenID:
+      name: id
+      in: path
+      required: true
+      description: The CI token ID from `GET /api/v1/ci-tokens`.
       schema:
         type: string
     ServerID:
@@ -4586,6 +4765,10 @@ components:
               description: One message per invalid field. Present only for `validation_failed`.
               additionalProperties:
                 type: string
+            right:
+              type: string
+              enum: [read, deploy, env, delete, servers]
+              description: The right a connection or CI token lacks. Present only for `missing_right`.
     CSRFToken:
       type: object
       required: [token]
@@ -4777,7 +4960,7 @@ components:
             $ref: '#/components/schemas/Membership'
         is_admin:
           type: boolean
-          description: True when the signed-in session belongs to an operator listed in `ADMIN_EMAILS` with a verified email, on the hosted hub. False for API tokens, during impersonation and on a self-hosted hub. The admin endpoints answer 403 when it is false, and 404 on a self-hosted hub.
+          description: True when the signed-in session belongs to an operator listed in `ADMIN_EMAILS` with a verified email, on the hosted hub. False for connections and CI tokens, during impersonation and on a self-hosted hub. The admin endpoints answer 403 when it is false, and 404 on a self-hosted hub.
         avatar_url:
           type: [string, 'null']
           format: uri
@@ -4858,34 +5041,102 @@ components:
         interval:
           type: integer
           description: Seconds to wait between polls, 5.
-    DeviceTokenRequest:
+    TokenRequest:
       type: object
-      required: [device_code]
+      required: [grant_type]
       properties:
-        device_code:
-          type: string
         grant_type:
           type: string
-          enum: ['urn:ietf:params:oauth:grant-type:device_code']
-          description: Optional, as in RFC 8628.
-    DeviceToken:
+          enum: ['urn:ietf:params:oauth:grant-type:device_code', refresh_token]
+        device_code:
+          type: string
+          description: For the device code grant.
+        refresh_token:
+          type: string
+          description: For the refresh token grant.
+        client_id:
+          type: string
+          description: The client of a connection made with OAuth; empty for `moin login`.
+    TokenResponse:
       type: object
-      required: [access_token, token_type, expires_in, api_token]
+      required: [access_token, token_type, expires_in, refresh_token, scope, connection_id]
       properties:
         access_token:
           type: string
-          description: The raw `pat_` token. Send it as `Authorization: Bearer`.
+          description: '`at_` and 52 characters. Send it as `Authorization: Bearer`.'
         token_type:
           type: string
           enum: [Bearer]
         expires_in:
           type: integer
-          description: Seconds until it expires without use; each use starts them again.
-        api_token:
-          $ref: '#/components/schemas/APIToken'
-    APIToken:
+          description: Seconds the access token works, 3600.
+        refresh_token:
+          type: string
+          description: '`rt_` and 52 characters. It gets the next pair, once.'
+        scope:
+          type: string
+          description: The rights of the connection, with spaces, like `read deploy env`.
+        connection_id:
+          type: string
+    OAuthError:
       type: object
-      required: [id, name, prefix, scopes, kind, workspace_id, last_used_at, expires_at, expired, created_at]
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: The code of RFC 6749 or RFC 8628.
+          examples: [invalid_grant]
+        error_description:
+          type: string
+    Connection:
+      type: object
+      required: [id, client_name, workspace_id, rights, current, last_used_at, created_at]
+      properties:
+        id:
+          type: string
+        client_name:
+          type: string
+          description: What the client calls itself, like "moin CLI on laptop-1". The client's word, not checked.
+        workspace_id:
+          type: string
+          description: The only workspace the connection can reach.
+        rights:
+          type: array
+          items:
+            type: string
+            enum: [read, deploy, env, delete, servers]
+        current:
+          type: boolean
+          description: This is the connection of the request.
+        last_used_at:
+          type: [string, 'null']
+          format: date-time
+          description: Updated at most once a minute. Unused for 90 days, a connection ends.
+        created_at:
+          type: string
+          format: date-time
+    ConnectionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Connection'
+    RightsRequest:
+      type: object
+      required: [rights]
+      additionalProperties: false
+      properties:
+        rights:
+          type: array
+          items:
+            type: string
+            enum: [read, deploy, env, delete, servers]
+          description: Read is always in.
+    CIToken:
+      type: object
+      required: [id, name, prefix, rights, app, created_by, workspace_id, last_used_at, expires_at, expired, created_at]
       properties:
         id:
           type: string
@@ -4894,19 +5145,19 @@ components:
         prefix:
           type: string
           description: The first 8 characters after `pat_`, to tell tokens apart.
-        scopes:
+        rights:
           type: array
           items:
             type: string
-            enum: [read, write]
-          description: '`["read"]` or `["read", "write"]`.'
-        kind:
+            enum: [read, deploy, env, delete, servers]
+        app:
+          type: [string, 'null']
+          description: The one app it reaches, `null` for every app.
+        created_by:
           type: string
-          enum: [personal, device]
-          description: '`personal` for a token made in Settings, `device` for the login of one computer with `moin login` in the browser, which expires 90 days after its last use.'
+          description: The name of the person who made it.
         workspace_id:
           type: string
-          description: The only workspace the token can reach.
         last_used_at:
           type: [string, 'null']
           format: date-time
@@ -4920,6 +5171,47 @@ components:
         created_at:
           type: string
           format: date-time
+    CITokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CIToken'
+    CreateCITokenRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: A label such as "shop deploy".
+        rights:
+          type: array
+          items:
+            type: string
+            enum: [read, deploy, env, delete, servers]
+          description: Read is always in. Defaults to read, deploy and env.
+        app:
+          type: string
+          description: The name or ID of the one app it may reach; empty for every app.
+        expires_in_days:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 365
+          description: '`null` or missing for a token that never expires.'
+    CreatedCIToken:
+      type: object
+      required: [token, ci_token]
+      properties:
+        token:
+          type: string
+          description: 'The raw token, `pat_` and 52 characters. It is shown only in this answer.'
+        ci_token:
+          $ref: '#/components/schemas/CIToken'
     Server:
       type: object
       required: [id, name, online, hostname, os, arch, daemon_version, last_seen_at, created_at]
@@ -4983,7 +5275,7 @@ components:
                 type: string
         rules:
           type: [object, 'null']
-          description: What the owner of the server allows moin to do there, from /etc/moin/rules on the server. The daemon enforces them; the hub cannot change them. Null without rules.
+          description: What the owner of the server allows moin to do there, from /etc/moin/rules on the server. The daemon enforces them; the hub cannot change them. Null for a server without the file, an empty object for one whose rules limit nothing.
           properties:
             data_off:
               type: boolean
@@ -6454,47 +6746,6 @@ components:
           type: array
           items:
             type: string
-    APITokenList:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/APIToken'
-    CreateAPITokenRequest:
-      type: object
-      required: [name, workspace_id]
-      additionalProperties: false
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 64
-          description: A label such as "Claude Desktop" or "Nightly export".
-        scopes:
-          type: array
-          items:
-            type: string
-            enum: [read, write]
-          description: '`write` includes `read`. Defaults to `["read"]`.'
-        expires_in_days:
-          type: [integer, 'null']
-          minimum: 1
-          maximum: 365
-          description: '`null` or missing for a token that never expires.'
-        workspace_id:
-          type: string
-          description: The workspace the token is bound to, one of `GET /api/v1/workspaces`.
-    CreatedAPIToken:
-      type: object
-      required: [token, api_token]
-      properties:
-        token:
-          type: string
-          description: 'The raw token, `pat_` and 52 characters. It is shown only in this answer.'
-        api_token:
-          $ref: '#/components/schemas/APIToken'
     AvatarResponse:
       type: object
       required: [avatar_url]
@@ -6693,7 +6944,7 @@ components:
           description: How the change came in. `system` is moin itself, such as a deploy that ended or a restore check. Events from before the CLI and TUI were told apart say `api` for them. Empty for some older events.
         token:
           type: string
-          description: The name of the API token the change came with, empty without one.
+          description: The name of the connection or CI token the change came with, empty without one.
         app:
           type: string
           description: The app the change touched, by name, empty for none.

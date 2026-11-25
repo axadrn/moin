@@ -45,8 +45,8 @@ func CSRFProtection(isProduction bool, clientIPs ClientIPResolver) func(http.Han
 				return
 			}
 
-			// Skip CSRF check for the MCP server. It only accepts personal API
-			// tokens and ignores cookies.
+			// Skip CSRF check for the MCP server. It only accepts
+			// connections and CI tokens and ignores cookies.
 			if r.URL.Path == "/mcp" {
 				next.ServeHTTP(w, r)
 				return

@@ -106,9 +106,12 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 	return rules, nil
 }
 
+// refusedByRules starts the answer to a request the rules do not allow.
+const refusedByRules = "refused by the rules of this server"
+
 // refused is the answer to a request the rules do not allow.
 func refused(file, what string) error {
-	return fmt.Errorf("refused by the rules of this server (%s): %s", file, what)
+	return fmt.Errorf("%s (%s): %s", refusedByRules, file, what)
 }
 
 // checkDeploy allows a deploy whose source the rules allow. A redeploy or a
@@ -182,16 +185,22 @@ func checkBucket(rules *protocol.Rules, file string, bucket *protocol.Bucket) er
 	if rules == nil || rules.BackupsTo == "" || bucket == nil {
 		return nil
 	}
+	if bucketPlace(bucket) != rules.BackupsTo {
+		return refused(file, fmt.Sprintf("backups-to allows only %s", rules.BackupsTo))
+	}
+	return nil
+}
+
+// bucketPlace is where a bucket is, as backups-to names it: <endpoint
+// host>/<bucket>, "" when its endpoint is no URL.
+func bucketPlace(bucket *protocol.Bucket) string {
 	host := "s3." + bucket.Region + ".amazonaws.com"
 	if bucket.Endpoint != "" {
 		endpoint, err := url.Parse(bucket.Endpoint)
 		if err != nil {
-			return refused(file, fmt.Sprintf("backups-to allows only %s", rules.BackupsTo))
+			return ""
 		}
 		host = endpoint.Host
 	}
-	if host+"/"+bucket.Bucket != rules.BackupsTo {
-		return refused(file, fmt.Sprintf("backups-to allows only %s", rules.BackupsTo))
-	}
-	return nil
+	return host + "/" + bucket.Bucket
 }

@@ -12,8 +12,10 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin` | opens the [terminal UI](/docs/reference/tui); without a login it signs you in through the browser first |
-| `moin login [--url <url>] [--web] [--token <token>]` | logs this computer in through the browser: prints a code, opens `/device` and waits for **Approve**. Without a browser, open the printed address on any device. `--web` uses the browser even without a terminal. `--token`, or a token on stdin (`echo "$TOKEN" \| moin login`), skips the browser, for CI and scripts. See [Log in the CLI](/docs/guides/account#log-in-the-cli) |
-| `moin logout` | forgets the token, and what the terminal UI kept for its next start |
+| `moin login [--url <url>] [--web] [--token <token>]` | connects this computer through the browser: prints a code, opens `/device` and waits for **Allow with passkey**, with the rights you pick. Without a browser, open the printed address on any device. `--web` uses the browser even without a terminal. `--token`, or a CI token on stdin (`echo "$TOKEN" \| moin login`), skips the browser, for CI and scripts. Logging in again ends this computer's old connection. See [Connect the CLI](/docs/guides/account#connect-the-cli) |
+| `moin logout` | ends this computer's connection at the hub and forgets it, and what the terminal UI kept for its next start. A CI token stays valid: remove it with `moin connections rm` |
+| `moin connections` | your connections, this one marked, and the CI tokens of the workspace, with their rights and when each was last used |
+| `moin connections rm <id> [--yes]` | ends a connection or removes a CI token, at once. Rights change in the web: **Settings**, **Connections** |
 | `moin status` | is everything OK: what needs you, catalog updates, what runs; exits `1` when something needs you ([Overview](/docs/guides/overview)) |
 | `moin version` | the version of `moin` and of the hub, and whether a newer one is out |
 | `moin update [--yes]` | updates a self-hosted hub to the newest version and waits until it is back; for its admins. It prints the whole release notes first, then asks; `--yes` skips the question |
@@ -26,7 +28,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin team` | the team of your workspace and its open invitations |
-| `moin team invite <email> [--admin]` | invites someone by email; `--admin` may invite others |
+| `moin team invite <email>` | invites someone by email, as member. An admin is invited in the web: **Settings**, **Team** |
 | `moin team resend <email>` | sends an invitation again; only the new link works |
 | `moin team revoke <email> [--yes]` | takes an invitation back |
 | `moin team rename <name>` | renames the workspace; its links follow the new name |

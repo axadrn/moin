@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/model"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -16,39 +17,39 @@ import (
 // file.
 func registerAppTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("list_apps", "List apps",
-		"Lists the user's apps with their server, newest deploy and live deploy. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listApps)))
-	mcpsdk.AddTool(server, newTool("get_app", "Get an app",
-		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres). Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getApp)))
-	mcpsdk.AddTool(server, newTool("create_app", "Create an app",
-		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. A new app starts with its password on: every address of it asks for user moin and the password in password, the one time moin shows it, so give it to the user to keep. remove_protection turns it off. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.createApp)))
-	mcpsdk.AddTool(server, newTool("remove_app", "Remove an app",
-		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.removeApp)))
-	mcpsdk.AddTool(server, newTool("rename_app", "Rename an app",
-		"Gives an app a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Links count its ID, so they keep working; its data, backups and instant address stay. The next restart or deploy gives its containers the new name. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.renameApp)))
-	mcpsdk.AddTool(server, newTool("pin_app", "Pin or unpin an app",
-		"Pins an app, or unpins it with pinned false, and returns it. Every list of the workspace shows pinned apps above the others that run fine, on every surface. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.pinApp)))
-	mcpsdk.AddTool(server, newTool("restart_app", "Restart an app",
-		"Starts the live deploy of an app again with its env vars, domains and protection as they are now, without a build. Use it after set_env. A stopped app runs again. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.restart)))
-	mcpsdk.AddTool(server, newTool("stop_app", "Stop an app",
-		"Stops the containers of an app. It stays offline, also after a reboot of the server, until start_app, restart_app or a deploy. Its data and settings stay. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.stop)))
-	mcpsdk.AddTool(server, newTool("start_app", "Start an app",
-		"Runs a stopped app again, with its env vars, domains and protection as they are now. An app that runs already answers already_running and nothing changes. Returns the deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(member(services, tools.start)))
-	mcpsdk.AddTool(server, newTool("get_logs", "Get app logs",
-		"Returns the last lines of every container of an app, read from its server. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getLogs)))
-	mcpsdk.AddTool(server, newTool("get_compose_file", "Get the compose file",
-		"Returns the compose file of the live deploy of an app, YAML: everything moin runs for it, the proxy with its domains and HTTPS too, written to run anywhere, without the instant address. It holds no secret value. image, ports, expose, volumes, user, the env PORT and the paths of a build show the values the deploy ran with; every other ${NAME} stays as written. Saved with a .env of the app's values next to it, docker compose up -d runs the app elsewhere. A live deploy without one answers no_compose_file: redeploy_app or restart_app makes one, and get_deploy's log says why if it stays empty. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getComposeFile)))
+	Add(server, newTool("list_apps", "List apps",
+		"Lists the user's apps with their server, newest deploy and live deploy.",
+		readOnly("")), model.RightRead, member(services, tools.listApps))
+	Add(server, newTool("get_app", "Get an app",
+		"Returns an app with its 20 newest deploys: status, errors, and what the daemon detected (compose, Dockerfile, Go, or Railpack with the language and start command it found; service; port; databases, SQLite and Postgres).",
+		readOnly("")), model.RightRead, member(services, tools.getApp))
+	Add(server, newTool("create_app", "Create an app",
+		"Creates an app on a server. Deploys come from its GitHub repo (link_repo, or `moin deploy` in the pushed repo, which can also create the app), an image (deploy_image) or the catalog. A new app starts with its password on: every address of it asks for user moin and the password in password, the one time moin shows it, so give it to the user to keep. remove_protection turns it off.",
+		change(false, false)), model.RightDeploy, changes(services, tools.createApp))
+	Add(server, newTool("remove_app", "Remove an app",
+		"Stops an app on its server and removes its containers and images. Its volumes and data stay on the server. Ask the user first: confirm must be the app's name, typed out.",
+		change(true, true)), model.RightDelete, changes(services, tools.removeApp))
+	Add(server, newTool("rename_app", "Rename an app",
+		"Gives an app a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Links count its ID, so they keep working; its data, backups and instant address stay. The next restart or deploy gives its containers the new name.",
+		change(false, true)), model.RightDeploy, changes(services, tools.renameApp))
+	Add(server, newTool("pin_app", "Pin or unpin an app",
+		"Pins an app, or unpins it with pinned false, and returns it. Every list of the workspace shows pinned apps above the others that run fine, on every surface.",
+		change(false, true)), model.RightDeploy, changes(services, tools.pinApp))
+	Add(server, newTool("restart_app", "Restart an app",
+		"Starts the live deploy of an app again with its env vars, domains and protection as they are now, without a build. Use it after set_env. A stopped app runs again. Returns the deploy; follow it with get_deploy.",
+		change(false, false)), model.RightDeploy, changes(services, tools.restart))
+	Add(server, newTool("stop_app", "Stop an app",
+		"Stops the containers of an app. It stays offline, also after a reboot of the server, until start_app, restart_app or a deploy. Its data and settings stay.",
+		change(true, true)), model.RightDeploy, member(services, tools.stop))
+	Add(server, newTool("start_app", "Start an app",
+		"Runs a stopped app again, with its env vars, domains and protection as they are now. An app that runs already answers already_running and nothing changes. Returns the deploy; follow it with get_deploy.",
+		change(false, false)), model.RightDeploy, member(services, tools.start))
+	Add(server, newTool("get_logs", "Get app logs",
+		"Returns the last lines of every container of an app, read from its server.",
+		readOnly("")), model.RightRead, member(services, tools.getLogs))
+	Add(server, newTool("get_compose_file", "Get the compose file",
+		"Returns the compose file of the live deploy of an app, YAML: everything moin runs for it, the proxy with its domains and HTTPS too, written to run anywhere, without the instant address. It holds no secret value. image, ports, expose, volumes, user, the env PORT and the paths of a build show the values the deploy ran with; every other ${NAME} stays as written. Saved with a .env of the app's values next to it, docker compose up -d runs the app elsewhere. A live deploy without one answers no_compose_file: redeploy_app or restart_app makes one, and get_deploy's log says why if it stays empty.",
+		readOnly("")), model.RightRead, member(services, tools.getComposeFile))
 }
 
 // ComposeFileInput is the input of get_compose_file.
@@ -66,7 +67,7 @@ func (f ComposeFile) Summary() string {
 }
 
 func (t moinTools) getComposeFile(_ context.Context, caller Caller, input ComposeFileInput) (ComposeFile, error) {
-	number, text, err := t.services.Apps.ComposeFile(caller.Token.WorkspaceID, input.App)
+	number, text, err := t.services.Apps.ComposeFile(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return ComposeFile{}, err
 	}
@@ -109,7 +110,7 @@ func (l AppList) Summary() string {
 }
 
 func (t moinTools) listApps(_ context.Context, caller Caller, _ NoInput) (AppList, error) {
-	apps, err := t.services.Apps.ListSorted(caller.Token.WorkspaceID)
+	apps, err := t.services.Apps.ListSorted(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return AppList{}, err
 	}
@@ -179,7 +180,7 @@ func (d AppDetail) Summary() string {
 }
 
 func (t moinTools) getApp(_ context.Context, caller Caller, input AppInput) (AppDetail, error) {
-	app, deploys, err := t.services.Apps.Deploys(caller.Token.WorkspaceID, input.app(), 20)
+	app, deploys, err := t.services.Apps.Deploys(caller.Bearer.WorkspaceID, input.app(), 20)
 	if err != nil {
 		return AppDetail{}, err
 	}
@@ -213,7 +214,7 @@ func (t moinTools) createApp(_ context.Context, caller Caller, input CreateAppIn
 }
 
 func (t moinTools) removeApp(ctx context.Context, caller Caller, input RemoveAppInput) (Done, error) {
-	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.App)
+	app, err := t.services.Apps.Get(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Done{}, err
 	}
@@ -263,7 +264,7 @@ func (t moinTools) getLogs(ctx context.Context, caller Caller, input LogsInput) 
 	if tail < 1 || tail > 1000 {
 		return Logs{}, InvalidField("tail", "Choose between 1 and 1000 lines.")
 	}
-	lines, err := t.services.Apps.Logs(ctx, caller.Token.WorkspaceID, input.App, tail)
+	lines, err := t.services.Apps.Logs(ctx, caller.Bearer.WorkspaceID, input.App, tail)
 	if err != nil {
 		return Logs{}, err
 	}

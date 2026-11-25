@@ -100,8 +100,6 @@ func explain(err error) string {
 		return fmt.Sprintf("Not logged in. Run `%s login`, or set %s in CI", build.Name, client.TokenVariable)
 	case errors.As(err, &apiErr) && apiErr.Code == "not_found" && apiErr.Message == "The app was not found." && picked.name != "":
 		return fmt.Sprintf("There is no app %s; the name came from %s. Name another with --app, or see yours with `%s apps`", picked.name, picked.from, build.Name)
-	case errors.As(err, &apiErr) && apiErr.Code == "insufficient_scope":
-		return fmt.Sprintf("This token may only read. Log in with a token that has read and write access: `%s login`", build.Name)
 	case errors.As(err, &urlErr) && errors.As(err, &netErr):
 		host := urlErr.URL
 		if parsed, parseErr := url.Parse(urlErr.URL); parseErr == nil {

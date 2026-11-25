@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/model"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -14,24 +15,24 @@ import (
 // and branches, linking a repo and deploying from it.
 func registerGitHubTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("get_github", "GitHub connection",
-		"Returns where the moin GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getGitHub)))
-	mcpsdk.AddTool(server, newTool("list_repos", "List GitHub repos",
-		"Lists the repos the moin GitHub App may read, and where on github.com the user gives it access to another repo. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listRepos)))
-	mcpsdk.AddTool(server, newTool("list_branches", "List branches",
-		"Lists the branches of a repo the moin GitHub App may read, the default branch first. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listBranches)))
-	mcpsdk.AddTool(server, newTool("link_repo", "Link a repo",
-		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): auto_deploy turns the app's deploy hook off, so CI can no longer deploy; ask the user first when get_app says hook. Without auto_deploy the hook stays, and its deploys take the repo's compose file. A branch the repo does not have on GitHub is refused; list_branches lists them. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.linkRepo)))
-	mcpsdk.AddTool(server, newTool("unlink_repo", "Unlink the repo",
-		"Stops an app from following its GitHub repo. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.unlinkRepo)))
-	mcpsdk.AddTool(server, newTool("deploy_ref", "Deploy from GitHub",
-		"Deploys a branch, tag or commit of the app's linked GitHub repo, without a checkout; empty ref deploys the linked branch. Follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.deployRef)))
+	Add(server, newTool("get_github", "GitHub connection",
+		"Returns where the moin GitHub App is installed, connect_url, the link that connects GitHub (it also works when the app is already installed), and install_url, which installs it on another account; both happen on github.com.",
+		readOnly("")), model.RightRead, member(services, tools.getGitHub))
+	Add(server, newTool("list_repos", "List GitHub repos",
+		"Lists the repos the moin GitHub App may read, and where on github.com the user gives it access to another repo.",
+		readOnly("")), model.RightRead, member(services, tools.listRepos))
+	Add(server, newTool("list_branches", "List branches",
+		"Lists the branches of a repo the moin GitHub App may read, the default branch first.",
+		readOnly("")), model.RightRead, member(services, tools.listBranches))
+	Add(server, newTool("link_repo", "Link a repo",
+		"Makes an app follow a GitHub repo and branch; with auto_deploy every push to the branch deploys. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): auto_deploy turns the app's deploy hook off, so CI can no longer deploy; ask the user first when get_app says hook. Without auto_deploy the hook stays, and its deploys take the repo's compose file. A branch the repo does not have on GitHub is refused; list_branches lists them.",
+		change(true, true)), model.RightDeploy, changes(services, tools.linkRepo))
+	Add(server, newTool("unlink_repo", "Unlink the repo",
+		"Stops an app from following its GitHub repo.",
+		change(true, true)), model.RightDeploy, changes(services, tools.unlinkRepo))
+	Add(server, newTool("deploy_ref", "Deploy from GitHub",
+		"Deploys a branch, tag or commit of the app's linked GitHub repo, without a checkout; empty ref deploys the linked branch. Follow it with get_deploy.",
+		change(false, false)), model.RightDeploy, changes(services, tools.deployRef))
 }
 
 // RepoInput is the input of link_repo.
@@ -86,7 +87,7 @@ func (t moinTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitH
 	link, err := t.services.Apps.GitHubInstallURL(caller.actor())
 	answer.Enabled, answer.InstallURL = err == nil, link
 	answer.ConnectURL, _ = t.services.Apps.GitHubConnectURL(caller.actor())
-	installations, err := t.services.Apps.GitHubInstallations(caller.Token.WorkspaceID)
+	installations, err := t.services.Apps.GitHubInstallations(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return GitHub{}, err
 	}
@@ -97,7 +98,7 @@ func (t moinTools) getGitHub(_ context.Context, caller Caller, _ struct{}) (GitH
 }
 
 func (t moinTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Repos, error) {
-	repos, err := t.services.Apps.GitHubRepos(ctx, caller.Token.WorkspaceID)
+	repos, err := t.services.Apps.GitHubRepos(ctx, caller.Bearer.WorkspaceID)
 	if err != nil {
 		return Repos{}, err
 	}
@@ -124,7 +125,7 @@ func (t moinTools) listRepos(ctx context.Context, caller Caller, _ struct{}) (Re
 }
 
 func (t moinTools) listBranches(ctx context.Context, caller Caller, input BranchesInput) (Branches, error) {
-	branches, err := t.services.Apps.GitHubBranches(ctx, caller.Token.WorkspaceID, input.Repo)
+	branches, err := t.services.Apps.GitHubBranches(ctx, caller.Bearer.WorkspaceID, input.Repo)
 	if err != nil {
 		return Branches{}, err
 	}
@@ -153,7 +154,7 @@ func (t moinTools) linkRepo(ctx context.Context, caller Caller, input RepoInput)
 }
 
 func (t moinTools) unlinkRepo(_ context.Context, caller Caller, input AppInput) (Done, error) {
-	app, err := t.services.Apps.Get(caller.Token.WorkspaceID, input.app())
+	app, err := t.services.Apps.Get(caller.Bearer.WorkspaceID, input.app())
 	if err != nil {
 		return Done{}, err
 	}

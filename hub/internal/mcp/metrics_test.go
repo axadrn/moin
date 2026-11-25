@@ -14,8 +14,8 @@ func TestMetricsTool(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "metrics")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read")
-	writer, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner)
+	writer, _ := createToken(t, env, owner, allRights...)
 	admin := connectMemory(t, env.server, owner, writer)
 	session := connectMemory(t, env.server, owner, token)
 

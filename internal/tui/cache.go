@@ -32,11 +32,11 @@ type saved struct {
 
 // cacheKey names the file of one hub and one login, so another
 // login or workspace starts empty.
-func cacheKey(url, token string) string {
-	if token == "" {
+func cacheKey(url, login string) string {
+	if login == "" {
 		return ""
 	}
-	sum := sha256.Sum256([]byte(url + "\n" + token))
+	sum := sha256.Sum256([]byte(url + "\n" + login))
 	return fmt.Sprintf("%x", sum[:8])
 }
 

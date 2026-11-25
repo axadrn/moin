@@ -49,7 +49,7 @@ func (m model) startLogin() tea.Cmd {
 			return
 		}
 		api, err := client.New(config)
-		m.send(signedInMsg{api: api, key: cacheKey(config.URL, config.Token), err: err})
+		m.send(signedInMsg{api: api, key: cacheKey(config.URL, config.Login()), err: err})
 	}()
 	return nil
 }

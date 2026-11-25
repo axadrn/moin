@@ -12,7 +12,7 @@ func TestRenameApp(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "renamer")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 
 	server := output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "web-1"}))
@@ -31,6 +31,6 @@ func TestRenameApp(t *testing.T) {
 	}
 	toolError(t, call(t, session, "get_app", map[string]any{"app": "blog"}), "not_found")
 	toolError(t, call(t, session, "rename_app", map[string]any{"app": "journal", "name": "Not Valid"}), "validation_failed")
-	reader, _ := createToken(t, env, owner, "read")
-	toolError(t, call(t, connectMemory(t, env.server, owner, reader), "rename_app", map[string]any{"app": "journal", "name": "diary"}), "insufficient_scope")
+	reader, _ := createToken(t, env, owner)
+	toolError(t, call(t, connectMemory(t, env.server, owner, reader), "rename_app", map[string]any{"app": "journal", "name": "diary"}), "missing_right")
 }

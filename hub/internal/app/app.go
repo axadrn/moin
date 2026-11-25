@@ -51,7 +51,8 @@ type App struct {
 	TelemetryService    *service.TelemetryService
 	UpdateService       *service.UpdateService
 	WorkspaceService    *service.WorkspaceService
-	APITokenService     *service.APITokenService
+	ConnectionService   *service.ConnectionService
+	CITokenService      *service.CITokenService
 	DeviceLoginService  *service.DeviceLoginService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
@@ -150,8 +151,9 @@ func New(cfg *config.Config) (*App, error) {
 		email, workspaceService,
 	)
 	passkeys := newPasskeys(cfg, users, email, repository.NewPasskeys(database))
-	apiTokenService := service.NewAPITokenService(repository.NewAPITokens(database), workspaceService)
-	auth.UseAPITokens(apiTokenService)
+	connectionService := service.NewConnectionService(repository.NewConnections(database), workspaceService)
+	ciTokenService := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, history), workspaceService)
+	auth.UseBearers(connectionService, ciTokenService)
 	secrets, err := secret.New(cfg.SecretsKey)
 	if err != nil {
 		return nil, fmt.Errorf("initialize secrets: %w", err)
@@ -238,8 +240,9 @@ func New(cfg *config.Config) (*App, error) {
 		// workflow updates the hosted one.
 		UpdateService:      service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, activity),
 		WorkspaceService:   workspaceService,
-		APITokenService:    apiTokenService,
-		DeviceLoginService: service.NewDeviceLoginService(repository.NewDeviceLogins(database), apiTokenService),
+		ConnectionService:  connectionService,
+		CITokenService:     ciTokenService,
+		DeviceLoginService: service.NewDeviceLoginService(repository.NewDeviceLogins(database), connectionService, passkeys),
 		ServerService:      serverService,
 		AppService:         appService,
 		GitHubAppService:   githubApp,

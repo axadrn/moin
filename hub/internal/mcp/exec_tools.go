@@ -15,9 +15,9 @@ import (
 // registerExecTools registers exec_command.
 func registerExecTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("exec_command", "Run a command in a container",
-		"Runs one command in a container of an app, such as rails db:migrate or ls /data, and returns its output (the last 64 KB) and exit code. No shell reads it: wrap pipes and variables in sh -c '...'. Only owners and admins may, and a server can forbid it with exec: off in its rules. Ask the user before a command that changes data. Needs a token with read and write access.",
-		change(true, false)), Write(changes(services, tools.exec)))
+	Add(server, newTool("exec_command", "Run a command in a container",
+		"Runs one command in a container of an app, such as rails db:migrate or ls /data, and returns its output (the last 64 KB) and exit code. No shell reads it: wrap pipes and variables in sh -c '...'. Only owners and admins may, and a server can forbid it with exec: off in its rules. Ask the user before a command that changes data.",
+		change(true, false)), model.RightDeploy|model.RightEnv|model.RightDelete, changes(services, tools.exec))
 }
 
 // execOutputLimit is how much of a command's output exec_command returns:
@@ -55,7 +55,7 @@ func execMember(services Services, caller Caller) (*model.WorkspaceMember, error
 		return nil, err
 	}
 	for _, membership := range memberships {
-		if membership.ID == caller.Token.WorkspaceID {
+		if membership.ID == caller.Bearer.WorkspaceID {
 			return &model.WorkspaceMember{WorkspaceID: membership.ID, UserID: caller.User.ID, Role: membership.Role}, nil
 		}
 	}

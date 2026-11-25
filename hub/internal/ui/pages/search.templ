@@ -113,7 +113,7 @@ func SearchItems(in SearchInput) []SearchItem {
 		{Title: "Activity", Where: "Settings", Key: "G Y", Icon: "activity", Href: in.Base + "/activity"},
 		{Title: "Account", Where: "Settings", Icon: "user", Href: in.Base + "/settings/account"},
 		{Title: "Security", Where: "Settings › Account", Icon: "shield", Href: in.Base + "/settings/account?tab=security"},
-		{Title: "Tokens", Where: "Settings › Account", Icon: "key", Href: in.Base + "/settings/account?tab=tokens"},
+		{Title: "Connections", Where: "Settings", Icon: "key", Href: in.Base + "/settings/connections"},
 		{Title: "Source code", Where: "GitHub", Icon: "git-hub", Href: layouts.GitHubURL, External: true},
 	}
 	if in.IsOwner {

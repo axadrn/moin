@@ -11,10 +11,9 @@ import (
 )
 
 // Settings is your account, one tab at a time: Profile (picture, name,
-// email, alerts), Security (GitHub, passkeys, sessions, and the account
-// itself at the end) and Tokens. tokenSections are the parts of the tokens
-// tab.
-templ Settings(sessions []model.Session, currentSessionID string, passkeys []model.Passkey, activeTab string, tokenSections ...templ.Component) {
+// email, alerts) and Security (GitHub, passkeys, sessions, and the account
+// itself at the end). Connections are a page of their own.
+templ Settings(sessions []model.Session, currentSessionID string, passkeys []model.Passkey, activeTab string) {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
 	@layouts.App("Account · Settings") {
@@ -23,7 +22,6 @@ templ Settings(sessions []model.Session, currentSessionID string, passkeys []mod
 			@components.Tabs(components.TabsProps{ID: "account-tabs", Label: "Account", Tabs: []components.Tab{
 				{Label: "Profile", Href: settingsPath, Active: activeTab == "profile"},
 				{Label: "Security", Href: settingsPath + "?tab=security", Active: activeTab == "security"},
-				{Label: "Tokens", Href: settingsPath + "?tab=tokens", Active: activeTab == "tokens"},
 			}})
 			switch activeTab {
 				case "security":
@@ -36,10 +34,6 @@ templ Settings(sessions []model.Session, currentSessionID string, passkeys []mod
 					}
 					@SettingsSessionsSection(sessions, currentSessionID)
 					@settingsAccountDanger()
-				case "tokens":
-					for _, section := range tokenSections {
-						@section
-					}
 				default:
 					@SettingsAvatarSection(user)
 					@settingsNameCard(user)
@@ -225,7 +219,7 @@ templ settingsAccountDanger() {
 // first): the server checks the typed DELETE.
 templ deleteAccountDialog() {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@components.Dialog(components.DialogProps{ID: "delete-account-dialog", Title: "Delete your account?", Note: "Your account, picture, passkeys, sessions and API tokens are deleted. This cannot be undone."}) {
+	@components.Dialog(components.DialogProps{ID: "delete-account-dialog", Title: "Delete your account?", Note: "Your account, picture, passkeys, sessions, connections and CI tokens are deleted. This cannot be undone."}) {
 		<form
 			id="delete-account-form"
 			class="moin-stack"

@@ -17,8 +17,8 @@ import (
 )
 
 // registerTools registers the built-in tools. Register your own tools here,
-// next to them: wrap the body in Read or Write, call your service, and return
-// a struct the SDK turns into the output schema.
+// next to them: Add the tool with the right it needs, call your service, and
+// return a struct the SDK turns into the output schema.
 //
 // Tools are a curated list for AI agents, not a copy of the JSON API. Keep
 // money-moving and account actions out: checkout, billing management,
@@ -27,66 +27,66 @@ import (
 // destructive ones marked so clients confirm them.
 func registerTools(server *mcpsdk.Server, services Services) {
 	tools := builtinTools{services: services}
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	Add(server, &mcpsdk.Tool{
 		Name:        "whoami",
 		Title:       "Who am I",
-		Description: "Returns the account this API token acts for: user id, name and email, the token's name, scopes and expiry, and the one workspace the token is bound to with the user's role there. Call it first to learn what the other tools can reach. Needs the read scope.",
+		Description: "Returns the account this connection acts for: user id, name and email; the connection or CI token with its name, its rights and when it stops working; and the one workspace it is bound to, with the user's role there. Call it first to learn what the other tools can reach: a tool whose right is missing fails with missing_right. Only the person changes the rights, in Settings, Connections.",
 		Annotations: readOnly("Who am I"),
-	}, Read(tools.whoami))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightRead, tools.whoami)
+	Add(server, &mcpsdk.Tool{
 		Name:        "list_workspaces",
 		Title:       "List workspaces",
-		Description: "Lists the workspaces this token can reach with the user's role in each. A token is bound to one workspace, so the list has at most one entry. Needs the read scope.",
+		Description: "Lists the workspaces this connection or CI token can reach with the user's role in each. It is bound to one workspace, so the list has at most one entry.",
 		Annotations: readOnly("List workspaces"),
-	}, Read(tools.listWorkspaces))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightRead, tools.listWorkspaces)
+	Add(server, &mcpsdk.Tool{
 		Name:        "get_workspace",
 		Title:       "Get workspace",
-		Description: "Returns a workspace: its name and slug, the user's role and permissions, the members, the pending invitations (only for members who may manage members), and the seats used and allowed by the plan. Needs the read scope.",
+		Description: "Returns a workspace: its name and slug, the user's role and permissions, the members, the pending invitations (only for members who may manage members), and the seats used and allowed by the plan.",
 		Annotations: readOnly("Get workspace"),
-	}, Read(tools.getWorkspace))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightRead, tools.getWorkspace)
+	Add(server, &mcpsdk.Tool{
 		Name:        "list_activity",
 		Title:       "List workspace activity",
-		Description: "Lists the activity of a workspace, newest first: who did what, when (RFC 3339, UTC, full precision) and how (via web, cli, tui, api, mcp, hook, github or system, and the API token by name), with a summary sentence and the app and server per event. It covers deploys and how they ended, rollbacks, redeploys, restarts, stops, restores, SQL writes and row edits, env keys (never values), domains, passwords, deploy hooks, registries, the bucket, GitHub, servers, security, API tokens, billing and team changes. Filter with app, server or user (email or user ID). Who did it is the member by name. Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Admins and owners also get the email, the client IP and the user agent. Every member may view it. Needs the read scope.",
+		Description: "Lists the activity of a workspace, newest first: who did what, when (RFC 3339, UTC, full precision) and how (via web, cli, tui, api, mcp, hook, github or system, and the connection or CI token by name), with a summary sentence and the app and server per event. It covers deploys and how they ended, rollbacks, redeploys, restarts, stops, restores, SQL writes and row edits, env keys (never values), domains, passwords, deploy hooks, registries, the bucket, GitHub, servers, security, connections, CI tokens, billing and team changes. Filter with app, server or user (email or user ID). Who did it is the member by name. Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Admins and owners also get the email, the client IP and the user agent. Every member may view it.",
 		Annotations: readOnly("List workspace activity"),
-	}, Read(tools.listActivity))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightRead, tools.listActivity)
+	Add(server, &mcpsdk.Tool{
 		Name:        "get_billing",
 		Title:       "Get billing",
-		Description: "Returns the subscription of a workspace: the plan, the subscription status, the resolved access state (free, trial, paid, grace or blocked) with trial and access end dates, and the plans that can be bought. It never starts a checkout or returns payment links. Only workspace owners may view billing. Needs the read scope.",
+		Description: "Returns the subscription of a workspace: the plan, the subscription status, the resolved access state (free, trial, paid, grace or blocked) with trial and access end dates, and the plans that can be bought. It never starts a checkout or returns payment links. Only workspace owners may view billing.",
 		Annotations: readOnly("Get billing"),
-	}, Read(tools.getBilling))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightRead, tools.getBilling)
+	Add(server, &mcpsdk.Tool{
 		Name:        "invite_member",
 		Title:       "Invite a member",
-		Description: "Invites a person to a workspace by email with the role member or admin. The invitation is emailed to them and shows up in get_workspace until they accept. Fails with seat_limit when the plan has no free seat and already_member for existing members. Only owners and admins may invite. Needs a token with read and write access.",
+		Description: "Invites a person to a workspace by email with the role member; an admin is invited in the web. The invitation is emailed to them and shows up in get_workspace until they accept. Fails with seat_limit when the plan has no free seat and already_member for existing members. Only owners and admins may invite.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Invite a member", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(true)},
-	}, Write(tools.inviteMember))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightServers, tools.inviteMember)
+	Add(server, &mcpsdk.Tool{
 		Name:        "rename_workspace",
 		Title:       "Rename a workspace",
-		Description: "Changes the name of a workspace (2 to 80 characters). Its slug, the name in its links, follows; links count the ID, so every old link keeps working. Only owners and admins may rename. Needs a token with read and write access.",
+		Description: "Changes the name of a workspace (2 to 80 characters). Its slug, the name in its links, follows; links count the ID, so every old link keeps working. Only owners and admins may rename.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Rename a workspace", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
-	}, Write(tools.renameWorkspace))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightServers, tools.renameWorkspace)
+	Add(server, &mcpsdk.Tool{
 		Name:        "resend_invitation",
 		Title:       "Send an invitation again",
-		Description: "Sends the email of a pending invitation again, with a new link that works for seven days; the old link stops working. Name the invitation by its email or its ID from get_workspace. Only owners and admins may resend. Needs a token with read and write access.",
+		Description: "Sends the email of a pending invitation again, with a new link that works for seven days; the old link stops working. Name the invitation by its email or its ID from get_workspace. Only owners and admins may resend.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Send an invitation again", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(true)},
-	}, Write(tools.resendInvitation))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightServers, tools.resendInvitation)
+	Add(server, &mcpsdk.Tool{
 		Name:        "revoke_invitation",
 		Title:       "Revoke an invitation",
-		Description: "Takes back a pending invitation; the link in the email stops working. Name it by its email or its ID from get_workspace. Only owners and admins may revoke. Needs a token with read and write access.",
+		Description: "Takes back a pending invitation; the link in the email stops working. Name it by its email or its ID from get_workspace. Only owners and admins may revoke.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Revoke an invitation", DestructiveHint: boolPointer(true), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
-	}, Write(tools.revokeInvitation))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	}, model.RightServers, tools.revokeInvitation)
+	Add(server, &mcpsdk.Tool{
 		Name:        "set_email_alerts",
 		Title:       "Turn email alerts on or off",
-		Description: "With on true, the user this token acts for gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; whoami returns the setting as user.email_alerts. Needs a token with read and write access.",
+		Description: "With on true, the user this connection or CI token acts for gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; whoami returns the setting as user.email_alerts.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Turn email alerts on or off", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
-	}, Write(tools.setEmailAlerts))
+	}, model.RightServers, tools.setEmailAlerts)
 	registerOpsTools(server, services)
 	registerUptimeTools(server, services)
 	registerMetricsTools(server, services)
@@ -111,31 +111,32 @@ type builtinTools struct {
 // NoInput is the input of tools without arguments.
 type NoInput struct{}
 
-// TokenInfo describes the personal API token of the caller.
-type TokenInfo struct {
-	Name      string     `json:"name" jsonschema:"the label the user gave the token"`
-	Scopes    []string   `json:"scopes" jsonschema:"read, or read and write"`
-	ExpiresAt *time.Time `json:"expires_at" jsonschema:"when the token stops working, null for never"`
+// ConnectionInfo describes the connection or CI token of the caller.
+type ConnectionInfo struct {
+	Kind      string     `json:"kind" jsonschema:"connection, from a login in the browser, or ci_token, made by hand"`
+	Name      string     `json:"name" jsonschema:"the client's name or the CI token's name"`
+	Rights    []string   `json:"rights" jsonschema:"what it may do: read, deploy, env, delete, servers"`
+	ExpiresAt *time.Time `json:"expires_at" jsonschema:"when this access ends; a connection's access token is refreshed before, null for a CI token that never expires"`
 }
 
 // WhoAmI is the output of whoami.
 type WhoAmI struct {
-	User      api.User        `json:"user"`
-	Token     TokenInfo       `json:"token"`
-	Workspace *api.Membership `json:"workspace" jsonschema:"the one workspace this token can reach, with the user's role; null when the user is no longer a member"`
+	User       api.User        `json:"user"`
+	Connection ConnectionInfo  `json:"connection"`
+	Workspace  *api.Membership `json:"workspace" jsonschema:"the one workspace this connection can reach, with the user's role; null when the user is no longer a member"`
 }
 
 func (w WhoAmI) Summary() string {
-	summary := fmt.Sprintf("Signed in as %s (%s) with the token %q and the scopes %s.", w.User.Name, w.User.Email, w.Token.Name, strings.Join(w.Token.Scopes, " and "))
+	summary := fmt.Sprintf("Signed in as %s (%s) through %q, which may %s.", w.User.Name, w.User.Email, w.Connection.Name, strings.Join(w.Connection.Rights, ", "))
 	if w.User.EmailAlerts {
 		summary += " Email alerts are on."
 	} else {
 		summary += " Email alerts are off."
 	}
 	if w.Workspace == nil {
-		return summary + " The user is no longer a member of the token's workspace, so workspace tools find nothing."
+		return summary + " The user is no longer a member of the connection's workspace, so workspace tools find nothing."
 	}
-	summary += fmt.Sprintf(" The token is bound to the workspace %s (slug %s), role %s.", w.Workspace.Workspace.Name, w.Workspace.Workspace.Slug, w.Workspace.Role)
+	summary += fmt.Sprintf(" It is bound to the workspace %s (slug %s), role %s.", w.Workspace.Workspace.Name, w.Workspace.Workspace.Slug, w.Workspace.Role)
 	return summary
 }
 
@@ -163,6 +164,14 @@ func (t builtinTools) setEmailAlerts(_ context.Context, caller Caller, input Ema
 	return EmailAlertsOutput{api.EmailAlerts{On: input.On}}, nil
 }
 
+// kind is "connection" or "ci_token", as whoami says.
+func kind(bearer model.Bearer) string {
+	if bearer.CITokenID != "" {
+		return "ci_token"
+	}
+	return "connection"
+}
+
 func (t builtinTools) whoami(_ context.Context, caller Caller, _ NoInput) (WhoAmI, error) {
 	// The user as stored now, so email_alerts shows a change made in the
 	// same session.
@@ -174,10 +183,11 @@ func (t builtinTools) whoami(_ context.Context, caller Caller, _ NoInput) (WhoAm
 	}
 	output := WhoAmI{
 		User: api.NewUser(user),
-		Token: TokenInfo{
-			Name:      caller.Token.Name,
-			Scopes:    caller.Token.ScopeList(),
-			ExpiresAt: caller.Token.ExpiresAt,
+		Connection: ConnectionInfo{
+			Kind:      kind(*caller.Bearer),
+			Name:      caller.Bearer.Name,
+			Rights:    caller.Bearer.Rights.List(),
+			ExpiresAt: caller.Bearer.ExpiresAt,
 		},
 	}
 	membership, err := t.boundMembership(caller)
@@ -194,7 +204,7 @@ func (t builtinTools) whoami(_ context.Context, caller Caller, _ NoInput) (WhoAm
 // WorkspaceInput names a workspace. Empty means the workspace the token is
 // bound to.
 type WorkspaceInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 }
 
 // WorkspaceList is the output of list_workspaces.
@@ -204,7 +214,7 @@ type WorkspaceList struct {
 
 func (l WorkspaceList) Summary() string {
 	if len(l.Items) == 0 {
-		return "This token reaches no workspace."
+		return "This connection or CI token reaches no workspace."
 	}
 	names := make([]string, 0, len(l.Items))
 	for _, item := range l.Items {
@@ -255,7 +265,7 @@ func (t builtinTools) getWorkspace(_ context.Context, caller Caller, input Works
 
 // ActivityInput selects a page of workspace activity.
 type ActivityInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Limit     int    `json:"limit,omitempty" jsonschema:"number of events, 1 to 200; default 50"`
 	Cursor    string `json:"cursor,omitempty" jsonschema:"next_cursor of the previous page; leave empty for the newest events"`
 	App       string `json:"app,omitempty" jsonschema:"only events of this app, by name"`
@@ -333,9 +343,9 @@ func (t builtinTools) getBilling(_ context.Context, caller Caller, input Workspa
 
 // InviteInput is the input of invite_member.
 type InviteInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Email     string `json:"email" jsonschema:"email address of the person to invite"`
-	Role      string `json:"role" jsonschema:"member or admin"`
+	Role      string `json:"role" jsonschema:"member; an admin is invited in the web"`
 }
 
 // Invitation is the output of invite_member.
@@ -350,6 +360,9 @@ func (i Invitation) Summary() string {
 }
 
 func (t builtinTools) inviteMember(_ context.Context, caller Caller, input InviteInput) (Invitation, error) {
+	if strings.TrimSpace(input.Role) == model.WorkspaceRoleAdmin {
+		return Invitation{}, &ToolError{Code: "forbidden", Message: api.AdminInviteMessage}
+	}
 	workspace, member, err := t.workspace(caller, input.Workspace)
 	if err != nil {
 		return Invitation{}, err
@@ -368,7 +381,7 @@ func (t builtinTools) inviteMember(_ context.Context, caller Caller, input Invit
 
 // RenameInput is the input of rename_workspace.
 type RenameInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Name      string `json:"name" jsonschema:"the new name, 2 to 80 characters"`
 }
 
@@ -399,7 +412,7 @@ func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input Re
 
 // InvitationInput names a pending invitation.
 type InvitationInput struct {
-	Workspace  string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace  string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Invitation string `json:"invitation" jsonschema:"the email the invitation went to, or its ID from get_workspace"`
 }
 
@@ -475,7 +488,7 @@ func (t builtinTools) boundMembership(caller Caller) (api.Membership, error) {
 		return api.Membership{}, err
 	}
 	for _, membership := range api.NewMemberships(memberships) {
-		if membership.Workspace.ID == link.ID(caller.Token.WorkspaceID) {
+		if membership.Workspace.ID == link.ID(caller.Bearer.WorkspaceID) {
 			return membership, nil
 		}
 	}
@@ -501,7 +514,7 @@ func (t builtinTools) workspace(caller Caller, slug string) (*model.Workspace, *
 	if err != nil {
 		return nil, nil, err
 	}
-	if workspace.ID != caller.Token.WorkspaceID {
+	if workspace.ID != caller.Bearer.WorkspaceID {
 		return nil, nil, repository.ErrWorkspaceNotFound
 	}
 	return workspace, member, nil
