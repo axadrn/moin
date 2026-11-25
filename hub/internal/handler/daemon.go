@@ -76,12 +76,14 @@ if [ -f /etc/systemd/system/%[2]s-agent.service ]; then
 	rm -f /etc/systemd/system/%[2]s-agent.service
 fi
 # A new server gets its rules file with every rule and the value it has
-# without the file. One that is there stays as the owner wrote it.
-if [ ! -e /etc/%[2]s/rules ]; then
+# without the file, root only. One that is there, also as a link, stays
+# as the owner wrote it.
+if [ ! -e /etc/%[2]s/rules ] && [ ! -L /etc/%[2]s/rules ]; then
 	mkdir -p /etc/%[2]s
-	cat > /etc/%[2]s/rules <<'RULES'
+	(umask 077; cat > /etc/%[2]s/rules.new <<'RULES'
 %[5]sRULES
-	chmod 600 /etc/%[2]s/rules
+)
+	mv /etc/%[2]s/rules.new /etc/%[2]s/rules
 fi
 cat > /etc/systemd/system/%[2]s-daemon.service <<'UNIT'
 %[3]sUNIT

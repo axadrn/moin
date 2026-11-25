@@ -937,7 +937,7 @@ paths:
       tags: [Servers]
       operationId: updateDaemon
       summary: Update the daemon of a server
-      description: The daemon downloads the binary this hub serves for its OS and CPU, from the hub URL it is registered with, checks it against the SHA-256 the hub sends, swaps it in and restarts through systemd. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs, without systemd, and when its server has rules in `/etc/moin/rules`; daemons older than the update say so with the command that updates them on the server.
+      description: The daemon downloads the binary this hub serves for its OS and CPU, from the hub URL it is registered with, checks it against the SHA-256 the hub sends, swaps it in and restarts through systemd. The answer comes once the new daemon is connected, within three minutes. A daemon refuses while a deploy runs and without systemd; daemons older than the update say so with the command that updates them on the server.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
@@ -3391,7 +3391,7 @@ paths:
       tags: [Servers]
       operationId: setDaemonUpdates
       summary: Turn automatic daemon updates on or off
-      description: With `auto` on, a daemon older than the hub updates when it connects, one server at a time, never during a deploy and never on a server with rules. A daemon that does not come back stops it for the workspace, and the activity says so; an update by hand starts it again.
+      description: With `auto` on, a daemon older than the hub updates when it connects, one server at a time, never during a deploy. A daemon that does not come back stops it for the workspace, and the activity says so; an update by hand starts it again.
       requestBody:
         required: true
         content:
@@ -4983,7 +4983,7 @@ components:
                 type: string
         rules:
           type: [object, 'null']
-          description: What the owner of the server allows moin to do there, from /etc/moin/rules on the server. The daemon enforces them; the hub cannot change them. Null without rules.
+          description: What the owner of the server allows moin to do there, from /etc/moin/rules on the server. The daemon enforces them; the hub cannot change them. Null for a server without the file, an empty object for one whose rules limit nothing.
           properties:
             data_off:
               type: boolean

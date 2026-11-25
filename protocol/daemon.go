@@ -27,7 +27,7 @@ type DaemonUpdate struct {
 }
 
 // UpdateCommand updates a daemon by hand on the server, as root: for a
-// daemon too old to update itself, or one whose rules keep it from doing so.
+// daemon too old to update itself, or one without systemd.
 func UpdateCommand(baseURL, name, arch string) string {
 	binary := "/usr/local/bin/" + name
 	return fmt.Sprintf("curl -fsSL %s%s%s-linux-%s -o %s.new && chmod 755 %s.new && mv %s.new %s && systemctl restart %s-daemon",

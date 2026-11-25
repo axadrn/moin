@@ -138,7 +138,7 @@ API: POST /api/v1/servers/{id}/update
 MCP: update_daemon
 ```
 
-A server with rules in `/etc/moin/rules` never updates from moin. Update it on the server ([CLI reference](/docs/reference/cli#daemon-updates)).
+A server with rules updates like any other.
 
 ## Remove a server
 

@@ -47,7 +47,7 @@ func TestInstallScriptWritesTheRules(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	daemons.InstallScript(recorder, httptest.NewRequest(http.MethodGet, "/install.sh", nil))
 	script := recorder.Body.String()
-	start := strings.Index(script, "if [ ! -e /etc/moin/rules ]")
+	start := strings.Index(script, "if [ ! -e /etc/moin/rules ] && [ ! -L /etc/moin/rules ]")
 	end := strings.Index(script[max(start, 0):], "\nfi\n")
 	if start < 0 || end < 0 {
 		t.Fatalf("install.sh writes no rules:\n%s", script)
@@ -75,6 +75,23 @@ func TestInstallScriptWritesTheRules(t *testing.T) {
 	}
 	if kept, _ := os.ReadFile(file); string(kept) != "exec: off\n" {
 		t.Errorf("a second install changed the rules to %q", kept)
+	}
+
+	// A link the owner put there, also a broken one, stays too.
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(dir, "elsewhere"), file); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("sh", "-eu", "-c", block).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, output)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "elsewhere")); err == nil {
+		t.Error("the install wrote through a link")
+	}
+	if _, err := os.Stat(file + ".new"); err == nil {
+		t.Error("the install left rules.new")
 	}
 }
 
