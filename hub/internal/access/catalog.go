@@ -1,10 +1,14 @@
 package access
 
+// TrialDays is how long the hosted trial runs, from the first server that
+// connects.
+const TrialDays = 30
+
 var Product = Catalog{
 	Signup: SignupPolicy{
 		Mode:          SignupTrial,
 		TrialPlanID:   PlanPro,
-		TrialDays:     30,
+		TrialDays:     TrialDays,
 		TrialFallback: FallbackFree,
 	},
 	Lifecycle: LifecyclePolicy{
@@ -27,8 +31,8 @@ var Product = Catalog{
 			ID:           PlanPro,
 			Name:         "moin Hosted",
 			Description:  "Deploys, backups and data for your servers",
-			MonthlyPrice: 2900,
-			YearlyPrice:  24900,
+			MonthlyPrice: 700,
+			YearlyPrice:  4900,
 			Features:     []Feature{FeatureChanges},
 			Limits:       map[Limit]int{LimitServers: Unlimited, LimitMembers: Unlimited},
 			Benefits: []string{

@@ -56,6 +56,8 @@ type ServerService struct {
 	onMessage   func(serverID string, message protocol.Message)
 	onConnect   func(serverID, workspaceID string)
 	accessOf    func(workspaceID string) (access.Access, error)
+	// startTrial starts the trial of a workspace when a daemon connects.
+	startTrial func(workspaceID string) error
 	// autoVersion is the version daemons update to by themselves; "" is
 	// off. autoRunning and autoHalted are per workspace.
 	autoVersion string
@@ -330,6 +332,11 @@ func (s *ServerService) Connect(server *model.Server, hello protocol.Hello, addr
 		slog.Error("store daemon hello failed", "error", err, "server_id", server.ID)
 	}
 	s.keepSecretNames(server.ID, hello.Secrets, now)
+	if s.startTrial != nil {
+		if err := s.startTrial(server.WorkspaceID); err != nil {
+			slog.Error("start the trial failed", "error", err, "workspace_id", server.WorkspaceID)
+		}
+	}
 	if s.apps != nil {
 		s.apps.keepEnv(server.ID, server.WorkspaceID, hello.Env, now)
 	}
@@ -410,6 +417,12 @@ func (s *ServerService) RequireChanges(workspaceID string) error {
 // sets it; without it every account may add servers.
 func (s *ServerService) RequirePlanFor(accessOf func(workspaceID string) (access.Access, error)) {
 	s.accessOf = accessOf
+}
+
+// StartTrialWith makes the first daemon that connects start the trial of
+// its workspace. Wiring sets it.
+func (s *ServerService) StartTrialWith(startTrial func(workspaceID string) error) {
+	s.startTrial = startTrial
 }
 
 // CanAdd says whether the user's plan allows another server.

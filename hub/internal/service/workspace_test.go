@@ -454,9 +454,8 @@ func TestTheTrialComesOncePerPerson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ends := trial.CurrentPeriodEnd
-	if trial.Status != access.StatusTrialing || ends == nil || ends.Before(time.Now().AddDate(0, 0, 29)) || ends.After(time.Now().AddDate(0, 0, 31)) {
-		t.Fatalf("first workspace = %s until %v, want a 30-day trial", trial.Status, ends)
+	if !trial.TrialWaits() {
+		t.Fatalf("first workspace = %s until %v, want a trial that waits for the first server", trial.Status, trial.CurrentPeriodEnd)
 	}
 	if current := trial.Access(); current.State != access.StateTrial || !current.Has(access.FeatureChanges) {
 		t.Fatalf("access in the trial = %s, changes %v", current.State, current.Has(access.FeatureChanges))

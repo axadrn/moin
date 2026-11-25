@@ -215,7 +215,7 @@ func adminForeverFreeAttributes(user *model.AdminUser, on bool) templ.Attributes
 		attributes["hx-confirm"] = "Make " + user.Email + " free forever? Their first workspace gets everything, forever, without paying."
 		attributes["data-confirm-action"] = "Make free forever"
 	} else {
-		attributes["hx-confirm"] = "End free forever for " + user.Email + "? They get the rest of their trial, or read-only once it is over, until they pay."
+		attributes["hx-confirm"] = "End free forever for " + user.Email + "? If no server has connected yet, their trial waits for the first one. Otherwise the workspace turns read-only until they pay."
 		attributes["data-confirm-action"] = "End free forever"
 	}
 	return attributes

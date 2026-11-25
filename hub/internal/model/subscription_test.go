@@ -19,7 +19,8 @@ func TestSubscriptionIsActiveDuringCancelledPaidPeriod(t *testing.T) {
 		{name: "free", sub: Subscription{PlanID: SubscriptionPlanFree, Status: SubscriptionStatusActive}, want: true},
 		{name: "active", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusActive}, want: true},
 		{name: "trialing", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusTrialing, CurrentPeriodEnd: &future}, want: true},
-		{name: "trialing without end", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusTrialing}, want: false},
+		{name: "trial that waits for the first server", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusTrialing}, want: true},
+		{name: "trial after its end", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusTrialing, CurrentPeriodEnd: &past}, want: false},
 		{name: "past due", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusPastDue, ProviderStateUpdatedAt: &recentStateChange}, want: true},
 		{name: "past due without state time", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusPastDue}, want: false},
 		{name: "incomplete", sub: Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusIncomplete}, want: false},
@@ -35,5 +36,20 @@ func TestSubscriptionIsActiveDuringCancelledPaidPeriod(t *testing.T) {
 				t.Fatalf("IsActiveAt() = %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+// TestWaitingTrialNeverBlocksDeletion: a workspace that never had a server
+// can go, a running trial still waits for its end.
+func TestWaitingTrialNeverBlocksDeletion(t *testing.T) {
+	now := time.Date(2026, time.September, 1, 12, 0, 0, 0, time.UTC)
+	future := now.Add(time.Hour)
+	waiting := Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusTrialing}
+	if !waiting.TrialWaits() || waiting.BlocksWorkspaceDeletion(now) {
+		t.Fatalf("waiting trial: waits %v, blocks %v", waiting.TrialWaits(), waiting.BlocksWorkspaceDeletion(now))
+	}
+	running := Subscription{PlanID: SubscriptionPlanPro, Status: SubscriptionStatusTrialing, CurrentPeriodEnd: &future}
+	if running.TrialWaits() || !running.BlocksWorkspaceDeletion(now) {
+		t.Fatalf("running trial: waits %v, blocks %v", running.TrialWaits(), running.BlocksWorkspaceDeletion(now))
 	}
 }

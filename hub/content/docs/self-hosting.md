@@ -35,7 +35,7 @@ The rest of these docs apply as they are.
 
 | | Self-hosted | Hosted |
 | --- | --- | --- |
-| Price | free forever | $29 a month or $249 a year, per workspace |
+| Price | free forever | $7 a month or $49 a year, per workspace |
 | Features; servers, apps, teammates | all; unlimited | all; unlimited |
 | Setup | one command on one server | ready to use |
 | Updates | one click, when a new version is out | by us, the day they ship |

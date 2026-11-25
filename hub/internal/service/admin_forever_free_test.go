@@ -21,10 +21,6 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 	adminRepository := repository.NewAdmin(database)
 
 	trialEnd := time.Now().Add(20 * 24 * time.Hour).UTC().Truncate(time.Second)
-	target.Workspace.CreatedAt = trialEnd.AddDate(0, 0, -30)
-	if _, err := database.Exec(`UPDATE workspaces SET created_at = $1 WHERE id = $2`, target.Workspace.CreatedAt, target.Workspace.ID); err != nil {
-		t.Fatal(err)
-	}
 	target.Subscription.PlanID, target.Subscription.Status, target.Subscription.CurrentPeriodEnd = model.SubscriptionPlanPro, model.SubscriptionStatusTrialing, &trialEnd
 	providerID, paidUntil := "sub_123", time.Now().Add(30*24*time.Hour)
 	payer.Subscription.PlanID, payer.Subscription.Status, payer.Subscription.CurrentPeriodEnd, payer.Subscription.ProviderSubscriptionID = model.SubscriptionPlanPro, model.SubscriptionStatusActive, &paidUntil, &providerID
@@ -84,7 +80,11 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 		t.Fatalf("after making free forever: %+v", user)
 	}
 
-	// Ended during the trial: the rest of the trial.
+	// Ended before a server connected, even with one added: the trial
+	// waits for the first one again.
+	if _, err := database.Exec(`INSERT INTO servers (id, workspace_id, name, created_at) VALUES ('server-1', $1, 'web-1', $2)`, target.Workspace.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
 	if err := admin.SetForeverFree(operator.User, session, target.User.ID, false, target.User.Email); err != nil {
 		t.Fatal(err)
 	}
@@ -92,14 +92,26 @@ func TestAdminMakesAUserFreeForeverAndBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Status != model.SubscriptionStatusTrialing || after.CurrentPeriodEnd == nil || !after.CurrentPeriodEnd.Equal(trialEnd) {
-		t.Fatalf("ended during the trial: %+v, trial ends %s", after, trialEnd)
+	if after.PlanID != model.SubscriptionPlanPro || !after.TrialWaits() {
+		t.Fatalf("ended before a server connected: %+v", after)
 	}
 
-	// Ended after the trial: the free plan, read-only.
-	after.EndForeverFree(target.Workspace.CreatedAt, trialEnd.Add(time.Hour))
+	// Ended after a server connected: the free plan, read-only.
+	if err := admin.SetForeverFree(operator.User, session, target.User.ID, true, target.User.Email); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`UPDATE servers SET last_seen_at = $1 WHERE id = 'server-1'`, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := admin.SetForeverFree(operator.User, session, target.User.ID, false, target.User.Email); err != nil {
+		t.Fatal(err)
+	}
+	after, err = subscriptions.ByWorkspaceID(target.Workspace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if after.PlanID != model.SubscriptionPlanFree || after.Status != model.SubscriptionStatusActive || after.CurrentPeriodEnd != nil {
-		t.Fatalf("ended after the trial: %+v", after)
+		t.Fatalf("ended after a server connected: %+v", after)
 	}
 
 	events, err := adminRepository.ListActivityEvents(10)

@@ -239,6 +239,8 @@ var summaryCases = []struct{ action, target, metadata, want string }{
 		"revoked the API token ci"},
 	{"billing.plan_changed", "", `{"from":"free","status_from":"active","to":"pro","status":"trialing"}`,
 		"changed the plan from free (active) to pro (trialing)"},
+	{"billing.trial_started", "", `{"ends":"Dec 25, 2026"}`,
+		"started the trial with the first server, until Dec 25, 2026"},
 	{"workspace.updated", "", `{"from":"Old","name":"New"}`,
 		"renamed the workspace from Old to New"},
 	{"workspace.updated", "", `{"name":"New"}`,

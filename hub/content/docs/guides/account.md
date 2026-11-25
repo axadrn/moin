@@ -175,7 +175,7 @@ API: DELETE /api/v1/account
 
 ## Billing
 
-On hosted moin you pay per workspace: $29 a month or $249 a year, with unlimited servers, apps and teammates. Your first workspace starts with 30 days free, without a card. After the trial without a subscription, the workspace is read-only. Apps and backups keep running. You cannot deploy or add servers.
+On hosted moin you pay per workspace: $7 a month or $49 a year, with unlimited servers, apps and teammates. Your price stays as long as your subscription runs. Your first workspace gets 30 days free, starting when you connect your first server. No card. After the trial without a subscription, the workspace is read-only. Apps and backups keep running. You cannot deploy or add servers.
 
 ```surfaces
 Web: **Settings**, **Billing**

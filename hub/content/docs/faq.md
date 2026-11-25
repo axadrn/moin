@@ -53,15 +53,17 @@ Your team in moin: its servers, apps, bucket, settings and people. You can be in
 
 ## Do I pay per workspace?
 
-Yes: $29 a month per workspace ($249 a year). Unlimited servers, apps and team. The free trial comes once, with your first. Hosting moin yourself is free.
+Yes: $7 a month per workspace, or $49 a year. Unlimited servers, apps and team. The free trial comes once, with your first. Hosting moin yourself is free.
 
-The tenth server costs the same as the first. On hosted plans, Coolify Cloud is $5 for 2 servers plus $3 per extra server, so it reaches $29 at 10 servers and $59 at 20. Dokploy Cloud Startup is from $15 with 3 servers plus $4.50 per extra server, so about $29 at 6 servers.
+This is the launch price. It may go up later. Your price stays as long as your subscription runs.
+
+The tenth server costs the same as the first. On hosted plans, Coolify Cloud is $5 for 2 servers plus $3 per extra server, so it reaches $29 at 10 servers and $59 at 20. Dokploy Cloud Startup is from $15 with 3 servers plus $4.50 per extra server.
 
 The whole team is included, with no per-seat fee, and so is everything else: backups with a daily check, uptime, the data browser and AI agents. No higher tier unlocks more.
 
 ## How does the hosted trial work?
 
-Your first workspace gets 30 days with everything, no card. Then it is read-only until you subscribe. Your apps and their backups keep running.
+Your first workspace gets 30 days with everything. The 30 days start when you connect your first server, not when you sign up. No card. Then it is read-only until you subscribe. Your apps and their backups keep running.
 
 The hosted plans are for businesses. Before **Subscribe** you tick one box: you subscribe as a business, not as a consumer. No tax ID, no company name. Self-hosted, moin asks nothing of the kind.
 

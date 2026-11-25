@@ -84,6 +84,10 @@ func TestAdminFreeForeverAsksForTheEmail(t *testing.T) {
 			t.Errorf("trial user page missing %q", want)
 		}
 	}
+	waiting := renderAdmin(t, AdminUser(&model.AdminUser{ID: "waiting", Email: "waiting@example.com", Plan: model.AdminPlanTrial}))
+	if !strings.Contains(waiting, "Trial, no server yet") {
+		t.Error("a trial that waits for the first server shows no label")
+	}
 	free := renderAdmin(t, AdminUser(&model.AdminUser{ID: "free", Email: "free@example.com", Plan: model.AdminPlanFreeForever}))
 	if !strings.Contains(free, `data-confirm-name="free@example.com"`) || !strings.Contains(free, "End free forever") {
 		t.Error("a free forever user cannot end it")
