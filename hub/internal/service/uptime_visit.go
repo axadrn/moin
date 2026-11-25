@@ -18,10 +18,10 @@ import (
 	"github.com/axadrn/moin/internal/build"
 )
 
-// newUptimeClient is one client for every visit: a shared transport that
-// keeps a bounded number of connections open, no redirects followed (a
-// redirect is an answer), and on the hosted hub only public
-// addresses.
+// newUptimeClient is one client for every visit: a new connection each
+// time, as a new visitor makes, so a renewed certificate or a changed DNS
+// record shows on the next visit. No redirects followed (a redirect is an
+// answer), and on the hosted hub only public addresses.
 func newUptimeClient(publicOnly bool) *http.Client {
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
 	if publicOnly {
@@ -33,9 +33,7 @@ func newUptimeClient(publicOnly bool) *http.Client {
 			DialContext:           dialer.DialContext,
 			TLSHandshakeTimeout:   5 * time.Second,
 			ResponseHeaderTimeout: uptimeTimeout,
-			MaxIdleConns:          1024,
-			MaxIdleConnsPerHost:   1,
-			IdleConnTimeout:       90 * time.Second,
+			DisableKeepAlives:     true,
 			ForceAttemptHTTP2:     true,
 		},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
