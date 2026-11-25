@@ -26,9 +26,9 @@ func TestExecArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	composeFile := filepath.Join(release, "compose.json")
-	got := a.execArgs("shop", composeFile, "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
-	want := []string{"compose", "-p", "moin-shop", "-f", composeFile, "--env-file", filepath.Join(release, ".env"), "--env-file", a.envFile("shop"), "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
+	composeJSON := filepath.Join(release, "compose.json")
+	got := a.execArgs("shop", composeJSON, "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
+	want := []string{"compose", "-p", "moin-shop", "-f", composeJSON, "--env-file", filepath.Join(release, ".env"), "--env-file", a.envFile("shop"), "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("execArgs = %q", got)
 	}

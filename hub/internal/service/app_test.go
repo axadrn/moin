@@ -327,10 +327,10 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, OK: true})
-	// A daemon from before compose files sends none.
+	// A compose file too big to keep is dropped.
+	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: third.ID, OK: true, ComposeFile: strings.Repeat("x", maxComposeFile+1)})
 	if _, _, err := apps.ComposeFile(owner.WorkspaceID, "blog"); !errors.Is(err, ErrNoComposeFile) {
-		t.Fatalf("the compose file of a deploy without one: err = %v", err)
+		t.Fatalf("the compose file of a deploy with one too big: err = %v", err)
 	}
 	rollback, err := apps.Rollback(owner, "blog", 0)
 	if err != nil {
@@ -345,6 +345,10 @@ func TestDeployRollbackAndEnv(t *testing.T) {
 		t.Fatalf("rollback = %+v", rollback)
 	}
 	daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: rollback.ID, OK: true})
+	// A daemon from before compose files sends none.
+	if _, _, err := apps.ComposeFile(owner.WorkspaceID, "blog"); !errors.Is(err, ErrNoComposeFile) {
+		t.Fatalf("the compose file of a deploy without one: err = %v", err)
+	}
 
 	// A redeploy builds the newest source again, with the env as it is now.
 	_, err = apps.SetEnv(ctx, owner, "blog", map[string]string{"SECRET": "new"}, nil)

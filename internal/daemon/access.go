@@ -145,7 +145,7 @@ func (a *apps) checkCompose(release *release) error {
 	if release.rules != nil && release.rules.ServerAccess {
 		return nil
 	}
-	config, err := readJSON(release.composeFile)
+	config, err := readJSON(release.composeJSON)
 	if err != nil {
 		return err
 	}

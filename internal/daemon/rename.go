@@ -139,8 +139,8 @@ func pinNames(config map[string]any, app, name string, volume func(string) strin
 }
 
 // pinFile pins the names of a compose file of a deploy.
-func (a *apps) pinFile(ctx context.Context, start protocol.DeployStart, composeFile string) error {
-	body, err := os.ReadFile(composeFile)
+func (a *apps) pinFile(ctx context.Context, start protocol.DeployStart, composeJSON string) error {
+	body, err := os.ReadFile(composeJSON)
 	if err != nil {
 		return err
 	}
@@ -153,5 +153,5 @@ func (a *apps) pinFile(ctx context.Context, start protocol.DeployStart, composeF
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(composeFile, body, 0o600)
+	return os.WriteFile(composeJSON, body, 0o600)
 }

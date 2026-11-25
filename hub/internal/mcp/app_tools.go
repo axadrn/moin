@@ -47,7 +47,7 @@ func registerAppTools(server *mcpsdk.Server, services Services) {
 		"Returns the last lines of every container of an app, read from its server. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getLogs)))
 	mcpsdk.AddTool(server, newTool("get_compose_file", "Get the compose file",
-		"Returns the compose file of the live deploy of an app, YAML: everything moin runs for it, the proxy with its domains and HTTPS too, written to run anywhere. Each ${NAME} stays as written; it holds no secret value. Saved with a .env of the app's values next to it, docker compose up -d runs the app elsewhere. A live deploy from before compose files answers no_compose_file: redeploy_app or restart_app makes one. Needs the read scope.",
+		"Returns the compose file of the live deploy of an app, YAML: everything moin runs for it, the proxy with its domains and HTTPS too, written to run anywhere, without the instant address. It holds no secret value. image, ports, expose, volumes, user, the env PORT and the paths of a build show the values the deploy ran with; every other ${NAME} stays as written. Saved with a .env of the app's values next to it, docker compose up -d runs the app elsewhere. A live deploy without one answers no_compose_file: redeploy_app or restart_app makes one, and get_deploy's log says why if it stays empty. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.getComposeFile)))
 }
 

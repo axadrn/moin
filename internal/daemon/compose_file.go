@@ -3,6 +3,7 @@ package daemon
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -16,11 +17,13 @@ import (
 )
 
 // The compose file of an app is everything moin runs for it, written to
-// run anywhere: the compose.json of its live release, with the proxy as a
-// service of its own and no path of this server. Save it, put a .env with
-// the app's values next to it, and docker compose up -d runs the app, its
-// domains and HTTPS. It holds each ${NAME} as written and no value of the
-// env, and no hash of the app's password: those stay on the server.
+// run anywhere: the compose.json of a release, with the proxy as a service
+// of its own and no path of this server. Save it, put a .env with the
+// app's values next to it, and docker compose up -d runs the app, its
+// domains and HTTPS. It holds no value of the env and no hash of the app's
+// password: those stay on the server. Each ${NAME} stays as written, but
+// for the settings the deploy filled in (takePlaces): image, ports,
+// expose, volumes, user, the env PORT and the paths of a build.
 //
 // On the way out of the server:
 //
@@ -31,34 +34,23 @@ import (
 //   - app.env, which the app's services read, is .env, the file docker
 //     compose also fills ${NAME} from;
 //   - the app's password is ./htpasswd, mounted into the proxy;
+//   - the instant address stays with moin: it names this server;
 //   - the proxy's network is the file's own, not external;
-//   - a service moin built builds again from ".", and the Dockerfile moin
-//     wrote for a Go repo without one comes inline. A Railpack build keeps
+//   - a service moin built builds again from ".". A Railpack build keeps
 //     the image moin built: its plan is not in the repo.
 //
 // Keys are in a stable order, so the same release gives the same file.
 
-// proxyService names the proxy in the compose file, unless the app has a
-// service of that name.
+// proxyService names the proxy in the compose file, or proxyName when the
+// app has a service of that name.
 const proxyService = "proxy"
 
 // proxyUsers is where the proxy of the compose file reads the app's
 // password.
 const proxyUsers = "/htpasswd"
 
-// composeFileOf is the compose file of release number of an app, "" when
-// it cannot be made; why goes to logf.
-func (a *apps) composeFileOf(app string, number int, logf func(string, ...any)) string {
-	text, err := a.portableCompose(app, number)
-	if err != nil {
-		logf("the compose file of v%d could not be made: %s", number, err)
-		return ""
-	}
-	return text
-}
-
-// portableCompose makes the compose file of release number of an app.
-func (a *apps) portableCompose(app string, number int) (string, error) {
+// composeFile makes the compose file of release number of an app.
+func (a *apps) composeFile(app string, number int) (string, error) {
 	dir := a.releaseDir(app, number)
 	config, err := readJSON(filepath.Join(dir, "compose.json"))
 	if err != nil {
@@ -75,46 +67,82 @@ func (a *apps) portableCompose(app string, number int) (string, error) {
 	for name, item := range services {
 		service, _ := item.(map[string]any)
 		baseService, _ := baseServices[name].(map[string]any)
-		buildAgain(app, name, service, baseService, detected.Kind)
+		buildAgain(app, name, service, baseService, detected.Kind == "railpack")
 	}
 	if detected.Kind == "railpack" {
 		// The env names railpackSecrets handed its build, which is gone.
 		delete(config, "secrets")
 	}
-	protected := exists(filepath.Join(dir, "htpasswd"))
+	dropInstant(app, config)
 	config = takeAlong(config, a.serverPaths(app)).(map[string]any)
 	takeEnvFile(services)
-	addProxy(config, protected)
+	err = addProxy(config, exists(filepath.Join(dir, "htpasswd")))
+	if err != nil {
+		return "", err
+	}
 	tunnel := a.proxyMode != nil && a.proxyMode() == "tunnel"
 	return writeComposeYAML(config, tunnel)
 }
 
 // buildAgain makes a service moin built build again where the file runs,
 // from the build its release read, and keeps the image of every other one.
-// kind is how the repo builds (protocol.Detected).
-func buildAgain(app, name string, service, baseService map[string]any, kind string) {
+// A Railpack build keeps its image.
+func buildAgain(app, name string, service, baseService map[string]any, railpack bool) {
 	image, _ := service["image"].(string)
 	built := image == "" || strings.HasPrefix(image, project(app)+"-"+name+":")
 	build, _ := service["build"].(map[string]any)
 	if build == nil {
 		build, _ = baseService["build"].(map[string]any)
 	}
-	if !built || build == nil || kind == "railpack" {
+	if !built || build == nil || railpack {
 		delete(service, "build")
 		return
 	}
 	delete(service, "image")
 	service["build"] = build
-	// moin wrote the Dockerfile of a Go repo without one (generate): it is
-	// not in the repo, so it comes along in the file.
-	if kind != "go" {
-		return
+	// A hash of the env values, so a Railpack build sees a new one: it
+	// builds the same without.
+	args, _ := build["args"].(map[string]any)
+	delete(args, "secrets-hash")
+	if len(args) == 0 {
+		delete(build, "args")
 	}
-	context, _ := build["context"].(string)
-	body, err := os.ReadFile(filepath.Join(context, "Dockerfile"))
-	if err == nil {
-		delete(build, "dockerfile")
-		build["dockerfile_inline"] = string(body)
+}
+
+// dropInstant takes the routers of the instant address out of the compose
+// file: it names this server's IP, so it stays with moin. A service the
+// proxy then routes nothing to leaves its network, and without any the
+// file has no proxy.
+func dropInstant(app string, config map[string]any) {
+	instant := "traefik.http.routers." + project(app) + "-instant."
+	routed := false
+	services, _ := config["services"].(map[string]any)
+	for _, item := range services {
+		service, _ := item.(map[string]any)
+		labels, _ := service["labels"].(map[string]any)
+		hasRouter := false
+		for key := range labels {
+			if strings.HasPrefix(key, instant) {
+				delete(labels, key)
+			} else if strings.HasPrefix(key, "traefik.http.routers.") {
+				hasRouter = true
+			}
+		}
+		if hasRouter {
+			routed = true
+			continue
+		}
+		for key := range labels {
+			if strings.HasPrefix(key, "traefik.") {
+				delete(labels, key)
+			}
+		}
+		networks, _ := service["networks"].(map[string]any)
+		delete(networks, proxyNetwork)
+	}
+	if !routed {
+		networks, _ := config["networks"].(map[string]any)
+		delete(networks, proxyNetwork)
 	}
 }
 
@@ -205,13 +233,21 @@ func takeEnvFile(services map[string]any) {
 // addProxy adds the proxy as moin runs it, on ports 80 and 443 with
 // certificates from Let's Encrypt, when a service of the app is on its
 // network. protected mounts the app's password.
-func addProxy(config map[string]any, protected bool) {
+func addProxy(config map[string]any, protected bool) error {
 	networks, _ := config["networks"].(map[string]any)
 	network, _ := networks[proxyNetwork].(map[string]any)
 	if network == nil {
-		return
+		return nil
 	}
 	delete(network, "external")
+	services, _ := config["services"].(map[string]any)
+	name := proxyService
+	if _, taken := services[name]; taken {
+		name = proxyName
+	}
+	if _, taken := services[name]; taken {
+		return fmt.Errorf("the app has services named %s and %s, so the proxy has no name: rename one", proxyService, proxyName)
+	}
 	volumes := []any{"/var/run/docker.sock:/var/run/docker.sock:ro", "./traefik:/data"}
 	if protected {
 		volumes = append(volumes, "./htpasswd:"+proxyUsers+":ro")
@@ -219,11 +255,6 @@ func addProxy(config map[string]any, protected bool) {
 	command := []any{}
 	for _, flag := range proxyFlags("direct") {
 		command = append(command, flag)
-	}
-	services, _ := config["services"].(map[string]any)
-	name := proxyService
-	if _, taken := services[name]; taken {
-		name = proxyName
 	}
 	services[name] = map[string]any{
 		"image":    proxyImage,
@@ -233,6 +264,7 @@ func addProxy(config map[string]any, protected bool) {
 		"networks": []any{proxyNetwork},
 		"restart":  "unless-stopped",
 	}
+	return nil
 }
 
 // composeParts are the parts of a compose file, in the order people write

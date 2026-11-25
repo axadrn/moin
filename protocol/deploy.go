@@ -113,7 +113,9 @@ type DeployDone struct {
 	Env *AppEnv `json:"env,omitempty"`
 	// ComposeFile is the compose file of a deploy that worked, YAML:
 	// everything the daemon runs for the app, written to run anywhere,
-	// with each ${NAME} as written and no value of the env. Daemons before
-	// it send none.
+	// without the instant address and with no value of the env. image,
+	// ports, expose, volumes, user, the env PORT and the paths of a build
+	// are as the deploy filled them in; every other ${NAME} stays as
+	// written. Daemons before it send none.
 	ComposeFile string `json:"compose_file,omitempty"`
 }

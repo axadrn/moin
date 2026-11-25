@@ -127,7 +127,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 			t.Errorf("worker lacks its env_file:\n%s", worker)
 		}
 		if t.Failed() {
-			body, _ := os.ReadFile(a.composeFile(app))
+			body, _ := os.ReadFile(a.composeJSON(app))
 			version, _ := exec.Command("docker", "compose", "version").CombinedOutput()
 			t.Fatalf("%s%s", version, body)
 		}

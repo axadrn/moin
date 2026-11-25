@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -175,12 +176,12 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 func (h *AppsHandler) ComposeFile(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	_, text, err := h.apps.ComposeFile(workspace.ID, r.PathValue("app"))
-	if errors.Is(err, repository.ErrAppNotFound) {
-		http.NotFound(w, r)
-		return
-	}
 	if err != nil {
-		http.Error(w, errorMessage(err), http.StatusConflict)
+		status, detail, known := api.ErrorFor(err)
+		if !known {
+			slog.Error("load the compose file failed", "error", err)
+		}
+		http.Error(w, detail.Message, status)
 		return
 	}
 	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")

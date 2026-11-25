@@ -35,7 +35,7 @@ The app's name is in moin too. `moin deploy` finds it on its own: the app that f
 
 ## The compose file moin runs
 
-moin turns your `compose.yml` into the file it runs: your services with their volumes, env files and builds, plus the proxy that serves your domains with HTTPS. It is the same file after every deploy, so you always see what runs. It holds every `${NAME}` as you wrote it. No secret value, no password hash.
+moin turns your `compose.yml` into the file it runs: your services with their volumes, env files and builds, plus the proxy that serves your domains with HTTPS. It is the same file after every deploy, so you always see what runs. No secret value, no password hash. Every `${NAME}` stays as you wrote it, but in the settings the deploy filled in: `image`, `ports`, `expose`, `volumes`, `user`, the env `PORT` and the paths of a `build` show the value they ran with.
 
 Web: the app's **Settings** tab, **Compose file**: **Copy** or **Download**
 
@@ -45,7 +45,7 @@ TUI: `C` on the app opens it in the web.
 
 API: `GET /api/v1/apps/{app}/compose`. MCP: `get_compose_file`.
 
-It is the one of the live deploy. A deploy before this feature has none: deploy or restart again to see it.
+It is the one of the live deploy. A deploy without one, such as one from before this feature, says so: deploy again. If it stays empty, the deploy log says why.
 
 ### Run it elsewhere
 
@@ -58,10 +58,13 @@ The compose file is your way out. Nothing in it needs moin.
 
 The proxy takes ports 80 and 443 and gets the certificates from Let's Encrypt, as on your server. It does that also when your server gets its traffic through a [Cloudflare Tunnel](/docs/guides/security#web), which only moin sets up.
 
+Each file brings its own proxy on 80 and 443. For several apps on one server, keep the proxy of one file, delete it from the others, and write `external: true` under `moin-proxy` in their `networks`.
+
 What changed on the way out:
 
-- **Source**: the folder of the file is your repo, `.`. A service moin built has `build: .` again. The `Dockerfile` moin writes for a Go repo without one comes inline.
+- **Source**: the folder of the file is your repo, `.`. A service moin built has `build: .` again. For a Go repo without a `Dockerfile`, moin writes one into the compose file, so it comes along.
 - **Data**: the folders moin kept outside each release are where your `compose.yml` put them, like `./data`. Copy the data there first. Named volumes keep their names.
+- **Instant address**: it stays with moin. It names your server's IP, so the file routes only your domains.
 - **Password**: when the app has one, the proxy reads it from `./htpasswd`. Make it with `htpasswd -nB moin > htpasswd`, with your user if you set one.
 - **Railpack apps**: moin builds them with [Railpack](https://railpack.com), whose build plan is not in your repo. The file keeps the image moin built, which is only on your server. Run `railpack build .` in your repo there and put the image's name in the file, or push the image to a registry.
 
