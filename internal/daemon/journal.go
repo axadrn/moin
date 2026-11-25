@@ -2,9 +2,13 @@ package daemon
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"maps"
 	"net/url"
 	"slices"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/axadrn/moin/protocol"
 )
@@ -14,30 +18,37 @@ import (
 // asked (logAsked), one what came of it (logAnswer), so the owner of the
 // server sees what a hub did there, also one that someone broke into.
 
-// asked is what a request of the hub names, for the log. It holds only
-// these fields, so an env value, a secret, a password, SQL, the arguments
-// of a command or a file never reaches the log. Add a field only when it
-// is safe to show.
+// asked is what a request of the hub names, for the log. Only these fields
+// are read, so an env value, a secret, a password, SQL, the arguments of a
+// command or a file never reaches the log. Add a field only when it is safe
+// to show; TestJournalShowsOnlyWhatItMay checks every request.
 type asked struct {
-	App          string                     `json:"app"`
-	DeployID     string                     `json:"deploy_id"`
-	Number       int                        `json:"number"`
-	FromNumber   int                        `json:"from_number"`
-	SourceNumber int                        `json:"source_number"`
-	SourceURL    string                     `json:"source_url"`
-	Image        string                     `json:"image"`
-	Catalog      string                     `json:"catalog"`
-	Service      string                     `json:"service"`
-	Argv         []string                   `json:"argv"`
-	Database     string                     `json:"database"`
-	Write        bool                       `json:"write"`
-	Copy         string                     `json:"copy"`
-	Undo         string                     `json:"undo"`
-	Name         string                     `json:"name"`
-	Set          map[string]json.RawMessage `json:"set"`
-	Remove       []string                   `json:"remove"`
-	Version      string                     `json:"version"`
-	URL          string                     `json:"url"`
+	App          string                      `json:"app"`
+	DeployID     string                      `json:"deploy_id"`
+	Number       int                         `json:"number"`
+	FromNumber   int                         `json:"from_number"`
+	SourceNumber int                         `json:"source_number"`
+	SourceURL    string                      `json:"source_url"`
+	Image        string                      `json:"image"`
+	Catalog      string                      `json:"catalog"`
+	Service      string                      `json:"service"`
+	Argv         []string                    `json:"argv"`
+	Database     string                      `json:"database"`
+	Write        bool                        `json:"write"`
+	Copy         string                      `json:"copy"`
+	Undo         string                      `json:"undo"`
+	Name         string                      `json:"name"`
+	Value        json.RawMessage             `json:"value"`
+	Set          map[string]json.RawMessage  `json:"set"`
+	Remove       []string                    `json:"remove"`
+	Version      string                      `json:"version"`
+	URL          string                      `json:"url"`
+	SSH          string                      `json:"ssh"`
+	SSHTailscale bool                        `json:"ssh_on_tailscale"`
+	Firewall     bool                        `json:"firewall"`
+	Bucket       *protocol.Bucket            `json:"bucket"`
+	Storage      *protocol.Bucket            `json:"storage"`
+	AppStorage   map[string]*protocol.Bucket `json:"app_storage"`
 }
 
 // logAsked writes what the hub asked: the type of the request and what it
@@ -45,10 +56,10 @@ type asked struct {
 func logAsked(message protocol.Message) {
 	var a asked
 	_ = json.Unmarshal(message.Data, &a)
-	line := []any{"type", message.Type}
+	line := []any{"type", clip(string(message.Type))}
 	add := func(key string, value any, ok bool) {
 		if ok {
-			line = append(line, key, value)
+			line = append(line, key, clip(fmt.Sprint(value)))
 		}
 	}
 	add("request", message.RequestID, message.RequestID != "")
@@ -73,41 +84,96 @@ func logAsked(message protocol.Message) {
 	add("copy", a.Copy, a.Copy != "")
 	add("undo", a.Undo, a.Undo != "")
 	add("name", a.Name, a.Name != "")
+	// Whether a secret goes, never its value.
+	add("removed", len(a.Value) == 0 || string(a.Value) == `""`, message.Type == protocol.TypeSecretSet)
 	// The env keys, never their values.
-	keys := make([]string, 0, len(a.Set))
-	for key := range a.Set {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	add("set", keys, len(keys) > 0)
+	add("set", slices.Sorted(maps.Keys(a.Set)), len(a.Set) > 0)
 	add("remove", a.Remove, len(a.Remove) > 0)
 	add("version", a.Version, a.Version != "")
 	add("url", a.URL, a.URL != "")
+	server := message.Type == protocol.TypeServerConfig
+	add("ssh", a.SSH, server)
+	add("ssh_on_tailscale", a.SSHTailscale, server)
+	add("firewall", a.Firewall, server)
+	// Where backups go, never the keys.
+	if a.Bucket != nil {
+		add("bucket", bucketPlace(a.Bucket), true)
+	}
+	if a.Storage != nil {
+		add("bucket", bucketPlace(a.Storage), true)
+	}
+	var apps []string
+	for _, app := range slices.Sorted(maps.Keys(a.AppStorage)) {
+		if bucket := a.AppStorage[app]; bucket != nil {
+			apps = append(apps, app+"="+bucketPlace(bucket))
+		}
+	}
+	add("app_buckets", apps, len(apps) > 0)
 	slog.Info("hub asked", line...)
 }
 
-// logAnswer writes what came of a request: done, or not done and why, such
-// as "refused by the rules of this server". It runs for every message the
-// daemon sends and skips those that answer nothing, such as metrics.
+// logAnswer writes what came of a request: done, or not done and why. It
+// runs for every message the daemon sends and skips those that answer
+// nothing, such as metrics.
 func logAnswer(messageType protocol.MessageType, requestID string, data any) {
+	requestID = clip(requestID)
 	switch answer := data.(type) {
 	case protocol.Error:
-		slog.Warn("not done", "request", requestID, "why", answer.Message)
+		slog.Warn("not done", "request", requestID, "why", why(answer.Message))
 	case protocol.DeployDone:
 		if answer.OK {
-			slog.Info("done", "deploy", answer.DeployID)
+			slog.Info("done", "deploy", clip(answer.DeployID))
 		} else {
-			slog.Warn("not done", "deploy", answer.DeployID, "why", answer.Error)
+			slog.Warn("not done", "deploy", clip(answer.DeployID), "why", why(answer.Error))
 		}
 	case protocol.ExecDone:
 		if answer.Error != "" {
-			slog.Warn("not done", "request", requestID, "why", answer.Error)
+			slog.Warn("not done", "request", requestID, "why", why(answer.Error))
 		} else {
 			slog.Info("done", "request", requestID, "exit_code", answer.ExitCode, "timed_out", answer.TimedOut)
 		}
+	case protocol.ServerConfigResult:
+		if len(answer.Problems) == 0 {
+			slog.Info("done", "request", requestID)
+			break
+		}
+		// What each problem is about, such as SSH: the rest may carry
+		// what a command printed.
+		var parts []string
+		for _, problem := range answer.Problems {
+			part, _, _ := strings.Cut(problem, ":")
+			parts = append(parts, part)
+		}
+		slog.Warn("not fully done", "request", requestID, "problems", clip(strings.Join(parts, ", ")))
 	default:
 		if requestID != "" && messageType != protocol.TypeExecOutput {
 			slog.Info("done", "request", requestID)
 		}
 	}
+}
+
+// why is the reason a request was not done, for the log: a refusal, or
+// another sentence of the daemon's own. Any other error may carry what a
+// command printed or a compose setting, an env value among them, so it is
+// only "failed": the hub shows the whole error.
+func why(text string) string {
+	switch {
+	case strings.HasPrefix(text, refusedByRules), text == errUpdating.Error(), strings.HasPrefix(text, "this daemon does not know "):
+		return clip(text)
+	case strings.Contains(text, beyondTheApp):
+		return "refused: " + beyondTheApp + ", without server-access: on"
+	}
+	return "failed"
+}
+
+// clip keeps a value in the log at 200 bytes or fewer, whole characters.
+func clip(text string) string {
+	if len(text) <= 200 {
+		return text
+	}
+	end := 200
+	for end > 0 && !utf8.RuneStart(text[end]) {
+		end--
+	}
+	return text[:end]
 }

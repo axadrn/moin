@@ -342,14 +342,15 @@ journalctl -u moin-daemon
 ```
 
 ```
-INFO hub asked type=deploy.start app=my-app deploy=d-41 number=12 source=api.github.com/repos/acme/blog/tarball/abc123
-INFO done deploy=d-41
-INFO hub asked type=exec.start request=r-7 app=my-app service=web command=psql
-WARN not done request=r-7 why="refused by the rules of this server (/etc/moin/rules): exec: off"
+Nov 25 09:14:02 server-1 moin[812]: 2026/11/25 09:14:02 INFO hub asked type=deploy.start app=my-app deploy=d-41 number=12 source=api.github.com/repos/acme/blog/tarball/abc123
+Nov 25 09:14:31 server-1 moin[812]: 2026/11/25 09:14:31 INFO done deploy=d-41
+Nov 25 09:20:45 server-1 moin[812]: 2026/11/25 09:20:45 INFO hub asked type=exec.start request=r-7 app=my-app service=web command=psql
+Nov 25 09:20:45 server-1 moin[812]: 2026/11/25 09:20:45 WARN not done request=r-7 why="refused by the rules of this server (/etc/moin/rules): exec: off"
 ```
 
 - One line for what was asked, one for what came of it. `request` or `deploy` ties the two together.
-- It names the app and what the request is about: the deploy number, the source, the image, the command, the env keys. Never an env value, a secret, a password, SQL, the arguments of a command or a file.
+- It names the app and what the request is about: the deploy number, the source, the image, the command, the env keys, a secret's name, the bucket, SSH and the firewall. Never an env value, a secret, a key, a password, SQL, the arguments of a command or a file.
+- Why a request was not done shows in full when the rules refused it. Any other error says `why=failed`, as it may hold what a command printed: the hub shows the whole error.
 - `journalctl -u moin-daemon -f` follows it as it happens. `--since today` shows one day.
 
 ## Updates

@@ -233,10 +233,16 @@ type runner struct {
 	pending map[string]protocol.DeployDone
 }
 
-// send writes a message to the current session. Log lines without a session
-// are dropped; a deploy.done waits for the next session.
+// send writes a message to the current session and what it answers to the
+// log. Log lines without a session are dropped; a deploy.done waits for
+// the next session.
 func (r *runner) send(messageType protocol.MessageType, requestID string, data any) {
 	logAnswer(messageType, requestID, data)
+	r.write(messageType, requestID, data)
+}
+
+// write is send without the log, for a deploy.done sent again.
+func (r *runner) write(messageType protocol.MessageType, requestID string, data any) {
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
 		slog.Error("encode message failed", "type", messageType, "error", err)
@@ -312,7 +318,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 		r.mu.Unlock()
 	}()
 	for _, done := range pending {
-		r.send(protocol.TypeDeployDone, "", done)
+		r.write(protocol.TypeDeployDone, "", done)
 	}
 	// The hub learns at once what is on the server and what was put back.
 	go r.reportSecurity(r.security.keep(ctx))
