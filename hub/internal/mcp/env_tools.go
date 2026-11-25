@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"github.com/axadrn/moin/hub/internal/model"
 	"slices"
 	"strings"
 
@@ -13,15 +14,15 @@ import (
 // registerEnvTools registers the tools of an app's env vars.
 func registerEnvTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("list_env", "List env vars",
-		"Lists the env vars of an app: each key and when it changed. Values are write-only: no tool returns one. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listEnv)))
-	mcpsdk.AddTool(server, newTool("set_env", "Set env vars",
-		"Sets and removes env vars of an app. The values go to the app's server, which keeps them; moin keeps only the keys and never shows a value. The server must be online (server_offline otherwise). They reach the app with its next restart_app or deploy. Returns the keys. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setEnv)))
-	mcpsdk.AddTool(server, newTool("replace_env", "Replace all env vars",
-		"Makes env every env var of an app, all at once, like one .env file: every key in env is set, keys not in env are removed. Show the user what changes first: list_env, then compare the keys. Returns the keys added, replaced and removed. The values go to the app's server, which must be online. They reach the app with its next restart_app or deploy. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.replaceEnv)))
+	Add(server, newTool("list_env", "List env vars",
+		"Lists the env vars of an app: each key and when it changed. Values are write-only: no tool returns one.",
+		readOnly("")), model.RightRead, member(services, tools.listEnv))
+	Add(server, newTool("set_env", "Set env vars",
+		"Sets and removes env vars of an app. The values go to the app's server, which keeps them; moin keeps only the keys and never shows a value. The server must be online (server_offline otherwise). They reach the app with its next restart_app or deploy. Returns the keys.",
+		change(false, true)), model.RightEnv, changes(services, tools.setEnv))
+	Add(server, newTool("replace_env", "Replace all env vars",
+		"Makes env every env var of an app, all at once, like one .env file: every key in env is set, keys not in env are removed. Show the user what changes first: list_env, then compare the keys. Returns the keys added, replaced and removed. The values go to the app's server, which must be online. They reach the app with its next restart_app or deploy.",
+		change(true, true)), model.RightEnv, changes(services, tools.replaceEnv))
 }
 
 // SetEnvInput is the input of set_env.
@@ -45,7 +46,7 @@ type Env struct {
 func (e Env) Summary() string { return count(len(e.Items), "env var") + "." }
 
 func (t moinTools) listEnv(_ context.Context, caller Caller, input AppInput) (Env, error) {
-	vars, err := t.services.Apps.EnvVars(caller.Token.WorkspaceID, input.app())
+	vars, err := t.services.Apps.EnvVars(caller.Bearer.WorkspaceID, input.app())
 	if err != nil {
 		return Env{}, err
 	}

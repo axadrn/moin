@@ -4,6 +4,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
@@ -18,18 +19,26 @@ type DeviceView struct {
 	// Login is the pending login of Code, nil until a valid code is in.
 	Login *model.DeviceLogin
 	// Workspaces are the user's workspaces the computer can be let into.
-	Workspaces  []APITokenWorkspace
+	Workspaces  []WorkspaceChoice
 	WorkspaceID string
 	// WorkspaceError says why the workspace was not taken.
 	WorkspaceError string
+	// Rights are the switches as they are, the default ones at first.
+	Rights model.Rights
+	// Passkey: Allow asks for the passkey. Without one, Fresh says the
+	// sign-in is new enough to allow; else Allow signs in again first.
+	Passkey bool
+	Fresh   bool
+	// Passkeys says this hub offers passkeys, to suggest one.
+	Passkeys bool
+	// AllowError says why Allow did not work.
+	AllowError string
 }
 
-// deviceName is how the page names the computer: "moin CLI on <computer name>".
-func deviceName(login *model.DeviceLogin) string {
-	if login == nil || login.Hostname == "" {
-		return brand.Name + " CLI"
-	}
-	return brand.Name + " CLI on " + login.Hostname
+// WorkspaceChoice is one workspace to pick.
+type WorkspaceChoice struct {
+	ID   string
+	Name string
 }
 
 // workspaceOptions are the workspaces to pick from.
@@ -41,11 +50,21 @@ func (v DeviceView) workspaceOptions() []components.Option {
 	return options
 }
 
+// deviceClientName is the name of the connection a login makes, as the
+// computer gave it.
+func deviceClientName(login *model.DeviceLogin) string {
+	if login == nil {
+		return service.DeviceClientName("")
+	}
+	return service.DeviceClientName(login.Hostname)
+}
+
 // Device asks for the code of `moin login`, or, with a pending login,
-// whether to let the computer in.
+// whether to connect the computer and with which rights. The computer's
+// name is its own word, so it shows in quotes.
 templ Device(view DeviceView) {
 	if view.Login == nil {
-		@authScreen(deviceSEO, "Log in the CLI") {
+		@authScreen(deviceSEO, "Connect the CLI") {
 			<form id="device-code-form" action="/device" method="GET" class="moin-stack" data-gap="4">
 				@formField("Code", "code", "Enter the code your terminal shows.", view.CodeError) {
 					@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "code", "name": "code", "type": "text", "value": view.Code, "placeholder": "ABCD-EFGH", "aria-invalid": ariaInvalid(view.CodeError), "aria-describedby": "code-hint", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false", "maxlength": "16", "autofocus": true, "required": true}})
@@ -56,14 +75,17 @@ templ Device(view DeviceView) {
 			</form>
 		}
 	} else {
-		@authScreen(deviceSEO, "Log in "+deviceName(view.Login)+"?") {
+		@authScreen(deviceSEO, "Connect \u201c"+deviceClientName(view.Login)+"\u201d?") {
 			<form id="device-approve-form" action="/device/approve" method="POST" class="moin-stack" data-gap="4">
 				@components.CSRF()
 				<input type="hidden" name="code" value={ view.Code }/>
+				if view.Passkey {
+					<input type="hidden" name="passkey" value=""/>
+				}
 				@components.Card(components.CardProps{}) {
 					<div class="moin-stack moin-center" data-gap="2">
 						<p class="moin-number moin-mono" data-device-code>{ view.Code }</p>
-						<p class="moin-text moin-muted">Approve only if your terminal shows this code.</p>
+						<p class="moin-text moin-muted">Allow only if your terminal shows this code.</p>
 					</div>
 				}
 				@components.Card(components.CardProps{}) {
@@ -72,7 +94,6 @@ templ Device(view DeviceView) {
 						if len(view.Workspaces) == 1 {
 							@factRow("Workspace", view.Workspaces[0].Name)
 						}
-						@factRow("Access", "Read and write")
 					}
 				}
 				if len(view.Workspaces) > 1 {
@@ -85,13 +106,37 @@ templ Device(view DeviceView) {
 						<p class="moin-message" data-state="failed" role="alert">{ view.WorkspaceError }</p>
 					}
 				}
-				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-					Approve
+				@components.Card(components.CardProps{Title: "Rights"}) {
+					@components.List() {
+						@rightsFields("device-right", view.Rights)
+					}
 				}
-				@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"formaction": "/device/deny"}}) {
-					Deny
+				<p class="moin-message" data-state="failed" role="alert" data-passkey-error hidden?={ view.AllowError == "" }>{ view.AllowError }</p>
+				switch  {
+					case view.Passkey:
+						@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"type": "button", "data-passkey": "confirm", "data-passkey-url": "/device/passkey"}}) {
+							Allow with passkey
+						}
+					case view.Fresh:
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+							Allow
+						}
+					default:
+						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"formaction": "/device/reauth", "formnovalidate": true}}) {
+							Sign in again to allow
+						}
+						<p class="moin-small moin-muted moin-center">Allow needs a sign-in from the last five minutes. Any way in counts.</p>
+				}
+				if !view.Passkey && view.Passkeys {
+					<p class="moin-small moin-muted moin-center">Add a passkey to approve faster.</p>
+				}
+				@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"formaction": "/device/deny", "formnovalidate": true}}) {
+					Cancel
 				}
 			</form>
+			if view.Passkey {
+				@passkeyScript()
+			}
 		}
 	}
 }
@@ -99,16 +144,16 @@ templ Device(view DeviceView) {
 // DeviceDone says what became of the login: approved or denied.
 templ DeviceDone(login *model.DeviceLogin, approved bool) {
 	if approved {
-		@authScreen(deviceSEO, "Logged in") {
+		@authScreen(deviceSEO, "Connected") {
 			@authLine() {
-				{ deviceName(login) } is logged in. Go back to your terminal.
+				{ deviceClientName(login) } is connected. Go back to your terminal.
 			}
 			@authLink("/app") {
 				{ "Open " + brand.Name }
 			}
 		}
 	} else {
-		@authScreen(deviceSEO, "Login denied") {
+		@authScreen(deviceSEO, "Not connected") {
 			@authLine() {
 				Nothing got access.
 			}
@@ -119,4 +164,4 @@ templ DeviceDone(login *model.DeviceLogin, approved bool) {
 	}
 }
 
-var deviceSEO = layouts.SEOProps{Title: "Log in the CLI", Description: "Approve a login of the " + brand.Name + " CLI"}
+var deviceSEO = layouts.SEOProps{Title: "Connect the CLI", Description: "Approve a login of the " + brand.Name + " CLI"}

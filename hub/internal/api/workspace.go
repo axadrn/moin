@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/access"
@@ -115,7 +116,7 @@ type WorkspaceEvent struct {
 	Metadata   string `json:"metadata"`
 	// Actor and Summary read as a sentence: "Ada Lovelace deployed blog
 	// v12". Via is web, cli, tui, api, mcp, hook, github or system;
-	// Token is the API token it came with, by name.
+	// Token is the connection or CI token it came with, by name.
 	Actor   string `json:"actor"`
 	Summary string `json:"summary"`
 	Via     string `json:"via"`
@@ -260,11 +261,21 @@ func (h *WorkspaceHandler) UpdateName(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, workspaceResponse{Workspace: NewWorkspace(updated)})
 }
 
+// AdminInviteMessage is the answer when a connection or CI token invites
+// an admin.
+const AdminInviteMessage = "A connection or CI token invites only members. Invite an admin in the web: Settings, Team."
+
 // Invite sends an invitation. It answers 202 because the invitation is
 // delivered by email; GET on the workspace lists it.
 func (h *WorkspaceHandler) Invite(w http.ResponseWriter, r *http.Request) {
 	var request invitationRequest
 	if !Decode(w, r, &request) {
+		return
+	}
+	// A connection or CI token invites only members: an admin can invite
+	// others and remove apps, so making one takes a signed-in browser.
+	if ctxkeys.Bearer(r.Context()) != nil && strings.TrimSpace(request.Role) == model.WorkspaceRoleAdmin {
+		Error(w, http.StatusForbidden, "forbidden", AdminInviteMessage)
 		return
 	}
 	err := h.workspaces.Invite(ctxkeys.WorkspaceMember(r.Context()), ctxkeys.Workspace(r.Context()), request.Email, request.Role, source(r))

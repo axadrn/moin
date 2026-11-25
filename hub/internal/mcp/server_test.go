@@ -18,6 +18,10 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// dataReadTools read app data, as strong as secrets: they change nothing
+// but need env.
+var dataReadTools = map[string]bool{"download_backup": true, "query_database": true}
+
 func TestToolsMatchTheSelection(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "lister")
@@ -34,12 +38,16 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		if tool.OutputSchema == nil || tool.InputSchema == nil {
 			t.Errorf("%s has no input or output schema", tool.Name)
 		}
-		if !strings.Contains(tool.Description, "Needs the read scope.") && !strings.Contains(tool.Description, "Needs a token with read and write access.") {
-			t.Errorf("%s description does not state its scope: %s", tool.Name, tool.Description)
+		rights := toolRights(t, tool)
+		if !strings.HasSuffix(tool.Description, " "+needsSentence(rights)) {
+			t.Errorf("%s description does not end with its right: %s", tool.Name, tool.Description)
 		}
-		write := strings.Contains(tool.Description, "read and write access")
-		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint == write {
-			t.Errorf("%s read-only hint does not match its scope", tool.Name)
+		readOnly := rights == model.RightRead || dataReadTools[tool.Name]
+		if dataReadTools[tool.Name] && rights != model.RightEnv {
+			t.Errorf("%s reads app data with %s, want env", tool.Name, rights)
+		}
+		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint != readOnly {
+			t.Errorf("%s read-only hint does not match its right %s", tool.Name, rights)
 		}
 	}
 	slices.Sort(names)
@@ -58,7 +66,7 @@ func TestWhoAmIReturnsTheTokenUser(t *testing.T) {
 
 	result := call(t, session, "whoami", nil)
 	whoami := output[mcp.WhoAmI](t, result)
-	if whoami.User.ID != owner.user.ID || whoami.User.Email != "ada@example.com" || whoami.Token.Name != "Claude" || strings.Join(whoami.Token.Scopes, ",") != "read" {
+	if whoami.User.ID != owner.user.ID || whoami.User.Email != "ada@example.com" || whoami.Connection.Name != "Claude" || whoami.Connection.Kind != "ci_token" || strings.Join(whoami.Connection.Rights, ",") != "read" {
 		t.Fatalf("whoami = %#v", whoami)
 	}
 	if whoami.Workspace == nil || whoami.Workspace.Workspace.ID != link.ID(owner.workspace.ID) || whoami.Workspace.Role != "owner" {
@@ -69,11 +77,11 @@ func TestWhoAmIReturnsTheTokenUser(t *testing.T) {
 	}
 }
 
-func TestMCPRequiresAPersonalAPIToken(t *testing.T) {
+func TestMCPRequiresAConnectionOrCIToken(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "guest")
 	token, raw := createToken(t, env, owner)
-	err := env.tokens.Revoke(owner.user.ID, token.ID, service.Source{})
+	err := env.ciTokens.Remove(&model.WorkspaceMember{WorkspaceID: owner.workspace.ID, UserID: owner.user.ID, Role: model.WorkspaceRoleOwner}, token.CITokenID, service.Source{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +89,7 @@ func TestMCPRequiresAPersonalAPIToken(t *testing.T) {
 	for name, authorization := range map[string]string{
 		"no header":        "",
 		"unknown token":    "Bearer pat_unknown",
+		"unknown access":   "Bearer at_unknown",
 		"revoked token":    "Bearer " + raw,
 		"non-token bearer": "Bearer " + strings.Repeat("s", 43),
 	} {
@@ -137,7 +146,7 @@ func TestUnknownToolIsAProtocolError(t *testing.T) {
 
 // addMember adds userID to the owner's workspace with role and returns a
 // token of that member bound to the workspace.
-func addMember(t *testing.T, env *environment, owner owner, id, role string, scopes ...string) string {
+func addMember(t *testing.T, env *environment, owner owner, id, role string, rights ...string) string {
 	t.Helper()
 	member := seedOwner(t, env, id)
 	_, err := env.database.Exec(`
@@ -148,7 +157,7 @@ func addMember(t *testing.T, env *environment, owner owner, id, role string, sco
 		t.Fatalf("add %s: %v", id, err)
 	}
 	member.workspace = owner.workspace
-	_, raw := createToken(t, env, member, scopes...)
+	_, raw := createToken(t, env, member, rights...)
 	return raw
 }
 
@@ -188,21 +197,21 @@ func TestWorkspaceToolsStayInTheBoundWorkspace(t *testing.T) {
 	}
 }
 
-func TestWriteToolsNeedTheWriteScope(t *testing.T) {
+func TestToolsNeedTheirRight(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "writer")
 	upgrade(t, env, owner)
 	_, readOnly := createToken(t, env, owner)
-	_, readWrite := createToken(t, env, owner, "read", "write")
+	_, readWrite := createToken(t, env, owner, allRights...)
 
 	reader := connectHTTP(t, env, readOnly)
 	for tool, arguments := range map[string]map[string]any{
 		"rename_workspace": {"name": "Renamed"},
 		"invite_member":    {"email": "new@example.com", "role": "member"},
 	} {
-		detail := toolError(t, call(t, reader, tool, arguments), "insufficient_scope")
-		if !strings.Contains(detail.Message, "write scope") {
-			t.Fatalf("%s message = %q", tool, detail.Message)
+		detail := toolError(t, call(t, reader, tool, arguments), "missing_right")
+		if detail.Right != "servers" || detail.Message != "This CI token may not manage servers and settings. Change it in Settings, Connections." {
+			t.Fatalf("%s error = %#v", tool, detail)
 		}
 	}
 	if len(env.mailer.Messages()) != 0 {
@@ -219,8 +228,11 @@ func TestWriteToolsNeedTheWriteScope(t *testing.T) {
 		t.Fatalf("fields = %v", fields)
 	}
 
-	invited := output[mcp.Invitation](t, call(t, writer, "invite_member", map[string]any{"email": " New@Example.com ", "role": "admin"}))
-	if invited.Email != "new@example.com" || invited.Role != "admin" || invited.Workspace.ID != link.ID(owner.workspace.ID) {
+	// A token invites members only, whatever its rights: an admin is
+	// invited in the web.
+	toolError(t, call(t, writer, "invite_member", map[string]any{"email": "boss@example.com", "role": "admin"}), "forbidden")
+	invited := output[mcp.Invitation](t, call(t, writer, "invite_member", map[string]any{"email": " New@Example.com ", "role": "member"}))
+	if invited.Email != "new@example.com" || invited.Role != "member" || invited.Workspace.ID != link.ID(owner.workspace.ID) {
 		t.Fatalf("invite_member = %#v", invited)
 	}
 	if len(env.mailer.Messages()) != 1 {
@@ -252,7 +264,7 @@ func TestInviteMemberSharesTheInvitationLimit(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "inviter")
 	upgrade(t, env, owner)
-	_, raw := createToken(t, env, owner, "read", "write")
+	_, raw := createToken(t, env, owner, allRights...)
 	for range 30 {
 		env.services.Invitations.Allow(owner.workspace.ID + ":" + owner.user.ID)
 	}
@@ -263,11 +275,26 @@ func TestInviteMemberSharesTheInvitationLimit(t *testing.T) {
 	}
 }
 
-func TestRolesStillApplyToTokens(t *testing.T) {
+// TestInviteMemberRefusesAdmins: an AI agent invites members only, so a
+// leaked token cannot make an admin.
+func TestInviteMemberRefusesAdmins(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "inviter")
+	upgrade(t, env, owner)
+	_, raw := createToken(t, env, owner, allRights...)
+	session := connectHTTP(t, env, raw)
+	toolError(t, call(t, session, "invite_member", map[string]any{"email": "new@example.com", "role": "admin"}), "forbidden")
+	if len(env.mailer.Messages()) != 0 {
+		t.Fatalf("emails = %d, want 0", len(env.mailer.Messages()))
+	}
+	output[mcp.Invitation](t, call(t, session, "invite_member", map[string]any{"email": "new@example.com", "role": "member"}))
+}
+
+func TestRolesStillApplyToRights(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "boss")
 	upgrade(t, env, owner)
-	member := connectHTTP(t, env, addMember(t, env, owner, "worker", model.WorkspaceRoleMember, "read", "write"))
+	member := connectHTTP(t, env, addMember(t, env, owner, "worker", model.WorkspaceRoleMember, allRights...))
 	admin := connectHTTP(t, env, addMember(t, env, owner, "helper", model.WorkspaceRoleAdmin))
 
 	toolError(t, call(t, member, "rename_workspace", map[string]any{"name": "Taken Over"}), "forbidden")
@@ -286,7 +313,7 @@ func TestRolesStillApplyToTokens(t *testing.T) {
 func TestListActivityPagesWithTheCursor(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "watcher")
-	_, raw := createToken(t, env, owner, "read", "write")
+	_, raw := createToken(t, env, owner, allRights...)
 	session := connectHTTP(t, env, raw)
 	for _, name := range []string{"First Name", "Second Name", "Third Name"} {
 		output[mcp.RenamedWorkspace](t, call(t, session, "rename_workspace", map[string]any{"name": name}))
@@ -347,7 +374,7 @@ func TestOpsToolsActAsMembersAndStopAfterRemoval(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "lead")
 	upgrade(t, env, owner)
-	member := connectHTTP(t, env, addMember(t, env, owner, "dev", model.WorkspaceRoleMember, "read", "write"))
+	member := connectHTTP(t, env, addMember(t, env, owner, "dev", model.WorkspaceRoleMember, allRights...))
 
 	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"name": "mcp-1"}))
 	activity := output[mcp.Activity](t, call(t, member, "list_activity", nil))
@@ -366,7 +393,7 @@ func TestOnlyQueryDatabaseTakesALimit(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "sql")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 
 	result, err := session.ListTools(context.Background(), nil)
@@ -407,7 +434,7 @@ func TestAppAndServerParametersKeepTheOldName(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "names")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
@@ -463,10 +490,10 @@ func TestExecCommandIsForOwnersAndAdmins(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "execs")
 	upgrade(t, env, owner)
-	member := connectHTTP(t, env, addMember(t, env, owner, "runner", model.WorkspaceRoleMember, "read", "write"))
+	member := connectHTTP(t, env, addMember(t, env, owner, "runner", model.WorkspaceRoleMember, allRights...))
 	output[mcp.CreatedServer](t, call(t, member, "add_server", map[string]any{"name": "exec-1"}))
 	toolError(t, call(t, member, "exec_command", map[string]any{"app": "blog", "command": "ls /data"}), "forbidden")
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 	fields := toolError(t, call(t, session, "exec_command", map[string]any{"app": "blog", "command": `echo "open`}), "validation_failed").Fields
 	if fields["command"] == "" {
@@ -483,7 +510,7 @@ func TestSecretsGoToServers(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "keys")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	defer bucket.Close()

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -153,14 +154,19 @@ func (c *Client) GetDeploy(ctx context.Context, app string, number int) (Deploy,
 // deploy once it ended.
 func (c *Client) FollowDeploy(ctx context.Context, app string, number int, line func(string)) (Deploy, error) {
 	var done Deploy
-	err := c.stream(ctx, appPath(app, "deploys", strconv.Itoa(number), "events"), func(event string, data []byte) error {
+	// The hub sends every line from the first on each stream, so after a
+	// reconnect the lines already printed are skipped.
+	printed, index := 0, 0
+	follow := func(event string, data []byte) error {
 		switch event {
 		case "line":
 			var payload struct {
 				Line string `json:"line"`
 			}
 			err := json.Unmarshal(data, &payload)
-			if err == nil {
+			index++
+			if err == nil && index > printed {
+				printed++
 				line(payload.Line)
 			}
 			return err
@@ -172,7 +178,13 @@ func (c *Client) FollowDeploy(ctx context.Context, app string, number int, line 
 			return errStreamDone
 		}
 		return nil
-	})
+	}
+	path := appPath(app, "deploys", strconv.Itoa(number), "events")
+	err := c.streamRequest(ctx, http.MethodGet, path, nil, follow)
+	for errors.Is(err, errStreamReconnect) && ctx.Err() == nil {
+		index = 0
+		err = c.streamRequest(ctx, http.MethodGet, path, nil, follow)
+	}
 	if err == nil && done.Number == 0 {
 		return done, fmt.Errorf("the deploy stream ended early")
 	}

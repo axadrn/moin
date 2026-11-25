@@ -11,7 +11,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 
 | | |
 | --- | --- |
-| Sign in | without a token, `moin` shows a code and opens the browser to confirm it, then lands on the overview. It saves the token where `moin login` does, so you sign in once for both. `esc` quits the sign-in |
+| Sign in | without a token, `moin` shows a code and opens the browser to confirm it, then lands on the overview. You pick its rights and allow it with your passkey. It saves the login where `moin login` does, so you sign in once for both. `esc` quits the sign-in |
 | Last seen | `moin` starts with what it showed last time, marked **last seen** in the header until the hub answers; an app you come back to shows its tabs at once while they load again |
 | Cache | in your cache folder, readable only by you, without env values, logs or the token; `moin logout` removes it |
 | Screen | every view fills the screen, from 80 by 24 up. The header says where you are, the footer the keys you need most, and results (a few seconds) and errors (in red, a little longer) |
@@ -138,5 +138,6 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `r` | Registries: logins for private images |
 | `n` | Alerts: Slack, Discord, Telegram and webhooks |
 | `d` | Data: browse and edit the rows of the open app's databases |
-| `s` | Settings: your account and API tokens |
+| `s` | Settings: your account and connections |
+| `l` | Connections: what each login may do, and CI tokens |
 | `b` | Billing, on moin.run |

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -29,8 +30,8 @@ var pollUnit = time.Second
 // flow of RFC 8628: it starts a login on the hub at baseURL, calls
 // show with the code and the page to open, and polls until the user
 // approved or denied it there, or it expired. surface is "cli" or "tui". The
-// config it returns has the new device token; the caller saves it with
-// SaveConfig.
+// config it returns has the tokens of the new connection; the caller saves
+// it with SaveConfig.
 func LoginInBrowser(ctx context.Context, baseURL, surface string, show func(DeviceLogin)) (Config, error) {
 	baseURL = strings.TrimRight(baseURL, "/")
 	err := CheckURL(baseURL)
@@ -58,25 +59,19 @@ func LoginInBrowser(ctx context.Context, baseURL, surface string, show func(Devi
 			return Config{}, ctx.Err()
 		case <-time.After(time.Duration(interval) * pollUnit):
 		}
-		var token struct {
-			AccessToken string `json:"access_token"`
-		}
-		err = guest.do(ctx, http.MethodPost, "/api/v1/auth/device/token", struct {
-			DeviceCode string `json:"device_code"`
-			GrantType  string `json:"grant_type"`
-		}{login.DeviceCode, "urn:ietf:params:oauth:grant-type:device_code"}, &token)
-		var apiErr *Error
+		config, err := exchange(ctx, guest.http, baseURL, surface, url.Values{"grant_type": {"urn:ietf:params:oauth:grant-type:device_code"}, "device_code": {login.DeviceCode}})
+		var oauth *oauthError
 		switch {
 		case err == nil:
-			return Config{URL: baseURL, Token: token.AccessToken}, nil
-		case !errors.As(err, &apiErr):
+			return config, nil
+		case !errors.As(err, &oauth):
 			return Config{}, err
-		case apiErr.Code == "authorization_pending":
-		case apiErr.Code == "slow_down":
+		case oauth.Code == "authorization_pending":
+		case oauth.Code == "slow_down":
 			interval += 5
-		case apiErr.Code == "access_denied":
+		case oauth.Code == "access_denied":
 			return Config{}, errors.New("the login was denied in the browser")
-		case apiErr.Code == "expired_token", apiErr.Code == "invalid_grant":
+		case oauth.Code == "expired_token", oauth.Code == "invalid_grant":
 			return Config{}, errLoginExpired
 		default:
 			return Config{}, err

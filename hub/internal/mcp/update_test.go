@@ -22,10 +22,10 @@ func TestUpdateTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	ada := seedOwner(t, env, "ada")
-	adaToken, _ := createToken(t, env, ada, "read", "write")
+	adaToken, _ := createToken(t, env, ada, allRights...)
 	adaSession := connectMemory(t, env.server, ada, adaToken)
 	bob := seedOwner(t, env, "bob")
-	bobToken, _ := createToken(t, env, bob, "read", "write")
+	bobToken, _ := createToken(t, env, bob, allRights...)
 	bobSession := connectMemory(t, env.server, bob, bobToken)
 
 	version := output[mcp.VersionOutput](t, call(t, bobSession, "get_version", nil))

@@ -185,6 +185,11 @@ func (r *WorkspaceMembers) Delete(workspaceID, actorUserID, memberID string, eve
 	if rows == 0 {
 		return ErrWorkspaceMemberNotFound
 	}
+	// Whoever leaves the workspace takes their access to it along: their
+	// connections there end and their CI tokens there go, in the same step.
+	if err := endAccessInWorkspace(tx, workspaceID, current.UserID, event.CreatedAt); err != nil {
+		return err
+	}
 	if !isLeaving {
 		event.Metadata = activityMetadata(map[string]string{"user_id": current.UserID, "email": userEmail(tx, current.UserID), "role": current.Role})
 	}
@@ -192,6 +197,19 @@ func (r *WorkspaceMembers) Delete(workspaceID, actorUserID, memberID string, eve
 		return err
 	}
 	return tx.Commit()
+}
+
+// endAccessInWorkspace ends the connections of a person in a workspace,
+// with their tokens, and deletes their CI tokens there.
+func endAccessInWorkspace(tx *sqlx.Tx, workspaceID, userID string, at time.Time) error {
+	if _, err := tx.Exec(`DELETE FROM connection_tokens WHERE connection_id IN (SELECT id FROM connections WHERE workspace_id = $1 AND user_id = $2)`, workspaceID, userID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE connections SET ended_at = $1 WHERE workspace_id = $2 AND user_id = $3 AND ended_at IS NULL`, at, workspaceID, userID); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`DELETE FROM ci_tokens WHERE workspace_id = $1 AND user_id = $2`, workspaceID, userID)
+	return err
 }
 
 // userEmail is the email of a user, empty for one that is gone.

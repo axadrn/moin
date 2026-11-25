@@ -12,6 +12,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/google/uuid"
 )
 
@@ -58,15 +59,17 @@ type StartedDeviceLogin struct {
 
 // DeviceLoginService runs `moin login` in the browser, the device
 // authorization grant of RFC 8628: the CLI starts a login and polls, the
-// user approves it on the web, and the next poll gets a device token.
+// user approves it on the web with their passkey and picks the rights, and
+// the next poll gets the tokens of the new connection.
 type DeviceLoginService struct {
-	logins *repository.DeviceLogins
-	tokens *APITokenService
-	now    func() time.Time
+	logins      *repository.DeviceLogins
+	connections *ConnectionService
+	passkeys    *PasskeyService
+	now         func() time.Time
 }
 
-func NewDeviceLoginService(logins *repository.DeviceLogins, tokens *APITokenService) *DeviceLoginService {
-	return &DeviceLoginService{logins: logins, tokens: tokens, now: time.Now}
+func NewDeviceLoginService(logins *repository.DeviceLogins, connections *ConnectionService, passkeys *PasskeyService) *DeviceLoginService {
+	return &DeviceLoginService{logins: logins, connections: connections, passkeys: passkeys, now: time.Now}
 }
 
 // Start begins a login for the computer named hostname.
@@ -122,61 +125,110 @@ func (s *DeviceLoginService) Pending(userCode string) (*model.DeviceLogin, error
 	return login, nil
 }
 
-// Approve lets the computer of a pending login act for the user in one of
-// the user's workspaces. Its next poll gets the token.
-func (s *DeviceLoginService) Approve(userID, userCode, workspaceID string) (*model.DeviceLogin, error) {
-	login, err := s.Pending(userCode)
+// Approval is a person letting the computer of a pending login in: in which
+// workspace, with which rights, and the proof they are there now.
+type Approval struct {
+	UserCode    string
+	WorkspaceID string
+	Rights      model.Rights
+	Presence    Presence
+	Source      Source
+}
+
+// Approve makes the connection of a pending login, once the person proved
+// they are there now (ConfirmPresence). The computer's next poll gets its
+// tokens.
+func (s *DeviceLoginService) Approve(approval Approval) (*model.DeviceLogin, *model.Connection, error) {
+	login, err := s.Pending(approval.UserCode)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	err = s.tokens.requireMembership(userID, workspaceID)
+	session := approval.Presence.Session
+	if session == nil || session.IsImpersonating() {
+		return nil, nil, ErrImpersonating
+	}
+	// The workspace and the rights first: a passkey is not spent on an
+	// approval that fails anyway.
+	if err := requireMembership(s.connections.workspaces, session.UserID, approval.WorkspaceID); err != nil {
+		return nil, nil, err
+	}
+	if approval.Rights&^allRights() != 0 {
+		return nil, nil, ErrRightsUnknown
+	}
+	if err := s.passkeys.ConfirmPresence(approval.Presence); err != nil {
+		return nil, nil, err
+	}
+	connection, err := s.connections.Create(NewConnection{
+		UserID:      approval.Presence.Session.UserID,
+		WorkspaceID: approval.WorkspaceID,
+		ClientName:  DeviceClientName(login.Hostname),
+		Rights:      approval.Rights,
+		Source:      approval.Source,
+	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	err = s.logins.Decide(login.ID, model.DeviceLoginApproved, userID, &workspaceID)
+	err = s.logins.Decide(login.ID, model.DeviceLoginApproved, &connection.ID)
+	if err != nil {
+		// Another approval of the same code came first: this connection
+		// goes again.
+		_ = s.connections.endWith(*connection, approval.Source, "the code was approved twice")
+	}
 	if errors.Is(err, repository.ErrDeviceLoginNotFound) {
-		return nil, ErrUserCodeNotFound
+		return nil, nil, ErrUserCodeNotFound
 	}
-	return login, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return login, connection, nil
+}
+
+// DeviceClientName names the connection of a computer: "moin CLI on
+// <computer name>".
+func DeviceClientName(hostname string) string {
+	if hostname == "" {
+		return build.Name + " CLI"
+	}
+	return CleanClientName(build.Name + " CLI on " + hostname)
 }
 
 // Deny turns a pending login down. Its next poll hears access_denied.
-func (s *DeviceLoginService) Deny(userID, userCode string) (*model.DeviceLogin, error) {
+func (s *DeviceLoginService) Deny(userCode string) (*model.DeviceLogin, error) {
 	login, err := s.Pending(userCode)
 	if err != nil {
 		return nil, err
 	}
-	err = s.logins.Decide(login.ID, model.DeviceLoginDenied, userID, nil)
+	err = s.logins.Decide(login.ID, model.DeviceLoginDenied, nil)
 	if errors.Is(err, repository.ErrDeviceLoginNotFound) {
 		return nil, ErrUserCodeNotFound
 	}
 	return login, err
 }
 
-// Token answers one poll of the CLI. Once the user approved, it creates the
-// device token and returns it with the raw token, exactly once. Until then
-// it returns ErrDeviceLoginPending, ErrDeviceLoginSlowDown when the CLI polls
-// faster than the interval, ErrDeviceLoginDenied, ErrDeviceLoginExpired or
+// Token answers one poll of the CLI. Once the user approved, it returns the
+// first tokens of the connection, exactly once. Until then it returns
+// ErrDeviceLoginPending, ErrDeviceLoginSlowDown when the CLI polls faster
+// than the interval, ErrDeviceLoginDenied, ErrDeviceLoginExpired or
 // ErrDeviceLoginInvalid.
-func (s *DeviceLoginService) Token(deviceCode string, source Source) (*model.APIToken, string, error) {
+func (s *DeviceLoginService) Token(deviceCode string) (Tokens, error) {
 	if deviceCode == "" {
-		return nil, "", ErrDeviceLoginInvalid
+		return Tokens{}, ErrDeviceLoginInvalid
 	}
 	hash := hashToken(deviceCode)
 	login, err := s.logins.ByDeviceCodeHash(hash)
 	if errors.Is(err, repository.ErrDeviceLoginNotFound) {
-		return nil, "", ErrDeviceLoginInvalid
+		return Tokens{}, ErrDeviceLoginInvalid
 	}
 	if err != nil {
-		return nil, "", err
+		return Tokens{}, err
 	}
 	if subtle.ConstantTimeCompare([]byte(login.DeviceCodeHash), []byte(hash)) != 1 {
-		return nil, "", ErrDeviceLoginInvalid
+		return Tokens{}, ErrDeviceLoginInvalid
 	}
 	now := s.now().UTC()
 	if login.IsExpired(now) {
 		_ = s.logins.Delete(login.ID)
-		return nil, "", ErrDeviceLoginExpired
+		return Tokens{}, ErrDeviceLoginExpired
 	}
 	interval := login.IntervalSeconds
 	early := login.LastPolledAt != nil && now.Sub(*login.LastPolledAt) < time.Duration(interval)*time.Second-deviceLoginLeeway
@@ -185,30 +237,38 @@ func (s *DeviceLoginService) Token(deviceCode string, source Source) (*model.API
 	}
 	err = s.logins.Polled(login.ID, now, interval)
 	if err != nil {
-		return nil, "", err
+		return Tokens{}, err
 	}
 	if early {
-		return nil, "", ErrDeviceLoginSlowDown
+		return Tokens{}, ErrDeviceLoginSlowDown
 	}
 	switch login.Status {
 	case model.DeviceLoginDenied:
 		_ = s.logins.Claim(login.ID, login.Status)
-		return nil, "", ErrDeviceLoginDenied
+		return Tokens{}, ErrDeviceLoginDenied
 	case model.DeviceLoginApproved:
 	default:
-		return nil, "", ErrDeviceLoginPending
+		return Tokens{}, ErrDeviceLoginPending
 	}
 	err = s.logins.Claim(login.ID, model.DeviceLoginApproved)
 	if errors.Is(err, repository.ErrDeviceLoginNotFound) {
-		return nil, "", ErrDeviceLoginInvalid
+		return Tokens{}, ErrDeviceLoginInvalid
 	}
 	if err != nil {
-		return nil, "", err
+		return Tokens{}, err
 	}
-	if login.UserID == nil || login.WorkspaceID == nil {
-		return nil, "", fmt.Errorf("approved device login %s has no user", login.ID)
+	if login.ConnectionID == nil {
+		return Tokens{}, fmt.Errorf("approved device login %s has no connection", login.ID)
 	}
-	return s.tokens.CreateForDevice(*login.UserID, *login.WorkspaceID, login.Hostname, source)
+	connection, err := s.connections.connections.ByID(*login.ConnectionID)
+	if errors.Is(err, repository.ErrConnectionNotFound) {
+		// Removed in Settings before the computer asked.
+		return Tokens{}, ErrDeviceLoginDenied
+	}
+	if err != nil {
+		return Tokens{}, err
+	}
+	return s.connections.Issue(connection)
 }
 
 // NormalizeUserCode turns a typed user code into the stored form: upper

@@ -5,8 +5,8 @@ import "time"
 const (
 	// DeviceLoginPending waits for the user to approve or deny it.
 	DeviceLoginPending = "pending"
-	// DeviceLoginApproved has a user and a workspace; the next poll of the
-	// CLI gets its token.
+	// DeviceLoginApproved has its connection; the next poll of the CLI gets
+	// the connection's first tokens.
 	DeviceLoginApproved = "approved"
 	// DeviceLoginDenied was turned down; the next poll of the CLI hears so.
 	DeviceLoginDenied = "denied"
@@ -22,9 +22,8 @@ type DeviceLogin struct {
 	// Hostname is the computer the CLI runs on, as it says.
 	Hostname string `db:"hostname"`
 	Status   string `db:"status"`
-	// UserID and WorkspaceID are set once the user approved or denied.
-	UserID      *string `db:"user_id"`
-	WorkspaceID *string `db:"workspace_id"`
+	// ConnectionID is the connection the user approved.
+	ConnectionID *string `db:"connection_id"`
 	// IntervalSeconds is how long the CLI waits between polls. Polling
 	// faster adds five seconds.
 	IntervalSeconds int        `db:"interval_seconds"`

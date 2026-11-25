@@ -27,11 +27,11 @@ func TestGetComposeFile(t *testing.T) {
 		expectStatus(t, answer, http.StatusCreated)
 		return decodeBody[api.App](t, answer)
 	}
-	adaWriter := environment.token(t, "ada", ada.Workspace.ID, "read", "write")
-	bobWriter := environment.token(t, "bob", bob.Workspace.ID, "read", "write")
+	adaWriter := environment.token(t, "ada", ada.Workspace.ID, allRights...)
+	bobWriter := environment.token(t, "bob", bob.Workspace.ID, allRights...)
 	app(adaWriter, "blog")
 	shop := app(bobWriter, "shop")
-	reader := environment.token(t, "ada", ada.Workspace.ID, "read")
+	reader := environment.token(t, "ada", ada.Workspace.ID)
 
 	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/apps/blog/compose", bearer: reader}), http.StatusConflict, "not_live")
 	text := "name: blog\nservices:\n  web:\n    image: ghcr.io/me/blog:1\n"

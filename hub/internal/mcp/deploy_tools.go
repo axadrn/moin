@@ -14,33 +14,33 @@ import (
 // registry logins images pull with.
 func registerDeployTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("get_deploy", "Get a deploy",
-		"Returns one deploy with its full log. Poll it to follow a running deploy until the status is succeeded or failed. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getDeploy)))
-	mcpsdk.AddTool(server, newTool("rollback_app", "Roll back an app",
-		"Starts the images of an earlier successful deploy again, with the env it had. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. It replaces the live deploy, so ask the user first. Needs a token with read and write access.",
-		change(true, false)), Write(changes(services, tools.rollback)))
-	mcpsdk.AddTool(server, newTool("redeploy_app", "Redeploy an app",
-		"Builds the source of the newest deploy again on the app's server, with the env as it is now. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.redeploy)))
-	mcpsdk.AddTool(server, newTool("deploy_image", "Deploy an image",
-		"Deploys an image built elsewhere, such as in CI, as the app's main service, and pulls it with the registry login for the image's host. An app that follows a GitHub repo takes the compose file of ref there, the linked branch by default; an app without a repo keeps the compose file of the live deploy and takes no ref. Returns the new deploy; follow it with get_deploy. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.deployImage)))
-	mcpsdk.AddTool(server, newTool("create_deploy_hook", "Create a deploy hook",
-		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): the hook turns deploy on push off and keeps the GitHub repo linked, whose compose file each deploy takes; ask the user first when get_app says auto_deploy. CI calls POST <url> with {\"image\": \"...\", \"commit\": \"<sha>\"}, the commit the image was built from; without one, the head of the linked branch. The hook deploys only new tags of the image running now, hook_image in get_app; another image is refused, and while no image runs, everything. deploy_image picks the image. Needs a token with read and write access.",
-		change(true, false)), Write(changes(services, tools.createDeployHook)))
-	mcpsdk.AddTool(server, newTool("remove_deploy_hook", "Turn the deploy hook off",
-		"Turns off the deploy hook of an app: its URL stops working and CI can no longer deploy. get_app says in hook whether there is one; create_deploy_hook makes a new one. Works while the plan allows no changes. Needs a token with read and write access.",
-		change(true, true)), Write(member(services, tools.removeDeployHook)))
-	mcpsdk.AddTool(server, newTool("list_registries", "List registry logins",
-		"Lists the registry logins servers pull private images with, without passwords: servers are the servers that keep each login, missing_on the ones that do not, whose image deploys from that registry fail until set_registry gives them the login. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listRegistries)))
-	mcpsdk.AddTool(server, newTool("set_registry", "Set a registry login",
-		"Gives server (empty for the workspace's only server) the login for a registry host such as ghcr.io. The server keeps it and pulls image deploys from that host with it; moin keeps the host and the username, never the password. Call it once per server. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setRegistry)))
-	mcpsdk.AddTool(server, newTool("remove_registry", "Remove a registry login",
-		"Removes the login for a registry host, also from the servers. Private images from it no longer pull. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.removeRegistry)))
+	Add(server, newTool("get_deploy", "Get a deploy",
+		"Returns one deploy with its full log. Poll it to follow a running deploy until the status is succeeded or failed.",
+		readOnly("")), model.RightRead, member(services, tools.getDeploy))
+	Add(server, newTool("rollback_app", "Roll back an app",
+		"Starts the images of an earlier successful deploy again, with the env it had. Number 0 means the one before the live deploy. Returns the new deploy; follow it with get_deploy. It replaces the live deploy, so ask the user first.",
+		change(true, false)), model.RightDeploy, changes(services, tools.rollback))
+	Add(server, newTool("redeploy_app", "Redeploy an app",
+		"Builds the source of the newest deploy again on the app's server, with the env as it is now. Returns the new deploy; follow it with get_deploy.",
+		change(false, false)), model.RightDeploy, changes(services, tools.redeploy))
+	Add(server, newTool("deploy_image", "Deploy an image",
+		"Deploys an image built elsewhere, such as in CI, as the app's main service, and pulls it with the registry login for the image's host. An app that follows a GitHub repo takes the compose file of ref there, the linked branch by default; an app without a repo keeps the compose file of the live deploy and takes no ref. Returns the new deploy; follow it with get_deploy.",
+		change(false, false)), model.RightDeploy, changes(services, tools.deployImage))
+	Add(server, newTool("create_deploy_hook", "Create a deploy hook",
+		"Gives an app a new secret deploy hook URL for CI and returns it once; the old URL stops working. An app deploys from one place at a time (deploy_from in get_app: ci, github, or empty for neither yet): the hook turns deploy on push off and keeps the GitHub repo linked, whose compose file each deploy takes; ask the user first when get_app says auto_deploy. CI calls POST <url> with {\"image\": \"...\", \"commit\": \"<sha>\"}, the commit the image was built from; without one, the head of the linked branch. The hook deploys only new tags of the image running now, hook_image in get_app; another image is refused, and while no image runs, everything. deploy_image picks the image.",
+		change(true, false)), model.RightDeploy, changes(services, tools.createDeployHook))
+	Add(server, newTool("remove_deploy_hook", "Turn the deploy hook off",
+		"Turns off the deploy hook of an app: its URL stops working and CI can no longer deploy. get_app says in hook whether there is one; create_deploy_hook makes a new one. Works while the plan allows no changes.",
+		change(true, true)), model.RightDeploy, member(services, tools.removeDeployHook))
+	Add(server, newTool("list_registries", "List registry logins",
+		"Lists the registry logins servers pull private images with, without passwords: servers are the servers that keep each login, missing_on the ones that do not, whose image deploys from that registry fail until set_registry gives them the login.",
+		readOnly("")), model.RightRead, member(services, tools.listRegistries))
+	Add(server, newTool("set_registry", "Set a registry login",
+		"Gives server (empty for the workspace's only server) the login for a registry host such as ghcr.io. The server keeps it and pulls image deploys from that host with it; moin keeps the host and the username, never the password. Call it once per server.",
+		change(false, true)), model.RightServers, changes(services, tools.setRegistry))
+	Add(server, newTool("remove_registry", "Remove a registry login",
+		"Removes the login for a registry host, also from the servers. Private images from it no longer pull.",
+		change(true, true)), model.RightServers, changes(services, tools.removeRegistry))
 }
 
 // DeployInput names one deploy of an app.
@@ -77,7 +77,7 @@ func (d Deploy) Summary() string {
 }
 
 func (t moinTools) getDeploy(_ context.Context, caller Caller, input DeployInput) (Deploy, error) {
-	deploy, lines, _, stop, err := t.services.Apps.Follow(caller.Token.WorkspaceID, input.App, input.Number)
+	deploy, lines, _, stop, err := t.services.Apps.Follow(caller.Bearer.WorkspaceID, input.App, input.Number)
 	if err != nil {
 		return Deploy{}, err
 	}
@@ -157,7 +157,7 @@ type RegistryList struct {
 func (l RegistryList) Summary() string { return count(len(l.Items), "registry login") + "." }
 
 func (t moinTools) listRegistries(_ context.Context, caller Caller, _ NoInput) (RegistryList, error) {
-	logins, err := t.services.Apps.Registries(caller.Token.WorkspaceID)
+	logins, err := t.services.Apps.Registries(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return RegistryList{}, err
 	}

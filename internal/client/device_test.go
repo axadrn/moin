@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -30,21 +31,22 @@ func (s *deviceServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/api/v1/auth/device":
 		s.started = string(body)
 		_, _ = io.WriteString(w, `{"device_code":"dc","user_code":"WDJB-MJHT","verification_uri":"http://x/device","verification_uri_complete":"http://x/device?code=WDJB-MJHT","expires_in":600,"interval":5}`)
-	case "/api/v1/auth/device/token":
-		if r.Header.Get("Authorization") != "" || !strings.Contains(string(body), `"device_code":"dc"`) {
+	case "/api/v1/auth/token":
+		form, _ := url.ParseQuery(string(body))
+		if r.Header.Get("Authorization") != "" || r.Header.Get("Content-Type") != "application/x-www-form-urlencoded" || form.Get("device_code") != "dc" || form.Get("grant_type") != "urn:ietf:params:oauth:grant-type:device_code" {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = io.WriteString(w, `{"error":{"code":"invalid_body","message":"bad poll"}}`)
+			_, _ = io.WriteString(w, `{"error":"invalid_request","error_description":"bad poll"}`)
 			return
 		}
 		s.polls = append(s.polls, time.Now())
 		answer := s.answers[0]
 		s.answers = s.answers[1:]
 		if answer == "" {
-			_, _ = io.WriteString(w, `{"access_token":"pat_new","token_type":"Bearer"}`)
+			_, _ = io.WriteString(w, `{"access_token":"at_new","token_type":"Bearer","expires_in":3600,"refresh_token":"rt_new","scope":"read deploy env","connection_id":"c1"}`)
 			return
 		}
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": answer, "message": answer}})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": answer, "error_description": answer})
 	}
 }
 
@@ -65,7 +67,7 @@ func TestLoginInBrowserPollsUntilApproved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoginInBrowser() error = %v", err)
 	}
-	if config.Token != "pat_new" || !strings.HasPrefix(config.URL, "http://127.0.0.1") {
+	if config.Token != "at_new" || config.RefreshToken != "rt_new" || config.Connection != "c1" || config.ExpiresAt == nil || time.Until(*config.ExpiresAt) < 59*time.Minute || !strings.HasPrefix(config.URL, "http://127.0.0.1") {
 		t.Fatalf("config = %+v", config)
 	}
 	if shown.UserCode != "WDJB-MJHT" || shown.VerificationURIComplete != "http://x/device?code=WDJB-MJHT" {

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/protocol"
 )
@@ -83,8 +84,8 @@ func (h *AppsHandler) Tables(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, tables)
 }
 
-// Rows returns one page of a table, newest first. Rows are app data, so
-// tokens need the write scope, like env vars.
+// Rows returns one page of a table, newest first. Rows are app data, as
+// strong as secrets, so a connection or CI token needs env.
 func (h *AppsHandler) Rows(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	query := r.URL.Query()
@@ -167,6 +168,11 @@ func (h *AppsHandler) Query(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.Limit < 0 || request.Limit > MaxQueryLimit {
 		ValidationError(w, map[string]string{"limit": QueryLimitMessage})
+		return
+	}
+	// The route needs env: rows are app data. SQL that writes changes
+	// data, which needs delete too.
+	if request.Write && !Allowed(w, r, model.RightDelete) {
 		return
 	}
 	result, err := h.apps.Query(r.Context(), actor(r), r.PathValue("app"), request.Database, request.SQL, request.Params, request.Write, request.Limit)

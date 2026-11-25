@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func TestSignOutEverywhereKeepsAPITokens(t *testing.T) {
+func TestSignOutEverywhereKeepsCITokens(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	owner := seedTokenOwner(t, environment, "keeper")
-	created := createAPIToken(t, environment, owner, `"name":"Script"`)
+	created := createCIToken(t, environment, owner, `"name":"Script"`)
 	other := environment.signIn(t, owner.id)
 
 	expectStatus(t, environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions", cookie: owner.session}), http.StatusNoContent)

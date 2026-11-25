@@ -10,12 +10,13 @@ import (
 	"testing"
 
 	"github.com/axadrn/moin/hub/internal/api"
+	"github.com/axadrn/moin/hub/internal/model"
 )
 
 var (
 	openAPIPathLine   = regexp.MustCompile(`^  (/[^:]*):$`)
 	openAPIMethodLine = regexp.MustCompile(`^    (get|post|put|patch|delete):$`)
-	openAPITokenRole  = regexp.MustCompile(`^        - apiTokenAuth: \[(read|write)\]$`)
+	openAPIRights     = regexp.MustCompile(`^        - bearerAuth: \[([a-z, ]+)\]$`)
 	pathParameter     = regexp.MustCompile(`\{[^}]+\}`)
 )
 
@@ -112,18 +113,18 @@ func TestOpenAPIDocumentIsServed(t *testing.T) {
 }
 
 // documentedTokenAccess describes what the OpenAPI document says about
-// personal API tokens on one operation.
+// connections and CI tokens on one operation.
 type documentedTokenAccess struct {
-	// role is the scope in its apiTokenAuth entry, empty when it has none.
-	role string
+	// rights are the roles of its bearerAuth entry, empty when it has none.
+	rights string
 	// public is set for operations with "security: []".
 	public bool
 	// forbidden is set when the operation documents a 403 answer.
 	forbidden bool
 }
 
-// documentedTokenAccesses reads the apiTokenAuth role, the public marker and
-// the 403 answer of every operation under /api/v1.
+// documentedTokenAccesses reads the bearerAuth rights, the public marker
+// and the 403 answer of every operation under /api/v1.
 func documentedTokenAccesses(t *testing.T) map[string]documentedTokenAccess {
 	t.Helper()
 	accesses := make(map[string]documentedTokenAccess)
@@ -153,10 +154,10 @@ func documentedTokenAccesses(t *testing.T) map[string]documentedTokenAccess {
 			continue
 		}
 		access := accesses[currentOperation]
-		roleMatch := openAPITokenRole.FindStringSubmatch(line)
+		rightsMatch := openAPIRights.FindStringSubmatch(line)
 		switch {
-		case roleMatch != nil:
-			access.role = roleMatch[1]
+		case rightsMatch != nil:
+			access.rights = strings.ReplaceAll(rightsMatch[1], ", ", ",")
 		case line == "      security: []":
 			access.public = true
 		case line == "        '403':":
@@ -171,50 +172,62 @@ func documentedTokenAccesses(t *testing.T) map[string]documentedTokenAccess {
 	return accesses
 }
 
-// TestOpenAPIDocumentsTokenAccess keeps the apiTokenAuth entries of the
-// document in sync with the token gate of every route: an operation that
-// needs a session lists no apiTokenAuth, and every operation that can refuse
-// a token documents the 403.
-func TestOpenAPIDocumentsTokenAccess(t *testing.T) {
+// TestOpenAPIDocumentsTheRights keeps the bearerAuth entries of the
+// document in sync with the right of every route: an operation a
+// connection may not call lists no bearerAuth, the others the rights the
+// route names, and every operation that can miss a right documents the 403.
+func TestOpenAPIDocumentsTheRights(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	documented := documentedTokenAccesses(t)
-	roles := map[api.TokenAccess]string{api.TokenDenied: "", api.TokenRead: "read", api.TokenWrite: "write"}
 	for _, route := range environment.routes {
 		access, ok := documented[route.Pattern]
 		if !ok {
 			continue
 		}
-		if !access.public && access.role != roles[route.Tokens] {
-			t.Errorf("%s: openapi.yaml apiTokenAuth role %q, route allows %q", route.Pattern, access.role, roles[route.Tokens])
+		if !access.public && access.rights != route.Right.String() {
+			t.Errorf("%s: openapi.yaml bearerAuth [%s], route needs [%s]", route.Pattern, access.rights, route.Right.String())
 		}
-		if access.public && access.role != "" {
-			t.Errorf("%s: a public operation lists apiTokenAuth", route.Pattern)
+		if access.public && access.rights != "" {
+			t.Errorf("%s: a public operation lists bearerAuth", route.Pattern)
 		}
-		if route.Tokens != api.TokenRead && !access.forbidden {
-			t.Errorf("%s: can answer 403 to tokens, but openapi.yaml documents no 403", route.Pattern)
+		if route.Right != model.RightRead && !access.forbidden {
+			t.Errorf("%s: can answer 403 to a connection, but openapi.yaml documents no 403", route.Pattern)
 		}
 	}
 }
 
-// TestTokenScopesFollowTheMethod checks that only GET routes are open to
-// read tokens and every route that changes data needs the write scope.
-// secretReads are GET routes that answer secrets. Reading them is as strong
-// as writing them, so they need the write scope.
-var secretReads = map[string]bool{
-	"GET /api/v1/apps/{app}/databases/rows": true,
-	// A link to a full copy of the database.
-	"GET /api/v1/apps/{app}/backups/downloads/{download}": true,
+// readChanges are the routes that change something with the read right
+// alone: removing a connection or CI token only takes access away (another
+// person's CI token needs servers in the handler).
+var readChanges = map[string]bool{
+	"DELETE /api/v1/account/connections/{id}": true,
+	"DELETE /api/v1/ci-tokens/{id}":           true,
 }
 
-func TestTokenScopesFollowTheMethod(t *testing.T) {
+// dataReads are the reads of app data, as strong as secrets: they need
+// env, not read.
+var dataReads = map[string]bool{
+	"GET /api/v1/apps/{app}/databases/rows": true,
+}
+
+// TestRightsFollowTheMethod checks that every GET route needs read and
+// nothing more, but for app data, and every route that changes data a
+// right beyond read.
+func TestRightsFollowTheMethod(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	for _, route := range environment.routes {
 		method, _, _ := strings.Cut(route.Pattern, " ")
-		if method == http.MethodGet && route.Tokens == api.TokenWrite && !secretReads[route.Pattern] {
-			t.Errorf("%s needs the write scope for a read", route.Pattern)
+		if dataReads[route.Pattern] {
+			if route.Right != model.RightEnv {
+				t.Errorf("%s reads app data with %s, want env", route.Pattern, route.Right)
+			}
+			continue
 		}
-		if method != http.MethodGet && route.Tokens == api.TokenRead {
-			t.Errorf("%s changes data with the read scope", route.Pattern)
+		if method == http.MethodGet && route.Right != api.NoToken && route.Right != model.RightRead {
+			t.Errorf("%s needs %s for a read", route.Pattern, route.Right)
+		}
+		if method != http.MethodGet && route.Right == model.RightRead && !readChanges[route.Pattern] {
+			t.Errorf("%s changes data with the read right", route.Pattern)
 		}
 	}
 }

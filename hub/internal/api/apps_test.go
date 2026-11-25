@@ -20,8 +20,8 @@ func TestAppDomainsRules(t *testing.T) {
 	t.Cleanup(func() { access.Product = saved })
 	environment := newAPIEnvironment(t)
 	ada := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Name: "Ada", Verified: true})
-	writer := environment.token(t, "ada", ada.Workspace.ID, "read", "write")
-	reader := environment.token(t, "ada", ada.Workspace.ID, "read")
+	writer := environment.token(t, "ada", ada.Workspace.ID, allRights...)
+	reader := environment.token(t, "ada", ada.Workspace.ID)
 
 	fields := expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/domains", bearer: writer,
 		body: `{"service":"api","domains":["api.shop.example.com"],"canonical":"api.shop.example.com"}`}), http.StatusUnprocessableEntity, "validation_failed").Fields
@@ -31,7 +31,7 @@ func TestAppDomainsRules(t *testing.T) {
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/domains", bearer: writer,
 		body: `{"service":"api","domains":["api.shop.example.com"]}`}), http.StatusNotFound, "not_found")
 
-	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: reader, body: `{}`}), http.StatusForbidden, "insufficient_scope")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: reader, body: `{}`}), http.StatusForbidden, "missing_right")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPut, path: "/api/v1/apps/shop/protection", bearer: writer, body: `{}`}), http.StatusNotFound, "not_found")
 	expectError(t, environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/instant/password", bearer: writer}), http.StatusNotFound, "not_found")
 }

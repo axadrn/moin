@@ -72,7 +72,7 @@ You sign in with GitHub or a passkey. Like a club that lets you in when a friend
 - **Recovery key.** Lost your GitHub account or your passkey? The operator of the hub runs `./main recovery-key <email>` on the server. The key is 160 random bits, works once, for one hour, and only its SHA-256 is stored. It is never logged and never in a link. Five tries per 15 minutes per address. It resets every way in: it signs the account out everywhere, disconnects its GitHub account and deletes its passkeys, so a stolen GitHub account or device no longer gets in. Then you connect your GitHub and add a passkey again.
 - **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
 - **Connecting GitHub and adding a passkey need a CSRF token**, so no other site can start them. [Recovery key](/docs/self-hosting#recovery-key)
-- **Scripts and AI agents** use a personal API token instead, which can never change how you sign in. [Account and tokens](/docs/guides/account)
+- **The CLI, the TUI and AI agents** are connections: you let each one in from the browser with your passkey and pick its [rights](/docs/reference/rights). CI uses a CI token. Neither can ever change how you sign in or give itself more rights. [Account and connections](/docs/guides/account)
 
 ## Ports, SSH and the firewall
 

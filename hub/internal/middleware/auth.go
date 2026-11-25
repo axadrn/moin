@@ -18,8 +18,8 @@ func AuthMiddleware(authService *service.AuthService, userService *service.UserS
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if hasBearerAuthorization(r) {
-				// A bearer request never falls back to cookies: APITokenAuth
-				// handles a personal API token, and anything else continues
+				// A bearer request never falls back to cookies: BearerAuth
+				// handles a connection or CI token, and anything else continues
 				// unauthenticated, so CSRFProtection may skip it safely.
 				next.ServeHTTP(w, r)
 				return
@@ -80,20 +80,20 @@ func RequireChanges(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// WithTokenWorkspace scopes a moin API route, whose path names no
-// workspace, to the workspace of the personal API token. A session names
+// WithBearerWorkspace scopes a moin API route, whose path names no
+// workspace, to the workspace of the connection or CI token. A session names
 // the workspace in the Moin-Workspace header, or an EventSource, which
 // sends no headers, in the workspace query parameter; otherwise it gets
 // its first.
-func WithTokenWorkspace(workspaceService *service.WorkspaceService, subscriptionService *service.SubscriptionService) func(http.HandlerFunc) http.HandlerFunc {
+func WithBearerWorkspace(workspaceService *service.WorkspaceService, subscriptionService *service.SubscriptionService) func(http.HandlerFunc) http.HandlerFunc {
 	withWorkspace := withWorkspaceOf(func(r *http.Request) string {
 		user := ctxkeys.User(r.Context())
 		workspaces, err := workspaceService.ListForUser(user.ID)
 		if err != nil || len(workspaces) == 0 {
 			return ""
 		}
-		token := ctxkeys.APIToken(r.Context())
-		if token == nil {
+		bearer := ctxkeys.Bearer(r.Context())
+		if bearer == nil {
 			if slug := r.Header.Get("Moin-Workspace"); slug != "" {
 				return slug
 			}
@@ -103,7 +103,7 @@ func WithTokenWorkspace(workspaceService *service.WorkspaceService, subscription
 			return workspaces[0].Slug
 		}
 		for _, workspace := range workspaces {
-			if workspace.ID == token.WorkspaceID {
+			if workspace.ID == bearer.WorkspaceID {
 				return workspace.Slug
 			}
 		}
@@ -171,7 +171,7 @@ func readOnlyAllows(r *http.Request) bool {
 	if _, route, ok := strings.Cut(path, " "); ok {
 		path = route
 	}
-	for _, part := range []string{"/api/v1/workspaces/", "/workspace/", "/billing/", "/account", "/profile/", "/settings/sessions", "/settings/passkeys", "/settings/api-tokens", "/data/query", "/databases/query", "/version/update", "/daemon-updates", "/alerts/", "/alert-destinations"} {
+	for _, part := range []string{"/api/v1/workspaces/", "/workspace/", "/billing/", "/account", "/profile/", "/settings/sessions", "/settings/passkeys", "/settings/connections", "/ci-tokens", "/data/query", "/databases/query", "/version/update", "/daemon-updates", "/alerts/", "/alert-destinations"} {
 		if strings.Contains(path, part) {
 			return true
 		}

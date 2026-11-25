@@ -45,7 +45,7 @@ Each role can do everything inside it.
 | Make someone a member or an admin, remove members and admins | | ✓ | ✓ |
 | Make someone an owner, remove an owner, billing, delete the workspace | | | ✓ |
 
-Everyone can leave a workspace. A workspace always keeps one owner.
+Everyone can leave a workspace. A workspace always keeps one owner. Whoever leaves or is removed loses their connections and CI tokens in that workspace at once.
 
 ## Invite someone
 
@@ -53,11 +53,13 @@ moin sends an email to join the workspace. It is good for seven days. They open 
 
 ```surfaces
 Web: **Settings**, **Team**, **Invite a teammate**, **Send invite**
-CLI: moin team invite <email>; --admin invites an admin
+CLI: moin team invite <email>, as member
 TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations
 MCP: invite_member
 ```
+
+The CLI, MCP and every connection or CI token invite members only. An admin is invited in the web, so a leaked token cannot make one.
 
 ## Send an invitation again
 
@@ -106,7 +108,7 @@ API: PATCH /api/v1/workspaces/{slug}/members/{id}/role
 
 ## Remove someone
 
-Their API tokens for the workspace stop working at once.
+Their connections and CI tokens for the workspace stop working at once.
 
 ```surfaces
 Web: **Settings**, **Team**, **Remove** next to the person
@@ -115,7 +117,7 @@ API: DELETE /api/v1/workspaces/{slug}/members/{id}
 
 ## Create a workspace
 
-One more workspace, for example one per client. On hosted moin each has its own plan. Your API tokens stay with their own workspace: [make a token](/docs/guides/account#create-an-api-token) in the new one.
+One more workspace, for example one per client. On hosted moin each has its own plan. Connections and CI tokens stay with their own workspace: run `moin login` again and pick the new one, or [make a CI token](/docs/guides/account#make-a-ci-token) in it.
 
 ```surfaces
 Web: **Settings**, **Workspaces**, **New workspace**
@@ -138,4 +140,4 @@ API: DELETE /api/v1/workspaces/{slug}
 ## Good to know
 
 - Changing roles, removing people, leaving and deleting a workspace need you signed in on the web. A leaked token never locks your team out.
-- A personal API token belongs to one workspace. For another one, log in with one of its tokens: `moin login --token pat_…`.
+- A connection or CI token belongs to one workspace. For another one, `moin login` again and pick it.

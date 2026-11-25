@@ -14,24 +14,24 @@ import (
 // alerts go besides email.
 func registerAlertTools(server *mcpsdk.Server, services Services) {
 	tools := alertTools{builtinTools{services: services}}
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "list_alert_destinations", Title: "List alert destinations", Annotations: readOnly("List alert destinations"),
-		Description: "Lists where the alerts of the workspace go besides email: Slack, Discord, Telegram or a webhook, each with its name, a hint of its target (never the URL or token), the events it gets (uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available, server.daemon_update_failed), and whether sends to it fail, since when and why. Every member may list them. Needs the read scope.",
-	}, Read(member(services, tools.list)))
+	Add(server, &mcpsdk.Tool{Name: "list_alert_destinations", Title: "List alert destinations", Annotations: readOnly("List alert destinations"),
+		Description: "Lists where the alerts of the workspace go besides email: Slack, Discord, Telegram or a webhook, each with its name, a hint of its target (never the URL or token), the events it gets (uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available, server.daemon_update_failed), and whether sends to it fail, since when and why. Every member may list them.",
+	}, model.RightRead, member(services, tools.list))
 	add := change(false, false)
 	add.Title = "Add an alert destination"
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "add_alert_destination", Title: add.Title, Annotations: add,
-		Description: "Adds an alert destination: kind slack or discord with the incoming webhook url, telegram with bot_token and chat_id, or webhook with any http or https url. events picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available and server.daemon_update_failed; none means all. A webhook returns signing_secret this once: each post carries X-Moin-Signature: sha256=<hex HMAC-SHA256 of the body>; tell the user to store it. Ask the user for the URL or token; never guess one. Only owners and admins. Needs a token with read and write access.",
-	}, Write(member(services, tools.add)))
+	Add(server, &mcpsdk.Tool{Name: "add_alert_destination", Title: add.Title, Annotations: add,
+		Description: "Adds an alert destination: kind slack or discord with the incoming webhook url, telegram with bot_token and chat_id, or webhook with any http or https url. events picks from uptime.down, uptime.up, server.down, server.up, deploy.failed, backup.failed, backup.recovered, check.failed, check.recovered, disk.full, disk.ok, update.available and server.daemon_update_failed; none means all. A webhook returns signing_secret this once: each post carries X-Moin-Signature: sha256=<hex HMAC-SHA256 of the body>; tell the user to store it. Ask the user for the URL or token; never guess one. Only owners and admins.",
+	}, model.RightServers, member(services, tools.add))
 	remove := change(true, true)
 	remove.Title = "Remove an alert destination"
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "remove_alert_destination", Title: remove.Title, Annotations: remove,
-		Description: "Removes an alert destination by name or ID; its alerts stop. Only owners and admins. Needs a token with read and write access.",
-	}, Write(member(services, tools.remove)))
+	Add(server, &mcpsdk.Tool{Name: "remove_alert_destination", Title: remove.Title, Annotations: remove,
+		Description: "Removes an alert destination by name or ID; its alerts stop. Only owners and admins.",
+	}, model.RightServers, member(services, tools.remove))
 	test := change(false, false)
 	test.Title = "Send a test alert"
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "test_alert_destination", Title: test.Title, Annotations: test,
-		Description: "Sends a test alert to a destination by name or ID and returns it; a webhook gets event test. Fails with alert_send_failed and the reason when the destination does not take it within 10 seconds. Only owners and admins. Needs a token with read and write access.",
-	}, Write(member(services, tools.test)))
+	Add(server, &mcpsdk.Tool{Name: "test_alert_destination", Title: test.Title, Annotations: test,
+		Description: "Sends a test alert to a destination by name or ID and returns it; a webhook gets event test. Fails with alert_send_failed and the reason when the destination does not take it within 10 seconds. Only owners and admins.",
+	}, model.RightServers, member(services, tools.test))
 }
 
 type alertTools struct {
@@ -102,7 +102,7 @@ func (d AlertDestination) Summary() string {
 }
 
 func (t alertTools) list(_ context.Context, caller Caller, _ NoInput) (AlertDestinationList, error) {
-	destinations, err := t.services.Alerts.Destinations(caller.Token.WorkspaceID)
+	destinations, err := t.services.Alerts.Destinations(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return AlertDestinationList{}, err
 	}

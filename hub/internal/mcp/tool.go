@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/axadrn/moin/hub/internal/service"
 	"log/slog"
+	"strings"
+
+	"github.com/axadrn/moin/hub/internal/service"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -13,13 +15,13 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Caller is who called a tool: the user and the personal API token the
+// Caller is who called a tool: the user and the connection or CI token the
 // request authenticated with.
 type Caller struct {
-	User  *model.User
-	Token *model.APIToken
-	// Source is how the call came in, for the activity: MCP, the token by
-	// name, the client IP and user agent.
+	User   *model.User
+	Bearer *model.Bearer
+	// Source is how the call came in, for the activity: MCP, the
+	// connection or CI token by name, the client IP and user agent.
 	Source service.Source
 }
 
@@ -28,28 +30,47 @@ type Caller struct {
 // the JSON API codes.
 type ToolFunc[In, Out any] func(ctx context.Context, caller Caller, input In) (Out, error)
 
-// Read wraps a tool that only reads data. It needs the read scope, which every
-// token has.
-func Read[In, Out any](tool ToolFunc[In, Out]) mcpsdk.ToolHandlerFor[In, Out] {
-	return withScope(model.APITokenScopeRead, tool)
+// Add registers a tool that needs right, one right or several that must
+// all be on. That right is the one place that says it: Add ends the
+// description with "Needs the deploy right.", puts the rights in the tool's
+// _meta, and checks them before the body runs. A connection without them
+// gets missing_right. A tool that names no right panics at start-up, so no
+// tool runs unchecked.
+func Add[In, Out any](server *mcpsdk.Server, tool *mcpsdk.Tool, right model.Rights, body ToolFunc[In, Out]) {
+	if right == 0 {
+		panic("mcp: the tool " + tool.Name + " names no right")
+	}
+	tool.Description = strings.TrimSpace(tool.Description + " " + needs(right))
+	if tool.Meta == nil {
+		tool.Meta = mcpsdk.Meta{}
+	}
+	tool.Meta["rights"] = right.List()
+	mcpsdk.AddTool(server, tool, handler(right, body))
 }
 
-// Write wraps a tool that changes data. A read-only token gets the error code
-// insufficient_scope.
-func Write[In, Out any](tool ToolFunc[In, Out]) mcpsdk.ToolHandlerFor[In, Out] {
-	return withScope(model.APITokenScopeWrite, tool)
+// needs is the sentence of a tool's description that names its right.
+func needs(right model.Rights) string {
+	names := right.List()
+	if len(names) == 1 {
+		return "Needs the " + names[0] + " right."
+	}
+	return "Needs the " + strings.Join(names, " and ") + " rights."
 }
 
-func withScope[In, Out any](scope string, tool ToolFunc[In, Out]) mcpsdk.ToolHandlerFor[In, Out] {
+func handler[In, Out any](right model.Rights, tool ToolFunc[In, Out]) mcpsdk.ToolHandlerFor[In, Out] {
 	return func(ctx context.Context, _ *mcpsdk.CallToolRequest, input In) (*mcpsdk.CallToolResult, Out, error) {
 		var empty Out
-		caller := Caller{User: ctxkeys.User(ctx), Token: ctxkeys.APIToken(ctx), Source: service.RequestSource(ctx)}
+		caller := Caller{User: ctxkeys.User(ctx), Bearer: ctxkeys.Bearer(ctx), Source: service.RequestSource(ctx)}
 		caller.Source.Via = service.ViaMCP
-		if caller.User == nil || caller.Token == nil {
-			return nil, empty, &ToolError{Code: "unauthenticated", Message: "Send a personal API token, which starts with pat_, as Authorization: Bearer <token>."}
+		if caller.User == nil || caller.Bearer == nil {
+			return nil, empty, &ToolError{Code: "unauthenticated", Message: unauthenticated}
 		}
-		if !caller.Token.HasScope(scope) {
-			return nil, empty, &ToolError{Code: "insufficient_scope", Message: "This API token needs the " + scope + " scope. Use a token with read and write access."}
+		if caller.Bearer.AppID != "" {
+			return nil, empty, &ToolError{Code: "app_only", Message: appOnly}
+		}
+		if missing := caller.Bearer.Rights.Missing(right); missing != 0 {
+			detail := api.MissingRight(*caller.Bearer, missing)
+			return nil, empty, &ToolError{Code: detail.Code, Message: detail.Message, Right: detail.Right}
 		}
 		output, err := tool(ctx, caller, input)
 		if err != nil {
@@ -58,6 +79,11 @@ func withScope[In, Out any](scope string, tool ToolFunc[In, Out]) mcpsdk.ToolHan
 		return result(output), output, nil
 	}
 }
+
+const (
+	unauthenticated = "Send a CI token, which starts with pat_, as Authorization: Bearer <token>. Make one under Settings, Connections."
+	appOnly         = "This CI token works only for its app, through the API. MCP needs a CI token for every app."
+)
 
 // Summarizer is implemented by tool outputs that describe themselves in one
 // sentence. The sentence comes before the JSON in the text content, so
@@ -87,10 +113,12 @@ type ToolError struct {
 	Code    string
 	Message string
 	Fields  map[string]string
+	// Right is the right a missing_right error names.
+	Right string
 }
 
 func (e *ToolError) Error() string {
-	data, err := json.Marshal(api.ErrorBody{Error: api.ErrorDetail{Code: e.Code, Message: e.Message, Fields: e.Fields}})
+	data, err := json.Marshal(api.ErrorBody{Error: api.ErrorDetail{Code: e.Code, Message: e.Message, Fields: e.Fields, Right: e.Right}})
 	if err != nil {
 		return e.Message
 	}
@@ -116,7 +144,8 @@ func toolError(err error) error {
 	return &ToolError{Code: detail.Code, Message: detail.Message, Fields: detail.Fields}
 }
 
-// actor is the token's user in the token's workspace, through MCP.
+// actor is the caller's user in the workspace of the connection or CI
+// token, through MCP.
 func (c Caller) actor() service.Actor {
-	return service.Actor{WorkspaceID: c.Token.WorkspaceID, UserID: c.User.ID, Source: c.Source}
+	return service.Actor{WorkspaceID: c.Bearer.WorkspaceID, UserID: c.User.ID, Source: c.Source}
 }

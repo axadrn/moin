@@ -71,7 +71,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.CORS(app.Cfg.CORSAllowedOrigins),
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),
-		middleware.APITokenAuth(app.APITokenService, app.UserService),
+		middleware.BearerAuth(app.ConnectionService, app.CITokenService, app.UserService),
 		middleware.BlockImpersonatedWrites,
 		middleware.AdminContext(app.AdminService),
 		middleware.WithURLPath,
@@ -240,9 +240,13 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, gi
 	mux.HandleFunc("GET /workspaces/invitations/{token}", workspaceInvitation.Show)
 	mux.HandleFunc("POST /workspaces/invitations/{token}", middleware.RequireAuth(workspaceInvitation.Accept))
 	// moin login in the browser: the page signs in first by itself.
-	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Cfg)
+	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Passkeys, app.AuthService, app.Cfg)
 	mux.HandleFunc("GET /device", deviceLimiter(device.Show))
+	if app.Passkeys.On() {
+		mux.HandleFunc("POST /device/passkey/options", passkeyLimiter(middleware.RequireAuth(device.PasskeyOptions)))
+	}
 	mux.HandleFunc("POST /device/approve", deviceLimiter(middleware.RequireAuth(device.Approve)))
+	mux.HandleFunc("POST /device/reauth", deviceLimiter(middleware.RequireAuth(device.Reauth)))
 	mux.HandleFunc("POST /device/deny", deviceLimiter(middleware.RequireAuth(device.Deny)))
 }
 
@@ -258,8 +262,8 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 // the overview, settings, the account, billing, the team and alerts.
 func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations, passkeyLimiter limiter) {
 	workspace := inWorkspace(app)
-	settings := handler.NewSettingsHandler(app.AuthService, app.Passkeys, app.APITokenService, app.AppService, app.UpdateService)
-	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
+	settings := handler.NewSettingsHandler(app.AuthService, app.Passkeys, app.AppService, app.UpdateService)
+	connections := handler.NewConnectionsHandler(app.ConnectionService, app.CITokenService, app.AppService, app.Passkeys, app.AuthService)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
@@ -284,8 +288,17 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 		mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys", passkeyLimiter(workspace(settings.AddPasskey)))
 	}
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RemovePasskey))
-	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
-	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/api-tokens/{id}", workspace(apiTokens.Revoke))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections", workspace(connections.Page))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm/options", passkeyLimiter(workspace(connections.ConfirmOptions)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm", passkeyLimiter(workspace(connections.Confirm)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/reauth", workspace(connections.Reauth))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.Connection))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/{id}/rights/{right}", workspace(connections.SetConnectionRight))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.RemoveConnection))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/ci-tokens", workspace(connections.CreateCIToken))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings/ci-tokens/{id}", workspace(connections.CIToken))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/ci-tokens/{id}/rights/{right}", workspace(connections.SetCITokenRight))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/ci-tokens/{id}", workspace(connections.RemoveCIToken))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/profile/name", workspace(profile.UpdateName))
 	mux.HandleFunc("POST /app/{workspaceSlug}/profile/email-alerts", workspace(profile.EmailAlerts))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/account/email", workspace(emailChanges(account.ChangeEmail)))
@@ -472,7 +485,9 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Account:     api.NewAccountHandler(app.AuthService, app.UserService, app.FileService),
 		Sessions:    api.NewSessionsHandler(app.AuthService),
 		Passkeys:    api.NewPasskeysHandler(app.Passkeys),
-		Tokens:      api.NewAPITokensHandler(app.APITokenService),
+		Connections: api.NewConnectionsHandler(app.ConnectionService, app.Passkeys),
+		CITokens:    api.NewCITokensHandler(app.CITokenService, app.Passkeys),
+		Token:       api.NewTokenHandler(app.DeviceLoginService, app.ConnectionService),
 		Billing:     apiBilling,
 		Admin:       api.NewAdminHandler(app.AdminService),
 		Workspaces:  api.NewWorkspaceHandler(app.WorkspaceService),
@@ -495,10 +510,17 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		},
 		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(invitationLimiter),
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
+			return middleware.RequireOnboardedAPI(middleware.WithBearerWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
 		},
 		RateLimitDevice:     deviceLimiter,
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
+		AppID: func(workspaceID, name string) (string, error) {
+			found, err := app.AppService.Get(workspaceID, name)
+			if err != nil {
+				return "", err
+			}
+			return found.ID, nil
+		},
 	}
 	for _, route := range api.Routes(apiHandlers, apiMiddleware) {
 		mux.HandleFunc(route.Pattern, route.Handler)

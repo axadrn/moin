@@ -1,7 +1,7 @@
 ---
 title: Privacy Policy
 description: What the hosted moin service stores, why, where it lives and how to get rid of it
-lastUpdated: November 11, 2026
+lastUpdated: November 25, 2026
 ---
 
 Short version: moin stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
@@ -64,7 +64,7 @@ Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
 ## Activity log
 
-Each workspace keeps a log of who changed what, so a team can see who deployed, restored or changed a setting. Each entry holds the time, the member's email or the API token's name, how the change came in (web, CLI, terminal UI, API, MCP, GitHub or a deploy hook), the IP address and browser or program of the request, and what changed. It never holds env var values, secrets, the values in your database or your SQL; a SQL change shows only its kind and tables, such as "UPDATE on orders". Every member of the workspace sees the log; only admins and owners see IP addresses and browsers.
+Each workspace keeps a log of who changed what, so a team can see who deployed, restored or changed a setting. Each entry holds the time, the member's email or the name of the connection or CI token, how the change came in (web, CLI, terminal UI, API, MCP, GitHub or a deploy hook), the IP address and browser or program of the request, and what changed. It never holds env var values, secrets, the values in your database or your SQL; a SQL change shows only its kind and tables, such as "UPDATE on orders". Every member of the workspace sees the log; only admins and owners see IP addresses and browsers.
 
 The log stays as long as the workspace exists. When you delete your account, your email stays on your earlier entries, so the team still knows who made them.
 
@@ -117,7 +117,7 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 
 ## How long we keep data
 
-- **Account**: while it exists. Deleting your account deletes your profile, your avatar, your sessions, your API tokens and the invitations you sent, and takes you out of every workspace. It does not delete workspaces you share with others: hand them over or delete them first if you are their only owner.
+- **Account**: while it exists. Deleting your account deletes your profile, your avatar, your sessions, your connections, your CI tokens and the invitations you sent, and takes you out of every workspace. It does not delete workspaces you share with others: hand them over or delete them first if you are their only owner.
 - **Workspace**: while it exists. Deleting a workspace deletes its servers, apps, deploys, env vars, integrations, invitations and activity log. A workspace with a subscription can be deleted once the subscription has ended.
 - **Activity log**: as long as its workspace. Your email stays on your entries in the workspaces that remain after you delete your account.
 - **Invitations**: deleted 180 days after they were sent.

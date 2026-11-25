@@ -6,6 +6,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/mcp"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/validation"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -19,10 +20,10 @@ type nameInput struct {
 }
 
 func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	mcp.Add(server, &mcpsdk.Tool{
 		Name:        "set_display_name",
-		Description: "Changes the display name of the user this token acts for. Needs a token with read and write access.",
-	}, mcp.Write(func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
+		Description: "Changes the display name of the user this connection acts for.",
+	}, model.RightServers, func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
 		err := validation.ValidateName(input.Name)
 		if err != nil {
 			return api.UserResponse{}, mcp.InvalidField("name", api.FieldMessage(err))
@@ -32,19 +33,19 @@ func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
 			return api.UserResponse{}, err
 		}
 		return api.UserResponse{User: api.NewUser(user)}, nil
-	}))
+	})
 }
 
-func TestAddedToolRunsWithTheTokenScopes(t *testing.T) {
+func TestAddedToolRunsWithItsRight(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "namer")
 	server := mcp.NewServer(env.services)
 	registerNameTool(server, env.services)
 	readToken, _ := createToken(t, env, owner)
-	writeToken, _ := createToken(t, env, owner, "read", "write")
+	writeToken, _ := createToken(t, env, owner, "servers")
 
 	reader := connectMemory(t, server, owner, readToken)
-	toolError(t, call(t, reader, "set_display_name", map[string]any{"name": "Grace Hopper"}), "insufficient_scope")
+	toolError(t, call(t, reader, "set_display_name", map[string]any{"name": "Grace Hopper"}), "missing_right")
 
 	writer := connectMemory(t, server, owner, writeToken)
 	tools, err := writer.ListTools(context.Background(), nil)

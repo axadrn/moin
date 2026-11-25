@@ -35,6 +35,9 @@ type softAuthenticator struct {
 	id         []byte
 	userHandle []byte
 	counter    uint32
+	// unverified answers without user verification: touched, but not
+	// unlocked with a face, a finger or the screen lock.
+	unverified bool
 }
 
 func newSoftAuthenticator(t *testing.T) *softAuthenticator {
@@ -89,7 +92,11 @@ func (a *softAuthenticator) get(t *testing.T, options *protocol.PublicKeyCredent
 	t.Helper()
 	a.counter++
 	clientData := a.clientData(t, "webauthn.get", options.Challenge, origin)
-	authData := a.authData(protocol.FlagUserPresent | protocol.FlagUserVerified)
+	flags := protocol.FlagUserPresent | protocol.FlagUserVerified
+	if a.unverified {
+		flags = protocol.FlagUserPresent
+	}
+	authData := a.authData(flags)
 	clientHash := sha256.Sum256(clientData)
 	digest := sha256.Sum256(append(append([]byte{}, authData...), clientHash[:]...))
 	signature, err := ecdsa.SignASN1(rand.Reader, a.key, digest[:])

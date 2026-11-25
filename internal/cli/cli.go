@@ -31,8 +31,9 @@ Usage
   moin <command>      Run one command
 
 Account
-  login              Log in through the browser: login [--url <url>]; --token <token> or the token on stdin for CI
-  logout             Forget the token and what the TUI kept on this machine
+  login              Connect this computer through the browser, with the rights you pick: login [--url <url>]; --token <token> or a CI token on stdin for CI
+  logout             End this computer's connection and forget it, and what the TUI kept on this machine
+  connections        Your connections and the CI tokens of the workspace; remove one: connections rm <id> [--yes]
   status             Is everything OK? What needs you, updates, what runs; exits 1 when something needs you
   activity           Who deployed, restored or changed what: activity [--limit 30]
   alerts             Email me when a site or server goes down or a deploy fails, on by default: alerts [on|off]; also lists the destinations
@@ -40,7 +41,7 @@ Account
   alerts test        Send a test alert: alerts test <name>
   alerts rm          Remove a destination: alerts rm <name> [--yes]
   team               Members and open invitations of your workspace
-  team invite        Invite someone: team invite ada@example.com [--admin]
+  team invite        Invite someone as member: team invite ada@example.com
   team resend        Send an invitation again: team resend ada@example.com
   team revoke        Take an invitation back: team revoke ada@example.com [--yes]
   team rename        Rename the workspace: team rename "Acme Inc"
@@ -243,15 +244,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		if err := noArguments(command, rest); err != nil {
 			return err
 		}
-		err := client.RemoveConfig()
-		if err != nil {
-			return err
-		}
-		if err := tui.ForgetCache(); err != nil {
-			return err
-		}
-		done(stdout, "Logged out")
-		return nil
+		return logout(ctx, stdout)
+	case "connections":
+		return connections(ctx, rest, stdin, stdout)
 	case "status":
 		return status(ctx, rest, stdout)
 	case "activity":
@@ -364,8 +359,22 @@ func openTUI(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			return client.SaveConfig(signedIn)
+			return saveLogin(ctx, signedIn)
 		}})
+}
+
+// saveLogin saves a new login. When this computer had a connection
+// already, it ends now, so logging in again, in the CLI or the TUI, never
+// leaves one behind.
+func saveLogin(ctx context.Context, config client.Config) error {
+	previous, _ := client.LoadSaved()
+	if err := client.SaveConfig(config); err != nil {
+		return err
+	}
+	if previous.RefreshToken != "" && previous.RefreshToken != config.RefreshToken {
+		_ = client.Logout(ctx, previous)
+	}
+	return nil
 }
 
 func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -373,9 +382,9 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	flags := newFlags("login", "login [--url <hub>] [--web] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
+	flags := newFlags("login", "login [--url <hub>] [--web] [--token <token>], or a CI token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
 	baseURL := flags.String("url", config.URL, "hub URL")
-	token := flags.String("token", "", "personal API token, for CI and scripts; without it "+build.Name+" logs in through the browser, or reads the token from stdin")
+	token := flags.String("token", "", "CI token, for CI and scripts; without it "+build.Name+" logs in through the browser, or reads the token from stdin")
 	web := flags.Bool("web", false, "log in through the browser even without a terminal")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -388,7 +397,9 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err := client.CheckURL(config.URL); err != nil {
 		return err
 	}
-	config.Token, config.TokenFromEnv = *token, false
+	// A new login replaces all of the old one: a CI token has no refresh
+	// token.
+	config = client.Config{URL: config.URL, Token: *token}
 	switch {
 	case config.Token != "":
 	case *web || isTerminal(stdin):
@@ -415,8 +426,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	err = client.SaveConfig(config)
-	if err != nil {
+	if err := saveLogin(ctx, config); err != nil {
 		return err
 	}
 	who := account.Email
@@ -430,14 +440,37 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	return nil
 }
 
+// logout ends this computer's connection at the hub, then forgets it and
+// what the TUI kept. A CI token stays valid: remove it in Settings.
+func logout(ctx context.Context, stdout io.Writer) error {
+	saved, err := client.LoadSaved()
+	if err != nil {
+		return err
+	}
+	if err := client.Logout(ctx, saved); err != nil {
+		step(stdout, "The hub did not answer: %v. Remove the connection in Settings, Connections.", err)
+	}
+	if err := client.RemoveConfig(); err != nil {
+		return err
+	}
+	if err := tui.ForgetCache(); err != nil {
+		return err
+	}
+	done(stdout, "Logged out")
+	if saved.Token != "" && saved.RefreshToken == "" {
+		hint(stdout, "The CI token still works. Remove it in the web: Settings, Connections, or with", build.Name+" connections rm <id>")
+	}
+	return nil
+}
+
 // showDeviceLogin prints the code and the page of a login in the browser,
 // and opens the page when it can.
 func showDeviceLogin(stdout io.Writer, login client.DeviceLogin) {
 	step(stdout, "Your code: %s", style.Bold.Render(login.UserCode))
 	if openBrowser(login.VerificationURIComplete) == nil {
-		step(stdout, "Opened %s in your browser. Check the code and approve it there.", login.VerificationURIComplete)
+		step(stdout, "Opened %s in your browser. Check the code, pick the rights and allow it there.", login.VerificationURIComplete)
 	} else {
-		step(stdout, "Open %s in a browser, check the code and approve it.", style.Bold.Render(login.VerificationURIComplete))
+		step(stdout, "Open %s in a browser, check the code, pick the rights and allow it.", style.Bold.Render(login.VerificationURIComplete))
 	}
 	step(stdout, "Waiting for the browser...")
 }

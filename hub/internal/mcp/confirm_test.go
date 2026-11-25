@@ -15,7 +15,7 @@ func TestRemoveToolsNeedTheName(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "confirm")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	defer bucket.Close()
