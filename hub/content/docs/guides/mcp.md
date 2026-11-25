@@ -19,6 +19,8 @@ Add the URL of your hub's MCP server, `https://moin.example.com/mcp`, to your AI
 
 Claude and ChatGPT connect from their own cloud, so they need a hub on the public internet. Claude Code and Cursor run on your computer and reach any hub you reach.
 
+An agent registers itself with the hub when you add it. Allow it within a day: an agent nobody let in after 24 hours is forgotten, and you add it again.
+
 ### Without the browser
 
 A client that cannot sign in with OAuth, or one that runs in CI, uses a CI token. [Make one](/docs/guides/account#make-a-ci-token) with the rights the agent needs and send it as a header:
@@ -31,7 +33,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 ## Good to know
 
 - An agent you let in works only at `/mcp` of your hub, never in the JSON API. Its access lasts an hour and renews by itself; unused for 90 days, the connection ends. `whoami` tells it its rights.
-- The approval page shows the agent's name as the agent gave it, and where it sends you back, like claude.ai or localhost. Nobody checked the name, so allow only an agent you just added.
+- The approval page shows the agent's name as the agent gave it, and where it sends you back, like claude.ai or localhost. Nobody checked the name, so allow only an agent you just added. Settings, Connections shows both too: "Claude · claude.ai".
 - Each tool needs one right, named in the table below and at the end of its description. Without it the tool answers `missing_right` with the right, and the agent says: "This connection may not deploy and restart. Change it in Settings, Connections." [Rights](/docs/reference/rights)
 - Rights never add to your role: a member's agent cannot invite, whatever its rights.
 - A CI token for one app does not reach MCP.

@@ -73,7 +73,7 @@ You sign in with GitHub or a passkey. Like a club that lets you in when a friend
 - **An email-change link is no way in.** It changes the address and signs the account out everywhere. Only a browser already signed in to that account stays in.
 - **Connecting GitHub and adding a passkey need a CSRF token**, so no other site can start them. [Recovery key](/docs/self-hosting#recovery-key)
 - **The CLI, the TUI and AI agents** are connections: you let each one in from the browser with your passkey and pick its [rights](/docs/reference/rights). CI uses a CI token. Neither can ever change how you sign in or give itself more rights. [Account and connections](/docs/guides/account)
-- **AI agents sign in with OAuth 2.1**, as the MCP spec asks: PKCE S256 only, redirect URIs exact and https or localhost, a code that works once for a minute, and tokens that work only at `/mcp`. [AI agents](/docs/guides/mcp)
+- **AI agents sign in with OAuth 2.1**, as the MCP spec asks: PKCE S256 only, redirect URIs exact and https or localhost, a code that works once for a minute, and tokens that work only at `/mcp`. Only on localhost, 127.0.0.1 and [::1] may the port differ, since an app there gets a free port each time. A redirect host must be plain ASCII, so no look-alike letters; the approval page shows it next to the agent's name, which is only the agent's own word. A wrong request goes back to the agent only when you click. [AI agents](/docs/guides/mcp)
 
 ## Ports, SSH and the firewall
 

@@ -94,14 +94,3 @@ func (r *OAuth) UseCode(id string, at time.Time) error {
 	result, err := r.db.Exec(`UPDATE oauth_codes SET used_at = $1 WHERE id = $2 AND used_at IS NULL`, at, id)
 	return oneRowOr(result, err, ErrOAuthCodeUsed)
 }
-
-// ExpiredUnusedCodes returns the codes nobody traded in time whose
-// connection is still live.
-func (r *OAuth) ExpiredUnusedCodes(now time.Time) ([]model.OAuthCode, error) {
-	codes := []model.OAuthCode{}
-	err := r.db.Select(&codes, `
-		SELECT o.* FROM oauth_codes o JOIN connections c ON c.id = o.connection_id
-		WHERE o.used_at IS NULL AND o.expires_at < $1 AND c.ended_at IS NULL
-	`, now)
-	return codes, err
-}

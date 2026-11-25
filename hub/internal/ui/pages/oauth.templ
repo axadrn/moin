@@ -75,26 +75,43 @@ templ OAuthFailed(message string) {
 	}
 }
 
-// OAuthDone sends the person back to the client. The page's Refresh
-// header goes there at once; the button is there in case it does not.
-templ OAuthDone(host, target string, approved bool) {
-	@authScreen(oauthSEO, doneTitle(approved)) {
+// OAuthDoneView is where the person goes back to the client: after Allow
+// or Cancel, or with what was wrong in the client's request.
+type OAuthDoneView struct {
+	Host   string
+	Target string
+	// Approved: Allow made the connection.
+	Approved bool
+	// Refusal says what was wrong in the client's request.
+	Refusal string
+}
+
+// OAuthDone sends the person back to the client. After Allow or Cancel the
+// page's Refresh header goes there at once; a refusal waits for the click.
+templ OAuthDone(view OAuthDoneView) {
+	@authScreen(oauthSEO, doneTitle(view)) {
 		@authLine() {
-			if approved {
-				Connected. Going back to { host }.
-			} else {
-				Nothing got access. Going back to { host }.
+			switch  {
+				case view.Approved:
+					Connected. Going back to { view.Host }.
+				case view.Refusal != "":
+					The app asked for something this hub does not do: { view.Refusal } Nothing got access.
+				default:
+					Nothing got access. Going back to { view.Host }.
 			}
 		}
-		@components.Button(components.ButtonProps{Kind: components.Primary, Href: target}) {
-			{ "Back to " + host }
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: view.Target}) {
+			{ "Back to " + view.Host }
 		}
 	}
 }
 
-func doneTitle(approved bool) string {
-	if approved {
+func doneTitle(view OAuthDoneView) string {
+	switch {
+	case view.Approved:
 		return "Connected"
+	case view.Refusal != "":
+		return "Cannot connect"
 	}
 	return "Not connected"
 }

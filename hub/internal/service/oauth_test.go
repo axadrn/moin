@@ -404,3 +404,138 @@ func TestDenyGoesBackWithAccessDenied(t *testing.T) {
 		t.Fatalf("Deny() = %s", back)
 	}
 }
+
+// TestRedirectHostsArePlainASCII: a host in other letters can pass for
+// another one, so it is refused, also percent-encoded. Punycode stays and
+// shows as it is.
+func TestRedirectHostsArePlainASCII(t *testing.T) {
+	e := newOAuthEnvironment(t)
+	for _, uri := range []string{"https://cl\u0430ude.example.com/callback", "https://%D1%81laude.example.com/callback", "http://l\u043ecalhost/callback"} {
+		if _, err := e.oauth.Register(NewClient{RedirectURIs: []string{uri}}); !errors.Is(err, ErrRedirectURIs) {
+			t.Errorf("Register(%q) = %v, want ErrRedirectURIs", uri, err)
+		}
+	}
+	client := e.register(t, "https://xn--clude-8va.example.com/callback")
+	authorization, err := e.oauth.Check(request(client, "https://xn--clude-8va.example.com/callback"))
+	if err != nil || authorization.RedirectHost() != "xn--clude-8va.example.com" {
+		t.Fatalf("punycode: %v, %v", authorization, err)
+	}
+}
+
+// TestRedirectHostShowsAPortThatIsNotTheDefault: the page and the
+// connection name the port only when it is not the scheme's own.
+func TestRedirectHostShowsAPortThatIsNotTheDefault(t *testing.T) {
+	for uri, want := range map[string]string{
+		"https://claude.example.com/callback":      "claude.example.com",
+		"https://claude.example.com:443/callback":  "claude.example.com",
+		"https://claude.example.com:8443/callback": "claude.example.com:8443",
+		"http://localhost:5555/callback":           "localhost:5555",
+		"http://localhost:80/callback":             "localhost",
+		"http://[::1]:5555/callback":               "[::1]:5555",
+	} {
+		authorization := Authorization{Request: AuthorizationRequest{RedirectURI: uri}}
+		if got := authorization.RedirectHost(); got != want {
+			t.Errorf("RedirectHost(%s) = %q, want %q", uri, got, want)
+		}
+	}
+	if !(Authorization{Request: AuthorizationRequest{RedirectURI: "http://[::1]:5555/callback"}}).Local() {
+		t.Error("[::1] is not local")
+	}
+}
+
+// TestClientNamesCannotHideOrTurnText: control and format characters, like
+// a right-to-left override or a zero-width space, and quotes go.
+func TestClientNamesCannotHideOrTurnText(t *testing.T) {
+	for name, want := range map[string]string{
+		"Claude\u202e edoc":          "Claude edoc",
+		"Cla\u200bude":               "Claude",
+		"\u201cClaude\u201d \"Pro\"": "Claude Pro",
+		"\ufeff":                     "A client",
+		"Claude\u2066x\u2069":        "Claudex",
+	} {
+		if got := CleanClientName(name); got != want {
+			t.Errorf("CleanClientName(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// TestTheConnectionKeepsWhereItGoesBack: the connection names its redirect
+// host, and so does the activity.
+func TestTheConnectionKeepsWhereItGoesBack(t *testing.T) {
+	e := newOAuthEnvironment(t)
+	client := e.register(t, testRedirect)
+	_, connection := e.approve(t, request(client, testRedirect), model.DefaultRights)
+	if connection.RedirectHost != "claude.example.com" || connection.Label() != "Claude · claude.example.com" {
+		t.Fatalf("connection = %+v", connection)
+	}
+	listed, err := e.connections.List(e.user.User.ID)
+	if err != nil || len(listed) != 1 || listed[0].RedirectHost != "claude.example.com" {
+		t.Fatalf("List() = %+v, %v", listed, err)
+	}
+	if !e.recorded(t, "connection.approved", "Claude · claude.example.com") {
+		t.Fatal("the activity does not name the host")
+	}
+}
+
+// TestAConnectionWhoseTokensFailEnds: the code is used up once traded, so
+// when its tokens cannot be made, the connection goes.
+func TestAConnectionWhoseTokensFailEnds(t *testing.T) {
+	e := newOAuthEnvironment(t)
+	client := e.register(t, testRedirect)
+	asked := request(client, testRedirect)
+	code, connection := e.approve(t, asked, model.DefaultRights)
+	e.database.MustExec(`CREATE TRIGGER no_tokens BEFORE INSERT ON connection_tokens BEGIN SELECT RAISE(ABORT, 'no tokens'); END`)
+	if _, err := e.exchange(asked, code); err == nil {
+		t.Fatal("Exchange() worked without tokens")
+	}
+	if _, err := e.connections.connections.ByID(connection.ID); !errors.Is(err, repository.ErrConnectionNotFound) {
+		t.Fatalf("the connection is still live: %v", err)
+	}
+}
+
+// TestListingEndsUntradedConnections: Settings never shows an AI agent's
+// connection whose code nobody traded.
+func TestListingEndsUntradedConnections(t *testing.T) {
+	e := newOAuthEnvironment(t)
+	client := e.register(t, testRedirect)
+	e.approve(t, request(client, testRedirect), model.DefaultRights)
+	e.clock.Add(model.OAuthCodeLifetime + time.Second)
+	listed, err := e.connections.List(e.user.User.ID)
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("List() = %+v, %v", listed, err)
+	}
+	if !e.recorded(t, "connection.ended", "the authorization code was never used") {
+		t.Fatal("the activity does not say why the connection ended")
+	}
+}
+
+// TestARepeatedParameterIsRefused: OAuth sends each parameter once. A
+// repeated client or redirect URI stays on the hub's page; any other goes
+// back as invalid_request.
+func TestARepeatedParameterIsRefused(t *testing.T) {
+	e := newOAuthEnvironment(t)
+	client := e.register(t, testRedirect)
+	values := request(client, testRedirect).Values()
+	for name, want := range map[string]error{"client_id": ErrOAuthClient, "redirect_uri": ErrOAuthRedirect} {
+		repeated := url.Values{}
+		for key, value := range values {
+			repeated[key] = append([]string{}, value...)
+		}
+		repeated.Add(name, repeated.Get(name))
+		if _, err := e.oauth.Check(ParseAuthorizationRequest(repeated)); !errors.Is(err, want) {
+			t.Errorf("repeated %s: Check() = %v, want %v", name, err, want)
+		}
+	}
+	for _, name := range []string{"state", "code_challenge", "resource", "response_type"} {
+		repeated := url.Values{}
+		for key, value := range values {
+			repeated[key] = append([]string{}, value...)
+		}
+		repeated.Add(name, "x")
+		authorization, err := e.oauth.Check(ParseAuthorizationRequest(repeated))
+		var refusal *OAuthError
+		if authorization == nil || !errors.As(err, &refusal) || refusal.Code != "invalid_request" {
+			t.Errorf("repeated %s: Check() = %v, %v", name, authorization, err)
+		}
+	}
+}

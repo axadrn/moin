@@ -30,7 +30,7 @@ templ SettingsConnections(view ConnectionsView) {
 							}
 						}
 						for _, connection := range view.Connections {
-							@components.Item(components.ItemProps{Href: base + "/settings/connections/" + linkID(connection.ID), Name: connection.ClientName, Note: view.connectionNote(connection), Attrs: templ.Attributes{"data-connection-row": linkID(connection.ID)}})
+							@components.Item(components.ItemProps{Href: base + "/settings/connections/" + linkID(connection.ID), Name: connection.Label(), Note: view.connectionNote(connection), Attrs: templ.Attributes{"data-connection-row": linkID(connection.ID)}})
 						}
 					}
 				}
@@ -144,9 +144,9 @@ templ SettingsConnection(view ConnectionView) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	{{ connection := view.Connection }}
 	{{ path := base + "/settings/connections/" + linkID(connection.ID) }}
-	@layouts.App(connection.ClientName + " · Connections") {
+	@layouts.App(connection.Label() + " · Connections") {
 		@panelPage() {
-			@components.Header(components.HeaderProps{Back: components.Back{Label: "Connections", Href: base + "/settings/connections"}, Title: connection.ClientName})
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Connections", Href: base + "/settings/connections"}, Title: connection.Label()})
 			@ConfirmCard(view.Confirm)
 			@components.Card(components.CardProps{}) {
 				@components.List() {
@@ -171,7 +171,7 @@ templ SettingsConnection(view ConnectionView) {
 						"hx-delete":  path,
 						"hx-swap":    "none",
 						"hx-disable": "this",
-						"hx-confirm": "Remove " + connection.ClientName + "? It stops working right away.",
+						"hx-confirm": "Remove " + connection.Label() + "? It stops working right away.",
 					}})
 				}
 			}

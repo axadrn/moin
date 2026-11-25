@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"log/slog"
+	"net"
 	"net/url"
 	"slices"
 	"strings"
@@ -138,6 +139,9 @@ func (s *OAuthService) Register(input NewClient) (*model.OAuthClient, error) {
 // AuthorizationRequest is what a client asks at the authorization
 // endpoint, with the names of RFC 6749 (4.1.1), RFC 7636 and RFC 8707.
 type AuthorizationRequest struct {
+	// Repeated names a parameter sent more than once, which OAuth forbids
+	// (RFC 6749, section 3.1).
+	Repeated            string
 	ResponseType        string
 	ClientID            string
 	RedirectURI         string
@@ -149,7 +153,15 @@ type AuthorizationRequest struct {
 
 // ParseAuthorizationRequest reads a request from its query or form.
 func ParseAuthorizationRequest(values url.Values) AuthorizationRequest {
+	repeated := ""
+	for _, name := range authorizationParameters {
+		if len(values[name]) > 1 {
+			repeated = name
+			break
+		}
+	}
 	return AuthorizationRequest{
+		Repeated:            repeated,
 		ResponseType:        values.Get("response_type"),
 		ClientID:            values.Get("client_id"),
 		RedirectURI:         values.Get("redirect_uri"),
@@ -159,6 +171,10 @@ func ParseAuthorizationRequest(values url.Values) AuthorizationRequest {
 		Resource:            values.Get("resource"),
 	}
 }
+
+// authorizationParameters are the parameters of an authorization request,
+// in the order they are checked.
+var authorizationParameters = []string{"client_id", "redirect_uri", "response_type", "state", "code_challenge", "code_challenge_method", "resource"}
 
 // Values is the request as a query again, for the approval form and to
 // come back to after signing in.
@@ -187,25 +203,34 @@ type Authorization struct {
 	Client  *model.OAuthClient
 }
 
-// RedirectHost is the host the person goes back to, for the approval page.
+// RedirectHost is the host the person goes back to, for the approval page
+// and the connection, with the port when it is not the scheme's own:
+// claude.ai, localhost:5555.
 func (a Authorization) RedirectHost() string {
 	parsed, err := url.Parse(a.Request.RedirectURI)
 	if err != nil {
 		return ""
 	}
-	return parsed.Hostname()
+	port := parsed.Port()
+	if port == "" || (parsed.Scheme == "https" && port == "443") || (parsed.Scheme == "http" && port == "80") {
+		return parsed.Hostname()
+	}
+	return net.JoinHostPort(parsed.Hostname(), port)
 }
 
 // Local reports whether the client goes back to this computer (localhost):
 // then only its own word says which app it is.
-func (a Authorization) Local() bool { return isLoopback(a.RedirectHost()) }
+func (a Authorization) Local() bool {
+	parsed, err := url.Parse(a.Request.RedirectURI)
+	return err == nil && isLoopback(parsed.Hostname())
+}
 
 // Check checks an authorization request. ErrOAuthClient and
 // ErrOAuthRedirect mean the answer cannot go back: the page says so
 // itself. An *OAuthError goes back to the client, with the authorization
 // that says where.
 func (s *OAuthService) Check(request AuthorizationRequest) (*Authorization, error) {
-	if request.ClientID == "" {
+	if request.ClientID == "" || request.Repeated == "client_id" {
 		return nil, ErrOAuthClient
 	}
 	client, err := s.oauth.Client(request.ClientID)
@@ -215,11 +240,13 @@ func (s *OAuthService) Check(request AuthorizationRequest) (*Authorization, erro
 	if err != nil {
 		return nil, err
 	}
-	if !redirectMatches(client.Redirects(), request.RedirectURI) {
+	if request.Repeated == "redirect_uri" || !redirectMatches(client.Redirects(), request.RedirectURI) {
 		return nil, ErrOAuthRedirect
 	}
 	authorization := &Authorization{Request: request, Client: client}
 	switch {
+	case request.Repeated != "":
+		return authorization, &OAuthError{"invalid_request", "Send " + request.Repeated + " once."}
 	case request.ResponseType != "code":
 		return authorization, &OAuthError{"unsupported_response_type", "Only the authorization code flow works: response_type=code."}
 	case request.CodeChallengeMethod != "S256":
@@ -246,19 +273,20 @@ type OAuthApproval struct {
 // and returns where to send them: back to the client with a code for its
 // tokens.
 func (s *OAuthService) Approve(approval OAuthApproval) (string, *model.Connection, error) {
-	s.endUntraded()
+	s.connections.endUntraded()
 	if err := s.connections.confirmApproval(s.passkeys, approval.Presence, approval.WorkspaceID, approval.Rights); err != nil {
 		return "", nil, err
 	}
 	authorization := approval.Authorization
 	connection, err := s.connections.Create(NewConnection{
-		UserID:      approval.Presence.Session.UserID,
-		WorkspaceID: approval.WorkspaceID,
-		ClientName:  authorization.Client.ClientName,
-		Rights:      approval.Rights,
-		ClientID:    authorization.Client.ID,
-		Resource:    MCPPath,
-		Source:      approval.Source,
+		UserID:       approval.Presence.Session.UserID,
+		WorkspaceID:  approval.WorkspaceID,
+		ClientName:   authorization.Client.ClientName,
+		Rights:       approval.Rights,
+		ClientID:     authorization.Client.ID,
+		Resource:     MCPPath,
+		RedirectHost: authorization.RedirectHost(),
+		Source:       approval.Source,
 	})
 	if err != nil {
 		return "", nil, err
@@ -335,7 +363,7 @@ type CodeExchange struct {
 // does it right makes none, and a code shown a second time ends the
 // connection with the tokens the first try got (OAuth 2.1, 4.1.3).
 func (s *OAuthService) Exchange(exchange CodeExchange) (Tokens, error) {
-	s.endUntraded()
+	s.connections.endUntraded()
 	if exchange.Code == "" {
 		return Tokens{}, ErrCodeInvalid
 	}
@@ -379,24 +407,14 @@ func (s *OAuthService) Exchange(exchange CodeExchange) (Tokens, error) {
 		s.connections.end(*connection, Source{Via: ViaSystem}, reason)
 		return Tokens{}, refused
 	}
-	return s.connections.Issue(connection)
-}
-
-// endUntraded ends the connections whose code nobody traded in time: the
-// client gave up, and a connection without tokens should not stay.
-func (s *OAuthService) endUntraded() {
-	codes, err := s.oauth.ExpiredUnusedCodes(s.now().UTC())
+	tokens, err := s.connections.Issue(connection)
 	if err != nil {
-		slog.Warn("failed to list untraded oauth codes", "error", err)
-		return
+		// The code is used up, so the client can never get the tokens of
+		// this connection: it goes.
+		s.connections.end(*connection, Source{Via: ViaSystem}, "its tokens could not be issued")
+		return Tokens{}, err
 	}
-	for _, code := range codes {
-		connection, err := s.connections.connections.ByID(code.ConnectionID)
-		if err != nil {
-			continue
-		}
-		s.connections.end(*connection, Source{Via: ViaSystem}, "the authorization code was never used")
-	}
+	return tokens, nil
 }
 
 // pkceMatches checks a PKCE code verifier against the S256 challenge:
@@ -433,7 +451,7 @@ func validRedirectURI(uri string) bool {
 		return false
 	}
 	parsed, err := url.Parse(uri)
-	if err != nil || parsed.Host == "" || parsed.User != nil {
+	if err != nil || parsed.Host == "" || parsed.User != nil || !asciiHost(parsed.Host) {
 		return false
 	}
 	switch parsed.Scheme {
@@ -443,6 +461,17 @@ func validRedirectURI(uri string) bool {
 		return isLoopback(parsed.Hostname())
 	}
 	return false
+}
+
+// asciiHost reports whether host is plain ASCII. A host in other letters
+// can look like another one; written as punycode (xn--) it shows as it is.
+func asciiHost(host string) bool {
+	for i := 0; i < len(host); i++ {
+		if host[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 // redirectMatches reports whether uri is one of the registered URIs,

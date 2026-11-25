@@ -31,6 +31,11 @@ CREATE TABLE oauth_codes (
 
 CREATE INDEX idx_oauth_codes_expires_at ON oauth_codes(expires_at);
 
+-- Where an AI agent sends the person back, like claude.ai: shown next to
+-- its name, which is only the agent's own word. Empty for `moin login`.
+ALTER TABLE connections ADD COLUMN redirect_host TEXT NOT NULL DEFAULT '';
+
 -- +goose Down
+ALTER TABLE connections DROP COLUMN redirect_host;
 DROP TABLE oauth_codes;
 DROP TABLE oauth_clients;

@@ -152,6 +152,14 @@ func readForm(w http.ResponseWriter, r *http.Request) bool {
 		oauthError(w, http.StatusBadRequest, "invalid_request", "The form could not be read.")
 		return false
 	}
+	// A parameter sent twice is a mistake OAuth refuses (RFC 6749, section
+	// 3.2).
+	for name, values := range r.PostForm {
+		if len(values) > 1 {
+			oauthError(w, http.StatusBadRequest, "invalid_request", "Send "+name+" once.")
+			return false
+		}
+	}
 	return true
 }
 

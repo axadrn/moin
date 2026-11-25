@@ -126,13 +126,29 @@ func TestOAuthPageRefusesBadRequests(t *testing.T) {
 			t.Errorf("%s: status %d, location %q", name, recorder.Code, recorder.Header().Get("Location"))
 		}
 	}
+	// Any other mistake goes back to the client, but only with a click:
+	// the hub never sends anyone on by itself from a link it did not
+	// approve, or it would be an open redirect.
+	for name, change := range map[string]func(url.Values){
+		"plain PKCE":     func(q url.Values) { q.Set("code_challenge_method", "plain") },
+		"repeated state": func(q url.Values) { q.Add("state", "other") },
+	} {
+		query := test.query("https://claude.example.com/callback")
+		change(query)
+		recorder := httptest.NewRecorder()
+		test.handler.Authorize(recorder, deviceRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil, nil, nil))
+		body := recorder.Body.String()
+		if recorder.Code != http.StatusBadRequest || recorder.Header().Get("Location") != "" || recorder.Header().Get("Refresh") != "" || !strings.Contains(body, "Back to claude.example.com") || !strings.Contains(body, "error=invalid_request") || !strings.Contains(body, "state=state-1") {
+			t.Fatalf("%s: status %d, headers %v, body %s", name, recorder.Code, recorder.Header(), body)
+		}
+	}
+	// A client_id sent twice is not one client.
 	query := test.query("https://claude.example.com/callback")
-	query.Set("code_challenge_method", "plain")
+	query.Add("client_id", "other")
 	recorder := httptest.NewRecorder()
 	test.handler.Authorize(recorder, deviceRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil, nil, nil))
-	location, _ := url.Parse(recorder.Header().Get("Location"))
-	if recorder.Code != http.StatusFound || location.Host != "claude.example.com" || location.Query().Get("error") != "invalid_request" || location.Query().Get("state") != "state-1" {
-		t.Fatalf("plain PKCE: status %d, location %s", recorder.Code, location)
+	if recorder.Code != http.StatusBadRequest || strings.Contains(recorder.Body.String(), "Back to") {
+		t.Fatalf("repeated client_id: status %d, body %s", recorder.Code, recorder.Body.String())
 	}
 }
 
@@ -164,7 +180,7 @@ func TestOAuthPageApprovesAndSendsBack(t *testing.T) {
 		t.Fatalf("sent back to %s", back)
 	}
 	tokens, err := test.oauth.Exchange(service.CodeExchange{Code: back.Query().Get("code"), Verifier: oauthTestVerifier, RedirectURI: redirect, ClientID: test.client.ID})
-	if err != nil || tokens.Connection.Rights != model.RightRead|model.RightDeploy || tokens.Connection.ClientName != `Claude <b>official</b>` {
+	if err != nil || tokens.Connection.Rights != model.RightRead|model.RightDeploy || tokens.Connection.ClientName != `Claude <b>official</b>` || tokens.Connection.Label() != `Claude <b>official</b> · claude.example.com` {
 		t.Fatalf("Exchange() = %+v, %v", tokens, err)
 	}
 

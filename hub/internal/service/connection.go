@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
@@ -88,7 +89,9 @@ type NewConnection struct {
 	Rights      model.Rights
 	ClientID    string
 	Resource    string
-	Source      Source
+	// RedirectHost is where an AI agent sends the person back.
+	RedirectHost string
+	Source       Source
 }
 
 // Create stores the connection a person approved. The approval itself, the
@@ -102,14 +105,15 @@ func (s *ConnectionService) Create(input NewConnection) (*model.Connection, erro
 		return nil, ErrRightsUnknown
 	}
 	connection := &model.Connection{
-		ID:          uuid.New().String(),
-		UserID:      input.UserID,
-		WorkspaceID: input.WorkspaceID,
-		ClientName:  CleanClientName(input.ClientName),
-		Rights:      input.Rights | model.RightRead,
-		ClientID:    input.ClientID,
-		Resource:    input.Resource,
-		CreatedAt:   s.now().UTC(),
+		ID:           uuid.New().String(),
+		UserID:       input.UserID,
+		WorkspaceID:  input.WorkspaceID,
+		ClientName:   CleanClientName(input.ClientName),
+		Rights:       input.Rights | model.RightRead,
+		ClientID:     input.ClientID,
+		Resource:     input.Resource,
+		RedirectHost: input.RedirectHost,
+		CreatedAt:    s.now().UTC(),
 	}
 	// Idle connections end first, so they do not count toward the limit.
 	if _, err := s.List(input.UserID); err != nil {
@@ -268,9 +272,11 @@ func (s *ConnectionService) Revoke(raw string, source Source) error {
 }
 
 // List returns the live connections of a person, newest first. One unused
-// for 90 days ends here, so Settings never shows it as live and it does not
-// count toward the limit.
+// for 90 days ends here, and so does an AI agent's that never traded its
+// code, so Settings never shows them as live and they do not count toward
+// the limit.
 func (s *ConnectionService) List(userID string) ([]model.Connection, error) {
+	s.endUntraded()
 	connections, err := s.connections.ListByUser(userID)
 	if err != nil {
 		return nil, err
@@ -365,6 +371,20 @@ func (s *ConnectionService) EndAllForUser(userID string) error {
 	return nil
 }
 
+// endUntraded ends the connections whose authorization code nobody traded
+// in time: the AI agent gave up, and a connection without tokens should
+// not stay.
+func (s *ConnectionService) endUntraded() {
+	connections, err := s.connections.Untraded(s.now().UTC())
+	if err != nil {
+		slog.Warn("failed to list untraded connections", "error", err)
+		return
+	}
+	for _, connection := range connections {
+		s.end(connection, Source{Via: ViaSystem}, "the authorization code was never used")
+	}
+}
+
 // own is a live connection of the person; another person's is not found.
 func (s *ConnectionService) own(userID, id string) (*model.Connection, error) {
 	connection, err := s.connections.ByID(normalID(id))
@@ -399,15 +419,17 @@ func (s *ConnectionService) record(connection model.Connection, source Source, a
 	if s.workspaces == nil {
 		return
 	}
-	details["name"] = connection.ClientName
-	s.workspaces.record(Actor{WorkspaceID: connection.WorkspaceID, UserID: connection.UserID, Source: source}, action, "connection", connection.ClientName, details)
+	details["name"] = connection.Label()
+	s.workspaces.record(Actor{WorkspaceID: connection.WorkspaceID, UserID: connection.UserID, Source: source}, action, "connection", connection.Label(), details)
 }
 
-// CleanClientName keeps a client's name printable and short. A client
-// without a name is "A client".
+// CleanClientName keeps a client's name printable and short. It drops
+// control and format characters, which could turn the text around or hide
+// in it, and quotes, so the name cannot close the quotes the pages put
+// around it. A client without a name is "A client".
 func CleanClientName(name string) string {
 	name = strings.TrimSpace(strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f {
+		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '"' || r == '\u201c' || r == '\u201d' {
 			return -1
 		}
 		return r

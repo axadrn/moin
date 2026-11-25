@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 	"strings"
+
+	"github.com/axadrn/moin/hub/internal/api"
 )
 
 const (
@@ -25,6 +27,10 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if publicOAuthPaths[r.URL.Path] {
+				publicCORS(w, r, next)
+				return
+			}
 			if !strings.HasPrefix(r.URL.Path, "/api/") {
 				next.ServeHTTP(w, r)
 				return
@@ -53,4 +59,30 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 		})
 	}
+}
+
+// publicOAuthPaths are the OAuth endpoints an MCP client running in a web
+// page calls, like MCP Inspector: the metadata, registration and the token
+// endpoint. They take no cookie and act on nothing a cookie carries, so
+// every page may call them, never with credentials.
+var publicOAuthPaths = map[string]bool{
+	"/.well-known/oauth-protected-resource":   true,
+	api.ProtectedResourcePath:                 true,
+	"/.well-known/oauth-authorization-server": true,
+	"/api/v1/auth/register":                   true,
+	"/api/v1/auth/token":                      true,
+}
+
+// publicCORS lets every origin call a public OAuth endpoint, and answers
+// its preflight.
+func publicCORS(w http.ResponseWriter, r *http.Request, next http.Handler) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method != http.MethodOptions || r.Header.Get("Access-Control-Request-Method") == "" {
+		next.ServeHTTP(w, r)
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, MCP-Protocol-Version")
+	w.Header().Set("Access-Control-Max-Age", corsMaxAge)
+	w.WriteHeader(http.StatusNoContent)
 }

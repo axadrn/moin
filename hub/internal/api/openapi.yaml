@@ -5193,13 +5193,16 @@ components:
           type: string
     Connection:
       type: object
-      required: [id, client_name, workspace_id, rights, current, last_used_at, created_at]
+      required: [id, client_name, redirect_host, workspace_id, rights, current, last_used_at, created_at]
       properties:
         id:
           type: string
         client_name:
           type: string
           description: What the client calls itself, like "moin CLI on laptop-1". The client's word, not checked.
+        redirect_host:
+          type: string
+          description: Where an AI agent sends you back after the approval, like `claude.ai`, the host of its redirect URI. Empty for `moin login`.
         workspace_id:
           type: string
           description: The only workspace the connection can reach.

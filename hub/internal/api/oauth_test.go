@@ -38,9 +38,6 @@ func TestMetadataTellsMCPClientsHowToSignIn(t *testing.T) {
 	if resource.Resource != mcpResource || len(resource.AuthorizationServers) != 1 || resource.AuthorizationServers[0] != "https://app.example.com" || strings.Join(resource.BearerMethodsSupported, ",") != "header" {
 		t.Fatalf("protected resource = %+v", resource)
 	}
-	if recorder.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Fatalf("headers = %v", recorder.Header())
-	}
 
 	recorder = environment.send(t, apiRequest{method: http.MethodGet, path: "/.well-known/oauth-authorization-server"})
 	expectStatus(t, recorder, http.StatusOK)
@@ -169,6 +166,18 @@ func TestAuthorizationCodeOverTheAPI(t *testing.T) {
 		expectOAuthError(t, tokenRequest(t, environment, "/api/v1/auth/token", codeForm(client, code)), "invalid_grant")
 		t.Logf("%s: refused, and the right try after it too", name)
 	}
+	// A parameter sent twice is refused, as RFC 6749 asks.
+	client, code = environment.authorize(t, owner, model.DefaultRights)
+	repeated := codeForm(client, code)
+	repeated.Add("code_verifier", oauthVerifier)
+	expectOAuthError(t, tokenRequest(t, environment, "/api/v1/auth/token", repeated), "invalid_request")
+
+	// The connection names where it goes back.
+	list := decodeBody[api.ConnectionList](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/connections", cookie: owner.session}))
+	if len(list.Items) == 0 || list.Items[0].RedirectHost != "127.0.0.1:33418" {
+		t.Fatalf("connections = %+v", list.Items)
+	}
+
 	client, code = environment.authorize(t, owner, model.DefaultRights)
 	form := codeForm(client, code)
 	form.Set("resource", "https://other.example.com/mcp")

@@ -54,10 +54,11 @@ type AuthorizationServerMetadata struct {
 // with the resource's path after it (RFC 9728, section 3.1).
 const ProtectedResourcePath = "/.well-known/oauth-protected-resource" + service.MCPPath
 
-// ProtectedResource answers the metadata of /mcp.
+// ProtectedResource answers the metadata of /mcp. middleware.CORS lets
+// any page read it, as the other public OAuth endpoints.
 func (h *OAuthHandler) ProtectedResource(w http.ResponseWriter, r *http.Request) {
 	issuer := h.oauth.Issuer()
-	metadata(w, ProtectedResourceMetadata{
+	JSON(w, http.StatusOK, ProtectedResourceMetadata{
 		Resource:               h.oauth.Resource(),
 		AuthorizationServers:   []string{issuer},
 		BearerMethodsSupported: []string{"header"},
@@ -70,7 +71,7 @@ func (h *OAuthHandler) ProtectedResource(w http.ResponseWriter, r *http.Request)
 // server.
 func (h *OAuthHandler) AuthorizationServer(w http.ResponseWriter, r *http.Request) {
 	issuer := h.oauth.Issuer()
-	metadata(w, AuthorizationServerMetadata{
+	JSON(w, http.StatusOK, AuthorizationServerMetadata{
 		Issuer:                                     issuer,
 		AuthorizationEndpoint:                      issuer + "/oauth/authorize",
 		TokenEndpoint:                              issuer + "/api/v1/auth/token",
@@ -84,13 +85,6 @@ func (h *OAuthHandler) AuthorizationServer(w http.ResponseWriter, r *http.Reques
 		AuthorizationResponseISSParameterSupported: true,
 		ServiceDocumentation:                       issuer + "/docs/guides/mcp",
 	})
-}
-
-// metadata answers a public metadata document, which any page may read.
-func metadata(w http.ResponseWriter, document any) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	JSON(w, http.StatusOK, document)
 }
 
 // ClientRegistration is what an MCP client sends to register (RFC 7591,

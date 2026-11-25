@@ -29,12 +29,15 @@ type Connection struct {
 	ID string `json:"id"`
 	// ClientName is what the client called itself, such as "moin CLI on
 	// laptop-1".
-	ClientName  string     `json:"client_name"`
-	WorkspaceID string     `json:"workspace_id"`
-	Rights      []string   `json:"rights"`
-	Current     bool       `json:"current"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ClientName string `json:"client_name"`
+	// RedirectHost is where an AI agent sends the person back, like
+	// claude.ai; empty for `moin login`.
+	RedirectHost string     `json:"redirect_host"`
+	WorkspaceID  string     `json:"workspace_id"`
+	Rights       []string   `json:"rights"`
+	Current      bool       `json:"current"`
+	LastUsedAt   *time.Time `json:"last_used_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 // ConnectionList is the answer of GET /api/v1/account/connections.
@@ -52,13 +55,14 @@ type RightsRequest struct {
 // marks the connection of the request.
 func NewConnection(connection model.Connection, current *model.Bearer) Connection {
 	return Connection{
-		ID:          link.ID(connection.ID),
-		ClientName:  connection.ClientName,
-		WorkspaceID: link.ID(connection.WorkspaceID),
-		Rights:      connection.Rights.List(),
-		Current:     current != nil && current.ConnectionID == connection.ID,
-		LastUsedAt:  connection.LastUsedAt,
-		CreatedAt:   connection.CreatedAt,
+		ID:           link.ID(connection.ID),
+		ClientName:   connection.ClientName,
+		RedirectHost: connection.RedirectHost,
+		WorkspaceID:  link.ID(connection.WorkspaceID),
+		Rights:       connection.Rights.List(),
+		Current:      current != nil && current.ConnectionID == connection.ID,
+		LastUsedAt:   connection.LastUsedAt,
+		CreatedAt:    connection.CreatedAt,
 	}
 }
 

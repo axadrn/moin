@@ -91,7 +91,7 @@ func (h *OAuthHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("oauth connection approved", "connection_id", connection.ID, "client_id", authorization.Client.ID)
-	sendBack(w, r, authorization, target, true)
+	sendBack(w, r, pages.OAuthDoneView{Host: authorization.RedirectHost(), Target: target, Approved: true})
 }
 
 // Deny sends the person back to the client, which hears access_denied.
@@ -100,7 +100,7 @@ func (h *OAuthHandler) Deny(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	sendBack(w, r, authorization, h.oauth.Deny(authorization), false)
+	sendBack(w, r, pages.OAuthDoneView{Host: authorization.RedirectHost(), Target: h.oauth.Deny(authorization)})
 }
 
 // Reauth signs the person out and sends them to sign in again and back
@@ -131,12 +131,16 @@ func posted(r *http.Request) url.Values {
 
 // check checks the client's request. When the client or its redirect URI
 // is wrong, the page says so and sends nobody anywhere. Any other mistake
-// goes back to the client, as OAuth asks.
+// goes back to the client, as OAuth asks, but only when the person clicks:
+// a link that sends people on by itself to wherever a client registered
+// would be an open redirect.
 func (h *OAuthHandler) check(w http.ResponseWriter, r *http.Request, request service.AuthorizationRequest) (*service.Authorization, bool) {
 	authorization, err := h.oauth.Check(request)
 	var refusal *service.OAuthError
 	if errors.As(err, &refusal) {
-		sendBack(w, r, authorization, h.oauth.Refuse(authorization, refusal), false)
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusBadRequest)
+		render(w, r, pages.OAuthDone(pages.OAuthDoneView{Host: authorization.RedirectHost(), Target: h.oauth.Refuse(authorization, refusal), Refusal: refusal.Description}))
 		return nil, false
 	}
 	if err != nil {
@@ -195,17 +199,13 @@ func (h *OAuthHandler) failed(w http.ResponseWriter, r *http.Request, err error)
 	render(w, r, pages.OAuthFailed(message))
 }
 
-// sendBack sends the person to the client's redirect URI. The request to
-// the page is a plain redirect. A form's answer is a page that goes on by
-// itself: the browser would not follow a form's redirect to another site,
-// which the page's form-action rules out.
-func sendBack(w http.ResponseWriter, r *http.Request, authorization *service.Authorization, target string, approved bool) {
-	if r.Method == http.MethodGet {
-		http.Redirect(w, r, target, http.StatusFound)
-		return
-	}
+// sendBack sends the person back to the client after Allow or Cancel. The
+// page goes on by itself, with its Refresh header: the browser would not
+// follow a form's redirect to another site, which the page's form-action
+// rules out. The button is there in case it does not.
+func sendBack(w http.ResponseWriter, r *http.Request, view pages.OAuthDoneView) {
 	// The page carries the code: no cache keeps it.
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Refresh", "0; url="+target)
-	render(w, r, pages.OAuthDone(authorization.RedirectHost(), target, approved))
+	w.Header().Set("Refresh", "0; url="+view.Target)
+	render(w, r, pages.OAuthDone(view))
 }

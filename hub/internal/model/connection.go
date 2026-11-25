@@ -20,10 +20,23 @@ type Connection struct {
 	ClientID string `db:"client_id"`
 	// Resource is the one place its tokens work, such as "/mcp" for an AI
 	// agent; empty for the API and MCP.
-	Resource   string     `db:"resource"`
-	CreatedAt  time.Time  `db:"created_at"`
-	LastUsedAt *time.Time `db:"last_used_at"`
-	EndedAt    *time.Time `db:"ended_at"`
+	Resource string `db:"resource"`
+	// RedirectHost is where an AI agent sends the person back, like
+	// claude.ai; empty for the device flow. Unlike the name, the hub
+	// checked it: it is the host of the redirect URI.
+	RedirectHost string     `db:"redirect_host"`
+	CreatedAt    time.Time  `db:"created_at"`
+	LastUsedAt   *time.Time `db:"last_used_at"`
+	EndedAt      *time.Time `db:"ended_at"`
+}
+
+// Label names the connection for people: the client's name, and for an AI
+// agent where it sends the person back, like "Claude · claude.ai".
+func (c Connection) Label() string {
+	if c.RedirectHost == "" {
+		return c.ClientName
+	}
+	return c.ClientName + " · " + c.RedirectHost
 }
 
 // ConnectionIdle is how long a connection lives unused. Every use starts

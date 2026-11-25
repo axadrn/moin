@@ -9,13 +9,14 @@ import (
 
 // Connection is a client let in from the browser, as the API answers it.
 type Connection struct {
-	ID          string     `json:"id"`
-	ClientName  string     `json:"client_name"`
-	WorkspaceID string     `json:"workspace_id"`
-	Rights      []string   `json:"rights"`
-	Current     bool       `json:"current"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID           string     `json:"id"`
+	ClientName   string     `json:"client_name"`
+	RedirectHost string     `json:"redirect_host"`
+	WorkspaceID  string     `json:"workspace_id"`
+	Rights       []string   `json:"rights"`
+	Current      bool       `json:"current"`
+	LastUsedAt   *time.Time `json:"last_used_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 // CIToken is a token made by hand for CI, as the API answers it.
