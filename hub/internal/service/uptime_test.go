@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -445,5 +446,34 @@ func TestServerDownAndUpGoToTheActivity(t *testing.T) {
 	visitAll(apps)
 	if !hasAction(activityActions(t, servers), "server.up ") {
 		t.Fatalf("activity = %v", activityActions(t, servers))
+	}
+}
+
+// Every visit opens a new connection, as a new visitor does: a renewed
+// certificate or a changed DNS record shows on the next visit, not once
+// an old connection closes.
+func TestUptimeVisitsOnANewConnection(t *testing.T) {
+	var mu sync.Mutex
+	opened := 0
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			mu.Lock()
+			opened++
+			mu.Unlock()
+		}
+	}
+	server.Start()
+	defer server.Close()
+	u := &uptimeRunner{client: newUptimeClient(false), url: func(_, path string) string { return server.URL + path }}
+	for range 3 {
+		if result := u.visit(context.Background(), "blog.example.com", "/"); !result.up {
+			t.Fatalf("visit: %+v", result)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if opened != 3 {
+		t.Fatalf("3 visits opened %d connections", opened)
 	}
 }

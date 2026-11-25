@@ -5,7 +5,7 @@ group: "Every day"
 order: 6
 ---
 
-Uptime tells you whether your app is open. From the first deploy on, moin visits every domain that serves something once a minute, like a visitor. Nothing to set up.
+Uptime tells you whether your app is open. From the first deploy on, moin visits every domain that serves something once a minute, like a new visitor: each visit on a new connection, so a renewed certificate shows at once. Nothing to set up.
 
 - The main domain: the canonical one, or every domain of the main service with `canonical none` ([www or not](/docs/guides/domains#www-or-not)).
 - The domains of your other services, like `api.my-app.example.com`.
