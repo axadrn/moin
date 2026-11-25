@@ -16,6 +16,7 @@ of the moin release it ships with.
 - **A folder icon**: `moin-icon-folder`.
 - **A hint in an item**: `moin-item-hint` puts a sentence under an item's words that wraps.
 - **A pick opens its part**: In a list, `data-picked` after a pick item shows only while that one is picked, with no script.
+- **A footer with any number of columns**: On a wide screen every column of links sits next to the brand, however many there are.
 
 ### Upgrade
 

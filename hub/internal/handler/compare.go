@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/axadrn/moin/hub/internal/compare"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
@@ -13,7 +14,7 @@ func CompareIndex(w http.ResponseWriter, r *http.Request) {
 
 // Compare shows one tool next to moin at /compare/{name}.
 func Compare(w http.ResponseWriter, r *http.Request) {
-	competitor, ok := pages.FindCompetitor(r.PathValue("name"))
+	competitor, ok := compare.Find(r.PathValue("name"))
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		render(w, r, pages.NotFound())

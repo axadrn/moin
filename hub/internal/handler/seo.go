@@ -5,8 +5,8 @@ import (
 	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
+	"github.com/axadrn/moin/hub/internal/compare"
 	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -17,7 +17,7 @@ type SEOHandler struct {
 	docsService    *service.DocsService
 	// catalog and compare are listed in llms.txt like in the sitemap.
 	catalog       []catalog.Entry
-	compare       []pages.Competitor
+	compare       []compare.Competitor
 	baseURL       string
 	files         fs.FS
 	robotsNoIndex bool
@@ -41,10 +41,10 @@ func NewSEOHandler(
 		}
 		sitemap.AddCatalog(slugs)
 	}
-	var compare []pages.Competitor
+	var competitors []compare.Competitor
 	if legal {
-		compare = pages.Competitors
-		sitemap.AddCompare(pages.CompareSlugs())
+		competitors = compare.Competitors
+		sitemap.AddCompare(compare.Slugs())
 	}
 	if releases, err := service.ChangelogReleases(files); err == nil && len(releases) > 0 {
 		sitemap.AddChangelog(releases[0].Date)
@@ -53,7 +53,7 @@ func NewSEOHandler(
 		sitemapService: sitemap,
 		docsService:    docsService,
 		catalog:        entries,
-		compare:        compare,
+		compare:        competitors,
 		baseURL:        strings.TrimSuffix(baseURL, "/"),
 		files:          files,
 		robotsNoIndex:  robotsNoIndex,
