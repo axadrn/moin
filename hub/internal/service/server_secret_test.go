@@ -46,9 +46,12 @@ func TestSecretsNeverReachTheHubDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	made, _, err := apps.SetProtection(owner, "blog", "", "")
-	if err != nil {
+	if _, err := apps.RemoveProtection(owner, "blog"); err != nil {
 		t.Fatal(err)
+	}
+	made, _, err := apps.SetProtection(owner, "blog", "", "")
+	if err != nil || made == "" {
+		t.Fatalf("a new password: %q, %v", made, err)
 	}
 	tailscale := "tskey-auth-5c2e91"
 	secrets := []string{"env-value-7f3a91", "registry-password-9c1d44", "s3-value-3e8b27", tailscale, app.Password, made}
