@@ -35,6 +35,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 - Each tool needs one right, named in the table below and at the end of its description. Without it the tool answers `missing_right` with the right, and the agent says: "This connection may not deploy and restart. Change it in Settings, Connections." [Rights](/docs/reference/rights)
 - Rights never add to your role: a member's agent cannot invite, whatever its rights.
 - A CI token for one app does not reach MCP.
+- A connection or CI token sends at most 121 requests a minute, MCP and API together; one more answers `rate_limited` with the seconds to wait. [API](/docs/reference/api#basics)
 - Tools that remove, replace or stop something are marked destructive, so clients ask first.
 - Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it or with another name: `confirm_mismatch`, the same check as on the web and in the API.
 - Tools take the app as `app` and the server as `server`; the older `name` still works for both, for now.
