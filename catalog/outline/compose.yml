@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /_health
-
 services:
   web:
     image: outlinewiki/outline:${VERSION}
+    expose: ["3000"]
     environment:
       URL: ${APP_URL}
       SECRET_KEY: ${SECRET_KEY_HEX}

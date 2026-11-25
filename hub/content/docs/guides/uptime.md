@@ -43,7 +43,7 @@ It sends an [alert](/docs/guides/alerts) too.
 
 ## Change the path
 
-The visit goes to the health path from `x-moin.health` ([Config in the repo](/docs/guides/config)), else `/`. Set another per domain. `default` goes back.
+The visit goes to `/`. Set another path per domain. `default` goes back to `/`.
 
 ```surfaces
 Web: the app, **Domains**, a domain under **Uptime**, its **Path**, then **Save**

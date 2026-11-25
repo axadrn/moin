@@ -56,7 +56,7 @@ type uptimeState struct {
 	stored      model.DomainUptime
 	workspaceID string
 	appName     string
-	// path is where the next visit goes: the set path, the health path or /.
+	// path is where the next visit goes: the set path, else /.
 	path string
 	// stop ends the domain's watcher; nil while none runs.
 	stop context.CancelFunc

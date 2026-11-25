@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,25 +22,17 @@ const proxyImage = "traefik:v3.6"
 
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
-// route settles the domains of a deploy: x-moin wins for every field it
-// sets, the hub's settings fill the rest. Domains are the main
-// service's; ServiceDomains those of the others; Instant its instant
-// address.
+// route settles the domains of a deploy from the hub's settings, the only
+// place they are set. Domains are the main service's; ServiceDomains those
+// of the others; Instant its instant address.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {
 		domains = &protocol.Domains{}
 	}
-	config := detected.Config
-	if config == nil {
-		config = &protocol.Config{}
-	}
-	detected.Domains = mainDomains(detected.Service, domains, config)
-	detected.ServiceDomains = otherServiceDomains(detected.Service, domains, config)
+	detected.Domains = slices.Clone(domains.Domains)
+	detected.ServiceDomains = otherServiceDomains(detected.Service, domains)
 	detected.Canonical = domains.Canonical
-	if config.Canonical != "" {
-		detected.Canonical = config.Canonical
-	}
-	detected.Protected = domains.Protect != "" || config.Protect
+	detected.Protected = domains.Protect != ""
 	err := cleanDomains(detected)
 	if err != nil {
 		return detected, err
@@ -49,47 +40,17 @@ func route(app string, detected protocol.Detected, domains *protocol.Domains) (p
 	if detected.Canonical != "" && !slices.Contains(detected.Domains, detected.Canonical) {
 		return detected, fmt.Errorf("canonical domain %s is not one of the domains", detected.Canonical)
 	}
-	if config.Protect && domains.Protect == "" {
-		return detected, errors.New("x-moin.protect is on but no password is set: set one with moin protect")
-	}
-	provider, err := instantProvider(domains, config)
-	if err != nil {
-		return detected, err
-	}
-	detected.Instant = protocol.InstantHost(app, domains.InstantIP, provider)
+	detected.Instant = protocol.InstantHost(app, domains.InstantIP, domains.Instant)
 	return detected, nil
-}
-
-// mainDomains are the domains of the main service.
-func mainDomains(mainName string, domains *protocol.Domains, config *protocol.Config) []string {
-	if len(config.Domains) > 0 {
-		return slices.Clone(config.Domains)
-	}
-	// The map form of x-moin domains may name the main service too.
-	named, ok := config.ServiceDomains[mainName]
-	if ok {
-		return slices.Clone(named)
-	}
-	return slices.Clone(domains.Domains)
 }
 
 // otherServiceDomains are the domains of the services other than the main
 // one, nil when there are none.
-func otherServiceDomains(mainName string, domains *protocol.Domains, config *protocol.Config) map[string][]string {
+func otherServiceDomains(mainName string, domains *protocol.Domains) map[string][]string {
 	byService := map[string][]string{}
 	for service, list := range domains.Services {
-		if service != mainName {
+		if service != mainName && len(list) > 0 {
 			byService[service] = slices.Clone(list)
-		}
-	}
-	for service, list := range config.ServiceDomains {
-		if service != mainName {
-			byService[service] = slices.Clone(list)
-		}
-	}
-	for service, list := range byService {
-		if len(list) == 0 {
-			delete(byService, service)
 		}
 	}
 	if len(byService) == 0 {
@@ -129,21 +90,6 @@ func cleanDomainList(list []string, seen map[string]bool) error {
 		list[index] = domain
 	}
 	return nil
-}
-
-// instantProvider is the provider of the instant address: x-moin wins over
-// the hub's setting, and off means none.
-func instantProvider(domains *protocol.Domains, config *protocol.Config) (string, error) {
-	switch config.Instant {
-	case "":
-		return domains.Instant, nil
-	case "off":
-		return "", nil
-	}
-	if !slices.Contains(protocol.InstantProviders, config.Instant) {
-		return "", fmt.Errorf("x-moin.instant is %q: use off, %s", config.Instant, strings.Join(protocol.InstantProviders, ", "))
-	}
-	return config.Instant, nil
 }
 
 func protectHash(domains *protocol.Domains) string {

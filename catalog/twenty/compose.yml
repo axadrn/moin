@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /healthz
-
 services:
   web:
     image: twentycrm/twenty:${VERSION}
+    expose: ["3000"]
     environment: &env
       NODE_PORT: "3000"
       SERVER_URL: ${APP_URL}

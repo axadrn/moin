@@ -41,9 +41,6 @@ func (s *AppService) setServiceDomains(actor Actor, idOrName, service string, do
 	if main := s.mainService(app); main != "" && main == service {
 		return false, ErrMainService
 	}
-	if len(s.composeServiceDomains(app)[service]) > 0 {
-		return false, ErrComposeDomains
-	}
 	clean, err := cleanDomains(domains)
 	if err != nil {
 		return false, err
@@ -124,9 +121,6 @@ func (s *AppService) Instant(workspaceID, idOrName string) (Instant, error) {
 		return Instant{}, err
 	}
 	provider := app.Instant
-	if inFile := s.FileConfig(app).Instant; inFile != "" {
-		provider = inFile
-	}
 	instant := Instant{Provider: provider, Open: app.InstantOpen}
 	host := app.InstantHost
 	if app.LiveNumber == 0 {
@@ -143,7 +137,7 @@ func (s *AppService) Instant(workspaceID, idOrName string) (Instant, error) {
 		if ipv4, _ := ServerAddresses(*server); ipv4 == "" {
 			instant.Reason = "The server has no public IPv4 the address could name."
 		} else {
-			instant.Reason = "x-moin.instant in compose.yml turns it off."
+			instant.Reason = "It comes on with the next restart."
 		}
 	}
 	if !instant.Open {
@@ -166,9 +160,6 @@ func (s *AppService) SetInstant(actor Actor, idOrName, provider string, open *bo
 		return false, err
 	}
 	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider != "" && s.FileConfig(app).Instant != "" {
-		return false, ErrInstantInFile
-	}
 	if provider == "" {
 		provider = app.Instant
 	}
@@ -220,7 +211,6 @@ func (s *AppService) fillInstant(app *model.App, domains *protocol.Domains) erro
 	if err != nil {
 		return err
 	}
-	// Also when it is off here: x-moin.instant in compose.yml may turn it on.
 	if server.Tunnel {
 		return nil
 	}

@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 80
-  health: /wp-includes/images/blank.gif
-
 services:
   web:
     image: wordpress:${VERSION}
+    expose: ["80"]
     environment:
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: wordpress

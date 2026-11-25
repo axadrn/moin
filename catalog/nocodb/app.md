@@ -7,7 +7,6 @@ source: github.com/nocodb/nocodb
 license: Sustainable Use License
 image: nocodb/nocodb
 database: postgres
-port: 8080
 logo: https://github.com/nocodb/nocodb/blob/HEAD/packages/nc-gui/assets/img/brand/nocodb-logo.svg
 ---
 

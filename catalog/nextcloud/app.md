@@ -7,7 +7,6 @@ source: github.com/nextcloud/server
 license: AGPL-3.0
 image: nextcloud
 database: postgres
-port: 80
 login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
 logo: https://github.com/nextcloud/server/blob/HEAD/core/img/favicon-touch.svg
 ---

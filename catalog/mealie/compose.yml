@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 9000
-  health: /api/app/about
-
 services:
   web:
     image: ghcr.io/mealie-recipes/mealie:${VERSION}
+    expose: ["9000"]
     environment:
       ALLOW_SIGNUP: "false"
     volumes:

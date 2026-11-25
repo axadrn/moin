@@ -79,7 +79,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `query_database` | runs read-only SQL | write |
 | `execute_sql` | runs SQL that changes data | write, destructive |
 | `get_backups` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to | read |
-| `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30); refused when `x-moin.backups` sets them | write |
+| `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30) | write |
 | `restore_app` | goes back to a moment (`moment`, its id or label: a copy, `before-v12`, `undo-…`) or a time (`at`), the newest copy at or before it; keeps the database before, so it can be undone; `confirm` is the app's name. It runs on its own and answers its state; with `id` it tells how it stands | write, destructive |
 | `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`, signed by the app's server; it works for 15 minutes | write |
 | `list_buckets` | the buckets, without their secrets, with the apps that use each and the servers that keep its key | read |
@@ -89,7 +89,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `set_default_bucket` | makes a bucket the default | write |
 | `remove_bucket` | removes a bucket nothing uses; `confirm` is the bucket's name | write, destructive |
 | `set_app_bucket` | moves an app's backups to a bucket; the copies start again there | write |
-| `check_domains` | whether each domain points at the server, and whether compose.yml sets it | read |
+| `check_domains` | whether each domain points at the server | read |
 | `get_uptime` | uptime per domain over 24 hours, 7 and 30 days, the last visit and the last outages | read |
 | `set_uptime` | the path uptime visits on a domain, or pauses and resumes it | write |
 | `get_metrics` | CPU, memory, disk and network of an app or a server, now and over 1h, 24h, 7d or 30d; for an app the deploys that went live, for a server its apps by memory | read |

@@ -1,8 +1,4 @@
-x-moin:
-  service: web
-  port: 80
-  health: /
-
 services:
   web:
     image: corentinth/it-tools:${VERSION}
+    expose: ["80"]

@@ -24,23 +24,6 @@ func TestImageName(t *testing.T) {
 	}
 }
 
-// The domains x-moin.domains sets in the live deploy win over the ones saved
-// in moin; without them the saved ones count.
-func TestMainDomains(t *testing.T) {
-	app := App{Domains: []Domain{{Name: "old.example.com", Main: true}, {Service: "api", Name: "api.example.com"}}}
-	if domains, canonical := app.MainDomains(); len(domains) != 1 || domains[0] != "old.example.com" || canonical != "old.example.com" {
-		t.Fatalf("saved domains = %v, %q", domains, canonical)
-	}
-	app.LiveDetected = `{"service":"web","domains":["my-app.example.com","www.my-app.example.com"],"canonical":"my-app.example.com","config":{"domains":["my-app.example.com","www.my-app.example.com"]}}`
-	if domains, canonical := app.MainDomains(); len(domains) != 2 || domains[0] != "my-app.example.com" || canonical != "my-app.example.com" {
-		t.Fatalf("compose domains = %v, %q", domains, canonical)
-	}
-	app.LiveDetected = `{"service":"web","domains":["old.example.com"],"config":{}}`
-	if domains, _ := app.ComposeDomains(); domains != nil {
-		t.Fatalf("a compose.yml without domains sets %v", domains)
-	}
-}
-
 // The saved domains split by service: the main service's with their
 // canonical one, the others by service.
 func TestDomainsOf(t *testing.T) {

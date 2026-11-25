@@ -7,7 +7,6 @@ source: github.com/gitroomhq/postiz-app
 license: AGPL-3.0
 image: ghcr.io/gitroomhq/postiz-app
 database: postgres
-port: 5000
 logo: https://github.com/gitroomhq/postiz-app/blob/HEAD/apps/frontend/public/logo.svg
 ---
 

@@ -7,7 +7,6 @@ source: github.com/actualbudget/actual
 license: MIT
 image: actualbudget/actual-server
 database: sqlite
-port: 5006
 logo: https://github.com/actualbudget/actual/blob/HEAD/packages/docs/static/img/logo.svg
 ---
 

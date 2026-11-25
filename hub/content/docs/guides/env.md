@@ -116,4 +116,4 @@ A change to such a variable takes a deploy, not just a restart.
 - A rollback runs with the env vars as they are now, not as they were then.
 - A rebuilt server starts without env. Set the values again, then deploy.
 - A removed app takes its env file with it.
-- Commands take the app from `--app`, from `x-moin.app` in [the repo](/docs/guides/config), or from the folder name.
+- Commands take the app from `--app`, or from the folder name.

@@ -157,11 +157,11 @@ func TestUptimeVisitsEveryDomainThatServes(t *testing.T) {
 	if err != nil || uptime.State != model.UptimePending || len(uptime.Domains) != 2 {
 		t.Fatalf("uptime before a deploy = %+v, %v", uptime, err)
 	}
-	deployBlog(t, apps, servers, server, protocol.Detected{Kind: "compose", Service: "web", Config: &protocol.Config{Health: "/health"}})
+	deployBlog(t, apps, servers, server, protocol.Detected{Kind: "compose", Service: "web"})
 
 	visitAll(apps)
-	if visits := sites.visits("blog.example.com"); len(visits) != 1 || visits[0] != "/health" {
-		t.Fatalf("visits = %v, want one to the health path", visits)
+	if visits := sites.visits("blog.example.com"); len(visits) != 1 || visits[0] != "/" {
+		t.Fatalf("visits = %v, want one to /", visits)
 	}
 	if len(sites.visits("api.blog.example.com")) != 1 || len(sites.visits("www.blog.example.com")) != 0 {
 		t.Fatalf("api visits = %v, www visits = %v: want the service's domain, not the redirect", sites.visits("api.blog.example.com"), sites.visits("www.blog.example.com"))
@@ -171,7 +171,7 @@ func TestUptimeVisitsEveryDomainThatServes(t *testing.T) {
 		t.Fatalf("uptime = %+v, %v", uptime, err)
 	}
 	first := uptime.Domains[0]
-	if first.Domain != "blog.example.com" || first.Path != "/health" || first.CustomPath || first.StatusCode != 200 || first.VisitedAt == nil || first.Uptime24h == nil || *first.Uptime24h != 100 {
+	if first.Domain != "blog.example.com" || first.Path != "/" || first.CustomPath || first.StatusCode != 200 || first.VisitedAt == nil || first.Uptime24h == nil || *first.Uptime24h != 100 {
 		t.Fatalf("blog.example.com = %+v", first)
 	}
 	if uptime.Domains[1].Domain != "api.blog.example.com" {

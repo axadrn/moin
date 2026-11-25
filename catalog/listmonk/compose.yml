@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 9000
-  health: /health
-
 services:
   web:
     image: listmonk/listmonk:${VERSION}
+    expose: ["9000"]
     command: [sh, -c, "./listmonk --install --idempotent --yes --config '' && ./listmonk --upgrade --yes --config '' && ./listmonk --config ''"]
     environment:
       LISTMONK_app__address: 0.0.0.0:9000

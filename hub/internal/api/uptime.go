@@ -22,8 +22,7 @@ type Uptime struct {
 // UptimeDomain is the uptime of one domain.
 type UptimeDomain struct {
 	Domain string `json:"domain"`
-	// Path is where the visit goes; custom_path says it was set, not the
-	// health path or /.
+	// Path is where the visit goes; custom_path says it was set, not /.
 	Path       string `json:"path"`
 	CustomPath bool   `json:"custom_path"`
 	Paused     bool   `json:"paused"`

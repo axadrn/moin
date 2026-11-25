@@ -67,7 +67,6 @@ source: github.com/miniflux/v2
 license: Apache-2.0
 image: miniflux/miniflux
 database: postgres
-port: 8080
 login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
 ---
 
@@ -77,14 +76,10 @@ Two or three plain sentences: what it does, and where its data lives.
 `compose.yml` runs it:
 
 ```yaml
-x-moin:
-  service: web
-  port: 8080
-  health: /healthcheck
-
 services:
   web:
     image: miniflux/miniflux:${VERSION}
+    expose: ["8080"]
     environment:
       DATABASE_URL: postgres://miniflux:${DB_PASSWORD}@db/miniflux?sslmode=disable
     depends_on:
@@ -110,6 +105,7 @@ The rules, which a test checks:
 | Rule | |
 | --- | --- |
 | Image | on Docker Hub or `ghcr.io`, for `amd64` and `arm64`, run as `<image>:${VERSION}` |
+| Port | `expose` on `web`, the port it listens on. The service that gets the traffic is `web` |
 | Secrets | every one a `${NAME}`, made by the server on install, and on an update that asks for a new one: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
 | First sign-in | a secret the person needs to sign in, named in `login:` like `ADMIN_PASSWORD`, is the one the install shows once |
 | Its own domain | `${APP_URL}` is `https://<its domain>`, `${APP_DOMAIN}` the domain alone; an app that uses either needs a domain on install |

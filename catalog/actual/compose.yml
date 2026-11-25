@@ -1,10 +1,6 @@
-x-moin:
-  service: web
-  port: 5006
-  health: /
-
 services:
   web:
     image: actualbudget/actual-server:${VERSION}
+    expose: ["5006"]
     volumes:
       - ./data:/data

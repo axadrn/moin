@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /api/v1/ping
-
 services:
   web:
     image: flowiseai/flowise:${VERSION}
+    expose: ["3000"]
     # The image's user cannot write to the data folder moin mounts.
     user: root
     environment:

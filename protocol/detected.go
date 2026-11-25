@@ -1,14 +1,9 @@
 package protocol
 
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // Detected is what the daemon learned about an app from its repo and its
-// running containers. Config holds the x-moin block of compose.yml, if any.
+// running containers.
 type Detected struct {
 	// Kind is "compose", "dockerfile", "go" or "railpack": what the repo
 	// brought, and for railpack that moin built it with Railpack. Builder
@@ -31,7 +26,6 @@ type Detected struct {
 	Databases      []Database          `json:"databases"`
 	// NoBackup is what looks like a database but moin cannot back up.
 	NoBackup []Database `json:"no_backup,omitempty"`
-	Config   *Config    `json:"config,omitempty"`
 }
 
 // Built says for people how moin built the app: the language Railpack found,
@@ -71,90 +65,3 @@ func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 // PostgresKey is the name of a Postgres service's database in moin: in the
 // bucket, the API and on every surface.
 func PostgresKey(service string) string { return "postgres-" + service }
-
-// OldConfigKey is the block of compose.yml under the name the product had
-// before. The daemon refuses it with a message to rename it to x-moin.
-const OldConfigKey = "x-ops"
-
-// Config is the x-moin block of compose.yml. Every field is optional.
-type Config struct {
-	App       string   `json:"app,omitempty"`
-	Server    string   `json:"server,omitempty"`
-	Service   string   `json:"service,omitempty"`
-	Port      int      `json:"port,omitempty"`
-	Health    string   `json:"health,omitempty"`
-	Domains   []string `json:"domains,omitempty"`
-	Canonical string   `json:"canonical,omitempty"`
-	Protect   bool     `json:"protect,omitempty"`
-	// Backups is the backup schedule. When it is set, the file decides.
-	Backups *ConfigBackups `json:"backups,omitempty"`
-	// ServiceDomains are domains by service, from the map form of domains:
-	// domains: {web: [my-app.example.com], api: [api.my-app.example.com]}. Ports are the ports
-	// of services moin cannot tell. Instant picks the instant address
-	// provider, or off.
-	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
-	Ports          map[string]int      `json:"ports,omitempty"`
-	Instant        string              `json:"instant,omitempty"`
-}
-
-// ConfigBackups is the backups block of x-moin: how often and how long.
-// What it leaves out is the default.
-type ConfigBackups struct {
-	Every string `json:"every,omitempty"`
-	Keep  string `json:"keep,omitempty"`
-}
-
-// Schedule is the schedule the block asks for.
-func (b ConfigBackups) Schedule() (Schedule, error) {
-	schedule := DefaultSchedule
-	if b.Every != "" {
-		minutes, ok := EveryMinutes(b.Every)
-		if !ok {
-			return schedule, fmt.Errorf("backups.every is %q: use 15m, 1h or 1d", b.Every)
-		}
-		schedule.Every = minutes
-	}
-	if b.Keep != "" {
-		days, ok := KeepDays(b.Keep)
-		if !ok {
-			return schedule, fmt.Errorf("backups.keep is %q: use 1d, 3d, 7d or 30d", b.Keep)
-		}
-		schedule.Keep = days
-	}
-	return schedule, nil
-}
-
-// UnmarshalJSON reads domains as a list, for the main service, or as a map
-// of service to domains.
-func (c *Config) UnmarshalJSON(body []byte) error {
-	type plain Config
-	var raw struct {
-		plain
-		Domains json.RawMessage `json:"domains,omitempty"`
-	}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return err
-	}
-	*c = Config(raw.plain)
-	c.Domains = nil
-	domains := bytes.TrimSpace(raw.Domains)
-	switch {
-	case len(domains) == 0 || string(domains) == "null":
-	case domains[0] == '{':
-		byService := map[string][]string{}
-		if err := json.Unmarshal(domains, &byService); err != nil {
-			return fmt.Errorf("x-moin domains: %w", err)
-		}
-		if c.ServiceDomains == nil {
-			c.ServiceDomains = map[string][]string{}
-		}
-		for service, list := range byService {
-			c.ServiceDomains[service] = list
-		}
-	default:
-		if err := json.Unmarshal(domains, &c.Domains); err != nil {
-			return fmt.Errorf("x-moin domains: %w", err)
-		}
-	}
-	return nil
-}

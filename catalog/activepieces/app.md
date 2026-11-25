@@ -7,7 +7,6 @@ source: github.com/activepieces/activepieces
 license: MIT
 image: activepieces/activepieces
 database: postgres
-port: 80
 login: "The first visit asks you to create the admin."
 logo: https://raw.githubusercontent.com/activepieces/activepieces/main/packages/web/public/logo.svg
 ---

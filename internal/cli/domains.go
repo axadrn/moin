@@ -132,10 +132,9 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		return nil
 	}
 	rows := make([][]string, 0, len(checks))
-	advice, fromCompose := "", false
+	advice := ""
 	for _, check := range checks {
 		advice = check.Advice
-		fromCompose = fromCompose || check.FromCompose
 		state := badge(stdout, style.Badge(style.StatusLive, "points here"), "points here")
 		if !check.Points {
 			state = badge(stdout, style.Badge(style.StatusWaiting, "set DNS"), "set DNS")
@@ -147,9 +146,6 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		if check.Canonical {
 			roles = append(roles, "canonical")
 		}
-		if check.FromCompose {
-			roles = append(roles, "from compose.yml")
-		}
 		role := strings.Join(roles, ", ")
 		rows = append(rows, []string{check.Domain, state, strings.Join(check.Found, " "), role})
 	}
@@ -157,9 +153,6 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 	if advice != "" {
 		fmt.Fprintln(stdout)
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each domain needs an "+advice+"."))
-	}
-	if fromCompose {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("x-moin.domains in compose.yml sets the domains marked from compose.yml: change them there and deploy."))
 	}
 	return nil
 }

@@ -36,8 +36,6 @@ type Entry struct {
 	// up, or mysql, mongodb or clickhouse, which it does not yet; empty
 	// for none.
 	Database string
-	// Port is what the app listens on.
-	Port int
 	// Filter picks the tags that are releases; empty takes x.y.z, with or
 	// without a v.
 	Filter *regexp.Regexp
@@ -118,14 +116,6 @@ func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, e
 		Image: text("image"), Database: text("database"), Login: text("login"), Stable: text("stable"),
 		Body: template.HTML(body),
 	}
-	switch port := meta["port"].(type) {
-	case int:
-		entry.Port = port
-	case uint64:
-		entry.Port = int(port)
-	case float64:
-		entry.Port = int(port)
-	}
 	entry.Filter = defaultFilter
 	if filter := text("versions"); filter != "" {
 		entry.Filter, err = regexp.Compile(filter)
@@ -164,8 +154,6 @@ func (e Entry) validate() error {
 		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, catalogfiles.VersionVar)
 	case e.Database != "" && databaseNames[e.Database] == "":
 		return errors.New("database is postgres, sqlite, mysql, mongodb, clickhouse or empty")
-	case e.Port <= 0 || e.Port > 65535:
-		return errors.New("port is required")
 	case !strings.HasPrefix(e.Website, "https://"):
 		return errors.New("website must be an https:// link")
 	}

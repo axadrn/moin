@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 80
-  health: /health
-
 services:
   web:
     image: gotify/server:${VERSION}
+    expose: ["80"]
     environment:
       GOTIFY_DEFAULTUSER_PASS: ${ADMIN_PASSWORD}
     volumes:

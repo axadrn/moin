@@ -7,7 +7,6 @@ source: github.com/docmost/docmost
 license: AGPL-3.0
 image: docmost/docmost
 database: postgres
-port: 3000
 logo: https://github.com/docmost/docmost/blob/HEAD/apps/client/public/icons/app-icon-512x512.png
 ---
 

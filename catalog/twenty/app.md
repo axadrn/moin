@@ -7,7 +7,6 @@ source: github.com/twentyhq/twenty
 license: AGPL-3.0
 image: twentycrm/twenty
 database: postgres
-port: 3000
 login: "The first visit asks you to create your workspace."
 logo: https://raw.githubusercontent.com/twentyhq/twenty/main/packages/twenty-front/public/images/icons/android/android-launchericon-512-512.png
 ---

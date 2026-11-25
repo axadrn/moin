@@ -1,10 +1,6 @@
-x-moin:
-  service: web
-  port: 5230
-  health: /
-
 services:
   web:
     image: neosmemo/memos:${VERSION}
+    expose: ["5230"]
     volumes:
       - ./data:/var/opt/memos

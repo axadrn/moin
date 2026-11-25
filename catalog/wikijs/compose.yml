@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /healthz
-
 services:
   web:
     image: ghcr.io/requarks/wiki:${VERSION}
+    expose: ["3000"]
     environment:
       DB_TYPE: postgres
       DB_HOST: db

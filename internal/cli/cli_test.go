@@ -480,27 +480,18 @@ func TestOneNamePerCommand(t *testing.T) {
 
 // moin apps shop shows one app; a typo says what exists.
 func TestAppsWithANameShowsTheApp(t *testing.T) {
-	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true,"deploy_from":"github"},
-		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"],"config":{"domains":["shop.example.com"]}}}]}`
+	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":["shop.example.com"],"repo":"me/shop","branch":"main","auto_deploy":true,"deploy_from":"github"},
+		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"]}}]}`
 	for _, args := range [][]string{{"apps", "shop"}} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": detail}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "deploy from GitHub, me/shop, branch main, every push") || !strings.Contains(stdout, "v2") {
+		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com") || !strings.Contains(stdout, "deploy from GitHub, me/shop, branch main, every push") || !strings.Contains(stdout, "v2") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
 		}
 	}
 	code, _, stderr := runCLI(t, &fakeAPI{}, "apps", "lsit")
 	if code != 1 || !strings.Contains(stderr, `No app or command "lsit"`) || !strings.Contains(stderr, "moin apps") {
 		t.Errorf("typo: code %d, stderr %q", code, stderr)
-	}
-}
-
-// Domains that x-moin sets are marked, with where to change them.
-func TestDomainsFromComposeAreMarked(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.example.com","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
-	code, stdout, stderr := runCLI(t, api, "domains", "shop")
-	if code != 0 || strings.Contains(stdout, "no domains yet") || !strings.Contains(stdout, "canonical, from compose.yml") || !strings.Contains(stdout, "change them there and deploy") {
-		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
 
@@ -638,6 +629,34 @@ func TestDeployDeploysThePushedCommit(t *testing.T) {
 	code, _, stderr = runCLI(t, api, "deploy", "shop")
 	if code == 0 || !strings.Contains(stderr, "follows me/other, and this folder is me/shop") || api.seen("POST") || api.seen("PUT") {
 		t.Errorf("another repo: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}
+
+// moin deploy without an app deploys the one app that follows the repo of
+// the folder, whatever the folder is called.
+func TestDeployTakesTheAppThatFollowsTheRepo(t *testing.T) {
+	commit := inPushedRepo(t)
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps":                       `{"items":[{"name":"other","repo":"me/other"},{"name":"blog","repo":"Me/Shop"}]}`,
+		"GET /api/v1/apps/blog":                  `{"app":{"name":"blog","repo":"me/shop","branch":"main"},"deploys":[]}`,
+		"POST /api/v1/apps/blog/deploys":         `{"number":1,"status":"running","commit":"` + commit + `"}`,
+		"GET /api/v1/apps/blog/deploys/1/events": "event: done\ndata: {\"number\":1,\"status\":\"succeeded\"}\n\n",
+	}}
+	code, stdout, stderr := runCLI(t, api, "deploy", "--detach")
+	if code != 0 || !api.seen(`POST /api/v1/apps/blog/deploys {"ref":"`+commit+`"}`) {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	// Every command finds it the same way.
+	api.answers["GET /api/v1/apps/blog/logs?tail=100"] = `{"lines":[]}`
+	runCLI(t, api, "logs")
+	if !api.seen("GET /api/v1/apps/blog/logs") {
+		t.Errorf("logs: requests %v", api.requests)
+	}
+	// Two apps that follow the repo: no command guesses.
+	api.answers["GET /api/v1/apps"] = `{"items":[{"name":"blog","repo":"me/shop"},{"name":"blog-staging","repo":"me/shop"}]}`
+	code, _, stderr = runCLI(t, api, "deploy", "--detach")
+	if code == 0 || !strings.Contains(stderr, "name one with --app") {
+		t.Errorf("two apps: code %d, stderr %q", code, stderr)
 	}
 }
 

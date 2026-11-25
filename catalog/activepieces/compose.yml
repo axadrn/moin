@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 80
-  health: /
-
 services:
   web:
     image: activepieces/activepieces:${VERSION}
+    expose: ["80"]
     environment:
       AP_FRONTEND_URL: ${APP_URL}
       AP_ENCRYPTION_KEY: ${ENCRYPTION_KEY_HEX16}

@@ -132,7 +132,7 @@ var appSummaries = map[string]summarize{
 	},
 	"uptime.path_set": func(target string, d map[string]string) string {
 		if d["path"] == "" {
-			return "set the uptime path of " + d["domain"] + " of " + target + " back to the health path or /"
+			return "set the uptime path of " + d["domain"] + " of " + target + " back to /"
 		}
 		return "set the uptime path of " + d["domain"] + " of " + target + " to " + d["path"]
 	},

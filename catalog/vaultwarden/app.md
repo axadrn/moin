@@ -7,7 +7,6 @@ source: github.com/dani-garcia/vaultwarden
 license: AGPL-3.0
 image: ghcr.io/dani-garcia/vaultwarden
 database: sqlite
-port: 80
 logo: https://github.com/dani-garcia/vaultwarden/blob/HEAD/resources/vaultwarden-icon.svg
 ---
 

@@ -6,7 +6,6 @@ package tui
 import (
 	"errors"
 	"github.com/axadrn/moin/internal/client"
-	"slices"
 	"strings"
 	"time"
 
@@ -198,25 +197,6 @@ func (m model) envKeys() []string {
 		keys = append(keys, v.Key)
 	}
 	return keys
-}
-
-// mainDomains are the domains of the app's main service moin set, without
-// the ones compose.yml sets.
-func (m model) mainDomains() []string {
-	a, _ := m.findApp(m.cur.app)
-	var fromCompose []string
-	for _, d := range m.app.domains {
-		if d.FromCompose {
-			fromCompose = append(fromCompose, d.Domain)
-		}
-	}
-	var out []string
-	for _, d := range a.Domains {
-		if !slices.Contains(fromCompose, d) {
-			out = append(out, d)
-		}
-	}
-	return out
 }
 
 // filteredLogs are the log lines the filter lets through.

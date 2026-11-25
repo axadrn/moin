@@ -6,7 +6,6 @@ website: https://gethomepage.dev
 source: github.com/gethomepage/homepage
 license: GPL-3.0
 image: ghcr.io/gethomepage/homepage
-port: 3000
 logo: https://simpleicons.org (CC0)
 ---
 

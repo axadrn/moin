@@ -6,7 +6,6 @@ website: "https://it-tools.tech"
 source: github.com/CorentinTh/it-tools
 license: GPL-3.0
 image: corentinth/it-tools
-port: 80
 versions: '^[0-9]{4}\.[0-9]+\.[0-9]+-[0-9a-f]{7}$'
 logo: https://github.com/CorentinTh/it-tools/blob/HEAD/public/apple-touch-icon.png
 ---

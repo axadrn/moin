@@ -7,7 +7,7 @@ order: 5
 
 CI is a computer elsewhere that builds your app. GitHub Actions, for example. It packs the app into an image, a box ready to run. It puts the image on a registry, a shelf for images. Your server only downloads and starts it.
 
-The image is the code. Your repo still has the rest: `compose.yml` with the databases, volumes and `x-moin`. Each deploy takes `compose.yml` from the commit CI built the image from. Code and compose file always match.
+The image is the code. Your repo still has the rest: `compose.yml` with the databases and volumes. Each deploy takes `compose.yml` from the commit CI built the image from. Code and compose file always match.
 
 1. [Link the repo](/docs/guides/github#link-a-repo). The hook turns deploy on push off later.
 2. [Deploy your image once by hand](#deploy-an-image-by-hand). That picks the image.

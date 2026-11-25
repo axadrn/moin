@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 80
-  health: /status.php
-
 services:
   web:
     image: nextcloud:${VERSION}
+    expose: ["80"]
     environment:
       POSTGRES_HOST: db
       POSTGRES_DB: nextcloud

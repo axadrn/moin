@@ -21,8 +21,6 @@ type DomainsView struct {
 	// NewPassword is the password of the instant address moin just made:
 	// the one time it shows it.
 	NewPassword string
-	// File is the x-moin block of the live deploy: what it sets is locked.
-	File protocol.Config
 }
 
 // AppDomains is where an app is reached: its domains, the instant address
@@ -40,21 +38,15 @@ templ AppDomains(view DomainsView) {
 					for _, check := range view.Checks {
 						@domainRow(check, view.App.Name, domainsPath)
 					}
-					if options := canonicalOptions(view.Checks); len(options) > 2 && !fromCompose(view.Checks) {
+					if options := canonicalOptions(view.Checks); len(options) > 2 {
 						@canonicalRow(options, canonicalDomain(view.Checks), domainsPath)
 					}
-					if fromCompose(view.Checks) {
-						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-domains-from-compose": true}}) {
-							<p class="moin-fill moin-text moin-muted">Change them in compose.yml (<span class="moin-mono">x-moin.domains</span>) and deploy.</p>
-						}
-					} else {
-						@addDomainRow(domainsPath)
-					}
+					@addDomainRow(domainsPath)
 				}
 			}
 		</section>
 		@instantSection(view, domainsPath)
-		@passwordSection(view.App, domainsPath, view.File.Protect)
+		@passwordSection(view.App, domainsPath)
 	</div>
 }
 
@@ -67,7 +59,7 @@ templ canonicalRow(options []components.Option, canonical, domainsPath string) {
 }
 
 // domainRow is one domain: its name, a quiet word for what it is
-// (canonical, a service, from compose.yml), what its DNS says once checked,
+// (canonical, a service), what its DNS says once checked,
 // and its actions. On a phone the actions go under the name when they do
 // not fit next to it.
 templ domainRow(check service.DomainCheck, appName, domainsPath string) {
@@ -107,20 +99,18 @@ templ domainRow(check service.DomainCheck, appName, domainsPath string) {
 			}}) {
 				Check
 			}
-			if !check.FromCompose {
-				@components.Button(components.ButtonProps{Icon: true, Kind: components.Danger, Attrs: templ.Attributes{
-					"aria-label":          "Remove " + check.Domain,
-					"title":               "Remove " + check.Domain,
-					"hx-post":             domainsPath + "/remove",
-					"hx-vals":             `{"domain": "` + check.Domain + `", "service": "` + check.Service + `"}`,
-					"hx-target":           "#app-domains",
-					"hx-swap":             "outerHTML",
-					"hx-disable":          "this",
-					"hx-confirm":          "Remove " + check.Domain + "? " + appName + " stops answering on it at the next restart.",
-					"data-confirm-action": "Remove",
-				}}) {
-					@components.Icon("x")
-				}
+			@components.Button(components.ButtonProps{Icon: true, Kind: components.Danger, Attrs: templ.Attributes{
+				"aria-label":          "Remove " + check.Domain,
+				"title":               "Remove " + check.Domain,
+				"hx-post":             domainsPath + "/remove",
+				"hx-vals":             `{"domain": "` + check.Domain + `", "service": "` + check.Service + `"}`,
+				"hx-target":           "#app-domains",
+				"hx-swap":             "outerHTML",
+				"hx-disable":          "this",
+				"hx-confirm":          "Remove " + check.Domain + "? " + appName + " stops answering on it at the next restart.",
+				"data-confirm-action": "Remove",
+			}}) {
+				@components.Icon("x")
 			}
 		</div>
 	}
@@ -172,18 +162,12 @@ templ instantSection(view DomainsView, domainsPath string) {
 								<div class="moin-strong moin-muted" data-instant-reason>Off</div>
 							}
 						</div>
-						if view.File.Instant == "" {
-							@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true}})
-						} else {
-							<span class="moin-item-value" data-instant-in-file>from compose.yml</span>
-						}
+						@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true}})
 					}
 					if on {
-						if view.File.Instant == "" {
-							@components.Item(components.ItemProps{Form: true, For: "instant-provider", Name: "Provider", Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "data-instant-provider": true}}) {
-								@components.CSRF()
-								@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
-							}
+						@components.Item(components.ItemProps{Form: true, For: "instant-provider", Name: "Provider", Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "data-instant-provider": true}}) {
+							@components.CSRF()
+							@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
 						}
 						if instant.URL != "" {
 							@components.Item(components.ItemProps{Form: true, For: "instant-password-on", Name: "Password", Note: instantSignIn(instant), Attrs: templ.Attributes{"hx-post": domainsPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
@@ -218,7 +202,7 @@ templ instantSection(view DomainsView, domainsPath string) {
 
 // passwordSection is the password in front of the app: off, a switch
 // opens its fields; on, who signs in and Remove.
-templ passwordSection(app model.App, domainsPath string, required bool) {
+templ passwordSection(app model.App, domainsPath string) {
 	<section class="moin-section">
 		<div class="moin-section-head">
 			<h2>Password</h2>
@@ -229,20 +213,14 @@ templ passwordSection(app model.App, domainsPath string, required bool) {
 					@components.Item(components.ItemProps{Name: "Sign in as " + protectUser(app)}) {
 						<span class="moin-small moin-muted" data-protected>On</span>
 					}
-					if required {
-						@components.Item(components.ItemProps{}) {
-							<p class="moin-fill moin-text moin-muted" data-protect-in-file>Required by compose.yml.</p>
-						}
-					} else {
-						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
-							"hx-post":        domainsPath + "/unprotect",
-							"hx-target":      "#app-domains",
-							"hx-swap":        "outerHTML",
-							"hx-disable":     "this",
-							"hx-confirm":     "Remove the password? Anyone with the link can open " + app.Name + " after the next restart.",
-							"data-unprotect": true,
-						}})
-					}
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
+						"hx-post":        domainsPath + "/unprotect",
+						"hx-target":      "#app-domains",
+						"hx-swap":        "outerHTML",
+						"hx-disable":     "this",
+						"hx-confirm":     "Remove the password? Anyone with the link can open " + app.Name + " after the next restart.",
+						"data-unprotect": true,
+					}})
 				}
 			}
 		} else {
@@ -294,8 +272,7 @@ func instantSignIn(instant service.Instant) string {
 	return "Sign in as " + instant.User
 }
 
-// domainNote is the quiet words under a domain: canonical, its service,
-// from compose.yml.
+// domainNote is the quiet words under a domain: canonical, its service.
 func domainNote(check service.DomainCheck) string {
 	var words []string
 	if check.Canonical {
@@ -303,9 +280,6 @@ func domainNote(check service.DomainCheck) string {
 	}
 	if check.Service != "" {
 		words = append(words, "service "+check.Service)
-	}
-	if check.FromCompose {
-		words = append(words, "from compose.yml")
 	}
 	return strings.Join(words, " · ")
 }
@@ -331,12 +305,6 @@ func canonicalDomain(checks []service.DomainCheck) string {
 		}
 	}
 	return ""
-}
-
-// fromCompose says x-moin.domains in compose.yml sets the domains of the
-// main service.
-func fromCompose(checks []service.DomainCheck) bool {
-	return len(checks) > 0 && checks[0].FromCompose && checks[0].Service == ""
 }
 
 func orDash(value string) string {

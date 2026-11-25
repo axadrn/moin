@@ -7,7 +7,6 @@ source: github.com/plausible/analytics
 license: AGPL-3.0
 image: ghcr.io/plausible/community-edition
 database: clickhouse
-port: 8000
 logo: https://github.com/plausible/analytics/blob/HEAD/priv/static/images/ce/favicon.svg
 ---
 

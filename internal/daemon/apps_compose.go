@@ -40,15 +40,14 @@ func (a *apps) resolve(ctx context.Context, app, src string) (map[string]any, pr
 	if len(services) == 0 {
 		return nil, detected, errors.New("compose.yml has no services")
 	}
-	detected.Config, err = readConfigBlock(config)
-	if err != nil {
-		return nil, detected, err
+	if _, ok := config[oldBlock]; ok {
+		return nil, detected, errOldBlock
 	}
-	detected.Service = mainService(services, detected.Config)
+	detected.Service = mainService(services)
 	if detected.Service == "" {
-		return nil, detected, errors.New("cannot tell which service gets the traffic: set x-moin.service")
+		return nil, detected, errors.New("which service gets the traffic? Name it web")
 	}
-	detected.Port = mainPort(src, services[detected.Service], detected.Config)
+	detected.Port = servicePort(src, services[detected.Service])
 	err = a.keepDataOutsideRelease(app, src, services)
 	if err != nil {
 		return nil, detected, err
@@ -92,31 +91,13 @@ func (a *apps) readComposeConfig(ctx context.Context, app, src string) (map[stri
 	return config, nil
 }
 
-// readConfigBlock reads the x-moin block of a compose file, nil when there
-// is none. What it could read comes back with an error too.
-func readConfigBlock(config map[string]any) (*protocol.Config, error) {
-	block, key, err := configBlock(config)
-	if err != nil {
-		return nil, err
-	}
-	if block == nil {
-		return nil, nil
-	}
-	settings := &protocol.Config{}
-	body, _ := json.Marshal(block)
-	err = json.Unmarshal(body, settings)
-	if err != nil {
-		return settings, fmt.Errorf("%s: %w", key, err)
-	}
-	if settings.Backups == nil {
-		return settings, nil
-	}
-	_, err = settings.Backups.Schedule()
-	if err != nil {
-		return settings, fmt.Errorf("%s: %w", key, err)
-	}
-	return settings, nil
-}
+// oldBlock is the block of compose.yml moin read its settings from before.
+// moin keeps every setting now, so a file that still has it fails the
+// deploy: the block may hold domains the app would quietly lose.
+var (
+	oldBlock    = "x-" + ourName
+	errOldBlock = fmt.Errorf("%s is gone: compose.yml is plain Docker now, and %s keeps its settings. Remove the %s block. https://%s.run/docs/guides/compose", oldBlock, ourName, oldBlock, ourName)
+)
 
 // keepDataOutsideRelease moves the data mounts of every service to the
 // app's volumes folder, so the data outlives the release.
@@ -415,7 +396,7 @@ func routeService(release *release, config map[string]any, name string, service 
 		router:    serviceRouter(app, name),
 		domains:   serviceDomains,
 		canonical: canonical,
-		port:      servicePort(name, service, detected.Config),
+		port:      servicePort("", service),
 		protect:   protectHash(domains),
 	})
 }
@@ -551,15 +532,9 @@ func exposedPort(src string) int {
 	return port
 }
 
-// mainService is the service that gets the traffic: the one x-moin names, the
-// only one, or the only one moin builds.
-func mainService(services map[string]any, config *protocol.Config) string {
-	if config != nil && config.Service != "" {
-		if _, ok := services[config.Service]; ok {
-			return config.Service
-		}
-		return ""
-	}
+// mainService is the service that gets the traffic: the only one, else the
+// only one moin builds, else the one named web.
+func mainService(services map[string]any) string {
 	if len(services) == 1 {
 		for name := range services {
 			return name
@@ -580,20 +555,11 @@ func mainService(services map[string]any, config *protocol.Config) string {
 	return ""
 }
 
-// servicePort is the port a service other than the main one listens on:
-// the one x-moin.ports names, else what its compose entry says, else 8080.
-func servicePort(name string, service map[string]any, config *protocol.Config) int {
-	if config != nil && config.Ports[name] > 0 {
-		return config.Ports[name]
-	}
-	return mainPort("", service, nil)
-}
-
-// mainPort is the port the service listens on inside its container.
-func mainPort(src string, service any, config *protocol.Config) int {
-	if config != nil && config.Port > 0 {
-		return config.Port
-	}
+// servicePort is the port a service listens on inside its container: its
+// ports target, else expose, else its env PORT, else EXPOSE of the
+// Dockerfile in src, else 8080. The main service passes the source as src,
+// the others none.
+func servicePort(src string, service any) int {
 	fields, _ := service.(map[string]any)
 	if ports, _ := fields["ports"].([]any); len(ports) > 0 {
 		if port, _ := ports[0].(map[string]any); port != nil {
@@ -613,8 +579,10 @@ func mainPort(src string, service any, config *protocol.Config) int {
 			return port
 		}
 	}
-	if port := exposedPort(src); src != "" && port > 0 {
-		return port
+	if src != "" {
+		if port := exposedPort(src); port > 0 {
+			return port
+		}
 	}
 	return 8080
 }
@@ -638,15 +606,4 @@ type composeMount struct {
 	Type   string `json:"type"`
 	Source string `json:"source"`
 	Target string `json:"target"`
-}
-
-// configBlock is the daemon's block of compose.yml, x-moin. The block of
-// the name the product had before is an error, never quietly ignored: it
-// may hold the domains.
-func configBlock(config map[string]any) (any, string, error) {
-	key := "x-" + ourName
-	if _, ok := config[protocol.OldConfigKey]; ok {
-		return nil, protocol.OldConfigKey, fmt.Errorf("compose.yml has an %s block: rename it to %s", protocol.OldConfigKey, key)
-	}
-	return config[key], key, nil
 }

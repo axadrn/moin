@@ -7,7 +7,6 @@ source: github.com/jellyfin/jellyfin
 license: GPL-2.0
 image: jellyfin/jellyfin
 database: sqlite
-port: 8096
 login: "A setup wizard creates the admin on first visit."
 logo: https://simpleicons.org (CC0)
 ---

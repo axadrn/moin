@@ -331,8 +331,6 @@ type DomainCheck struct {
 	Advice    string   `json:"advice"`
 	Found     []string `json:"found"`
 	Points    bool     `json:"points"`
-	// FromCompose says x-moin.domains in compose.yml sets the domain.
-	FromCompose bool `json:"from_compose"`
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
 	Service string `json:"service"`

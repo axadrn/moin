@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 2368
-  health: /
-
 services:
   web:
     image: ghost:${VERSION}
+    expose: ["2368"]
     environment:
       url: ${APP_URL}
       database__client: mysql

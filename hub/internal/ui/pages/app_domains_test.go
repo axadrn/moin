@@ -8,29 +8,15 @@ import (
 	"github.com/axadrn/moin/hub/internal/service"
 )
 
-// Domains x-moin sets are marked and offer no remove, canonical or add,
-// because moin cannot change them.
-func TestDomainsMarkComposeDomains(t *testing.T) {
-	view := DomainsView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true, FromCompose: true}}}
+// Every domain offers remove and the page offers add: moin keeps them all.
+func TestDomainsOfferChanges(t *testing.T) {
+	view := DomainsView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true}}}
 	var html strings.Builder
 	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
-	page := html.String()
-	if !strings.Contains(page, "from compose.yml") || !strings.Contains(page, "data-domains-from-compose") {
-		t.Errorf("no compose marker: %s", page)
-	}
-	if strings.Contains(page, "Remove shop.example.com") || strings.Contains(page, "data-add-domain") {
-		t.Errorf("compose domains offer changes: %s", page)
-	}
-
-	view.Checks[0].FromCompose = false
-	html.Reset()
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
-		t.Fatal(err)
-	}
 	if !strings.Contains(html.String(), "Remove shop.example.com") || !strings.Contains(html.String(), "data-add-domain") {
-		t.Errorf("moin domains lost their actions")
+		t.Errorf("a domain lost its actions")
 	}
 }
 
@@ -103,14 +89,14 @@ func TestDomainsShowTheCheck(t *testing.T) {
 	}
 }
 
-// The overview lists the domains compose.yml sets, like the Domains page.
-func TestOverviewListsComposeDomains(t *testing.T) {
-	app := model.App{Name: "my-app", LiveNumber: 3, LiveDetected: `{"service":"web","domains":["my-app.example.com"],"config":{"domains":["my-app.example.com"]}}`}
+// The overview lists the app's domains, like the Domains page.
+func TestOverviewListsTheDomains(t *testing.T) {
+	app := model.App{Name: "my-app", LiveNumber: 3, Domains: []model.Domain{{Name: "my-app.example.com", Main: true}}}
 	var html strings.Builder
 	if err := appHomeSection(AppPageView{App: app}).Render(projectPageContext("/app/tiny-rocket-co/apps/my-app"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if page := html.String(); !strings.Contains(page, `href="https://my-app.example.com"`) || strings.Contains(page, "No domain yet") {
-		t.Errorf("the overview lacks the domain from compose.yml: %s", page)
+		t.Errorf("the overview lacks the domain: %s", page)
 	}
 }

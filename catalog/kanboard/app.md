@@ -7,7 +7,6 @@ source: github.com/kanboard/kanboard
 license: MIT
 image: kanboard/kanboard
 database: sqlite
-port: 80
 login: Sign in as admin with the password admin, then change it right away.
 logo: https://github.com/kanboard/kanboard/blob/HEAD/assets/img/adaptive-favicon.svg
 ---

@@ -7,7 +7,6 @@ source: github.com/WordPress/WordPress
 license: GPL-2.0
 image: wordpress
 database: mysql
-port: 80
 logo: https://github.com/WordPress/WordPress/blob/HEAD/wp-admin/images/wordpress-logo.svg
 ---
 

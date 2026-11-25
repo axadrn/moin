@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 8000
-  health: /
-
 services:
   web:
     image: healthchecks/healthchecks:${VERSION}
+    expose: ["8000"]
     environment:
       SITE_ROOT: ${APP_URL}
       SECRET_KEY: ${SECRET_KEY}

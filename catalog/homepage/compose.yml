@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 3000
-  health: /
-
 services:
   web:
     image: ghcr.io/gethomepage/homepage:${VERSION}
+    expose: ["3000"]
     environment:
       HOMEPAGE_ALLOWED_HOSTS: ${APP_DOMAIN}
     volumes:

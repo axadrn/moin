@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -16,10 +15,7 @@ import (
 // builds that commit from GitHub, so it fails, saying what to do, unless dir
 // is the top folder of a GitHub repo with every change committed and pushed.
 func PushedCommit(dir string) (repo, commit string, err error) {
-	origin, err := git(dir, "remote", "get-url", "origin")
-	if err == nil {
-		repo = gitHubRepo(origin)
-	}
+	repo = OriginRepo(dir)
 	if repo == "" {
 		return "", "", fmt.Errorf("%s deploys from GitHub, a CI image or the catalog: push this folder to a GitHub repo and run %s deploy again, or deploy an image with --image", build.Name, build.Name)
 	}
@@ -57,6 +53,16 @@ func git(dir string, args ...string) (string, error) {
 // gitHubRemote is a remote on GitHub, over HTTPS or SSH.
 var gitHubRemote = regexp.MustCompile(`^(?:https://(?:[^@/]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$`)
 
+// OriginRepo is owner/name of the GitHub repo of dir's remote origin, ""
+// when it has none.
+func OriginRepo(dir string) string {
+	origin, err := git(dir, "remote", "get-url", "origin")
+	if err != nil {
+		return ""
+	}
+	return gitHubRepo(origin)
+}
+
 // gitHubRepo is owner/name of a GitHub remote URL, or "" for any other.
 func gitHubRepo(remote string) string {
 	match := gitHubRemote.FindStringSubmatch(remote)
@@ -66,66 +72,26 @@ func gitHubRepo(remote string) string {
 	return match[1]
 }
 
-// LocalConfig is what `moin deploy` reads from the repo before it deploys:
-// the app and server names of the x-moin block. The daemon reads the whole
-// block on the server.
-type LocalConfig struct {
-	App    string
-	Server string
-}
-
-var (
-	// The x-moin block.
-	configBlock = regexp.MustCompile(`(?m)^x-` + build.Name + `:[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)`)
-	configField = regexp.MustCompile(`(?m)^[ \t]+(app|server):[ \t]*["']?([A-Za-z0-9._-]+)["']?[ \t]*(?:#.*)?$`)
-)
-
-// ReadLocalConfig looks for x-moin.app and x-moin.server in the compose file of dir.
-func ReadLocalConfig(dir string) LocalConfig {
-	config := LocalConfig{}
-	for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
-		body, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			continue
-		}
-		block := configBlock.FindSubmatch(body)
-		if block == nil {
-			return config
-		}
-		for _, field := range configField.FindAllSubmatch(block[1], -1) {
-			switch string(field[1]) {
-			case "app":
-				config.App = string(field[2])
-			case "server":
-				config.Server = string(field[2])
-			}
-		}
-		return config
-	}
-	return config
-}
-
 var unsafeName = regexp.MustCompile(`[^a-z0-9-]+`)
 
-// AppName picks the app: the flag, x-moin.app in compose.yml, or the name of
-// the directory.
+// AppName picks the app: the flag, or the name of the directory.
 func AppName(flagValue, dir string) string {
 	name, _ := PickApp(flagValue, dir)
 	return name
 }
 
-// PickApp is AppName that also says where the name came from: "--app",
-// "x-moin.app in compose.yml" or "the directory name".
+// PickApp is AppName that also says where the name came from: "--app" or
+// FromDirectory.
 func PickApp(flagValue, dir string) (name, from string) {
 	if flagValue != "" {
 		return flagValue, "--app"
-	}
-	if config := ReadLocalConfig(dir); config.App != "" {
-		return config.App, "x-moin.app in compose.yml"
 	}
 	absolute, err := filepath.Abs(dir)
 	if err != nil {
 		return "", ""
 	}
-	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(absolute)), "-"), "-"), "the directory name"
+	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(absolute)), "-"), "-"), FromDirectory
 }
+
+// FromDirectory says an app name came from the name of the directory.
+const FromDirectory = "the directory name"

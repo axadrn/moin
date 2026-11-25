@@ -7,7 +7,6 @@ source: github.com/TwiN/gatus
 license: Apache-2.0
 image: twinproduction/gatus
 database: sqlite
-port: 8080
 logo: https://raw.githubusercontent.com/TwiN/gatus/master/.github/assets/logo.png
 ---
 

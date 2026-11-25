@@ -7,7 +7,6 @@ source: github.com/umami-software/umami
 license: MIT
 image: ghcr.io/umami-software/umami
 database: postgres
-port: 3000
 login: "Sign in as admin with the password umami, then change it right away."
 logo: https://github.com/umami-software/umami/blob/HEAD/src/assets/logo.svg
 ---

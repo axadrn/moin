@@ -16,10 +16,10 @@ import (
 func registerDomainTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	mcpsdk.AddTool(server, newTool("check_domains", "Check domains",
-		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. from_compose marks domains x-moin.domains in compose.yml sets; they change there. Needs the read scope.",
+		"Looks up every domain of an app and says whether it points at the address of its server, which the DNS record must point at. Needs the read scope.",
 		readOnly("")), Read(member(services, tools.checkDomains)))
 	mcpsdk.AddTool(server, newTool("set_domains", "Set domains",
-		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Fails when x-moin.domains in compose.yml sets the domains; change them there. Needs a token with read and write access.",
+		"Replaces the domains of an app and the canonical one the others redirect to (empty for none). Saving never restarts the app: the change waits for restart_app, a start or a deploy. With service, replaces the domains of that service of compose.yml instead of the main one's; canonical is for the main service. HTTPS is always on. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setDomains)))
 	mcpsdk.AddTool(server, newTool("get_instant", "Get the instant address",
 		"Returns the instant address of an app, https://<app>.<server IPv4 with dashes>.<provider>, which works without a domain, or why it has none, such as a server behind a Cloudflare Tunnel, which needs ports 80 and 443 open instead. A password guards it unless it is open: the app's own, else one moin made, which moin showed once and never shows again; new_instant_password makes a new one. Needs the read scope.",
@@ -28,7 +28,7 @@ func registerDomainTools(server *mcpsdk.Server, services Services) {
 		"Makes a new password for the instant address of an app and returns it with its user: the one time moin shows it, it keeps only a hash. Give it to the user right away. The app takes it on restart_app, a start or a deploy; until then the old one works. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.newInstantPassword)))
 	mcpsdk.AddTool(server, newTool("set_instant", "Set the instant address",
-		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it. The change waits for restart_app, a start or a deploy. x-moin.instant in compose.yml wins. Needs a token with read and write access.",
+		"Picks the provider of the instant address of an app, sslip.io or nip.io, or off, and whether a password guards it. The change waits for restart_app, a start or a deploy. Needs a token with read and write access.",
 		change(false, true)), Write(changes(services, tools.setInstant)))
 	mcpsdk.AddTool(server, newTool("set_protection", "Protect with a password",
 		"Puts basic auth in front of an app with a username and a password of at least 8 characters. The change waits for restart_app, a start or a deploy. Needs a token with read and write access.",
@@ -45,23 +45,17 @@ type DomainChecks struct {
 
 func (d DomainChecks) Summary() string {
 	parts := []string{}
-	fromCompose := false
 	for _, check := range d.Items {
 		state := "does not point at the server yet: set its " + check.Advice
 		if check.Points {
 			state = "points at the server"
 		}
 		parts = append(parts, check.Domain+" "+state)
-		fromCompose = fromCompose || check.FromCompose
 	}
 	if len(parts) == 0 {
 		return "The app has no domains."
 	}
-	summary := strings.Join(parts, "; ") + "."
-	if fromCompose {
-		summary += " x-moin.domains in compose.yml sets these domains: change them there and deploy, set_domains cannot."
-	}
-	return summary
+	return strings.Join(parts, "; ") + "."
 }
 
 func (t moinTools) checkDomains(ctx context.Context, caller Caller, input AppInput) (DomainChecks, error) {

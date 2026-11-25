@@ -52,8 +52,7 @@ const appSelect = `
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), 0) AS latest_number,
 		COALESCE((SELECT status FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), '') AS latest_status,
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), 0) AS live_number,
-		COALESCE((SELECT image FROM deploys WHERE app_id = a.id AND status = 'succeeded' AND (image != '' OR source_key != '' OR from_number > 0) ORDER BY number DESC LIMIT 1), '') AS live_image,
-		COALESCE((SELECT detected FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), '') AS live_detected
+		COALESCE((SELECT image FROM deploys WHERE app_id = a.id AND status = 'succeeded' AND (image != '' OR source_key != '' OR from_number > 0) ORDER BY number DESC LIMIT 1), '') AS live_image
 	FROM apps a JOIN servers s ON s.id = a.server_id JOIN workspaces w ON w.id = a.workspace_id`
 
 func (r *Apps) Create(app *model.App) error {

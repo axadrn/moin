@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 8055
-  health: /server/health
-
 services:
   web:
     image: directus/directus:${VERSION}
+    expose: ["8055"]
     environment:
       SECRET: ${SECRET}
       PUBLIC_URL: ${APP_URL}

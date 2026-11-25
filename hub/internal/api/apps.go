@@ -163,7 +163,7 @@ type envRequest struct {
 }
 
 func NewApp(app model.App) App {
-	domains, canonical := app.MainDomains()
+	domains, canonical := app.DomainsOf("")
 	return App{
 		ID:              link.ID(app.ID),
 		Name:            app.Name,
@@ -787,8 +787,6 @@ type DomainCheck struct {
 	Advice string   `json:"advice"`
 	Found  []string `json:"found"`
 	Points bool     `json:"points"`
-	// FromCompose says x-moin.domains in compose.yml sets the domain.
-	FromCompose bool `json:"from_compose"`
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
 	Service string `json:"service,omitempty"`
@@ -806,7 +804,7 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 		if found == nil {
 			found = []string{}
 		}
-		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, FromCompose: check.FromCompose, Service: check.Service})
+		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, Service: check.Service})
 	}
 	return out
 }

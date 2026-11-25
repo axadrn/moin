@@ -55,17 +55,6 @@ MCP: set_backups
 
 The CLI takes `15m`, `1h` or `1d`, and `1d`, `3d`, `7d` or `30d`. The API and MCP take `every_minutes` (15, 60 or 1440) and `keep_days` (1, 3, 7 or 30).
 
-The schedule can also live in your repo:
-
-```yaml
-x-moin:
-  backups:
-    every: 15m
-    keep: 30d
-```
-
-Then the file decides. moin shows the schedule locked, marked **from compose.yml**. Changing it elsewhere answers `schedule_in_file`. [Who decides](/docs/guides/config#who-decides).
-
 ## Extra copies
 
 moin also takes one copy right before each of these:

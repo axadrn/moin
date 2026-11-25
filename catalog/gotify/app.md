@@ -7,7 +7,6 @@ source: github.com/gotify/server
 license: MIT
 image: gotify/server
 database: sqlite
-port: 80
 login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
 logo: https://github.com/gotify/server/blob/HEAD/ui/public/static/apple-touch-icon-152x152.png
 ---

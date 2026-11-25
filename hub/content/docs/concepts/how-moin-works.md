@@ -146,15 +146,14 @@ Railpack finds the language, the version and the start command by itself. It cov
 ### What a deploy does
 
 1. Gets the code from GitHub, or the compose file of a catalog app, and keeps it with the deploy.
-2. Reads the compose file and the [x-moin block](/docs/guides/config).
+2. Reads the [compose file](/docs/guides/compose): the services, the one that gets the traffic and its port.
 3. Tags the built images, points the app's services at its env file on the server and sets `restart: unless-stopped`.
 4. Builds.
 5. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
-6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds.
-7. Calls the health path, if x-moin sets one, until it answers below 500.
-8. Reports the databases it found and what it detected. The app page, `moin deploy`, the TUI, the API and `get_app` show it.
+6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds. A service with a Docker `healthcheck` must be healthy too.
+7. Reports the databases it found and what it detected. The app page, `moin deploy`, the TUI, the API and `get_app` show it.
 
-If the start or the health check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
+If the start or the check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
 
 The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env as it is now.
 

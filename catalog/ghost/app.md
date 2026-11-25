@@ -7,7 +7,6 @@ source: github.com/TryGhost/Ghost
 license: MIT
 image: ghost
 database: mysql
-port: 2368
 logo: https://simpleicons.org/?q=ghost (CC0)
 ---
 

@@ -1,11 +1,7 @@
-x-moin:
-  service: web
-  port: 8000
-  health: /
-
 services:
   web:
     image: ghcr.io/paperless-ngx/paperless-ngx:${VERSION}
+    expose: ["8000"]
     environment:
       PAPERLESS_REDIS: redis://redis:6379
       PAPERLESS_DBHOST: db

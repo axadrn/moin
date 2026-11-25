@@ -7,7 +7,6 @@ source: github.com/FlowiseAI/Flowise
 license: Apache-2.0
 image: flowiseai/flowise
 database: postgres
-port: 3000
 logo: https://raw.githubusercontent.com/FlowiseAI/Flowise/main/packages/ui/src/assets/images/flowise_logo.png
 ---
 
