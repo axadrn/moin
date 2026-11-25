@@ -177,8 +177,8 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		redirect(w, r, "/workspaces/invitations/"+pendingInvitation, http.StatusSeeOther)
 		return
 	}
-	if device, ok := pendingDevice(r); ok {
-		redirect(w, r, device, http.StatusSeeOther)
+	if approval, ok := pendingApproval(r); ok {
+		redirect(w, r, approval, http.StatusSeeOther)
 		return
 	}
 	redirect(w, r, workspace.Path()+"/overview", http.StatusSeeOther)
@@ -193,14 +193,15 @@ func (h *authHandler) redirectAfterAuth(w http.ResponseWriter, r *http.Request, 
 	redirect(w, r, h.afterAuth(w, r, user), http.StatusSeeOther)
 }
 
-// afterAuth is where a sign-in leads: the invitation or the moin login
-// this browser opened before, else the user's first workspace.
+// afterAuth is where a sign-in leads: the invitation, or the approval of
+// moin login or an AI agent, this browser opened before, else the user's
+// first workspace.
 func (h *authHandler) afterAuth(w http.ResponseWriter, r *http.Request, user *model.User) string {
 	if invitation, ok := h.pendingInvitationForUser(w, r, user); ok {
 		return "/workspaces/invitations/" + invitation
 	}
-	if device, ok := pendingDevice(r); ok {
-		return device
+	if approval, ok := pendingApproval(r); ok {
+		return approval
 	}
 	members, err := h.workspaceService.ListForUser(user.ID)
 	if err != nil || len(members) == 0 {

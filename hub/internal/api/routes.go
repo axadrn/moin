@@ -42,6 +42,7 @@ type Handlers struct {
 	Catalog     *CatalogHandler
 	Status      *StatusHandler
 	Device      *DeviceHandler
+	OAuth       *OAuthHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -70,6 +71,9 @@ type Middleware struct {
 	// RateLimitDevicePoll limits the polls of `moin login` and the
 	// refreshes of the token endpoint per client IP.
 	RateLimitDevicePoll Wrap
+	// RateLimitRegister limits the MCP clients that register themselves per
+	// client IP.
+	RateLimitRegister Wrap
 	// AppID finds the ID of an app in a workspace by its name or ID, for
 	// CI tokens that may reach one app only.
 	AppID func(workspaceID, app string) (string, error)
@@ -91,6 +95,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"POST /api/v1/auth/device", m.RateLimitDevice(h.Device.Start), NoToken},
 		{"POST /api/v1/auth/token", m.RateLimitDevicePoll(h.Token.Token), NoToken},
 		{"POST /api/v1/auth/revoke", m.RateLimitDevicePoll(h.Token.Revoke), NoToken},
+		{"POST /api/v1/auth/register", m.RateLimitRegister(h.OAuth.Register), NoToken},
 		{"POST /api/v1/auth/onboarding", m.RequireAuth(h.Auth.CompleteOnboarding), NoToken},
 		{"POST /api/v1/auth/logout", m.RequireAuth(h.Auth.Logout), NoToken},
 		{"GET /api/v1/account", m.RequireAuth(h.Auth.Account), model.RightRead},

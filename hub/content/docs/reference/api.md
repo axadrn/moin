@@ -38,8 +38,9 @@ Endpoints for no token keep a leaked token from making new tokens, giving itself
 | Endpoint | What it does |
 | --- | --- |
 | `POST /api/v1/auth/device` | starts `moin login` through the browser (RFC 8628) with `{"hostname"}` |
-| `POST /api/v1/auth/token` | the OAuth token endpoint (RFC 6749), a form: `grant_type=urn:ietf:params:oauth:grant-type:device_code` with `device_code` polls `moin login` every `interval` seconds until it answers `access_token` (an hour) and `refresh_token`; `grant_type=refresh_token` gets the next pair, once. A refresh token used twice ends the connection. Errors are OAuth's: `{"error": "authorization_pending"}`. See [Connect the CLI](/docs/guides/account#connect-the-cli) |
+| `POST /api/v1/auth/token` | the OAuth token endpoint (RFC 6749), a form: `grant_type=urn:ietf:params:oauth:grant-type:device_code` with `device_code` polls `moin login` every `interval` seconds until it answers `access_token` (an hour) and `refresh_token`; `grant_type=authorization_code` with `code`, `code_verifier`, `redirect_uri` and `client_id` trades the code of an AI agent (PKCE S256, `resource` the hub's `/mcp`); `grant_type=refresh_token` gets the next pair, once. A refresh token used twice ends the connection. Errors are OAuth's: `{"error": "authorization_pending"}`. See [Connect the CLI](/docs/guides/account#connect-the-cli) and [AI agents](/docs/guides/mcp) |
 | `POST /api/v1/auth/revoke` | ends the connection of a `token`, a form (RFC 7009); `moin logout` calls it |
+| `POST /api/v1/auth/register` | registers an MCP client (RFC 7591) with `{"client_name", "redirect_uris"}`: https, or http on localhost; answers its `client_id`, a public client without a secret |
 | `POST /api/v1/auth/email-change/verify` | confirms a new email and answers the user; every session of the account ends, only a caller signed in as that user gets a new one |
 | `POST /api/v1/auth/onboarding` | the name of a new account and its first workspace, or none with an `invitation_token`; every other endpoint answers `onboarding_required` until it is done |
 | `POST /api/v1/auth/logout` | signs this browser out |

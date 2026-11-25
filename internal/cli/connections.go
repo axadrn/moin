@@ -42,6 +42,9 @@ func connections(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	rows := [][]string{}
 	for _, connection := range connections {
 		name := connection.ClientName
+		if connection.RedirectHost != "" {
+			name += " · " + connection.RedirectHost
+		}
 		if connection.Current {
 			name += style.Muted.Render(" (this login)")
 		}

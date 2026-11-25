@@ -283,6 +283,10 @@ paths:
         `grant_type=urn:ietf:params:oauth:grant-type:device_code` with `device_code` polls a login in
         the browser (RFC 8628): once the user approved it with their passkey and picked the rights,
         it answers the first tokens of the new connection, exactly once.
+        `grant_type=authorization_code` with `code`, `code_verifier`, `redirect_uri` and `client_id`
+        trades the code of an AI agent's approval (RFC 6749, RFC 7636 PKCE S256, RFC 8707 `resource`):
+        the tokens work only at `/mcp`. A code works for a minute and one try; any mistake, and a
+        second try, ends its connection.
         `grant_type=refresh_token` with `refresh_token` exchanges a refresh token for a new pair.
         A refresh token works once: showing it again ends the whole connection.
         The access token works for `expires_in` seconds (an hour); the refresh token for 90 days.
@@ -290,7 +294,8 @@ paths:
         Errors are 400 with `error`: `authorization_pending` (poll again after `interval`),
         `slow_down` (add 5 seconds to the interval), `access_denied` (the user said no),
         `expired_token` (start again), `invalid_grant` (an unknown, used or expired code or
-        refresh token, or a connection that ended), `unsupported_grant_type` or `invalid_request`.
+        refresh token, or a connection that ended), `invalid_target` (a `resource` other than this
+        hub's `/mcp`), `unsupported_grant_type` or `invalid_request`.
       security: []
       requestBody:
         required: true
@@ -349,6 +354,50 @@ paths:
           description: The connection ended, or there was none.
         '400':
           description: '`invalid_request` without a token.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          description: '`server_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: registerClient
+      summary: Register an MCP client
+      description: |
+        Dynamic client registration (RFC 7591) for MCP clients that sign in with OAuth. It takes
+        `client_name` and `redirect_uris` and keeps only those: every client is a public client
+        with PKCE, without a secret. Redirect URIs must be https, or http on localhost, 127.0.0.1
+        or [::1]; others are left out of the answer, and without one left it is
+        `invalid_redirect_uri`. Nothing about a client is trusted: the approval page shows its
+        name as its own word and the host it sends the person back to. Errors are OAuth errors,
+        not the API's `Error` envelope. A client nobody approved goes after a day.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientRegistration'
+      responses:
+        '201':
+          description: The client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisteredClient'
+        '400':
+          description: '`invalid_redirect_uri` or `invalid_client_metadata`.'
           content:
             application/json:
               schema:
@@ -5051,10 +5100,22 @@ components:
       properties:
         grant_type:
           type: string
-          enum: ['urn:ietf:params:oauth:grant-type:device_code', refresh_token]
+          enum: ['urn:ietf:params:oauth:grant-type:device_code', authorization_code, refresh_token]
         device_code:
           type: string
           description: For the device code grant.
+        code:
+          type: string
+          description: For the authorization code grant.
+        code_verifier:
+          type: string
+          description: The PKCE verifier of the authorization code grant.
+        redirect_uri:
+          type: string
+          description: The redirect URI the authorization request named, for the authorization code grant.
+        resource:
+          type: string
+          description: Optional. This hub's `/mcp` URL (RFC 8707); any other is `invalid_target`.
         refresh_token:
           type: string
           description: For the refresh token grant.
@@ -5082,6 +5143,44 @@ components:
           description: The rights of the connection, with spaces, like `read deploy env`.
         connection_id:
           type: string
+    ClientRegistration:
+      type: object
+      required: [redirect_uris]
+      properties:
+        client_name:
+          type: string
+          description: Shown on the approval page as the client's own word, up to 64 characters.
+        redirect_uris:
+          type: array
+          items:
+            type: string
+    RegisteredClient:
+      type: object
+      required: [client_id, client_id_issued_at, client_name, redirect_uris, grant_types, response_types, token_endpoint_auth_method]
+      properties:
+        client_id:
+          type: string
+        client_id_issued_at:
+          type: integer
+        client_name:
+          type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+        grant_types:
+          type: array
+          items:
+            type: string
+            enum: [authorization_code, refresh_token]
+        response_types:
+          type: array
+          items:
+            type: string
+            enum: [code]
+        token_endpoint_auth_method:
+          type: string
+          enum: [none]
     OAuthError:
       type: object
       required: [error]
@@ -5094,13 +5193,16 @@ components:
           type: string
     Connection:
       type: object
-      required: [id, client_name, workspace_id, rights, current, last_used_at, created_at]
+      required: [id, client_name, redirect_host, workspace_id, rights, current, last_used_at, created_at]
       properties:
         id:
           type: string
         client_name:
           type: string
           description: What the client calls itself, like "moin CLI on laptop-1". The client's word, not checked.
+        redirect_host:
+          type: string
+          description: Where an AI agent sends you back after the approval, like `claude.ai`, the host of its redirect URI. Empty for `moin login`.
         workspace_id:
           type: string
           description: The only workspace the connection can reach.

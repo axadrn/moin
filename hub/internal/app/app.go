@@ -54,6 +54,7 @@ type App struct {
 	ConnectionService   *service.ConnectionService
 	CITokenService      *service.CITokenService
 	DeviceLoginService  *service.DeviceLoginService
+	OAuthService        *service.OAuthService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
 	// GitHubAppService is the GitHub App of the hub.
@@ -243,6 +244,7 @@ func New(cfg *config.Config) (*App, error) {
 		ConnectionService:  connectionService,
 		CITokenService:     ciTokenService,
 		DeviceLoginService: service.NewDeviceLoginService(repository.NewDeviceLogins(database), connectionService, passkeys),
+		OAuthService:       service.NewOAuthService(repository.NewOAuth(database), connectionService, passkeys, cfg.AppURL),
 		ServerService:      serverService,
 		AppService:         appService,
 		GitHubAppService:   githubApp,

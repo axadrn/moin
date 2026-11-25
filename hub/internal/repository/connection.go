@@ -33,10 +33,10 @@ func NewConnections(db *sqlx.DB) *Connections {
 // the limit.
 func (r *Connections) Create(connection *model.Connection, limit int) error {
 	result, err := r.db.Exec(`
-		INSERT INTO connections (id, user_id, workspace_id, client_name, rights, client_id, resource, created_at)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8
-		WHERE (SELECT COUNT(*) FROM connections WHERE user_id = $2 AND ended_at IS NULL) < $9
-	`, connection.ID, connection.UserID, connection.WorkspaceID, connection.ClientName, connection.Rights, connection.ClientID, connection.Resource, connection.CreatedAt, limit)
+		INSERT INTO connections (id, user_id, workspace_id, client_name, rights, client_id, resource, redirect_host, created_at)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9
+		WHERE (SELECT COUNT(*) FROM connections WHERE user_id = $2 AND ended_at IS NULL) < $10
+	`, connection.ID, connection.UserID, connection.WorkspaceID, connection.ClientName, connection.Rights, connection.ClientID, connection.Resource, connection.RedirectHost, connection.CreatedAt, limit)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (r *Connections) Token(hash, kind string) (*model.ConnectionToken, *model.C
 		SELECT t.*,
 			c.id AS "connection.id", c.user_id AS "connection.user_id", c.workspace_id AS "connection.workspace_id",
 			c.client_name AS "connection.client_name", c.rights AS "connection.rights", c.client_id AS "connection.client_id",
-			c.resource AS "connection.resource", c.created_at AS "connection.created_at",
+			c.resource AS "connection.resource", c.redirect_host AS "connection.redirect_host", c.created_at AS "connection.created_at",
 			c.last_used_at AS "connection.last_used_at", c.ended_at AS "connection.ended_at"
 		FROM connection_tokens t JOIN connections c ON c.id = t.connection_id
 		WHERE t.token_hash = $1 AND t.kind = $2 AND c.ended_at IS NULL
@@ -160,6 +160,17 @@ func (r *Connections) UseRefresh(id string, at time.Time) error {
 func (r *Connections) DeleteExpiredTokens(connectionID string, now time.Time) error {
 	_, err := r.db.Exec(`DELETE FROM connection_tokens WHERE connection_id = $1 AND expires_at <= $2`, connectionID, now)
 	return err
+}
+
+// Untraded returns the live connections whose authorization code nobody
+// traded before now: an AI agent that gave up and never got its tokens.
+func (r *Connections) Untraded(now time.Time) ([]model.Connection, error) {
+	connections := []model.Connection{}
+	err := r.db.Select(&connections, `
+		SELECT c.* FROM connections c JOIN oauth_codes o ON o.connection_id = c.id
+		WHERE o.used_at IS NULL AND o.expires_at < $1 AND c.ended_at IS NULL
+	`, now)
+	return connections, err
 }
 
 // LiveByUser returns the IDs of the live connections of a user.

@@ -79,6 +79,12 @@ func TestBearersAuthenticateOnlyTheJSONAPIAndMCP(t *testing.T) {
 	if identity := identify(t, environment, "/api/v1/account", "Bearer "+agent); identity != (requestIdentity{}) {
 		t.Fatalf("API identity of an agent = %#v, want unauthenticated", identity)
 	}
+	// A token for another resource is not one for /mcp: its audience is
+	// checked on every request.
+	other := issue("/api/v1/servers")
+	if identity := identify(t, environment, "/mcp", "Bearer "+other); identity != (requestIdentity{}) {
+		t.Fatalf("/mcp identity of a token for another resource = %#v, want unauthenticated", identity)
+	}
 	for _, raw := range []string{"pat_unknown", "at_unknown", "rt_unknown", "unknown"} {
 		if identity := identify(t, environment, "/api/v1/account", "Bearer "+raw); identity != (requestIdentity{}) {
 			t.Fatalf("%s identity = %#v", raw, identity)

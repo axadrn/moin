@@ -89,12 +89,13 @@ These stay in the web on purpose: they move money or decide who is in charge, so
 
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
-| Sign up and sign in with GitHub, connect GitHub | ✓ | `login` signs this computer in through the browser; the rest is the web. | Signs in with the browser; the rest is the web. | Browser only: `/auth/github` sets the session cookie. `github_login` in `GET /api/v1/account`. | AI agents use a token, never your GitHub account. |
+| Sign up and sign in with GitHub, connect GitHub | ✓ | `login` signs this computer in through the browser; the rest is the web. | Signs in with the browser; the rest is the web. | Browser only: `/auth/github` sets the session cookie. `github_login` in `GET /api/v1/account`. | AI agents sign in as a connection, never with your GitHub account. |
 | Passkeys: add, sign in, remove | ✓ Settings, Security; sign in on `/auth` | Adding one is a ceremony in the browser: web only. | Web only. | List and remove with a session; adding and signing in are in the browser. | AI agents do not manage ways to sign in. |
 | Recovery key | ✓ `/auth/key` | The operator makes it on the server with `./main recovery-key <email>`. | Web only. | Browser only. | Never. |
 | Email | ✓ | Web only. | Web only. | ✓ with a session | Never. |
 | Sessions | ✓ | A token can't see your sessions. | Web only. | ✓ with a session | Web only. |
-| Connect a computer, pick its rights, allow with a passkey | ✓ `/device` | ✓ `login` | ✓ shows the code, opens the browser | ✓ `POST /api/v1/auth/device`, `/auth/token` | AI agents use a CI token. |
+| Connect a computer, pick its rights, allow with a passkey | ✓ `/device` | ✓ `login` | ✓ shows the code, opens the browser | ✓ `POST /api/v1/auth/device`, `/auth/token` | AI agents sign in with OAuth, the next row. |
+| Connect an AI agent, pick its rights, allow with a passkey | ✓ `/oauth/authorize` | The agent opens the browser. | The agent opens the browser. | ✓ OAuth: `/.well-known/oauth-authorization-server`, `POST /api/v1/auth/register`, `/auth/token` | ✓ the 401 of `/mcp` leads the way; a CI token for clients without OAuth |
 | Connections: see, remove | ✓ Settings, Connections | ✓ `connections`, `connections rm`; `logout` ends this computer's | Shows who is logged in; `l` opens the web. | ✓ | ✓ `whoami` shows its own rights |
 | Change the rights of a connection or CI token | ✓ | No login gives itself more: the web, signed in. | Opens the web. | ✓ with a session | Never. |
 | CI tokens: make one | ✓ Settings, Connections | A token can't make tokens. | Opens the web. | ✓ with a session | A token can't make tokens. |

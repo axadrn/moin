@@ -63,8 +63,10 @@ func NewServer(services Services) *mcpsdk.Server {
 // Handler serves server over Streamable HTTP. It is stateless: every POST is
 // one complete exchange, so the server keeps no sessions and scales like the
 // JSON API. Requests without a connection or CI token get 401
-// unauthenticated; a CI token for one app gets 403 app_only.
-func Handler(server *mcpsdk.Server) http.Handler {
+// unauthenticated, whose WWW-Authenticate names resourceMetadata, the URL
+// of the metadata of /mcp (RFC 9728): from there an MCP client finds how to
+// sign in. A CI token for one app gets 403 app_only.
+func Handler(server *mcpsdk.Server, resourceMetadata string) http.Handler {
 	streamable := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
 		return server
 	}, &mcpsdk.StreamableHTTPOptions{
@@ -78,7 +80,11 @@ func Handler(server *mcpsdk.Server) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bearer := ctxkeys.Bearer(r.Context())
 		if bearer == nil {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="mcp"`)
+			challenge := `Bearer resource_metadata="` + resourceMetadata + `"`
+			if r.Header.Get("Authorization") != "" {
+				challenge += `, error="invalid_token"`
+			}
+			w.Header().Set("WWW-Authenticate", challenge)
 			api.Error(w, http.StatusUnauthorized, "unauthenticated", unauthenticated)
 			return
 		}

@@ -143,19 +143,7 @@ func (s *DeviceLoginService) Approve(approval Approval) (*model.DeviceLogin, *mo
 	if err != nil {
 		return nil, nil, err
 	}
-	session := approval.Presence.Session
-	if session == nil || session.IsImpersonating() {
-		return nil, nil, ErrImpersonating
-	}
-	// The workspace and the rights first: a passkey is not spent on an
-	// approval that fails anyway.
-	if err := requireMembership(s.connections.workspaces, session.UserID, approval.WorkspaceID); err != nil {
-		return nil, nil, err
-	}
-	if approval.Rights&^allRights() != 0 {
-		return nil, nil, ErrRightsUnknown
-	}
-	if err := s.passkeys.ConfirmPresence(approval.Presence); err != nil {
+	if err := s.connections.confirmApproval(s.passkeys, approval.Presence, approval.WorkspaceID, approval.Rights); err != nil {
 		return nil, nil, err
 	}
 	connection, err := s.connections.Create(NewConnection{

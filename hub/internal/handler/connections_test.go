@@ -119,6 +119,27 @@ func TestConnectionsPage(t *testing.T) {
 	}
 }
 
+// TestConnectionsPageShowsWhereAnAgentGoesBack: an AI agent's row shows
+// the host it sends the person back to next to its name, which is only
+// its own word.
+func TestConnectionsPageShowsWhereAnAgentGoesBack(t *testing.T) {
+	test := newConnectionsTest(t)
+	connection, err := test.connections.Create(service.NewConnection{UserID: test.owner.User.ID, WorkspaceID: test.owner.Workspace.ID, ClientName: "Claude", Rights: model.DefaultRights, ClientID: "client-1", Resource: service.MCPPath, RedirectHost: "claude.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := test.owner.Workspace.Path()
+	page := test.request(t, http.MethodGet, "/app/{workspaceSlug}/settings/connections", base+"/settings/connections", nil, test.handler.Page)
+	if !strings.Contains(page.Body.String(), "Claude · claude.example.com") {
+		t.Fatalf("page: %d %s", page.Code, page.Body.String())
+	}
+	path := base + "/settings/connections/" + link.ID(connection.ID)
+	detail := test.request(t, http.MethodGet, "/app/{workspaceSlug}/settings/connections/{id}", path, nil, test.handler.Connection)
+	if !strings.Contains(detail.Body.String(), "Claude · claude.example.com") {
+		t.Fatalf("detail: %d %s", detail.Code, detail.Body.String())
+	}
+}
+
 var revealedToken = regexp.MustCompile(`pat_[a-z2-7]{52}`)
 
 // TestCITokenFromThePage: the form makes a CI token with the rights
