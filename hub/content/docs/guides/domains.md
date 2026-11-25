@@ -128,7 +128,7 @@ API: DELETE /api/v1/apps/{app}/protection
 MCP: remove_protection
 ```
 
-Turn it on again. moin makes a new password and shows it once:
+Turn it on again. moin makes a new password and shows it once. When it is on already, this changes nothing: lost the password? Turn it off, then on, or set your own.
 
 ```surfaces
 Web: the app page, **Domains**, the **Ask for a password** switch

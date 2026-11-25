@@ -224,6 +224,16 @@ func TestPasswordShownOnce(t *testing.T) {
 	if _, hash, _ := strings.Cut(renewed.Protect, ":"); bcrypt.CompareHashAndPassword([]byte(hash), []byte(again)) != nil {
 		t.Fatal("the new hash does not take the new password")
 	}
+	// On while on changes nothing: no password is replaced by surprise.
+	if made, changed, err := apps.SetProtection(owner, "blog", "", ""); err != nil || changed || made != "" {
+		t.Fatalf("on while on: %q, %v, %v", made, changed, err)
+	}
+	if kept, _ := apps.Get(owner.WorkspaceID, "blog"); kept.Protect != renewed.Protect {
+		t.Fatal("on while on replaced the password")
+	}
+	if _, _, err := apps.SetProtection(owner, "blog", "a,b", "a-long-password"); !errors.Is(err, ErrProtectUser) {
+		t.Fatalf("a comma in the username: %v", err)
+	}
 }
 
 // TestServerIsTheTruthForEnvKeys: the hub shows the env keys a server

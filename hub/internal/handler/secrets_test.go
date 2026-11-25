@@ -28,6 +28,8 @@ func TestSecretsOnServersWeb(t *testing.T) {
 		t.Fatalf("create: %s", added)
 	}
 
+	// Off, then on: a new password, shown once.
+	s.post("/app/{workspaceSlug}/apps/{app}/domains/protect", base+"/apps/blog/domains/protect", url.Values{"switch": {"1"}}, s.handler.Protect)
 	before := s.app().Protect
 	fresh := s.post("/app/{workspaceSlug}/apps/{app}/domains/protect", base+"/apps/blog/domains/protect", url.Values{"switch": {"1"}, "on": {"1"}}, s.handler.Protect)
 	if !strings.Contains(fresh, "data-new-password") || !strings.Contains(fresh, "Shown once.") || s.app().Protect == before {

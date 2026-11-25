@@ -276,6 +276,9 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
+	if *user == "" {
+		*user = passwordUser
+	}
 	answer, err := api.SetProtection(ctx, name, *user, password)
 	if err != nil {
 		return err

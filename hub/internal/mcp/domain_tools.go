@@ -152,7 +152,7 @@ type Protection struct {
 func (p Protection) Summary() string {
 	summary := Change{p.Change}.Summary()
 	if p.Password != "" {
-		summary += " moin made the password " + p.Password + ": shown this once, give it to the user now."
+		summary += " The password moin made is in password: shown this once, give it to the user now."
 	}
 	return summary
 }

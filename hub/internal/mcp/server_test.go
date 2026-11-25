@@ -498,7 +498,7 @@ func TestSecretsGoToServers(t *testing.T) {
 		t.Fatalf("remove_protection = %+v", off)
 	}
 	fresh := output[mcp.Protection](t, call(t, session, "set_protection", map[string]any{"app": "shop"}))
-	if fresh.Password == "" || fresh.Password == created.Password || !fresh.App.Protected || !strings.Contains(fresh.Summary(), fresh.Password) {
+	if fresh.Password == "" || fresh.Password == created.Password || !fresh.App.Protected || strings.Contains(fresh.Summary(), fresh.Password) {
 		t.Fatalf("set_protection = %+v", fresh)
 	}
 

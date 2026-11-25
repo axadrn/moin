@@ -39,10 +39,11 @@ func TestMigration055MakesOnePassword(t *testing.T) {
 		{"open", "", "$2a$10$open", true},
 		{"old", "", "", false},
 		{"own", "me:$2a$10$own", "$2a$10$unused", false},
+		{"admin", "", "$2a$10$admin", false},
 	} {
 		database.MustExec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, created_at, protect, instant_password_hash, instant_open) VALUES ($1, 'w1', 's1', $1, $1, $2, $3, $4, $5)`, app.id, now, app.protect, app.hash, app.open)
 	}
-	database.MustExec(`INSERT INTO domains (app_id, service, name) VALUES ('shop', '', 'shop.example.com')`)
+	database.MustExec(`INSERT INTO domains (app_id, service, name) VALUES ('shop', '', 'shop.example.com'), ('admin', 'api', 'api.example.com')`)
 
 	if err := goose.UpTo(database.DB, ".", 55); err != nil {
 		t.Fatal(err)
@@ -51,8 +52,11 @@ func TestMigration055MakesOnePassword(t *testing.T) {
 		"idea": "moin:$2a$10$idea",
 		"shop": "",
 		"open": "",
-		"old":  "",
-		"own":  "me:$2a$10$own",
+		// No password moin kept: one nobody knows, closed until set.
+		"old": "moin:!",
+		"own": "me:$2a$10$own",
+		// Only another service had a domain: the main one stays guarded.
+		"admin": "moin:$2a$10$admin",
 	} {
 		var protect string
 		if err := database.Get(&protect, `SELECT protect FROM apps WHERE id = $1`, app); err != nil || protect != want {

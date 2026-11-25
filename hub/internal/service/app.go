@@ -631,8 +631,13 @@ func (s *AppService) SetProtection(actor Actor, idOrName, username, password str
 		return "", false, err
 	}
 	username = cmp.Or(strings.TrimSpace(username), PasswordUser)
-	if strings.ContainsAny(username, ": ") {
+	if strings.ContainsAny(username, ": ,") {
 		return "", false, ErrProtectUser
+	}
+	// On already, and no password given: nothing changes. A new one is
+	// off, then on.
+	if password == "" && app.Protect != "" {
+		return "", false, nil
 	}
 	var protect string
 	if password == "" {
