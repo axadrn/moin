@@ -90,7 +90,7 @@ Your app runs in containers, with Docker. You do not need to know Docker. For a 
 
 Saving a setting never restarts your app. The change waits for you. The app page says how many changes wait.
 
-A restart applies them all, without a build. A deploy or a start applies them too. That holds for a variable used as `${NAME}` in `compose.yml`, unless it sits in the image, the ports, the volumes or an `env_file` path: those take a deploy. [In compose.yml](/docs/guides/env#in-composeyml)
+A restart applies them all, without a build. A deploy or a start applies them too. That holds for a variable used as `${NAME}` in `compose.yml`, unless it sits in the image, the ports or the volumes: those take a deploy. [In compose.yml](/docs/guides/env#in-composeyml)
 
 ## Your data survives every deploy
 

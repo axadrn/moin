@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,14 +17,19 @@ import (
 //     could be anywhere on the server, so refuseIncludes refuses them before
 //     compose reads the file. Put the services in one compose file.
 //   - env_file is read when the containers start, so its path must be in
-//     the source. compose itself says where it points, in filled, the
-//     compose file as it runs (readComposeConfig): after ~, ${VAR} and the
-//     project folder, which a second guess here would get wrong.
-func checkSourceFiles(src string, filled map[string]any) error {
-	services, _ := filled["services"].(map[string]any)
+//     the source. compose itself says where it points, in config, the
+//     compose file as moin keeps it (readComposeConfig): after ~ and the
+//     project folder, which a second guess here would get wrong. A path
+//     with ${VAR} in it would point elsewhere once the env changes, so it
+//     is refused.
+func checkSourceFiles(src string, config map[string]any) error {
+	services, _ := config["services"].(map[string]any)
 	for _, name := range sortedKeys(services) {
 		service, _ := services[name].(map[string]any)
 		for _, file := range envFilePaths(service) {
+			if strings.Contains(file, "$") {
+				return fmt.Errorf("service %s: env_file %s takes a variable, so the server refuses it: name the file", name, file)
+			}
 			if !within(resolved(src), resolved(file)) {
 				return fmt.Errorf("service %s: env_file %s is not in the app's source, so the server refuses it", name, file)
 			}

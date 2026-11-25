@@ -279,7 +279,7 @@ So moin does not list what is forbidden. It lists what a normal app needs, and r
 
 The server checks the compose file as it will run, before anything builds or starts. That holds for every deploy: new code, a new image, new env and a rollback. A refused deploy says which setting: `service web: privileged is not allowed: this reaches beyond the app, so the server refuses it. Allow it with server-access: on in /etc/moin/rules`.
 
-moin fills in `${NAME}` in the image, the ports, the volumes and the `env_file` and `build` paths when it reads the file, so it checks them as they will run. In another setting it checks, such as the name of a network, `${NAME}` is refused: it could become anything when the containers start.
+moin fills in `${NAME}` in the image, the ports, the volumes and the `build` paths when it reads the file, so it checks them as they will run. In another setting it checks, such as an `env_file` path or the name of a network, `${NAME}` is refused: it could become anything when the containers start.
 
 | Allowed | What for |
 | --- | --- |

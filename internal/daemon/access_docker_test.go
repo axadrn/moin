@@ -142,7 +142,7 @@ func TestEnvFileOutsideSource(t *testing.T) {
 				compose = "services:\n  web:\n    image: nginx:1\n---\nservices:\n  web:\n    env_file: [{path: /etc/hostname, required: false}]\n"
 			}
 			_, err := checkResolved(t, compose, map[string]string{"DIR": "/etc"})
-			if err == nil || !strings.Contains(err.Error(), "is not in the app's source") {
+			if err == nil || !strings.Contains(err.Error(), "is not in the app's source") && !strings.Contains(err.Error(), "takes a variable") {
 				t.Fatalf("err = %v", err)
 			}
 		})

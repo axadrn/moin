@@ -84,22 +84,23 @@ func (a *apps) generateCompose(ctx context.Context, app, src string, env map[str
 // The settings that say where a service runs are the exception: config
 // takes them as filled (takePlaces).
 //
-// --no-env-resolution leaves the env files a service names unread, so
-// compose reads none before checkSourceFiles has checked where they point.
+// The env files a service names stay files it reads when it starts, so
+// checkSourceFiles checks them in config: compose 2.38 drops them from the
+// filled read, even with --no-env-resolution.
 func (a *apps) readComposeConfig(ctx context.Context, app, src string) (config, filled map[string]any, err error) {
 	err = refuseIncludes(composePath(src))
 	if err != nil {
 		return nil, nil, err
 	}
-	filled, err = a.composeConfig(ctx, app, src, "--no-env-resolution")
-	if err != nil {
-		return nil, nil, err
-	}
-	err = checkSourceFiles(src, filled)
-	if err != nil {
-		return nil, nil, err
-	}
 	config, err = a.composeConfig(ctx, app, src, "--no-interpolate")
+	if err != nil {
+		return nil, nil, err
+	}
+	err = checkSourceFiles(src, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	filled, err = a.composeConfig(ctx, app, src, "--no-env-resolution")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -125,11 +126,11 @@ func (a *apps) composeConfig(ctx context.Context, app, src, mode string) (map[st
 }
 
 // placeKeys are the settings of a service that say where it runs: its
-// image, its ports, and its files and folders on the server. compose
-// cannot read a mount with ${VAR} in it unfilled, moin checks these as they
-// run and moves data mounts, and none of them holds a secret. They stay as
-// the deploy filled them: a rollback runs the same images and folders.
-var placeKeys = []string{"image", "ports", "expose", "volumes", "env_file"}
+// image, its ports and its folders on the server. compose cannot read a
+// mount with ${VAR} in it unfilled, moin checks these as they run and moves
+// data mounts, and none of them holds a secret. They stay as the deploy
+// filled them: a rollback runs the same images and folders.
+var placeKeys = []string{"image", "ports", "expose", "volumes"}
 
 // takePlaces copies the place settings of every service, and the folder
 // and Dockerfile of its build, from filled into config.
