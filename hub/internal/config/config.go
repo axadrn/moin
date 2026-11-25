@@ -142,7 +142,9 @@ type RenderConfig struct {
 	GoogleAnalyticsID string
 	Billing           bool
 	SignupsOpen       bool
-	// GitHubLogin is Config.GitHubLogin, for the sign-in pages.
+	// GitHubLogin says people sign in with GitHub: the hub's GitHub App
+	// is there with its client ID and secret. The routes set it from the
+	// GitHubAppService on every request.
 	GitHubLogin bool
 	// Passkeys says the hub offers passkeys, for the sign-in page, the
 	// settings and the banner. The routes set it from the PasskeyService.
@@ -462,15 +464,7 @@ func (c *Config) Render() RenderConfig {
 		GoogleAnalyticsID: c.GoogleAnalyticsID,
 		Billing:           c.Billing,
 		SignupsOpen:       c.SignupsOpen,
-		GitHubLogin:       c.GitHubLogin(),
 	}
-}
-
-// GitHubLogin says whether people sign in with GitHub: the GitHub App is
-// set up with its client ID and secret. Without it, the operator's
-// recovery key is the only way in.
-func (c *Config) GitHubLogin() bool {
-	return c.GitHubAppID != "" && c.GitHubAppClientID != "" && c.GitHubAppClientSecret != ""
 }
 
 func (c RenderConfig) IsProduction() bool {

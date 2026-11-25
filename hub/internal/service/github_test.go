@@ -176,7 +176,7 @@ func TestGitHubDeploys(t *testing.T) {
 	if !errors.Is(err, ErrGitHubOff) {
 		t.Fatalf("without the app: err = %v", err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 
 	link, err := apps.GitHubInstallURL(owner)
@@ -330,7 +330,7 @@ func TestGitHubChecksInstaller(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 	stateOf := func(actor Actor) string {
 		link, _ := apps.GitHubInstallURL(actor)
@@ -373,7 +373,7 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 
 	link, err := apps.GitHubConnectURL(owner)
@@ -431,7 +431,7 @@ func TestImageDeploysTakeTheCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 	link, _ := apps.GitHubInstallURL(owner)
 	parsed, _ := url.Parse(link)

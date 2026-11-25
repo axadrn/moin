@@ -74,7 +74,7 @@ type UpdateService struct {
 	selfHosted bool
 	check      bool
 	dir        string
-	admins     map[string]struct{}
+	admins     HubAdmins
 	activity   *repository.Activity
 	client     *http.Client
 	now        func() time.Time
@@ -92,13 +92,9 @@ type UpdateService struct {
 // the request, status and heartbeat files of the updater live. selfHosted
 // is false on the hosted hub, which shows no update at all.
 func NewUpdateService(version, url, dir string, selfHosted, check bool, adminEmails []string, activity *repository.Activity) *UpdateService {
-	admins := make(map[string]struct{}, len(adminEmails))
-	for _, address := range adminEmails {
-		admins[strings.ToLower(strings.TrimSpace(address))] = struct{}{}
-	}
 	return &UpdateService{
 		version: version, url: url, dir: dir, selfHosted: selfHosted, check: check && selfHosted,
-		admins: admins, activity: activity,
+		admins: NewHubAdmins(adminEmails), activity: activity,
 		client: &http.Client{Timeout: 10 * time.Second}, now: time.Now,
 	}
 }
@@ -228,14 +224,9 @@ func (s *UpdateService) HubBackup() model.HubBackup {
 	return backup
 }
 
-// hubAdmin reports whether user runs this hub, hosted or self-hosted:
-// an address of ADMIN_EMAILS, verified.
+// hubAdmin reports whether user runs this hub, hosted or self-hosted.
 func (s *UpdateService) hubAdmin(user *model.User) bool {
-	if user == nil || user.EmailVerifiedAt == nil {
-		return false
-	}
-	_, ok := s.admins[strings.ToLower(user.Email)]
-	return ok
+	return s.admins.Has(user)
 }
 
 // CanUpdate reports whether user runs this hub: on a self-hosted

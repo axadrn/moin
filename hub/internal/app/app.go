@@ -57,12 +57,12 @@ type App struct {
 	OAuthService        *service.OAuthService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
-	// GitHub is the GitHub App, nil without one.
-	GitHub         *service.GitHub
-	Passkeys       *service.PasskeyService
-	CatalogService *service.CatalogService
-	StatusService  *service.StatusService
-	AlertService   *service.AlertService
+	// GitHubAppService is the GitHub App of the hub.
+	GitHubAppService *service.GitHubAppService
+	Passkeys         *service.PasskeyService
+	CatalogService   *service.CatalogService
+	StatusService    *service.StatusService
+	AlertService     *service.AlertService
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -184,14 +184,19 @@ func New(cfg *config.Config) (*App, error) {
 	// Daemons older than the hub update to its version by
 	// themselves, unless their workspace turned it off.
 	serverService.UpdateDaemonsTo(build.Version)
-	github, err := service.NewGitHub(cfg.GitHubAppID, cfg.GitHubAppSlug, cfg.GitHubAppPrivateKey, cfg.GitHubAppWebhookSecret, cfg.GitHubAppClientID, cfg.GitHubAppClientSecret, cfg.GitHubAPIURL, cfg.GitHubURL)
+	// The GitHub App of GITHUB_APP_*, else the one an admin created with
+	// one click.
+	githubApp, err := service.NewGitHubAppService(service.GitHubAppSettings{
+		ID: cfg.GitHubAppID, Slug: cfg.GitHubAppSlug, PrivateKey: cfg.GitHubAppPrivateKey, WebhookSecret: cfg.GitHubAppWebhookSecret,
+		ClientID: cfg.GitHubAppClientID, ClientSecret: cfg.GitHubAppClientSecret,
+	}, repository.NewGitHubApps(database), secrets, activity, service.NewHubAdmins(cfg.AdminEmails), cfg.AppURL, cfg.GitHubAPIURL, cfg.GitHubURL)
 	if err != nil {
 		return nil, err
 	}
-	if github != nil && !github.ChecksInstaller() {
+	if github := githubApp.GitHub(); github != nil && !github.ChecksInstaller() {
 		slog.Warn("GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET are not set: nobody signs in with GitHub, and moin cannot check who installed the GitHub App, so a member could connect another account's installation by its ID. Set both and turn on \"Request user authorization (OAuth) during installation\" in the app settings")
 	}
-	appService.SetGitHub(github)
+	appService.UseGitHubApp(githubApp)
 	// The hosted hub's uptime checks reach only public addresses; in
 	// development they may check an app next to it.
 	if cfg.Billing && !cfg.IsDevelopment() {
@@ -242,7 +247,7 @@ func New(cfg *config.Config) (*App, error) {
 		OAuthService:       service.NewOAuthService(repository.NewOAuth(database), connectionService, passkeys, cfg.AppURL),
 		ServerService:      serverService,
 		AppService:         appService,
-		GitHub:             github,
+		GitHubAppService:   githubApp,
 		Passkeys:           passkeys,
 		CatalogService:     catalogService,
 		StatusService:      service.NewStatusService(appService, serverService, catalogService),
