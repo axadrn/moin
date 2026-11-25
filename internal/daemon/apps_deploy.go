@@ -50,10 +50,6 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart, rules *pr
 	done := protocol.DeployDone{DeployID: start.DeployID}
 	detected, err := a.runDeploy(ctx, start, rules, logf)
 	done.Detected = detected
-	if protocol.ValidAppName(start.App) {
-		env := a.envKeys(start.App)
-		done.Env = &env
-	}
 	a.mu.Lock()
 	if before, ok := a.befores[start.DeployID]; ok {
 		done.Before = &before
@@ -67,6 +63,11 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart, rules *pr
 	} else {
 		done.OK = true
 		logf("v%d is live", start.Number)
+	}
+	// Last, so the keys are as fresh as they can be.
+	if protocol.ValidAppName(start.App) {
+		env := a.envKeys(start.App)
+		done.Env = &env
 	}
 	a.send(protocol.TypeDeployDone, "", done)
 }
@@ -287,6 +288,10 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 		err = catalogSource(start.Catalog, src)
 		if err == nil {
 			err = a.makeSecrets(start.App, start.Catalog)
+		}
+		// The release reads the env with the secrets just made.
+		if err == nil {
+			release.env, err = a.env(start.App)
 		}
 	case start.SourceURL != "":
 		release.logf("downloading the source")

@@ -88,6 +88,15 @@ func TestDeployDoneKeepsTheEnvKeys(t *testing.T) {
 	if err != nil || len(vars) != 3 || vars[1].Key != "DB_PASSWORD" {
 		t.Fatalf("env vars = %+v, %v", vars, err)
 	}
+	// A deploy.done without keys, like a refused deploy's, keeps them.
+	next, err := apps.Redeploy(owner, app.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	daemonSays(t, apps.servers, app.ServerID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: next.ID, Error: "the daemon is updating"})
+	if vars, _ := apps.EnvVars(owner.WorkspaceID, app.ID); len(vars) != 3 {
+		t.Fatalf("env vars after a deploy without keys = %+v", vars)
+	}
 }
 
 func TestCatalogInstallRefuses(t *testing.T) {

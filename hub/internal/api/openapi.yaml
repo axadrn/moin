@@ -1045,7 +1045,7 @@ paths:
       tags: [Catalog]
       operationId: installCatalogApp
       summary: Install a catalog app
-      description: Creates the app on the server, generates every secret its compose.yml needs as an env var, sets VERSION and deploys it. An empty version takes the newest release, an empty name the slug. The answer holds the secret the first sign-in needs, such as ADMIN_PASSWORD, in `login`; it is never shown again.
+      description: Creates the app on the server, sets VERSION and deploys it. The server makes every secret its compose.yml needs as an env var, so the hub never sees them. An empty version takes the newest release, an empty name the slug. The answer holds the secret the first sign-in needs, such as ADMIN_PASSWORD, in `login`; it is never shown again.
       security:
         - cookieAuth: []
         - apiTokenAuth: [write]
