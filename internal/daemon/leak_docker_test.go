@@ -126,6 +126,11 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		if !strings.Contains(worker, "WORKER_PASSWORD="+secret+"\n") {
 			t.Errorf("worker lacks its env_file:\n%s", worker)
 		}
+		if t.Failed() {
+			body, _ := os.ReadFile(a.composeFile(app))
+			version, _ := exec.Command("docker", "compose", "version").CombinedOutput()
+			t.Fatalf("%s%s", version, body)
+		}
 	}
 
 	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceURL: server.URL + "/repos/me/leak/tarball/abc123", Domains: protect("first-password")})
