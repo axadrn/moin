@@ -401,3 +401,17 @@ func (r *Subscriptions) execConditionalUpdate(workspaceID, query string, args ..
 	}
 	return rows > 0, nil
 }
+
+// StartTrial gives a trial that waits for its first server its end. It
+// changes nothing else, so it starts a trial only once.
+func (r *Subscriptions) StartTrial(workspaceID string, endsAt, now time.Time) (bool, error) {
+	result, err := r.db.Exec(`
+		UPDATE subscriptions SET current_period_end = $1, updated_at = $2
+		WHERE workspace_id = $3 AND status = 'trialing' AND current_period_end IS NULL
+	`, endsAt, now, workspaceID)
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	return rows == 1, err
+}

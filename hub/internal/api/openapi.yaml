@@ -6776,6 +6776,7 @@ components:
         trial_ends_at:
           type: [string, 'null']
           format: date-time
+          description: When the trial ends. Null outside a trial, and while the trial waits for the first server to connect.
         access_ends_at:
           type: [string, 'null']
           format: date-time

@@ -223,11 +223,14 @@ func adminEventHref(event model.AdminActivityEvent) string {
 	return ""
 }
 
-// adminPlanLabel is the plan of a user: "Trial until Dec 2, 2026", "Free
-// forever", "Paying".
+// adminPlanLabel is the plan of a user: "Trial until Dec 2, 2026", "Trial,
+// no server yet", "Free forever", "Paying".
 func adminPlanLabel(user model.AdminUser) string {
 	if user.Plan == model.AdminPlanTrial && user.TrialEndsAt != nil {
 		return "Trial until " + user.TrialEndsAt.Format("Jan 2, 2006")
+	}
+	if user.Plan == model.AdminPlanTrial {
+		return "Trial, no server yet"
 	}
 	if user.Plan == "" {
 		return ""

@@ -118,20 +118,19 @@ func (s *WorkspaceService) insert(userID, name, slug string) (*model.Workspace, 
 		Role:        model.WorkspaceRoleOwner,
 		CreatedAt:   now,
 	}
-	initial := access.Initial(now)
+	initial := access.Initial()
 	// The trial comes once per person: a second workspace of its creator
 	// starts on the free plan.
 	if initial.Status == access.StatusTrialing && s.createdWorkspace(userID) {
 		initial = access.InitialSubscription{PlanID: access.PlanFree, Status: access.StatusActive}
 	}
 	subscription := &model.Subscription{
-		ID:               uuid.New().String(),
-		WorkspaceID:      workspaceID,
-		PlanID:           initial.PlanID,
-		Status:           initial.Status,
-		CurrentPeriodEnd: initial.CurrentPeriodEnd,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:          uuid.New().String(),
+		WorkspaceID: workspaceID,
+		PlanID:      initial.PlanID,
+		Status:      initial.Status,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	event := activityEvent(workspaceID, userID, Source{}, "workspace.created", "workspace", workspaceID, nil, now)
 	err := s.workspaces.CreateWithOwner(workspace, member, subscription, event)

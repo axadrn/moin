@@ -179,3 +179,10 @@ func (r *Admin) FirstWorkspace(userID string) (*model.Workspace, error) {
 	}
 	return &workspace, nil
 }
+
+// HasServer says whether the workspace has a server.
+func (r *Admin) HasServer(workspaceID string) (bool, error) {
+	var has bool
+	err := r.db.Get(&has, `SELECT EXISTS (SELECT 1 FROM servers WHERE workspace_id = $1)`, workspaceID)
+	return has, err
+}

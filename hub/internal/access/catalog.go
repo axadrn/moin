@@ -27,8 +27,8 @@ var Product = Catalog{
 			ID:           PlanPro,
 			Name:         "moin Hosted",
 			Description:  "Deploys, backups and data for your servers",
-			MonthlyPrice: 2900,
-			YearlyPrice:  24900,
+			MonthlyPrice: 700,
+			YearlyPrice:  4900,
 			Features:     []Feature{FeatureChanges},
 			Limits:       map[Limit]int{LimitServers: Unlimited, LimitMembers: Unlimited},
 			Benefits: []string{

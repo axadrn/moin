@@ -19,7 +19,8 @@ func TestResolveSubscriptionAccess(t *testing.T) {
 	}{
 		{name: "free", sub: Subscription{PlanID: PlanFree, Status: StatusActive}, want: StateFree},
 		{name: "trial", sub: Subscription{PlanID: PlanPro, Status: StatusTrialing, CurrentPeriodEnd: &future}, want: StateTrial},
-		{name: "trial without end falls back", sub: Subscription{PlanID: PlanPro, Status: StatusTrialing}, want: StateFree},
+		{name: "trial without end waits for the first server", sub: Subscription{PlanID: PlanPro, Status: StatusTrialing}, want: StateTrial},
+		{name: "trial after its end falls back", sub: Subscription{PlanID: PlanPro, Status: StatusTrialing, CurrentPeriodEnd: &past}, want: StateFree},
 		{name: "paid", sub: Subscription{PlanID: PlanPro, Status: StatusActive}, want: StatePaid},
 		{name: "past due grace", sub: Subscription{PlanID: PlanPro, Status: StatusPastDue, StatusChangedAt: &recentStateChange}, want: StateGrace},
 		{name: "past due after grace", sub: Subscription{PlanID: PlanPro, Status: StatusPastDue, StatusChangedAt: &oldStateChange}, want: StateFree},
@@ -54,19 +55,22 @@ func TestInitialSubscriptionFollowsSignupPolicy(t *testing.T) {
 	now := time.Date(2026, time.September, 1, 12, 0, 0, 0, time.UTC)
 
 	Product.Signup.Mode = SignupFreemium
-	if initial := Initial(now); initial.PlanID != PlanFree || initial.Status != StatusActive {
+	if initial := Initial(); initial.PlanID != PlanFree || initial.Status != StatusActive {
 		t.Fatalf("freemium initial = %#v", initial)
 	}
 
 	Product.Signup.Mode = SignupTrial
 	Product.Signup.TrialPlanID = PlanPro
 	Product.Signup.TrialDays = 7
-	if initial := Initial(now); initial.PlanID != PlanPro || initial.Status != StatusTrialing || initial.CurrentPeriodEnd == nil || !initial.CurrentPeriodEnd.Equal(now.AddDate(0, 0, 7)) {
+	if initial := Initial(); initial.PlanID != PlanPro || initial.Status != StatusTrialing {
 		t.Fatalf("trial initial = %#v", initial)
+	}
+	if end := TrialEnd(now); !end.Equal(now.AddDate(0, 0, 7)) {
+		t.Fatalf("trial end = %s", end)
 	}
 
 	Product.Signup.Mode = SignupPaidOnly
-	if initial := Initial(now); initial.PlanID != PlanFree || initial.Status != StatusBlocked {
+	if initial := Initial(); initial.PlanID != PlanFree || initial.Status != StatusBlocked {
 		t.Fatalf("paid-only initial = %#v", initial)
 	}
 }
@@ -77,7 +81,7 @@ func TestInitialSubscriptionBlocksUnknownTrialPlan(t *testing.T) {
 	Product.Signup.Mode = SignupTrial
 	Product.Signup.TrialPlanID = "missing"
 
-	initial := Initial(time.Now())
+	initial := Initial()
 	if initial.Status != StatusBlocked {
 		t.Fatalf("initial = %#v, want blocked", initial)
 	}
@@ -88,7 +92,7 @@ func TestInitialSubscriptionBlocksUnknownSignupMode(t *testing.T) {
 	t.Cleanup(func() { Product.Signup = previous })
 	Product.Signup.Mode = "typo"
 
-	initial := Initial(time.Now())
+	initial := Initial()
 	if initial.Status != StatusBlocked {
 		t.Fatalf("initial = %#v, want blocked", initial)
 	}
@@ -189,8 +193,8 @@ func TestSelfHostedGivesEverything(t *testing.T) {
 	defer func() { Product = saved }()
 
 	now := time.Now()
-	initial := Initial(now)
-	got := Resolve(Subscription{PlanID: initial.PlanID, Status: initial.Status, CurrentPeriodEnd: initial.CurrentPeriodEnd}, now)
+	initial := Initial()
+	got := Resolve(Subscription{PlanID: initial.PlanID, Status: initial.Status}, now)
 	if got.Limit(LimitServers) != Unlimited || got.Limit(LimitMembers) != Unlimited || got.RequireProduct() != nil {
 		t.Fatalf("self-hosted access = %+v", got)
 	}

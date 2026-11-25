@@ -159,6 +159,7 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServers(database), activity, cfg.AppURL)
 	appService := service.NewAppService(repository.NewApps(database, history), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
+	serverService.StartTrialWith(subscriptionService.StartTrial)
 	// The catalog ships in catalog/ at the root, built into the hub and the
 	// daemon; its releases come from the registries, asked by this hub itself.
 	texts := content.FS(cfg.IsDevelopment())

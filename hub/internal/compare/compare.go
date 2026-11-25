@@ -91,7 +91,7 @@ var Rows = []Row{
 	{"Every day", "Ways in", yes("All five", "Web, CLI, terminal UI, API and MCP.", "")},
 	{"Every day", "Activity log", yes("Yes", "Who did what, when, in every workspace.", "")},
 	{"Price", "Host it yourself, free", yes("Yes", "All of it.", "")},
-	{"Price", "You pay", plain("$29 per workspace", "Unlimited servers, apps and team. $249 a year. The tenth server costs the same as the first, the whole team is included and every feature is in.", "")},
+	{"Price", "You pay", plain("$7 per workspace", "Unlimited servers, apps and team. $49 a year. The tenth server costs the same as the first, the whole team is included and every feature is in.", "")},
 }
 
 // hasNoServer is the answer on a row about your server for a tool that runs
@@ -140,7 +140,7 @@ var Competitors = []Competitor{
 			part("Four ways", "Web, CLI, API and MCP.", "https://docs.dokploy.com/docs/api"),
 			part("Enterprise plans", "Audit logs on the Enterprise and Agency plans.", "https://docs.dokploy.com/docs/core/differences"),
 			yes("Yes", "Free to run. Apache-2.0, except a source-available part.", "https://github.com/Dokploy/dokploy/blob/canary/LICENSE.MD"),
-			plain("From $15 + $4.50 per extra server", "Dokploy Cloud Startup, 3 servers included. About $29 at 6 servers.", "https://dokploy.com/pricing"),
+			plain("From $15 + $4.50 per extra server", "Dokploy Cloud Startup, 3 servers included.", "https://dokploy.com/pricing"),
 		},
 	},
 	{

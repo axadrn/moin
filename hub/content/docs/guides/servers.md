@@ -66,6 +66,7 @@ It installs Docker if it is missing. It installs the daemon as the `moin-daemon`
 - The name: 1 to 63 lowercase letters, digits or dashes, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …
 - Not root? Put `sudo` before `sh`. The command works once. If the install stops halfway, get [a new install command](#a-new-install-command).
 - `MOIN_URL=http://127.0.0.1:8090` before `sh` makes the daemon dial that address instead of the hub's `APP_URL`, as on a server that runs the hub too ([one server](/docs/self-hosting#one-server)).
+- On hosted moin, the first server that connects starts your 30 days free. [Billing](/docs/guides/account#billing)
 
 ## See your servers
 

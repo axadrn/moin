@@ -382,6 +382,9 @@ var teamSummaries = map[string]summarize{
 	"billing.plan_changed": func(target string, d map[string]string) string {
 		return "changed the plan from " + d["from"] + " (" + d["status_from"] + ") to " + d["to"] + " (" + d["status"] + ")"
 	},
+	"billing.trial_started": func(target string, d map[string]string) string {
+		return "started the trial with the first server, until " + d["ends"]
+	},
 }
 
 func domainsSetSummary(target string, d map[string]string) string {

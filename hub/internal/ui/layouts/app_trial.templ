@@ -18,8 +18,9 @@ func trialDaysLeft(ends *time.Time, now time.Time) int {
 	return max(1, int(ends.Sub(now).Hours()/24+0.999))
 }
 
-// AppTrialCard is one quiet line over the page while the trial runs or
-// after it ended, with Subscribe for whoever may pay.
+// AppTrialCard is one quiet line over the page while the trial waits for
+// the first server, while it runs or after it ended, with Subscribe for
+// whoever may pay.
 templ AppTrialCard() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ member := ctxkeys.WorkspaceMember(ctx) }}
@@ -29,7 +30,10 @@ templ AppTrialCard() {
 			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-trial": string(current.State)}}) {
 				<div class="moin-row" data-gap="4" data-phone="stack">
 					<p class="moin-fill moin-text">
-						if current.State == access.StateTrial {
+						if current.State == access.StateTrial && current.TrialEndsAt == nil {
+							<span class="moin-strong">30 days free, starting when you connect your first server.</span>
+							<span class="moin-muted">No card.</span>
+						} else if current.State == access.StateTrial {
 							{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
 							<span class="moin-strong" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
 							<span class="moin-muted">After it, moin turns read-only. Your apps keep running.</span>
