@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, where your secrets live, web, SSH, firewall, rules, the journal and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, secrets, web, SSH, firewall, rules, the journal and signed updates."
 group: "Servers and data"
 order: 2
 ---
