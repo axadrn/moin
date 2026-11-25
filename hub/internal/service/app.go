@@ -43,6 +43,7 @@ var (
 	ErrDeployGone    = errors.New("that deploy is no longer on the server")
 	ErrNoSource      = errors.New("no deploy has a source yet")
 	ErrNotLive       = errors.New("the app has no live deploy yet")
+	ErrNoComposeFile = errors.New("the live deploy came before compose files: deploy again to see it")
 	ErrRunning       = errors.New("the app is already running")
 	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
 	ErrDeployHook    = errors.New("deploy hook is invalid")
@@ -1142,7 +1143,11 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 	if live != nil {
 		log = strings.Join(live.lines, "\n")
 	}
-	err := s.apps.FinishDeploy(deployID, status, clipText(done.Error, 2000), log, detected, s.now().UTC())
+	composeFile := ""
+	if done.OK {
+		composeFile = done.ComposeFile
+	}
+	err := s.apps.FinishDeploy(deployID, status, clipText(done.Error, 2000), log, detected, composeFile, s.now().UTC())
 	if err != nil {
 		slog.Error("store deploy result failed", "error", err, "deploy_id", deployID)
 	}
@@ -1267,6 +1272,28 @@ func (s *AppService) DeployByNumber(workspaceID, idOrName string, number int) (*
 	}
 	s.expire(deploy)
 	return deploy, nil
+}
+
+// ComposeFile is the compose file of an app's live deploy, and its number:
+// everything moin runs for the app, written to run anywhere, without a
+// secret value. A live deploy from before compose files has none, and
+// answers ErrNoComposeFile.
+func (s *AppService) ComposeFile(workspaceID, idOrName string) (int, string, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
+	if err != nil {
+		return 0, "", err
+	}
+	if app.LiveNumber == 0 {
+		return 0, "", ErrNotLive
+	}
+	text, err := s.apps.ComposeFile(app.ID, app.LiveNumber)
+	if err != nil {
+		return 0, "", err
+	}
+	if text == "" {
+		return app.LiveNumber, "", ErrNoComposeFile
+	}
+	return app.LiveNumber, text, nil
 }
 
 // Logs asks the daemon for the last lines of the app's containers.

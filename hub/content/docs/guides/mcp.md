@@ -74,6 +74,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `install_catalog_app` | installs a catalog app on a server; returns the first sign-in password and the app's password, this once | write |
 | `update_app` | sets a catalog app to a version and deploys it | write |
 | `get_logs` | the last container lines | read |
+| `get_compose_file` | the [compose file](/docs/guides/compose#the-compose-file-moin-runs) moin runs for an app, without secret values, to run it elsewhere | read |
 | `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin) | write |
 | `list_tables` | tables, row counts, schema and migration of the database | read |
 | `query_database` | runs read-only SQL | write |

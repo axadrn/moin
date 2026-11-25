@@ -59,7 +59,7 @@ func TestSettingsShowTheID(t *testing.T) {
 		Render(context.Context, io.Writer) error
 	}{
 		"workspace": WorkspaceContent(nil, nil),
-		"app":       appSettingsSection(model.App{ID: uuid, Name: "my-app"}, nil),
+		"app":       appSettingsSection(model.App{ID: uuid, Name: "my-app"}, nil, nil),
 	} {
 		var output bytes.Buffer
 		if err := page.Render(ctx, &output); err != nil {

@@ -80,6 +80,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `*` | pins the app, or unpins it: pinned apps stay above the others that run fine |
 | `X` | [runs a command](/docs/guides/exec) in the main service, no shell; start the line with `@service` for another one |
 | `W` | opens the app in the web app |
+| `C` | opens the app's [compose file](/docs/guides/compose#the-compose-file-moin-runs) in the web app, to copy or download |
 
 ## App tabs
 

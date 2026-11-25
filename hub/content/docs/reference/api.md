@@ -107,6 +107,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `POST /api/v1/apps/{app}/restart` | write | starts the live deploy again with the current settings |
 | `POST /api/v1/apps/{app}/stop` · `POST /apps/{app}/start` | write | takes the app offline, its data stays; runs it again |
 | `GET /api/v1/apps/{app}/logs` | read | container logs |
+| `GET /api/v1/apps/{app}/compose` | read | the [compose file](/docs/guides/compose#the-compose-file-moin-runs) of the live deploy: `{"number": 12, "compose_file": "…"}`, YAML without secret values; `no_compose_file` for a deploy from before it |
 | `POST /api/v1/apps/{app}/exec` | write | [runs a command](/docs/guides/exec), answered as server-sent events: `output` pieces, then `done` with `exit_code`, `timed_out` and `truncated`. Takes `{"command": [...]}` or `{"line": "..."}`, `service` and `timeout` in seconds (owner or admin) |
 | `GET /api/v1/apps/{app}/metrics?range=1h` | read | CPU, memory and network now and over `1h`, `24h`, `7d` or `30d`, with the deploys that went live |
 

@@ -130,6 +130,20 @@ func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
 	}
 }
 
+// TestComposePrintsTheFile: compose prints the compose file as it is, to
+// pipe to a file, and says why there is none.
+func TestComposePrintsTheFile(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/compose": `{"number":3,"compose_file":"name: shop\nservices:\n  web:\n    build:\n      context: .\n"}`}}
+	code, stdout, stderr := runCLI(t, api, "compose", "shop")
+	if code != 0 || stdout != "name: shop\nservices:\n  web:\n    build:\n      context: .\n" || stderr != "" {
+		t.Errorf("compose: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, stderr = runCLI(t, &fakeAPI{conflicts: map[string]string{"GET /api/v1/apps/shop/compose": "no_compose_file"}}, "compose", "--app", "shop")
+	if code != 1 || stdout != "" || stderr == "" {
+		t.Errorf("without a file: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
 func TestOwnUsageNotGoFlags(t *testing.T) {
 	code, stdout, stderr := runCLI(t, &fakeAPI{}, "logs", "--bogus")
 	if code != 1 || !strings.Contains(stderr, "Unknown flag --bogus. Usage: `moin logs [--tail 200] [app]`") || strings.Contains(stdout+stderr, "Usage of") {

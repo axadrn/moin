@@ -1,0 +1,273 @@
+package daemon
+
+import (
+	"bytes"
+	"encoding/json"
+	"math"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/axadrn/moin/protocol"
+)
+
+// The compose file of an app is everything moin runs for it, written to
+// run anywhere: the compose.json of its live release, with the proxy as a
+// service of its own and no path of this server. Save it, put a .env with
+// the app's values next to it, and docker compose up -d runs the app, its
+// domains and HTTPS. It holds each ${NAME} as written and no value of the
+// env, and no hash of the app's password: those stay on the server.
+//
+// On the way out of the server:
+//
+//   - the source of a release, releases/<n>/src, is ".", the folder of the
+//     file, so ./config stays ./config;
+//   - the data folders moin moved to the app's volumes folder are where
+//     the repo's compose file put them, such as ./data;
+//   - app.env, which the app's services read, is .env, the file docker
+//     compose also fills ${NAME} from;
+//   - the app's password is ./htpasswd, mounted into the proxy;
+//   - the proxy's network is the file's own, not external;
+//   - a service moin built builds again from ".", and the Dockerfile moin
+//     wrote for a Go repo without one comes inline. A Railpack build keeps
+//     the image moin built: its plan is not in the repo.
+//
+// Keys are in a stable order, so the same release gives the same file.
+
+// proxyService names the proxy in the compose file, unless the app has a
+// service of that name.
+const proxyService = "proxy"
+
+// proxyUsers is where the proxy of the compose file reads the app's
+// password.
+const proxyUsers = "/htpasswd"
+
+// composeFileOf is the compose file of release number of an app, "" when
+// it cannot be made; why goes to logf.
+func (a *apps) composeFileOf(app string, number int, logf func(string, ...any)) string {
+	text, err := a.portableCompose(app, number)
+	if err != nil {
+		logf("the compose file of v%d could not be made: %s", number, err)
+		return ""
+	}
+	return text
+}
+
+// portableCompose makes the compose file of release number of an app.
+func (a *apps) portableCompose(app string, number int) (string, error) {
+	dir := a.releaseDir(app, number)
+	config, err := readJSON(filepath.Join(dir, "compose.json"))
+	if err != nil {
+		return "", err
+	}
+	base, _ := readJSON(filepath.Join(dir, "base.json"))
+	var detected protocol.Detected
+	body, _ := os.ReadFile(filepath.Join(dir, "detected.json"))
+	_ = json.Unmarshal(body, &detected)
+
+	config["name"] = a.projectOf(app)
+	services, _ := config["services"].(map[string]any)
+	baseServices, _ := base["services"].(map[string]any)
+	for name, item := range services {
+		service, _ := item.(map[string]any)
+		baseService, _ := baseServices[name].(map[string]any)
+		buildAgain(app, name, service, baseService, detected.Kind)
+	}
+	if detected.Kind == "railpack" {
+		// The env names railpackSecrets handed its build, which is gone.
+		delete(config, "secrets")
+	}
+	protected := exists(filepath.Join(dir, "htpasswd"))
+	config = takeAlong(config, a.serverPaths(app)).(map[string]any)
+	takeEnvFile(services)
+	addProxy(config, protected)
+	tunnel := a.proxyMode != nil && a.proxyMode() == "tunnel"
+	return writeComposeYAML(config, tunnel)
+}
+
+// buildAgain makes a service moin built build again where the file runs,
+// from the build its release read, and keeps the image of every other one.
+// kind is how the repo builds (protocol.Detected).
+func buildAgain(app, name string, service, baseService map[string]any, kind string) {
+	image, _ := service["image"].(string)
+	built := image == "" || strings.HasPrefix(image, project(app)+"-"+name+":")
+	build, _ := service["build"].(map[string]any)
+	if build == nil {
+		build, _ = baseService["build"].(map[string]any)
+	}
+	if !built || build == nil || kind == "railpack" {
+		delete(service, "build")
+		return
+	}
+	delete(service, "image")
+	service["build"] = build
+	// moin wrote the Dockerfile of a Go repo without one (generate): it is
+	// not in the repo, so it comes along in the file.
+	if kind != "go" {
+		return
+	}
+	context, _ := build["context"].(string)
+	body, err := os.ReadFile(filepath.Join(context, "Dockerfile"))
+	if err == nil {
+		delete(build, "dockerfile")
+		build["dockerfile_inline"] = string(body)
+	}
+}
+
+// serverPaths are the paths of an app on this server, and how the compose
+// file writes them.
+type serverPaths struct {
+	source   *regexp.Regexp
+	volumes  string
+	envFile  string
+	password *regexp.Regexp
+}
+
+func (a *apps) serverPaths(app string) serverPaths {
+	releases := regexp.QuoteMeta(filepath.Join(a.appDir(app), "releases") + "/")
+	return serverPaths{
+		source:   regexp.MustCompile(`^` + releases + `[0-9]+/src(/|$)`),
+		volumes:  filepath.Join(a.appDir(app), "volumes"),
+		envFile:  a.envFile(app),
+		password: regexp.MustCompile(`^` + regexp.QuoteMeta(proxyApps+"/"+app+"/releases/") + `[0-9]+/htpasswd$`),
+	}
+}
+
+// path writes one path of the server as the compose file reads it, and
+// leaves every other value as it is.
+func (paths serverPaths) path(value string) string {
+	switch {
+	case value == paths.envFile:
+		return ".env"
+	case paths.password.MatchString(value):
+		return proxyUsers
+	case paths.source.MatchString(value):
+		return "." + strings.TrimSuffix(paths.source.ReplaceAllString(value, "/"), "/")
+	case value == paths.volumes || strings.HasPrefix(value, paths.volumes+"/"):
+		return "." + strings.TrimPrefix(value, paths.volumes)
+	}
+	return value
+}
+
+// takeAlong writes every path of the server in value as the compose file
+// reads it, and every whole number JSON read as one, so YAML writes 8080,
+// not 8080.0 or 1.073741824e+09.
+func takeAlong(value any, paths serverPaths) any {
+	switch value := value.(type) {
+	case map[string]any:
+		for key, item := range value {
+			value[key] = takeAlong(item, paths)
+		}
+	case []any:
+		for index, item := range value {
+			value[index] = takeAlong(item, paths)
+		}
+	case string:
+		return paths.path(value)
+	case float64:
+		if value == math.Trunc(value) && math.Abs(value) < 1<<53 {
+			return int64(value)
+		}
+	}
+	return value
+}
+
+// takeEnvFile names each env file of a service once: the source's .env and
+// app.env are both .env now.
+func takeEnvFile(services map[string]any) {
+	for _, item := range services {
+		service, _ := item.(map[string]any)
+		files, _ := service["env_file"].([]any)
+		if files == nil {
+			continue
+		}
+		seen := map[string]bool{}
+		kept := []any{}
+		for _, file := range files {
+			path, _ := file.(string)
+			if entry, ok := file.(map[string]any); ok {
+				path, _ = entry["path"].(string)
+			}
+			if seen[filepath.Clean(path)] {
+				continue
+			}
+			seen[filepath.Clean(path)] = true
+			kept = append(kept, file)
+		}
+		service["env_file"] = kept
+	}
+}
+
+// addProxy adds the proxy as moin runs it, on ports 80 and 443 with
+// certificates from Let's Encrypt, when a service of the app is on its
+// network. protected mounts the app's password.
+func addProxy(config map[string]any, protected bool) {
+	networks, _ := config["networks"].(map[string]any)
+	network, _ := networks[proxyNetwork].(map[string]any)
+	if network == nil {
+		return
+	}
+	delete(network, "external")
+	volumes := []any{"/var/run/docker.sock:/var/run/docker.sock:ro", "./traefik:/data"}
+	if protected {
+		volumes = append(volumes, "./htpasswd:"+proxyUsers+":ro")
+	}
+	command := []any{}
+	for _, flag := range proxyFlags("direct") {
+		command = append(command, flag)
+	}
+	services, _ := config["services"].(map[string]any)
+	name := proxyService
+	if _, taken := services[name]; taken {
+		name = proxyName
+	}
+	services[name] = map[string]any{
+		"image":    proxyImage,
+		"command":  command,
+		"ports":    []any{"80:80", "443:443"},
+		"volumes":  volumes,
+		"networks": []any{proxyNetwork},
+		"restart":  "unless-stopped",
+	}
+}
+
+// composeParts are the parts of a compose file, in the order people write
+// them. Others follow by name.
+var composeParts = []string{"name", "services", "networks", "volumes", "configs", "secrets"}
+
+// writeComposeYAML writes a compose file as YAML. tunnel says that the
+// server gets its traffic through a Cloudflare Tunnel.
+func writeComposeYAML(config map[string]any, tunnel bool) (string, error) {
+	var out bytes.Buffer
+	if tunnel {
+		out.WriteString("# On the server, a Cloudflare Tunnel brings the traffic. Here the proxy takes ports 80 and 443.\n")
+	}
+	keys := []string{}
+	for key := range config {
+		if !slices.Contains(composeParts, key) {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(keys)
+	for _, key := range append(slices.Clone(composeParts), keys...) {
+		value, ok := config[key]
+		if !ok {
+			continue
+		}
+		encoder := yaml.NewEncoder(&out)
+		encoder.SetIndent(2)
+		err := encoder.Encode(map[string]any{key: value})
+		if err != nil {
+			return "", err
+		}
+		err = encoder.Close()
+		if err != nil {
+			return "", err
+		}
+	}
+	return out.String(), nil
+}

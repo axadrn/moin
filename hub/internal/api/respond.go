@@ -283,6 +283,7 @@ var serviceErrors = []serviceError{
 	{err: service.ErrProtect, field: "password", message: "Use a password of 8 to 72 characters."},
 	{err: service.ErrRunning, status: http.StatusConflict, code: "already_running", message: "The app is already running. Nothing changed."},
 	{err: service.ErrNotLive, status: http.StatusConflict, code: "not_live", message: "The app has no live deploy yet. Run moin deploy in the repo first."},
+	{err: service.ErrNoComposeFile, status: http.StatusConflict, code: "no_compose_file", message: "The live deploy came before compose files. Deploy again to see the file."},
 	{err: service.ErrNoCommand, field: "command", message: "Give a command to run, like rails db:migrate."},
 	{err: service.ErrNoSource, status: http.StatusConflict, code: "no_source", message: "No deploy has a source or an image yet. Run moin deploy in the repo first."},
 	{err: service.ErrDeployGone, status: http.StatusConflict, code: "deploy_gone", message: "That deploy is no longer on the server: it keeps the last 5 builds. Deploy again or roll back to a newer deploy."},

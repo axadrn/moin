@@ -62,6 +62,7 @@ func (a *apps) deploy(ctx context.Context, start protocol.DeployStart, rules *pr
 	} else {
 		done.OK = true
 		logf("v%d is live", start.Number)
+		done.ComposeFile = a.composeFileOf(start.App, start.Number, logf)
 	}
 	// Last, so the keys are as fresh as they can be.
 	if protocol.ValidAppName(start.App) {
@@ -103,6 +104,7 @@ func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) proto
 	if current == note.Number {
 		done.OK = true
 		done.Detected, _ = a.live(app)
+		done.ComposeFile = a.composeFileOf(app, note.Number, func(string, ...any) {})
 		return done
 	}
 	a.markFailed(app, note.Number)

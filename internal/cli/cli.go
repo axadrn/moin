@@ -77,6 +77,7 @@ Deploys
   rollback           Start an earlier deploy again: rollback [app] [v<number>] [--yes]
   logs               Show the last lines of the app: logs [--tail 200] [app]
   exec               Run a command in a container, no shell: exec [app] [--service web] -- rails db:migrate
+  compose            The compose file moin runs, without secret values, to run it elsewhere: compose [app] > compose.yml
 
 Domains
   domains            List domains and their DNS: domains [app]
@@ -273,6 +274,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return redeploy(ctx, rest, stdout)
 	case "logs":
 		return logs(ctx, rest, stdout)
+	case "compose":
+		return compose(ctx, rest, stdout)
 	case "db":
 		return db(ctx, rest, stdout)
 	case "sql":

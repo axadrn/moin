@@ -1951,6 +1951,37 @@ paths:
         '500':
           $ref: '#/components/responses/Internal'
 
+  /api/v1/apps/{app}/compose:
+    parameters:
+      - $ref: '#/components/parameters/AppName'
+    get:
+      tags: [Apps]
+      operationId: getComposeFile
+      summary: Get the compose file
+      description: 'The compose file of the live deploy, YAML: everything moin runs for the app, the proxy with its domains and HTTPS too, written to run anywhere. Each `${NAME}` stays as written, with no secret value and no password hash. Save it, put a `.env` with your values next to it, run `docker compose up -d`.'
+      security:
+        - cookieAuth: []
+        - apiTokenAuth: [read]
+      responses:
+        '200':
+          description: The compose file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComposeFile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No app with this ID or name belongs to the account.'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: '`not_live` before the first deploy. `no_compose_file` when the live deploy came before compose files: deploy again.'
+        '500':
+          $ref: '#/components/responses/Internal'
+
   /api/v1/apps/{app}/logs:
     parameters:
       - $ref: '#/components/parameters/AppName'
@@ -5252,6 +5283,16 @@ components:
         service:
           type: string
           description: Set the domains of this service of compose.yml, not the main one. `canonical` is for the main service only.
+    ComposeFile:
+      type: object
+      required: [number, compose_file]
+      properties:
+        number:
+          type: integer
+          description: The number of the live deploy the file is of.
+        compose_file:
+          type: string
+          description: The compose file, YAML.
     Instant:
       type: object
       required: [url, provider]

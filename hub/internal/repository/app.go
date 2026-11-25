@@ -200,13 +200,22 @@ func (r *Apps) ListDeploys(appID string, limit int) ([]model.Deploy, error) {
 	return deploys, err
 }
 
-// FinishDeploy ends a running deploy. A deploy that already ended stays as it is.
-func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected string, at time.Time) error {
+// FinishDeploy ends a running deploy, with the compose file the daemon
+// made for it. A deploy that already ended stays as it is.
+func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected, composeFile string, at time.Time) error {
 	_, err := r.db.Exec(`
-		UPDATE deploys SET status = $1, error = $2, log = $3, detected = CASE WHEN $4 = '' THEN detected ELSE $4 END, finished_at = $5
-		WHERE id = $6 AND status = 'running'
-	`, status, errorMessage, log, detected, at, id)
+		UPDATE deploys SET status = $1, error = $2, log = $3, detected = CASE WHEN $4 = '' THEN detected ELSE $4 END, compose_file = $5, finished_at = $6
+		WHERE id = $7 AND status = 'running'
+	`, status, errorMessage, log, detected, composeFile, at, id)
 	return err
+}
+
+// ComposeFile is the compose file of deploy number of an app, "" when its
+// daemon sent none.
+func (r *Apps) ComposeFile(appID string, number int) (string, error) {
+	var text string
+	err := r.db.Get(&text, `SELECT compose_file FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
+	return text, err
 }
 
 // SetDeployDetected replaces what a deploy has in it.

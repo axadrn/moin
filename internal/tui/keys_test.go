@@ -492,6 +492,10 @@ func TestWebPagesOpenTheBrowser(t *testing.T) {
 	if opened[len(opened)-1] != "https://moin.example/app/acme/apps/shop" {
 		t.Errorf("W opens the app in the web, got %v", opened)
 	}
+	press(fixture(120, 40).withApp("shop", tDeploys), "C")
+	if opened[len(opened)-1] != "https://moin.example/app/acme/apps/shop/settings#compose-file" {
+		t.Errorf("C opens the compose file in the web, got %v", opened)
+	}
 }
 
 func TestLoginShowsTheCodeThenConnects(t *testing.T) {

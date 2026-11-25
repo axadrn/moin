@@ -103,7 +103,7 @@ func finishDeploy(t *testing.T, apps *AppService, appID string, number int, stat
 	if err := apps.apps.CreateDeploy(deploy); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.apps.FinishDeploy(deploy.ID, status, "", "", "", time.Now().UTC()); err != nil {
+	if err := apps.apps.FinishDeploy(deploy.ID, status, "", "", "", "", time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
 }

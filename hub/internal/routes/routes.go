@@ -345,6 +345,7 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/deploys/{number}/log", workspace(apps.DeployLog))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/domains", workspace(apps.AppSection("domains")))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/settings", workspace(apps.AppSection("settings")))
+	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/compose.yml", workspace(apps.ComposeFile))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/name", workspace(apps.RenameApp))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/detail", workspace(apps.Detail))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/apps/{app}", workspace(apps.Delete))
