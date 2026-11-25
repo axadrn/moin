@@ -125,6 +125,7 @@ templ Device(view DeviceView) {
 						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"formaction": "/device/reauth", "formnovalidate": true}}) {
 							Sign in again to allow
 						}
+						<p class="moin-small moin-muted moin-center">Allow needs a sign-in from the last five minutes. Any way in counts.</p>
 				}
 				if !view.Passkey && view.Passkeys {
 					<p class="moin-small moin-muted moin-center">Add a passkey to approve faster.</p>

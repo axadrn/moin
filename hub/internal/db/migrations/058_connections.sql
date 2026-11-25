@@ -126,11 +126,15 @@ CREATE TABLE api_tokens (
 );
 CREATE INDEX idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX idx_api_tokens_workspace_id ON api_tokens(workspace_id);
+-- Only the CI tokens that look as Up made them go back: every app, and
+-- read, or read, deploy and env. A token for one app or with other rights
+-- has no personal token that is as narrow, so it goes, never wider.
 INSERT INTO api_tokens (id, user_id, workspace_id, name, token_hash, prefix, scopes, last_used_at, expires_at, created_at)
 SELECT id, user_id, workspace_id, name, token_hash, prefix,
-       CASE WHEN rights = 'read' THEN 'read' ELSE 'read,write' END,
+       CASE rights WHEN 'read' THEN 'read' ELSE 'read,write' END,
        last_used_at, expires_at, created_at
-FROM ci_tokens;
+FROM ci_tokens
+WHERE app_id IS NULL AND rights IN ('read', 'read,deploy,env');
 
 DROP TABLE ci_tokens;
 DROP TABLE connection_tokens;

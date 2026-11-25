@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -192,5 +194,78 @@ func TestACITokenNeverRefreshes(t *testing.T) {
 	var apiErr *Error
 	if _, err := api.Account(context.Background()); !errors.As(err, &apiErr) || apiErr.Status != http.StatusUnauthorized || hub.refreshes != 0 {
 		t.Fatalf("Account() = %v, refreshes %d", err, hub.refreshes)
+	}
+}
+
+// slowHub answers a refresh only after a while: the hub has rotated the
+// pair already when the caller gives up.
+type slowHub struct{ *tokenHub }
+
+func (h slowHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/api/v1/auth/token" {
+		h.tokenHub.ServeHTTP(w, r)
+		return
+	}
+	recorder := httptest.NewRecorder()
+	h.tokenHub.ServeHTTP(recorder, r)
+	time.Sleep(300 * time.Millisecond)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(recorder.Code)
+	_, _ = w.Write(recorder.Body.Bytes())
+}
+
+// TestACancelledCallerDoesNotEndTheLogin: a command stopped while it
+// refreshes still saves the new pair, so the next command does not send
+// the used refresh token and end the connection.
+func TestACancelledCallerDoesNotEndTheLogin(t *testing.T) {
+	hub := newTokenHub()
+	server := httptest.NewServer(slowHub{hub})
+	t.Cleanup(server.Close)
+	api, err := New(savedLogin(t, server.URL, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, _ = api.Account(ctx)
+	saved, err := LoadSaved()
+	if err != nil || saved.Token != "at_1" || saved.RefreshToken != "rt_1" {
+		t.Fatalf("saved = %+v, %v", saved, err)
+	}
+	next, err := New(saved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = next.Account(context.Background())
+	hub.mu.Lock()
+	ended := hub.ended
+	hub.mu.Unlock()
+	if err != nil || ended {
+		t.Fatalf("the next command: %v, ended %v", err, ended)
+	}
+}
+
+// TestSaveConfigReplacesTheFile: the config is written beside it and
+// renamed, readable only by the user, with nothing left over.
+func TestSaveConfigReplacesTheFile(t *testing.T) {
+	savedLogin(t, "https://hub.example.com", time.Hour)
+	if err := SaveConfig(Config{URL: "https://hub.example.com", Token: "pat_test"}); err != nil {
+		t.Fatal(err)
+	}
+	path, err := configPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("config = %v, %v", info, err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("the config folder holds %v, %v", entries, err)
+	}
+	saved, err := LoadSaved()
+	if err != nil || saved.Token != "pat_test" || saved.RefreshToken != "" {
+		t.Fatalf("saved = %+v, %v", saved, err)
 	}
 }

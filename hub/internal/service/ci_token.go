@@ -133,7 +133,9 @@ func (s *CITokenService) List(member *model.WorkspaceMember) ([]model.CIToken, e
 }
 
 // SetRights changes what a token may do. Only its maker changes it.
-func (s *CITokenService) SetRights(actor Actor, id string, rights model.Rights) (*model.CIToken, error) {
+// presence is what PasskeyService.Present answered for the browser: a
+// change that adds a right fails with it.
+func (s *CITokenService) SetRights(actor Actor, id string, rights model.Rights, presence error) (*model.CIToken, error) {
 	if rights&^allRights() != 0 {
 		return nil, ErrRightsUnknown
 	}
@@ -145,6 +147,9 @@ func (s *CITokenService) SetRights(actor Actor, id string, rights model.Rights) 
 		return nil, ErrCITokenMaker
 	}
 	rights |= model.RightRead
+	if rights&^token.Rights != 0 && presence != nil {
+		return nil, presence
+	}
 	if err := s.tokens.SetRights(token.ID, rights); err != nil {
 		return nil, err
 	}
@@ -154,6 +159,38 @@ func (s *CITokenService) SetRights(actor Actor, id string, rights model.Rights) 
 		s.record(actor, "ci_token.rights_changed", *token, map[string]string{"from": before.String(), "to": rights.String()})
 	}
 	return token, nil
+}
+
+// SetRight turns one right of a token on or off and leaves the others as
+// they are now. Only its maker changes it.
+func (s *CITokenService) SetRight(actor Actor, id string, right model.Rights, on bool) (*model.CIToken, error) {
+	if right == model.RightRead {
+		return nil, ErrRightsUnknown
+	}
+	for range swapTries {
+		token, err := s.tokens.ByID(actor.WorkspaceID, normalID(id))
+		if err != nil {
+			return nil, err
+		}
+		if token.UserID != actor.UserID {
+			return nil, ErrCITokenMaker
+		}
+		before := token.Rights
+		after := withRight(before, right, on)
+		if after == before {
+			return token, nil
+		}
+		swapped, err := s.tokens.SwapRights(token.ID, before, after)
+		if err != nil {
+			return nil, err
+		}
+		if swapped {
+			token.Rights = after
+			s.record(actor, "ci_token.rights_changed", *token, map[string]string{"from": before.String(), "to": after.String()})
+			return token, nil
+		}
+	}
+	return nil, ErrRightsBusy
 }
 
 // Remove deletes a token: one's own, or as the workspace's owner any.
@@ -173,8 +210,8 @@ func (s *CITokenService) Remove(member *model.WorkspaceMember, id string, source
 	return nil
 }
 
-// DeleteAllForUser removes every token of a person: the admin kill switch,
-// a recovery key and a new email call it.
+// DeleteAllForUser removes every token of a person. RevokeAllAccess, the
+// admin kill switch, calls it.
 func (s *CITokenService) DeleteAllForUser(userID string) error {
 	tokens, err := s.tokens.ListByUser(userID)
 	if err != nil {

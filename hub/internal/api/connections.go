@@ -16,10 +16,11 @@ import (
 // browser changes rights, so no client gives itself more.
 type ConnectionsHandler struct {
 	connections *service.ConnectionService
+	passkeys    *service.PasskeyService
 }
 
-func NewConnectionsHandler(connections *service.ConnectionService) *ConnectionsHandler {
-	return &ConnectionsHandler{connections: connections}
+func NewConnectionsHandler(connections *service.ConnectionService, passkeys *service.PasskeyService) *ConnectionsHandler {
+	return &ConnectionsHandler{connections: connections, passkeys: passkeys}
 }
 
 // Connection is the public JSON shape of a connection. It never carries a
@@ -81,7 +82,8 @@ func (h *ConnectionsHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetRights changes what a connection may do: {"rights": ["deploy"]}. It
-// counts from the connection's next request.
+// counts from the connection's next request. Adding a right needs the
+// person to have confirmed in the last five minutes, as an approval does.
 func (h *ConnectionsHandler) SetRights(w http.ResponseWriter, r *http.Request) {
 	var request RightsRequest
 	if !Decode(w, r, &request) {
@@ -92,7 +94,8 @@ func (h *ConnectionsHandler) SetRights(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, service.ErrRightsUnknown)
 		return
 	}
-	connection, err := h.connections.SetRights(ctxkeys.User(r.Context()).ID, r.PathValue("id"), rights, source(r))
+	presence := h.passkeys.Present(ctxkeys.Session(r.Context()))
+	connection, err := h.connections.SetRights(ctxkeys.User(r.Context()).ID, r.PathValue("id"), rights, presence, source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return

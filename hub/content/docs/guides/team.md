@@ -45,7 +45,7 @@ Each role can do everything inside it.
 | Make someone a member or an admin, remove members and admins | | ✓ | ✓ |
 | Make someone an owner, remove an owner, billing, delete the workspace | | | ✓ |
 
-Everyone can leave a workspace. A workspace always keeps one owner.
+Everyone can leave a workspace. A workspace always keeps one owner. Whoever leaves or is removed loses their connections and CI tokens in that workspace at once.
 
 ## Invite someone
 
@@ -53,11 +53,13 @@ moin sends an email to join the workspace. It is good for seven days. They open 
 
 ```surfaces
 Web: **Settings**, **Team**, **Invite a teammate**, **Send invite**
-CLI: moin team invite <email>; --admin invites an admin
+CLI: moin team invite <email>, as member
 TUI: opens the web: `w`, then `t`
 API: POST /api/v1/workspaces/{slug}/invitations
 MCP: invite_member
 ```
+
+The CLI, MCP and every connection or CI token invite members only. An admin is invited in the web, so a leaked token cannot make one.
 
 ## Send an invitation again
 

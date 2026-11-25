@@ -17,7 +17,7 @@ func registerExecTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
 	Add(server, newTool("exec_command", "Run a command in a container",
 		"Runs one command in a container of an app, such as rails db:migrate or ls /data, and returns its output (the last 64 KB) and exit code. No shell reads it: wrap pipes and variables in sh -c '...'. Only owners and admins may, and a server can forbid it with exec: off in its rules. Ask the user before a command that changes data.",
-		change(true, false)), model.RightDeploy, changes(services, tools.exec))
+		change(true, false)), model.RightDeploy|model.RightEnv|model.RightDelete, changes(services, tools.exec))
 }
 
 // execOutputLimit is how much of a command's output exec_command returns:

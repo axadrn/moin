@@ -79,6 +79,18 @@ func (r *Connections) SetRights(id, userID string, rights model.Rights) error {
 	return oneRowOr(result, err, ErrConnectionNotFound)
 }
 
+// SwapRights changes the rights of a live connection of the user from
+// from to to, only if they are still from: two switches flipped at once
+// never undo each other. It reports whether it changed them.
+func (r *Connections) SwapRights(id, userID string, from, to model.Rights) (bool, error) {
+	result, err := r.db.Exec(`UPDATE connections SET rights = $1 WHERE id = $2 AND user_id = $3 AND rights = $4 AND ended_at IS NULL`, to, id, userID, from)
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	return rows == 1, err
+}
+
 // End ends a live connection and deletes its tokens, in one transaction.
 // An ended connection is not found.
 func (r *Connections) End(id string, at time.Time) error {

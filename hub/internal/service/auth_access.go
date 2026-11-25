@@ -11,8 +11,9 @@ func (s *AuthService) UseBearers(connections *ConnectionService, ciTokens *CITok
 }
 
 // RevokeAllAccess ends every session, connection and CI token of the user.
-// The admin kill switch calls it. Signing out everywhere ends sessions only
-// and keeps the rest.
+// The admin kill switch is its one caller. Signing out everywhere, a
+// recovery key and a new email end sessions only: connections and CI tokens
+// stay, and the person removes them under Settings, Connections.
 func (s *AuthService) RevokeAllAccess(userID string) error {
 	err := s.RevokeAllSessions(userID)
 	if err != nil {

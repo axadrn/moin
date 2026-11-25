@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -23,6 +24,9 @@ type connectionsTest struct {
 	deviceHandlerTest
 	handler  *ConnectionsHandler
 	ciTokens *service.CITokenService
+	// signedIn is the owner's session of the requests, signed in just now
+	// unless a test says else.
+	signedIn *model.Session
 }
 
 func newConnectionsTest(t *testing.T) connectionsTest {
@@ -36,7 +40,7 @@ func newConnectionsTest(t *testing.T) connectionsTest {
 	servers := service.NewServerService(repository.NewServers(database), repository.NewActivity(database), "https://app.example.com")
 	apps := service.NewAppService(repository.NewApps(database, database), servers, box)
 	ciTokens := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), device.workspaces)
-	return connectionsTest{deviceHandlerTest: device, handler: NewConnectionsHandler(device.connections, ciTokens, apps), ciTokens: ciTokens}
+	return connectionsTest{deviceHandlerTest: device, handler: NewConnectionsHandler(device.connections, ciTokens, apps, device.passkeys, device.auth), ciTokens: ciTokens, signedIn: device.session(t, 0)}
 }
 
 // request runs the page of pattern at path as the owner, from htmx when
@@ -53,6 +57,7 @@ func (test connectionsTest) request(t *testing.T, method, pattern, path string, 
 	ctx = ctxkeys.WithURLPath(ctx, path)
 	ctx = ctxkeys.WithCSRFToken(ctx, "csrf-token")
 	ctx = ctxkeys.WithUser(ctx, test.owner.User)
+	ctx = ctxkeys.WithSession(ctx, test.signedIn)
 	ctx = ctxkeys.WithWorkspace(ctx, test.owner.Workspace)
 	ctx = ctxkeys.WithWorkspaces(ctx, []model.WorkspaceMembership{{Workspace: *test.owner.Workspace, Role: model.WorkspaceRoleOwner}})
 	ctx = ctxkeys.WithWorkspaceMember(ctx, test.owner.WorkspaceMember)
@@ -149,5 +154,46 @@ func TestCITokenFromThePage(t *testing.T) {
 	}
 	if _, err := test.ciTokens.Authenticate(raw); err == nil {
 		t.Fatal("the CI token works after Remove")
+	}
+}
+
+// TestMoreRightsNeedAFreshSignIn: with a sign-in older than five minutes
+// and no passkey, turning a right on and making a CI token are refused and
+// the page asks to sign in again; turning one off and removing are not.
+func TestMoreRightsNeedAFreshSignIn(t *testing.T) {
+	test := newConnectionsTest(t)
+	test.signedIn = test.session(t, 10*time.Minute)
+	connection, err := test.connections.Create(service.NewConnection{UserID: test.owner.User.ID, WorkspaceID: test.owner.Workspace.ID, ClientName: "moin CLI on host-1", Rights: model.DefaultRights})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := test.owner.Workspace.Path()
+	path := base + "/settings/connections/" + link.ID(connection.ID)
+
+	detail := test.request(t, http.MethodGet, "/app/{workspaceSlug}/settings/connections/{id}", path, nil, test.handler.Connection)
+	if !strings.Contains(detail.Body.String(), "Confirm it&#39;s you") || !strings.Contains(detail.Body.String(), base+"/settings/connections/reauth") {
+		t.Fatalf("detail asks nothing: %s", detail.Body.String())
+	}
+	on := test.request(t, http.MethodPost, "/app/{workspaceSlug}/settings/connections/{id}/rights/{right}", path+"/rights/servers", url.Values{"on": {"1"}}, test.handler.SetConnectionRight)
+	if strings.Contains(on.Body.String(), `value="1" checked`) || !strings.Contains(on.Body.String(), "Sign in again first") {
+		t.Fatalf("servers on: %d %s", on.Code, on.Body.String())
+	}
+	off := test.request(t, http.MethodPost, "/app/{workspaceSlug}/settings/connections/{id}/rights/{right}", path+"/rights/deploy", url.Values{}, test.handler.SetConnectionRight)
+	if off.Code != http.StatusOK || strings.Contains(off.Body.String(), "checked") {
+		t.Fatalf("deploy off: %d %s", off.Code, off.Body.String())
+	}
+	connections, err := test.connections.List(test.owner.User.ID)
+	if err != nil || len(connections) != 1 || connections[0].Rights != model.RightRead|model.RightEnv {
+		t.Fatalf("connections = %+v, %v", connections, err)
+	}
+	created := test.request(t, http.MethodPost, "/app/{workspaceSlug}/settings/ci-tokens", base+"/settings/ci-tokens", url.Values{"name": {"shop deploy"}, "expiry": {"30"}, "rights": {"deploy"}}, test.handler.CreateCIToken)
+	if revealedToken.MatchString(created.Body.String()) || created.Header().Get("HX-Reswap") != "none" {
+		t.Fatalf("create: %d %s", created.Code, created.Body.String())
+	}
+
+	test.signedIn = test.session(t, 0)
+	fresh := test.request(t, http.MethodGet, "/app/{workspaceSlug}/settings/connections/{id}", path, nil, test.handler.Connection)
+	if strings.Contains(fresh.Body.String(), "Confirm it&#39;s you") {
+		t.Fatal("a fresh sign-in is asked to confirm")
 	}
 }

@@ -197,21 +197,32 @@ func TestOpenAPIDocumentsTheRights(t *testing.T) {
 }
 
 // readChanges are the routes that change something with the read right
-// alone: removing a connection or CI token only takes access away, and SQL
-// and a download link read (SQL that writes needs delete in the handler).
+// alone: removing a connection or CI token only takes access away (another
+// person's CI token needs servers in the handler).
 var readChanges = map[string]bool{
-	"DELETE /api/v1/account/connections/{id}":  true,
-	"DELETE /api/v1/ci-tokens/{id}":            true,
-	"POST /api/v1/apps/{app}/databases/query":  true,
-	"POST /api/v1/apps/{app}/backups/download": true,
+	"DELETE /api/v1/account/connections/{id}": true,
+	"DELETE /api/v1/ci-tokens/{id}":           true,
+}
+
+// dataReads are the reads of app data, as strong as secrets: they need
+// env, not read.
+var dataReads = map[string]bool{
+	"GET /api/v1/apps/{app}/databases/rows": true,
 }
 
 // TestRightsFollowTheMethod checks that every GET route needs read and
-// nothing more, and every route that changes data a right beyond read.
+// nothing more, but for app data, and every route that changes data a
+// right beyond read.
 func TestRightsFollowTheMethod(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	for _, route := range environment.routes {
 		method, _, _ := strings.Cut(route.Pattern, " ")
+		if dataReads[route.Pattern] {
+			if route.Right != model.RightEnv {
+				t.Errorf("%s reads app data with %s, want env", route.Pattern, route.Right)
+			}
+			continue
+		}
 		if method == http.MethodGet && route.Right != api.NoToken && route.Right != model.RightRead {
 			t.Errorf("%s needs %s for a read", route.Pattern, route.Right)
 		}

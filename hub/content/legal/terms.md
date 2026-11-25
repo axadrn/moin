@@ -18,7 +18,7 @@ You must be at least 16 years old. If you sign up for a company or another organ
 
 ## Your account
 
-Keep your sign-in, API tokens and deploy hook URLs secret: anyone who has them can act as you. You are responsible for what happens with your account and your tokens. Tell us at [{{support_email}}](mailto:{{support_email}}) if you think someone else has access.
+Keep your sign-in, CI tokens and deploy hook URLs secret, and let only your own computers and agents connect: anyone who has them can act as you. You are responsible for what happens with your account, your connections and your tokens. Tell us at [{{support_email}}](mailto:{{support_email}}) if you think someone else has access.
 
 ## Your servers, apps and data
 

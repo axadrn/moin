@@ -18,10 +18,10 @@ func registerDataTools(server *mcpsdk.Server, services Services) {
 		readOnly("")), model.RightRead, member(services, tools.listTables))
 	Add(server, newTool("query_database", "Query a database",
 		"Runs one read-only SQL statement with ? parameters on an app's database, SQLite or Postgres (in the SQL dialect of that database), and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets.",
-		readOnly("")), model.RightRead, changes(services, tools.queryDatabase))
+		readOnly("")), model.RightEnv, changes(services, tools.queryDatabase))
 	Add(server, newTool("execute_sql", "Change a database",
 		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. moin takes a copy just before, so restore_app can go back to it.",
-		change(true, false)), model.RightDelete, changes(services, tools.executeSQL))
+		change(true, false)), model.RightEnv|model.RightDelete, changes(services, tools.executeSQL))
 }
 
 // DatabaseInput names an app's database.

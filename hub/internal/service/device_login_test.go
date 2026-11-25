@@ -323,3 +323,84 @@ func TestDeviceClientName(t *testing.T) {
 		}
 	}
 }
+
+// TestApprovalChecksTheWorkspaceBeforeThePasskey: a workspace the person
+// is not in, or a right that does not exist, fails before the ceremony, so
+// the passkey answer is not spent.
+func TestApprovalChecksTheWorkspaceBeforeThePasskey(t *testing.T) {
+	e := newDeviceLoginEnvironment(t)
+	session := e.fresh(t)
+	authenticator := newSoftAuthenticator(t)
+	e.add(t, session, authenticator)
+	started := e.start(t)
+	options, ceremony, err := e.passkeys.BeginConfirm(session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer, err := io.ReadAll(authenticator.get(t, options, passkeyOrigin))
+	if err != nil {
+		t.Fatal(err)
+	}
+	presence := Presence{Session: session, Ceremony: ceremony, Answer: answer}
+	if _, _, err := e.logins.Approve(Approval{UserCode: started.UserCode, WorkspaceID: "elsewhere", Rights: model.DefaultRights, Presence: presence}); !errors.Is(err, ErrConnectionWorkspace) {
+		t.Fatalf("Approve() in another workspace = %v, want ErrConnectionWorkspace", err)
+	}
+	if _, _, err := e.logins.Approve(Approval{UserCode: started.UserCode, WorkspaceID: e.user.Workspace.ID, Rights: model.DefaultRights | 1<<7, Presence: presence}); !errors.Is(err, ErrRightsUnknown) {
+		t.Fatalf("Approve() with an unknown right = %v, want ErrRightsUnknown", err)
+	}
+	if _, _, err := e.logins.Approve(Approval{UserCode: started.UserCode, WorkspaceID: e.user.Workspace.ID, Rights: model.DefaultRights, Presence: presence}); err != nil {
+		t.Fatalf("Approve() with the same answer in the right workspace and rights = %v", err)
+	}
+}
+
+// TestPresentLastsFiveMinutes: an account without a passkey is present
+// for five minutes after any sign-in; one with a passkey for five minutes
+// after it confirmed with it on this session. Adding a passkey needs the
+// same.
+func TestPresentLastsFiveMinutes(t *testing.T) {
+	e := newDeviceLoginEnvironment(t)
+	session := e.fresh(t)
+	if err := e.passkeys.Present(session); err != nil {
+		t.Fatalf("Present() after signing in = %v", err)
+	}
+	e.clock.Add(FreshSignIn + time.Second)
+	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresenceSignIn) {
+		t.Fatalf("Present() later = %v, want ErrPresenceSignIn", err)
+	}
+	if _, _, err := e.passkeys.BeginAdd(session); !errors.Is(err, ErrPresenceSignIn) {
+		t.Fatalf("BeginAdd() on an old session = %v, want ErrPresenceSignIn", err)
+	}
+
+	session = e.fresh(t)
+	authenticator := newSoftAuthenticator(t)
+	e.add(t, session, authenticator)
+	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("Present() with a passkey, not confirmed = %v, want ErrPresencePasskey", err)
+	}
+	options, ceremony, err := e.passkeys.BeginConfirm(session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer, err := io.ReadAll(authenticator.get(t, options, passkeyOrigin))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.passkeys.Confirm(Presence{Session: session, Ceremony: ceremony, Answer: answer}); err != nil {
+		t.Fatalf("Confirm() = %v", err)
+	}
+	e.clock.Add(FreshSignIn - time.Second)
+	if err := e.passkeys.Present(session); err != nil {
+		t.Fatalf("Present() after confirming = %v", err)
+	}
+	if _, _, err := e.passkeys.BeginAdd(session); err != nil {
+		t.Fatalf("BeginAdd() after confirming = %v", err)
+	}
+	e.clock.Add(2 * time.Second)
+	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("Present() five minutes after confirming = %v, want ErrPresencePasskey", err)
+	}
+	admin := "admin"
+	if err := e.passkeys.Present(&model.Session{ID: session.ID, UserID: session.UserID, ImpersonatorUserID: &admin}); !errors.Is(err, ErrImpersonating) {
+		t.Fatalf("Present() impersonating = %v", err)
+	}
+}

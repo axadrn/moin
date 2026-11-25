@@ -1,9 +1,11 @@
 package api_test
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/model"
@@ -85,23 +87,69 @@ func TestAConnectionSeesOnlyItsWorkspace(t *testing.T) {
 	}
 }
 
-// TestSQLThatWritesNeedsDelete: the query route needs read, and SQL that
-// writes the delete right on top, before anything reaches the server.
+// TestSQLThatWritesNeedsDelete: SQL reads app data, so the query route
+// needs env, and SQL that writes the delete right on top, before anything
+// reaches the server.
 func TestSQLThatWritesNeedsDelete(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	owner := seedTokenOwner(t, environment, "ada")
-	reader := environment.token(t, owner.id, owner.workspaceID)
-	write := apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/databases/query", body: `{"sql":"DELETE FROM users","write":true}`, bearer: reader}
-	if detail := expectError(t, environment.send(t, write), http.StatusForbidden, "missing_right"); detail.Right != "delete" {
-		t.Fatalf("detail = %#v", detail)
+	read := apiRequest{method: http.MethodPost, path: "/api/v1/apps/shop/databases/query", body: `{"sql":"SELECT 1"}`, bearer: environment.token(t, owner.id, owner.workspaceID)}
+	if detail := expectError(t, environment.send(t, read), http.StatusForbidden, "missing_right"); detail.Right != "env" {
+		t.Fatalf("a read without env: %#v", detail)
 	}
-	read := write
-	read.body = `{"sql":"SELECT 1"}`
+	read.bearer = environment.token(t, owner.id, owner.workspaceID, "env")
 	if recorder := environment.send(t, read); strings.Contains(recorder.Body.String(), "missing_right") {
-		t.Fatalf("a read was refused for its right: %s", recorder.Body.String())
+		t.Fatalf("a read with env was refused for its right: %s", recorder.Body.String())
 	}
-	write.bearer = environment.token(t, owner.id, owner.workspaceID, "delete")
+	write := read
+	write.body = `{"sql":"DELETE FROM users","write":true}`
+	if detail := expectError(t, environment.send(t, write), http.StatusForbidden, "missing_right"); detail.Right != "delete" {
+		t.Fatalf("a write without delete: %#v", detail)
+	}
+	write.bearer = environment.token(t, owner.id, owner.workspaceID, "env", "delete")
 	if recorder := environment.send(t, write); strings.Contains(recorder.Body.String(), "missing_right") {
 		t.Fatalf("a write with delete was refused for its right: %s", recorder.Body.String())
 	}
+}
+
+// TestAStreamEndsWithItsAccessToken: the live stream of a connection ends
+// when its access token does, with the event reconnect, so a removal or a
+// change of rights counts within the hour. The client comes back with a
+// fresh token.
+func TestAStreamEndsWithItsAccessToken(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "ada")
+	laptop := environment.login(t, owner, model.DefaultRights)
+	// The one connection's access token ends in a second.
+	if result := environment.database.MustExec(`UPDATE connection_tokens SET expires_at = $1 WHERE kind = 'access'`, time.Now().UTC().Add(time.Second)); rowsAffected(t, result) != 1 {
+		t.Fatal("no access token to shorten")
+	}
+	started := time.Now()
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/apps/events", bearer: laptop.AccessToken})
+	if took := time.Since(started); took > 10*time.Second {
+		t.Fatalf("the stream ran %s", took)
+	}
+	expectStatus(t, recorder, http.StatusOK)
+	if !strings.HasSuffix(recorder.Body.String(), "event: reconnect\ndata: {}\n\n") {
+		t.Fatalf("body = %q", recorder.Body.String())
+	}
+
+	// A CI token's stream ends within the hour, whenever the token ends.
+	expires := time.Now().Add(30 * 24 * time.Hour)
+	now := time.Now()
+	if got := api.StreamDeadline(model.Bearer{ExpiresAt: &expires}, now); !got.Equal(now.Add(model.AccessTokenLifetime)) {
+		t.Fatalf("deadline = %s", got)
+	}
+	if got := api.StreamDeadline(model.Bearer{}, now); !got.Equal(now.Add(model.AccessTokenLifetime)) {
+		t.Fatalf("deadline without an end = %s", got)
+	}
+}
+
+func rowsAffected(t *testing.T, result sql.Result) int64 {
+	t.Helper()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
 }

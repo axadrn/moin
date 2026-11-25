@@ -16,7 +16,7 @@ The CLI, the terminal UI and your own scripts use this API. Its OpenAPI 3.1 docu
 | Session | people sign in in the browser with GitHub or a passkey and get a session cookie, never a bearer token; `GET /api/v1/csrf` gives the CSRF token a session sends with every change; the `Moin-Workspace` header names the workspace |
 | Errors | `{"error":{"code","message","fields"}}`, with stable codes such as `server_offline`, `deploy_running` and `no_rollback`. A secret goes straight to a server: `409` `server_offline` when it is offline, `409` `secret_missing` when a server lacks a key a request needs |
 | Confirm | what is big and cannot be undone takes the name, typed out, as `?confirm=`: removing a server, an app or a bucket, deleting a workspace. Without it or with another name: `422` `confirm_mismatch` |
-| Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place |
+| Streams | `…/events` endpoints are server-sent events. A user holds at most 20 streams at once; one more answers `429` `rate_limited`, closing one frees its place. The stream of a connection or CI token ends when its access token does, within the hour, with the event `reconnect`: open it again with a fresh token, so new rights and a removal count |
 | IDs | answers carry the `id` of a workspace, app, server or bucket in 32 characters, the UUID without dashes, as links do. `{app}`, `{id}`, `{name}` and `{slug}` in a path, and fields that name one, take its name, its ID or a link part like `my-app-<id>` ([Names and links](/docs/guides/names)) |
 
 Endpoints for no token keep a leaked token from making new tokens, giving itself rights, changing roles, removing people or deleting a workspace. [Rights](/docs/reference/rights) lists the right of every endpoint. [Where things work](/docs/reference/surfaces) shows the same per feature.
@@ -56,9 +56,9 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `PATCH /api/v1/account/email` | changes your email |
 | `DELETE /api/v1/account` | deletes your account |
 | `GET /api/v1/account/connections` | the clients you let in from the browser, with `rights`; `current` marks the connection that asks. A connection sees those of its workspace |
-| `PATCH /api/v1/account/connections/{id}` | changes its rights, `{"rights": ["deploy", "env"]}`, from a signed-in browser only |
+| `PATCH /api/v1/account/connections/{id}` | changes its rights, `{"rights": ["deploy", "env"]}`, from a signed-in browser only. Adding a right needs a passkey confirmation or a sign-in from the last five minutes, else `403` `confirm_required` |
 | `DELETE /api/v1/account/connections/{id}` | ends a connection and its tokens at once |
-| `GET` · `POST /api/v1/ci-tokens` | the CI tokens of the workspace you see (yours; the owner's every one); makes one from a signed-in browser, `{"name", "rights", "app", "expires_in_days"}`, and answers it once |
+| `GET` · `POST /api/v1/ci-tokens` | the CI tokens of the workspace you see (yours; the owner's every one); makes one from a signed-in browser, `{"name", "rights", "app", "expires_in_days"}`, and answers it once; like adding a right it needs a fresh confirmation, else `403` `confirm_required` |
 | `PATCH` · `DELETE /api/v1/ci-tokens/{id}` | changes its rights (only its maker, from a signed-in browser); removes it (yours, or as the owner any) |
 | `GET /api/v1/account/sessions` · `DELETE /account/sessions/{id}` · `DELETE /account/sessions` | signed-in browsers; signs one, or all others, out |
 | `GET /api/v1/account/passkeys` · `DELETE /account/passkeys/{id}` | your passkeys, never their keys; removes one, but not the last way in: `409` `last_way_in` for the only passkey of an account without GitHub |
@@ -72,7 +72,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `GET /api/v1/workspaces/{slug}` | the team: who is in it, their roles, open invitations |
 | `PATCH /api/v1/workspaces/{slug}/name` | renames the workspace (admin); its slug follows |
 | `DELETE /api/v1/workspaces/{slug}?confirm=<name>` | deletes the workspace (owner) |
-| `POST /api/v1/workspaces/{slug}/invitations` | invites someone by email (admin) |
+| `POST /api/v1/workspaces/{slug}/invitations` | invites someone by email (admin). A connection or CI token invites only members: `"role": "admin"` answers `403` `forbidden` |
 | `POST /api/v1/workspaces/{slug}/invitations/{id}/resend` · `DELETE /invitations/{id}` | sends an invitation again; revokes it (admin) |
 | `PATCH /api/v1/workspaces/{slug}/members/{id}/role` | changes a role (admin; only an owner makes or changes an owner) |
 | `DELETE /api/v1/workspaces/{slug}/members/{id}` | removes someone from the team (admin; only an owner removes an owner) |

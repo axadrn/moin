@@ -5,8 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
@@ -22,10 +24,78 @@ type ConnectionsHandler struct {
 	connections *service.ConnectionService
 	ciTokens    *service.CITokenService
 	apps        *service.AppService
+	passkeys    *service.PasskeyService
+	auth        *service.AuthService
 }
 
-func NewConnectionsHandler(connections *service.ConnectionService, ciTokens *service.CITokenService, apps *service.AppService) *ConnectionsHandler {
-	return &ConnectionsHandler{connections: connections, ciTokens: ciTokens, apps: apps}
+func NewConnectionsHandler(connections *service.ConnectionService, ciTokens *service.CITokenService, apps *service.AppService, passkeys *service.PasskeyService, auth *service.AuthService) *ConnectionsHandler {
+	return &ConnectionsHandler{connections: connections, ciTokens: ciTokens, apps: apps, passkeys: passkeys, auth: auth}
+}
+
+// confirmView is the card that asks the person to confirm, when they have
+// to before more rights or a new CI token.
+func (h *ConnectionsHandler) confirmView(r *http.Request) pages.ConfirmView {
+	err := h.passkeys.Present(ctxkeys.Session(r.Context()))
+	if err == nil {
+		return pages.ConfirmView{}
+	}
+	return pages.ConfirmView{Needed: true, Passkey: errors.Is(err, service.ErrPresencePasskey), Next: r.URL.Path}
+}
+
+// Confirm checks the passkey's answer and goes back to the page it came
+// from: for five minutes, more rights and new CI tokens need nothing more.
+func (h *ConnectionsHandler) Confirm(w http.ResponseWriter, r *http.Request) {
+	base := ctxkeys.AppBasePath(r.Context())
+	next := r.FormValue("next")
+	if !strings.HasPrefix(next, base+"/settings/connections") && !strings.HasPrefix(next, base+"/settings/ci-tokens") {
+		next = base + "/settings/connections"
+	}
+	err := h.passkeys.Confirm(service.Presence{
+		Session:  ctxkeys.Session(r.Context()),
+		Ceremony: takePasskeyCeremony(w, r),
+		Answer:   []byte(r.FormValue("passkey")),
+	})
+	if err != nil {
+		slog.Warn("confirming with a passkey failed", "error", err)
+	}
+	redirect(w, r, next, http.StatusSeeOther)
+}
+
+// ConfirmOptions starts the passkey ceremony of Confirm.
+func (h *ConnectionsHandler) ConfirmOptions(w http.ResponseWriter, r *http.Request) {
+	options, ceremony, err := h.passkeys.BeginConfirm(ctxkeys.Session(r.Context()))
+	if err != nil {
+		passkeyFailed(w, err)
+		return
+	}
+	setPasskeyCeremony(w, r, ceremony)
+	api.JSON(w, http.StatusOK, options)
+}
+
+// Reauth signs the person out and sends them to sign in again, any way
+// in: an account without a passkey gives more rights only with a sign-in
+// less than five minutes old.
+func (h *ConnectionsHandler) Reauth(w http.ResponseWriter, r *http.Request) {
+	if err := h.auth.EndSession(r); err != nil {
+		renderError(w, "end session failed", err)
+		return
+	}
+	h.auth.ClearSessionCookie(w)
+	redirect(w, r, "/auth", http.StatusSeeOther)
+}
+
+// presenceMessage is what a switch or the form says when the person has to
+// confirm first.
+func presenceMessage(err error) (string, bool) {
+	switch {
+	case errors.Is(err, service.ErrPresencePasskey):
+		return "Confirm with your passkey first, at the top of the page.", true
+	case errors.Is(err, service.ErrPresenceSignIn):
+		return "Sign in again first, at the top of the page. Any sign-in in the last five minutes counts.", true
+	case errors.Is(err, service.ErrImpersonating):
+		return "Impersonation is read-only.", true
+	}
+	return "", false
 }
 
 // Page lists the connections and CI tokens, with the form for a new CI
@@ -55,7 +125,7 @@ func (h *ConnectionsHandler) view(r *http.Request, form pages.CITokenForm) (page
 	if err != nil {
 		return pages.ConnectionsView{}, err
 	}
-	view := pages.ConnectionsView{Connections: connections, CITokens: tokens, Apps: apps, Form: form, Now: time.Now(), WorkspaceNames: map[string]string{}}
+	view := pages.ConnectionsView{Connections: connections, CITokens: tokens, Apps: apps, Form: form, Now: time.Now(), WorkspaceNames: map[string]string{}, Confirm: h.confirmView(r)}
 	for _, membership := range ctxkeys.Workspaces(r.Context()) {
 		view.WorkspaceNames[membership.ID] = membership.Name
 	}
@@ -74,7 +144,7 @@ func (h *ConnectionsHandler) Connection(w http.ResponseWriter, r *http.Request) 
 			name = membership.Name
 		}
 	}
-	render(w, r, pages.SettingsConnection(pages.ConnectionView{Connection: *connection, WorkspaceName: name, Now: time.Now()}))
+	render(w, r, pages.SettingsConnection(pages.ConnectionView{Connection: *connection, WorkspaceName: name, Now: time.Now(), Confirm: h.confirmView(r)}))
 }
 
 // connection finds the connection of the path, or answers not found.
@@ -105,8 +175,15 @@ func (h *ConnectionsHandler) SetConnectionRight(w http.ResponseWriter, r *http.R
 		return
 	}
 	path := ctxkeys.AppBasePath(r.Context()) + "/settings/connections/" + link.ID(connection.ID)
-	rights := withRight(connection.Rights, right, r.FormValue("on") == "1")
-	updated, err := h.connections.SetRights(connection.UserID, connection.ID, rights, service.RequestSource(r.Context()))
+	on := r.FormValue("on") == "1"
+	if on && !connection.Rights.Has(right) {
+		if err := h.passkeys.Present(ctxkeys.Session(r.Context())); err != nil {
+			h.refused(w, r, err)
+			render(w, r, pages.RightSwitch(path, "connection-right", right, false))
+			return
+		}
+	}
+	updated, err := h.connections.SetRight(connection.UserID, connection.ID, right, on, service.RequestSource(r.Context()))
 	if err != nil {
 		answerError(w, r, "Right not changed", errorMessage(err))
 		render(w, r, pages.RightSwitch(path, "connection-right", right, connection.Rights.Has(right)))
@@ -133,6 +210,11 @@ func (h *ConnectionsHandler) RemoveConnection(w http.ResponseWriter, r *http.Req
 // the list. A wrong field shows the form again with what is wrong.
 func (h *ConnectionsHandler) CreateCIToken(w http.ResponseWriter, r *http.Request) {
 	input, form := parseCITokenForm(r)
+	if err := h.passkeys.Present(ctxkeys.Session(r.Context())); err != nil {
+		w.Header().Set("HX-Reswap", "none")
+		h.refused(w, r, err)
+		return
+	}
 	if len(form.Errors) == 0 {
 		member := ctxkeys.WorkspaceMember(r.Context())
 		actor := service.Actor{WorkspaceID: member.WorkspaceID, UserID: member.UserID, Source: service.RequestSource(r.Context())}
@@ -204,7 +286,7 @@ func (h *ConnectionsHandler) CIToken(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	render(w, r, pages.SettingsCIToken(pages.CITokenView{Token: *token, Mine: token.UserID == ctxkeys.User(r.Context()).ID, Now: time.Now()}))
+	render(w, r, pages.SettingsCIToken(pages.CITokenView{Token: *token, Mine: token.UserID == ctxkeys.User(r.Context()).ID, Now: time.Now(), Confirm: h.confirmView(r)}))
 }
 
 // ciToken finds the CI token of the path among those the person sees, or
@@ -238,7 +320,15 @@ func (h *ConnectionsHandler) SetCITokenRight(w http.ResponseWriter, r *http.Requ
 	member := ctxkeys.WorkspaceMember(r.Context())
 	actor := service.Actor{WorkspaceID: member.WorkspaceID, UserID: member.UserID, Source: service.RequestSource(r.Context())}
 	path := ctxkeys.AppBasePath(r.Context()) + "/settings/ci-tokens/" + link.ID(token.ID)
-	updated, err := h.ciTokens.SetRights(actor, token.ID, withRight(token.Rights, right, r.FormValue("on") == "1"))
+	on := r.FormValue("on") == "1"
+	if on && !token.Rights.Has(right) {
+		if err := h.passkeys.Present(ctxkeys.Session(r.Context())); err != nil {
+			h.refused(w, r, err)
+			render(w, r, pages.RightSwitch(path, "ci-token-right", right, false))
+			return
+		}
+	}
+	updated, err := h.ciTokens.SetRight(actor, token.ID, right, on)
 	if err != nil {
 		answerError(w, r, "Right not changed", errorMessage(err))
 		render(w, r, pages.RightSwitch(path, "ci-token-right", right, token.Rights.Has(right)))
@@ -271,12 +361,13 @@ func pathRight(r *http.Request) (model.Rights, bool) {
 	return 0, false
 }
 
-// withRight is rights with right turned on or off.
-func withRight(rights, right model.Rights, on bool) model.Rights {
-	if on {
-		return rights | right
+// refused answers a change that needs the person to confirm first.
+func (h *ConnectionsHandler) refused(w http.ResponseWriter, r *http.Request, err error) {
+	message, ok := presenceMessage(err)
+	if !ok {
+		message = errorMessage(err)
 	}
-	return rights &^ right
+	answerError(w, r, "Confirm it's you", message)
 }
 
 // notFound answers a page or an action that names nothing there.

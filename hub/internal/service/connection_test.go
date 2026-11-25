@@ -133,6 +133,26 @@ func TestAConnectionUnusedFor90DaysEnds(t *testing.T) {
 	}
 }
 
+// TestAnIdleConnectionEndsWhenListed: Settings never shows a connection
+// unused for 90 days as live, and it does not count toward the limit.
+func TestAnIdleConnectionEndsWhenListed(t *testing.T) {
+	e := newDeviceLoginEnvironment(t)
+	e.connect(t, model.DefaultRights)
+	e.clock.Add(model.ConnectionIdle + time.Hour)
+	fresh := e.connect(t, model.DefaultRights)
+	connections, err := e.connections.List(e.user.User.ID)
+	if err != nil || len(connections) != 1 || connections[0].ID != fresh.Connection.ID {
+		t.Fatalf("List() = %+v, %v", connections, err)
+	}
+	var live int
+	if err := e.database.Get(&live, `SELECT COUNT(*) FROM connections WHERE ended_at IS NULL`); err != nil || live != 1 {
+		t.Fatalf("live connections = %d, %v", live, err)
+	}
+	if !e.recorded(t, "connection.ended", "unused for 90 days") {
+		t.Fatal("the activity does not say the connection ended unused")
+	}
+}
+
 // TestRemovingAConnectionStopsItsAccessAtOnce, and a change of rights
 // counts from the next request.
 func TestRemovingAConnectionStopsItsAccessAtOnce(t *testing.T) {
@@ -140,7 +160,7 @@ func TestRemovingAConnectionStopsItsAccessAtOnce(t *testing.T) {
 	tokens := e.connect(t, model.DefaultRights)
 	id := tokens.Connection.ID
 
-	if _, err := e.connections.SetRights(e.user.User.ID, id, model.RightDelete, Source{Via: ViaWeb}); err != nil {
+	if _, err := e.connections.SetRights(e.user.User.ID, id, model.RightDelete, nil, Source{Via: ViaWeb}); err != nil {
 		t.Fatal(err)
 	}
 	bearer, err := e.connections.Authenticate(tokens.Access)
@@ -153,7 +173,7 @@ func TestRemovingAConnectionStopsItsAccessAtOnce(t *testing.T) {
 
 	// Grace cannot change or remove Ada's connection.
 	testutil.SeedUser(t, e.database, testutil.UserOptions{ID: "grace", Verified: true})
-	if _, err := e.connections.SetRights("grace", id, model.RightServers, Source{}); !errors.Is(err, repository.ErrConnectionNotFound) {
+	if _, err := e.connections.SetRights("grace", id, model.RightServers, nil, Source{}); !errors.Is(err, repository.ErrConnectionNotFound) {
 		t.Fatalf("SetRights() by another person = %v, want not found", err)
 	}
 	if err := e.connections.Remove("grace", id, Source{}); !errors.Is(err, repository.ErrConnectionNotFound) {

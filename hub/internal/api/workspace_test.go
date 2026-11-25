@@ -539,3 +539,62 @@ func TestOnboardingIgnoresUnavailableInvitations(t *testing.T) {
 	unknownField := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/auth/onboarding", body: `{"name":"Fresh","invite":"x"}`, cookie: seeded.outsider})
 	expectError(t, unknownField, http.StatusBadRequest, "invalid_body")
 }
+
+// TestATokenInvitesOnlyMembers: an admin can invite others and remove
+// apps, so a connection or CI token cannot make one, whatever its rights.
+func TestATokenInvitesOnlyMembers(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	owner := seedTokenOwner(t, environment, "ada")
+	created := createCIToken(t, environment, owner, `"name":"team","rights":["deploy","env","delete","servers"]`)
+	path := "/api/v1/workspaces/" + owner.workspaceSlug + "/invitations"
+	recorder := environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"email":"new@example.com","role":"admin"}`, bearer: created.Token})
+	expectError(t, recorder, http.StatusForbidden, "forbidden")
+	recorder = environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"email":"new@example.com","role":"member"}`, bearer: created.Token})
+	expectStatus(t, recorder, http.StatusAccepted)
+	recorder = environment.send(t, apiRequest{method: http.MethodPost, path: path, body: `{"email":"other@example.com","role":"admin"}`, cookie: owner.session})
+	expectStatus(t, recorder, http.StatusAccepted)
+}
+
+// TestLeavingTheWorkspaceEndsItsAccess: a member removed from a workspace,
+// or one who leaves, loses their connections and CI tokens there at once.
+func TestLeavingTheWorkspaceEndsItsAccess(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	seeded := seedTeam(t, environment)
+	access := func(memberID string) (string, string) {
+		t.Helper()
+		var userID string
+		if err := environment.database.Get(&userID, `SELECT user_id FROM workspace_members WHERE id = $1`, memberID); err != nil {
+			t.Fatal(err)
+		}
+		connection, err := environment.connections.Create(service.NewConnection{UserID: userID, WorkspaceID: seeded.workspace.ID, ClientName: "moin CLI on host-1", Rights: model.DefaultRights})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tokens, err := environment.connections.Issue(connection)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, raw, err := environment.ciTokens.Create(service.Actor{UserID: userID, WorkspaceID: seeded.workspace.ID}, service.NewCIToken{Name: "ci", Rights: model.DefaultRights})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, bearer := range []string{tokens.Access, raw} {
+			expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: bearer}), http.StatusOK)
+		}
+		return tokens.Access, raw
+	}
+	gone := func(bearers ...string) {
+		t.Helper()
+		for _, bearer := range bearers {
+			expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: bearer}), http.StatusUnauthorized, "unauthenticated")
+		}
+	}
+
+	connection, ciToken := access("member-member")
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodDelete, path: seeded.path("/members/member-member"), cookie: seeded.owner}), http.StatusNoContent)
+	gone(connection, ciToken)
+
+	connection, ciToken = access("member-admin")
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodPost, path: seeded.path("/leave"), cookie: seeded.admin}), http.StatusNoContent)
+	gone(connection, ciToken)
+}

@@ -27,7 +27,7 @@ API: POST /api/v1/auth/device, then POST /api/v1/auth/token
 Only allow a code you started yourself. Someone who sends you a link to `/device` wants your access.
 
 - The rights start at read, deploy and env. Delete and servers are off. Turn on what this computer needs.
-- **Allow** needs your passkey right then, also when you just signed in. An account without a passkey allows only within five minutes of signing in: the page says **Sign in again to allow** after that. [Add a passkey](#add-a-passkey) to approve faster.
+- **Allow** needs your passkey right then, also when you just signed in. An account without a passkey allows only within five minutes of signing in, any way in counts. After that the page says **Sign in again to allow**. [Add a passkey](#add-a-passkey) to approve faster.
 - No browser here? Open the address moin prints on any other device.
 - The code is good once, for ten minutes.
 - The CLI keeps the login in its config file, readable only by you. It renews itself every hour.
@@ -48,7 +48,9 @@ MCP: whoami, the rights of its own connection
 
 ## Change what a connection may do
 
-Each right is a switch. It counts from the connection's next request. Only you, signed in in the browser, change rights: no connection gives itself more.
+Each right is a switch. It counts from the connection's next request, and a live stream comes back with it within the hour. Only you, signed in in the browser, change rights: no connection gives itself more.
+
+Turning a right on asks you to confirm, like **Allow**: **Confirm with passkey** at the top of the page, which counts for five minutes, or without a passkey **Sign in again**. Turning a right off never asks.
 
 ```surfaces
 Web: **Settings**, **Connections**, the connection, **Rights**
@@ -76,10 +78,14 @@ Web: **Settings**, **Connections**, **New CI token**
 API: POST /api/v1/ci-tokens with a session
 ```
 
+Making one asks you to confirm first, as turning a right on does.
+
 moin shows the token once. Give it to the CLI with `moin login --token <token>`, on stdin with `echo "$TOKEN" | moin login`, or as `MOIN_TOKEN` in CI.
 
 - Its page changes its rights and removes it. Only the person who made it changes its rights.
-- You see your own CI tokens. The workspace's owner sees every one and can remove any.
+- You see your own CI tokens. The workspace's owner sees every one and can remove any. A connection or CI token removes another person's only with the servers right.
+- Someone who leaves the workspace, or is removed from it, loses their connections and CI tokens there at once.
+- A connection unused for 90 days ends. It leaves the list and frees its place.
 - A CI token for one app reaches only that app's endpoints. MCP refuses it.
 
 ## Remove a CI token
@@ -118,6 +124,7 @@ Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Add passkey**
 
 - Your browser asks where to keep it. Pick your password manager to have it on every device.
 - moin emails you when a passkey is added, so one you did not add does not go unseen.
+- Adding one needs a sign-in from the last five minutes, any way in, or a confirmation with a passkey you have. A passkey lets clients in, so a stolen session cannot add its own.
 - Until you have one, every page asks: **Secure your account: add a passkey.**
 - On the sign-in page, **Sign in with a passkey**. No email to type: the passkey knows your account.
 

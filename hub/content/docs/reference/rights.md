@@ -5,24 +5,27 @@ group: "Reference"
 order: 6
 ---
 
-Every client that acts for you has rights: the CLI and the TUI of a computer, an AI agent, a CI token. You pick them when you let it in, and change them under **Settings**, **Connections**. A change counts from its next request.
+Every client that acts for you has rights: the CLI and the TUI of a computer, an AI agent, a CI token. You pick them when you let it in, and change them under **Settings**, **Connections**. A change counts from its next request. A live stream, such as the TUI's lists, comes back with fresh rights within the hour.
 
 | Right | On at first | Lets it |
 | --- | --- | --- |
-| read | always, it cannot be off | look: apps, servers, deploys, logs, metrics, status, the compose file, env var names, database rows and read-only SQL, a link to download a copy, the live streams |
-| deploy | on | run and change apps: create, rename, pin, deploy, redeploy, roll back, restart, start, stop, run a command, update from the catalog, domains, the instant address, uptime, how often backups run, the deploy hook, the repo, the app's bucket |
-| env | on | the secrets of an app: set and remove env vars, its password |
+| read | always, it cannot be off | look: apps, servers, deploys, logs, metrics, status, the compose file, env var names, database tables, the backup schedule and its copies, the live streams |
+| deploy | on | run and change apps: create, rename, pin, deploy, redeploy, roll back, restart, start, stop, update from the catalog, domains, the instant address, uptime, how often backups run, the deploy hook, the repo, the app's bucket |
+| env | on | an app's secrets and data, the switch "Secrets and data": set and remove env vars, its password, database rows, read-only SQL, a link to download a copy |
 | delete | off | what is hard to get back: remove an app or a bucket, a server's apps, restore a database, change rows and run SQL that writes |
 | servers | off | what is around the apps: add, rename and remove servers, update daemons, server access, integrations, buckets, registry logins, alert destinations, the team and the workspace's name, hub updates, your name, picture and email alerts |
 
-- Rights never add to your role. A member's connection with every right still cannot invite anyone.
+- Rights never add to your role. A member's connection with every right still cannot invite anyone. And a connection or CI token invites only members: an admin is invited in the web.
 - Without the right, the API answers `403` `missing_right` with the `right`, and the CLI and MCP say: "This connection may not deploy and restart. Change it in Settings, Connections."
 - Removing a server needs servers and delete: an offline server takes its apps with it.
 - Domains are one list: setting it needs deploy, also when it drops a domain.
-- SQL through the API needs read; SQL that writes (`write: true`) also needs delete.
-- Read also removes connections and CI tokens. Taking access away never needs more.
+- Rows, SQL and copies of a database are app data, as strong as secrets: they need env. SQL that writes (`write: true`) also needs delete.
+- Running a command in a container (`exec`) can do anything in the app, read its secrets and delete its data: it needs deploy, env and delete together.
+- Read removes your connections and your own CI tokens: taking your own access away never needs more. Removing another person's CI token, as the owner, needs servers.
 - **no token**: a connection or CI token never calls it, whatever its rights: your sessions, passkeys and email, rights themselves, new CI tokens, roles, leaving or deleting a workspace or the account, billing, admin. A signed-in browser does, and nobody needs to be signed in for the steps of signing in.
 - A CI token for one app reaches only the endpoints of that app, `GET /api/v1/account` and `GET /api/v1/meta`. Everything else answers `403` `app_only`, MCP too.
+
+Giving more is guarded like letting a client in. Turning a right on and making a CI token need your passkey, or without one a sign-in from the last five minutes, any way in. A passkey counts for five minutes, so a few switches need it once. Turning a right off and removing never ask.
 
 The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and at the end of their description.
 
@@ -124,17 +127,17 @@ The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and a
 | `DELETE /api/v1/registries/{host}` | servers |
 | `GET /api/v1/apps/{app}/logs` | read |
 | `GET /api/v1/apps/{app}/compose` | read |
-| `POST /api/v1/apps/{app}/exec` | deploy |
+| `POST /api/v1/apps/{app}/exec` | deploy, env, delete |
 | `GET /api/v1/apps/{app}/databases` | read |
 | `GET /api/v1/apps/{app}/databases/tables` | read |
-| `GET /api/v1/apps/{app}/databases/rows` | read |
+| `GET /api/v1/apps/{app}/databases/rows` | env |
 | `POST /api/v1/apps/{app}/databases/rows` | delete |
 | `PATCH /api/v1/apps/{app}/databases/rows` | delete |
 | `DELETE /api/v1/apps/{app}/databases/rows` | delete |
-| `POST /api/v1/apps/{app}/databases/query` | read |
+| `POST /api/v1/apps/{app}/databases/query` | env |
 | `GET /api/v1/apps/{app}/backups` | read |
 | `PUT /api/v1/apps/{app}/backups` | deploy |
-| `POST /api/v1/apps/{app}/backups/download` | read |
+| `POST /api/v1/apps/{app}/backups/download` | env |
 | `POST /api/v1/apps/{app}/restores` | delete |
 | `GET /api/v1/apps/{app}/restores/{restore}` | read |
 | `GET /api/v1/apps/{app}/uptime` | read |

@@ -137,10 +137,10 @@ func TestOwnersSeeEveryCIToken(t *testing.T) {
 		t.Fatalf("the member sees %v", got)
 	}
 
-	if _, err := e.tokens.SetRights(actorOf(e.owner), graces.ID, model.RightServers); !errors.Is(err, ErrCITokenMaker) {
+	if _, err := e.tokens.SetRights(actorOf(e.owner), graces.ID, model.RightServers, nil); !errors.Is(err, ErrCITokenMaker) {
 		t.Fatalf("SetRights() by the owner on Grace's token = %v, want ErrCITokenMaker", err)
 	}
-	changed, err := e.tokens.SetRights(actorOf(e.member), graces.ID, model.RightEnv)
+	changed, err := e.tokens.SetRights(actorOf(e.member), graces.ID, model.RightEnv, nil)
 	if err != nil || changed.Rights != model.RightRead|model.RightEnv {
 		t.Fatalf("SetRights() by its maker = %+v, %v", changed, err)
 	}

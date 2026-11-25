@@ -26,6 +26,11 @@ import (
 // refreshEarly is how long before its end an access token is refreshed.
 const refreshEarly = time.Minute
 
+// refreshTimeout is how long a refresh may take, the exchange and saving
+// the pair. It is well below the half minute after which another process
+// takes the lock as stale.
+const refreshTimeout = 10 * time.Second
+
 // ErrLoginEnded is a connection the hub ended: removed in Settings, unused
 // for 90 days, or its refresh token used twice.
 var ErrLoginEnded = errors.New("your login ended: run `" + build.Name + " login` again")
@@ -75,7 +80,13 @@ func (c *Client) refresh(ctx context.Context, sent string) error {
 		c.login = saved
 		return nil
 	}
-	fresh, err := exchange(ctx, c.http, c.url, c.surface, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {c.login.RefreshToken}})
+	// Once the hub has the refresh token it is used up, so the exchange and
+	// saving the new pair finish even when the caller gives up: otherwise
+	// the file keeps a used token, and the next refresh ends the login.
+	work, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshTimeout)
+	defer cancel()
+	client := &http.Client{Transport: c.http.Transport, Timeout: refreshTimeout}
+	fresh, err := exchange(work, client, c.url, c.surface, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {c.login.RefreshToken}})
 	if err != nil {
 		var oauth *oauthError
 		if errors.As(err, &oauth) && oauth.Code == "invalid_grant" {

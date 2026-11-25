@@ -329,7 +329,7 @@ var settingsSummaries = map[string]summarize{
 }
 
 // teamSummaries are about the people of the workspace: invitations,
-// members, API tokens and the plan.
+// members, connections, CI tokens and the plan.
 var teamSummaries = map[string]summarize{
 	"workspace.updated": func(target string, d map[string]string) string {
 		if d["from"] != "" {
@@ -374,10 +374,10 @@ var teamSummaries = map[string]summarize{
 		if d["kind"] == "device" {
 			return "logged in " + d["name"] + " from the browser, with read and write access"
 		}
-		return "created the API token " + d["name"] + " with " + strings.ReplaceAll(d["scopes"], ",", " and ") + " access, expiring " + d["expires"]
+		return "created the CI token " + d["name"] + " with " + strings.ReplaceAll(d["scopes"], ",", " and ") + " access, expiring " + d["expires"]
 	},
 	"api_token.revoked": func(target string, d map[string]string) string {
-		return "revoked the API token " + d["name"]
+		return "removed the CI token " + d["name"]
 	},
 	"connection.approved": func(target string, d map[string]string) string {
 		return "let " + d["name"] + " in from the browser, with " + rightsText(d["rights"])

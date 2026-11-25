@@ -77,14 +77,14 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `update_app` | sets a catalog app to a version and deploys it | deploy |
 | `get_logs` | the last container lines | read |
 | `get_compose_file` | the [compose file](/docs/guides/compose#the-compose-file-moin-runs) moin runs for an app, without secret values, to run it elsewhere | read |
-| `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin) | deploy, destructive |
+| `exec_command` | [runs a command](/docs/guides/exec) in a container, no shell; the exit code and the last 64 KB of output (owner or admin). It can do anything in the app | deploy, env, delete, destructive |
 | `list_tables` | tables, row counts, schema and migration of the database | read |
-| `query_database` | runs read-only SQL | read |
-| `execute_sql` | runs SQL that changes data | delete, destructive |
+| `query_database` | runs read-only SQL | env |
+| `execute_sql` | runs SQL that changes data | env, delete, destructive |
 | `get_backups` | how each database is backed up: how often, how long, the newest copy, the daily check, and the moments to go back to | read |
 | `set_backups` | how often (`every_minutes`: 15, 60 or 1440), how long (`keep_days`: 1, 3, 7 or 30) | deploy, destructive |
 | `restore_app` | goes back to a moment (`moment`, its id or label: a copy, `before-v12`, `undo-…`) or a time (`at`), the newest copy at or before it; keeps the database before, so it can be undone; `confirm` is the app's name. It runs on its own and answers its state; with `id` it tells how it stands | delete, destructive |
-| `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`, signed by the app's server; it works for 15 minutes | read |
+| `download_backup` | a link to a copy in the app's own bucket, the newest or `moment`, signed by the app's server; it works for 15 minutes | env |
 | `list_buckets` | the buckets, without their secrets, with the apps that use each and the servers that keep its key | read |
 | `add_bucket` | adds a bucket; `server` tests it and keeps the secret key; the first is the default | servers |
 | `edit_bucket` | changes a bucket; `server` tests a new place or key, an empty `secret_key` keeps the server's | servers |
@@ -119,7 +119,7 @@ Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mc
 | `get_billing` | the subscription; on a self-hosted hub it says billing is off | read |
 | `list_workspaces` · `get_workspace` | the token's workspace with its team | read |
 | `list_activity` | who did what, newest first, to the second; filter by `app`, `server` or `user` | read |
-| `invite_member` | invites someone by email | servers |
+| `invite_member` | invites someone by email, as member; an admin is invited in the web | servers |
 | `resend_invitation` | sends an invitation again | servers |
 | `revoke_invitation` | takes an invitation back | servers, destructive |
 | `rename_workspace` | renames the workspace | servers |

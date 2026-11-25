@@ -62,7 +62,7 @@ type Middleware struct {
 	// RateLimitInvitations limits workspace invitation emails.
 	RateLimitInvitations Wrap
 	// InWorkspace requires onboarding and scopes a moin route to the
-	// workspace of the API token, or for a session to the workspace its
+	// workspace of the connection or CI token, or for a session to the workspace its
 	// Moin-Workspace header names.
 	InWorkspace Wrap
 	// RateLimitDevice limits the logins `moin login` starts per client IP.
@@ -176,17 +176,17 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"DELETE /api/v1/registries/{host}", m.InWorkspace(h.Apps.DeleteRegistry), model.RightServers},
 		{"GET /api/v1/apps/{app}/logs", m.InWorkspace(h.Apps.Logs), model.RightRead},
 		{"GET /api/v1/apps/{app}/compose", m.InWorkspace(h.Apps.ComposeFile), model.RightRead},
-		{"POST /api/v1/apps/{app}/exec", m.InWorkspace(h.Apps.Exec), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/exec", m.InWorkspace(h.Apps.Exec), model.RightDeploy | model.RightEnv | model.RightDelete},
 		{"GET /api/v1/apps/{app}/databases", m.InWorkspace(h.Apps.Databases), model.RightRead},
 		{"GET /api/v1/apps/{app}/databases/tables", m.InWorkspace(h.Apps.Tables), model.RightRead},
-		{"GET /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.Rows), model.RightRead},
+		{"GET /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.Rows), model.RightEnv},
 		{"POST /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.InsertRow), model.RightDelete},
 		{"PATCH /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.UpdateRow), model.RightDelete},
 		{"DELETE /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.DeleteRow), model.RightDelete},
-		{"POST /api/v1/apps/{app}/databases/query", m.InWorkspace(h.Apps.Query), model.RightRead},
+		{"POST /api/v1/apps/{app}/databases/query", m.InWorkspace(h.Apps.Query), model.RightEnv},
 		{"GET /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.Backups), model.RightRead},
 		{"PUT /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.SetBackupSchedule), model.RightDeploy},
-		{"POST /api/v1/apps/{app}/backups/download", m.InWorkspace(h.Apps.Download), model.RightRead},
+		{"POST /api/v1/apps/{app}/backups/download", m.InWorkspace(h.Apps.Download), model.RightEnv},
 		{"POST /api/v1/apps/{app}/restores", m.InWorkspace(h.Apps.StartRestore), model.RightDelete},
 		{"GET /api/v1/apps/{app}/restores/{restore}", m.InWorkspace(h.Apps.Restore), model.RightRead},
 		{"GET /api/v1/apps/{app}/uptime", m.InWorkspace(h.Apps.Uptime), model.RightRead},

@@ -36,7 +36,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	Add(server, &mcpsdk.Tool{
 		Name:        "list_workspaces",
 		Title:       "List workspaces",
-		Description: "Lists the workspaces this token can reach with the user's role in each. A token is bound to one workspace, so the list has at most one entry.",
+		Description: "Lists the workspaces this connection or CI token can reach with the user's role in each. It is bound to one workspace, so the list has at most one entry.",
 		Annotations: readOnly("List workspaces"),
 	}, model.RightRead, tools.listWorkspaces)
 	Add(server, &mcpsdk.Tool{
@@ -48,7 +48,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	Add(server, &mcpsdk.Tool{
 		Name:        "list_activity",
 		Title:       "List workspace activity",
-		Description: "Lists the activity of a workspace, newest first: who did what, when (RFC 3339, UTC, full precision) and how (via web, cli, tui, api, mcp, hook, github or system, and the API token by name), with a summary sentence and the app and server per event. It covers deploys and how they ended, rollbacks, redeploys, restarts, stops, restores, SQL writes and row edits, env keys (never values), domains, passwords, deploy hooks, registries, the bucket, GitHub, servers, security, API tokens, billing and team changes. Filter with app, server or user (email or user ID). Who did it is the member by name. Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Admins and owners also get the email, the client IP and the user agent. Every member may view it.",
+		Description: "Lists the activity of a workspace, newest first: who did what, when (RFC 3339, UTC, full precision) and how (via web, cli, tui, api, mcp, hook, github or system, and the connection or CI token by name), with a summary sentence and the app and server per event. It covers deploys and how they ended, rollbacks, redeploys, restarts, stops, restores, SQL writes and row edits, env keys (never values), domains, passwords, deploy hooks, registries, the bucket, GitHub, servers, security, connections, CI tokens, billing and team changes. Filter with app, server or user (email or user ID). Who did it is the member by name. Returns up to limit events (default 50, at most 200) and next_cursor; pass next_cursor as cursor to get the next page, null means there are no more events. Admins and owners also get the email, the client IP and the user agent. Every member may view it.",
 		Annotations: readOnly("List workspace activity"),
 	}, model.RightRead, tools.listActivity)
 	Add(server, &mcpsdk.Tool{
@@ -60,7 +60,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	Add(server, &mcpsdk.Tool{
 		Name:        "invite_member",
 		Title:       "Invite a member",
-		Description: "Invites a person to a workspace by email with the role member or admin. The invitation is emailed to them and shows up in get_workspace until they accept. Fails with seat_limit when the plan has no free seat and already_member for existing members. Only owners and admins may invite.",
+		Description: "Invites a person to a workspace by email with the role member; an admin is invited in the web. The invitation is emailed to them and shows up in get_workspace until they accept. Fails with seat_limit when the plan has no free seat and already_member for existing members. Only owners and admins may invite.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Invite a member", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(true)},
 	}, model.RightServers, tools.inviteMember)
 	Add(server, &mcpsdk.Tool{
@@ -84,7 +84,7 @@ func registerTools(server *mcpsdk.Server, services Services) {
 	Add(server, &mcpsdk.Tool{
 		Name:        "set_email_alerts",
 		Title:       "Turn email alerts on or off",
-		Description: "With on true, the user this token acts for gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; whoami returns the setting as user.email_alerts.",
+		Description: "With on true, the user this connection or CI token acts for gets a mail when a site goes down or comes back, a server goes offline or comes back, or a deploy fails, in every workspace they own or run as admin. Only a verified address gets them. On by default; whoami returns the setting as user.email_alerts.",
 		Annotations: &mcpsdk.ToolAnnotations{Title: "Turn email alerts on or off", DestructiveHint: boolPointer(false), IdempotentHint: true, OpenWorldHint: boolPointer(false)},
 	}, model.RightServers, tools.setEmailAlerts)
 	registerOpsTools(server, services)
@@ -204,7 +204,7 @@ func (t builtinTools) whoami(_ context.Context, caller Caller, _ NoInput) (WhoAm
 // WorkspaceInput names a workspace. Empty means the workspace the token is
 // bound to.
 type WorkspaceInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 }
 
 // WorkspaceList is the output of list_workspaces.
@@ -214,7 +214,7 @@ type WorkspaceList struct {
 
 func (l WorkspaceList) Summary() string {
 	if len(l.Items) == 0 {
-		return "This token reaches no workspace."
+		return "This connection or CI token reaches no workspace."
 	}
 	names := make([]string, 0, len(l.Items))
 	for _, item := range l.Items {
@@ -265,7 +265,7 @@ func (t builtinTools) getWorkspace(_ context.Context, caller Caller, input Works
 
 // ActivityInput selects a page of workspace activity.
 type ActivityInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Limit     int    `json:"limit,omitempty" jsonschema:"number of events, 1 to 200; default 50"`
 	Cursor    string `json:"cursor,omitempty" jsonschema:"next_cursor of the previous page; leave empty for the newest events"`
 	App       string `json:"app,omitempty" jsonschema:"only events of this app, by name"`
@@ -343,9 +343,9 @@ func (t builtinTools) getBilling(_ context.Context, caller Caller, input Workspa
 
 // InviteInput is the input of invite_member.
 type InviteInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Email     string `json:"email" jsonschema:"email address of the person to invite"`
-	Role      string `json:"role" jsonschema:"member or admin"`
+	Role      string `json:"role" jsonschema:"member; an admin is invited in the web"`
 }
 
 // Invitation is the output of invite_member.
@@ -360,6 +360,9 @@ func (i Invitation) Summary() string {
 }
 
 func (t builtinTools) inviteMember(_ context.Context, caller Caller, input InviteInput) (Invitation, error) {
+	if strings.TrimSpace(input.Role) == model.WorkspaceRoleAdmin {
+		return Invitation{}, &ToolError{Code: "forbidden", Message: api.AdminInviteMessage}
+	}
 	workspace, member, err := t.workspace(caller, input.Workspace)
 	if err != nil {
 		return Invitation{}, err
@@ -378,7 +381,7 @@ func (t builtinTools) inviteMember(_ context.Context, caller Caller, input Invit
 
 // RenameInput is the input of rename_workspace.
 type RenameInput struct {
-	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Name      string `json:"name" jsonschema:"the new name, 2 to 80 characters"`
 }
 
@@ -409,7 +412,7 @@ func (t builtinTools) renameWorkspace(_ context.Context, caller Caller, input Re
 
 // InvitationInput names a pending invitation.
 type InvitationInput struct {
-	Workspace  string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this token is bound to"`
+	Workspace  string `json:"workspace,omitempty" jsonschema:"slug of the workspace; leave empty for the workspace this connection or CI token is bound to"`
 	Invitation string `json:"invitation" jsonschema:"the email the invitation went to, or its ID from get_workspace"`
 }
 

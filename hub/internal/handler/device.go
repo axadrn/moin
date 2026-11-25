@@ -80,7 +80,15 @@ func (h *DeviceHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	workspaceID := r.FormValue("workspace_id")
 	rights, ok := model.ParseRights(r.Form["rights"]...)
 	if !ok {
-		rights = model.DefaultRights
+		view, err := h.view(r, code, workspaceID, model.DefaultRights)
+		if err != nil {
+			h.codeError(w, r, code, err)
+			return
+		}
+		view.AllowError = "Choose from the rights shown."
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		render(w, r, pages.Device(view))
+		return
 	}
 	login, connection, err := h.logins.Approve(service.Approval{
 		UserCode:    code,
@@ -124,7 +132,7 @@ func approveError(err error) (message string, workspace, ok bool) {
 	case errors.Is(err, service.ErrPresencePasskey):
 		return "Allow with your passkey.", false, true
 	case errors.Is(err, service.ErrPresenceSignIn):
-		return "Your sign-in is older than five minutes. Sign in again to allow.", false, true
+		return "Your sign-in is older than five minutes. Sign in again, any way you like, then allow.", false, true
 	case errors.Is(err, service.ErrPasskeyRefused):
 		slog.Warn("passkey refused", "error", err)
 		return "This passkey did not work. Try again.", false, true
@@ -138,9 +146,9 @@ func approveError(err error) (message string, workspace, ok bool) {
 	return "", false, false
 }
 
-// Reauth signs the person out and sends them to sign in again, and back
-// here after: an account without a passkey allows a login only with a
-// sign-in less than five minutes old.
+// Reauth signs the person out and sends them to sign in again, any way
+// in, and back here after: an account without a passkey allows a login
+// only with a sign-in less than five minutes old.
 func (h *DeviceHandler) Reauth(w http.ResponseWriter, r *http.Request) {
 	h.setPending(w, service.FormatUserCode(r.FormValue("code")))
 	if err := h.auth.EndSession(r); err != nil {
@@ -148,11 +156,8 @@ func (h *DeviceHandler) Reauth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.auth.ClearSessionCookie(w)
-	next := "/auth"
-	if h.cfg.GitHubLogin() {
-		next = "/auth/github"
-	}
-	redirect(w, r, next, http.StatusSeeOther)
+	// Any way in counts, so the person picks one.
+	redirect(w, r, "/auth", http.StatusSeeOther)
 }
 
 // Deny turns the login down. Its next poll hears so and stops.

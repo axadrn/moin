@@ -26,7 +26,7 @@ func registerBackupTools(server *mcpsdk.Server, services Services) {
 		change(true, false)), model.RightDelete, changes(services, tools.restoreApp))
 	Add(server, newTool("download_backup", "Download a copy",
 		"Returns link, a signed link to a copy of a database of an app in the app's own bucket, never through moin, valid 15 minutes: the newest copy, or the one moment names (a copy from get_backups). SQLite is gzipped, Postgres a pg_dump in its custom format.",
-		readOnly("")), model.RightRead, changes(services, tools.downloadBackup))
+		readOnly("")), model.RightEnv, changes(services, tools.downloadBackup))
 }
 
 // RestoreInput is the input of restore_app.

@@ -171,3 +171,24 @@ func TestConnectionsListsAndRemoves(t *testing.T) {
 		t.Fatalf("rm nope: code %d, stderr %q", code, stderr.String())
 	}
 }
+
+// TestTheTUILoginEndsTheOldConnection: the TUI saves its login as `moin
+// login` does, so the computer's connection from before ends at the hub.
+func TestTheTUILoginEndsTheOldConnection(t *testing.T) {
+	server, url := loginEnvironment(t)
+	if err := client.SaveConfig(client.Config{URL: url, Token: "at_older", RefreshToken: "rt_older", Connection: "c0"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveLogin(t.Context(), client.Config{URL: url, Token: "at_device", RefreshToken: "rt_device", Connection: "c1"}); err != nil {
+		t.Fatal(err)
+	}
+	server.mu.Lock()
+	revoked := strings.Join(server.revoked, ",")
+	server.mu.Unlock()
+	if revoked != "rt_older" {
+		t.Fatalf("revoked = %q, want the older login", revoked)
+	}
+	if saved, err := client.LoadSaved(); err != nil || saved.RefreshToken != "rt_device" {
+		t.Fatalf("saved = %+v, %v", saved, err)
+	}
+}

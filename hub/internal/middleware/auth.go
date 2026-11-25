@@ -80,12 +80,12 @@ func RequireChanges(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// WithTokenWorkspace scopes a moin API route, whose path names no
+// WithBearerWorkspace scopes a moin API route, whose path names no
 // workspace, to the workspace of the connection or CI token. A session names
 // the workspace in the Moin-Workspace header, or an EventSource, which
 // sends no headers, in the workspace query parameter; otherwise it gets
 // its first.
-func WithTokenWorkspace(workspaceService *service.WorkspaceService, subscriptionService *service.SubscriptionService) func(http.HandlerFunc) http.HandlerFunc {
+func WithBearerWorkspace(workspaceService *service.WorkspaceService, subscriptionService *service.SubscriptionService) func(http.HandlerFunc) http.HandlerFunc {
 	withWorkspace := withWorkspaceOf(func(r *http.Request) string {
 		user := ctxkeys.User(r.Context())
 		workspaces, err := workspaceService.ListForUser(user.ID)

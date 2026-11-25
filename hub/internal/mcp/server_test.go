@@ -18,6 +18,10 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// dataReadTools read app data, as strong as secrets: they change nothing
+// but need env.
+var dataReadTools = map[string]bool{"download_backup": true, "query_database": true}
+
 func TestToolsMatchTheSelection(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "lister")
@@ -38,7 +42,11 @@ func TestToolsMatchTheSelection(t *testing.T) {
 		if !strings.HasSuffix(tool.Description, " "+needsSentence(rights)) {
 			t.Errorf("%s description does not end with its right: %s", tool.Name, tool.Description)
 		}
-		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint != (rights == model.RightRead) {
+		readOnly := rights == model.RightRead || dataReadTools[tool.Name]
+		if dataReadTools[tool.Name] && rights != model.RightEnv {
+			t.Errorf("%s reads app data with %s, want env", tool.Name, rights)
+		}
+		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint != readOnly {
 			t.Errorf("%s read-only hint does not match its right %s", tool.Name, rights)
 		}
 	}
@@ -220,8 +228,11 @@ func TestToolsNeedTheirRight(t *testing.T) {
 		t.Fatalf("fields = %v", fields)
 	}
 
-	invited := output[mcp.Invitation](t, call(t, writer, "invite_member", map[string]any{"email": " New@Example.com ", "role": "admin"}))
-	if invited.Email != "new@example.com" || invited.Role != "admin" || invited.Workspace.ID != link.ID(owner.workspace.ID) {
+	// A token invites members only, whatever its rights: an admin is
+	// invited in the web.
+	toolError(t, call(t, writer, "invite_member", map[string]any{"email": "boss@example.com", "role": "admin"}), "forbidden")
+	invited := output[mcp.Invitation](t, call(t, writer, "invite_member", map[string]any{"email": " New@Example.com ", "role": "member"}))
+	if invited.Email != "new@example.com" || invited.Role != "member" || invited.Workspace.ID != link.ID(owner.workspace.ID) {
 		t.Fatalf("invite_member = %#v", invited)
 	}
 	if len(env.mailer.Messages()) != 1 {
@@ -262,6 +273,21 @@ func TestInviteMemberSharesTheInvitationLimit(t *testing.T) {
 	if len(env.mailer.Messages()) != 0 {
 		t.Fatalf("emails = %d, want 0", len(env.mailer.Messages()))
 	}
+}
+
+// TestInviteMemberRefusesAdmins: an AI agent invites members only, so a
+// leaked token cannot make an admin.
+func TestInviteMemberRefusesAdmins(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "inviter")
+	upgrade(t, env, owner)
+	_, raw := createToken(t, env, owner, allRights...)
+	session := connectHTTP(t, env, raw)
+	toolError(t, call(t, session, "invite_member", map[string]any{"email": "new@example.com", "role": "admin"}), "forbidden")
+	if len(env.mailer.Messages()) != 0 {
+		t.Fatalf("emails = %d, want 0", len(env.mailer.Messages()))
+	}
+	output[mcp.Invitation](t, call(t, session, "invite_member", map[string]any{"email": "new@example.com", "role": "member"}))
 }
 
 func TestRolesStillApplyToRights(t *testing.T) {

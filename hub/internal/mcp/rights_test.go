@@ -246,3 +246,47 @@ func TestTheDocsNameEveryToolsRight(t *testing.T) {
 		t.Fatalf("guides/mcp.md, the Right column of Tools:\n%s", strings.Join(wrong, "\n"))
 	}
 }
+
+// TestAddWithoutARightPanics: a tool that names no right does not start,
+// so no tool runs unchecked.
+func TestAddWithoutARightPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Add with no right did not panic")
+		}
+	}()
+	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "test"}, nil)
+	mcp.Add(server, &mcpsdk.Tool{Name: "unchecked"}, 0, func(context.Context, mcp.Caller, struct{}) (struct{}, error) {
+		return struct{}{}, nil
+	})
+}
+
+// TestDataAndExecToolsNeedTheirRights: rows and copies are app data, as
+// strong as secrets, so they need env. A command in a container can do
+// anything in the app, so it needs deploy, env and delete.
+func TestDataAndExecToolsNeedTheirRights(t *testing.T) {
+	env := newEnvironment(t)
+	owner := seedOwner(t, env, "data")
+	full, _ := createToken(t, env, owner, allRights...)
+	tools, err := connectMemory(t, env.server, owner, full).ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]model.Rights{
+		"query_database":  model.RightEnv,
+		"download_backup": model.RightEnv,
+		"execute_sql":     model.RightEnv | model.RightDelete,
+		"exec_command":    model.RightDeploy | model.RightEnv | model.RightDelete,
+	}
+	for _, tool := range tools.Tools {
+		if right, ok := want[tool.Name]; ok {
+			if got := toolRights(t, tool); got != right {
+				t.Errorf("%s needs %s, want %s", tool.Name, got, right)
+			}
+			delete(want, tool.Name)
+		}
+	}
+	if len(want) > 0 {
+		t.Fatalf("tools not found: %v", want)
+	}
+}

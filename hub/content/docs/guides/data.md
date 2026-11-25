@@ -86,7 +86,7 @@ moin changes data, not tables or columns. Those change through the migrations yo
 - **Reads cannot change anything.** A read opens the database read-only. A typo cannot delete rows.
 - **Which database.** With several, pick one in the list, or use `--db <path>` or `--db postgres-db` in the CLI.
 - **No primary key?** A table without one takes new rows. Change them with SQL.
-- **Who may read.** Rows are your users' data. A connection with the read right reads rows and runs read-only SQL; changing rows and SQL that writes need the delete right. [Rights](/docs/reference/rights)
+- **Who may read.** Rows are your users' data, as strong as secrets. A connection needs the env right, the switch **Secrets and data**, to read rows, run read-only SQL or download a copy; changing rows and SQL that writes need the delete right too. [Rights](/docs/reference/rights)
 - **Off on a server.** `data: off` in the [rules](/docs/guides/security#rules) refuses reading and changing data through moin there.
 
 ## Requirements

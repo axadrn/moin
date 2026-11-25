@@ -23,12 +23,16 @@ info:
 
     Rights: a connection or CI token acts for its person on the operations that list
     `bearerAuth`, with the rights the operation names there: `read`, `deploy`, `env`,
-    `delete` or `servers`, and both of two. Without one it gets 403 `missing_right` with the
+    `delete` or `servers`, and all of several. Without one it gets 403 `missing_right` with the
     missing `right`. Every other operation answers it 403 `forbidden`: sessions, passkeys,
     email, billing, admin, roles, deletions of the account or the workspace, and changing
     rights. A CI token for one app reaches only the operations of that app. Each
     connection and CI token is bound to one workspace: other workspaces answer 404 and are
-    left out of lists. Rights never add to a role.
+    left out of lists. Rights never add to a role: a connection or CI token invites only
+    members. Streams of a connection or CI token end when its access token does, within
+    the hour, with the event `reconnect`: open them again with a fresh token. Making a CI
+    token and adding a right need the person to have confirmed in the last five minutes,
+    else 403 `confirm_required`.
 
     Errors: every non-2xx JSON answer is the `Error` envelope with a stable lowercase
     snake case `code`. `fields` is present only for `validation_failed`.
@@ -2214,7 +2218,7 @@ paths:
         the output. A server with `exec: off` in its rules refuses it.
       security:
         - cookieAuth: []
-        - bearerAuth: [deploy]
+        - bearerAuth: [deploy, env, delete]
       requestBody:
         required: true
         content:
@@ -2344,7 +2348,7 @@ paths:
       tags: [Data]
       operationId: getTableRows
       summary: Browse rows
-      description: One page of a table, newest rowid first. When the table has a rowid it is the first column. Rows are app data; a connection reads them with the read right.
+      description: One page of a table, newest rowid first. When the table has a rowid it is the first column. Rows are app data, as strong as secrets; a connection reads them with the env right.
       parameters:
         - name: database
           in: query
@@ -2370,7 +2374,7 @@ paths:
             maximum: 500
       security:
         - cookieAuth: []
-        - bearerAuth: [read]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The rows.
@@ -2502,7 +2506,7 @@ paths:
       tags: [Data]
       operationId: queryDatabase
       summary: Run SQL
-      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. With `write` it runs in one transaction and returns `changes`; a connection or CI token then needs the delete right too, else 403 `missing_right`.
+      description: Runs one statement with positional parameters. A read opens the database read-only and returns at most `limit` rows (default 100). A `limit` outside 1 to 1000 is refused with `validation_failed`. Rows are app data: a connection or CI token needs the env right. With `write` it runs in one transaction and returns `changes`; a connection or CI token then needs the delete right too, else 403 `missing_right`.
       requestBody:
         required: true
         content:
@@ -2511,7 +2515,7 @@ paths:
               $ref: '#/components/schemas/QueryRequest'
       security:
         - cookieAuth: []
-        - bearerAuth: [read]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The result.
@@ -2619,7 +2623,7 @@ paths:
               $ref: '#/components/schemas/DownloadRequest'
       security:
         - cookieAuth: []
-        - bearerAuth: [read]
+        - bearerAuth: [env]
       responses:
         '200':
           description: The link.

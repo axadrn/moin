@@ -18,7 +18,9 @@ const (
 	// RightDeploy runs and changes apps: deploy, restart, stop, an app's
 	// settings.
 	RightDeploy
-	// RightEnv sets the secrets of an app: env vars and its password.
+	// RightEnv is an app's secrets and data: env vars and its password,
+	// database rows, SQL that reads and copies of the databases. The name
+	// stays env; the switch says "Secrets and data".
 	RightEnv
 	// RightDelete removes what is hard to get back: apps, buckets, data.
 	RightDelete
@@ -56,7 +58,7 @@ func (r Rights) Label() string {
 	case RightDeploy:
 		return "Deploy and restart"
 	case RightEnv:
-		return "Set env vars"
+		return "Secrets and data"
 	case RightDelete:
 		return "Delete apps, buckets, data"
 	case RightServers:
@@ -74,7 +76,7 @@ func (r Rights) Verb() string {
 	case RightDeploy:
 		return "deploy and restart"
 	case RightEnv:
-		return "set env vars"
+		return "use secrets and data"
 	case RightDelete:
 		return "delete"
 	case RightServers:

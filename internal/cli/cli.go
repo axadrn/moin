@@ -41,7 +41,7 @@ Account
   alerts test        Send a test alert: alerts test <name>
   alerts rm          Remove a destination: alerts rm <name> [--yes]
   team               Members and open invitations of your workspace
-  team invite        Invite someone: team invite ada@example.com [--admin]
+  team invite        Invite someone as member: team invite ada@example.com
   team resend        Send an invitation again: team resend ada@example.com
   team revoke        Take an invitation back: team revoke ada@example.com [--yes]
   team rename        Rename the workspace: team rename "Acme Inc"
@@ -359,8 +359,22 @@ func openTUI(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			return client.SaveConfig(signedIn)
+			return saveLogin(ctx, signedIn)
 		}})
+}
+
+// saveLogin saves a new login. When this computer had a connection
+// already, it ends now, so logging in again, in the CLI or the TUI, never
+// leaves one behind.
+func saveLogin(ctx context.Context, config client.Config) error {
+	previous, _ := client.LoadSaved()
+	if err := client.SaveConfig(config); err != nil {
+		return err
+	}
+	if previous.RefreshToken != "" && previous.RefreshToken != config.RefreshToken {
+		_ = client.Logout(ctx, previous)
+	}
+	return nil
 }
 
 func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -412,15 +426,8 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	previous, _ := client.LoadSaved()
-	err = client.SaveConfig(config)
-	if err != nil {
+	if err := saveLogin(ctx, config); err != nil {
 		return err
-	}
-	// This computer had a connection already: it ends now, so logging in
-	// again never leaves one behind.
-	if previous.RefreshToken != "" && previous.RefreshToken != config.RefreshToken {
-		_ = client.Logout(ctx, previous)
 	}
 	who := account.Email
 	if account.Name != "" {

@@ -263,7 +263,7 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations, passkeyLimiter limiter) {
 	workspace := inWorkspace(app)
 	settings := handler.NewSettingsHandler(app.AuthService, app.Passkeys, app.AppService, app.UpdateService)
-	connections := handler.NewConnectionsHandler(app.ConnectionService, app.CITokenService, app.AppService)
+	connections := handler.NewConnectionsHandler(app.ConnectionService, app.CITokenService, app.AppService, app.Passkeys, app.AuthService)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
@@ -289,6 +289,9 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	}
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RemovePasskey))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections", workspace(connections.Page))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm/options", passkeyLimiter(workspace(connections.ConfirmOptions)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm", passkeyLimiter(workspace(connections.Confirm)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/reauth", workspace(connections.Reauth))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.Connection))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/{id}/rights/{right}", workspace(connections.SetConnectionRight))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.RemoveConnection))
@@ -482,8 +485,8 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Account:     api.NewAccountHandler(app.AuthService, app.UserService, app.FileService),
 		Sessions:    api.NewSessionsHandler(app.AuthService),
 		Passkeys:    api.NewPasskeysHandler(app.Passkeys),
-		Connections: api.NewConnectionsHandler(app.ConnectionService),
-		CITokens:    api.NewCITokensHandler(app.CITokenService),
+		Connections: api.NewConnectionsHandler(app.ConnectionService, app.Passkeys),
+		CITokens:    api.NewCITokensHandler(app.CITokenService, app.Passkeys),
 		Token:       api.NewTokenHandler(app.DeviceLoginService, app.ConnectionService),
 		Billing:     apiBilling,
 		Admin:       api.NewAdminHandler(app.AdminService),
@@ -507,7 +510,7 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		},
 		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(invitationLimiter),
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
+			return middleware.RequireOnboardedAPI(middleware.WithBearerWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
 		},
 		RateLimitDevice:     deviceLimiter,
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),

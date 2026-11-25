@@ -13,7 +13,8 @@ import (
 // device tokens. A personal token becomes a CI token with its hash, so it
 // keeps working: read stays read, read and write becomes read, deploy and
 // env. A device token of `moin login` ends, and so does a pending login.
-// Down brings the CI tokens back as personal tokens.
+// Down brings the CI tokens back as personal tokens, only those that look
+// as Up made them: none comes back wider than it was.
 func TestMigration058MakesCITokensAndConnections(t *testing.T) {
 	database, err := db.Init(filepath.Join(t.TempDir(), "hub.db") + "?_pragma=foreign_keys(1)")
 	if err != nil {
@@ -73,6 +74,11 @@ func TestMigration058MakesCITokensAndConnections(t *testing.T) {
 		t.Fatalf("api_tokens is still there: %d, %v", tables, err)
 	}
 
+	// Tokens made since that no personal token is as narrow as go on Down.
+	database.MustExec(`INSERT INTO servers (id, workspace_id, name, created_at) VALUES ('server-1', 'acme', 'web-1', $1)`, now)
+	database.MustExec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, created_at) VALUES ('shop', 'acme', 'server-1', 'shop', 'shop', $1)`, now)
+	database.MustExec(`INSERT INTO ci_tokens (id, user_id, workspace_id, name, token_hash, prefix, rights, app_id, created_at) VALUES ('shop-only', 'ada', 'acme', 'shop', 'hash-shop', 'prefix', 'read,deploy,env', 'shop', $1)`, now)
+	database.MustExec(`INSERT INTO ci_tokens (id, user_id, workspace_id, name, token_hash, prefix, rights, created_at) VALUES ('wiper', 'ada', 'acme', 'wiper', 'hash-wiper', 'prefix', 'read,delete', $1)`, now)
 	if err := goose.DownTo(database.DB, ".", 57); err != nil {
 		t.Fatal(err)
 	}

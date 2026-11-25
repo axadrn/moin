@@ -90,6 +90,17 @@ func (r *CITokens) SetRights(id string, rights model.Rights) error {
 	return oneRowOr(result, err, ErrCITokenNotFound)
 }
 
+// SwapRights changes the rights of a token from from to to, only if they
+// are still from. It reports whether it changed them.
+func (r *CITokens) SwapRights(id string, from, to model.Rights) (bool, error) {
+	result, err := r.db.Exec(`UPDATE ci_tokens SET rights = $1 WHERE id = $2 AND rights = $3`, to, id, from)
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	return rows == 1, err
+}
+
 // TouchLastUsed records a use.
 func (r *CITokens) TouchLastUsed(id string, at time.Time) error {
 	_, err := r.db.Exec(`UPDATE ci_tokens SET last_used_at = $1 WHERE id = $2`, at, id)

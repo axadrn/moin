@@ -111,6 +111,10 @@ func (s *ConnectionService) Create(input NewConnection) (*model.Connection, erro
 		Resource:    input.Resource,
 		CreatedAt:   s.now().UTC(),
 	}
+	// Idle connections end first, so they do not count toward the limit.
+	if _, err := s.List(input.UserID); err != nil {
+		return nil, err
+	}
 	err := s.connections.Create(connection, MaxConnectionsPerUser)
 	if errors.Is(err, repository.ErrConnectionLimit) {
 		return nil, ErrConnectionLimit
@@ -244,19 +248,39 @@ func (s *ConnectionService) Revoke(raw string, source Source) error {
 	return nil
 }
 
-// List returns the live connections of a person, newest first.
+// List returns the live connections of a person, newest first. One unused
+// for 90 days ends here, so Settings never shows it as live and it does not
+// count toward the limit.
 func (s *ConnectionService) List(userID string) ([]model.Connection, error) {
-	return s.connections.ListByUser(userID)
+	connections, err := s.connections.ListByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now().UTC()
+	live := connections[:0]
+	for _, connection := range connections {
+		if connection.IsIdle(now) {
+			s.end(connection, Source{Via: ViaSystem}, "unused for 90 days")
+			continue
+		}
+		live = append(live, connection)
+	}
+	return live, nil
 }
 
 // SetRights changes what a connection of the person may do. The next
-// request of the connection has the new rights.
-func (s *ConnectionService) SetRights(userID, id string, rights model.Rights, source Source) (*model.Connection, error) {
+// request of the connection has the new rights. presence is what
+// PasskeyService.Present answered for the browser: a change that adds a
+// right fails with it, taking one away never does.
+func (s *ConnectionService) SetRights(userID, id string, rights model.Rights, presence error, source Source) (*model.Connection, error) {
 	connection, err := s.own(userID, id)
 	if err != nil {
 		return nil, err
 	}
 	rights |= model.RightRead
+	if rights&^connection.Rights != 0 && presence != nil {
+		return nil, presence
+	}
 	if err := s.connections.SetRights(connection.ID, userID, rights); err != nil {
 		return nil, err
 	}
@@ -268,6 +292,36 @@ func (s *ConnectionService) SetRights(userID, id string, rights model.Rights, so
 	return connection, nil
 }
 
+// SetRight turns one right of a connection of the person on or off, and
+// leaves the others as they are now: a switch flipped at the same time in
+// another tab is kept. Read stays on.
+func (s *ConnectionService) SetRight(userID, id string, right model.Rights, on bool, source Source) (*model.Connection, error) {
+	if right == model.RightRead {
+		return nil, ErrRightsUnknown
+	}
+	for range swapTries {
+		connection, err := s.own(userID, id)
+		if err != nil {
+			return nil, err
+		}
+		before := connection.Rights
+		after := withRight(before, right, on)
+		if after == before {
+			return connection, nil
+		}
+		swapped, err := s.connections.SwapRights(connection.ID, userID, before, after)
+		if err != nil {
+			return nil, err
+		}
+		if swapped {
+			connection.Rights = after
+			s.record(*connection, source, "connection.rights_changed", map[string]string{"from": before.String(), "to": after.String()})
+			return connection, nil
+		}
+	}
+	return nil, ErrRightsBusy
+}
+
 // Remove ends a connection of the person and every token of it, at once.
 func (s *ConnectionService) Remove(userID, id string, source Source) error {
 	connection, err := s.own(userID, id)
@@ -277,8 +331,8 @@ func (s *ConnectionService) Remove(userID, id string, source Source) error {
 	return s.endWith(*connection, source, "removed")
 }
 
-// EndAllForUser ends every connection of a person: the admin kill switch,
-// a recovery key and a new email call it.
+// EndAllForUser ends every connection of a person. RevokeAllAccess, the
+// admin kill switch, calls it.
 func (s *ConnectionService) EndAllForUser(userID string) error {
 	connections, err := s.connections.ListByUser(userID)
 	if err != nil {
@@ -372,6 +426,21 @@ func normalID(id string) string {
 		return parsed
 	}
 	return id
+}
+
+// swapTries is how often SetRight tries again when the rights changed
+// between reading and writing them.
+const swapTries = 5
+
+// ErrRightsBusy says the rights kept changing while one switch was set.
+var ErrRightsBusy = errors.New("the rights changed meanwhile: try again")
+
+// withRight is rights with right turned on or off. Read stays on.
+func withRight(rights, right model.Rights, on bool) model.Rights {
+	if on {
+		return rights | right | model.RightRead
+	}
+	return (rights &^ right) | model.RightRead
 }
 
 func allRights() model.Rights {

@@ -28,7 +28,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | Command | What it does |
 | --- | --- |
 | `moin team` | the team of your workspace and its open invitations |
-| `moin team invite <email> [--admin]` | invites someone by email; `--admin` may invite others |
+| `moin team invite <email>` | invites someone by email, as member. An admin is invited in the web: **Settings**, **Team** |
 | `moin team resend <email>` | sends an invitation again; only the new link works |
 | `moin team revoke <email> [--yes]` | takes an invitation back |
 | `moin team rename <name>` | renames the workspace; its links follow the new name |

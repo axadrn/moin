@@ -129,7 +129,22 @@ func SaveConfig(config Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, body, 0o600)
+	// A temporary file in the same folder, 0600 as CreateTemp makes it,
+	// renamed over the config: a process that dies while writing never
+	// leaves half a login behind.
+	file, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if _, err := file.Write(body); err != nil {
+		file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), path)
 }
 
 // RemoveConfig deletes the config file.
@@ -412,11 +427,22 @@ func (c *Client) WatchServers(ctx context.Context, fn func([]Server)) error {
 // errStreamDone ends a stream on purpose.
 var errStreamDone = errors.New("stream done")
 
+// errStreamReconnect is the hub's event reconnect: the stream ended with
+// its access token, and the client comes back with a fresh one.
+var errStreamReconnect = errors.New("stream ended with its access token")
+
 // stream reads server-sent events and calls fn with each event name and its
 // data, until ctx ends, fn returns an error or the stream breaks. fn returns
-// errStreamDone to end it without an error.
+// errStreamDone to end it without an error. When the hub ends the stream
+// with its access token, stream opens it again with a fresh one; the hub
+// sends the full list again.
 func (c *Client) stream(ctx context.Context, path string, fn func(event string, data []byte) error) error {
-	return c.streamRequest(ctx, http.MethodGet, path, nil, fn)
+	for {
+		err := c.streamRequest(ctx, http.MethodGet, path, nil, fn)
+		if !errors.Is(err, errStreamReconnect) || ctx.Err() != nil {
+			return err
+		}
+	}
 }
 
 // streamRequest is stream for any method, with a JSON body.
@@ -441,6 +467,9 @@ func (c *Client) streamRequest(ctx context.Context, method, path string, body an
 		line := scanner.Text()
 		if name, ok := strings.CutPrefix(line, "event: "); ok {
 			event = name
+			if event == "reconnect" {
+				return errStreamReconnect
+			}
 			continue
 		}
 		data, ok := strings.CutPrefix(line, "data: ")

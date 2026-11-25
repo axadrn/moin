@@ -30,12 +30,16 @@ type Caller struct {
 // the JSON API codes.
 type ToolFunc[In, Out any] func(ctx context.Context, caller Caller, input In) (Out, error)
 
-// Add registers a tool that needs right, one right or two that must both
-// be on. That right is the one place that says it: Add ends the
+// Add registers a tool that needs right, one right or several that must
+// all be on. That right is the one place that says it: Add ends the
 // description with "Needs the deploy right.", puts the rights in the tool's
 // _meta, and checks them before the body runs. A connection without them
-// gets missing_right.
+// gets missing_right. A tool that names no right panics at start-up, so no
+// tool runs unchecked.
 func Add[In, Out any](server *mcpsdk.Server, tool *mcpsdk.Tool, right model.Rights, body ToolFunc[In, Out]) {
+	if right == 0 {
+		panic("mcp: the tool " + tool.Name + " names no right")
+	}
 	tool.Description = strings.TrimSpace(tool.Description + " " + needs(right))
 	if tool.Meta == nil {
 		tool.Meta = mcpsdk.Meta{}
@@ -77,8 +81,8 @@ func handler[In, Out any](right model.Rights, tool ToolFunc[In, Out]) mcpsdk.Too
 }
 
 const (
-	unauthenticated = "Log in with OAuth, or send a CI token, which starts with pat_, as Authorization: Bearer <token>."
-	appOnly         = "This CI token works only for its app, through the API. Make a CI token for every app, or connect in the browser."
+	unauthenticated = "Send a CI token, which starts with pat_, as Authorization: Bearer <token>. Make one under Settings, Connections."
+	appOnly         = "This CI token works only for its app, through the API. MCP needs a CI token for every app."
 )
 
 // Summarizer is implemented by tool outputs that describe themselves in one

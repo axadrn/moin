@@ -13,11 +13,12 @@ import (
 // CITokensHandler lists, makes, edits and removes the CI tokens of a
 // workspace. Making one and changing its rights need a signed-in browser.
 type CITokensHandler struct {
-	tokens *service.CITokenService
+	tokens   *service.CITokenService
+	passkeys *service.PasskeyService
 }
 
-func NewCITokensHandler(tokens *service.CITokenService) *CITokensHandler {
-	return &CITokensHandler{tokens: tokens}
+func NewCITokensHandler(tokens *service.CITokenService, passkeys *service.PasskeyService) *CITokensHandler {
+	return &CITokensHandler{tokens: tokens, passkeys: passkeys}
 }
 
 // CIToken is the public JSON shape of a CI token. It never carries the
@@ -95,10 +96,16 @@ func (h *CITokensHandler) List(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, CITokenList{Items: items})
 }
 
-// Create makes a CI token in the workspace and answers it once.
+// Create makes a CI token in the workspace and answers it once. It needs
+// the person to have confirmed in the last five minutes, as an approval
+// does.
 func (h *CITokensHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var request createCITokenRequest
 	if !Decode(w, r, &request) {
+		return
+	}
+	if err := h.passkeys.Present(ctxkeys.Session(r.Context())); err != nil {
+		ServiceError(w, err)
 		return
 	}
 	rights := model.DefaultRights
@@ -137,7 +144,7 @@ func (h *CITokensHandler) SetRights(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, service.ErrRightsUnknown)
 		return
 	}
-	token, err := h.tokens.SetRights(actor(r), r.PathValue("id"), rights)
+	token, err := h.tokens.SetRights(actor(r), r.PathValue("id"), rights, h.passkeys.Present(ctxkeys.Session(r.Context())))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -146,9 +153,23 @@ func (h *CITokensHandler) SetRights(w http.ResponseWriter, r *http.Request) {
 }
 
 // Remove deletes a CI token: yours, or as the owner any. Requests with it
-// stop at once.
+// stop at once. A connection or CI token removes another person's only
+// with the servers right: its own with read.
 func (h *CITokensHandler) Remove(w http.ResponseWriter, r *http.Request) {
-	err := h.tokens.Remove(ctxkeys.WorkspaceMember(r.Context()), r.PathValue("id"), source(r))
+	member := ctxkeys.WorkspaceMember(r.Context())
+	if ctxkeys.Bearer(r.Context()) != nil {
+		tokens, err := h.tokens.List(member)
+		if err != nil {
+			ServiceError(w, err)
+			return
+		}
+		for _, token := range tokens {
+			if link.ID(token.ID) == link.ID(r.PathValue("id")) && token.UserID != member.UserID && !Allowed(w, r, model.RightServers) {
+				return
+			}
+		}
+	}
+	err := h.tokens.Remove(member, r.PathValue("id"), source(r))
 	if err != nil {
 		ServiceError(w, err)
 		return

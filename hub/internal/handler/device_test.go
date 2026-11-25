@@ -26,6 +26,7 @@ type deviceHandlerTest struct {
 	connections *service.ConnectionService
 	workspaces  *service.WorkspaceService
 	auth        *service.AuthService
+	passkeys    *service.PasskeyService
 	owner       testutil.UserFixture
 	db          *sqlx.DB
 }
@@ -55,6 +56,7 @@ func newDeviceHandlerTest(t *testing.T, passkeys bool) deviceHandlerTest {
 		connections: connections,
 		workspaces:  workspaces,
 		auth:        auth,
+		passkeys:    passkeyService,
 		owner:       owner,
 		db:          database,
 	}
@@ -128,7 +130,7 @@ func TestDevicePageSignsInFirstAndComesBack(t *testing.T) {
 	recorder = httptest.NewRecorder()
 	test.handler.Show(recorder, deviceRequest(http.MethodGet, want, nil, test.owner.User, test.session(t, 0)))
 	body := recorder.Body.String()
-	for _, part := range []string{"moin CLI on host-1", started.UserCode, "Read: apps, logs, status", `name="rights" value="deploy" checked`, `name="rights" value="env" checked`, `name="rights" value="delete"`, `name="rights" value="servers"`, ">Allow<"} {
+	for _, part := range []string{"moin CLI on host-1", started.UserCode, "Read: apps, logs, status", "Secrets and data", `name="rights" value="deploy" checked`, `name="rights" value="env" checked`, `name="rights" value="delete"`, `name="rights" value="servers"`, ">Allow<"} {
 		if !strings.Contains(body, part) {
 			t.Fatalf("signed in: the page misses %q: status %d, body %s", part, recorder.Code, body)
 		}
@@ -149,8 +151,16 @@ func TestDevicePageApprovesWithTheRightsPicked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	form := url.Values{"code": {started.UserCode}, "workspace_id": {test.owner.Workspace.ID}, "rights": {"deploy", "servers"}}
+	// A right that does not exist is an error, not left out.
+	unknown := url.Values{"code": {started.UserCode}, "workspace_id": {test.owner.Workspace.ID}, "rights": {"deploy", "root"}}
 	recorder := httptest.NewRecorder()
+	test.handler.Approve(recorder, deviceRequest(http.MethodPost, "/device/approve", unknown, test.owner.User, test.session(t, time.Minute)))
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "Choose from the rights shown.") {
+		t.Fatalf("an unknown right: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+
+	form := url.Values{"code": {started.UserCode}, "workspace_id": {test.owner.Workspace.ID}, "rights": {"deploy", "servers"}}
+	recorder = httptest.NewRecorder()
 	test.handler.Approve(recorder, deviceRequest(http.MethodPost, "/device/approve", form, test.owner.User, test.session(t, time.Minute)))
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "is connected") {
 		t.Fatalf("approve: status %d, body %s", recorder.Code, recorder.Body.String())

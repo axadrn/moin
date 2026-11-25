@@ -157,3 +157,27 @@ func TestTheDocsNameEveryEndpointsRight(t *testing.T) {
 		t.Fatalf("reference/rights.md, Endpoints, must be:\n| Endpoint | Right |\n| --- | --- |\n%s", strings.Join(want, "\n"))
 	}
 }
+
+// TestDataAndExecNeedTheirRights: rows, read-only SQL and a copy are app
+// data, as strong as secrets, so they need env. A command in a container
+// can do anything in the app, so it needs deploy, env and delete.
+func TestDataAndExecNeedTheirRights(t *testing.T) {
+	environment := newAPIEnvironment(t)
+	want := map[string]model.Rights{
+		"GET /api/v1/apps/{app}/databases/rows":    model.RightEnv,
+		"POST /api/v1/apps/{app}/databases/query":  model.RightEnv,
+		"POST /api/v1/apps/{app}/backups/download": model.RightEnv,
+		"POST /api/v1/apps/{app}/exec":             model.RightDeploy | model.RightEnv | model.RightDelete,
+	}
+	for _, route := range environment.routes {
+		if right, ok := want[route.Pattern]; ok {
+			if route.Right != right {
+				t.Errorf("%s needs %s, want %s", route.Pattern, route.Right, right)
+			}
+			delete(want, route.Pattern)
+		}
+	}
+	if len(want) > 0 {
+		t.Fatalf("routes not found: %v", want)
+	}
+}

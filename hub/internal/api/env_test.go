@@ -116,8 +116,8 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Account:     accountHandler,
 		Sessions:    sessionsHandler,
 		Passkeys:    api.NewPasskeysHandler(environment.passkeys),
-		Connections: api.NewConnectionsHandler(environment.connections),
-		CITokens:    api.NewCITokensHandler(environment.ciTokens),
+		Connections: api.NewConnectionsHandler(environment.connections, environment.passkeys),
+		CITokens:    api.NewCITokensHandler(environment.ciTokens, environment.passkeys),
 		Token:       api.NewTokenHandler(environment.devices, environment.connections),
 		Billing:     billingHandler,
 		Admin:       adminHandler,
@@ -140,7 +140,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		},
 		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(middleware.NewWorkspaceInvitationLimiter()),
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(environment.workspaces, subscriptions)(next))
+			return middleware.RequireOnboardedAPI(middleware.WithBearerWorkspace(environment.workspaces, subscriptions)(next))
 		},
 		RateLimitDevice:     middleware.RateLimitDeviceLogin(clientIPs),
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
