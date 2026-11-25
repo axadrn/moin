@@ -185,11 +185,10 @@ func (a *apps) remove(ctx context.Context, app string) error {
 		return errors.New("invalid app name")
 	}
 	defer a.lock(app)()
-	args := []string{"compose", "-p", a.projectOf(app)}
-	if current := a.current(app); current > 0 {
-		args = a.composeArgs(app, a.composeFile(app))
-	}
-	_, err := a.output(ctx, "docker", append(args, "down", "--rmi", "all", "--remove-orphans")...)
+	// By the project's name only: compose finds the containers, networks
+	// and images by their labels and reads no compose file, so a ${VAR}
+	// the env no longer has cannot stop the removal.
+	_, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "down", "--rmi", "all", "--remove-orphans")
 	if err != nil {
 		return err
 	}

@@ -211,7 +211,7 @@ On your server, and only there. The hub passes a value on once, the moment you e
 | `/var/lib/moin/apps/<app>/releases/<n>/htpasswd` | the hash of the app's [password](/docs/guides/domains#password), for deploy n |
 | `/var/lib/moin/server.json` | the secrets of the server: the secret keys of your [buckets](/docs/guides/bucket), the [registry logins](/docs/guides/ci#registry-logins), the Tailscale key and the token of the Cloudflare Tunnel |
 
-All are readable by root only. No other file of moin holds a value: not the compose file of a deploy, not its logs, not what the server tells the hub. A test proves it on every change. It deploys an app that uses a secret every way a compose file can, then searches every file of the daemon and every message it sends. A secret goes to a server only while it is online. When it is offline, moin says so and keeps nothing to send later.
+All are readable by root only. No other file of moin holds a value: not the compose file of a deploy, not its logs, not what the server tells the hub. A test proves it on every change. It deploys an app that uses a secret every way a compose file can, then searches every file of the daemon and every message it sends. Deploys from before moin 1.0.0-beta.35 wrote values into their compose file: that holds once an app deployed from its source again, and its old deploys are cleaned up after 5 builds. [In compose.yml](/docs/guides/env#in-composeyml) A secret goes to a server only while it is online. When it is offline, moin says so and keeps nothing to send later.
 
 **What the hub keeps.** Names and dates, never a value:
 
@@ -232,7 +232,8 @@ All are readable by root only. No other file of moin holds a value: not the comp
 - The secrets of a [catalog app](/docs/guides/catalog) never pass the hub: the server makes them. Only the first sign-in password, which moin shows you once, passes it once.
 - The hub can still send what your [rules](#rules) allow. Without `exec: off`, a command in a container can print its env. Strict rules close that.
 - A server rebuilt from scratch starts without secrets. Enter them again, then deploy. A later server gets the bucket key, registry login and Tailscale key once more: the pages show which server lacks one.
-- The proxy reads the password's hash from the apps folder, which it sees read-only. It holds the Docker socket already, which is as much as root, so this gives it nothing new.
+- The proxy, Traefik, sees the apps folder read-only, to read the password's hash. So it can read every app's `app.env` too. We accept that: it runs with the Docker socket, which is as much as root on the server anyway. A bug in Traefik that reads files would expose them, so moin keeps Traefik current.
+- An app moin builds with [Railpack](/docs/concepts/how-moin-works) has a hash of its env in its compose file, so a changed value builds again. A hash, not a value.
 - The env names moin shows come from the server: each daemon reports which keys its apps have, never the values. A key the server does not have is not shown.
 
 **How Docker gets the env.** Every Docker Compose command moin runs for an app gets its `app.env`: as `env_file` of the app's services, and as `--env-file` to fill `${NAME}` in the compose file the moment the containers start. The compose file itself keeps `${NAME}`. Docker never sees the values as its own settings, so an env var like `DOCKER_CONFIG` or `DOCKER_HOST` cannot steer it.

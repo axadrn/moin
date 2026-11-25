@@ -493,3 +493,71 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 		t.Errorf("htpasswd = %q, %v", hash, err)
 	}
 }
+
+// TestTakePlaces: the kept compose file holds only what runs, as the filled
+// read has it: no service of a profile nobody turned on, no version. A
+// service takes its user and its env PORT filled in, so moin hands it its
+// data folders and routes its domain to the right port.
+func TestTakePlaces(t *testing.T) {
+	config := map[string]any{
+		"version":  "3.8",
+		"networks": map[string]any{"default": map[string]any{}, "debug": map[string]any{}},
+		"services": map[string]any{
+			"web":   map[string]any{"image": "shop", "user": "${UID:-1000}:${GID:-1000}"},
+			"api":   map[string]any{"image": "api", "environment": map[string]any{"PORT": "${API_PORT}", "TOKEN": "${TOKEN}"}},
+			"debug": map[string]any{"image": "busybox", "profiles": []any{"debug"}},
+		},
+	}
+	filled := map[string]any{
+		"networks": map[string]any{"default": map[string]any{}},
+		"services": map[string]any{
+			"web": map[string]any{"image": "shop", "user": "1000:1000"},
+			"api": map[string]any{"image": "api", "environment": map[string]any{"PORT": "9000", "TOKEN": "t0ken"}},
+		},
+	}
+	takePlaces(config, filled)
+	services := config["services"].(map[string]any)
+	if _, ok := services["debug"]; ok || config["version"] != nil || config["networks"].(map[string]any)["debug"] != nil {
+		t.Errorf("kept what does not run: %v", config)
+	}
+	if user := services["web"].(map[string]any)["user"]; user != "1000:1000" {
+		t.Errorf("user = %v", user)
+	}
+	api := services["api"].(map[string]any)
+	environment := api["environment"].(map[string]any)
+	if environment["PORT"] != "9000" || environment["TOKEN"] != "${TOKEN}" {
+		t.Errorf("environment = %v", environment)
+	}
+	if port := servicePort("", api); port != 9000 {
+		t.Errorf("port of api = %d", port)
+	}
+}
+
+// TestPruneKeepsNamedSources: image deploys run from the source of the
+// release they took the compose file from. prune keeps that release while
+// a kept one names its source, also past the last builds it keeps.
+func TestPruneKeepsNamedSources(t *testing.T) {
+	a := newApps(t.TempDir(), nil)
+	app := "prune-sources"
+	source := filepath.Join(a.releaseDir(app, 1), "src")
+	for number := 1; number <= protocol.KeepReleases+2; number++ {
+		dir := a.releaseDir(app, number)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		compose := `{"services": {"web": {"image": "ghcr.io/me/shop:` + strconv.Itoa(number) + `", "env_file": ["` + source + `/web.env"]}}}`
+		os.WriteFile(filepath.Join(dir, "compose.json"), []byte(compose), 0o600)
+		os.WriteFile(filepath.Join(dir, "kind"), []byte(releaseBuild), 0o600)
+	}
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(a.appDir(app), "current"), []byte(strconv.Itoa(protocol.KeepReleases+2)), 0o600)
+	a.prune(context.Background(), app)
+	if _, err := os.Stat(source); err != nil {
+		t.Fatalf("the source the kept releases name is gone: %v", err)
+	}
+	if _, err := os.Stat(a.releaseDir(app, 2)); err == nil {
+		t.Fatal("a release nobody names is still there")
+	}
+}

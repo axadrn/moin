@@ -153,6 +153,39 @@ func TestEnvFileOutsideSource(t *testing.T) {
 	}
 }
 
+// TestEnvFileOfTheServer refuses /etc/hostname as an env_file, written as
+// a path or as a list.
+func TestEnvFileOfTheServer(t *testing.T) {
+	for _, envFile := range []string{"/etc/hostname", "[/etc/hostname]"} {
+		_, err := checkResolved(t, "services:\n  web:\n    image: nginx:1\n    env_file: "+envFile+"\n", nil)
+		if err == nil || !strings.Contains(err.Error(), "is not in the app's source") {
+			t.Errorf("env_file: %s: err = %v", envFile, err)
+		}
+	}
+}
+
+// TestOnlyWhatRuns: the kept compose file has no service of a profile
+// nobody turned on, nor its network, nor version.
+func TestOnlyWhatRuns(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "src")
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	compose := "version: '3.8'\nservices:\n  web:\n    image: nginx:1\n  debug:\n    image: busybox\n    profiles: [debug]\n    networks: [dbg]\nnetworks:\n  dbg: {}\n"
+	if err := os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(t.TempDir(), nil)
+	config, _, err := a.readComposeConfig(context.Background(), "web", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	networks, _ := config["networks"].(map[string]any)
+	if config["services"].(map[string]any)["debug"] != nil || networks["dbg"] != nil || config["version"] != nil {
+		t.Fatalf("keeps what does not run: %v", config)
+	}
+}
+
 // TestBuildTagsRefused: a build may not name its image like another one,
 // such as the proxy's, which holds the Docker socket.
 func TestBuildTagsRefused(t *testing.T) {

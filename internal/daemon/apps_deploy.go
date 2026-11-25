@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -218,42 +217,32 @@ func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, log
 	return &release{start: start, rules: rules, dir: dir, composeFile: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
 }
 
-// rollBack copies the compose file of an older release into this one: the
-// same images, with the env as it is now. The files next to it come along,
-// and the copy names this release's htpasswd.
+// rollBack runs an older release again: its compose file and images, with
+// the env, the domains and the password as they are now. An app has one
+// password, so a rollback never brings an old one back.
 func (a *apps) rollBack(ctx context.Context, release *release) error {
-	start := release.start
-	from := start.FromNumber
+	from := release.start.FromNumber
 	release.logf("rolling back to v%d", from)
-	old := a.releaseDir(start.App, from)
-	body, err := os.ReadFile(filepath.Join(old, "compose.json"))
-	if err != nil {
+	old := a.releaseDir(release.start.App, from)
+	if !exists(filepath.Join(old, "compose.json")) {
 		return fmt.Errorf("v%d is no longer on the server", from)
 	}
-	detectedBody, _ := os.ReadFile(filepath.Join(old, "detected.json"))
-	_ = json.Unmarshal(detectedBody, &release.detected)
-	for _, name := range []string{".env", "htpasswd"} {
-		err = copyIfThere(filepath.Join(old, name), filepath.Join(release.dir, name))
-		if err != nil {
-			return err
-		}
-	}
-	body = bytes.ReplaceAll(body, []byte(proxyUsersFile(start.App, from)), []byte(proxyUsersFile(start.App, start.Number)))
-	err = os.WriteFile(release.composeFile, body, 0o600)
+	err := loadBase(release, old)
 	if err != nil {
 		return err
 	}
-	base, err := os.ReadFile(filepath.Join(old, "base.json"))
-	if err == nil {
-		_ = os.WriteFile(filepath.Join(release.dir, "base.json"), base, 0o600)
+	if release.start.Image == "" {
+		release.start.Image = release.detected.Image
 	}
-	err = a.pinFile(ctx, release.start, release.composeFile)
+	release.detected.Image = release.start.Image
+	err = copyIfThere(filepath.Join(old, ".env"), filepath.Join(release.dir, ".env"))
 	if err != nil {
 		return err
 	}
+	saveJSON(filepath.Join(release.dir, "base.json"), release.config)
 	// An old release may come from before a rule, or its files may have
-	// changed since: check it as a new one.
-	return a.checkCompose(release)
+	// changed since: writeCompose checks it as a new one.
+	return a.writeCompose(ctx, release)
 }
 
 // prepareRelease fetches the source, routes the app, writes compose.json and
@@ -723,6 +712,12 @@ func (a *apps) prune(ctx context.Context, app string) {
 		releases = append(releases, protocol.Release{Number: number, Build: build})
 	}
 	kept := protocol.KeptReleases(releases, current)
+	// An image deploy, a restart or a rollback runs from the source of an
+	// older release: its build, its env files and its mounts are there. That
+	// release stays while a kept one names it.
+	for _, number := range a.sourcesNamed(app, kept) {
+		kept[number] = true
+	}
 	used := map[string]bool{}
 	for _, release := range releases {
 		if !kept[release.Number] {
@@ -744,6 +739,21 @@ func (a *apps) prune(ctx context.Context, app string) {
 			_ = exec.CommandContext(ctx, "docker", "image", "rm", image).Run()
 		}
 	}
+}
+
+// sourcesNamed are the releases whose source the compose files of the
+// releases in numbers name, as releases/<n>/src.
+func (a *apps) sourcesNamed(app string, numbers map[int]bool) []int {
+	pattern := regexp.MustCompile(regexp.QuoteMeta(filepath.Join(a.appDir(app), "releases")+"/") + `([0-9]+)/src[/"]`)
+	found := []int{}
+	for number := range numbers {
+		body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "compose.json"))
+		for _, match := range pattern.FindAllStringSubmatch(string(body), -1) {
+			source, _ := strconv.Atoi(match[1])
+			found = append(found, source)
+		}
+	}
+	return found
 }
 
 // The kind file of a release says what it brought: a build (source or

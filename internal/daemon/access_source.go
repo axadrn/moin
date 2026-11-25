@@ -26,7 +26,11 @@ func checkSourceFiles(src string, config map[string]any) error {
 	services, _ := config["services"].(map[string]any)
 	for _, name := range sortedKeys(services) {
 		service, _ := services[name].(map[string]any)
-		for _, file := range envFilePaths(service) {
+		files, ok := envFilePaths(service)
+		if !ok {
+			return fmt.Errorf("service %s: env_file is not a list of files, so the server refuses it", name)
+		}
+		for _, file := range files {
 			if strings.Contains(file, "$") {
 				return fmt.Errorf("service %s: env_file %s takes a variable, so the server refuses it: name the file", name, file)
 			}
@@ -39,20 +43,30 @@ func checkSourceFiles(src string, config map[string]any) error {
 }
 
 // envFilePaths are the env files a service reads. compose writes each as
-// {path, required}; moin adds the app's env file as a path.
-func envFilePaths(service map[string]any) []string {
-	items, _ := service["env_file"].([]any)
+// {path, required}; moin adds the app's env file as a path. It reports
+// false for any other shape, which the checks refuse.
+func envFilePaths(service map[string]any) ([]string, bool) {
+	value, found := service["env_file"]
+	items, isList := value.([]any)
+	if found && !isList {
+		return nil, false
+	}
 	paths := []string{}
 	for _, item := range items {
 		switch file := item.(type) {
 		case string:
 			paths = append(paths, file)
 		case map[string]any:
-			path, _ := file["path"].(string)
+			path, ok := file["path"].(string)
+			if !ok {
+				return nil, false
+			}
 			paths = append(paths, path)
+		default:
+			return nil, false
 		}
 	}
-	return paths
+	return paths, true
 }
 
 // refuseIncludes refuses include, extends with a file and label_file, in any

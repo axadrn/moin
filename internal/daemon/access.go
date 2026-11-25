@@ -269,12 +269,20 @@ func (r appRoom) checkService(service map[string]any) string {
 			return key + " is not allowed"
 		}
 	}
-	if build, ok := service["build"].(map[string]any); ok {
+	if value, found := service["build"]; found {
+		build, ok := value.(map[string]any)
+		if !ok {
+			return "build is not in the shape compose writes"
+		}
 		if reason := r.checkBuild(build); reason != "" {
 			return "build: " + reason
 		}
 	}
-	for _, file := range envFilePaths(service) {
+	files, ok := envFilePaths(service)
+	if !ok {
+		return "env_file is not a list of files"
+	}
+	for _, file := range files {
 		if file != r.envFile && !r.inSource(resolved(file)) {
 			return "env_file " + file + " is neither the app's env file nor in its source"
 		}

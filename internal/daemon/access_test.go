@@ -237,3 +237,20 @@ func TestAppRoomEnvFile(t *testing.T) {
 		}
 	}
 }
+
+// TestAppRoomOddShapes: a build or an env_file in a shape compose never
+// writes is refused, not skipped.
+func TestAppRoomOddShapes(t *testing.T) {
+	room := appRoom{project: "web", envFile: "/var/lib/moin/apps/web/app.env"}
+	for _, service := range []map[string]any{
+		{"image": "nginx", "build": "/"},
+		{"image": "nginx", "env_file": "/etc/hostname"},
+		{"image": "nginx", "env_file": []any{42}},
+		{"image": "nginx", "env_file": []any{map[string]any{"required": false}}},
+	} {
+		config := map[string]any{"services": map[string]any{"web": service}}
+		if reason := room.check(config); reason == "" {
+			t.Errorf("%v passed", service)
+		}
+	}
+}

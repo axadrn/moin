@@ -126,21 +126,48 @@ func (a *apps) composeConfig(ctx context.Context, app, src, mode string) (map[st
 }
 
 // placeKeys are the settings of a service that say where it runs: its
-// image, its ports and its folders on the server. compose cannot read a
-// mount with ${VAR} in it unfilled, moin checks these as they run and moves
-// data mounts, and none of them holds a secret. They stay as the deploy
-// filled them: a rollback runs the same images and folders.
-var placeKeys = []string{"image", "ports", "expose", "volumes"}
+// image, its ports, its user and its folders on the server. compose cannot
+// read a mount with ${VAR} in it unfilled, moin checks these as they run,
+// moves data mounts and hands them to the user, and none of them holds a
+// secret. They stay as the deploy filled them: a rollback runs the same
+// images and folders.
+var placeKeys = []string{"image", "ports", "expose", "volumes", "user"}
 
-// takePlaces copies the place settings of every service, and the folder
-// and Dockerfile of its build, from filled into config.
+// topParts are the parts of a compose file whose entries services use.
+var topParts = []string{"services", "networks", "volumes", "configs", "secrets"}
+
+// takePlaces makes config hold only what runs and takes its places from
+// filled. What filled lacks does not run, such as a service of a profile
+// nobody turned on, or version: config drops it, so the server checks and
+// keeps only what runs. Every service takes its place settings, its env
+// PORT, which tells moin its port, and the folder and Dockerfile of its
+// build.
 func takePlaces(config, filled map[string]any) {
+	for key := range config {
+		if _, ok := filled[key]; !ok {
+			delete(config, key)
+		}
+	}
+	for _, part := range topParts {
+		entries, _ := config[part].(map[string]any)
+		filledEntries, _ := filled[part].(map[string]any)
+		for name := range entries {
+			if _, ok := filledEntries[name]; !ok {
+				delete(entries, name)
+			}
+		}
+	}
 	services, _ := config["services"].(map[string]any)
 	filledServices, _ := filled["services"].(map[string]any)
 	for name, item := range services {
 		service, _ := item.(map[string]any)
 		from, _ := filledServices[name].(map[string]any)
 		copyKeys(service, from, placeKeys...)
+		environment, _ := service["environment"].(map[string]any)
+		fromEnvironment, _ := from["environment"].(map[string]any)
+		if port, ok := fromEnvironment["PORT"]; ok && environment != nil {
+			environment["PORT"] = port
+		}
 		build, _ := service["build"].(map[string]any)
 		fromBuild, _ := from["build"].(map[string]any)
 		if build != nil {

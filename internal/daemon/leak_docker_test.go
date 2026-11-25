@@ -26,8 +26,8 @@ import (
 // TestNoEnvValueLeaks deploys an app that uses a secret of its env in
 // every way a compose file can: in environment, inside a URL, through an
 // env_file of its source, and with the app's password on. The containers
-// see the secret, and the proxy asks for the password, through a restart
-// with a new password and a rollback. Yet no file of the daemon but app.env
+// see the secret, and the proxy asks for the app's one password, through a
+// restart with a new password and rollbacks with it on and off. Yet no file of the daemon but app.env
 // and the htpasswd files holds the secret or a password hash, and neither
 // does any message the daemon sends.
 func TestNoEnvValueLeaks(t *testing.T) {
@@ -144,13 +144,23 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	deploy(protocol.DeployStart{DeployID: "2", Number: 2, Domains: protect("second-password")})
 	seesValues(changed)
 	asks(t, app, "second-password")
-	// A rollback to v1 runs v1 again, with its password and the env as it
-	// is now.
+	// A rollback to v1 runs v1 again, with the env and the password as they
+	// are now: an app has one password.
 	deploy(protocol.DeployStart{DeployID: "3", Number: 3, FromNumber: 1, Domains: protect("third-password")})
 	seesValues(changed)
-	asks(t, app, "first-password")
+	asks(t, app, "third-password")
+	// With the password off, a rollback asks for none.
+	deploy(protocol.DeployStart{DeployID: "4", Number: 4, FromNumber: 2, Domains: &protocol.Domains{Domains: []string{app + ".example.net"}}})
+	seesValues(changed)
+	asks(t, app, "")
 
-	leaks := append([]string{secret, changed}, hashes...)
+	// compose writes a $ of a value as $$, so a hash in a compose file reads
+	// $$2a$$04$$...: what follows its last $, the salt and the digest, is
+	// searched too.
+	leaks := []string{secret, changed}
+	for _, hash := range hashes {
+		leaks = append(leaks, hash, hash[strings.LastIndex(hash, "$")+1:])
+	}
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || entry.Name() == "app.env" || entry.Name() == "htpasswd" {
 			return err
@@ -182,7 +192,8 @@ func TestNoEnvValueLeaks(t *testing.T) {
 }
 
 // asks checks that the proxy asks for the app's password on its tunnel
-// entrypoint, and lets the right one in.
+// entrypoint, and lets the right one in. Without a password, it lets
+// everyone in.
 func asks(t *testing.T, app, password string) {
 	t.Helper()
 	out, err := exec.Command("docker", "inspect", "-f", "{{(index .NetworkSettings.Networks \""+proxyNetwork+"\").IPAddress}}", proxyName).Output()
@@ -205,16 +216,71 @@ func asks(t *testing.T, app, password string) {
 	}
 	// The proxy takes a moment to see the new containers.
 	deadline := time.Now().Add(30 * time.Second)
-	for status("ada", password) != http.StatusOK {
+	user := "ada"
+	if password == "" {
+		user = ""
+	}
+	for status(user, password) != http.StatusOK {
 		if time.Now().After(deadline) {
 			t.Fatalf("the proxy does not let %q in", password)
 		}
 		time.Sleep(500 * time.Millisecond)
+	}
+	if password == "" {
+		return
 	}
 	if got := status("", ""); got != http.StatusUnauthorized {
 		t.Fatalf("without the password: %d", got)
 	}
 	if got := status("ada", "wrong"); got != http.StatusUnauthorized {
 		t.Fatalf("with a wrong password: %d", got)
+	}
+}
+
+// TestRemoveWithoutVariable removes an app whose compose file needs a
+// variable the env no longer has: remove reads no compose file, and takes
+// the containers and networks all the same.
+func TestRemoveWithoutVariable(t *testing.T) {
+	ctx := context.Background()
+	defer func(stable, window time.Duration) { stableFor, startWindow = stable, window }(stableFor, startWindow)
+	stableFor, startWindow = time.Second, 30*time.Second
+	suffix := make([]byte, 3)
+	_, _ = rand.Read(suffix)
+	app := "gone-" + hex.EncodeToString(suffix)
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "compose", "-p", app, "down", "--volumes", "--remove-orphans").Run()
+	})
+	// Not on the main service: that one reads app.env itself.
+	compose := "services:\n  web:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n  db:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n    environment:\n      NEED: ${NEED:?set NEED}\n"
+	source := tarball(t, map[string]string{"compose.yml": compose})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
+	defer server.Close()
+	var done protocol.DeployDone
+	a := newApps(t.TempDir(), func(_ protocol.MessageType, _ string, data any) {
+		if value, ok := data.(protocol.DeployDone); ok {
+			done = value
+		}
+	})
+	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"NEED": "x"}}); err != nil {
+		t.Fatal(err)
+	}
+	a.deploy(ctx, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/gone/tarball/abc123"}, nil)
+	if !done.OK {
+		t.Fatalf("deploy: %s", done.Error)
+	}
+	if _, err := a.setEnv(protocol.EnvSet{App: app, Remove: []string{"NEED"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.stop(ctx, app); err == nil {
+		t.Fatal("stop ran without the variable it needs")
+	}
+	if err := a.remove(ctx, app); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	for _, list := range [][]string{{"ps", "-a"}, {"network", "ls"}} {
+		out, _ := exec.Command("docker", append(list, "-q", "--filter", "label=com.docker.compose.project="+app)...).CombinedOutput()
+		if strings.TrimSpace(string(out)) != "" {
+			t.Errorf("docker %s lists what is left of %s: %s", list[0], app, out)
+		}
 	}
 }

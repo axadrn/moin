@@ -155,7 +155,7 @@ Railpack finds the language, the version and the start command by itself. It cov
 
 If the start or the check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
 
-The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env as it is now.
+The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env, the domains and the password as they are now.
 
 ### How moin reads your database
 
