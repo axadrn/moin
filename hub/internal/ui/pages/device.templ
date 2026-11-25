@@ -18,7 +18,14 @@ type DeviceView struct {
 	CodeError string
 	// Login is the pending login of Code, nil until a valid code is in.
 	Login *model.DeviceLogin
-	// Workspaces are the user's workspaces the computer can be let into.
+	Approval
+}
+
+// Approval is what the approval page asks, the same for `moin login` and
+// an AI agent: the workspace, the rights, and how Allow works for this
+// person.
+type Approval struct {
+	// Workspaces are the user's workspaces the client can be let into.
 	Workspaces  []WorkspaceChoice
 	WorkspaceID string
 	// WorkspaceError says why the workspace was not taken.
@@ -42,7 +49,7 @@ type WorkspaceChoice struct {
 }
 
 // workspaceOptions are the workspaces to pick from.
-func (v DeviceView) workspaceOptions() []components.Option {
+func (v Approval) workspaceOptions() []components.Option {
 	options := make([]components.Option, 0, len(v.Workspaces))
 	for _, workspace := range v.Workspaces {
 		options = append(options, components.Option{Value: workspace.ID, Label: workspace.Name})
@@ -88,56 +95,63 @@ templ Device(view DeviceView) {
 						<p class="moin-text moin-muted">Allow only if your terminal shows this code.</p>
 					</div>
 				}
-				@components.Card(components.CardProps{}) {
-					@components.List() {
-						@factRow("You", ctxkeys.User(ctx).Email)
-						if len(view.Workspaces) == 1 {
-							@factRow("Workspace", view.Workspaces[0].Name)
-						}
-					}
-				}
-				if len(view.Workspaces) > 1 {
-					@formField("Workspace", "device-workspace", "", view.WorkspaceError) {
-						@components.Select(components.SelectProps{ID: "device-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: view.WorkspaceID})
-					}
-				} else {
-					<input type="hidden" name="workspace_id" value={ view.WorkspaceID }/>
-					if view.WorkspaceError != "" {
-						<p class="moin-message" data-state="failed" role="alert">{ view.WorkspaceError }</p>
-					}
-				}
-				@components.Card(components.CardProps{Title: "Rights"}) {
-					@components.List() {
-						@rightsFields("device-right", view.Rights)
-					}
-				}
-				<p class="moin-message" data-state="failed" role="alert" data-passkey-error hidden?={ view.AllowError == "" }>{ view.AllowError }</p>
-				switch  {
-					case view.Passkey:
-						@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"type": "button", "data-passkey": "confirm", "data-passkey-url": "/device/passkey"}}) {
-							Allow with passkey
-						}
-					case view.Fresh:
-						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-							Allow
-						}
-					default:
-						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"formaction": "/device/reauth", "formnovalidate": true}}) {
-							Sign in again to allow
-						}
-						<p class="moin-small moin-muted moin-center">Allow needs a sign-in from the last five minutes. Any way in counts.</p>
-				}
-				if !view.Passkey && view.Passkeys {
-					<p class="moin-small moin-muted moin-center">Add a passkey to approve faster.</p>
-				}
-				@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"formaction": "/device/deny", "formnovalidate": true}}) {
-					Cancel
-				}
+				@approvalFields("/device", view.Approval)
 			</form>
 			if view.Passkey {
 				@passkeyScript()
 			}
 		}
+	}
+}
+
+// approvalFields are the part of the approval page that is the same for
+// `moin login` and an AI agent: who, the workspace, the rights, and Allow
+// and Cancel, which post to base and the paths under it.
+templ approvalFields(base string, view Approval) {
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			@factRow("You", ctxkeys.User(ctx).Email)
+			if len(view.Workspaces) == 1 {
+				@factRow("Workspace", view.Workspaces[0].Name)
+			}
+		}
+	}
+	if len(view.Workspaces) > 1 {
+		@formField("Workspace", "approval-workspace", "", view.WorkspaceError) {
+			@components.Select(components.SelectProps{ID: "approval-workspace", Name: "workspace_id", Label: "Workspace", Options: view.workspaceOptions(), Value: view.WorkspaceID})
+		}
+	} else {
+		<input type="hidden" name="workspace_id" value={ view.WorkspaceID }/>
+		if view.WorkspaceError != "" {
+			<p class="moin-message" data-state="failed" role="alert">{ view.WorkspaceError }</p>
+		}
+	}
+	@components.Card(components.CardProps{Title: "Rights"}) {
+		@components.List() {
+			@rightsFields("approval-right", view.Rights)
+		}
+	}
+	<p class="moin-message" data-state="failed" role="alert" data-passkey-error hidden?={ view.AllowError == "" }>{ view.AllowError }</p>
+	switch  {
+		case view.Passkey:
+			@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"type": "button", "data-passkey": "confirm", "data-passkey-url": base + "/passkey"}}) {
+				Allow with passkey
+			}
+		case view.Fresh:
+			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+				Allow
+			}
+		default:
+			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"formaction": base + "/reauth", "formnovalidate": true}}) {
+				Sign in again to allow
+			}
+			<p class="moin-small moin-muted moin-center">Allow needs a sign-in from the last five minutes. Any way in counts.</p>
+	}
+	if !view.Passkey && view.Passkeys {
+		<p class="moin-small moin-muted moin-center">Add a passkey to approve faster.</p>
+	}
+	@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"formaction": base + "/deny", "formnovalidate": true}}) {
+		Cancel
 	}
 }
 

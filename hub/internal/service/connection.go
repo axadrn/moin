@@ -126,6 +126,25 @@ func (s *ConnectionService) Create(input NewConnection) (*model.Connection, erro
 	return connection, nil
 }
 
+// confirmApproval checks a person letting a client in, before the
+// connection is made: the person themselves, never an impersonation, a
+// workspace of theirs, rights that exist, and then that they are at the
+// browser now. The workspace and the rights come first: a passkey is not
+// spent on an approval that fails anyway.
+func (s *ConnectionService) confirmApproval(passkeys *PasskeyService, presence Presence, workspaceID string, rights model.Rights) error {
+	session := presence.Session
+	if session == nil || session.IsImpersonating() {
+		return ErrImpersonating
+	}
+	if err := requireMembership(s.workspaces, session.UserID, workspaceID); err != nil {
+		return err
+	}
+	if rights&^allRights() != 0 {
+		return ErrRightsUnknown
+	}
+	return passkeys.ConfirmPresence(presence)
+}
+
 // Issue gives a connection a new access and refresh token.
 func (s *ConnectionService) Issue(connection *model.Connection) (Tokens, error) {
 	now := s.now().UTC()

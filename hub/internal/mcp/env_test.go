@@ -80,10 +80,13 @@ func newEnvironment(t *testing.T) *environment {
 	tokenAuth := middleware.BearerAuth(env.connections, env.ciTokens, env.services.Users)
 	env.server = mcp.NewServer(env.services)
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", mcp.Handler(env.server))
+	mux.Handle("/mcp", mcp.Handler(env.server, testResourceMetadata))
 	env.handler = middleware.Chain(mux, middleware.CSRFProtection(false, middleware.NewClientIPResolver(nil)), tokenAuth)
 	return env
 }
+
+// testResourceMetadata is where the 401 of /mcp points MCP clients.
+const testResourceMetadata = "https://app.example.com/.well-known/oauth-protected-resource/mcp"
 
 // owner is a seeded user with a workspace.
 type owner struct {

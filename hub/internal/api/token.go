@@ -18,10 +18,11 @@ import (
 type TokenHandler struct {
 	logins      *service.DeviceLoginService
 	connections *service.ConnectionService
+	oauth       *service.OAuthService
 }
 
-func NewTokenHandler(logins *service.DeviceLoginService, connections *service.ConnectionService) *TokenHandler {
-	return &TokenHandler{logins: logins, connections: connections}
+func NewTokenHandler(logins *service.DeviceLoginService, connections *service.ConnectionService, oauth *service.OAuthService) *TokenHandler {
+	return &TokenHandler{logins: logins, connections: connections, oauth: oauth}
 }
 
 const (
@@ -29,7 +30,10 @@ const (
 	DeviceGrantType = "urn:ietf:params:oauth:grant-type:device_code"
 	// RefreshGrantType exchanges a refresh token for new tokens.
 	RefreshGrantType = "refresh_token"
-	maxTokenRequest  = 8 << 10
+	// CodeGrantType trades the code of an AI agent's approval, with its
+	// PKCE verifier.
+	CodeGrantType   = "authorization_code"
+	maxTokenRequest = 8 << 10
 )
 
 // TokenResponse is a successful answer of POST /api/v1/auth/token (RFC
@@ -51,20 +55,34 @@ type OAuthError struct {
 	Description string `json:"error_description"`
 }
 
-// Token answers a poll of the device flow or a refresh.
+// Token answers a poll of the device flow, the code of an AI agent or a
+// refresh.
 func (h *TokenHandler) Token(w http.ResponseWriter, r *http.Request) {
 	if !readForm(w, r) {
 		return
 	}
+	form := r.PostForm
 	var tokens service.Tokens
 	var err error
-	switch r.PostForm.Get("grant_type") {
+	switch form.Get("grant_type") {
 	case DeviceGrantType:
-		tokens, err = h.logins.Token(r.PostForm.Get("device_code"))
+		tokens, err = h.logins.Token(form.Get("device_code"))
+	case CodeGrantType:
+		tokens, err = h.oauth.Exchange(service.CodeExchange{
+			Code:        form.Get("code"),
+			Verifier:    form.Get("code_verifier"),
+			RedirectURI: form.Get("redirect_uri"),
+			ClientID:    form.Get("client_id"),
+			Resource:    form.Get("resource"),
+		})
 	case RefreshGrantType:
-		tokens, err = h.connections.Refresh(r.PostForm.Get("refresh_token"), r.PostForm.Get("client_id"))
+		if resource := form.Get("resource"); resource != "" && !h.oauth.IsResource(resource) {
+			err = service.ErrResourceInvalid
+			break
+		}
+		tokens, err = h.connections.Refresh(form.Get("refresh_token"), form.Get("client_id"))
 	default:
-		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "Use the device code or a refresh token.")
+		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "Use the device code, an authorization code or a refresh token.")
 		return
 	}
 	switch {
@@ -80,6 +98,10 @@ func (h *TokenHandler) Token(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "The device code is unknown or was used already. Start the login again.")
 	case errors.Is(err, service.ErrRefreshReused):
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "This refresh token was used before, so the connection ended. Log in again.")
+	case errors.Is(err, service.ErrCodeInvalid):
+		oauthError(w, http.StatusBadRequest, "invalid_grant", "The authorization code is unknown, expired, used, or came with another client, redirect URI or code verifier. Sign in again.")
+	case errors.Is(err, service.ErrResourceInvalid):
+		oauthError(w, http.StatusBadRequest, "invalid_target", "The resource must be "+h.oauth.Resource()+".")
 	case errors.Is(err, service.ErrRefreshInvalid):
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "The refresh token is unknown, expired or its connection ended. Log in again.")
 	case err != nil:

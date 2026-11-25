@@ -1,0 +1,102 @@
+package pages
+
+import (
+	"net/url"
+	"slices"
+
+	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// OAuthView is the page where an AI agent is let in: the approval of
+// `moin login`, and where Allow and Cancel send the person back.
+type OAuthView struct {
+	// ClientName is the client's own word; nobody checked it.
+	ClientName string
+	// Host is where the person goes back to, like claude.ai.
+	Host string
+	// Local says Host is this computer: only the client's own word says
+	// which app it is.
+	Local bool
+	// Request is the client's request, carried by the form.
+	Request url.Values
+	Approval
+}
+
+// requestFields are the names of the request's fields, in order.
+func (v OAuthView) requestFields() []string {
+	names := make([]string, 0, len(v.Request))
+	for name := range v.Request {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	return names
+}
+
+// OAuth asks whether to let an AI agent in, with which rights, and says
+// where it goes back to. The client's name is its own word, so it shows in
+// quotes.
+templ OAuth(view OAuthView) {
+	@authScreen(oauthSEO, "Connect “"+view.ClientName+"”?") {
+		<form id="oauth-approve-form" action="/oauth/approve" method="POST" class="moin-stack" data-gap="4">
+			@components.CSRF()
+			for _, name := range view.requestFields() {
+				<input type="hidden" name={ name } value={ view.Request.Get(name) }/>
+			}
+			if view.Passkey {
+				<input type="hidden" name="passkey" value=""/>
+			}
+			@authLine() {
+				if view.Local {
+					It will send you back to { view.Host }, an app on this computer. Allow only if you just started it.
+				} else {
+					It will send you back to { view.Host }.
+				}
+			}
+			@approvalFields("/oauth", view.Approval)
+		</form>
+		if view.Passkey {
+			@passkeyScript()
+		}
+	}
+}
+
+// OAuthFailed says why a client's request cannot go on, when it cannot go
+// back to the client either.
+templ OAuthFailed(message string) {
+	@authScreen(oauthSEO, "Cannot connect") {
+		@authLine() {
+			{ message }
+		}
+		@authLink("/app") {
+			{ "Open " + brand.Name }
+		}
+	}
+}
+
+// OAuthDone sends the person back to the client. The page's Refresh
+// header goes there at once; the button is there in case it does not.
+templ OAuthDone(host, target string, approved bool) {
+	@authScreen(oauthSEO, doneTitle(approved)) {
+		@authLine() {
+			if approved {
+				Connected. Going back to { host }.
+			} else {
+				Nothing got access. Going back to { host }.
+			}
+		}
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: target}) {
+			{ "Back to " + host }
+		}
+	}
+}
+
+func doneTitle(approved bool) string {
+	if approved {
+		return "Connected"
+	}
+	return "Not connected"
+}
+
+var oauthSEO = layouts.SEOProps{Title: "Connect an AI agent", Description: "Approve an AI agent's sign-in to " + brand.Name}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -16,9 +17,10 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
-// pendingDeviceCookie keeps the code of `moin login` while the user signs
-// in, so every way to sign in comes back to the approval.
-const pendingDeviceCookie = "pending_device"
+// pendingApprovalCookie keeps the approval page, of `moin login` or an AI
+// agent, while the person signs in, so every way to sign in comes back to
+// it.
+const pendingApprovalCookie = "pending_approval"
 
 // DeviceHandler is the page where `moin login` is approved in the browser:
 // which workspace, which rights, and the person's passkey or a fresh
@@ -41,7 +43,7 @@ func (h *DeviceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	code := service.FormatUserCode(r.URL.Query().Get("code"))
 	user := ctxkeys.User(r.Context())
 	if user == nil || user.Name == "" {
-		h.setPending(w, code)
+		setPendingApproval(w, h.cfg, devicePath(code))
 		next := "/auth"
 		if user != nil {
 			next = "/auth/onboarding"
@@ -49,7 +51,7 @@ func (h *DeviceHandler) Show(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, next, http.StatusSeeOther)
 		return
 	}
-	clearPendingDevice(w, h.cfg)
+	clearPendingApproval(w, h.cfg)
 	if code == "" {
 		render(w, r, pages.Device(pages.DeviceView{}))
 		return
@@ -150,7 +152,7 @@ func approveError(err error) (message string, workspace, ok bool) {
 // in, and back here after: an account without a passkey allows a login
 // only with a sign-in less than five minutes old.
 func (h *DeviceHandler) Reauth(w http.ResponseWriter, r *http.Request) {
-	h.setPending(w, service.FormatUserCode(r.FormValue("code")))
+	setPendingApproval(w, h.cfg, devicePath(r.FormValue("code")))
 	if err := h.auth.EndSession(r); err != nil {
 		h.codeError(w, r, r.FormValue("code"), err)
 		return
@@ -183,24 +185,33 @@ func (h *DeviceHandler) codeError(w http.ResponseWriter, r *http.Request, code s
 	render(w, r, pages.Device(pages.DeviceView{Code: code, CodeError: message}))
 }
 
-// view is the approval of the pending login of code: the workspaces it can
-// go into, the chosen one or the first, the rights, and how Allow works for
-// this person.
+// view is the approval of the pending login of code.
 func (h *DeviceHandler) view(r *http.Request, code, workspaceID string, rights model.Rights) (pages.DeviceView, error) {
 	login, err := h.logins.Pending(code)
 	if err != nil {
 		return pages.DeviceView{}, err
 	}
+	approval, err := approvalView(r, h.workspaces, h.passkeys, workspaceID, rights)
+	if err != nil {
+		return pages.DeviceView{}, err
+	}
+	return pages.DeviceView{Code: code, Login: login, Approval: approval}, nil
+}
+
+// approvalView is how the approval page asks this person, for `moin login`
+// and an AI agent alike: the workspaces the client can go into, the chosen
+// one or the first, the rights, and how Allow works for them.
+func approvalView(r *http.Request, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, workspaceID string, rights model.Rights) (pages.Approval, error) {
 	user := ctxkeys.User(r.Context())
-	memberships, err := h.workspaces.ListForUser(user.ID)
+	memberships, err := workspaces.ListForUser(user.ID)
 	if err != nil {
-		return pages.DeviceView{}, err
+		return pages.Approval{}, err
 	}
-	passkey, err := h.passkeys.NeedsPasskey(user.ID)
+	passkey, err := passkeys.NeedsPasskey(user.ID)
 	if err != nil {
-		return pages.DeviceView{}, err
+		return pages.Approval{}, err
 	}
-	view := pages.DeviceView{Code: code, Login: login, WorkspaceID: workspaceID, Rights: rights, Passkey: passkey, Passkeys: h.passkeys.On()}
+	view := pages.Approval{WorkspaceID: workspaceID, Rights: rights, Passkey: passkey, Passkeys: passkeys.On()}
 	if session := ctxkeys.Session(r.Context()); session != nil {
 		view.Fresh = time.Since(session.CreatedAt) < service.FreshSignIn
 	}
@@ -213,33 +224,49 @@ func (h *DeviceHandler) view(r *http.Request, code, workspaceID string, rights m
 	return view, nil
 }
 
-func (h *DeviceHandler) setPending(w http.ResponseWriter, code string) {
+// devicePath is the approval page of a code of `moin login`.
+func devicePath(code string) string {
+	code = service.FormatUserCode(code)
+	if code == "" {
+		return "/device"
+	}
+	return "/device?code=" + url.QueryEscape(code)
+}
+
+// setPendingApproval remembers path, an approval page, while the person
+// signs in.
+func setPendingApproval(w http.ResponseWriter, cfg *config.Config, path string) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     pendingDeviceCookie,
-		Value:    service.NormalizeUserCode(code),
+		Name:     pendingApprovalCookie,
+		Value:    base64.RawURLEncoding.EncodeToString([]byte(path)),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   h.cfg.IsProduction(),
+		Secure:   cfg != nil && cfg.IsProduction(),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(service.DeviceLoginLifetime.Seconds()),
 	})
 }
 
-func clearPendingDevice(w http.ResponseWriter, cfg *config.Config) {
+func clearPendingApproval(w http.ResponseWriter, cfg *config.Config) {
 	secure := cfg != nil && cfg.IsProduction()
-	http.SetCookie(w, &http.Cookie{Name: pendingDeviceCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: pendingApprovalCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
 }
 
-// pendingDevice is where to go after signing in when `moin login` sent the
-// user: the approval page, with the code when there is one.
-func pendingDevice(r *http.Request) (string, bool) {
-	cookie, err := r.Cookie(pendingDeviceCookie)
+// pendingApproval is where to go after signing in when `moin login` or an
+// AI agent sent the person: the approval page. Only the two approval pages
+// of this hub count, so the cookie never leads elsewhere.
+func pendingApproval(r *http.Request) (string, bool) {
+	cookie, err := r.Cookie(pendingApprovalCookie)
 	if err != nil {
 		return "", false
 	}
-	code := service.NormalizeUserCode(cookie.Value)
-	if code == "" {
-		return "/device", true
+	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return "", false
 	}
-	return "/device?code=" + url.QueryEscape(service.FormatUserCode(code)), true
+	target, err := url.Parse(string(raw))
+	if err != nil || target.Scheme != "" || target.Host != "" || target.Opaque != "" || (target.Path != "/device" && target.Path != "/oauth/authorize") {
+		return "", false
+	}
+	return target.String(), true
 }

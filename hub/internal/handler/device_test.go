@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -93,7 +94,7 @@ func deviceRequest(method, target string, form url.Values, user *model.User, ses
 
 func deviceCookie(recorder *httptest.ResponseRecorder) *http.Cookie {
 	for _, cookie := range recorder.Result().Cookies() {
-		if cookie.Name == pendingDeviceCookie {
+		if cookie.Name == pendingApprovalCookie {
 			return cookie
 		}
 	}
@@ -112,7 +113,7 @@ func TestDevicePageSignsInFirstAndComesBack(t *testing.T) {
 		t.Fatalf("guest: status %d, location %q", recorder.Code, recorder.Header().Get("Location"))
 	}
 	cookie := deviceCookie(recorder)
-	if cookie == nil || cookie.Value != service.NormalizeUserCode(started.UserCode) {
+	if cookie == nil || cookie.Value != base64.RawURLEncoding.EncodeToString([]byte("/device?code="+started.UserCode)) {
 		t.Fatalf("pending device cookie = %#v", cookie)
 	}
 
@@ -208,7 +209,7 @@ func TestDevicePageAsksToSignInAgain(t *testing.T) {
 	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != "/auth" {
 		t.Fatalf("reauth: status %d, location %q", recorder.Code, recorder.Header().Get("Location"))
 	}
-	if cookie := deviceCookie(recorder); cookie == nil || cookie.Value != service.NormalizeUserCode(started.UserCode) {
+	if cookie := deviceCookie(recorder); cookie == nil || cookie.Value != base64.RawURLEncoding.EncodeToString([]byte("/device?code="+started.UserCode)) {
 		t.Fatalf("reauth kept no pending code: %#v", cookie)
 	}
 }

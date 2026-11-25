@@ -39,6 +39,7 @@ type apiEnvironment struct {
 	ciTokens    *service.CITokenService
 	passkeys    *service.PasskeyService
 	devices     *service.DeviceLoginService
+	oauth       *service.OAuthService
 	files       *service.FileService
 	storage     *testutil.MemoryStorage
 	admin       *service.AdminService
@@ -96,6 +97,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	environment.auth.UseBearers(environment.connections, environment.ciTokens)
 	environment.passkeys = service.NewPasskeyService(repository.NewPasskeys(database), userRepository, email, nil)
 	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.connections, environment.passkeys)
+	environment.oauth = service.NewOAuthService(repository.NewOAuth(database), environment.connections, environment.passkeys, "https://app.example.com")
 	environment.admin = service.NewAdminService(repository.NewAdmin(database), userRepository, environment.auth, []string{testAdminEmail})
 	adminHandler := api.NewAdminHandler(environment.admin)
 
@@ -118,7 +120,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Passkeys:    api.NewPasskeysHandler(environment.passkeys),
 		Connections: api.NewConnectionsHandler(environment.connections, environment.passkeys),
 		CITokens:    api.NewCITokensHandler(environment.ciTokens, environment.passkeys),
-		Token:       api.NewTokenHandler(environment.devices, environment.connections),
+		Token:       api.NewTokenHandler(environment.devices, environment.connections, environment.oauth),
 		Billing:     billingHandler,
 		Admin:       adminHandler,
 		Workspaces:  api.NewWorkspaceHandler(environment.workspaces),
@@ -129,6 +131,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Status:      api.NewStatusHandler(service.NewStatusService(apps, servers, nil)),
 		Catalog:     api.NewCatalogHandler(service.NewCatalogService(catalog.NewStore(nil, catalog.Registry{}), apps)),
 		Device:      api.NewDeviceHandler(environment.devices, "https://app.example.com"),
+		OAuth:       api.NewOAuthHandler(environment.oauth),
 	}
 	routeMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -144,6 +147,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		},
 		RateLimitDevice:     middleware.RateLimitDeviceLogin(clientIPs),
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
+		RateLimitRegister:   middleware.RateLimit(clientIPs, 60, time.Hour),
 		AppID: func(workspaceID, name string) (string, error) {
 			app, err := apps.Get(workspaceID, name)
 			if err != nil {
@@ -158,6 +162,9 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		mux.HandleFunc(route.Pattern, route.Handler)
 	}
 	mux.HandleFunc("/api/", middleware.APINotFound)
+	mux.HandleFunc("GET "+api.ProtectedResourcePath, handlers.OAuth.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", handlers.OAuth.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", handlers.OAuth.AuthorizationServer)
 
 	environment.handler = middleware.Chain(
 		mux,

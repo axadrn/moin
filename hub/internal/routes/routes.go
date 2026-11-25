@@ -248,6 +248,23 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, gi
 	mux.HandleFunc("POST /device/approve", deviceLimiter(middleware.RequireAuth(device.Approve)))
 	mux.HandleFunc("POST /device/reauth", deviceLimiter(middleware.RequireAuth(device.Reauth)))
 	mux.HandleFunc("POST /device/deny", deviceLimiter(middleware.RequireAuth(device.Deny)))
+	// AI agents sign in on the same approval page, with OAuth; the page
+	// shares the budget of moin login.
+	oauth := handler.NewOAuthHandler(app.OAuthService, app.WorkspaceService, app.Passkeys, app.AuthService, app.Cfg)
+	mux.HandleFunc("GET /oauth/authorize", deviceLimiter(oauth.Authorize))
+	if app.Passkeys.On() {
+		mux.HandleFunc("POST /oauth/passkey/options", passkeyLimiter(middleware.RequireAuth(device.PasskeyOptions)))
+	}
+	mux.HandleFunc("POST /oauth/approve", deviceLimiter(middleware.RequireAuth(oauth.Approve)))
+	mux.HandleFunc("POST /oauth/reauth", deviceLimiter(middleware.RequireAuth(oauth.Reauth)))
+	mux.HandleFunc("POST /oauth/deny", deviceLimiter(middleware.RequireAuth(oauth.Deny)))
+	// How an MCP client finds all of it: the metadata of /mcp (RFC 9728),
+	// at its own path and at the root, and of the hub as an authorization
+	// server (RFC 8414).
+	metadata := api.NewOAuthHandler(app.OAuthService)
+	mux.HandleFunc("GET "+api.ProtectedResourcePath, metadata.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", metadata.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", metadata.AuthorizationServer)
 }
 
 // inWorkspace is the middleware of every page under /app/{workspaceSlug}:
@@ -487,7 +504,7 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Passkeys:    api.NewPasskeysHandler(app.Passkeys),
 		Connections: api.NewConnectionsHandler(app.ConnectionService, app.Passkeys),
 		CITokens:    api.NewCITokensHandler(app.CITokenService, app.Passkeys),
-		Token:       api.NewTokenHandler(app.DeviceLoginService, app.ConnectionService),
+		Token:       api.NewTokenHandler(app.DeviceLoginService, app.ConnectionService, app.OAuthService),
 		Billing:     apiBilling,
 		Admin:       api.NewAdminHandler(app.AdminService),
 		Workspaces:  api.NewWorkspaceHandler(app.WorkspaceService),
@@ -499,6 +516,7 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Catalog:     api.NewCatalogHandler(app.CatalogService),
 		Status:      api.NewStatusHandler(app.StatusService),
 		Device:      api.NewDeviceHandler(app.DeviceLoginService, app.Cfg.AppURL),
+		OAuth:       api.NewOAuthHandler(app.OAuthService),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
@@ -514,6 +532,9 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		},
 		RateLimitDevice:     deviceLimiter,
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
+		// MCP clients register once per sign-in. claude.ai registers from
+		// a few addresses for everyone, so the budget is generous.
+		RateLimitRegister: middleware.RateLimit(clientIPs, 60, time.Hour),
 		AppID: func(workspaceID, name string) (string, error) {
 			found, err := app.AppService.Get(workspaceID, name)
 			if err != nil {
@@ -542,5 +563,5 @@ func mcpRoutes(mux *http.ServeMux, app *app.App, invitationLimiter *middleware.R
 		Status:        app.StatusService,
 		BillingOff:    !app.Cfg.Billing,
 	})
-	mux.Handle("/mcp", mcp.Handler(mcpServer))
+	mux.Handle("/mcp", mcp.Handler(mcpServer, app.OAuthService.Issuer()+api.ProtectedResourcePath))
 }

@@ -7,7 +7,7 @@ order: 3
 
 Your account is you in moin: your name, your email and how you sign in. It lives under **Settings**, **Account**.
 
-`moin login` connects your computer through the browser. You pick what it may do and allow it with your passkey. Every client you let in is a **connection**: you see it, change its rights and remove it. CI and scripts use a **CI token**, a key you make by hand.
+`moin login` connects your computer through the browser. You pick what it may do and allow it with your passkey. An AI agent signs in the same way, from the URL of your hub's MCP server: [AI agents](/docs/guides/mcp). Every client you let in is a **connection**: you see it, change its rights and remove it. CI and scripts use a **CI token**, a key you make by hand.
 
 ```bash
 moin login

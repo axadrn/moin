@@ -53,7 +53,7 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 - Every route under `/api/v1` is listed once in `api.Routes` in `internal/api/routes.go`. `internal/api/openapi.yaml` documents each one and is served at `GET /api/v1/openapi.yaml`. `internal/api/openapi_test.go` fails when the two drift.
 - People sign in in the browser, with GitHub through the moin GitHub App or with a passkey, and get the `session_token` cookie; a hub without the app takes a recovery key from `./main recovery-key <email>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`. The CLI, the TUI and AI agents are connections (`at_...` access tokens from `POST /api/v1/auth/token`); CI sends a CI token (`pat_...`); both as `Authorization: Bearer`. A session is never a bearer token.
 - A connection is a client the person let in from the browser (`service.ConnectionService`), a CI token one made by hand (`service.CITokenService`); both act with rights: read, deploy, env, delete, servers (`model.Rights`). Each route in `api.Routes` names the right it needs, or `api.NoToken` to keep them out; that table is the one place, and `content/docs/reference/rights.md` and the `bearerAuth` roles in `openapi.yaml` are checked against it. A right a handler can only tell from the body, like SQL that writes, is asked with `api.Allowed`. Rights never add to a role. A connection or CI token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
-- `POST /api/v1/auth/token` and `/api/v1/auth/revoke` follow OAuth (RFC 6749, 8628, 7009): forms in, `{"error", "error_description"}` out, not the envelope.
+- `POST /api/v1/auth/token`, `/api/v1/auth/revoke` and `/api/v1/auth/register` follow OAuth (RFC 6749, 8628, 7009, 7591): forms in (registration is JSON), `{"error", "error_description"}` out, not the envelope.
 - Every non-2xx answer is the envelope `{"error":{"code","message","fields"}}`. Codes are stable lowercase snake case. `fields` appears only for `validation_failed`.
 - `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards.
 - Email change emails link to the HTML route under `APP_URL/auth/...`. An API client that receives the token another way calls `POST /api/v1/auth/email-change/verify`.
@@ -96,12 +96,7 @@ func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
 
 The description tells the AI agent what the tool returns or changes; Add says the right. Add a test with the in-memory transport like `TestAddedToolRunsWithItsRight`.
 
-Client setup, with a CI token from Settings, Connections and the public URL of this server:
-
-- Claude Code: `claude mcp add --transport http app https://example.com/mcp --header "Authorization: Bearer pat_..."`
-- Claude Desktop and claude.ai: Customize, Connectors, Add custom connector, the `/mcp` URL, Authentication "No sign in", and the request header `Authorization: Bearer pat_...`. Claude connects from Anthropic's cloud, so the URL must be public. Request headers on custom connectors are in beta and not available to every organization yet. For a local server, or when your organization has no Request headers field, use the local `mcp-remote` bridge: run `npx mcp-remote http://localhost:8090/mcp --header Authorization:${AUTH_HEADER}` from `claude_desktop_config.json` with `AUTH_HEADER` set to `Bearer pat_...`.
-- Cursor: `.cursor/mcp.json` with `"mcpServers": {"app": {"url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${env:API_TOKEN}"}}}`.
-- VS Code: `.vscode/mcp.json` with `"servers": {"app": {"type": "http", "url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${input:api-token}"}}}` and a `promptString` input `api-token` with `"password": true`.
+Client setup: the `/mcp` URL is all an MCP client needs. Its 401 carries `WWW-Authenticate: Bearer resource_metadata=...` (RFC 9728), the client finds the hub's OAuth metadata (RFC 8414), registers itself (RFC 7591, `POST /api/v1/auth/register`), sends the person to `/oauth/authorize`, the approval page of `moin login`, and trades the code with PKCE S256 at `POST /api/v1/auth/token`. The result is a connection like any other, bound to `/mcp` (`service.OAuthService`). Clients without OAuth send a CI token as `Authorization: Bearer pat_...`. The steps per client are in `content/docs/guides/mcp.md`.
 
 ## Commands
 

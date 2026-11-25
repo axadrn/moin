@@ -42,6 +42,7 @@ The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and a
 | `POST /api/v1/auth/device` | no token |
 | `POST /api/v1/auth/token` | no token |
 | `POST /api/v1/auth/revoke` | no token |
+| `POST /api/v1/auth/register` | no token |
 | `POST /api/v1/auth/onboarding` | no token |
 | `POST /api/v1/auth/logout` | no token |
 | `GET /api/v1/account` | read |

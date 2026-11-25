@@ -7,30 +7,33 @@ order: 4
 
 MCP lets an AI agent such as Claude or Cursor use moin for you: *"roll back my app and show me its logs"*. The hub is an MCP server at `/mcp`. Almost every action is a tool. [Where things work](/docs/reference/surfaces) lists what stays in the web.
 
-[Make a CI token](/docs/guides/account#make-a-ci-token) with the rights the agent needs, and put it where `pat_…` stands. Read, deploy and env are on at first; delete and servers only when you turn them on.
-
 ## Connect an AI agent
 
-Claude Code:
+Add the URL of your hub's MCP server, `https://moin.example.com/mcp`, to your AI agent. It opens the browser. You see the same page as for `moin login`: pick the workspace and the rights, then allow with your passkey. The agent is now a connection under **Settings**, **Connections**, where you change its rights or remove it.
+
+- **Claude Code**: `claude mcp add --transport http moin https://moin.example.com/mcp`, then `/mcp` in Claude Code, pick moin and sign in.
+- **Claude and Claude Desktop**: **Customize**, **Connectors**, **Add custom connector**, the URL, then **Connect**.
+- **Cursor**: `{"mcpServers": {"moin": {"url": "https://moin.example.com/mcp"}}}` in `.cursor/mcp.json`, then **Connect** next to moin in the MCP settings.
+- **ChatGPT**: add a connector in developer mode with the URL and OAuth to sign in.
+- **Any other client**: the URL is enough when it signs in with OAuth, as the MCP spec asks.
+
+Claude and ChatGPT connect from their own cloud, so they need a hub on the public internet. Claude Code and Cursor run on your computer and reach any hub you reach.
+
+### Without the browser
+
+A client that cannot sign in with OAuth, or one that runs in CI, uses a CI token. [Make one](/docs/guides/account#make-a-ci-token) with the rights the agent needs and send it as a header:
 
 ```bash
 claude mcp add --transport http moin https://moin.example.com/mcp \
   --header "Authorization: Bearer pat_…"
 ```
 
-Cursor, in `.cursor/mcp.json`:
-
-```json
-{"mcpServers": {"moin": {"url": "https://moin.example.com/mcp", "headers": {"Authorization": "Bearer pat_…"}}}}
-```
-
-Any other client that speaks MCP over HTTP: the URL `https://moin.example.com/mcp` and the header `Authorization: Bearer pat_…`.
-
 ## Good to know
 
-- The token is all an AI agent needs. `whoami` tells it its rights.
-- Each tool needs one right, named in the table below and at the end of its description. Without it the tool answers `missing_right` with the right, and the agent says: "This CI token may not deploy and restart. Change it in Settings, Connections." [Rights](/docs/reference/rights)
-- Rights never add to your role: a member's token cannot invite, whatever its rights.
+- An agent you let in works only at `/mcp` of your hub, never in the JSON API. Its access lasts an hour and renews by itself; unused for 90 days, the connection ends. `whoami` tells it its rights.
+- The approval page shows the agent's name as the agent gave it, and where it sends you back, like claude.ai or localhost. Nobody checked the name, so allow only an agent you just added.
+- Each tool needs one right, named in the table below and at the end of its description. Without it the tool answers `missing_right` with the right, and the agent says: "This connection may not deploy and restart. Change it in Settings, Connections." [Rights](/docs/reference/rights)
+- Rights never add to your role: a member's agent cannot invite, whatever its rights.
 - A CI token for one app does not reach MCP.
 - Tools that remove, replace or stop something are marked destructive, so clients ask first.
 - Four cannot be undone: `remove_server`, `remove_app`, `remove_bucket` and `restore_app`. They also take `confirm`, the name of the server, app or bucket, and refuse without it or with another name: `confirm_mismatch`, the same check as on the web and in the API.

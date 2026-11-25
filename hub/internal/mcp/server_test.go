@@ -101,7 +101,13 @@ func TestMCPRequiresAConnectionOrCIToken(t *testing.T) {
 		}
 		recorder := httptest.NewRecorder()
 		env.handler.ServeHTTP(recorder, request)
-		if recorder.Code != http.StatusUnauthorized || !strings.HasPrefix(recorder.Header().Get("WWW-Authenticate"), "Bearer") {
+		// The 401 tells an MCP client where to learn how to sign in (RFC
+		// 9728), and that a token it sent did not work.
+		challenge := `Bearer resource_metadata="` + testResourceMetadata + `"`
+		if authorization != "" {
+			challenge += `, error="invalid_token"`
+		}
+		if recorder.Code != http.StatusUnauthorized || recorder.Header().Get("WWW-Authenticate") != challenge {
 			t.Fatalf("%s: status = %d, headers %v, body %s", name, recorder.Code, recorder.Header(), recorder.Body.String())
 		}
 		var envelope api.ErrorBody
