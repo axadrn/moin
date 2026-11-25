@@ -33,7 +33,7 @@ Merging ships nothing. The change only lands on `main`. [Contributing](https://g
 
 A release has a version, like `v1.0.0-beta.28`, and its notes in the [changelog](/changelog). A deploy has neither.
 
-A release also carries the `moin` binaries, their `SHA256SUMS` and its signature, `SHA256SUMS.sig`. The Deploy workflow signs with `RELEASE_SIGNING_KEY`, a secret of the GitHub environment `release`: only a `v*` tag reaches it, and only after a maintainer approves the run. It never reaches a hub. Daemons update from there. [Updates](/docs/guides/security#updates)
+A release also carries the `moin` binaries, their `SHA256SUMS` and its signature, `SHA256SUMS.sig`. `SHA256SUMS` also names the hub image of the release by its digest, so the signature covers the image too. The Deploy workflow signs with `RELEASE_SIGNING_KEY`, a secret of the GitHub environment `release`: only a `v*` tag reaches it, and only after a maintainer approves the run. It never reaches a hub. Daemons update from there. [Updates](/docs/guides/security#updates)
 
 A release waits for a maintainer to approve it in GitHub. Then the workflow signs, makes the GitHub release as a draft, adds every file, and only then publishes it and tags its image `stable`. No hub sees a new version before its signed release is complete.
 
@@ -76,6 +76,8 @@ The hub is one image, `ghcr.io/axadrn/moin`.
 | `stable`, `latest` | the newest release, once its signed release is complete. Your hub runs `stable`. |
 | `v1.0.0-beta.28` | exactly that version, forever |
 | `main-c00bd77` | one deploy of moin.run. Not for your hub. |
+
+A release's signed `SHA256SUMS` names its image by digest: the line `<digest>  ghcr.io/axadrn/moin:v1.2.3`. `stable` is that same image. Pull it by the digest to run exactly what we signed: [Updates](/docs/guides/security#updates)
 
 ## Your version
 
