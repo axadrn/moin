@@ -236,6 +236,7 @@ type runner struct {
 // send writes a message to the current session. Log lines without a session
 // are dropped; a deploy.done waits for the next session.
 func (r *runner) send(messageType protocol.MessageType, requestID string, data any) {
+	logAnswer(messageType, requestID, data)
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
 		slog.Error("encode message failed", "type", messageType, "error", err)
@@ -329,6 +330,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 
 // handle runs one request from the hub.
 func (r *runner) handle(ctx context.Context, message protocol.Message) {
+	logAsked(message)
 	// A rules file with a mistake refuses everything until it is fixed.
 	rules, err := LoadRules(r.rulesFile)
 	if err != nil {

@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, where your secrets live, web, SSH, firewall, rules and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, where your secrets live, web, SSH, firewall, rules, the journal and signed updates."
 group: "Servers and data"
 order: 2
 ---
@@ -38,6 +38,7 @@ moin has two parts. The **hub** is where you click and type: the web, the CLI, t
 **You write the house rules.** A note on your door says what the messenger may do. Only you can write it, on the server. The messenger cannot change it.
 
 - `/etc/moin/rules`, readable by root. The daemon checks every request against it. [Rules](#rules)
+- The daemon writes every request in the server's journal, and whether it did it. [See what the hub asked](#see-what-the-hub-asked)
 
 **New versions carry a seal.** A messenger cannot slip your server a fake daemon.
 
@@ -331,6 +332,25 @@ MCP: list_servers
 ```
 
 `moin servers` shows them in its RULES column; the API in the `rules` field.
+
+## See what the hub asked
+
+Your server keeps a diary. Every letter the messenger brings goes in it: what it asked, and whether the daemon did it or said no, and why. The messenger cannot tear out a page: the diary is on your server.
+
+```
+journalctl -u moin-daemon
+```
+
+```
+INFO hub asked type=deploy.start app=my-app deploy=d-41 number=12 source=api.github.com/repos/acme/blog/tarball/abc123
+INFO done deploy=d-41
+INFO hub asked type=exec.start request=r-7 app=my-app service=web command=psql
+WARN not done request=r-7 why="refused by the rules of this server (/etc/moin/rules): exec: off"
+```
+
+- One line for what was asked, one for what came of it. `request` or `deploy` ties the two together.
+- It names the app and what the request is about: the deploy number, the source, the image, the command, the env keys. Never an env value, a secret, a password, SQL, the arguments of a command or a file.
+- `journalctl -u moin-daemon -f` follows it as it happens. `--since today` shows one day.
 
 ## Updates
 
