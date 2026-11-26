@@ -60,8 +60,7 @@ claude mcp add --transport http moin https://moin.example.com/mcp \
 | `rename_server` | renames a server | servers |
 | `update_daemon` | puts the hub's daemon version on a server | servers |
 | `set_daemon_updates` | turns automatic daemon updates on or off | servers |
-| `get_version` | the hub's version, the newest version of moin and whether daemons update by themselves; for the admins of the hub also the hub backup | read |
-| `update_hub` | updates a self-hosted hub to the newest version, for its admins: first it returns the release notes, then it updates with `confirm` | servers |
+| `get_version` | the hub's version, the newest version of moin with its notes and whether daemons update by themselves; for the admins of the hub also the hub backup. A self-hosted hub updates on its server: `sh /opt/moin/update.sh` | read |
 | `list_apps` | apps with the live and the newest deploy | read |
 | `get_app` | an app with its deploys and what was detected | read |
 | `create_app` | creates an app on a server with its password on; returns the password, this once | deploy |

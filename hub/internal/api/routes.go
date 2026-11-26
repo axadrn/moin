@@ -90,7 +90,6 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"GET /api/v1/csrf", CSRFToken, model.RightRead},
 		{"GET /api/v1/meta", h.Meta.Meta, model.RightRead},
 		{"GET /api/v1/version", m.RequireOnboarded(h.Version.Show), model.RightRead},
-		{"POST /api/v1/version/update", m.InWorkspace(h.Version.Update), model.RightServers},
 		{"POST /api/v1/auth/email-change/verify", h.Auth.VerifyEmailChange, NoToken},
 		{"POST /api/v1/auth/device", m.RateLimitDevice(h.Device.Start), NoToken},
 		{"POST /api/v1/auth/token", m.RateLimitDevicePoll(h.Token.Token), NoToken},

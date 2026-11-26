@@ -420,6 +420,7 @@ A daemon only updates to a release we signed. Think of a stamp: we stamp every r
 - In GitHub the key sits in a protected environment. Only a release tag reaches it, and only after a maintainer approves. A workflow or an action someone slipped in cannot sign.
 - A daemon without systemd cannot restart itself, so it does not update itself. Update it by hand: take the binary from the release and check it first (below).
 - The first install trusts the hub you install from. The install script and the binary come from it, and nothing checks them. To trust only our signature, take the binary from the release and check it (below).
+- A self-hosted hub never updates itself. Its admins run `sh /opt/moin/update.sh` on its server. Nothing with the Docker socket runs next to the hub, so the hub cannot touch your server, not even to update itself.
 - A hub update pulls the image by its version tag. Nothing checks its signature. To be sure, check `SHA256SUMS` and pull the image by its digest (below).
 - There are two keys: one signs every release, a spare stays offline. If the first ever leaks, a release signed with the spare drops it, and every daemon stops trusting it.
 - The keys are Ed25519, in `releaseKeys` in `internal/daemon/update.go`. Forging a signature without the private key is not possible with today's computers. What matters is that nobody steals the key.

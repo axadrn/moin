@@ -317,18 +317,6 @@ var settingsSummaries = map[string]summarize{
 	"hub.github_app_created": func(target string, d map[string]string) string {
 		return "created the GitHub App " + target + " of the hub"
 	},
-	"hub.update_started": func(target string, d map[string]string) string {
-		return "started the update of the hub from " + d["from"] + " to " + d["to"]
-	},
-	"hub.updated": func(target string, d map[string]string) string {
-		return "updated the hub from " + d["from"] + " to " + d["to"]
-	},
-	"hub.rolled_back": func(target string, d map[string]string) string {
-		return "could not update the hub to " + d["to"] + ", so it runs " + d["from"] + " again: " + d["reason"]
-	},
-	"hub.update_failed": func(target string, d map[string]string) string {
-		return "could not update the hub to " + d["to"] + ": " + d["reason"]
-	},
 }
 
 // teamSummaries are about the people of the workspace: invitations,

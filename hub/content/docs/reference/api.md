@@ -30,8 +30,7 @@ Endpoints for no token keep a leaked token from making new tokens, giving itself
 | `GET /api/v1/meta` | the name, version and support address of this hub |
 | `GET /api/v1/openapi.yaml` | this API as OpenAPI 3.1 |
 | `GET /api/v1/csrf` | the CSRF token of a session |
-| `GET /api/v1/version` | the version and, on a self-hosted hub, the newest version, its "In short" line, the notes and how the last update went |
-| `POST /api/v1/version/update` | updates a self-hosted hub to the newest version (admins in `ADMIN_EMAILS`); follow it with `GET /api/v1/version` |
+| `GET /api/v1/version` | the version and, on a self-hosted hub, the newest version, its "In short" line and the notes. The hub updates on its server: `sh /opt/moin/update.sh` |
 | `GET /api/v1/status` | whether everything is OK: `ok`, the `issues` that need you with the `path` to fix them, catalog `updates` and `counts` ([Overview](/docs/guides/overview)) |
 
 ## Sign in

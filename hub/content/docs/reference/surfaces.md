@@ -85,7 +85,8 @@ The terminal UI opens these in your browser: `w` on the overview, or `web app` i
 | Email alerts on or off | ✓ | ✓ `alerts on`, `alerts off` | Opens the web. | ✓ | ✓ |
 | Team and invitations | ✓ | ✓ `team` | Opens the web. | ✓ | ✓ |
 | Rename the workspace | ✓ | ✓ `team rename` | Opens the web. | ✓ | ✓ |
-| Update a self-hosted hub | ✓ | ✓ `update` | Opens the web. | ✓ | ✓ |
+| A new release of a self-hosted hub, for its admins | ✓ a notice with the command | ✓ `version` | Opens the web. | ✓ `GET /api/v1/version` | ✓ `get_version` |
+| Update a self-hosted hub | On its server: `sh /opt/moin/update.sh`. The hub never updates itself. | On its server. | On its server. | On its server. | On its server. |
 | Hub backup, for the admins of the hub | ✓ Settings | ✓ `version` | Opens the web. | ✓ `GET /api/v1/version` | ✓ `get_version` |
 
 ## Account, roles and money

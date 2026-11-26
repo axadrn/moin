@@ -350,11 +350,6 @@ var serviceErrors = []serviceError{
 	{err: service.ErrTunnelsOn, status: http.StatusConflict, code: "tunnels_on", message: "Turn the tunnels off first: without the token moin cannot delete them in Cloudflare."},
 	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "This server has no Tailscale key. Enter one for it in Settings, Integrations, or join the server to your tailnet by hand."},
 	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit is optional: with it moin turns on Always Use HTTPS."},
-	{err: service.ErrUpdateNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this hub, in ADMIN_EMAILS, update it."},
-	{err: service.ErrUpdateHosted, status: http.StatusConflict, code: "hosted", message: "The hosted hub updates itself with every release. Nothing to do."},
-	{err: service.ErrNoUpdate, status: http.StatusConflict, code: "up_to_date", message: "This hub runs the newest release."},
-	{err: service.ErrUpdaterMissing, status: http.StatusConflict, code: "no_updater", message: "The updater does not run next to this hub. Update it on the server with sh update.sh, which also starts the updater."},
-	{err: service.ErrUpdateRunning, status: http.StatusConflict, code: "update_running", message: "An update is already under way."},
 	{err: service.ErrTailscaleKey, field: "tailscale_key", message: "A Tailscale auth key starts with tskey-."},
 	{err: service.ErrSSH, field: "ssh", message: "SSH is tailscale, everyone or off."},
 }

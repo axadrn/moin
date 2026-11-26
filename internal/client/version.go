@@ -7,7 +7,7 @@ import (
 )
 
 // Version is the hub's version and, on a self-hosted one, the
-// newest release and the update under way.
+// newest release.
 type Version struct {
 	Version         string     `json:"version"`
 	SelfHosted      bool       `json:"self_hosted"`
@@ -16,11 +16,7 @@ type Version struct {
 	PublishedAt     *time.Time `json:"published_at"`
 	NotesURL        string     `json:"notes_url"`
 	Summary         string     `json:"summary"`
-	Notes           string     `json:"notes"`
 	ReadFirst       string     `json:"read_first"`
-	CanUpdate       bool       `json:"can_update"`
-	Updater         bool       `json:"updater"`
-	Update          *Update    `json:"update"`
 	// HubBackup is how the backup of the hub's own database stands; only
 	// the admins of the hub get it.
 	HubBackup *HubBackup `json:"hub_backup"`
@@ -34,33 +30,10 @@ type HubBackup struct {
 	LastCopy *time.Time `json:"last_copy"`
 }
 
-// Update is an update of the hub: requested, updating, done,
-// rolled_back or failed.
-type Update struct {
-	State   string    `json:"state"`
-	Version string    `json:"version"`
-	From    string    `json:"from"`
-	Reason  string    `json:"reason"`
-	At      time.Time `json:"at"`
-}
-
-// Running reports whether the update has not ended yet.
-func (u *Update) Running() bool {
-	return u != nil && (u.State == "requested" || u.State == "updating")
-}
-
 // Version returns the hub's version and the newest release.
 func (c *Client) Version(ctx context.Context) (Version, error) {
 	var response Version
 	err := c.do(ctx, http.MethodGet, "/api/v1/version", nil, &response)
-	return response, err
-}
-
-// UpdateHub has the updater next to a self-hosted hub
-// install the newest release.
-func (c *Client) UpdateHub(ctx context.Context) (Version, error) {
-	var response Version
-	err := c.do(ctx, http.MethodPost, "/api/v1/version/update", nil, &response)
 	return response, err
 }
 
