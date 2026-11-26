@@ -93,14 +93,14 @@ fi
 mkdir -p "$data"
 chmod 700 "$data"
 
-# The new hub checks these settings before the running one stops: a hub
+# The new hub tries these settings before the running one stops: a hub
 # that would not start never replaces one that runs. It runs once from
 # compose.yml alone, without the proxy's labels, so no visitor reaches it.
-# A hub before v1.0.0-beta.36 knows no check: it answers unknown command,
-# which it says only once its settings loaded.
-if ! out=$(docker compose -f compose.yml --progress quiet run --rm --no-deps -T --pull "$MOIN_PULL" hub ./main check 2>&1); then
+# A hub before v1.0.0-beta.36 knows no settings command: it answers unknown
+# command, which it says only once its settings loaded.
+if ! out=$(docker compose -f compose.yml --progress quiet run --rm --no-deps -T --pull "$MOIN_PULL" hub ./main settings 2>&1); then
 	case "$out" in
-	*'unknown command "check"'*) ;;
+	*'unknown command "settings"'*) ;;
 	*)
 		echo "$out" >&2
 		echo "The new hub does not start with these settings. The running hub stays." >&2
