@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
@@ -21,7 +22,8 @@ import (
 // of its own and no path of this server. Save it, put a .env with the
 // app's values next to it, and docker compose up -d runs the app, its
 // domains and HTTPS. It holds no value of the env and no hash of the app's
-// password: those stay on the server. Each ${NAME} stays as written, but
+// password: those stay on the server, and a file that holds one is not
+// made (secretIn). Each ${NAME} stays as written, but
 // for the settings the deploy filled in (takePlaces): image, ports,
 // expose, volumes, user, the env PORT and the paths of a build.
 //
@@ -76,12 +78,105 @@ func (a *apps) composeFile(app string, number int) (string, error) {
 	dropInstant(app, config)
 	config = takeAlong(config, a.serverPaths(app)).(map[string]any)
 	takeEnvFile(services)
+	held, err := a.secretIn(app, dir, config)
+	if err != nil {
+		return "", err
+	}
+	if held != "" {
+		return "", fmt.Errorf("it holds %s, so it stays on the server: deploy from source once to see it", held)
+	}
 	err = addProxy(config, exists(filepath.Join(dir, "htpasswd")))
 	if err != nil {
 		return "", err
 	}
 	tunnel := a.proxyMode != nil && a.proxyMode() == "tunnel"
 	return writeComposeYAML(config, tunnel)
+}
+
+// minSecret is the shortest env value secretIn looks for: a shorter one,
+// such as 1, true or a port, is in many a compose file by chance.
+const minSecret = 6
+
+// secretIn names the env value or password hash of the app the compose
+// file config of the release in dir holds, "" for none. It looks
+// everywhere but in the settings the deploy fills in on purpose
+// (takePlaces) and in the proxy's labels, which name the domains. A
+// deploy from before v1.0.0-beta.35 wrote the values into base.json, and
+// a restart takes the compose file from there: such a file never leaves
+// the server.
+func (a *apps) secretIn(app, dir string, config map[string]any) (string, error) {
+	secrets := map[string]string{}
+	env, err := a.env(app)
+	if err != nil {
+		return "", err
+	}
+	for key, value := range env {
+		if len(value) >= minSecret {
+			secrets[value] = "the value of " + key
+			secrets[escape(value)] = "the value of " + key
+		}
+	}
+	// A hash in a compose file has each $ written $$: what follows its
+	// last $, the salt and the digest, is the same either way.
+	body, _ := os.ReadFile(filepath.Join(dir, "htpasswd"))
+	for _, line := range strings.Fields(string(body)) {
+		_, hash, _ := strings.Cut(line, ":")
+		if hash = hash[strings.LastIndex(hash, "$")+1:]; len(hash) >= minSecret {
+			secrets[hash] = "the hash of the app's password"
+		}
+	}
+	if len(secrets) == 0 {
+		return "", nil
+	}
+	scan, err := copyConfig(config)
+	if err != nil {
+		return "", err
+	}
+	services, _ := scan["services"].(map[string]any)
+	for _, item := range services {
+		service, _ := item.(map[string]any)
+		for _, key := range placeKeys {
+			delete(service, key)
+		}
+		environment, _ := service["environment"].(map[string]any)
+		delete(environment, "PORT")
+		build, _ := service["build"].(map[string]any)
+		delete(build, "context")
+		delete(build, "dockerfile")
+		labels, _ := service["labels"].(map[string]any)
+		for key := range labels {
+			if strings.HasPrefix(key, "traefik.") {
+				delete(labels, key)
+			}
+		}
+	}
+	held := ""
+	sorted := slices.Sorted(maps.Keys(secrets))
+	walkStrings(scan, func(text string) {
+		for _, secret := range sorted {
+			if held == "" && strings.Contains(text, secret) {
+				held = secrets[secret]
+			}
+		}
+	})
+	return held, nil
+}
+
+// walkStrings calls see with every string in value, keys too.
+func walkStrings(value any, see func(string)) {
+	switch value := value.(type) {
+	case map[string]any:
+		for key, item := range value {
+			see(key)
+			walkStrings(item, see)
+		}
+	case []any:
+		for _, item := range value {
+			walkStrings(item, see)
+		}
+	case string:
+		see(value)
+	}
 }
 
 // buildAgain makes a service moin built build again where the file runs,

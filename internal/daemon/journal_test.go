@@ -98,6 +98,7 @@ func TestJournalShowsWhyOnlyWhenItIsSafe(t *testing.T) {
 	logAnswer(protocol.TypeError, "r2", protocol.Error{Message: refused("/etc/moin/rules", "data: off").Error()})
 	logAnswer(protocol.TypeServerConfigResult, "r3", protocol.ServerConfigResult{Problems: []string{"SSH: sshd said " + secret}})
 	logAnswer(protocol.TypeOK, "r4", nil)
+	logAnswer(protocol.TypeServerConfigResult, "", protocol.ServerConfigResult{})
 	log := out.String()
 	for _, want := range []string{
 		`msg="not done" request=r1 why=failed`,
@@ -113,6 +114,9 @@ func TestJournalShowsWhyOnlyWhenItIsSafe(t *testing.T) {
 	}
 	if strings.Contains(log, secret) {
 		t.Errorf("the log shows a value:\n%s", log)
+	}
+	if strings.Contains(log, `request=""`) {
+		t.Errorf("the log has a line for an answer to no request:\n%s", log)
 	}
 }
 

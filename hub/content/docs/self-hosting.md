@@ -235,6 +235,7 @@ Before every update moin shows the whole release notes, under one line: "Read th
 
 - moin is away for about a minute; your apps keep running.
 - Before the database changes it keeps a copy next to it, like `/var/lib/moin-hub/backup-before-v0.3.0.db`; the last three stay.
+- `update.sh` keeps `/var/lib/moin-hub`, the hub's database, readable by root only.
 - If the new version is not up within two minutes, the old one starts again and the note says why.
 - `moin version` shows the version and whether a newer one is out. You only get published versions, never work in between.
 - **Update now** needs the updater next to the hub, the only part with access to Docker: someone who breaks into moin can at most ask for an official version, never run their own code. A hub set up before it gets it once with `git pull`, then `sh update.sh`.

@@ -17,5 +17,5 @@ if [ "${1:-}" = "--tailscale" ]; then
 fi
 
 mkdir -p -m 700 /etc/moin-hub
-mkdir -p /var/lib/moin-hub
+mkdir -p -m 700 /var/lib/moin-hub
 echo "Ready. Write /etc/moin-hub/env, then run update.sh."

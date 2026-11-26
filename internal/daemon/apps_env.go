@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/internal/dotenv"
@@ -26,18 +29,11 @@ func (a *apps) envFile(app string) string { return filepath.Join(a.appDir(app), 
 
 // env reads the app's env, empty when it has none.
 func (a *apps) env(app string) (map[string]string, error) {
-	body, err := os.ReadFile(a.envFile(app))
+	env, err := readEnvFile(a.envFile(app))
 	if errors.Is(err, os.ErrNotExist) {
 		return map[string]string{}, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	env, err := dotenv.Parse(string(body))
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", a.envFile(app), err)
-	}
-	return env, nil
+	return env, err
 }
 
 // setEnv sets and removes env values of an app (EnvSet) and answers the
@@ -146,31 +142,124 @@ func (a *apps) ensureEnv(app string) error {
 	return writeEnv(a.envFile(app), map[string]string{})
 }
 
-// Up to v1.0.0-beta.34 the daemon wrote the env into the folder of each
-// release, releases/<n>/app.env, and the hub kept the values. Now the hub
-// keeps none, so the running release's file is the only copy. moveOldEnv
-// copies it to apps/<app>/app.env when the app has no env file yet: the
-// app keeps its values, a catalog app its passwords and keys. It runs when
-// the daemon starts (moveOldEnvs) and before every deploy (ensureEnv). The
+// Up to v1.0.0-beta.34 the hub kept the env values and sent them with
+// every deploy, and the daemon wrote them into the release:
+//
+//   - a deploy from source, and any deploy of an app with a service to
+//     build, wrote them to releases/<n>/app.env;
+//   - every deploy but a rollback wrote them into compose.json: the main
+//     service's environment is the one of base.json, the compose file as
+//     docker compose read it, plus each env key, with $ written $$;
+//   - a rollback copied compose.json and base.json of the older release.
+//
+// Now the hub keeps none, so the running release is the only copy.
+// moveOldEnv writes it to apps/<app>/app.env when the app has no env file
+// yet: from releases/<current>/app.env when there is one, else from its
+// compose.json (envOfCompose). The app keeps its values, a catalog app its
+// passwords and keys. It runs when the daemon starts (moveOldEnvs) and
+// before every deploy (ensureEnv), and logs where the env came from. The
 // caller holds envMu. Remove this once no server runs beta.34.
 func (a *apps) moveOldEnv(app string) error {
 	current := a.current(app)
 	if current == 0 || exists(a.envFile(app)) {
 		return nil
 	}
-	body, err := os.ReadFile(filepath.Join(a.releaseDir(app, current), "app.env"))
+	dir := a.releaseDir(app, current)
+	from := filepath.Join("releases", strconv.Itoa(current), "app.env")
+	env, err := readEnvFile(filepath.Join(a.appDir(app), from))
+	withoutBase := false
 	if errors.Is(err, os.ErrNotExist) {
+		from = filepath.Join("releases", strconv.Itoa(current), "compose.json")
+		withoutBase = !exists(filepath.Join(dir, "base.json"))
+		env, err = envOfCompose(dir, a.oldEnvKeys(app))
+	}
+	if err != nil {
+		slog.Warn("no env found in the running release: the next deploy starts with an empty env, set it again with moin env set", "app", app, "release", current, "error", err)
 		return nil
 	}
+	err = writeEnv(a.envFile(app), env)
 	if err != nil {
 		return err
 	}
-	err = writeWhole(a.envFile(app), body)
-	if err != nil {
-		return err
+	keys := slices.Sorted(maps.Keys(env))
+	if withoutBase {
+		slog.Warn("env taken from the running release without its base.json: only the keys an older app.env names", "app", app, "release", current, "from", from, "keys", keys)
+		return nil
 	}
-	slog.Info("env taken from the running release", "app", app, "release", current)
+	slog.Info("env taken from the running release", "app", app, "release", current, "from", from, "keys", keys)
 	return nil
+}
+
+// readEnvFile reads an env file.
+func readEnvFile(file string) (map[string]string, error) {
+	body, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	env, err := dotenv.Parse(string(body))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	return env, nil
+}
+
+// oldEnvKeys names the keys of every releases/<n>/app.env of the app.
+func (a *apps) oldEnvKeys(app string) map[string]bool {
+	files, _ := filepath.Glob(filepath.Join(a.appDir(app), "releases", "*", "app.env"))
+	keys := map[string]bool{}
+	for _, file := range files {
+		env, _ := readEnvFile(file)
+		for key := range env {
+			keys[key] = true
+		}
+	}
+	return keys
+}
+
+// envOfCompose is the env beta.34 wrote into the compose.json of the
+// release in dir, with $$ read as $ again. Its main service has the
+// environment of base.json plus the env, so a key is the env's when
+// base.json lacks it or has another value. A key with the value base.json
+// has too, such as ADMIN_PASSWORD: ${ADMIN_PASSWORD}, is the env's when
+// an app.env of the app names it (named); any other, such as TZ: UTC,
+// is the compose file's. Without base.json only the named keys count.
+func envOfCompose(dir string, named map[string]bool) (map[string]string, error) {
+	compose, err := readJSON(filepath.Join(dir, "compose.json"))
+	if err != nil {
+		return nil, err
+	}
+	var detected protocol.Detected
+	body, err := os.ReadFile(filepath.Join(dir, "detected.json"))
+	if err == nil {
+		err = json.Unmarshal(body, &detected)
+	}
+	if err != nil || detected.Service == "" {
+		return nil, errors.New("detected.json names no main service")
+	}
+	base, _ := readJSON(filepath.Join(dir, "base.json"))
+	environment := serviceEnvironment(compose, detected.Service)
+	baseEnvironment := serviceEnvironment(base, detected.Service)
+	env := map[string]string{}
+	for key, item := range environment {
+		value, ok := item.(string)
+		if !ok || !envNamePattern.MatchString(key) {
+			continue
+		}
+		baseValue, inBase := baseEnvironment[key].(string)
+		if named[key] || base != nil && (!inBase || baseValue != value) {
+			env[key] = strings.ReplaceAll(value, "$$", "$")
+		}
+	}
+	return env, nil
+}
+
+// serviceEnvironment is the environment of a service of a compose file
+// docker compose read, nil for none.
+func serviceEnvironment(config map[string]any, name string) map[string]any {
+	services, _ := config["services"].(map[string]any)
+	service, _ := services[name].(map[string]any)
+	environment, _ := service["environment"].(map[string]any)
+	return environment
 }
 
 // moveOldEnvs runs moveOldEnv for every app on the server.

@@ -12,6 +12,10 @@ dir=/etc/moin-hub
 data=/var/lib/moin-hub
 cd "$(dirname "$0")"
 MOIN_PULL=${MOIN_PULL:-always}
+# MOIN_PULL=never runs a hub image built on this server. The other images,
+# such as the updater's, still come from their registry when they are not
+# here yet, and a hub image that is here is never pulled.
+[ "$MOIN_PULL" != never ] || MOIN_PULL=missing
 [ -n "${MOIN_IMAGE:-}" ] && export MOIN_IMAGE || unset MOIN_IMAGE
 
 # Up to v1.0.0-beta.25 the hub was called the control plane. Once, its
@@ -84,7 +88,10 @@ if grep -q '^SAME_SERVER=true' "$dir/env"; then
 	fi
 fi
 
+# The hub's database holds the accounts and sessions: root only. The hub's
+# container runs as root, so it reads it.
 mkdir -p "$data"
+chmod 700 "$data"
 # shellcheck disable=SC2086
 COMPOSE_PROFILES=$profiles docker compose $files up -d --pull "$MOIN_PULL" --remove-orphans "$@"
 echo "moin hub started."

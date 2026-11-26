@@ -1,0 +1,1 @@
+{"name":"moin-blog","networks":{"default":{"ipam":{},"name":"moin-blog_default"}},"services":{"web":{"command":["sleep","3600"],"entrypoint":null,"environment":{"SECRET_KEY":"secret-key-value","TZ":"UTC"},"expose":["8080"],"image":"busybox:1.37","networks":{"default":null}}}}

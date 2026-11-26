@@ -128,3 +128,97 @@ func TestMoveOldEnv(t *testing.T) {
 		t.Errorf("env = %v, %v", env, err)
 	}
 }
+
+// TestMoveOldEnvFromBeta34: testdata/beta34 holds release folders beta.34
+// wrote with its own deploy code, up to the start of the containers, for a
+// server whose state folder is /var/lib/moin. A deploy without
+// source, such as a restart or an env change, and a rollback wrote no
+// app.env: the env is in compose.json only. The daemon takes it from there,
+// with no key of the compose file's own, and a catalog app keeps its
+// passwords through an update.
+func TestMoveOldEnvFromBeta34(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(dir, nil)
+	a.moveOldEnvs()
+	want := map[string]map[string]string{
+		// Deployed without env, then env set and restarted.
+		"echo": {"GREETING": "hello-greeting", "API_TOKEN": "token-value"},
+		// Restarted with the env of the deploy: SECRET_KEY: ${SECRET_KEY}
+		// has the value base.json has, and v1's app.env names it. TZ: UTC
+		// is the compose file's.
+		"blog": {"SECRET_KEY": "secret-key-value", "TOKEN": "token-value", "ODD": "a$b \"c\" d\\e\nf"},
+		// miniflux from the catalog, restarted: DATABASE_URL and the
+		// others are the compose file's.
+		"feeds": {"VERSION": "2.3.4", "DB_PASSWORD": "db-password-value", "ADMIN_PASSWORD": "admin-password-value"},
+		// v2 changed the env, v3 deployed from source, v4 rolled back to
+		// v2: the env v2 ran with.
+		"roll": {"A": "two", "B": "bee"},
+	}
+	for app, env := range want {
+		got, err := a.env(app)
+		if err != nil || !maps.Equal(got, env) {
+			t.Errorf("%s: env = %v, %v; want %v", app, got, err, env)
+		}
+		if info, err := os.Stat(a.envFile(app)); err != nil || info.Mode().Perm() != 0o600 {
+			t.Errorf("%s: app.env %v, %v", app, info, err)
+		}
+	}
+	// Postgres runs with the password the env has now, and a catalog
+	// update makes no new one.
+	compose, err := readJSON(filepath.Join(a.releaseDir("feeds", 2), "compose.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := serviceEnvironment(compose, "db")["POSTGRES_PASSWORD"]; got != want["feeds"]["DB_PASSWORD"] {
+		t.Errorf("Postgres runs with %v", got)
+	}
+	if err := a.makeSecrets("feeds", "miniflux"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := a.env("feeds"); !maps.Equal(got, want["feeds"]) {
+		t.Errorf("the update made new secrets: %v", got)
+	}
+}
+
+// TestMoveOldEnvSaysWhy: without compose.json the daemon has no env to
+// take; it says so, and the deploy starts with an empty one. Without
+// base.json it takes only the keys an older app.env names.
+func TestMoveOldEnvSaysWhy(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(dir, nil)
+	if err := os.Remove(filepath.Join(a.releaseDir("echo", 2), "compose.json")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(a.releaseDir("feeds", 2), "base.json")); err != nil {
+		t.Fatal(err)
+	}
+	out := journal(t)
+	a.moveOldEnvs()
+	log := out.String()
+	for _, want := range []string{
+		`level=WARN msg="no env found in the running release`,
+		`app=echo release=2`,
+		`level=WARN msg="env taken from the running release without its base.json`,
+		`app=feeds release=2 from=releases/2/compose.json keys="[ADMIN_PASSWORD DB_PASSWORD VERSION]"`,
+		`level=INFO msg="env taken from the running release" app=blog release=2 from=releases/2/compose.json keys="[ODD SECRET_KEY TOKEN]"`,
+	} {
+		if !strings.Contains(log, want) {
+			t.Errorf("the log has no %q:\n%s", want, log)
+		}
+	}
+	if exists(a.envFile("echo")) {
+		t.Error("echo got an env file")
+	}
+	if err := a.ensureEnv("echo"); err != nil {
+		t.Fatal(err)
+	}
+	if env, err := a.env("echo"); err != nil || len(env) != 0 || !exists(a.envFile("echo")) {
+		t.Errorf("env = %v, %v", env, err)
+	}
+}

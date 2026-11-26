@@ -1,0 +1,35 @@
+{
+  "name": "moin-blog",
+  "networks": {
+    "default": {
+      "ipam": {},
+      "name": "blog_default"
+    }
+  },
+  "services": {
+    "web": {
+      "command": [
+        "sleep",
+        "3600"
+      ],
+      "entrypoint": null,
+      "environment": {
+        "ODD": "a$$b \"c\" d\\e\nf",
+        "SECRET_KEY": "secret-key-value",
+        "TOKEN": "token-value",
+        "TZ": "UTC"
+      },
+      "expose": [
+        "8080"
+      ],
+      "image": "busybox:1.37",
+      "labels": {
+        "moin.app": "blog"
+      },
+      "networks": {
+        "default": null
+      },
+      "restart": "unless-stopped"
+    }
+  }
+}

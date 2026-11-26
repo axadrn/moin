@@ -1,0 +1,1 @@
+{"name":"moin-roll","networks":{"default":{"ipam":{},"name":"moin-roll_default"}},"services":{"web":{"command":["sleep","3600"],"entrypoint":null,"image":"busybox:1.37","networks":{"default":null}}}}
