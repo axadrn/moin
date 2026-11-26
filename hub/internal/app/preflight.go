@@ -25,6 +25,14 @@ func Preflight(cfg *config.Config) error {
 	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
+	// A preflight that was stopped, such as with Ctrl-C, left its copy
+	// behind: it holds the whole database, so it goes first.
+	old, _ := filepath.Glob(filepath.Join(filepath.Dir(file), "preflight-*"))
+	for _, path := range old {
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+	}
 	dir, err := os.MkdirTemp(filepath.Dir(file), "preflight-")
 	if err != nil {
 		return err
