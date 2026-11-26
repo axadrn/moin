@@ -3,6 +3,73 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.35
+
+November 26, 2026
+
+**In short:** Your secrets live only on your server, every login gets the rights you pick, and hosted moin costs $7 a month.
+
+### Why
+Someone who breaks into a hub should find nothing worth stealing. This release moves every secret value to your server, gives every login its own rights, and writes every request of the hub into your server's journal. Some changes break old setups, so read the Upgrade steps first.
+
+### New
+- **Passkeys**: Sign in with one. Add it under **Settings**, **Account**, **Security**. (#111)
+- **Connections**: `moin login`, the TUI and AI agents sign in in the browser. You pick what each may do: read, deploy, secrets and data, delete, servers. More rights need your passkey. See and remove them under **Settings**, **Connections**. (#135)
+- **AI agents sign in in the browser**: Add `https://moin.run/mcp` in Claude, Claude Code, Cursor or ChatGPT. The browser opens, you pick the rights. No token to copy. (#140)
+- **CI tokens**: For scripts and CI. Each has its own rights, for one app or all. (#135)
+- **See the compose file**: Every app shows the compose file moin runs, with the proxy and without your secret values. Save it, put a `.env` next to it, run it anywhere. Web, `moin compose`, API and MCP. (#131)
+- **One password per app**: One switch guards the app's domains and its instant address. New apps start with it on. (#129)
+- **Uptime per domain**: Each domain is watched on its own. Down after 3 failed visits, up after 3 answers. (#115)
+- **Your server's journal**: Every request of the hub, and what came of it, in `journalctl -u moin-daemon`. Never a secret value. (#134)
+- **The rules, written down**: A new server gets `/etc/moin/rules` with every rule and its value. (#137)
+- **GitHub App in one click**: A self-hosted hub creates its GitHub App with one button. (#138)
+- **A blog**: Guides on servers, backups and deploys at `/blog`. (#128)
+- **moin on X**: News at [@usemoin](https://x.com/usemoin). (#146)
+
+### Changed
+- **$7 a month or $49 a year**: Hosted moin, everything unlimited. The 30 free days start when your first server connects, not at sign-up. (#132)
+- **Sign in with GitHub or a passkey**: Passwords and sign-in links are gone. Everyone signs in once more. (#110)
+- **Secrets live on your server**: Env values, catalog passwords, bucket keys and registry logins stay on your server. The hub sets them and never reads them. Setting one needs the server online. (#112, #113, #123, #130)
+- **compose.yml is plain Docker**: Domains, the password and backups are set in moin only. A compose file with an `x-moin` block stops the deploy and says why. moin finds the port in `ports`, `expose`, `PORT`, then the Dockerfile's `EXPOSE`. (#124)
+- **The instant address follows the password**: An app with a domain and no password of its own no longer guards its instant address. Turn on the password to guard it. (#129)
+- **A domain is unique per app**: Two apps may use the same domain. (#125)
+- **Code comes from GitHub, an image or the catalog**: `moin deploy` deploys the pushed commit. Your server fetches code only from GitHub, over HTTPS. (#106, #107)
+- **A rollback keeps today's settings**: It runs the old code with today's env, domains and password. (#130)
+- **Only what a normal app needs**: `privileged`, the Docker socket or a folder of the server are refused unless `/etc/moin/rules` allows them. (#96)
+- **Personal tokens are CI tokens**: Read stays read. Read and write becomes read, deploy and secrets, without delete and servers. (#135)
+- **Reading data needs "secrets and data"**: Database rows, SQL and backup downloads. Changing rows also needs delete. `exec` needs deploy, secrets and delete. (#135)
+- **121 API requests a minute**: Per connection or CI token. More get "try again in N seconds". (#139)
+- **Deploy every push is on by default**: In the API and MCP too, unless the app has a deploy hook.
+- **Servers with rules update too**: Like any other server. (#102)
+- **A CLI that is too old says so**: The hub answers it with the command that updates it. (#148)
+
+### Fixed
+- **1 update**: The TUI says "1 update", not "1 updates". (#93)
+
+### Removed
+- **Passwords, sign-in links, password reset**: Use GitHub or a passkey. (#110)
+- **`x-moin`**: Set domains, the password and backups in moin. Use Docker's `expose` and `healthcheck`. (#124)
+- **Folder uploads**: `moin deploy --dir` is gone. Push to GitHub, or deploy an image. (#106)
+- **Reading env values**: `moin env --show`, `moin env pull`, `moin run` and MCP `get_env` are gone. Values are write-only. (#112)
+- **The instant password**: The app has one password now. (#129)
+- **`moin protect`**: Now `moin password <app>` and `moin password off <app>`. API `/apps/{app}/password`, MCP `set_password` and `remove_password`. `POST /apps` answers `{app, password}`. (#144)
+- **MCP aliases**: `name` for app and server is gone. `remove_bucket`, `set_default_bucket` and `set_bucket_key` take `name`.
+- **`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `API_URL`**: A self-hosted hub signs in through its one GitHub App. (#110)
+
+### Upgrade
+
+Read all steps first.
+
+1. Self-hosted, before you update: a GitHub App you made by hand needs the account permission **Email addresses: Read** and the callback URL `https://<your hub>/auth/github/callback`.
+2. Update. Self-hosted: **Update now**, or `sh update.sh`, then `chmod 700 /var/lib/moin-hub`. Your daemons update by themselves and keep the env values of every app. Check each app once with `moin env <app>`.
+3. A server with `/etc/moin/rules` updates once by hand, as root: `curl -fsSL https://<your hub>/download/moin-linux-amd64 -o /usr/local/bin/moin.new && chmod 755 /usr/local/bin/moin.new && mv /usr/local/bin/moin.new /usr/local/bin/moin && systemctl restart moin-daemon` (`arm64` on ARM).
+4. Update the CLI on every computer: `curl -fsSL https://moin.run/cli.sh | sh`. Then `moin login`.
+5. Enter bucket keys and registry logins once more: **Backups**, or `moin buckets key <name> --server <server>`. Backups pause until you do.
+6. Remove the `x-moin` block from each compose.yml and move its port to `expose`. moin already took over its domains.
+7. Give CI tokens the rights they now miss under **Settings**, **Connections**: delete to remove apps or run `moin exec`, servers to manage servers.
+8. An app guarded only by the instant password asks for a new one after its next restart: `moin password off <app>`, then `moin password <app>`.
+9. Self-hosted: once all works, delete the hub's database copies from before this update (`backup-before-*.db` in `/var/lib/moin-hub`, and older hub backups). They still hold the old secrets.
+
 ## v1.0.0-beta.34
 
 November 19, 2026
