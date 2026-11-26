@@ -1,9 +1,11 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"os"
@@ -155,10 +157,12 @@ func (a *apps) ensureEnv(app string) error {
 // Now the hub keeps none, so the running release is the only copy.
 // moveOldEnv writes it to apps/<app>/app.env when the app has no env file
 // yet: from releases/<current>/app.env when there is one, else from its
-// compose.json (envOfCompose). The app keeps its values, a catalog app its
-// passwords and keys. It runs when the daemon starts (moveOldEnvs) and
-// before every deploy (ensureEnv), and logs where the env came from. The
-// caller holds envMu. Remove this once no server runs beta.34.
+// compose.json (envOfCompose), where a key an older app.env names counts
+// as env, and so does each env key of a catalog app (catalogNames). The
+// app keeps its values, a catalog app its passwords and keys. It runs when
+// the daemon starts (moveOldEnvs) and before every deploy (ensureEnv), and
+// logs where the env came from. The caller holds envMu. Remove this once
+// no server runs beta.34.
 func (a *apps) moveOldEnv(app string) error {
 	current := a.current(app)
 	if current == 0 || exists(a.envFile(app)) {
@@ -171,7 +175,11 @@ func (a *apps) moveOldEnv(app string) error {
 	if errors.Is(err, os.ErrNotExist) {
 		from = filepath.Join("releases", strconv.Itoa(current), "compose.json")
 		withoutBase = !exists(filepath.Join(dir, "base.json"))
-		env, err = envOfCompose(dir, a.oldEnvKeys(app))
+		named := a.oldEnvKeys(app)
+		for _, name := range a.catalogNames(app) {
+			named[name] = true
+		}
+		env, err = envOfCompose(dir, named)
 	}
 	if err != nil {
 		slog.Warn("no env found in the running release: the next deploy starts with an empty env, set it again with moin env set", "app", app, "release", current, "error", err)
@@ -183,7 +191,7 @@ func (a *apps) moveOldEnv(app string) error {
 	}
 	keys := slices.Sorted(maps.Keys(env))
 	if withoutBase {
-		slog.Warn("env taken from the running release without its base.json: only the keys an older app.env names", "app", app, "release", current, "from", from, "keys", keys)
+		slog.Warn("env taken from the running release without its base.json: only the keys an older app.env or the catalog names", "app", app, "release", current, "from", from, "keys", keys)
 		return nil
 	}
 	slog.Info("env taken from the running release", "app", app, "release", current, "from", from, "keys", keys)
@@ -221,8 +229,8 @@ func (a *apps) oldEnvKeys(app string) map[string]bool {
 // environment of base.json plus the env, so a key is the env's when
 // base.json lacks it or has another value. A key with the value base.json
 // has too, such as ADMIN_PASSWORD: ${ADMIN_PASSWORD}, is the env's when
-// an app.env of the app names it (named); any other, such as TZ: UTC,
-// is the compose file's. Without base.json only the named keys count.
+// an app.env of the app or the catalog names it (named); any other, such
+// as TZ: UTC, is the compose file's. Without base.json only the named keys count.
 func envOfCompose(dir string, named map[string]bool) (map[string]string, error) {
 	compose, err := readJSON(filepath.Join(dir, "compose.json"))
 	if err != nil {
@@ -262,8 +270,9 @@ func serviceEnvironment(config map[string]any, name string) map[string]any {
 	return environment
 }
 
-// moveOldEnvs runs moveOldEnv for every app on the server.
-func (a *apps) moveOldEnvs() {
+// moveOldEnvs runs moveOldEnv and repairCatalogEnv for every app on the
+// server.
+func (a *apps) moveOldEnvs(ctx context.Context) {
 	entries, _ := os.ReadDir(a.dir)
 	for _, entry := range entries {
 		if !entry.IsDir() || !protocol.ValidAppName(entry.Name()) {
@@ -271,11 +280,131 @@ func (a *apps) moveOldEnvs() {
 		}
 		a.envMu.Lock()
 		err := a.moveOldEnv(entry.Name())
+		if err == nil {
+			err = a.repairCatalogEnv(ctx, entry.Name())
+		}
 		a.envMu.Unlock()
 		if err != nil {
 			slog.Warn("take the env of the running release", "app", entry.Name(), "error", err)
 		}
 	}
+}
+
+// Up to v1.0.0-beta.35 moveOldEnv left out a key of a catalog app whose
+// value base.json has too when no app.env named it, such as
+// APP_SECRET: ${APP_SECRET} of umami, so the app would start again
+// without it. repairCatalogEnv adds each env key of a catalog app
+// (catalogNames) its app.env lacks: from the compose.json of the running
+// release (envOfCompose), else from the container of its main service, as
+// Docker runs it. A value app.env has stays. It runs when the daemon
+// starts (moveOldEnvs), before hello names the keys, and logs the keys it
+// added, never a value. The caller holds envMu. Remove this once no server
+// runs beta.35.
+func (a *apps) repairCatalogEnv(ctx context.Context, app string) error {
+	if !exists(a.envFile(app)) {
+		return nil
+	}
+	env, err := a.env(app)
+	if err != nil {
+		return err
+	}
+	missing := map[string]bool{}
+	for _, name := range a.catalogNames(app) {
+		if _, ok := env[name]; !ok {
+			missing[name] = true
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	fromCompose, _ := envOfCompose(a.releaseDir(app, a.current(app)), missing)
+	var fromDocker map[string]string
+	added := []string{}
+	for _, name := range slices.Sorted(maps.Keys(missing)) {
+		value := fromCompose[name]
+		// A release from beta.35 names the key and holds no value.
+		if value == "" || value == "${"+name+"}" {
+			if fromDocker == nil {
+				fromDocker = a.containerEnv(ctx, app)
+			}
+			value = fromDocker[name]
+		}
+		if value != "" {
+			env[name] = value
+			added = append(added, name)
+			delete(missing, name)
+		}
+	}
+	if len(added) > 0 {
+		err = writeEnv(a.envFile(app), env)
+		if err != nil {
+			return err
+		}
+		slog.Info("env of the catalog app repaired", "app", app, "keys", added)
+	}
+	if len(missing) > 0 {
+		slog.Warn("a key of the catalog app is neither in its env nor in the running release: set it with moin env set if the app needs it", "app", app, "keys", slices.Sorted(maps.Keys(missing)))
+	}
+	return nil
+}
+
+// catalogNames names the env keys of a catalog app: the ${NAME}s of its
+// compose file the hub or the server gave a value, its secrets, VERSION
+// and the URL vars. None for an app of your own. A server keeps no note of
+// which catalog app an app is, so the image of the main service of the
+// running release tells: the catalog app whose compose file runs it with
+// VERSION as the tag, such as umami for ghcr.io/umami-software/umami:2.19.0.
+// Remove this once no server runs beta.35.
+func (a *apps) catalogNames(app string) []string {
+	detected, _ := a.live(app)
+	image := a.serviceImage(app, detected.Service)
+	colon := strings.LastIndex(image, ":")
+	if colon < 0 || strings.Contains(image[colon:], "/") {
+		return nil
+	}
+	line := "image: " + image[:colon] + ":${" + catalog.VersionVar + "}"
+	folders, _ := fs.ReadDir(catalog.Files, ".")
+	for _, folder := range folders {
+		compose, _ := catalog.Compose(folder.Name())
+		if !strings.Contains(string(compose), line) {
+			continue
+		}
+		names := catalog.Secrets(compose)
+		for _, name := range []string{catalog.VersionVar, catalog.URLVar, catalog.DomainVar} {
+			if strings.Contains(string(compose), "${"+name+"}") {
+				names = append(names, name)
+			}
+		}
+		return names
+	}
+	return nil
+}
+
+// containerEnv is the env of the container of the app's main service, as
+// Docker has it: docker inspect. Empty when there is none.
+func (a *apps) containerEnv(ctx context.Context, app string) map[string]string {
+	env := map[string]string{}
+	detected, _ := a.live(app)
+	if !validService(detected.Service) {
+		return env
+	}
+	out, err := a.output(ctx, "docker", "ps", "-aq",
+		"--filter", "label=com.docker.compose.project="+a.projectOf(app),
+		"--filter", "label=com.docker.compose.service="+detected.Service)
+	container, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	if err != nil || container == "" {
+		return env
+	}
+	inspected, err := a.output(ctx, "docker", "inspect", "-f", "{{json .Config.Env}}", container)
+	var items []string
+	if err != nil || json.Unmarshal([]byte(inspected), &items) != nil {
+		return env
+	}
+	for _, item := range items {
+		key, value, _ := strings.Cut(item, "=")
+		env[key] = value
+	}
+	return env
 }
 
 // writeEnv replaces the env file with env, 0600, whole (writeWhole).

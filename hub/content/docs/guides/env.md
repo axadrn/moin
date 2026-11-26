@@ -106,7 +106,7 @@ services:
 
 **The value stays in `app.env`.** The compose file moin keeps for each deploy names the variable, `${DB_PASSWORD}`, never its value. Docker fills it in from `app.env` when it starts the containers. So a restart applies a new value, like any env var. A value you replace or remove is gone from the server.
 
-Deploys from before moin 1.0.0-beta.35 wrote the values into their compose file. An app's next deploy from its source writes a clean one; a restart or an image deploy keeps the old one until then, on the server only: it never goes to the hub. The old deploys go when moin cleans them up, after 5 builds. The update to beta.35 takes each app's env from the deploy that runs, and the server's log names the keys it took.
+Deploys from before moin 1.0.0-beta.35 wrote the values into their compose file. An app's next deploy from its source writes a clean one; a restart or an image deploy keeps the old one until then, on the server only: it never goes to the hub. The old deploys go when moin cleans them up, after 5 builds. The update to beta.35 takes each app's env from the deploy that runs, and the server's log names the keys it took. A catalog app keeps every key its compose file names. One that lost such a key with beta.35, like `APP_SECRET: ${APP_SECRET}`, gets it back with the next daemon update: from the deploy that runs, else from its running container.
 
 One exception: the settings that say where a service runs. moin fills in `${NAME}` in `image`, `ports`, `expose`, `volumes`, `user`, the env `PORT`, and the folder and `Dockerfile` of `build`, when it reads your compose file. It checks them as they will run, and a rollback runs the same image. A change there takes a deploy. Keep secrets out of them.
 
