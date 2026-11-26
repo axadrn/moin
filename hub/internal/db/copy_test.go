@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/pressly/goose/v3"
 )
 
@@ -69,5 +70,80 @@ func TestCopyBeforeMigrations(t *testing.T) {
 	path, err = CopyBeforeMigrations(database, dir, "v1.0.0")
 	if err != nil || path != "" {
 		t.Fatalf("current database: path %q, error %v; want no copy", path, err)
+	}
+}
+
+// TestCheck migrates a copy of a database that misses migrations, while
+// the hub holds it open, and leaves the database as it was.
+func TestCheck(t *testing.T) {
+	dir := t.TempDir()
+	connection := filepath.Join(dir, "app.db") + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	if err := Check(connection); err != nil {
+		t.Fatalf("no database yet: %v", err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("no database yet: check left %v", entries)
+	}
+
+	database, err := Init(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if err := setupGoose(); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.UpTo(database.DB, ".", 62); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`INSERT INTO users (id, email) VALUES ('u1', 'ada@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	history, err := OpenHistory(HistoryConnection(connection))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := history.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Check(connection); err != nil {
+		t.Fatal(err)
+	}
+	version, err := goose.GetDBVersion(database.DB)
+	if err != nil || version != 62 {
+		t.Fatalf("version after check = %d, %v; want 62", version, err)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "check-*")); len(matches) != 0 {
+		t.Fatalf("copies left = %v", matches)
+	}
+}
+
+// TestCheckFails reports a migration that fails and removes its copy.
+func TestCheckFails(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "app.db")
+	database, err := Init(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if _, err := database.Exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY); INSERT INTO sessions (id) VALUES ('s1')`); err != nil {
+		t.Fatal(err)
+	}
+
+	broken := func(copied *sqlx.DB) error {
+		_, err := copied.Exec(`ALTER TABLE sessions ADD COLUMN missing TEXT NOT NULL`)
+		return err
+	}
+	if err := checkCopy(file, broken); err == nil {
+		t.Fatal("check passed a migration that fails")
+	}
+	var columns int
+	if err := database.Get(&columns, `SELECT count(*) FROM pragma_table_info('sessions')`); err != nil || columns != 1 {
+		t.Fatalf("columns of the database = %d, %v; want 1", columns, err)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "check-*")); len(matches) != 0 {
+		t.Fatalf("copies left = %v", matches)
 	}
 }
