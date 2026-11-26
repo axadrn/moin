@@ -111,8 +111,8 @@ jobs:
             exit 1
           fi
           public=$(printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkey -pubout -outform DER | tail -c 32 | base64)
-          if ! grep -q "\"$public\"" internal/daemon/update.go; then
-            echo "RELEASE_SIGNING_KEY is not one of the release keys in internal/daemon/update.go" >&2
+          if ! grep -q "\"$public\", // RELEASE_SIGNING_KEY$" internal/daemon/update.go; then
+            echo "RELEASE_SIGNING_KEY is not the signing key in internal/daemon/update.go (the spare stays offline)" >&2
             exit 1
           fi
           docker create --name box "ghcr.io/axadrn/moin@$DIGEST" >/dev/null
