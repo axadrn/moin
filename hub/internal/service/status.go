@@ -114,12 +114,14 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 		if err == nil {
 			for _, backup := range backups {
 				status.Databases++
-				if backup.CheckedAt != nil && backup.CheckedAt.After(day) {
-					status.BackupsChecked++
-				}
 				message := backup.BackupError()
 				if message == "" && late(&app, backup.CopiedAt, s.now()) {
 					message = "the copies are late"
+				}
+				// A backup counts as checked only while its copies come
+				// and the newest one restored within a day.
+				if message == "" && backup.CheckError == "" && backup.CheckedAt != nil && backup.CheckedAt.After(day) {
+					status.BackupsChecked++
 				}
 				if message != "" {
 					status.Issues = append(status.Issues, StatusIssue{Kind: IssueBackupFailed, Target: app.Name, Detail: "backups of " + backup.Database + " stopped: " + inSentence(BackupProblem(message)), Path: path + "/data?db=" + url.QueryEscape(backup.Database)})

@@ -47,3 +47,4 @@ The bar on every page holds the wordmark, the search and your picture. Your pict
 ## Good to know
 
 - The API answers `ok`, the `issues`, the `updates` and the `counts`.
+- A backup counts as checked when its copies come and the newest one restored in the last day. Backups that stopped never count.

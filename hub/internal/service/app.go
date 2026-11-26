@@ -45,7 +45,7 @@ var (
 	ErrDeployGone    = errors.New("that deploy is no longer on the server")
 	ErrNoSource      = errors.New("no deploy has a source yet")
 	ErrNotLive       = errors.New("the app has no live deploy yet")
-	ErrNoComposeFile = errors.New("this deploy has no compose file: deploy again; the deploy log says why if it stays empty")
+	ErrNoComposeFile = errors.New("this deploy has no compose file: deploys before v1.0.0-beta.35 have none; deploy again to make one, and if it stays empty, the deploy log says why")
 	ErrRunning       = errors.New("the app is already running")
 	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
 	ErrDeployHook    = errors.New("deploy hook is invalid")
