@@ -40,9 +40,26 @@ A release waits for a maintainer to approve it in GitHub. Then the workflow sign
 ## What runs where
 
 - **moin.run** runs the last deploy or release.
-- **Your own hub** runs releases only. A new one shows up in the web UI, and one click updates. [Self-hosting](/docs/self-hosting#updates)
-- **Every hub update**, moin.run's too, first starts the new hub once with its real settings. If they fail, the update stops and the running hub stays.
+- **Your own hub** runs releases only. A new one shows up in the web UI. `sh /opt/moin/update.sh` installs it. [Self-hosting](/docs/self-hosting#updates)
+- **Every hub update**, moin.run's too, first starts the new hub once, on a copy of the database, with its real settings. If that fails, the update stops and the running hub stays. [How a hub updates](#how-a-hub-updates)
 - **Daemons** run releases only. They update themselves, one server at a time, and your apps keep running. [How a daemon updates](#how-a-daemon-updates)
+
+## How a hub updates
+
+Every hub updates the same way: `update.sh` in `/opt/moin`, with its settings in `/opt/moin/.env`.
+
+1. `docker compose pull` gets the new version. The running hub keeps serving.
+2. `./main preflight` runs in the new version, once. It loads the settings and runs the migrations on a copy of the database. If that fails, `update.sh` stops. The running hub stays.
+3. `docker compose up -d` switches to the new version.
+
+moin.run gets one more step, from the Deploy workflow, through Tailscale:
+
+1. It copies the deploy files of the commit to `/opt/moin`.
+2. It fills the settings from 1Password: `op inject` turns `/opt/moin/.env.tpl`, with `op://` references, into `/opt/moin/.env`. The token of a service account is in `/etc/moin-hub/op-token`. If that fails, the deploy stops. The running hub stays.
+3. It runs `update.sh` with the image of the deploy or release, `MOIN_IMAGE=ghcr.io/axadrn/moin:<tag>`.
+4. It waits until the hub answers on `/healthz`.
+
+In `.env.tpl`, a value that can hold a `$` goes in single quotes, like `S3_SECRET_KEY='{{ op://vault/item/field }}'`. Compose would read `$` as a variable.
 
 ## How a daemon updates
 

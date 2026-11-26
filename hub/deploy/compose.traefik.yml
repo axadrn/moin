@@ -1,0 +1,35 @@
+# The hub on its own server, with its own Traefik. It takes ports 80 and
+# 443 and gets a certificate for DOMAIN from Let's Encrypt. Same image and
+# setup as the daemon's Traefik.
+services:
+  hub:
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.moin_hub.rule: Host(`${DOMAIN}`)
+      traefik.http.routers.moin_hub.entrypoints: websecure
+      traefik.http.services.moin_hub.loadbalancer.server.port: "8090"
+
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=le
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.storage=/data/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # The certificates.
+      - traefik:/data
+
+volumes:
+  traefik:

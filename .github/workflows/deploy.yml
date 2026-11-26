@@ -11,7 +11,8 @@ name: Deploy
 #      and the signed digest of the hub image; then the image gets its
 #      version, stable and latest.
 #   4. deploy: through Tailscale, the hosted hub gets the deploy
-#      files of this commit and runs update.sh with the new box.
+#      files of this commit, fills its settings from 1Password and runs
+#      update.sh with the new box.
 # Only main and tags ship: run by hand on another branch, it does nothing.
 # Forks only build: the deploy runs in axadrn/moin alone, with the
 # repository variables DEPLOY_HOST and TS_CLIENT_ID. The one secret is
@@ -181,9 +182,16 @@ jobs:
           IMAGE: ${{ needs.box.outputs.image }}
         run: |
           tailscale ssh "root@$HOST" "mkdir -p /opt/moin"
-          for file in compose.yml compose.same-server.yml update.sh updater.sh setup.sh; do
+          for file in setup.sh update.sh compose.yml compose.same-server.yml compose.traefik.yml compose.tunnel.yml; do
             tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "hub/deploy/$file"
           done
+          # moin.run only: its settings come from 1Password. The token in
+          # /etc/moin-hub/op-token fills the op:// references of .env.tpl
+          # into .env. If that fails, this step fails and the running hub
+          # stays.
+          tailscale ssh "root@$HOST" 'set -eu; umask 077; cd /opt/moin
+            OP_SERVICE_ACCOUNT_TOKEN=$(cat /etc/moin-hub/op-token) docker run --rm -i -e OP_SERVICE_ACCOUNT_TOKEN 1password/op:2 op inject < .env.tpl > .env.new
+            mv .env.new .env'
           tailscale ssh "root@$HOST" "cd /opt/moin && MOIN_IMAGE='$IMAGE' sh update.sh"
       - name: Wait until it answers
         run: |

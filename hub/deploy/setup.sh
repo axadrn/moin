@@ -1,7 +1,7 @@
 #!/bin/sh
-# Prepares a fresh Ubuntu or Debian server for the moin hub: Docker,
-# security updates and, with --tailscale, Tailscale with SSH on your tailnet.
-# Run it once as root.
+# Prepares an Ubuntu or Debian server for the moin hub: Docker, security
+# updates and, with --tailscale, Tailscale with SSH on your tailnet.
+# install.sh runs it. Run it again any time, as root.
 set -eu
 
 command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
@@ -16,6 +16,8 @@ if [ "${1:-}" = "--tailscale" ]; then
 	tailscale set --auto-update
 fi
 
-mkdir -p -m 700 /etc/moin-hub
-mkdir -p -m 700 /var/lib/moin-hub
-echo "Ready. Write /etc/moin-hub/env, then run update.sh."
+# The deploy files and settings, the files they point to, and the
+# database. The last two are for root only.
+mkdir -p /opt/moin /etc/moin-hub /var/lib/moin-hub
+chmod 700 /etc/moin-hub /var/lib/moin-hub
+echo "Ready."
