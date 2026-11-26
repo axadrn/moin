@@ -67,6 +67,19 @@ func (r *Passkeys) Used(id, credential string, at time.Time) error {
 	return err
 }
 
+// Rename names the user's passkey and returns it as it is now.
+func (r *Passkeys) Rename(userID, id, name string) (*model.Passkey, error) {
+	passkey := &model.Passkey{}
+	err := r.db.Get(passkey, `UPDATE passkeys SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING *`, name, id, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrPasskeyNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return passkey, nil
+}
+
 // Delete removes the user's passkey, unless it is their last way in: their
 // only passkey, without GitHub. One statement, so two removals at once
 // never leave the user without one.

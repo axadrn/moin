@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -63,14 +64,43 @@ func (h *SettingsHandler) PasskeyOptions(w http.ResponseWriter, r *http.Request)
 }
 
 // AddPasskey takes the browser's answer, stores the passkey and says to
-// go back to the security settings, which list it.
+// go back to the security settings, which list it and ask for its name.
 func (h *SettingsHandler) AddPasskey(w http.ResponseWriter, r *http.Request) {
-	_, err := h.passkeys.Add(ctxkeys.Session(r.Context()), takePasskeyCeremony(w, r), http.MaxBytesReader(w, r.Body, maxPasskeyAnswer))
+	passkey, err := h.passkeys.Add(ctxkeys.Session(r.Context()), takePasskeyCeremony(w, r), http.MaxBytesReader(w, r.Body, maxPasskeyAnswer))
 	if err != nil {
 		passkeyFailed(w, err)
 		return
 	}
-	api.JSON(w, http.StatusOK, passkeyDone{Location: ctxkeys.AppBasePath(r.Context()) + "/settings/account?tab=security"})
+	api.JSON(w, http.StatusOK, passkeyDone{Location: securityPath(r) + "&passkey=" + url.QueryEscape(passkey.ID)})
+}
+
+// RenamePasskey names a passkey of the signed-in user and answers the
+// passkeys as they are now, without the name form.
+func (h *SettingsHandler) RenamePasskey(w http.ResponseWriter, r *http.Request) {
+	user := ctxkeys.User(r.Context())
+	_, err := h.passkeys.Rename(ctxkeys.Session(r.Context()), r.PathValue("id"), r.FormValue("name"))
+	switch {
+	case errors.Is(err, repository.ErrPasskeyNotFound):
+		answerFailed(w, r, "Passkey not found", "It was removed already.")
+		return
+	case err != nil:
+		failed(w, r, "Name not saved", err, map[string]string{"name": "passkey-name"})
+		return
+	}
+	passkeys, err := h.passkeys.List(user.ID)
+	if err != nil {
+		slog.Error("failed to list passkeys", "error", err, "user_id", user.ID)
+		answerFailed(w, r, "Passkeys not refreshed", "Something went wrong. Please try again.")
+		return
+	}
+	w.Header().Set("HX-Replace-Url", securityPath(r))
+	answerDone(w, r, "Name saved", "")
+	render(w, r, pages.SettingsPasskeysSection(passkeys, ""))
+}
+
+// securityPath is the Security tab of the account settings.
+func securityPath(r *http.Request) string {
+	return ctxkeys.AppBasePath(r.Context()) + "/settings/account?tab=security"
 }
 
 // passkeyDone tells passkey.js where to go after a ceremony worked.
@@ -101,7 +131,7 @@ func (h *SettingsHandler) RemovePasskey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	answerDone(w, r, "Passkey removed", "It no longer signs you in.")
-	render(w, r, pages.SettingsPasskeysSection(passkeys))
+	render(w, r, pages.SettingsPasskeysSection(passkeys, ""))
 }
 
 func setPasskeyCeremony(w http.ResponseWriter, r *http.Request, ceremony string) {

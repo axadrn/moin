@@ -118,7 +118,9 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
 		return
 	}
-	render(w, r, pages.Settings(sessions, currentSessionID, passkeys, activeTab))
+	// ?passkey=<id> shows the form that names that passkey: right after
+	// it was added, and on Rename.
+	render(w, r, pages.Settings(sessions, currentSessionID, passkeys, r.URL.Query().Get("passkey"), activeTab))
 }
 
 func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {

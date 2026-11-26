@@ -12,8 +12,8 @@ type Passkey struct {
 	// Credential is the JSON of go-webauthn's webauthn.Credential: the
 	// public key, the sign counter and the flags.
 	Credential string `db:"credential"`
-	// Name is "Passkey"; when it was added and last used tell passkeys
-	// apart.
+	// Name is what the person calls it: at first its password manager's
+	// name, or "Passkey" when that is unknown.
 	Name       string     `db:"name"`
 	LastUsedAt *time.Time `db:"last_used_at"`
 	CreatedAt  time.Time  `db:"created_at"`

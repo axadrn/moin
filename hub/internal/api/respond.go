@@ -194,6 +194,7 @@ var serviceErrors = []serviceError{
 	{err: repository.ErrUserNotFound, status: http.StatusNotFound, code: "not_found", message: "The user was not found."},
 	{err: repository.ErrSessionNotFound, status: http.StatusNotFound, code: "not_found", message: "The session was not found."},
 	{err: repository.ErrPasskeyNotFound, status: http.StatusNotFound, code: "not_found", message: "The passkey was not found."},
+	{err: service.ErrPasskeyName, field: "name", message: "Name it with 1 to 64 characters."},
 	{err: repository.ErrPasskeyLastWayIn, status: http.StatusConflict, code: "last_way_in", message: "This is your last way in. Add another first."},
 	{err: service.ErrImpersonating, status: http.StatusForbidden, code: "impersonation_read_only", message: "Impersonation is read-only. Return to Admin before making changes."},
 	{err: repository.ErrConnectionNotFound, status: http.StatusNotFound, code: "not_found", message: "The connection was not found."},

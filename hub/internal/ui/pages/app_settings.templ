@@ -13,7 +13,9 @@ import (
 // Settings is your account, one tab at a time: Profile (picture, name,
 // email, alerts) and Security (GitHub, passkeys, sessions, and the account
 // itself at the end). Connections are a page of their own.
-templ Settings(sessions []model.Session, currentSessionID string, passkeys []model.Passkey, activeTab string) {
+//
+// naming is the ID of the passkey whose name form shows, or empty.
+templ Settings(sessions []model.Session, currentSessionID string, passkeys []model.Passkey, naming string, activeTab string) {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ settingsPath := ctxkeys.AppBasePath(ctx) + "/settings/account" }}
 	@layouts.App("Account · Settings") {
@@ -29,7 +31,7 @@ templ Settings(sessions []model.Session, currentSessionID string, passkeys []mod
 						@settingsGitHubCard(user)
 					}
 					if ctxkeys.RenderConfig(ctx).Passkeys {
-						@SettingsPasskeysSection(passkeys)
+						@SettingsPasskeysSection(passkeys, naming)
 						@passkeyScript()
 					}
 					@SettingsSessionsSection(sessions, currentSessionID)
@@ -109,9 +111,10 @@ templ settingsGitHubCard(user *model.User) {
 }
 
 // SettingsPasskeysSection lists the passkeys you sign in with, each with
-// its button to remove it, and adds one in the browser (passkey.js). The
-// hub refuses to remove the last way in.
-templ SettingsPasskeysSection(passkeys []model.Passkey) {
+// its buttons to rename and remove it, and adds one in the browser
+// (passkey.js). Above the list, the form names the passkey naming, if it
+// is one of them. The hub refuses to remove the last way in.
+templ SettingsPasskeysSection(passkeys []model.Passkey, naming string) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	{{ now := time.Now() }}
 	<div id="settings-passkeys" hx-swap-oob="true">
@@ -119,19 +122,29 @@ templ SettingsPasskeysSection(passkeys []model.Passkey) {
 			<div class="moin-section-head">
 				<h2>Passkeys</h2>
 			</div>
+			for _, passkey := range passkeys {
+				if passkey.ID == naming {
+					@passkeyNameCard(passkey)
+				}
+			}
 			@components.Card(components.CardProps{}) {
 				@components.List() {
 					for _, passkey := range passkeys {
-						@components.Item(components.ItemProps{Name: passkey.Name, Note: passkeyNote(passkey, now)}) {
-							@components.Button(components.ButtonProps{Attrs: templ.Attributes{
-								"type":       "button",
-								"hx-delete":  basePath + "/settings/passkeys/" + passkey.ID,
-								"hx-swap":    "none",
-								"hx-disable": "this",
-								"hx-confirm": "Remove this passkey? It no longer signs you in.",
-							}}) {
-								Remove
-							}
+						@components.Item(components.ItemProps{Name: passkey.Name, Note: passkeyNote(passkey, now), Attrs: templ.Attributes{"data-control": true}}) {
+							<div class="moin-row moin-width" style="--width:auto" data-gap="2">
+								@components.Button(components.ButtonProps{Href: basePath + "/settings/account?tab=security&passkey=" + passkey.ID}) {
+									Rename
+								}
+								@components.Button(components.ButtonProps{Attrs: templ.Attributes{
+									"type":       "button",
+									"hx-delete":  basePath + "/settings/passkeys/" + passkey.ID,
+									"hx-swap":    "none",
+									"hx-disable": "this",
+									"hx-confirm": "Remove this passkey? It no longer signs you in.",
+								}}) {
+									Remove
+								}
+							</div>
 						}
 					}
 					@components.Item(components.ItemProps{Button: true, Name: "Add passkey", Attrs: templ.Attributes{
@@ -145,14 +158,31 @@ templ SettingsPasskeysSection(passkeys []model.Passkey) {
 	</div>
 }
 
+// passkeyNameCard names a passkey: right after it was added, with the
+// name of its password manager filled in, and on Rename.
+templ passkeyNameCard(passkey model.Passkey) {
+	@components.Card(components.CardProps{Title: "Name this passkey"}) {
+		<form hx-patch={ ctxkeys.AppBasePath(ctx) + "/settings/passkeys/" + passkey.ID } hx-swap="none" hx-disable="find button[type='submit']">
+			@components.CSRF()
+			<label for="passkey-name" class="moin-sr-only">Passkey name</label>
+			<div class="moin-row" data-gap="2" data-phone="stack">
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "passkey-name", "name": "name", "type": "text", "value": passkey.Name, "maxlength": "64", "autocomplete": "off", "autofocus": true}})
+				@components.Button(components.ButtonProps{Type: "submit"}) {
+					Save
+				}
+			</div>
+		</form>
+	}
+}
+
 // passkeyNote is the second line of a passkey: when it was added, and
 // when it last signed in.
 func passkeyNote(passkey model.Passkey, now time.Time) string {
 	note := "Added " + human.Ago(passkey.CreatedAt, now)
 	if passkey.LastUsedAt == nil {
-		return note + ", never used"
+		return note + " · never used"
 	}
-	return note + ", last used " + human.Ago(*passkey.LastUsedAt, now)
+	return note + " · used " + human.Ago(*passkey.LastUsedAt, now)
 }
 
 // SettingsSessionsSection lists the browsers signed in to the account, each

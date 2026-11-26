@@ -95,7 +95,7 @@ These stay in the web on purpose: they move money or decide who is in charge, so
 | Feature | Web | CLI | TUI | API | MCP |
 | --- | --- | --- | --- | --- | --- |
 | Sign up and sign in with GitHub, connect GitHub | ✓ | `login` signs this computer in through the browser; the rest is the web. | Signs in with the browser; the rest is the web. | Browser only: `/auth/github` sets the session cookie. `github_login` in `GET /api/v1/account`. | AI agents sign in as a connection, never with your GitHub account. |
-| Passkeys: add, sign in, remove | ✓ Settings, Security; sign in on `/auth` | Adding one is a ceremony in the browser: web only. | Web only. | List and remove with a session; adding and signing in are in the browser. | AI agents do not manage ways to sign in. |
+| Passkeys: add, name, sign in, rename, remove | ✓ Settings, Security; sign in on `/auth` | Adding one is a ceremony in the browser: web only. | Web only. | List, rename and remove with a session; adding and signing in are in the browser. | AI agents do not manage ways to sign in. |
 | Recovery key | ✓ `/auth/key` | The operator makes it on the server with `./main recovery-key <email>`. | Web only. | Browser only. | Never. |
 | Email | ✓ | Web only. | Web only. | ✓ with a session | Never. |
 | Sessions | ✓ | A token can't see your sessions. | Web only. | ✓ with a session | Web only. |

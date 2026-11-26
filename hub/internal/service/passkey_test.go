@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol/webauthncbor"
 	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/google/uuid"
 )
 
 const passkeyOrigin = "http://localhost:8090"
@@ -38,6 +40,9 @@ type softAuthenticator struct {
 	// unverified answers without user verification: touched, but not
 	// unlocked with a face, a finger or the screen lock.
 	unverified bool
+	// aaguid names the password manager that makes the passkey; nil sends
+	// zeros, as some do.
+	aaguid []byte
 }
 
 func newSoftAuthenticator(t *testing.T) *softAuthenticator {
@@ -71,7 +76,11 @@ func (a *softAuthenticator) create(t *testing.T, options *protocol.PublicKeyCred
 		t.Fatal(err)
 	}
 	authData := a.authData(protocol.FlagUserPresent | protocol.FlagUserVerified | protocol.FlagAttestedCredentialData)
-	authData = append(authData, make([]byte, 16)...) // AAGUID, zero
+	aaguid := a.aaguid
+	if aaguid == nil {
+		aaguid = make([]byte, 16)
+	}
+	authData = append(authData, aaguid...)
 	authData = binary.BigEndian.AppendUint16(authData, uint16(len(a.id)))
 	authData = append(authData, a.id...)
 	authData = append(authData, publicKey...)
@@ -438,5 +447,60 @@ func TestPasskeysOffRefuses(t *testing.T) {
 	}
 	if _, _, err := passkeys.BeginAdd(&model.Session{UserID: "ada"}); !errors.Is(err, ErrPasskeysOff) {
 		t.Fatalf("BeginAdd() error = %v, want ErrPasskeysOff", err)
+	}
+}
+
+// A new passkey is named after its password manager, from the AAGUID it
+// was made with. An unknown or zero AAGUID is "Passkey".
+func TestPasskeyIsNamedAfterItsPasswordManager(t *testing.T) {
+	environment := newPasskeyEnvironment(t)
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
+	session := environment.session(t, "ada")
+	for aaguid, want := range map[string]string{
+		"bada5566-a7aa-401f-bd96-45619a55120d": "1Password",
+		"fbfc3007-154e-4ecc-8c0b-6e020557d7bd": "Apple Passwords", // gitleaks:allow
+		"01234567-89ab-cdef-0123-456789abcdef": "Passkey",         // gitleaks:allow
+		"00000000-0000-0000-0000-000000000000": "Passkey",
+	} {
+		authenticator := newSoftAuthenticator(t)
+		id := uuid.MustParse(aaguid)
+		authenticator.aaguid = id[:]
+		if passkey := environment.add(t, session, authenticator); passkey.Name != want {
+			t.Errorf("AAGUID %s: name = %q, want %q", aaguid, passkey.Name, want)
+		}
+	}
+}
+
+// Rename names your own passkey, trimmed and with 1 to 64 characters.
+// Another user's passkey is not found, and impersonation changes nothing.
+func TestPasskeyRename(t *testing.T) {
+	environment := newPasskeyEnvironment(t)
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "bob", Email: "bob@example.com", Name: "Bob", Verified: true})
+	session := environment.session(t, "ada")
+	passkey := environment.add(t, session, newSoftAuthenticator(t))
+
+	renamed, err := environment.passkeys.Rename(session, passkey.ID, "  Work laptop  ")
+	if err != nil || renamed.Name != "Work laptop" || renamed.ID != passkey.ID {
+		t.Fatalf("Rename() = %+v, %v", renamed, err)
+	}
+	for _, name := range []string{"", "   ", strings.Repeat("a", 65), "two\nlines"} {
+		if _, err := environment.passkeys.Rename(session, passkey.ID, name); !errors.Is(err, ErrPasskeyName) {
+			t.Errorf("name %q: error = %v, want ErrPasskeyName", name, err)
+		}
+	}
+	if _, err := environment.passkeys.Rename(session, passkey.ID, strings.Repeat("ä", 64)); err != nil {
+		t.Errorf("64 characters: error = %v", err)
+	}
+	if _, err := environment.passkeys.Rename(environment.session(t, "bob"), passkey.ID, "Mine now"); !errors.Is(err, repository.ErrPasskeyNotFound) {
+		t.Fatalf("Bob renames Ada's passkey: error = %v, want ErrPasskeyNotFound", err)
+	}
+	operator := "operator"
+	if _, err := environment.passkeys.Rename(&model.Session{UserID: "ada", ImpersonatorUserID: &operator}, passkey.ID, "Operator"); !errors.Is(err, ErrImpersonating) {
+		t.Fatalf("Rename() while impersonating: error = %v", err)
+	}
+	listed, err := environment.passkeys.List("ada")
+	if err != nil || len(listed) != 1 || listed[0].Name != strings.Repeat("ä", 64) {
+		t.Fatalf("List() = %+v, %v", listed, err)
 	}
 }

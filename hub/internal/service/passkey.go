@@ -33,6 +33,9 @@ var (
 	// ErrPasskeyRefused refuses an answer that go-webauthn does not
 	// verify, or a passkey this hub does not know.
 	ErrPasskeyRefused = errors.New("this passkey did not work")
+	// ErrPasskeyName refuses a passkey name that is empty, longer than 64
+	// characters or holds a control character.
+	ErrPasskeyName = errors.New("passkey name must contain between 1 and 64 characters")
 	// ErrImpersonating refuses a change to how someone signs in while an
 	// operator impersonates them.
 	ErrImpersonating = errors.New("impersonation is read-only")
@@ -343,7 +346,7 @@ func (s *PasskeyService) BeginAdd(session *model.Session) (*protocol.PublicKeyCr
 }
 
 // Add checks the browser's answer to the options of the ceremony and
-// stores the new passkey. Only the user who began the ceremony adds with it,
+// stores the new passkey, named after its password manager (passkeyMaker). Only the user who began the ceremony adds with it,
 // and only while session is live and fresh (freshForPasskey). An email tells the user, so a passkey
 // nobody expected does not go unseen.
 func (s *PasskeyService) Add(session *model.Session, ceremony string, answer io.Reader) (*model.Passkey, error) {
@@ -383,7 +386,7 @@ func (s *PasskeyService) Add(session *model.Session, ceremony string, answer io.
 		UserID:       user.ID,
 		CredentialID: credential.ID,
 		Credential:   string(stored),
-		Name:         "Passkey",
+		Name:         passkeyMaker(credential.Authenticator.AAGUID),
 		CreatedAt:    now,
 	}
 	if err := s.passkeys.Create(passkey, session.ID); err != nil {
@@ -412,6 +415,24 @@ func (s *PasskeyService) Remove(session *model.Session, id string) error {
 	}
 	slog.Info("passkey removed", "user_id", session.UserID)
 	return nil
+}
+
+// Rename names a passkey of the user of session. Another user's passkey
+// is ErrPasskeyNotFound.
+func (s *PasskeyService) Rename(session *model.Session, id, name string) (*model.Passkey, error) {
+	if session == nil || session.IsImpersonating() {
+		return nil, ErrImpersonating
+	}
+	name, err := passkeyName(name)
+	if err != nil {
+		return nil, err
+	}
+	passkey, err := s.passkeys.Rename(session.UserID, id, name)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("passkey renamed", "user_id", session.UserID)
+	return passkey, nil
 }
 
 // startCeremony keeps go-webauthn's session data of a ceremony for

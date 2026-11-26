@@ -308,6 +308,7 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 		mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys/options", passkeyLimiter(workspace(settings.PasskeyOptions)))
 		mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys", passkeyLimiter(workspace(settings.AddPasskey)))
 	}
+	mux.HandleFunc("PATCH /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RenamePasskey))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RemovePasskey))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections", workspace(connections.Page))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm/options", passkeyLimiter(workspace(connections.ConfirmOptions)))
