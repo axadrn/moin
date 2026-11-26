@@ -39,7 +39,9 @@ info:
     to wait. A stream counts once, when it opens. Cookie sessions are not counted.
 
     Errors: every non-2xx JSON answer is the `Error` envelope with a stable lowercase
-    snake case `code`. `fields` is present only for `validation_failed`.
+    snake case `code`. `fields` is present only for `validation_failed`. A CLI or TUI
+    older than the hub needs gets 426 `client_outdated` on every operation, with the
+    command that updates it in `message`.
 
     Plan: after the trial, a workspace without a subscription is read-only. Every
     operation that changes something answers 402 `trial_ended`, except stopping and

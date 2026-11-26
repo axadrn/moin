@@ -69,6 +69,7 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.RequestLogging(app.Cfg.LogHTTP, clientIPs),
 		middleware.Client(clientIPs),
 		middleware.OldDomain(app.OldDomainService.Hosts(), app.Cfg.AppURL, app.OldDomainService.Count),
+		middleware.RefuseOutdatedClients(app.Cfg.AppURL),
 		middleware.CORS(app.Cfg.CORSAllowedOrigins),
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),

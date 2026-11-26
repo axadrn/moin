@@ -169,3 +169,18 @@ func TestNothingToGoBackToNeedsABucketMoinCanReach(t *testing.T) {
 		t.Errorf("a bucket moin cannot reach proves nothing, got:\n%s", rows)
 	}
 }
+
+// A hub that refuses this moin as too old closes the TUI with its message,
+// from a load and from the live stream alike.
+func TestOutdatedQuits(t *testing.T) {
+	outdated := &client.Error{Status: 426, Code: "client_outdated", Message: "Update it"}
+	for _, msg := range []tea.Msg{errMsg{outdated}, offlineMsg{outdated}} {
+		next, cmd := fixture(100, 30).received(msg)
+		if cmd == nil || next.(model).outdated != outdated {
+			t.Errorf("%T did not quit with the message", msg)
+		}
+	}
+	if _, cmd := fixture(100, 30).received(errMsg{&client.Error{Code: "not_found"}}); cmd != nil {
+		t.Error("another error quit")
+	}
+}
