@@ -7,17 +7,15 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/app"
 	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/db"
 	"github.com/axadrn/moin/hub/internal/service"
 )
 
 // command runs a one-off task of the operator, such as from install.sh:
 //
-//	preflight              prints ok: the settings load and the
-//	                       migrations of this build run on a copy of the
-//	                       database, so this hub starts on its data; the
-//	                       database itself stays untouched, so an update
-//	                       runs it before it replaces the running hub
+//	preflight              prints ok: this build starts on a copy of the
+//	                       database, so it starts on the data; it never
+//	                       writes the database, so an update runs it
+//	                       before it replaces the running hub
 //	bootstrap <server>     the account of the first ADMIN_EMAILS address, a
 //	                       workspace and the server, named like this
 //	                       machine; prints its install token, or nothing
@@ -31,7 +29,7 @@ import (
 func command(cfg *config.Config, args []string) error {
 	switch args[0] {
 	case "preflight":
-		if err := db.Preflight(cfg.DBConnection); err != nil {
+		if err := app.Preflight(cfg); err != nil {
 			return err
 		}
 		fmt.Println("ok")

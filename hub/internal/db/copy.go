@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pressly/goose/v3"
 )
 
@@ -108,59 +107,23 @@ func pruneCopies(dir string) {
 	}
 }
 
-// Preflight proves that this build starts on the databases of connection
-// without touching them: it copies the database and its history.db with
-// VACUUM INTO, which works while the running hub writes, migrates each
-// copy as the start does and deletes it. A database without a file yet,
-// on a first start or before a restore from the bucket, has nothing to
-// migrate.
-func Preflight(connection string) error {
-	if err := preflightCopy(connection, func(copied *sqlx.DB) error { return RunMigrations(copied.DB) }); err != nil {
-		return err
-	}
-	return preflightCopy(HistoryConnection(connection), CreateHistory)
-}
-
-// preflightCopy copies the database of connection to preflight-<name> next to it,
-// opens the copy with the same settings, runs migrate on it and removes it.
-func preflightCopy(connection string, migrate func(*sqlx.DB) error) error {
+// CopyInto copies the database of connection into dir with VACUUM INTO,
+// which works while the running hub writes. It opens the database
+// read-only, so it never writes it. It returns the connection of the copy,
+// with the same settings.
+func CopyInto(connection, dir string) (string, error) {
 	file, settings, _ := strings.Cut(strings.TrimPrefix(connection, "file:"), "?")
-	if file == "" || file == ":memory:" || strings.Contains(file, "://") {
-		return nil
-	}
-	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	path := filepath.Join(filepath.Dir(file), "preflight-"+filepath.Base(file))
-	removeCopy := func() {
-		for _, suffix := range []string{"", "-wal", "-shm"} {
-			_ = os.Remove(path + suffix)
-		}
-	}
-	// VACUUM INTO refuses a file that exists, such as one of a preflight that
-	// was killed.
-	removeCopy()
-	defer removeCopy()
-	source, err := sqlx.Open(databaseDriver, "file:"+file+"?mode=ro&_pragma=busy_timeout(5000)")
+	path := filepath.Join(dir, filepath.Base(file))
+	source, err := sql.Open(databaseDriver, "file:"+file+"?mode=ro&_pragma=busy_timeout(5000)")
 	if err != nil {
-		return err
+		return "", err
 	}
-	_, err = source.Exec(`VACUUM INTO ?`, path)
-	_ = source.Close()
-	if err != nil {
-		return fmt.Errorf("copy %s: %w", file, err)
+	defer source.Close()
+	if _, err := source.Exec(`VACUUM INTO ?`, path); err != nil {
+		return "", fmt.Errorf("copy %s: %w", file, err)
 	}
-	copyConnection := path
 	if settings != "" {
-		copyConnection += "?" + settings
+		path += "?" + settings
 	}
-	copied, err := Init(copyConnection)
-	if err != nil {
-		return err
-	}
-	defer copied.Close()
-	if err := migrate(copied); err != nil {
-		return fmt.Errorf("%s: %w", file, err)
-	}
-	return copied.Close()
+	return path, nil
 }
