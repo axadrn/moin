@@ -55,6 +55,7 @@
   .moin-icon-user { --i: url("icons/user.svg"); }
   .moin-icon-users { --i: url("icons/users.svg"); }
   .moin-icon-x { --i: url("icons/x.svg"); }
+  .moin-icon-x-logo { --i: url("icons/x-logo.svg"); }
   .moin-icon-git-hub { --i: url("icons/git-hub.svg"); }
   .moin-icon-google { --i: url("icons/google.svg"); }
 }
