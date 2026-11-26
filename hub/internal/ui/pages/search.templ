@@ -115,6 +115,7 @@ func SearchItems(in SearchInput) []SearchItem {
 		{Title: "Security", Where: "Settings › Account", Icon: "shield", Href: in.Base + "/settings/account?tab=security"},
 		{Title: "Connections", Where: "Settings", Icon: "key", Href: in.Base + "/settings/connections"},
 		{Title: "Source code", Where: "GitHub", Icon: "git-hub", Href: layouts.GitHubURL, External: true},
+		{Title: "News", Where: "X", Icon: "x-logo", Href: layouts.XURL, External: true},
 	}
 	if in.IsOwner {
 		places = append(places, SearchItem{Title: "Billing", Where: "Settings", Icon: "card", Href: in.Base + "/billing"})

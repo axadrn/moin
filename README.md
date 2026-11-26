@@ -17,6 +17,8 @@ The daemon on your server only dials out. Nothing listens for moin.
 
 Everything else is in the docs: [moin.run/docs](https://moin.run/docs), or `/docs` on your own hub. They are the source of truth.
 
+News on X: [@usemoin](https://x.com/usemoin).
+
 ## Build
 
 ```bash

@@ -99,6 +99,7 @@ templ SettingsHome(view SettingsHomeView) {
 						}
 						@components.Item(components.ItemProps{Name: "Support", Value: cfg.SupportEmail})
 						@components.Item(components.ItemProps{Href: layouts.GitHubURL, External: true, Name: "Source code", Value: "GitHub"})
+						@components.Item(components.ItemProps{Href: layouts.XURL, External: true, Name: "News", Value: "@" + layouts.XHandle})
 					}
 				}
 			</section>

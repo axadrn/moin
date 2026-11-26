@@ -41,6 +41,7 @@ func footerColumns(billing bool) []components.FooterColumn {
 		}},
 		{Title: "Company", Links: []components.FooterLink{
 			{Label: "Why " + brand.Name, Href: "/docs/why-moin"},
+			{Label: brand.Name + " on X", Href: XURL, External: true},
 			{Label: "Terms", Href: "/legal/terms"},
 			{Label: "Privacy", Href: "/legal/privacy"},
 		}},

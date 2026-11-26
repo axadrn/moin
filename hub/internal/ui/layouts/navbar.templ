@@ -12,6 +12,12 @@ import (
 // GitHubURL is the open source repository of moin.
 const GitHubURL = "https://github.com/" + githubstars.Repo
 
+// XHandle is moin's account on X, without the @.
+const XHandle = "usemoin"
+
+// XURL is moin's account on X.
+const XURL = "https://x.com/" + XHandle
+
 // navLinks are the places of the public site. A self-hosted hub has no
 // prices to show.
 func navLinks(billing bool, path string) []components.BarLink {
@@ -77,6 +83,11 @@ templ Navbar() {
 				@components.Button(components.ButtonProps{Href: GitHubURL, Icon: true, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
 					<i class="moin-icon moin-icon-git-hub"></i>
 				}
+			}
+		</span>
+		<span class="moin-hidden-phone">
+			@components.Button(components.ButtonProps{Href: XURL, Icon: true, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "X"}}) {
+				<i class="moin-icon moin-icon-x-logo"></i>
 			}
 		</span>
 		// One way in: /auth signs in and signs up alike.

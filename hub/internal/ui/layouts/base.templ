@@ -125,6 +125,7 @@ templ seo(props SEOProps) {
 	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
 	// Twitter Card
 	<meta name="twitter:card" content="summary_large_image"/>
+	<meta name="twitter:site" content={ "@" + XHandle }/>
 	<meta name="twitter:title" content={ fullTitle }/>
 	<meta name="twitter:description" content={ props.Description }/>
 	<meta name="twitter:image" content={ baseURL + components.AssetURL("/assets/img/og.png") }/>
