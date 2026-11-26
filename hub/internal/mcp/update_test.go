@@ -2,53 +2,25 @@ package mcp_test
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/hub/internal/mcp"
 )
 
-// TestUpdateTools: get_version tells of the newest release, only the admin
-// of the hub updates it, and set_daemon_updates turns automatic
-// daemon updates off.
+// TestUpdateTools: get_version tells of the newest release, and
+// set_daemon_updates turns automatic daemon updates off.
 func TestUpdateTools(t *testing.T) {
 	env := newEnvironment(t)
 	if err := env.services.Updates.Check(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(env.updates, "updater"), []byte("alive\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	ada := seedOwner(t, env, "ada")
 	adaToken, _ := createToken(t, env, ada, allRights...)
 	adaSession := connectMemory(t, env.server, ada, adaToken)
-	bob := seedOwner(t, env, "bob")
-	bobToken, _ := createToken(t, env, bob, allRights...)
-	bobSession := connectMemory(t, env.server, bob, bobToken)
 
-	version := output[mcp.VersionOutput](t, call(t, bobSession, "get_version", nil))
-	if version.Latest != "v0.3.0" || !version.UpdateAvailable || version.CanUpdate || !version.AutoUpdateDaemons || version.Summary != "Updates in one click." {
-		t.Fatalf("bob's version = %+v", version)
-	}
-	if result := call(t, bobSession, "update_hub", nil); !result.IsError || !strings.Contains(text(result), `"forbidden"`) {
-		t.Fatalf("bob's update = %s", text(result))
-	}
-	// First the notes: nothing updates until ada confirms.
-	notes := output[mcp.VersionOutput](t, call(t, adaSession, "update_hub", nil))
-	if notes.ReadFirst == "" || notes.Notes == "" || notes.Update != nil {
-		t.Fatalf("ada's notes = %+v", notes)
-	}
-	if _, err := os.Stat(filepath.Join(env.updates, "request")); err == nil {
-		t.Fatal("update_hub without confirm updated")
-	}
-	updated := output[mcp.VersionOutput](t, call(t, adaSession, "update_hub", map[string]any{"confirm": true}))
-	if updated.Update == nil || updated.Update.State != "requested" || updated.Update.Version != "v0.3.0" {
-		t.Fatalf("ada's update = %+v", updated)
-	}
-	if _, err := os.Stat(filepath.Join(env.updates, "request")); err != nil {
-		t.Fatal(err)
+	version := output[mcp.VersionOutput](t, call(t, adaSession, "get_version", nil))
+	if version.Latest != "v0.3.0" || !version.UpdateAvailable || version.ReadFirst == "" || !version.AutoUpdateDaemons || version.Summary != "A new release." {
+		t.Fatalf("ada's version = %+v", version)
 	}
 
 	off := output[mcp.DaemonUpdatesOutput](t, call(t, adaSession, "set_daemon_updates", map[string]any{"auto": false}))

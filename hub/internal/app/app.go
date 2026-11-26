@@ -76,12 +76,9 @@ func New(cfg *config.Config) (*App, error) {
 			_ = database.Close()
 		}
 	}()
-	// The data directory holds the database, its copies from before
-	// migrations and the files the updater reads and writes.
-	dataDir := "data"
+	// The database keeps its copies from before migrations next to it.
 	if file := dbbackup.File(cfg.DBConnection); file != "" {
-		dataDir = filepath.Dir(file)
-		if _, err := db.CopyBeforeMigrations(database.DB, dataDir, build.Version); err != nil {
+		if _, err := db.CopyBeforeMigrations(database.DB, filepath.Dir(file), build.Version); err != nil {
 			return nil, err
 		}
 	}
@@ -239,7 +236,7 @@ func New(cfg *config.Config) (*App, error) {
 		TelemetryService: service.NewTelemetryService(repository.NewTelemetry(database), cfg.TelemetryURL, build.Version, cfg.Telemetry && !cfg.Billing),
 		// Only a self-hosted hub offers updates; the Deploy
 		// workflow updates the hosted one.
-		UpdateService:      service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, activity),
+		UpdateService:      service.NewUpdateService(build.Version, service.ReleasesURL, !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails),
 		WorkspaceService:   workspaceService,
 		ConnectionService:  connectionService,
 		CITokenService:     ciTokenService,

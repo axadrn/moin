@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ui/components"
-	"time"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
@@ -10,112 +9,60 @@ import (
 )
 
 // UpdateNotice tells the admins of a self-hosted hub that a new
-// release is out, with its "In short" line, and updates it with one click.
-// While an update runs it asks again every five seconds. Everyone else, and
-// everyone on the hosted hub, gets an empty element.
+// release is out, with its "In short" line, its notes and the command
+// that updates it on the server. Everyone else, and everyone on the
+// hosted hub, gets an empty element.
 templ UpdateNotice(info model.VersionInfo) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ update := info.Update }}
-	{{ running := update != nil && update.Running() }}
 	<div
 		id="update-notice"
 		class={ components.Page, "moin-hide-empty" }
 		style="--page-top:var(--space-4)"
-		if running {
-			hx-get={ basePath + "/update" }
-			hx-trigger="every 5s"
-			hx-swap="outerHTML"
-		}
 		data-update-notice
 	>
-		if info.Admin {
-			switch  {
-				case running:
-					@updateLine(templ.Attributes{"data-update-state": update.State}) {
-						@components.Status(components.StatusProps{State: components.StateRunning}) {
-							{ "Updating " + build.Name + " to " + update.Version }
-						}
+		if info.Admin && info.UpdateAvailable {
+			@updateLine(templ.Attributes{"data-update-available": info.Latest}) {
+				<div class="moin-stack" data-gap="1">
+					<p class="moin-strong">{ build.Name + " " + info.Latest + " is out." }</p>
+					if info.Summary != "" {
 						<p class="moin-small moin-muted">
-							Back in a minute. Your apps keep running.
+							{ info.Summary }
 						</p>
 					}
-				case update != nil && (update.State == "rolled_back" || update.State == "failed"):
-					@updateLine(templ.Attributes{"data-update-state": update.State}) {
-						@components.Status(components.StatusProps{State: components.StateFailed}) {
-							{ "The update to " + update.Version + " did not work" }
-						}
-						<p class="moin-small moin-muted">
-							{ update.Reason }
-							if update.State == "rolled_back" {
-								{ " " + build.Name + " runs " + info.Version + " again." }
-							}
-							{ " " }
-							<a class="moin-link moin-foreground" href={ templ.SafeURL("/docs/self-hosting#updates") }>What to do</a>
-						</p>
+					<p class="moin-small moin-muted">Read what is new, then on the server:</p>
+				</div>
+				<div class="moin-row" data-wrap data-gap="2">
+					@components.Command(components.CommandProps{Text: model.UpdateCommand})
+					@components.Button(components.ButtonProps{Attrs: components.OpenDialog("update-dialog")}) {
+						What is new
 					}
-				case update != nil && update.State == "done" && update.Version == info.Version && time.Since(update.At) < 10*time.Minute:
-					@updateLine(templ.Attributes{"data-update-state": "done"}) {
-						@components.Status(components.StatusProps{State: components.StateLive}) {
-							{ build.Name + " " + info.Version + " runs now" }
-						}
-						<div>
-							@components.Button(components.ButtonProps{Href: info.NotesURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
-								Changelog
-							}
-						</div>
-					}
-				case info.UpdateAvailable:
-					@updateLine(templ.Attributes{"data-update-available": info.Latest}) {
-						<div class="moin-stack" data-gap="1">
-							<p class="moin-strong">{ build.Name + " " + info.Latest + " is out" }</p>
-							if info.Summary != "" {
-								<p class="moin-small moin-muted">
-									{ info.Summary }
-								</p>
-							}
-						</div>
-						<div class="moin-row" data-wrap data-gap="2">
-							if info.CanUpdate {
-								@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: components.OpenDialog("update-dialog")}) {
-									Update now
-								}
-								@updateDialog(info)
-							} else {
-								<span class="moin-small moin-muted">On the server: <code class="moin-mono moin-foreground">sh update.sh</code></span>
-							}
-							if info.NotesURL != "" {
-								@components.Button(components.ButtonProps{Href: info.NotesURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
-									Release notes
-								}
-							}
-						</div>
-					}
+				</div>
 			}
+			@updateDialog(info)
 		}
 	</div>
 }
 
-// updateDialog shows the whole release notes before every update: some
-// updates need a step from the admin first, and the notes say which.
+// updateDialog shows the whole release notes: some updates need a step
+// from the admin first, and the notes say which.
 templ updateDialog(info model.VersionInfo) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@components.Dialog(components.DialogProps{ID: "update-dialog", Title: "Update to " + info.Latest + "?", Note: model.ReadFirst}) {
+	@components.Dialog(components.DialogProps{ID: "update-dialog", Title: "What is new in " + info.Latest, Note: model.ReadFirst}) {
 		if info.NotesHTML != "" {
 			@components.Prose(components.ProseProps{HTML: info.NotesHTML})
-		} else if info.NotesURL != "" {
-			<p class="moin-text"><a class="moin-link" href={ templ.SafeURL(info.NotesURL) } target="_blank" rel="noopener">The release notes</a></p>
 		}
-		<form hx-post={ basePath + "/update" } hx-swap="outerHTML" hx-target="#update-notice" hx-disable="find button[type='submit']">
-			@components.CSRF()
-			@components.DialogButtons() {
-				@components.Button(components.ButtonProps{Attrs: components.CloseDialog()}) {
-					Cancel
-				}
-				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-update-start": true}}) {
-					Update
+		<div class="moin-stack" data-gap="2">
+			<p class="moin-text">Then on the server:</p>
+			@components.Command(components.CommandProps{Text: model.UpdateCommand})
+		</div>
+		@components.DialogButtons() {
+			if info.NotesURL != "" {
+				@components.Button(components.ButtonProps{Href: info.NotesURL, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+					Release notes
 				}
 			}
-		</form>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: components.CloseDialog()}) {
+				Close
+			}
+		}
 	}
 }
 

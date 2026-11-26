@@ -31,11 +31,8 @@ type environment struct {
 	ciTokens    *service.CITokenService
 	connections *service.ConnectionService
 	services    mcp.Services
-	// updates is where the updater of the self-hosted test hub
-	// keeps its files; ada@example.com is its admin.
-	updates string
-	server  *mcpsdk.Server
-	handler http.Handler
+	server      *mcpsdk.Server
+	handler     http.Handler
 }
 
 func newEnvironment(t *testing.T) *environment {
@@ -68,11 +65,11 @@ func newEnvironment(t *testing.T) *environment {
 	}
 	env.services.Apps = service.NewAppService(repository.NewApps(database, database), env.services.Servers, box)
 	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z","body":"**In short:** Updates in one click."}`))
+		w.Write([]byte(`{"tag_name":"v0.3.0","html_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","published_at":"2026-11-02T10:00:00Z","body":"**In short:** A new release."}`))
 	}))
 	t.Cleanup(releases.Close)
-	env.updates = t.TempDir()
-	env.services.Updates = service.NewUpdateService("v0.2.0", releases.URL, env.updates, true, true, []string{"ada@example.com"}, repository.NewActivity(database))
+	// The test hub is self-hosted; ada@example.com is its admin.
+	env.services.Updates = service.NewUpdateService("v0.2.0", releases.URL, true, true, []string{"ada@example.com"})
 	env.services.Alerts = service.NewAlertService(email, repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), repository.NewApps(database, database), repository.NewAlertDestinations(database), repository.NewActivity(database), box)
 	env.services.Status = service.NewStatusService(env.services.Apps, env.services.Servers, nil)
 	env.ciTokens = service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), workspaces)

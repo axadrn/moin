@@ -363,7 +363,6 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/daemon-updates", workspace(servers.DaemonUpdates))
 	updates := handler.NewUpdateHandler(app.UpdateService)
 	mux.HandleFunc("GET /app/{workspaceSlug}/update", workspace(updates.Notice))
-	mux.HandleFunc("POST /app/{workspaceSlug}/update", workspace(updates.Start))
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/install", workspace(servers.NewInstall))
 	mux.HandleFunc("GET /app/{workspaceSlug}/servers/{id}/install", workspace(servers.Install))
 	apps := handler.NewAppsHandler(app.AppService, app.ServerService, app.UserService, app.CatalogService)

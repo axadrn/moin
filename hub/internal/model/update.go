@@ -14,28 +14,15 @@ type Release struct {
 	NotesHTML string
 }
 
-// UpdateState is an update of the hub: requested, under way or
-// ended, as the updater next to it reports.
-type UpdateState struct {
-	// State is requested, updating, done, rolled_back or failed.
-	State   string    `json:"state"`
-	Version string    `json:"version"`
-	From    string    `json:"from"`
-	Reason  string    `json:"reason,omitempty"`
-	At      time.Time `json:"at"`
-}
-
-// Running reports whether the update has not ended yet.
-func (u UpdateState) Running() bool {
-	return u.State == "requested" || u.State == "updating"
-}
-
-// VersionInfo is the version of the hub and, on a self-hosted
-// one, the newest release and how to get it.
 // ReadFirst is what the web, the CLI and MCP show above the release notes
-// before every update of a self-hosted hub.
+// of a new release of a self-hosted hub.
 const ReadFirst = "Read this first. Some updates need a step from you before you update."
 
+// UpdateCommand updates a self-hosted hub, run on its server.
+const UpdateCommand = "sh /opt/moin/update.sh"
+
+// VersionInfo is the version of the hub and, on a self-hosted
+// one, the newest release.
 type VersionInfo struct {
 	Version string
 	// SelfHosted is false on the hosted hub, which updates with
@@ -51,12 +38,6 @@ type VersionInfo struct {
 	CheckedAt       *time.Time
 	// Admin is whether the user runs this hub.
 	Admin bool
-	// Updater is whether the updater service runs next to it.
-	Updater bool
-	// CanUpdate is whether the user can start an update now.
-	CanUpdate bool
-	// Update is the update under way, or the last one of the past day.
-	Update *UpdateState
 	// HubBackup is how the backup of the hub's own database stands, only
 	// for the admins of the hub, on every hub.
 	HubBackup *HubBackup

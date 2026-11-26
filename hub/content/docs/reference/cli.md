@@ -17,8 +17,7 @@ Every command of `moin`, by area. `moin <command> --help` shows the same on your
 | `moin connections` | your connections, this one marked, and the CI tokens of the workspace, with their rights and when each was last used |
 | `moin connections rm <id> [--yes]` | ends a connection or removes a CI token, at once. Rights change in the web: **Settings**, **Connections** |
 | `moin status` | is everything OK: what needs you, catalog updates, what runs; exits `1` when something needs you ([Overview](/docs/guides/overview)) |
-| `moin version` | the version of `moin` and of the hub, and whether a newer one is out |
-| `moin update [--yes]` | updates a self-hosted hub to the newest version and waits until it is back; for its admins. It prints the whole release notes first, then asks; `--yes` skips the question |
+| `moin version` | the version of `moin` and of the hub, and whether a newer one is out. A self-hosted hub updates on its server: `sh /opt/moin/update.sh` |
 | `moin help` | the list of commands |
 
 `--url` defaults to the saved hub, else `https://moin.run`. It must be https; plain http works only for localhost and your tailnet (`100.x` addresses, `*.ts.net`).

@@ -9,7 +9,7 @@ import (
 )
 
 // TestVersionOnTheHostedHub: the hosted hub answers its
-// version and nothing to update, even to an operator, and daemons update by
+// version and no update, even to an operator, and daemons update by
 // themselves until the workspace turns it off.
 func TestVersionOnTheHostedHub(t *testing.T) {
 	environment := newAPIEnvironment(t)
@@ -24,12 +24,8 @@ func TestVersionOnTheHostedHub(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &version); err != nil {
 		t.Fatal(err)
 	}
-	if version["version"] != "v0.2.0" || version["self_hosted"] != false || version["update_available"] != false || version["can_update"] != false || version["update"] != nil {
+	if version["version"] != "v0.2.0" || version["self_hosted"] != false || version["update_available"] != false {
 		t.Fatalf("version = %v", version)
-	}
-	update := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/version/update", cookie: token})
-	if update.Code != http.StatusConflict || !json.Valid(update.Body.Bytes()) {
-		t.Fatalf("POST update = %d %s", update.Code, update.Body)
 	}
 
 	auto := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/daemon-updates", cookie: token})

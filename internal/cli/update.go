@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -12,9 +11,6 @@ import (
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
-
-// updateWait is how long `moin update` follows an update.
-const updateWait = 5 * time.Minute
 
 // version prints the version of this binary and, when signed in, of the
 // hub, and says when a newer release is out.
@@ -62,120 +58,34 @@ func hubBackupLine(backup client.HubBackup, now time.Time) string {
 	return style.Badge(status, line)
 }
 
-// printUpdate says how a self-hosted hub gets the newest release.
+// printUpdate says that a self-hosted hub has a newer release and how
+// to update it: on its server.
 func printUpdate(stdout io.Writer, info client.Version) {
-	switch {
-	case info.Update.Running():
-		fmt.Fprintln(stdout)
-		step(stdout, "Updating the hub to %s", info.Update.Version)
-	case info.UpdateAvailable:
-		fmt.Fprintln(stdout)
-		fmt.Fprintln(stdout, style.Warning.Render(build.Name+" "+info.Latest+" is out.")+" "+info.Summary)
-		if info.NotesURL != "" {
-			fmt.Fprintln(stdout, "  "+style.Muted.Render(info.NotesURL))
-		}
-		switch {
-		case info.CanUpdate:
-			hint(stdout, "Update the hub with", build.Name+" update")
-		case info.Updater:
-			hint(stdout, "An admin of the hub updates it, with", build.Name+" update")
-		default:
-			hint(stdout, "Update it on the server with", "sh update.sh")
-		}
+	if !info.UpdateAvailable {
+		return
 	}
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, style.Warning.Render(build.Name+" "+info.Latest+" is out.")+" "+info.Summary)
+	if info.NotesURL != "" {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(info.NotesURL))
+	}
+	if info.ReadFirst != "" {
+		fmt.Fprintln(stdout, "  "+info.ReadFirst)
+	}
+	hint(stdout, "Then on the server:", "sh /opt/moin/update.sh")
 }
 
-// update updates a self-hosted hub to the newest release and
-// follows it until it is back.
-func update(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("update", "update [--yes], or update <app> [--version <tag>] for an app from the catalog").withYes()
-	appVersion := flags.String("version", "", "with an app: a version from moin catalog; default the newest")
+// update updates an app from the catalog.
+func update(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("update", "update <app> [--version <tag>]")
+	appVersion := flags.String("version", "", "a version from moin catalog; default the newest")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() == 1 {
-		return updateApp(ctx, flags.Arg(0), *appVersion, stdout)
+	if flags.NArg() != 1 {
+		return fmt.Errorf("%w. A self-hosted hub updates on its server: `sh /opt/moin/update.sh`", flags.wrong())
 	}
-	if flags.NArg() > 1 || *appVersion != "" {
-		return flags.wrong()
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	info, err := api.Version(ctx)
-	if err != nil {
-		return err
-	}
-	if !info.SelfHosted {
-		done(stdout, "This hub runs %s and updates itself with every release. Nothing to do.", info.Version)
-		return nil
-	}
-	if !info.UpdateAvailable && !info.Update.Running() {
-		done(stdout, "The hub runs %s, the newest release.", info.Version)
-		return nil
-	}
-	if !info.Update.Running() {
-		// The whole release notes come first: some updates need a step
-		// before them.
-		fmt.Fprintln(stdout, style.Bold.Render(build.Name+" "+info.Latest))
-		if info.ReadFirst != "" {
-			fmt.Fprintln(stdout, style.Warning.Render(info.ReadFirst))
-		}
-		fmt.Fprintln(stdout)
-		if info.Notes != "" {
-			fmt.Fprintln(stdout, info.Notes)
-		} else {
-			fmt.Fprintln(stdout, info.Summary)
-			if info.NotesURL != "" {
-				fmt.Fprintln(stdout, style.Muted.Render(info.NotesURL))
-			}
-		}
-		fmt.Fprintln(stdout)
-		if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Update the hub from %s to %s? It is away for a minute; your apps keep running.", info.Version, info.Latest)); err != nil {
-			return err
-		}
-		info, err = api.UpdateHub(ctx)
-		var apiErr *client.Error
-		if errors.As(err, &apiErr) && apiErr.Code == "no_updater" {
-			return fmt.Errorf("%s", apiErr.Message)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	target := info.Latest
-	if info.Update != nil {
-		target = info.Update.Version
-	}
-	progress := newProgress(stdout, "updating the hub to "+target)
-	deadline := time.Now().Add(updateWait)
-	for {
-		select {
-		case <-ctx.Done():
-			progress.end()
-			return ctx.Err()
-		case <-time.After(3 * time.Second):
-		}
-		// The hub is away while it restarts.
-		current, err := api.Version(ctx)
-		if err == nil && current.Update != nil && !current.Update.Running() {
-			progress.end()
-			switch current.Update.State {
-			case "done":
-				done(stdout, "The hub runs %s now", style.Bold.Render(current.Version))
-				return nil
-			case "rolled_back":
-				return fmt.Errorf("the update to %s did not work, so the hub runs %s again: %s", current.Update.Version, current.Version, current.Update.Reason)
-			default:
-				return fmt.Errorf("the update to %s did not work: %s", current.Update.Version, current.Update.Reason)
-			}
-		}
-		if time.Now().After(deadline) {
-			progress.end()
-			return fmt.Errorf("the update to %s has not ended after %s: see `docker compose logs updater` on the server", target, updateWait)
-		}
-	}
+	return updateApp(ctx, flags.Arg(0), *appVersion, stdout)
 }
 
 // daemonUpdates shows or sets whether the daemons update by themselves.

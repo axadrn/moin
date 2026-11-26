@@ -10,7 +10,7 @@ import (
 )
 
 // VersionHandler answers the version of the hub, the newest
-// release and the update, and the workspace's automatic daemon updates.
+// release, and the workspace's automatic daemon updates.
 type VersionHandler struct {
 	updates *service.UpdateService
 	servers *service.ServerService
@@ -36,12 +36,6 @@ type VersionInfo struct {
 	// ReadFirst goes above the notes before every update, while one is out.
 	ReadFirst string     `json:"read_first,omitempty"`
 	CheckedAt *time.Time `json:"checked_at"`
-	// CanUpdate is true for an admin of a self-hosted hub while
-	// an update is out and the updater runs.
-	CanUpdate bool `json:"can_update"`
-	// Updater says whether the updater runs next to the hub.
-	Updater bool               `json:"updater"`
-	Update  *model.UpdateState `json:"update"`
 	// HubBackup is how the backup of the hub's own database stands, for
 	// the admins of the hub only; null for everyone else.
 	HubBackup *model.HubBackup `json:"hub_backup"`
@@ -57,23 +51,13 @@ func NewVersion(info model.VersionInfo) VersionInfo {
 		ReadFirst: readFirst,
 		Version:   info.Version, SelfHosted: info.SelfHosted, Latest: info.Latest, UpdateAvailable: info.UpdateAvailable,
 		PublishedAt: info.PublishedAt, NotesURL: info.NotesURL, Summary: info.Summary, Notes: info.Notes,
-		CheckedAt: info.CheckedAt, CanUpdate: info.CanUpdate, Updater: info.Updater, Update: info.Update, HubBackup: info.HubBackup,
+		CheckedAt: info.CheckedAt, HubBackup: info.HubBackup,
 	}
 }
 
 // Show answers the version and the newest release.
 func (h *VersionHandler) Show(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewVersion(h.updates.Info(ctxkeys.User(r.Context()))))
-}
-
-// Update asks the updater to install the newest release.
-func (h *VersionHandler) Update(w http.ResponseWriter, r *http.Request) {
-	info, err := h.updates.Start(actor(r), ctxkeys.User(r.Context()))
-	if err != nil {
-		ServiceError(w, err)
-		return
-	}
-	JSON(w, http.StatusAccepted, NewVersion(info))
 }
 
 // DaemonUpdates is the answer of GET and PUT /api/v1/daemon-updates.

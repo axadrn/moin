@@ -171,7 +171,7 @@ func readOnlyAllows(r *http.Request) bool {
 	if _, route, ok := strings.Cut(path, " "); ok {
 		path = route
 	}
-	for _, part := range []string{"/api/v1/workspaces/", "/workspace/", "/billing/", "/account", "/profile/", "/settings/sessions", "/settings/passkeys", "/settings/connections", "/ci-tokens", "/data/query", "/databases/query", "/version/update", "/daemon-updates", "/alerts/", "/alert-destinations"} {
+	for _, part := range []string{"/api/v1/workspaces/", "/workspace/", "/billing/", "/account", "/profile/", "/settings/sessions", "/settings/passkeys", "/settings/connections", "/ci-tokens", "/data/query", "/databases/query", "/daemon-updates", "/alerts/", "/alert-destinations"} {
 		if strings.Contains(path, part) {
 			return true
 		}

@@ -152,7 +152,6 @@ Daemon
   daemon             Run the daemon on this server
 
   version            Show the version of moin and the hub, and a newer release
-  update             Update a self-hosted hub to the newest release [--yes]
   update <app>       Update an app from the catalog; restore can go back to before it: update umami [--version 3.4.1]
   help               Show this help
 
@@ -237,7 +236,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "version", "--version":
 		return version(ctx, rest, stdout)
 	case "update":
-		return update(ctx, rest, stdin, stdout)
+		return update(ctx, rest, stdout)
 	case "login":
 		return login(ctx, rest, stdin, stdout)
 	case "logout":

@@ -40,7 +40,6 @@ The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and a
 | `GET /api/v1/csrf` | read |
 | `GET /api/v1/meta` | read |
 | `GET /api/v1/version` | read |
-| `POST /api/v1/version/update` | servers |
 | `POST /api/v1/auth/email-change/verify` | no token |
 | `POST /api/v1/auth/device` | no token |
 | `POST /api/v1/auth/token` | no token |
