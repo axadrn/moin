@@ -59,7 +59,7 @@ Sign-in itself is in the browser, not JSON: `/auth/github` with GitHub, `POST /a
 | `PATCH /api/v1/account/email` | changes your email |
 | `DELETE /api/v1/account` | deletes your account |
 | `GET /api/v1/account/connections` | the clients you let in from the browser, with `rights`; `current` marks the connection that asks. A connection sees those of its workspace |
-| `PATCH /api/v1/account/connections/{id}` | changes its rights, `{"rights": ["deploy", "env"]}`, from a signed-in browser only. Adding a right needs a confirmation from the last five minutes (a sign-in, your passkey or GitHub), else `403` `confirm_required` |
+| `PATCH /api/v1/account/connections/{id}` | changes its rights, `{"rights": ["deploy", "env"]}`, from a signed-in browser only. Adding a right needs a confirmation from the last five minutes (your passkey; without one, a sign-in or GitHub), else `403` `confirm_required` |
 | `DELETE /api/v1/account/connections/{id}` | ends a connection and its tokens at once |
 | `GET` · `POST /api/v1/ci-tokens` | the CI tokens of the workspace you see (yours; the owner's every one); makes one from a signed-in browser, `{"name", "rights", "app", "expires_in_days"}`, and answers it once; like adding a right it needs a fresh confirmation, else `403` `confirm_required` |
 | `PATCH` · `DELETE /api/v1/ci-tokens/{id}` | changes its rights (only its maker, from a signed-in browser); removes it (yours, or as the owner any) |

@@ -177,7 +177,7 @@ func passkeyFailed(w http.ResponseWriter, err error) {
 		http.Error(w, "This passkey is added already.", http.StatusConflict)
 	case errors.Is(err, service.ErrImpersonating):
 		http.Error(w, "Impersonation is read-only.", http.StatusForbidden)
-	case errors.Is(err, service.ErrConfirm):
+	case errors.Is(err, service.ErrConfirm), errors.Is(err, service.ErrPresencePasskey):
 		// passkey.js opens the page's Confirm it's you dialog.
 		http.Error(w, "Confirm it's you first.", http.StatusPreconditionRequired)
 	case errors.Is(err, repository.ErrSessionNotFound):

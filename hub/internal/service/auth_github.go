@@ -137,7 +137,8 @@ var ErrGitHubOtherAccount = errors.New("this is not the GitHub account of this m
 
 // ConfirmWithGitHub notes that the person of session confirmed it is them
 // with account, which must be the GitHub account they sign in with. The
-// session stays, and so do the others: nobody signs out.
+// session stays, and so do the others: nobody signs out. For an account
+// with a passkey it does not count (PasskeyService.Present).
 func (s *AuthService) ConfirmWithGitHub(session *model.Session, account GitHubAccount) error {
 	if session == nil || session.IsImpersonating() {
 		return ErrImpersonating
@@ -150,10 +151,10 @@ func (s *AuthService) ConfirmWithGitHub(session *model.Session, account GitHubAc
 		return ErrGitHubOtherAccount
 	}
 	now := time.Now().UTC()
-	if err := s.sessionRepository.Confirm(session.ID, now); err != nil {
+	if err := s.sessionRepository.Confirm(session.ID, model.ConfirmedWithGitHub, now); err != nil {
 		return err
 	}
-	session.ConfirmedAt = now
+	session.ConfirmedAt, session.ConfirmedWith = now, model.ConfirmedWithGitHub
 	slog.Info("session confirmed with github", "user_id", user.ID)
 	return nil
 }
