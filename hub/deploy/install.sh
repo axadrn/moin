@@ -57,7 +57,7 @@ env=$deploy/.env
 files="setup.sh update.sh compose.yml compose.same-server.yml compose.caddy.yml compose.tunnel.yml"
 # New settings bring a new SECRETS_KEY, which cannot open the secrets in a
 # database that is here already.
-if [ ! -f "$env" ] && [ -f /var/lib/moin-hub/app.db ]; then
+if [ ! -f "$env" ] && { [ -f /var/lib/moin-hub/app.db ] || [ -d /etc/moin-controlplane ]; }; then
 	echo "A hub is here, but its settings are not in $env yet: https://moin.run/docs/self-hosting#coming-from-before-v100-beta37" >&2
 	exit 1
 fi
@@ -86,9 +86,7 @@ elif [ "$no_proxy" = true ]; then
 else
 	compose_file=compose.yml:compose.caddy.yml
 fi
-new=false
 if [ ! -f "$env" ]; then
-	new=true
 	(
 		umask 077
 		{
@@ -148,8 +146,9 @@ if [ "$hub_only" = false ]; then
 		[ "$i" -lt 60 ] || { echo "Traefik did not start: journalctl -u moin-daemon" >&2; exit 1; }
 		sleep 2
 	done
-elif [ "$new" = true ]; then
+else
 	# The admin's account, a workspace and the first app server, web-1.
+	# Once web-1's daemon is connected, it prints nothing.
 	first_server=$(docker compose exec -T hub ./main bootstrap web-1)
 fi
 

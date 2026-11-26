@@ -204,7 +204,7 @@ It does three things:
 - Before the database changes, the hub keeps a copy next to it, like `/var/lib/moin-hub/backup-before-v0.3.0.db`. The last three stay.
 - `moin version` shows the version and whether a newer one is out. You only get published versions, never work in between.
 - `UPDATE_CHECK=false` stops the daily check.
-- One exact version, for one run: `MOIN_IMAGE=ghcr.io/axadrn/moin:v1.0.0-beta.36 sh /opt/moin/update.sh`.
+- One exact version, for one run: `MOIN_IMAGE=ghcr.io/axadrn/moin:<version> sh /opt/moin/update.sh`.
 - New deploy files come with the install command. Run it again, with the same flags.
 - The daemons update themselves to the version of the hub, one server at a time, never during a deploy: [How a daemon updates](/docs/reference/shipping#how-a-daemon-updates).
 - Your hub runs the image `ghcr.io/axadrn/moin:stable`, the newest release. Which versions exist and when they come: [How moin ships](/docs/reference/shipping).
@@ -241,6 +241,7 @@ Before v1.0.0-beta.37 the settings were in `/etc/moin-hub/env`, and an updater r
    | You had | Add |
    | --- | --- |
    | `SAME_SERVER=true` | `COMPOSE_FILE=compose.yml:compose.same-server.yml` |
+   | `SAME_SERVER=true` and `TUNNEL_TOKEN` | `COMPOSE_FILE=compose.yml:compose.same-server.yml:compose.tunnel.yml` |
    | `TUNNEL_TOKEN` | `COMPOSE_FILE=compose.yml:compose.tunnel.yml` |
    | your own proxy | `COMPOSE_FILE=compose.yml` |
 
@@ -261,6 +262,7 @@ Before v1.0.0-beta.37 the settings were in `/etc/moin-hub/env`, and an updater r
 The old updater goes away by itself with the update. Ran your hub from a git clone, in its `hub/deploy`? Stop it there first, with `docker compose --profile '*' down`, then start with step 1.
 
 - **Update now** in the web of v1.0.0-beta.35 or beta.36 still takes you to v1.0.0-beta.37. The update after that needs the new place.
+- Still have `/etc/moin-controlplane`, from before v1.0.0-beta.25? Run your old `update.sh` once first, with `MOIN_IMAGE=ghcr.io/axadrn/moin:v1.0.0-beta.35`. It moves the folders. Then start with step 1.
 - Filling the settings from 1Password with `env.tpl` and `op-token` is gone. Put the values in `/opt/moin/.env` yourself. Then delete `/etc/moin-hub/env.tpl` and `/etc/moin-hub/op-token`.
 
 ## Move the hub to its own server

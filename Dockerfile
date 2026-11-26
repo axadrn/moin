@@ -61,7 +61,10 @@ COPY --from=build /app/hub/downloads ./downloads
 # Expose the port
 EXPOSE 8090
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- http://127.0.0.1:8090/healthz >/dev/null || exit 1
+# Healthy within seconds of a start, since update.sh waits for it. A start
+# that restores the database from the bucket or migrates long has five
+# minutes before a failed check counts.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5m --start-interval=2s --retries=3 CMD wget -qO- http://127.0.0.1:8090/healthz >/dev/null || exit 1
 
 # Command to run
 CMD ["./main"]
