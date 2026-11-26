@@ -43,7 +43,8 @@ func TestAuthOffersAPasskey(t *testing.T) {
 	}
 }
 
-// The security tab lists the passkeys, each with Remove, and adds one.
+// The security tab lists the passkeys, each with Rename and Remove, and
+// adds one.
 func TestSettingsListsPasskeys(t *testing.T) {
 	ctx := projectPageContext("/app/tiny-rocket-co/settings/account")
 	ctx = ctxkeys.WithRenderConfig(ctx, config.RenderConfig{Passkeys: true})
@@ -52,8 +53,8 @@ func TestSettingsListsPasskeys(t *testing.T) {
 		{ID: "p1", Name: "Passkey", CreatedAt: time.Now().Add(-72 * time.Hour), LastUsedAt: &used},
 		{ID: "p2", Name: "Passkey", CreatedAt: time.Now()},
 	}
-	page := renderPage(t, ctx, Settings(nil, "", passkeys, "security"))
-	for _, want := range []string{"Passkeys", "Added 3d ago, last used 2h ago", "Added just now, never used", `hx-delete="/app/tiny-rocket-co/settings/passkeys/p1"`, "Add passkey", `data-passkey="add"`, `data-passkey-url="/app/tiny-rocket-co/settings/passkeys"`, "js/passkey.js"} {
+	page := renderPage(t, ctx, Settings(nil, "", passkeys, "", "security"))
+	for _, want := range []string{"Passkeys", "Added 3d ago · used 2h ago", "Added just now · never used", `href="/app/tiny-rocket-co/settings/account?tab=security&amp;passkey=p1"`, `hx-delete="/app/tiny-rocket-co/settings/passkeys/p1"`, "Add passkey", `data-passkey="add"`, `data-passkey-url="/app/tiny-rocket-co/settings/passkeys"`, "js/passkey.js"} {
 		if !strings.Contains(page, want) {
 			t.Fatalf("the security tab lacks %s", want)
 		}

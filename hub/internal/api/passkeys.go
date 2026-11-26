@@ -9,7 +9,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/service"
 )
 
-// PasskeysHandler lists and removes the passkeys of the signed-in user.
+// PasskeysHandler lists, renames and removes the passkeys of the signed-in
+// user.
 // Adding one is a ceremony in the browser: only the web adds passkeys.
 type PasskeysHandler struct {
 	passkeys *service.PasskeyService
@@ -45,6 +46,25 @@ func (h *PasskeysHandler) List(w http.ResponseWriter, r *http.Request) {
 		items = append(items, newPasskey(passkey))
 	}
 	JSON(w, http.StatusOK, PasskeyList{Items: items})
+}
+
+// PasskeyNameRequest is the body of PATCH /api/v1/account/passkeys/{id}.
+type PasskeyNameRequest struct {
+	Name string `json:"name"`
+}
+
+// Rename names one passkey of the user.
+func (h *PasskeysHandler) Rename(w http.ResponseWriter, r *http.Request) {
+	var request PasskeyNameRequest
+	if !Decode(w, r, &request) {
+		return
+	}
+	passkey, err := h.passkeys.Rename(ctxkeys.Session(r.Context()), r.PathValue("id"), request.Name)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, newPasskey(*passkey))
 }
 
 // Remove deletes one passkey, unless it is the user's last way in.

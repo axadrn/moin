@@ -123,21 +123,22 @@ Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Add passkey**
 ```
 
 - Your browser asks where to keep it. Pick your password manager to have it on every device.
+- Then moin asks for its name, filled in with your password manager's, like 1Password, or "Passkey" when moin does not know it. Keep it or type your own. Your password manager lists it under your hub's address, like `moin.run`.
 - moin emails you when a passkey is added, so one you did not add does not go unseen.
 - Adding one needs a sign-in from the last five minutes, any way in, or a confirmation with a passkey you have. A passkey lets clients in, so a stolen session cannot add its own.
 - Until you have one, every page asks: **Secure your account: add a passkey.**
 - On the sign-in page, **Sign in with a passkey**. No email to type: the passkey knows your account.
 
-## See and remove passkeys
+## See, rename and remove passkeys
 
-The card lists each passkey, when you added it and when it last signed you in. **Remove** ends one.
+The card lists each passkey by name, when you added it and when it last signed you in. **Rename** gives one a new name, 1 to 64 characters. **Remove** ends one.
 
 ```surfaces
-Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Remove**
+Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Rename** or **Remove**
 API: GET /api/v1/account/passkeys
 ```
 
-`DELETE /api/v1/account/passkeys/{id}` removes one. Your last way in stays: without GitHub, moin keeps your last passkey. Add another first.
+`PATCH /api/v1/account/passkeys/{id}` with `{"name": "Work laptop"}` renames one. `DELETE /api/v1/account/passkeys/{id}` removes one. Your last way in stays: without GitHub, moin keeps your last passkey. Add another first.
 
 ## Connect GitHub
 

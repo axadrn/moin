@@ -708,6 +708,41 @@ paths:
   /api/v1/account/passkeys/{id}:
     parameters:
       - $ref: '#/components/parameters/PasskeyID'
+    patch:
+      tags: [Passkeys]
+      operationId: renamePasskey
+      summary: Rename a passkey
+      description: 'The name is trimmed: 1 to 64 characters, plain text.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NameRequest'
+      responses:
+        '200':
+          description: The renamed passkey.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Passkey'
+        '400':
+          $ref: '#/components/responses/InvalidBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/OnboardedForbidden'
+          description: '`onboarding_required`, `forbidden` for a connection or CI token or a cookie request without a valid `X-CSRF-Token` header, `impersonation_read_only` during impersonation.'
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: '`not_found`. No passkey with this ID belongs to the account.'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+          description: '`validation_failed` with `fields.name`.'
+        '500':
+          $ref: '#/components/responses/Internal'
     delete:
       tags: [Passkeys]
       operationId: removePasskey
@@ -5079,7 +5114,7 @@ components:
           type: string
         name:
           type: string
-          description: Always "Passkey"; `created_at` and `last_used_at` tell passkeys apart.
+          description: What you call it. A new passkey is named after its password manager, like "1Password", or "Passkey" when that is unknown.
         created_at:
           type: string
           format: date-time

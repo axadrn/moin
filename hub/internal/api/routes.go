@@ -107,6 +107,7 @@ func Routes(h Handlers, m Middleware) []Route {
 		{"DELETE /api/v1/account/sessions/{id}", m.RequireOnboarded(h.Sessions.Revoke), NoToken},
 		{"DELETE /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.RevokeOthers), NoToken},
 		{"GET /api/v1/account/passkeys", m.RequireOnboarded(h.Passkeys.List), NoToken},
+		{"PATCH /api/v1/account/passkeys/{id}", m.RequireOnboarded(h.Passkeys.Rename), NoToken},
 		{"DELETE /api/v1/account/passkeys/{id}", m.RequireOnboarded(h.Passkeys.Remove), NoToken},
 		{"GET /api/v1/account/connections", m.RequireOnboarded(h.Connections.List), model.RightRead},
 		{"PATCH /api/v1/account/connections/{id}", m.RequireOnboarded(h.Connections.SetRights), NoToken},

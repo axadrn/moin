@@ -275,7 +275,7 @@ func newPasskeys(cfg *config.Config, users *repository.Users, email *service.Ema
 	ceremony := webauthn.TimeoutConfig{Enforce: true, Timeout: service.PasskeyCeremonyExpiry, TimeoutUVD: service.PasskeyCeremonyExpiry}
 	webAuthn, err := webauthn.New(&webauthn.Config{
 		RPID:                  appURL.Hostname(),
-		RPDisplayName:         build.Name,
+		RPDisplayName:         relyingPartyName(appURL),
 		RPOrigins:             []string{appURL.Scheme + "://" + appURL.Host},
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
@@ -290,6 +290,17 @@ func newPasskeys(cfg *config.Config, users *repository.Users, email *service.Ema
 		return service.NewPasskeyService(passkeys, users, email, nil)
 	}
 	return service.NewPasskeyService(passkeys, users, email, webAuthn)
+}
+
+// relyingPartyName is what a password manager calls the hub's passkeys:
+// its address without the scheme, like moin.run or hub.example.com, with
+// the port only when it is not the scheme's own. Every hub has its own.
+func relyingPartyName(appURL *url.URL) string {
+	port := appURL.Port()
+	if port == "" || (appURL.Scheme == "https" && port == "443") || (appURL.Scheme == "http" && port == "80") {
+		return appURL.Hostname()
+	}
+	return appURL.Host
 }
 
 func (a *App) Close() error {

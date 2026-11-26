@@ -57,6 +57,7 @@ The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and a
 | `DELETE /api/v1/account/sessions/{id}` | no token |
 | `DELETE /api/v1/account/sessions` | no token |
 | `GET /api/v1/account/passkeys` | no token |
+| `PATCH /api/v1/account/passkeys/{id}` | no token |
 | `DELETE /api/v1/account/passkeys/{id}` | no token |
 | `GET /api/v1/account/connections` | read |
 | `PATCH /api/v1/account/connections/{id}` | no token |
