@@ -13,6 +13,8 @@ Install the CLI on your Mac or Linux computer:
 curl -fsSL https://moin.example.com/cli.sh | sh
 ```
 
+The same command updates it. A CLI too old for your hub stops and tells you to run it.
+
 Then four steps, and your app is live.
 
 ## 1. Log in

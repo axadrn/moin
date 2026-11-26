@@ -14,6 +14,9 @@ func (m model) received(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case appsMsg:
 		return m.gotApps(msg)
 	case offlineMsg:
+		if client.IsClientOutdated(msg.err) {
+			return m.quitOutdated(msg.err)
+		}
 		m.offline = msg.err
 	case statusMsg:
 		return m.gotStatus(msg), nil
@@ -58,6 +61,9 @@ func (m model) received(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case noticeMsg:
 		m.say(string(msg))
 	case errMsg:
+		if client.IsClientOutdated(msg.err) {
+			return m.quitOutdated(msg.err)
+		}
 		m.fail(msg.err)
 	case undoMsg:
 		m.fail(msg.err)
@@ -70,6 +76,14 @@ func (m model) received(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.edited(msg)
 	}
 	return m, nil
+}
+
+// quitOutdated closes the TUI when the hub refuses this moin as too old.
+// The CLI prints the hub's message with the command that updates it, too
+// long for the footer.
+func (m model) quitOutdated(err error) (tea.Model, tea.Cmd) {
+	m.outdated = err
+	return m, tea.Quit
 }
 
 // gotApps keeps the apps. The first list loads the usage of the servers.

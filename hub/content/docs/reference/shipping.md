@@ -67,6 +67,10 @@ These steps are one list in `hub/internal/service/daemon_steps.go`. It only grow
 
 The hub only sends the order. The code that does it is in the daemon. [What the daemon does](/docs/concepts/how-moin-works#what-the-daemon-does)
 
+## The CLI and the TUI
+
+The hub refuses a CLI or TUI older than `MinClientVersion` in `hub/internal/middleware/client_version.go`. It answers `426` `client_outdated` with the command that updates it. A release that breaks older ones raises it to its own version.
+
 ## Images
 
 The hub is one image, `ghcr.io/axadrn/moin`.

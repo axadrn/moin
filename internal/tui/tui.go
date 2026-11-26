@@ -55,6 +55,9 @@ func Run(ctx context.Context, opts Options) error {
 	if ctx.Err() != nil {
 		return nil
 	}
+	if last, ok := final.(model); ok && last.outdated != nil {
+		return last.outdated
+	}
 	return err
 }
 
@@ -184,6 +187,7 @@ type model struct {
 	cpu       map[string][]float64
 	usage     map[string]*client.ServerMetricsNow
 	offline   error // the live stream broke
+	outdated  error // the hub refused this moin as too old
 
 	cur   screen
 	stack []screen

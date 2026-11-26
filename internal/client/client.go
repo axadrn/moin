@@ -593,6 +593,13 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.Code == "not_found"
 }
 
+// IsClientOutdated reports whether the hub refused this moin as too old.
+// The message says how to update.
+func IsClientOutdated(err error) bool {
+	var apiErr *Error
+	return errors.As(err, &apiErr) && apiErr.Code == "client_outdated"
+}
+
 // IsReadOnlyQuery reports whether a read query was refused because it
 // changes data.
 func IsReadOnlyQuery(err error) bool {
