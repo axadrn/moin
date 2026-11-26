@@ -1,0 +1,8 @@
+services:
+  web:
+    image: stirlingtools/stirling-pdf:${VERSION}
+    expose: ["8080"]
+    environment:
+      DISABLE_ADDITIONAL_FEATURES: "true"
+    volumes:
+      - ./data/configs:/configs

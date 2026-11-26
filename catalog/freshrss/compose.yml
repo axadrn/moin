@@ -1,0 +1,8 @@
+services:
+  web:
+    image: freshrss/freshrss:${VERSION}
+    expose: ["80"]
+    environment:
+      CRON_MIN: "*/20"
+    volumes:
+      - ./data:/var/www/FreshRSS/data

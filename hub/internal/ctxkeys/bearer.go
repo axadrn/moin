@@ -1,23 +1,22 @@
 package ctxkeys
 
-import "context"
+import (
+	"context"
 
-const BearerTokenKey contextKey = "bearer_token"
+	"github.com/axadrn/moin/hub/internal/model"
+)
 
-// WithBearer marks a request as authenticated by an Authorization bearer
-// token. No cookie is involved in such a request.
-func WithBearer(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, BearerTokenKey, token)
+const BearerKey contextKey = "bearer"
+
+// WithBearer marks a request as authenticated by a connection or a CI
+// token. Such a request has a user but no session.
+func WithBearer(ctx context.Context, bearer *model.Bearer) context.Context {
+	return context.WithValue(ctx, BearerKey, bearer)
 }
 
-// BearerToken returns the raw bearer token that authenticated the request, or
-// an empty string when the request used a cookie or no session.
-func BearerToken(ctx context.Context) string {
-	token, _ := ctx.Value(BearerTokenKey).(string)
-	return token
-}
-
-// IsBearer reports whether the request was authenticated by a bearer token.
-func IsBearer(ctx context.Context) bool {
-	return BearerToken(ctx) != ""
+// Bearer returns the connection or CI token that authenticated the request,
+// or nil for session and guest requests.
+func Bearer(ctx context.Context) *model.Bearer {
+	bearer, _ := ctx.Value(BearerKey).(*model.Bearer)
+	return bearer
 }

@@ -13,8 +13,8 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// secure sets how a server is reached; flags it does not get keep their
-// value.
+// secure shows how a server is reached, or sets it; flags it does not
+// get keep their value. Without flags it only shows.
 func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("servers secure", "servers secure <server> [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]").withYes()
 	tunnel := flags.String("tunnel", "", "on: visitors come through a Cloudflare Tunnel, no open port; off: ports 80 and 443")
@@ -39,6 +39,10 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return fmt.Errorf("no server %s", flags.Arg(0))
 	}
 	server := servers[index]
+	if *tunnel == "" && *ssh == "" && *firewall == "" {
+		printSecurity(stdout, server)
+		return nil
+	}
 	now := client.Security{Tunnel: server.Tunnel, SSH: server.SSH, Firewall: server.Firewall}
 	security := now
 	for _, setting := range []struct {
@@ -114,11 +118,13 @@ func printSecurity(w io.Writer, server client.Server) {
 	}
 }
 
-// integrations shows or stores the Cloudflare token and the Tailscale key.
+// integrations shows or stores the Cloudflare token, which the hub keeps,
+// and hands a server the Tailscale key, which only the server keeps.
 func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	// Help works without a login.
 	api, apiErr := apiClient()
-	flags := newFlags("integrations", "integrations, integrations cloudflare|tailscale with the key on stdin, or integrations rm cloudflare|tailscale [--yes]").withYes()
+	flags := newFlags("integrations", "integrations, integrations cloudflare|tailscale [--server <server>] with the key on stdin, or integrations rm cloudflare|tailscale [--server <server>] [--yes]").withYes()
+	server := flags.String("server", "", "the server that keeps the Tailscale key; needed with more than one")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -135,8 +141,8 @@ func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io
 		if stored.Cloudflare {
 			cloudflare = "set, account " + stored.CloudflareAccount
 		}
-		if stored.Tailscale {
-			tailscale = "set"
+		if len(stored.Tailscale.Servers) > 0 {
+			tailscale = "kept on " + keptOn(stored.Tailscale.Servers, stored.Tailscale.MissingOn)
 		}
 		table(stdout, []string{"KEY", "STATE"}, [][]string{{"cloudflare", cloudflare}, {"tailscale", tailscale}})
 		return nil
@@ -155,7 +161,7 @@ func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io
 		if err != nil {
 			return err
 		}
-		if (args[0] == "cloudflare" && !stored.Cloudflare) || (args[0] == "tailscale" && !stored.Tailscale) {
+		if (args[0] == "cloudflare" && !stored.Cloudflare) || (args[0] == "tailscale" && len(stored.Tailscale.Servers) == 0) {
 			done(stdout, "Nothing changed: no %s key is stored.", args[0])
 			return nil
 		}
@@ -184,14 +190,17 @@ func integrations(ctx context.Context, args []string, stdin io.Reader, stdout io
 	} else {
 		tailscale = &value
 	}
-	_, err = api.SetIntegrations(ctx, cloudflare, tailscale)
+	_, err = api.SetIntegrations(ctx, cloudflare, tailscale, *server)
 	if err != nil {
 		return err
 	}
-	if remove {
+	switch {
+	case remove:
 		done(stdout, "Removed the %s key.", args[0])
-	} else {
-		done(stdout, "Stored the %s key, encrypted.", args[0])
+	case args[0] == "tailscale":
+		done(stdout, "The server keeps the Tailscale key now; the hub does not.")
+	default:
+		done(stdout, "Stored the Cloudflare token, encrypted. The hub uses it to make tunnels and DNS records.")
 	}
 	return nil
 }

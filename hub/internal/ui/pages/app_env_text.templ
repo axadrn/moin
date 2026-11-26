@@ -16,7 +16,8 @@ templ envModes(appLink string, text bool) {
 	}})
 }
 
-// AppEnvText is every env var of an app as one .env text to edit. Saving
+// AppEnvText takes every env var of an app as one .env text. It starts
+// empty: values are write-only, so there is nothing to fill it with. Saving
 // shows what changes first; problem is why the text was refused.
 templ AppEnvText(appLink, text, problem string) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
@@ -37,6 +38,7 @@ templ AppEnvText(appLink, text, problem string) {
 						if problem != "" {
 							<p id="env-text-problem" class="moin-text moin-failed" role="alert">{ problem }</p>
 						}
+						<p class="moin-small moin-muted">Paste every env var the app keeps. A key that is not in the text is removed.</p>
 					</div>
 					<div class="moin-row" data-end>
 						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
@@ -45,6 +47,7 @@ templ AppEnvText(appLink, text, problem string) {
 					</div>
 				</form>
 			}
+			<p class="moin-small moin-muted">{ envWriteOnly }</p>
 		</section>
 	</div>
 }
@@ -58,7 +61,7 @@ func envTextAttributes(problem string) templ.Attributes {
 	return attributes
 }
 
-// AppEnvReview says which keys the text adds, changes and removes, and
+// AppEnvReview says which keys the text adds, replaces and removes, and
 // asks before it replaces the env vars. The values never show here.
 templ AppEnvReview(appLink, text string, change dotenv.Change) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
@@ -73,8 +76,8 @@ templ AppEnvReview(appLink, text string, change dotenv.Change) {
 					for _, key := range change.Added {
 						<li><span class="moin-mono"><span class="moin-live">+</span> { key }</span> <span class="moin-small moin-muted">new</span></li>
 					}
-					for _, key := range change.Changed {
-						<li><span class="moin-mono"><span class="moin-running">~</span> { key }</span> <span class="moin-small moin-muted">new value</span></li>
+					for _, key := range change.Replaced {
+						<li><span class="moin-mono"><span class="moin-running">~</span> { key }</span> <span class="moin-small moin-muted">replaced</span></li>
 					}
 					for _, key := range change.Removed {
 						<li><span class="moin-mono"><span class="moin-failed">-</span> { key }</span> <span class="moin-small moin-muted">removed</span></li>

@@ -1,6 +1,6 @@
 ---
 title: "Servers"
-description: "Add, watch, update and remove servers"
+description: "Add a server with one command, watch its CPU, memory and disk, update it and remove it."
 group: "Servers and data"
 order: 1
 ---
@@ -61,11 +61,12 @@ MCP: add_server
 curl -fsSL https://moin.example.com/install.sh | sh -s -- ins_…
 ```
 
-It installs Docker if it is missing. It installs the daemon as the `moin-daemon` service and connects it.
+It installs Docker if it is missing. It installs the daemon as the `moin-daemon` service and connects it. It writes `/etc/moin/rules` with every rule and what moin may do, unless the file is there. [Rules](/docs/guides/security#rules)
 
-- The name: 1 to 63 lowercase letters, digits or dashes, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …
+- The name: 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace. Leave it empty and moin names it `web-1`, `web-2` …
 - Not root? Put `sudo` before `sh`. The command works once. If the install stops halfway, get [a new install command](#a-new-install-command).
 - `MOIN_URL=http://127.0.0.1:8090` before `sh` makes the daemon dial that address instead of the hub's `APP_URL`, as on a server that runs the hub too ([one server](/docs/self-hosting#one-server)).
+- On hosted moin, the first server that connects starts your 30 days free. [Billing](/docs/guides/account#billing)
 
 ## See your servers
 
@@ -85,11 +86,11 @@ MCP: list_servers
 | **online** | the daemon is connected |
 | **offline** | the connection dropped: the daemon cannot reach moin |
 
-A server offline for two minutes sends an [alert](/docs/guides/alerts). So does a server that comes back. The API streams changes from `GET /api/v1/servers/events`.
+A server offline for 3 minutes sends an [alert](/docs/guides/alerts). So does a server that comes back. The API streams changes from `GET /api/v1/servers/events`.
 
 ## A new install command
 
-The install command shows once. Lost it, or moving the daemon to another server? Get a new one. It works once, within one hour. The old command and the old daemon's token stop working.
+The install command shows once. Lost it, or moving the daemon to another server? Get a new one. It works once, within one hour. The old command stops working at once. The old daemon's token stops when a daemon registers with the new one.
 
 ```surfaces
 Web: **Servers**, open the server, **New install command**
@@ -137,7 +138,7 @@ API: POST /api/v1/servers/{id}/update
 MCP: update_daemon
 ```
 
-A server with rules in `/etc/moin/rules` never updates from moin. Update it on the server ([CLI reference](/docs/reference/cli#daemon-updates)).
+A server with rules updates like any other.
 
 ## Remove a server
 
@@ -163,7 +164,7 @@ moin daemon uninstall --apps   # the apps and their data go too, for good
 
 | | `uninstall` | `uninstall --apps` |
 | --- | --- | --- |
-| `moin-daemon` service, `moin` binary, daemon state in `/var/lib/moin` | removed | removed |
+| `moin-daemon` service, `moin` binary, daemon state in `/var/lib/moin`, with the server's secrets | removed | removed |
 | apps and their data in `/var/lib/moin/apps` | keep running | removed with containers, images and volumes |
 | proxy, tunnel, firewall | stay | removed |
 | `/etc/moin/rules`, Docker | stay | stay |
@@ -171,6 +172,8 @@ moin daemon uninstall --apps   # the apps and their data go too, for good
 ## Good to know
 
 - **Disk space**: after every deploy and once a day the daemon removes images nothing uses and old build cache. What a rollback needs, your volumes and anything moin did not put there stay.
+- **A second server** has none of the bucket keys, registry logins and Tailscale key of the first. The Bucket, Registries and Integrations pages say which server lacks one. Enter it for that server. [Where your secrets live](/docs/guides/security#where-your-secrets-live)
+- **A server rebuilt from scratch** starts without env values and keys. Enter them again, then deploy.
 - Next: close every port with the [Cloudflare Tunnel and the firewall](/docs/guides/security).
 
 ## Under the hood
@@ -182,4 +185,4 @@ systemctl status moin-daemon    # does the daemon run?
 journalctl -u moin-daemon -f     # its log
 ```
 
-It keeps its state in `/var/lib/moin`: its token in `daemon.json` and every app under `apps/<app>`.
+It keeps its state in `/var/lib/moin`: its token in `daemon.json`, the server's secrets in `server.json`, and every app under `apps/<app>`, with its env in `app.env`.

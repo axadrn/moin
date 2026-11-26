@@ -5,18 +5,15 @@ package service
 import (
 	"context"
 	"errors"
-	"path"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/moin/protocol"
 )
 
 // Download is a copy of a database to download, straight from the app's
-// own bucket, never through the hub: Link is a signed link to
-// it there, valid 15 minutes.
+// own bucket, never through the hub: Link is a link to it there, signed by
+// the app's server, valid protocol.BackupLinkLife.
 type Download struct {
 	App      string
 	Database string
@@ -26,8 +23,6 @@ type Download struct {
 	Size     int64
 	Link     string
 }
-
-const downloadLinkLife = 15 * time.Minute
 
 // Download signs a link to a copy of a database: the newest, or the one
 // moment names.
@@ -57,17 +52,18 @@ func (s *AppService) Download(ctx context.Context, actor Actor, idOrName, databa
 	if copy == nil {
 		return nil, backup.missing(ErrNoCopy)
 	}
-	bucket, err := s.openAppBucket(app)
+	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
-	key := protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database) + "/" + protocol.CopyFile(copy.Copy, backup.Kind == protocol.DatabasePostgres)
-	name := app.Name + "-" + path.Base(protocol.DatabaseFolder(*bucket, app.Folder, app.ID, backup.Database)) + "-" + path.Base(key)
-	link, err := s3.NewPresignClient(bucketClient(*bucket)).PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket:                     aws.String(bucket.Bucket),
-		Key:                        aws.String(key),
-		ResponseContentDisposition: aws.String(`attachment; filename="` + name + `"`),
-	}, s3.WithPresignExpires(downloadLinkLife))
+	// The server signs the link with the bucket's key, which only it keeps.
+	ctx, cancel := context.WithTimeout(ctx, secretTimeout)
+	defer cancel()
+	var link protocol.BackupLinkResult
+	err = s.servers.Request(ctx, app.ServerID, protocol.TypeBackupLink, protocol.BackupLink{App: app.Folder, Database: backup.Database, Copy: copy.Copy, Name: app.Name}, &link)
+	if errors.Is(err, ErrServerOffline) {
+		return nil, &OfflineError{Server: server.Name}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +74,7 @@ func (s *AppService) Download(ctx context.Context, actor Actor, idOrName, databa
 		}
 	}
 	s.servers.record(actor, "backup.downloaded", "app", app.Name, map[string]string{"database": backup.Database, "copy": copy.Label})
-	return &Download{App: app.Name, Database: backup.Database, Copy: copy.Copy, Label: copy.Label, At: copy.At, Size: size, Link: link.URL}, nil
+	return &Download{App: app.Name, Database: backup.Database, Copy: copy.Copy, Label: copy.Label, At: copy.At, Size: size, Link: link.Link}, nil
 }
 
 // errorText is an error as people read it.

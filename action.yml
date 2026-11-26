@@ -1,5 +1,5 @@
 name: moin deploy
-description: Deploy with moin from GitHub Actions, the repo or an image built in CI.
+description: Deploy with moin from GitHub Actions, the pushed commit or an image built in CI.
 branding:
   icon: upload-cloud
   color: gray-dark
@@ -8,18 +8,18 @@ inputs:
     description: The hub URL.
     required: true
   token:
-    description: A personal API token with write access. Store it as a secret.
+    description: A CI token with the deploy right, best limited to the app. Store it as a secret.
     required: true
   app:
-    description: The app to deploy. Default x-moin.app in compose.yml or the repo name.
+    description: The app to deploy. Default the app that follows the repo, else the repo name.
     required: false
   image:
     description: Deploy this image, built and pushed earlier in the job, instead of the repo.
     required: false
-  dir:
-    description: The directory to deploy.
+  commit:
+    description: The commit whose compose.yml an image deploy takes. Default the commit of the run; empty for an app that follows no repo.
     required: false
-    default: .
+    default: ${{ github.sha }}
 runs:
   using: composite
   steps:
@@ -36,9 +36,10 @@ runs:
         MOIN_TOKEN: ${{ inputs.token }}
         APP: ${{ inputs.app }}
         IMAGE: ${{ inputs.image }}
-        DIR: ${{ inputs.dir }}
+        COMMIT: ${{ inputs.commit }}
       run: |
-        args=(deploy --yes --dir "$DIR")
+        args=(deploy --yes)
         [ -n "$IMAGE" ] && args+=(--image "$IMAGE")
+        [ -n "$IMAGE" ] && [ -n "$COMMIT" ] && args+=(--ref "$COMMIT")
         [ -n "$APP" ] && args+=("$APP")
         "$RUNNER_TEMP/moin" "${args[@]}"

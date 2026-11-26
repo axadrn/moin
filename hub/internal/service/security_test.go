@@ -134,21 +134,26 @@ func TestServerSecurity(t *testing.T) {
 		t.Fatalf("SSH for nobody: err = %v", err)
 	}
 	bad := "cf-bad"
-	if err := apps.SetIntegrations(ctx, owner, &bad, nil); !errors.Is(err, ErrCloudflareToken) {
+	if err := apps.SetIntegrations(ctx, owner, IntegrationsInput{CloudflareToken: &bad}); !errors.Is(err, ErrCloudflareToken) {
 		t.Fatalf("a token Cloudflare refuses: err = %v", err)
 	}
 	wrongKey := "nope"
-	if err := apps.SetIntegrations(ctx, owner, nil, &wrongKey); !errors.Is(err, ErrTailscaleKey) {
+	if err := apps.SetIntegrations(ctx, owner, IntegrationsInput{TailscaleKey: &wrongKey}); !errors.Is(err, ErrTailscaleKey) {
 		t.Fatalf("a key that is no Tailscale key: err = %v", err)
 	}
 	good, key := "cf-good", "tskey-auth-abc"
-	err = apps.SetIntegrations(ctx, owner, &good, &key)
+	err = apps.SetIntegrations(ctx, owner, IntegrationsInput{CloudflareToken: &good, TailscaleKey: &key})
 	if err != nil {
 		t.Fatal(err)
 	}
 	integrations, _ := apps.Integrations(owner.WorkspaceID)
-	if !integrations.Cloudflare || integrations.CloudflareAccount != "acc1" || !integrations.Tailscale {
+	if !integrations.Cloudflare || integrations.CloudflareAccount != "acc1" || len(integrations.Tailscale.On) != 1 || integrations.Tailscale.On[0].Server != "web-1" {
 		t.Fatalf("integrations = %+v", integrations)
+	}
+	var secret protocol.SecretSet
+	daemon.last(t, protocol.TypeSecretSet, &secret)
+	if secret != (protocol.SecretSet{Name: protocol.SecretTailscale, Value: "tskey-auth-abc"}) {
+		t.Fatalf("the Tailscale key went as %+v", secret)
 	}
 
 	app, err := apps.Create(owner, "blog", server.ID)
@@ -184,9 +189,14 @@ func TestServerSecurity(t *testing.T) {
 				var config protocol.ServerConfig
 				request.Decode(&config)
 				proxy := "direct"
-				if config.TunnelToken != "" {
-					proxy = "tunnel"
+				daemon.mu.Lock()
+				for _, message := range daemon.sent {
+					var secret protocol.SecretSet
+					if message.Type == protocol.TypeSecretSet && message.Decode(&secret) == nil && secret.Name == protocol.SecretTunnel {
+						proxy = map[bool]string{true: "tunnel", false: "direct"}[secret.Value != ""]
+					}
 				}
+				daemon.mu.Unlock()
 				answer, _ := protocol.NewMessage(protocol.TypeServerConfigResult, protocol.ServerConfigResult{Proxy: proxy, Firewall: config.Firewall, OpenPorts: []string{"41641/udp"}, TailscaleIP: "100.64.0.9"})
 				answer.RequestID = request.RequestID
 				apps.servers.Receive(server.ID, answer)
@@ -206,7 +216,7 @@ func TestServerSecurity(t *testing.T) {
 	}
 	// The token stays while a tunnel needs it to be deleted.
 	none := ""
-	if err := apps.SetIntegrations(ctx, owner, &none, nil); !errors.Is(err, ErrTunnelsOn) {
+	if err := apps.SetIntegrations(ctx, owner, IntegrationsInput{CloudflareToken: &none}); !errors.Is(err, ErrTunnelsOn) {
 		t.Fatalf("remove the token with a tunnel on: err = %v", err)
 	}
 	report := SecurityReport(*secured)
@@ -215,8 +225,13 @@ func TestServerSecurity(t *testing.T) {
 	}
 	var config protocol.ServerConfig
 	daemon.last(t, protocol.TypeServerConfig, &config)
-	if config.TunnelToken != "tunnel-token-123456" || config.TailscaleKey != "tskey-auth-abc" || config.SSH != protocol.SSHTailscale || !config.SSHOnTailscale || !config.Firewall {
+	if config.SSH != protocol.SSHTailscale || !config.SSHOnTailscale || !config.Firewall {
 		t.Fatalf("daemon config = %+v", config)
+	}
+	// The tunnel token went to the server once; the hub keeps none.
+	daemon.last(t, protocol.TypeSecretSet, &secret)
+	if secret != (protocol.SecretSet{Name: protocol.SecretTunnel, Value: "tunnel-token-123456"}) {
+		t.Fatalf("the tunnel token went as %+v", secret)
 	}
 	for _, call := range []string{"POST /accounts/acc1/cfd_tunnel", "PUT /accounts/acc1/cfd_tunnel/tun1/configurations", "POST /zones/zone1/dns_records", "PATCH /zones/zone1/settings/always_use_https"} {
 		if !fake.called(call) {
@@ -269,10 +284,15 @@ func TestServerSecurity(t *testing.T) {
 	if open.Tunnel || open.TunnelID != "" || !fake.called("DELETE /accounts/acc1/cfd_tunnel/tun1") {
 		t.Fatalf("turning the tunnel off: %+v, calls %v", open, fake.calls)
 	}
+	secret = protocol.SecretSet{}
+	daemon.last(t, protocol.TypeSecretSet, &secret)
+	if secret != (protocol.SecretSet{Name: protocol.SecretTunnel}) {
+		t.Fatalf("the server keeps the old tunnel token: %+v", secret)
+	}
 	if !fake.called("DELETE /zones/zone1/dns_records/rec1") || fake.called("DELETE /zones/zone1/dns_records/rec2") {
 		t.Fatalf("turning the tunnel off deletes only the record at the tunnel: %v", fake.calls)
 	}
-	if err := apps.SetIntegrations(ctx, owner, &none, nil); err != nil {
+	if err := apps.SetIntegrations(ctx, owner, IntegrationsInput{CloudflareToken: &none}); err != nil {
 		t.Fatalf("remove the token with the tunnels off: %v", err)
 	}
 	if integrations, _ := apps.Integrations(owner.WorkspaceID); integrations.Cloudflare {

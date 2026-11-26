@@ -2,39 +2,29 @@ package service
 
 import "errors"
 
-var errAPITokensNotConfigured = errors.New("api token revocation is not configured")
+var errBearersNotConfigured = errors.New("connections and ci tokens are not configured")
 
-// UseAPITokens lets RevokeAllAccess and RevokeOtherAccess revoke the personal
-// API tokens of a user. The application wires it once at startup.
-func (s *AuthService) UseAPITokens(tokens *APITokenService) {
-	s.apiTokens = tokens
+// UseBearers lets RevokeAllAccess end the connections and CI tokens of a
+// user, and a recovery key record the ones it ended. The application wires it once at startup.
+func (s *AuthService) UseBearers(connections *ConnectionService, ciTokens *CITokenService) {
+	s.connections, s.ciTokens = connections, ciTokens
 }
 
-// RevokeAllAccess ends every session and revokes every personal API token of
-// the user. Account recovery and the admin kill switch call it. Signing out
-// everywhere ends sessions only and keeps the tokens.
+// RevokeAllAccess ends every session, connection and CI token of the user.
+// The admin kill switch is its one caller; a recovery key ends them too, in
+// its own transaction (SignInWithRecoveryKey). Signing out everywhere and a
+// new email end sessions only: connections and CI tokens stay, and the
+// person removes them under Settings, Connections.
 func (s *AuthService) RevokeAllAccess(userID string) error {
 	err := s.RevokeAllSessions(userID)
 	if err != nil {
 		return err
 	}
-	return s.revokeAPITokens(userID)
-}
-
-// RevokeOtherAccess ends every session except currentSessionID and revokes
-// every personal API token of the user. Changing, setting and removing the
-// password call it.
-func (s *AuthService) RevokeOtherAccess(userID, currentSessionID string) error {
-	err := s.RevokeOtherSessions(userID, currentSessionID)
-	if err != nil {
+	if s.connections == nil || s.ciTokens == nil {
+		return errBearersNotConfigured
+	}
+	if err := s.connections.EndAllForUser(userID); err != nil {
 		return err
 	}
-	return s.revokeAPITokens(userID)
-}
-
-func (s *AuthService) revokeAPITokens(userID string) error {
-	if s.apiTokens == nil {
-		return errAPITokensNotConfigured
-	}
-	return s.apiTokens.RevokeAllForUser(userID)
+	return s.ciTokens.DeleteAllForUser(userID)
 }

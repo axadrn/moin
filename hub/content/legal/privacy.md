@@ -1,12 +1,12 @@
 ---
 title: Privacy Policy
 description: What the hosted moin service stores, why, where it lives and how to get rid of it
-lastUpdated: November 11, 2026
+lastUpdated: November 25, 2026
 ---
 
-Short version: moin stores what it needs to run your servers and apps, encrypts every secret, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
+Short version: moin stores what it needs to run your servers and apps, leaves your secrets on your own server, sets no tracking cookies, shows no ads and never sells your data. Your code, your apps and their data stay on your own servers and in your own bucket. Deleting your account or your workspace deletes what belongs to it.
 
-This policy covers the hosted moin service. A hub you host yourself sends us nothing about its users; you decide what it stores.
+This policy covers the hosted moin service. A hub you host yourself sends us nothing about its users; you decide what it stores. It also keeps the keys of its own GitHub App, encrypted like the keys below.
 
 ## Who we are
 
@@ -20,7 +20,7 @@ Legal basis: our legitimate interest in a secure, working service (Art. 6(1)(f) 
 
 ## Page views
 
-We count page views of our public pages (home, docs, changelog, apps, legal) with Umami on a server we run; never inside your workspace. Umami sets no cookies, uses your IP address only to tell the country and does not store it, and shows us only totals, such as which pages are read and which site sent a visitor. We do not use Google Analytics or any advertising network.
+We count page views of our public pages (home, docs, blog, changelog, catalog, compare, legal) with Umami on a server we run; never inside your workspace. Umami sets no cookies, uses your IP address only to tell the country and does not store it, and shows us only totals, such as which pages are read and which site sent a visitor. We do not use Google Analytics or any advertising network.
 
 Legal basis: our legitimate interest in knowing which pages help (Art. 6(1)(f) GDPR).
 
@@ -30,16 +30,19 @@ moin sets only cookies it needs to work, so there is no cookie banner:
 
 - **session_token** keeps you signed in, for up to 7 days.
 - **csrf_token** protects forms against forged requests.
-- **auth_email**, **oauth_state** and **github_next** remember a step for at most an hour while you sign in or connect GitHub.
+- **oauth_state** and **github_next** remember a step for at most an hour while you sign in or connect GitHub.
 - **pending_invitation** remembers an invitation you opened, for up to 7 days.
+- **passkey_ceremony** remembers a passkey sign-in or a passkey you add, for at most five minutes.
+- **github_name** carries your GitHub name to the first sign-in page, for at most 30 minutes.
+- **pending_approval** remembers a CLI or AI agent you are about to let in while you sign in, for at most 10 minutes.
 
 Your light or dark theme and a few view choices stay in your browser's local storage and are never sent to us.
 
 ## Your account
 
-For your account we store your email address and, if you add them, your name and avatar. You sign in with a link sent by email, or with GitHub if it is offered; with GitHub we ask GitHub for your verified email address and store only that. Sign-in links expire after 10 minutes. Sessions store the browser that opened them, so you can see and end them in the settings. Sessions, API tokens and sign-in links are stored only as cryptographic hashes.
+For your account we store your email address and, if you add them, your name and avatar. You sign in with GitHub or a passkey. When you sign in with GitHub, we ask GitHub for your account's ID, its username and its verified primary email address, and store the ID and the username with your account. If you add a passkey, we store its public key and when you added and last used it; the secret half never leaves your device. Sessions store the browser that opened them, so you can see and end them in the settings. A connection, such as the CLI on a computer or an AI agent, stores the name of the program, its workspace, its rights and when it was last used. A CI token stores its name, its workspace, its app if you limit it to one, its rights and when it expires. Sessions, the tokens of connections, CI tokens and recovery keys are stored only as cryptographic hashes.
 
-We send only emails that belong to the service: sign-in links, invitations, changes to your account, and important changes to moin. No newsletters or marketing emails.
+We send only emails that belong to the service: a welcome, invitations, changes to your account such as a new email or passkey, alerts about your servers and apps, and important changes to moin. No newsletters or marketing emails.
 
 Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
@@ -50,8 +53,10 @@ To run your apps moin stores:
 - **Servers**: name, hostname, operating system, architecture, daemon version, firewall and security settings, and the IP addresses of the server. The daemon token is stored as a hash.
 - **Apps**: name, domains and their settings, deploy history with its logs, what the daemon detected about the app (such as its services, port and SQLite databases), and the status of its backups.
 - **GitHub**: if you connect the moin GitHub App, the installation and its account name, the repo and branch of each app, and the commit of each deploy.
-- **Code**: never. `moin deploy` puts your code into your own bucket through a link moin signs, and your server deletes it there after downloading. Deploys from GitHub go from GitHub straight to your server.
-- **Secrets**: env vars, registry passwords, the secret key of your backup bucket, your Cloudflare API token, Cloudflare tunnel tokens and your Tailscale auth key are encrypted with AES-256-GCM before they are stored. Deploy hook tokens are stored as SHA-256 hashes, protection passwords as bcrypt hashes.
+- **Code**: never. A deploy goes from GitHub, or from your registry, straight to your server.
+- **Secrets**: env values, registry passwords, the secret key of your backup bucket, Cloudflare tunnel tokens and your Tailscale auth key live only on your server. moin passes each one on once and keeps its name and when it changed, never the value. It also keeps your bucket's endpoint, name, folder and access key ID, and each registry's host and username.
+- **Keys moin uses itself**: your Cloudflare API token and your alert targets (Slack and Discord webhooks, Telegram bot tokens, webhook URLs and the webhook signing secret), encrypted with AES-256-GCM. Deploy hook tokens are stored as SHA-256 hashes, app passwords as bcrypt hashes.
+- **Alerts**: where each alert goes and which events it sends, and whether you get alerts by email.
 
 Your apps, their files and their databases live on your servers, not with us. When you open the logs or the data of an app, moin fetches them from your server for that one view and does not keep them. Backups go from your server straight to the bucket you configure, never through moin.
 
@@ -63,7 +68,7 @@ Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
 ## Activity log
 
-Each workspace keeps a log of who changed what, so a team can see who deployed, restored or changed a setting. Each entry holds the time, the member's email or the API token's name, how the change came in (web, CLI, terminal UI, API, MCP, GitHub or a deploy hook), the IP address and browser or program of the request, and what changed. It never holds env var values, secrets, the values in your database or your SQL; a SQL change shows only its kind and tables, such as "UPDATE on orders". Every member of the workspace sees the log; only admins and owners see IP addresses and browsers.
+Each workspace keeps a log of who changed what, so a team can see who deployed, restored or changed a setting. Each entry holds the time, the member's email or the name of the connection or CI token, how the change came in (web, CLI, terminal UI, API, MCP, GitHub or a deploy hook), the IP address and browser or program of the request, and what changed. It never holds env var values, secrets, the values in your database or your SQL; a SQL change shows only its kind and tables, such as "UPDATE on orders". Every member of the workspace sees the log; only admins and owners see IP addresses and browsers.
 
 The log stays as long as the workspace exists. When you delete your account, your email stays on your earlier entries, so the team still knows who made them.
 
@@ -71,7 +76,7 @@ Legal basis: our and your team's legitimate interest in a secure, accountable se
 
 ## Support access
 
-To help with a problem, our support team can open your account as you see it. While they do, moin hides env var values, the data in your databases and the logs of your apps. When such a visit starts and ends is recorded in our own log, which is kept for 180 days.
+To help with a problem, our support team can open your account as you see it. While they do, moin hides the data in your databases and the logs of your apps. Env values are not on the hub at all. When such a visit starts and ends is recorded in our own log, which is kept for 180 days.
 
 Legal basis: the contract with you and our legitimate interest in a secure service (Art. 6(1)(b) and (f) GDPR).
 
@@ -104,7 +109,7 @@ We share data only with the services that run moin for us, and only what each on
 | Hetzner Online (EU) | Hosts the hub | Everything moin stores, on our server |
 | Cloudflare (USA) | Protects the site, sends our emails, stores files and a copy of our database | Every request to the site, your email address and the emails we send you, your avatar, a copy of our database |
 | Stripe (USA and EU) | Payments, tax and invoices | Your email address and what you enter at checkout |
-| GitHub (USA) | Sign-in with GitHub and the moin GitHub App, if you use them | What you allow on GitHub; moin reads your email address and the repos you chose |
+| GitHub (USA) | Sign-in with GitHub and the moin GitHub App | What you allow on GitHub; moin reads your account ID, username and email address, and the repos you chose |
 
 Umami runs on a server we control, so no other company gets the page views.
 
@@ -116,8 +121,8 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 
 ## How long we keep data
 
-- **Account**: while it exists. Deleting your account deletes your profile, your avatar, your sessions, your API tokens and the invitations you sent, and takes you out of every workspace. It does not delete workspaces you share with others: hand them over or delete them first if you are their only owner.
-- **Workspace**: while it exists. Deleting a workspace deletes its servers, apps, deploys, env vars, integrations, invitations and activity log. A workspace with a subscription can be deleted once the subscription has ended.
+- **Account**: while it exists. Deleting your account deletes your profile, your avatar, your sessions, your connections, your CI tokens and the invitations you sent, and takes you out of every workspace. It does not delete workspaces you share with others: hand them over or delete them first if you are their only owner.
+- **Workspace**: while it exists. Deleting a workspace deletes its servers, apps, deploys, the names of its env vars, alert targets, integrations, invitations and activity log. A workspace with a subscription can be deleted once the subscription has ended.
 - **Activity log**: as long as its workspace. Your email stays on your entries in the workspaces that remain after you delete your account.
 - **Invitations**: deleted 180 days after they were sent.
 - **Support log**: 180 days.
@@ -133,7 +138,7 @@ You can ask for access to your data, a copy of it in a common format, its correc
 
 ## Security
 
-Secrets are encrypted, tokens and passwords are stored only as hashes, and the server has no open port: traffic reaches it only through Cloudflare. No system is perfectly secure, though. If we learn that your data was exposed, we tell you without delay.
+Your secrets stay on your server. The few keys moin uses itself are encrypted, tokens and passwords are stored only as hashes, and our server has no open port: traffic reaches it only through Cloudflare. No system is perfectly secure, though. If we learn that your data was exposed, we tell you without delay.
 
 ## Age
 

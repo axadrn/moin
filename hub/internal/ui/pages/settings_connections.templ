@@ -1,0 +1,277 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/build"
+)
+
+// SettingsConnections is Settings, Connections: every client you let in
+// from the browser, the CI tokens of the workspace, and a new CI token.
+// A row opens the page of one, where its rights change and it goes.
+templ SettingsConnections(view ConnectionsView) {
+	{{ base := ctxkeys.AppBasePath(ctx) }}
+	@layouts.App("Connections · Settings") {
+		@panelPage() {
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Settings", Href: base + "/settings"}, Title: "Connections"})
+			@ConfirmCard(view.Confirm)
+			<div id="ci-token-reveal" class="moin-hide-empty"></div>
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Connections</h2>
+				</div>
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						if len(view.Connections) == 0 {
+							@components.Item(components.ItemProps{}) {
+								<p class="moin-small moin-muted">Nothing is connected. Run <span class="moin-mono">{ build.Name } login</span> to connect this computer.</p>
+							}
+						}
+						for _, connection := range view.Connections {
+							@components.Item(components.ItemProps{Href: base + "/settings/connections/" + linkID(connection.ID), Name: connection.Label(), Note: view.connectionNote(connection), Attrs: templ.Attributes{"data-connection-row": linkID(connection.ID)}})
+						}
+					}
+				}
+			</section>
+			@CITokenList(view)
+			@CITokenCreate(view)
+		}
+	}
+}
+
+// CITokenList is the CI tokens of the workspace you see.
+templ CITokenList(view ConnectionsView) {
+	{{ base := ctxkeys.AppBasePath(ctx) }}
+	{{ user := ctxkeys.User(ctx) }}
+	<section id="ci-token-list" class="moin-section" hx-swap-oob="true">
+		<div class="moin-section-head">
+			<h2>CI tokens</h2>
+		</div>
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				if len(view.CITokens) == 0 {
+					@components.Item(components.ItemProps{}) {
+						<p class="moin-small moin-muted">No CI tokens yet.</p>
+					}
+				}
+				for _, token := range view.CITokens {
+					@components.Item(components.ItemProps{Href: base + "/settings/ci-tokens/" + linkID(token.ID), Name: token.Name, Note: ciTokenNote(token, user.ID, view.Now), Attrs: templ.Attributes{"data-ci-token-row": linkID(token.ID)}})
+				}
+			}
+		}
+	</section>
+}
+
+// CITokenCreate is the card that makes a CI token. A successful create
+// replaces it, which empties the form.
+templ CITokenCreate(view ConnectionsView) {
+	<div id="ci-token-create" hx-swap-oob="true">
+		@components.Card(components.CardProps{Title: "New CI token"}) {
+			@CITokenCreateForm(view, false)
+		}
+	</div>
+}
+
+// CITokenCreateForm is the form of a new CI token. With oob it replaces the
+// form on the page, to show what is wrong with it.
+templ CITokenCreateForm(view ConnectionsView, oob bool) {
+	{{ form := view.Form }}
+	<form
+		id="ci-token-form"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="moin-stack"
+		data-gap="4"
+		hx-post={ ctxkeys.AppBasePath(ctx) + "/settings/ci-tokens" }
+		hx-swap="none"
+		hx-disable="find button[type='submit']"
+	>
+		@components.CSRF()
+		<div class="moin-grid" data-cols="2">
+			@formField("Name", "ci-token-name", "", form.Errors["name"]) {
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "ci-token-name", "name": "name", "type": "text", "value": form.Name, "placeholder": "Like shop deploy", "required": true, "maxlength": "64", "autocomplete": "off", "aria-invalid": ariaInvalid(form.Errors["name"]), "aria-describedby": "ci-token-name-hint"}})
+			}
+			@formField("Expires", "ci-token-expiry", "", form.Errors["expiry"]) {
+				@components.Select(components.SelectProps{ID: "ci-token-expiry", Name: "expiry", Label: "Expires", Options: ciTokenExpiryOptions, Value: form.Expiry})
+			}
+			@formField("App", "ci-token-app", "", form.Errors["app"]) {
+				@components.Select(components.SelectProps{ID: "ci-token-app", Name: "app", Label: "App", Options: view.appOptions(), Value: form.App})
+			}
+		</div>
+		@components.List() {
+			@rightsFields("ci-token-right", form.Rights)
+		}
+		<div class="moin-row" data-end>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+				Create CI token
+			}
+		</div>
+	</form>
+}
+
+// rightsFields are the switches of the rights inside a form, named rights:
+// read on and fixed, the others as given.
+templ rightsFields(prefix string, rights model.Rights) {
+	@components.Item(components.ItemProps{For: rightSwitchID(prefix, model.RightRead), Name: model.RightRead.Label()}) {
+		@components.Switch(components.SwitchProps{ID: rightSwitchID(prefix, model.RightRead), Checked: true, Disabled: true})
+	}
+	for _, right := range editableRights {
+		@components.Item(components.ItemProps{For: rightSwitchID(prefix, right), Name: right.Label()}) {
+			@components.Switch(components.SwitchProps{ID: rightSwitchID(prefix, right), Name: "rights", Value: right.Name(), Checked: rights.Has(right)})
+		}
+	}
+}
+
+// CITokenReveal shows a new CI token once, at the top of the page, until
+// the page is left.
+templ CITokenReveal(raw string) {
+	<div id="ci-token-reveal" class="moin-hide-empty" hx-swap-oob="true">
+		@components.Card(components.CardProps{Title: "Copy your new CI token"}) {
+			@components.Command(components.CommandProps{Text: raw})
+			<p class="moin-small moin-muted">
+				It shows only this once.
+			</p>
+		}
+	</div>
+}
+
+// SettingsConnection is the page of one connection: what it is, its rights,
+// each switch saving itself, and Remove at the end.
+templ SettingsConnection(view ConnectionView) {
+	{{ base := ctxkeys.AppBasePath(ctx) }}
+	{{ connection := view.Connection }}
+	{{ path := base + "/settings/connections/" + linkID(connection.ID) }}
+	@layouts.App(connection.Label() + " · Connections") {
+		@panelPage() {
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Connections", Href: base + "/settings/connections"}, Title: connection.Label()})
+			@ConfirmCard(view.Confirm)
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@factRow("Workspace", view.WorkspaceName)
+					@factRow("Connected", agoNote(connection.CreatedAt, view.Now))
+					@factRow("Last used", usedNote(connection.LastUsedAt, view.Now))
+				}
+			}
+			@components.Card(components.CardProps{Title: "Rights"}) {
+				@components.List() {
+					@components.Item(components.ItemProps{For: "connection-right-read", Name: model.RightRead.Label()}) {
+						@components.Switch(components.SwitchProps{ID: "connection-right-read", Checked: true, Disabled: true})
+					}
+					for _, right := range editableRights {
+						@RightSwitch(path, "connection-right", right, connection.Rights.Has(right))
+					}
+				}
+			}
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove", Attrs: templ.Attributes{
+						"hx-delete":  path,
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Remove " + connection.Label() + "? It stops working right away.",
+					}})
+				}
+			}
+		}
+	}
+}
+
+// RightSwitch is one right of a connection or CI token, a switch that saves
+// itself at path/rights/<right> and answers itself as stored.
+templ RightSwitch(path, prefix string, right model.Rights, on bool) {
+	@components.Item(components.ItemProps{Form: true, For: rightSwitchID(prefix, right), Name: right.Label(), Attrs: templ.Attributes{"id": rightSwitchID(prefix, right) + "-form", "hx-post": path + "/rights/" + right.Name(), "hx-trigger": "change", "hx-target": "this", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+		@components.CSRF()
+		@components.Switch(components.SwitchProps{ID: rightSwitchID(prefix, right), Name: "on", Value: "1", Checked: on})
+	}
+}
+
+// SettingsCIToken is the page of one CI token: what it is, its rights
+// (switches for its maker), and Remove at the end.
+templ SettingsCIToken(view CITokenView) {
+	{{ base := ctxkeys.AppBasePath(ctx) }}
+	{{ token := view.Token }}
+	{{ path := base + "/settings/ci-tokens/" + linkID(token.ID) }}
+	@layouts.App(token.Name + " · Connections") {
+		@panelPage() {
+			@components.Header(components.HeaderProps{Back: components.Back{Label: "Connections", Href: base + "/settings/connections"}, Title: token.Name})
+			if view.Mine {
+				@ConfirmCard(view.Confirm)
+			}
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@factRow("Token", "pat_"+token.Prefix+"…")
+					if token.AppName != nil {
+						@factRow("App", *token.AppName)
+					} else {
+						@factRow("App", "Every app")
+					}
+					@factRow("Made by", token.MakerName)
+					@factRow("Made", agoNote(token.CreatedAt, view.Now))
+					@factRow("Last used", usedNote(token.LastUsedAt, view.Now))
+					@factRow("Expires", expiresNote(token.ExpiresAt, view.Now))
+				}
+			}
+			@components.Card(components.CardProps{Title: "Rights"}) {
+				@components.List() {
+					@components.Item(components.ItemProps{For: "ci-token-right-read", Name: model.RightRead.Label()}) {
+						@components.Switch(components.SwitchProps{ID: "ci-token-right-read", Checked: true, Disabled: true})
+					}
+					for _, right := range editableRights {
+						if view.Mine {
+							@RightSwitch(path, "ci-token-right", right, token.Rights.Has(right))
+						} else {
+							@components.Item(components.ItemProps{For: rightSwitchID("ci-token-right", right), Name: right.Label()}) {
+								@components.Switch(components.SwitchProps{ID: rightSwitchID("ci-token-right", right), Checked: token.Rights.Has(right), Disabled: true})
+							}
+						}
+					}
+				}
+			}
+			@components.Card(components.CardProps{}) {
+				@components.List() {
+					@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove", Attrs: templ.Attributes{
+						"hx-delete":  path,
+						"hx-swap":    "none",
+						"hx-disable": "this",
+						"hx-confirm": "Remove " + token.Name + "? Requests with it stop right away.",
+					}})
+				}
+			}
+		}
+	}
+}
+
+// ConfirmCard asks the person to confirm before more rights or a new CI
+// token, as the approval of a login does: with the passkey, which counts
+// for five minutes, or without one by signing in again, any way in.
+// Turning a right off and removing never ask.
+templ ConfirmCard(confirm ConfirmView) {
+	{{ base := ctxkeys.AppBasePath(ctx) }}
+	if confirm.Needed {
+		@components.Card(components.CardProps{Title: "Confirm it's you"}) {
+			<form method="post" action={ templ.SafeURL(confirmAction(base, confirm.Passkey)) } class="moin-stack" data-gap="3">
+				@components.CSRF()
+				if confirm.Passkey {
+					<p class="moin-small moin-muted">More rights and new CI tokens need your passkey. It counts for five minutes.</p>
+					<input type="hidden" name="passkey" value=""/>
+					<input type="hidden" name="next" value={ confirm.Next }/>
+					<p class="moin-message" data-state="failed" role="alert" data-passkey-error hidden?={ confirm.Error == "" }>{ confirm.Error }</p>
+					@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"type": "button", "data-passkey": "confirm", "data-passkey-url": base + "/settings/connections/confirm"}}) {
+						Confirm with passkey
+					}
+				} else {
+					<p class="moin-small moin-muted">More rights and new CI tokens need a sign-in from the last five minutes. Any way in counts.</p>
+					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+						Sign in again
+					}
+				}
+			</form>
+		}
+		if confirm.Passkey {
+			@passkeyScript()
+		}
+	}
+}

@@ -11,7 +11,8 @@ moin is in beta. It runs real sites today. There are no dates: "soon" is shortly
 
 On every surface: web, CLI, terminal UI, API and MCP.
 
-- **Deploys** from your folder, GitHub or CI, with or without a Dockerfile. A failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
+- **Deploys** from GitHub or CI, with or without a Dockerfile. A failed deploy brings the last good one back. [Deploy](/docs/guides/deploy)
+- **Your compose file**: see and download the one moin runs, to run your app anywhere. [Compose](/docs/guides/compose#the-compose-file-moin-runs)
 - **Backups** of every SQLite and Postgres database in your own bucket, on the schedule you pick. A check every day that a copy restores. [Backups](/docs/guides/backups)
 - **Data**: browse, edit and query the live database. [Data](/docs/guides/data)
 - **Domains** with HTTPS and a password, and an [instant address](/docs/guides/domains#instant-address) after the first deploy. [Domains](/docs/guides/domains)
@@ -23,11 +24,12 @@ On every surface: web, CLI, terminal UI, API and MCP.
 - **Metrics**: CPU, memory, disk and network of every server and app, up to 30 days back. [Metrics](/docs/guides/metrics)
 - **More than one bucket**, one per app if you like. [Bucket](/docs/guides/bucket#more-than-one-bucket)
 - **Updates in one click** for a self-hosted moin; daemons update themselves. [Self-hosting](/docs/self-hosting#updates)
-- **Env vars** as fields or one `.env` text. [Env vars](/docs/guides/env)
+- **Env vars** as fields or one `.env` text, kept only on your server. [Env vars](/docs/guides/env)
 - **Terminal UI** for the daily work. [Terminal UI](/docs/reference/tui)
-- **Security**: Cloudflare Tunnel, SSH only on Tailscale, a firewall and a rules file on your server. [Security](/docs/guides/security)
+- **Security**: Cloudflare Tunnel, SSH only on Tailscale, a firewall and a rules file on your server the hub cannot change. Signed daemon updates. Every request of the hub in the server's journal. Env values, bucket keys and registry logins live only there. [Security](/docs/guides/security)
+- **Sign-in** with GitHub or a passkey. The CLI, the TUI and AI agents connect in the browser, each with its own rights; AI agents through OAuth. CI gets a CI token. [Account](/docs/guides/account)
 - **Team and activity**: who changed what, to the second. [Activity](/docs/guides/activity)
-- **Self-hosting**, free, every feature, one command. [Self-hosting](/docs/self-hosting)
+- **Self-hosting**, free, every feature, one command. Its GitHub App in one click. [Self-hosting](/docs/self-hosting)
 
 ## Soon
 
@@ -36,12 +38,9 @@ On every surface: web, CLI, terminal UI, API and MCP.
 
 ## Later
 
-Zero trust: even someone in full control of moin can't read your data or command your servers. [#16](https://github.com/axadrn/moin/issues/16)
+Zero trust: even someone in full control of moin can't read your data or command your servers. Today the rules on your server narrow what such a person can do, but not to nothing: [If someone breaks into the hub](/docs/guides/security#if-someone-breaks-into-the-hub). [#16](https://github.com/axadrn/moin/issues/16)
 
-- **Bucket keys only on your servers**: moin knows the bucket's name, never its key.
-- **Secrets encrypted end to end**: only your servers can read your env vars.
 - **Signed commands**: your server only obeys changes signed by a key on your own device.
-- **Signed daemon updates**: your server checks every new daemon before it runs it.
 
 ## moin next
 

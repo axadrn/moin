@@ -1,26 +1,13 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"log/slog"
-	"net"
-	"net/http"
-	"net/netip"
-	"path"
-	"strings"
 	"sync"
-	"syscall"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
-	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/moin/hub/internal/repository"
-	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -34,8 +21,6 @@ const (
 var (
 	ErrBackupEndpoint  = errors.New("the endpoint must be an https:// URL, or empty for AWS S3")
 	ErrBackupBucket    = errors.New("bucket, access key and secret key are required")
-	ErrBackupAccess    = errors.New("moin could not write to the bucket with these keys")
-	ErrBucketPrivate   = errors.New("the endpoint points to a private or local address: moin only reaches buckets on the public internet")
 	ErrNoBackups       = errors.New("backups are not set up: add a bucket first")
 	ErrRestoreTarget   = errors.New("pick a moment to go back to")
 	ErrMoment          = errors.New("there is no such moment: pick one from the list")
@@ -44,103 +29,21 @@ var (
 	ErrRestoreRunning  = errors.New("a restore of this app runs: wait until it is done")
 	ErrRestoreNotFound = errors.New("there is no such restore: it is older than a week, or of another app")
 	ErrNoCopy          = errors.New("there is no copy yet: the first one is taken within a minute of a deploy with a bucket")
-	ErrScheduleInFile  = errors.New("the backup schedule is set in compose.yml: change it there and deploy")
 	ErrBackupEvery     = errors.New("how often: every 15 minutes, hourly or daily")
 	ErrBackupKeep      = errors.New("keep: 1, 3, 7 or 30 days")
 )
 
-// AllowOnlyPublicBuckets makes the bucket check refuse private and local
-// addresses. The hosted hub turns it on: otherwise a user could
-// make it call into its own network. A self-hosted one may use a bucket
-// next to it.
-func (s *AppService) AllowOnlyPublicBuckets() { s.publicBucketsOnly = true }
+// AllowOnlyPublicAddresses makes the uptime checks refuse private and
+// local addresses. The hosted hub turns it on: otherwise a user could make
+// it call into its own network. A self-hosted one may check an app next
+// to it.
+func (s *AppService) AllowOnlyPublicAddresses() { s.publicOnly = true }
 
-// checkBucket writes and deletes a small object in the workspace's folder,
-// which needs the same rights as backups. publicOnly refuses addresses that
-// are not on the public internet.
-func checkBucket(ctx context.Context, bucket protocol.Bucket, publicOnly bool) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	client := bucketClient(bucket)
-	if publicOnly {
-		client = s3.New(client.Options(), func(options *s3.Options) {
-			options.HTTPClient = publicHTTPClient()
-			// A refused address stays refused: do not try it again.
-			options.Retryer = retry.NewStandard(func(retries *retry.StandardOptions) {
-				refused := retry.IsErrorRetryableFunc(func(err error) aws.Ternary {
-					if errors.Is(err, ErrBucketPrivate) {
-						return aws.FalseTernary
-					}
-					return aws.UnknownTernary
-				})
-				retries.Retryables = append([]retry.IsErrorRetryable{refused}, retries.Retryables...)
-			})
-		})
-	}
-	key := strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace, "."+build.Name+"-check"), "/")
-	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte("moin"))})
-	if err != nil {
-		return err
-	}
-	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(key)})
-	return err
-}
-
-// publicHTTPClient connects only to public addresses. The check runs when
-// the connection opens, after DNS: a name that points inside cannot slip
-// past it. It goes without a proxy, so the check sees the bucket itself.
-func publicHTTPClient() *awshttp.BuildableClient {
-	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: refusePrivate}
-	return awshttp.NewBuildableClient().WithTransportOptions(func(transport *http.Transport) {
-		transport.Proxy = nil
-		transport.DialContext = dialer.DialContext
-	})
-}
-
-// sharedNetwork is 100.64.0.0/10: carrier networks and Tailscale.
-var sharedNetwork = netip.MustParsePrefix("100.64.0.0/10")
-
-// refusePrivate stops a connection to loopback, private, link-local,
-// shared or unspecified addresses, like 127.0.0.1, 10.0.0.5, 169.254.169.254
-// or 0.0.0.0.
-func refusePrivate(network, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return err
-	}
-	ip, err := netip.ParseAddr(host)
-	if err != nil {
-		return err
-	}
-	ip = ip.Unmap()
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() || sharedNetwork.Contains(ip) {
-		return ErrBucketPrivate
-	}
-	return nil
-}
-
-func bucketClient(bucket protocol.Bucket) *s3.Client {
-	endpoint := bucket.Endpoint
-	if endpoint == "" {
-		region := bucket.Region
-		if region == "" || region == "auto" {
-			region = "us-east-1"
-		}
-		endpoint = "https://s3." + region + ".amazonaws.com"
-	}
-	return s3.New(s3.Options{
-		Region:       bucket.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(bucket.AccessKey, bucket.SecretKey, ""),
-		BaseEndpoint: aws.String(endpoint),
-		UsePathStyle: bucket.Endpoint != "",
-	})
-}
-
-// backupConfig is what the daemon of a server gets: the default bucket in
-// plain text, the bucket of each of its apps that uses another one, and
-// the schedule of each; nothing without a bucket. An app whose bucket
-// cannot be opened is paused, the others go on. An error means none of
-// it can be told: half a config would stop or prune backups.
+// backupConfig is what the daemon of a server gets: the default bucket,
+// the bucket of each of its apps that uses another one, and the schedule
+// of each; nothing without a bucket. The server fills in the secret keys
+// it keeps; an app whose bucket key the server does not keep is paused,
+// the others go on.
 func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.BackupConfig, error) {
 	bucket, err := s.apps.DefaultBucket(workspaceID)
 	if errors.Is(err, repository.ErrNoBucket) {
@@ -149,36 +52,51 @@ func (s *AppService) backupConfig(workspaceID, serverID string) (protocol.Backup
 	if err != nil {
 		return protocol.BackupConfig{}, err
 	}
-	open, err := s.openBucket(bucket)
+	index, err := s.servers.secretsIndex(workspaceID)
 	if err != nil {
 		return protocol.BackupConfig{}, err
 	}
-	config := protocol.BackupConfig{Bucket: open, Schedules: map[string]protocol.Schedule{}}
+	config := protocol.BackupConfig{Bucket: daemonBucket(bucket), Schedules: map[string]protocol.Schedule{}}
 	apps, err := s.apps.ListByWorkspaceID(workspaceID)
 	if err != nil {
 		return protocol.BackupConfig{}, err
 	}
 	for _, app := range apps {
-		if app.ServerID == serverID {
-			config.Schedules[app.Folder] = scheduleOf(&app)
-		}
-		if app.ServerID != serverID || app.BucketID == nil || *app.BucketID == bucket.ID {
+		if app.ServerID != serverID {
 			continue
 		}
-		own, err := s.openAppBucket(&app)
+		config.Schedules[app.Folder] = scheduleOf(&app)
+		own, err := s.appBucket(&app)
 		if err != nil {
+			return protocol.BackupConfig{}, err
+		}
+		if !index.has(serverID, protocol.BucketSecret(own.ID)) {
 			if config.Paused == nil {
 				config.Paused = map[string]string{}
 			}
-			config.Paused[app.Folder] = "the bucket of " + app.Name + " cannot be opened: " + err.Error()
+			config.Paused[app.Folder] = missingBucketKey(index, serverID, own.Name).Error()
+		}
+		if own.ID == bucket.ID {
 			continue
 		}
 		if config.AppBuckets == nil {
 			config.AppBuckets = map[string]*protocol.Bucket{}
 		}
-		config.AppBuckets[app.Folder] = own
+		config.AppBuckets[app.Folder] = daemonBucket(own)
 	}
 	return config, nil
+}
+
+// missingBucketKey says that a server keeps no key for a bucket, and where
+// to enter it.
+func missingBucketKey(index secretsIndex, serverID, bucket string) error {
+	name := serverID
+	for _, server := range index.servers {
+		if server.ID == serverID {
+			name = server.Name
+		}
+	}
+	return &MissingSecretError{Message: name + " has no key for the bucket " + bucket + ". Enter it for " + name + " under Backups."}
 }
 
 // reconfigure sends the backup config to a server, when it is online, on

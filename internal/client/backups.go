@@ -58,8 +58,8 @@ type Moment struct {
 	Kind  string    `json:"kind"`
 }
 
-// Download is a copy of a database in the app's bucket; Link is a signed
-// link to it there, valid 15 minutes.
+// Download is a copy of a database in the app's bucket; Link is a link to
+// it there, signed by the app's server, valid 15 minutes.
 type Download struct {
 	App      string    `json:"app"`
 	Database string    `json:"database"`
@@ -70,25 +70,30 @@ type Download struct {
 	Link     string    `json:"link"`
 }
 
-// Bucket is one bucket of the workspace, without its secret key. Apps use
-// it now; OlderBackups moved away and keep older backups there.
+// Bucket is one bucket of the workspace, without its secret key, which
+// only the servers keep: Servers say which, MissingOn which do not. Apps
+// use it now; OlderBackups moved away and keep older backups there.
 type Bucket struct {
-	Name         string    `json:"name"`
-	Default      bool      `json:"default"`
-	Endpoint     string    `json:"endpoint"`
-	Region       string    `json:"region"`
-	Bucket       string    `json:"bucket"`
-	Path         string    `json:"path"`
-	Folder       string    `json:"folder,omitempty"`
-	AccessKey    string    `json:"access_key"`
-	Apps         []string  `json:"apps,omitempty"`
-	OlderBackups []string  `json:"older_backups,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	Name         string     `json:"name"`
+	Default      bool       `json:"default"`
+	Endpoint     string     `json:"endpoint"`
+	Region       string     `json:"region"`
+	Bucket       string     `json:"bucket"`
+	Path         string     `json:"path"`
+	Folder       string     `json:"folder,omitempty"`
+	AccessKey    string     `json:"access_key"`
+	Apps         []string   `json:"apps,omitempty"`
+	OlderBackups []string   `json:"older_backups,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	Servers      []SecretOn `json:"servers,omitempty"`
+	MissingOn    []string   `json:"missing_on,omitempty"`
 }
 
-// BucketInput adds or changes a bucket. On a change an empty Name keeps
-// the name and an empty SecretKey the stored key.
+// BucketInput adds or changes a bucket. Server tests it and keeps the
+// secret key, empty for the workspace's only server. On a change an empty
+// Name keeps the name and an empty SecretKey the key the server keeps.
 type BucketInput struct {
+	Server    string `json:"server,omitempty"`
 	Name      string `json:"name"`
 	Endpoint  string `json:"endpoint"`
 	Region    string `json:"region"`
@@ -134,13 +139,21 @@ func (c *Client) EditBucket(ctx context.Context, name string, input BucketInput)
 	return bucket, err
 }
 
+// SetBucketKey hands one more server the secret key of a bucket; it
+// tests the bucket with it first.
+func (c *Client) SetBucketKey(ctx context.Context, name, server, secretKey string) (Bucket, error) {
+	var bucket Bucket
+	err := c.do(ctx, http.MethodPut, "/api/v1/buckets/"+url.PathEscape(name)+"/key", map[string]string{"server": server, "secret_key": secretKey}, &bucket)
+	return bucket, err
+}
+
 // RemoveBucket forgets a bucket nothing uses; what is in it stays. confirm
 // is the bucket's name, typed out; the hub checks it.
 func (c *Client) RemoveBucket(ctx context.Context, name, confirm string) error {
 	return c.do(ctx, http.MethodDelete, "/api/v1/buckets/"+url.PathEscape(name)+"?confirm="+url.QueryEscape(confirm), nil, nil)
 }
 
-// SetAppBucket moves an app's uploads and new backups to a bucket; empty
+// SetAppBucket moves an app's new backups to a bucket; empty
 // follows the workspace's default.
 func (c *Client) SetAppBucket(ctx context.Context, app, bucket string) (App, error) {
 	var answer App

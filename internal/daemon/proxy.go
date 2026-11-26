@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,25 +22,17 @@ const proxyImage = "traefik:v3.6"
 
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
-// route settles the domains of a deploy: x-moin wins for every field it
-// sets, the hub's settings fill the rest. Domains are the main
-// service's; ServiceDomains those of the others; Instant its instant
-// address.
+// route settles the domains of a deploy from the hub's settings, the only
+// place they are set. Domains are the main service's; ServiceDomains those
+// of the others; Instant its instant address.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {
 		domains = &protocol.Domains{}
 	}
-	config := detected.Config
-	if config == nil {
-		config = &protocol.Config{}
-	}
-	detected.Domains = mainDomains(detected.Service, domains, config)
-	detected.ServiceDomains = otherServiceDomains(detected.Service, domains, config)
+	detected.Domains = slices.Clone(domains.Domains)
+	detected.ServiceDomains = otherServiceDomains(detected.Service, domains)
 	detected.Canonical = domains.Canonical
-	if config.Canonical != "" {
-		detected.Canonical = config.Canonical
-	}
-	detected.Protected = domains.Protect != "" || config.Protect
+	detected.Password = domains.Password != ""
 	err := cleanDomains(detected)
 	if err != nil {
 		return detected, err
@@ -49,47 +40,17 @@ func route(app string, detected protocol.Detected, domains *protocol.Domains) (p
 	if detected.Canonical != "" && !slices.Contains(detected.Domains, detected.Canonical) {
 		return detected, fmt.Errorf("canonical domain %s is not one of the domains", detected.Canonical)
 	}
-	if config.Protect && domains.Protect == "" {
-		return detected, errors.New("x-moin.protect is on but no password is set: set one with moin protect")
-	}
-	provider, err := instantProvider(domains, config)
-	if err != nil {
-		return detected, err
-	}
-	detected.Instant = protocol.InstantHost(app, domains.InstantIP, provider)
+	detected.Instant = protocol.InstantHost(app, domains.InstantIP, domains.Instant)
 	return detected, nil
-}
-
-// mainDomains are the domains of the main service.
-func mainDomains(mainName string, domains *protocol.Domains, config *protocol.Config) []string {
-	if len(config.Domains) > 0 {
-		return slices.Clone(config.Domains)
-	}
-	// The map form of x-moin domains may name the main service too.
-	named, ok := config.ServiceDomains[mainName]
-	if ok {
-		return slices.Clone(named)
-	}
-	return slices.Clone(domains.Domains)
 }
 
 // otherServiceDomains are the domains of the services other than the main
 // one, nil when there are none.
-func otherServiceDomains(mainName string, domains *protocol.Domains, config *protocol.Config) map[string][]string {
+func otherServiceDomains(mainName string, domains *protocol.Domains) map[string][]string {
 	byService := map[string][]string{}
 	for service, list := range domains.Services {
-		if service != mainName {
+		if service != mainName && len(list) > 0 {
 			byService[service] = slices.Clone(list)
-		}
-	}
-	for service, list := range config.ServiceDomains {
-		if service != mainName {
-			byService[service] = slices.Clone(list)
-		}
-	}
-	for service, list := range byService {
-		if len(list) == 0 {
-			delete(byService, service)
 		}
 	}
 	if len(byService) == 0 {
@@ -131,33 +92,12 @@ func cleanDomainList(list []string, seen map[string]bool) error {
 	return nil
 }
 
-// instantProvider is the provider of the instant address: x-moin wins over
-// the hub's setting, and off means none.
-func instantProvider(domains *protocol.Domains, config *protocol.Config) (string, error) {
-	switch config.Instant {
-	case "":
-		return domains.Instant, nil
-	case "off":
-		return "", nil
-	}
-	if !slices.Contains(protocol.InstantProviders, config.Instant) {
-		return "", fmt.Errorf("x-moin.instant is %q: use off, %s", config.Instant, strings.Join(protocol.InstantProviders, ", "))
-	}
-	return config.Instant, nil
-}
-
-func protectHash(domains *protocol.Domains) string {
+// passwordLine is the app's password as an htpasswd line, "" for none.
+func passwordLine(domains *protocol.Domains) string {
 	if domains == nil {
 		return ""
 	}
-	return domains.Protect
-}
-
-func instantProtectHash(domains *protocol.Domains) string {
-	if domains == nil {
-		return ""
-	}
-	return domains.InstantProtect
+	return domains.Password
 }
 
 // routes says how the proxy reaches one service of an app.
@@ -168,12 +108,11 @@ type routes struct {
 	domains   []string
 	canonical string
 	port      int
-	// protect is the password in front of the domains, "" for none.
-	protect string
+	// usersFile is where the proxy reads the app's password, "" for none:
+	// the service's domains and the instant address ask for it.
+	usersFile string
 	// instant is the instant address, "" for none, on a router of its own.
 	instant string
-	// instantProtect is the password in front of the instant address.
-	instantProtect string
 }
 
 // addRouters puts a service of an app on the proxy network and labels its
@@ -183,6 +122,9 @@ func addRouters(config, service map[string]any, routes routes) {
 		"traefik.enable":         "true",
 		"traefik.docker.network": proxyNetwork,
 		"traefik.http.services." + routes.router + ".loadbalancer.server.port": fmt.Sprint(routes.port),
+	}
+	if routes.usersFile != "" {
+		labels["traefik.http.middlewares."+routes.router+"-auth.basicauth.usersfile"] = routes.usersFile
 	}
 	if len(routes.domains) > 0 {
 		addDomainLabels(labels, routes)
@@ -195,7 +137,7 @@ func addRouters(config, service map[string]any, routes routes) {
 }
 
 // addDomainLabels labels every domain over HTTPS, the other domains
-// redirecting to the canonical one, and basic auth when a password is set.
+// redirecting to the canonical one, and the password when the app has one.
 func addDomainLabels(labels map[string]any, routes routes) {
 	name := routes.router
 	hosts := make([]string, 0, len(routes.domains))
@@ -237,24 +179,21 @@ func addDomainMiddlewares(labels map[string]any, routes routes) []string {
 		labels["traefik.http.middlewares."+name+"-canonical.redirectregex.permanent"] = "true"
 		middlewares = append(middlewares, name+"-canonical")
 	}
-	if routes.protect != "" {
-		labels["traefik.http.middlewares."+name+"-auth.basicauth.users"] = escape(routes.protect)
+	if routes.usersFile != "" {
 		middlewares = append(middlewares, name+"-auth")
 	}
 	return middlewares
 }
 
-// addInstantLabels labels the instant address. It has a router of its own:
-// no canonical redirect, and its own password, so own domains can stay
-// public.
+// addInstantLabels labels the instant address. It has a router of its own,
+// without the canonical redirect, and the same password as the domains.
 func addInstantLabels(labels map[string]any, routes routes) {
 	router := routes.router + "-instant"
 	labels["traefik.http.routers."+router+".rule"] = "Host(`" + routes.instant + "`)"
 	labels["traefik.http.routers."+router+".entrypoints"] = "websecure"
 	labels["traefik.http.routers."+router+".service"] = routes.router
-	if routes.instantProtect != "" {
-		labels["traefik.http.middlewares."+router+"-auth.basicauth.users"] = escape(routes.instantProtect)
-		labels["traefik.http.routers."+router+".middlewares"] = router + "-auth"
+	if routes.usersFile != "" {
+		labels["traefik.http.routers."+router+".middlewares"] = routes.router + "-auth"
 	}
 }
 
@@ -286,6 +225,16 @@ func joinProxyNetwork(config, service map[string]any, app string) {
 	config["networks"] = top
 }
 
+// proxyApps is where the proxy sees the apps folder, read-only.
+const proxyApps = "/apps"
+
+// proxyUsersFile is where the proxy reads the password of release number of
+// an app: the htpasswd next to its compose.json. Each release names its own
+// file, so the proxy reads the password again when a deploy changes it.
+func proxyUsersFile(app string, number int) string {
+	return fmt.Sprintf("%s/%s/releases/%d/htpasswd", proxyApps, app, number)
+}
+
 // serviceRouter names the router of a service other than the main one.
 func serviceRouter(app, service string) string { return project(app) + "-svc-" + service }
 
@@ -305,10 +254,17 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 			return err
 		}
 	}
-	// A proxy on an older image or with other flags is replaced, so proxy
-	// updates reach every server. A label holds a hash of the flags.
+	data := filepath.Join(filepath.Dir(a.dir), "traefik")
+	// It reads the app's passwords from the apps folder (proxyUsersFile).
+	mounts := []string{
+		"-v", "/var/run/docker.sock:/var/run/docker.sock:ro",
+		"-v", data + ":/data",
+		"-v", a.dir + ":" + proxyApps + ":ro",
+	}
+	// A proxy on an older image or with other mounts or flags is replaced,
+	// so proxy updates reach every server. A label holds a hash of them.
 	flags := proxyFlags(mode)
-	setup := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(flags, "\n"))))[:12]
+	setup := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(append(slices.Clone(mounts), flags...), "\n"))))[:12]
 	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{index .Config.Labels \""+labelMode+"\"}} {{index .Config.Labels \""+labelSetup+"\"}}", proxyName)
 	if err == nil && strings.TrimSpace(running) == "true "+proxyImage+" "+mode+" "+setup {
 		return nil
@@ -316,10 +272,11 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	if err == nil {
 		_, _ = a.output(ctx, "docker", "rm", "-f", proxyName)
 	}
-	data := filepath.Join(filepath.Dir(a.dir), "traefik")
-	err = os.MkdirAll(data, 0o700)
-	if err != nil {
-		return err
+	for _, folder := range []string{data, a.dir} {
+		err = os.MkdirAll(folder, 0o700)
+		if err != nil {
+			return err
+		}
 	}
 	args := []string{"run", "-d", "--name", proxyName, "--restart", "unless-stopped",
 		"--network", proxyNetwork, "--label", labelMode + "=" + mode, "--label", labelSetup + "=" + setup}
@@ -330,11 +287,8 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	} else {
 		logf("starting the proxy behind the Cloudflare Tunnel, with no open port")
 	}
-	args = append(args,
-		"-v", "/var/run/docker.sock:/var/run/docker.sock:ro",
-		"-v", data+":/data",
-		proxyImage,
-	)
+	args = append(args, mounts...)
+	args = append(args, proxyImage)
 	args = append(args, flags...)
 	_, err = a.output(ctx, "docker", args...)
 	return err

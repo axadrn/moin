@@ -14,13 +14,13 @@ import (
 
 type SettingsHandler struct {
 	authService *service.AuthService
-	apiTokens   *service.APITokenService
+	passkeys    *service.PasskeyService
 	apps        *service.AppService
 	updates     *service.UpdateService
 }
 
-func NewSettingsHandler(authService *service.AuthService, apiTokens *service.APITokenService, apps *service.AppService, updates *service.UpdateService) *SettingsHandler {
-	return &SettingsHandler{authService: authService, apiTokens: apiTokens, apps: apps, updates: updates}
+func NewSettingsHandler(authService *service.AuthService, passkeys *service.PasskeyService, apps *service.AppService, updates *service.UpdateService) *SettingsHandler {
+	return &SettingsHandler{authService: authService, passkeys: passkeys, apps: apps, updates: updates}
 }
 
 // Home is Settings: you, your workspaces, this workspace, moin, sign out.
@@ -68,13 +68,13 @@ func (h *SettingsHandler) SetIntegrations(w http.ResponseWriter, r *http.Request
 			tailscale = &tailscaleKey
 		}
 	}
-	err := h.apps.SetIntegrations(r.Context(), actor(r), cloudflare, tailscale)
+	err := h.apps.SetIntegrations(r.Context(), actor(r), service.IntegrationsInput{CloudflareToken: cloudflare, TailscaleKey: tailscale, TailscaleServer: r.FormValue("server")})
 	if errors.Is(err, service.ErrCloudflareToken) {
 		fieldRefused(w, r, notDone, "cloudflare-token", errorMessage(err))
 		return
 	}
 	if err != nil {
-		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key"})
+		failed(w, r, notDone, err, map[string]string{"tailscale_key": "tailscale-key", "server": "tailscale-key-server"})
 		return
 	}
 	h.Integrations(w, r)
@@ -90,7 +90,7 @@ func (h *SettingsHandler) gitHub(r *http.Request) ([]model.GitHubInstallation, b
 	return installations, true, err
 }
 
-// SettingsPage is your account: profile, how you sign in, and tokens.
+// SettingsPage is your account: profile and how you sign in.
 func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	user := ctxkeys.User(r.Context())
 	sessions, err := h.authService.Sessions(user.ID)
@@ -102,7 +102,7 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	activeTab := r.URL.Query().Get("tab")
-	if activeTab != "security" && activeTab != "tokens" {
+	if activeTab != "security" {
 		activeTab = "profile"
 	}
 	currentSession := ctxkeys.Session(r.Context())
@@ -111,14 +111,14 @@ func (h *SettingsHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		currentSessionID = currentSession.ID
 	}
 
-	tokens, err := apiTokensView(r, h.apiTokens, newAPITokenForm(r))
+	passkeys, err := h.passkeys.List(user.ID)
 	if err != nil {
-		slog.Error("failed to list api tokens", "error", err, "user_id", user.ID)
+		slog.Error("failed to list passkeys", "error", err, "user_id", user.ID)
 		w.WriteHeader(http.StatusInternalServerError)
 		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Settings unavailable", "Your settings could not be loaded. Please try again."))
 		return
 	}
-	render(w, r, pages.Settings(sessions, currentSessionID, activeTab, r.URL.Query().Get("password_removed") == "1", pages.SettingsAPITokensSection(tokens)))
+	render(w, r, pages.Settings(sessions, currentSessionID, passkeys, activeTab))
 }
 
 func (h *SettingsHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {

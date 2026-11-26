@@ -21,8 +21,8 @@ One alert per event, and one when it is fixed.
 
 | Event | When |
 | --- | --- |
-| `uptime.down`, `uptime.up` | a site goes down, or comes back ([Uptime](/docs/guides/uptime#down-and-back-up)) |
-| `server.down`, `server.up` | a daemon has not answered for two minutes; back online |
+| `uptime.down`, `uptime.up` | a site failed 3 visits in a row; answers 3 in a row again ([Uptime](/docs/guides/uptime#down-and-back-up)) |
+| `server.down`, `server.up` | a daemon has not answered for 3 minutes; back online |
 | `deploy.failed` | a deploy fails ([Deploy](/docs/guides/deploy#what-a-deploy-does)) |
 | `backup.failed`, `backup.recovered` | a copy does not reach the bucket; and when it works again ([Backups](/docs/guides/backups)) |
 | `check.failed`, `check.recovered` | the daily check could not restore the newest copy; passes again |

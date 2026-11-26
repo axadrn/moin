@@ -32,6 +32,49 @@ const (
 	tailscalePort    = "41641"
 )
 
+// serverFile is server.json, 0600: the config the hub sent, and the
+// secrets of the server, which only the daemon keeps (protocol.SecretSet).
+// The hub forwards a secret once and knows only its name.
+type serverFile struct {
+	protocol.ServerConfig
+	// TunnelToken runs cloudflared, the tunnel is on while there is one.
+	TunnelToken string `json:"tunnel_token,omitempty"`
+	// TailscaleKey joins the server to a tailnet.
+	TailscaleKey string `json:"tailscale_key,omitempty"`
+	// Buckets are the secret keys of buckets by their ID in the hub;
+	// Registries the registry logins by host, as <username>:<password>.
+	Buckets    map[string]string `json:"buckets,omitempty"`
+	Registries map[string]string `json:"registries,omitempty"`
+}
+
+// loadServerFile reads server.json from dir; ok is false when there is none.
+func loadServerFile(dir string) (file serverFile, ok bool) {
+	body, err := os.ReadFile(filepath.Join(dir, serverConfigFile))
+	if err != nil {
+		return serverFile{}, false
+	}
+	return file, json.Unmarshal(body, &file) == nil
+}
+
+// secretNames are the names of the secrets in the file, for Hello.
+func (f serverFile) secretNames() []string {
+	names := []string{}
+	if f.TunnelToken != "" {
+		names = append(names, protocol.SecretTunnel)
+	}
+	if f.TailscaleKey != "" {
+		names = append(names, protocol.SecretTailscale)
+	}
+	for id := range f.Buckets {
+		names = append(names, protocol.BucketSecret(id))
+	}
+	for host := range f.Registries {
+		names = append(names, protocol.RegistrySecret(host))
+	}
+	slices.Sort(names)
+	return names
+}
+
 // security applies the server config and keeps it: after each start and
 // every protocol.SecurityEvery it puts back what drifted.
 type security struct {
@@ -40,28 +83,30 @@ type security struct {
 	// applying lets one apply or check run at a time.
 	applying sync.Mutex
 
-	mu     sync.Mutex
-	config protocol.ServerConfig
-	// known is whether the hub ever sent a config: without one there is
-	// nothing to keep, only what is to report.
-	known bool
+	mu   sync.Mutex
+	file serverFile
 	// fixed is what checks put back that the hub has not heard of yet.
 	fixed []string
 }
 
 func newSecurity(dir string, a *apps) *security {
-	s := &security{dir: dir, apps: a}
-	body, err := os.ReadFile(filepath.Join(dir, serverConfigFile))
-	if err == nil {
-		s.known = json.Unmarshal(body, &s.config) == nil
-	}
-	return s
+	file, _ := loadServerFile(dir)
+	return &security{dir: dir, apps: a, file: file}
 }
 
-func (s *security) current() protocol.ServerConfig {
+func (s *security) current() serverFile {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.config
+	return s.file
+}
+
+// known is whether the hub ever sent a config, which always names SSH:
+// without one there is nothing to keep, only what is to report.
+func (f serverFile) known() bool { return f.SSH != "" }
+
+// save writes server.json whole, 0600. The caller holds mu.
+func (s *security) save() error {
+	return writeState(filepath.Join(s.dir, serverConfigFile), s.file)
 }
 
 // proxyMode is the mode the proxy runs in now.
@@ -70,6 +115,69 @@ func (s *security) proxyMode() string {
 		return "tunnel"
 	}
 	return "direct"
+}
+
+// bucketKey is the secret key the server keeps for the bucket with the
+// hub's ID id, "" for none.
+func (s *security) bucketKey(id string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.file.Buckets[id]
+}
+
+// registryLogin is the server's login for a registry host, as
+// <username>:<password>, "" for none.
+func (s *security) registryLogin(host string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.file.Registries[host]
+}
+
+// setSecret keeps a secret under its name, or removes it when value is
+// empty (SecretSet). The tunnel and the tailnet take a new one with the
+// next server config, which the hub sends after it.
+func (s *security) setSecret(name, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kind, of := protocol.SecretOf(name)
+	switch {
+	case name == protocol.SecretTunnel:
+		s.file.TunnelToken = value
+	case name == protocol.SecretTailscale:
+		s.file.TailscaleKey = value
+	case kind == "bucket" && of != "":
+		s.file.Buckets = setOrRemove(s.file.Buckets, of, value)
+	case kind == "registry" && of != "":
+		s.file.Registries = setOrRemove(s.file.Registries, of, value)
+	default:
+		return fmt.Errorf("this daemon keeps no secret %q: update it", name)
+	}
+	return s.save()
+}
+
+func setOrRemove(values map[string]string, key, value string) map[string]string {
+	if value == "" {
+		delete(values, key)
+		return values
+	}
+	if values == nil {
+		values = map[string]string{}
+	}
+	values[key] = value
+	return values
+}
+
+// secretSet answers secret.set (SecretSet). The rule network: locked
+// refuses the tunnel token and the Tailscale key, like the config they
+// belong to.
+func (r *runner) secretSet(message protocol.Message, rules *protocol.Rules) {
+	answer(r, message, protocol.TypeOK, func(request protocol.SecretSet) (any, error) {
+		network := request.Name == protocol.SecretTunnel || request.Name == protocol.SecretTailscale
+		if network && rules != nil && rules.NetworkLocked {
+			return nil, refused(r.rulesFile, "network: locked")
+		}
+		return nil, r.security.setSecret(request.Name, request.Value)
+	})
 }
 
 // serverConfig answers server.config (ServerConfig) unless the rules say
@@ -122,18 +230,24 @@ func (s *security) apply(ctx context.Context, config protocol.ServerConfig) prot
 	s.applying.Lock()
 	defer s.applying.Unlock()
 	s.mu.Lock()
-	before, known := s.config, s.known
-	s.config, s.known = config, true
+	before := s.file
+	if config.SSH == "" {
+		config.SSH = config.WantSSH()
+	}
+	s.file.ServerConfig = config
+	err := s.save()
+	file := s.file
 	s.mu.Unlock()
-	saveJSON(filepath.Join(s.dir, serverConfigFile), config)
-	_ = os.Chmod(filepath.Join(s.dir, serverConfigFile), 0o600)
 	var problems []string
-	if known && before.WantSSH() == protocol.SSHOff && config.WantSSH() != protocol.SSHOff {
+	if err != nil {
+		problems = append(problems, "keep the config: "+err.Error())
+	}
+	if before.known() && before.WantSSH() == protocol.SSHOff && config.WantSSH() != protocol.SSHOff {
 		if err := startSSHD(ctx); err != nil {
 			problems = append(problems, "SSH: "+err.Error())
 		}
 	}
-	result := s.set(ctx, config)
+	result := s.set(ctx, file)
 	result.Problems = append(problems, result.Problems...)
 	return result
 }
@@ -144,16 +258,14 @@ func (s *security) apply(ctx context.Context, config protocol.ServerConfig) prot
 func (s *security) keep(ctx context.Context) protocol.ServerConfigResult {
 	s.applying.Lock()
 	defer s.applying.Unlock()
-	s.mu.Lock()
-	config, known := s.config, s.known
-	s.mu.Unlock()
-	if !known {
+	file := s.current()
+	if !file.known() {
 		after := look(ctx, s.apps)
 		return protocol.ServerConfigResult{Proxy: s.proxyMode(), TailscaleIP: after.tailnet, SSH: sshNow(after.sshd, false, false), OpenPorts: []string{}}
 	}
 	before := look(ctx, s.apps)
-	result := s.set(ctx, config)
-	fixed := drifted(config, before, look(ctx, s.apps))
+	result := s.set(ctx, file)
+	fixed := drifted(file.ServerConfig, before, look(ctx, s.apps))
 	s.mu.Lock()
 	s.fixed = append(s.fixed, fixed...)
 	result.Fixed = slices.Clone(s.fixed)
@@ -219,7 +331,8 @@ func drifted(config protocol.ServerConfig, before, after seen) []string {
 // set sets up the proxy, the tunnel, Tailscale, sshd and the firewall. A
 // part that fails is reported and the rest still applies; SSH only closes
 // to everyone else when the server is in a tailnet.
-func (s *security) set(ctx context.Context, config protocol.ServerConfig) protocol.ServerConfigResult {
+func (s *security) set(ctx context.Context, file serverFile) protocol.ServerConfigResult {
+	config := file.ServerConfig
 	result := protocol.ServerConfigResult{Proxy: s.proxyMode(), OpenPorts: []string{}}
 	problem := func(format string, args ...any) {
 		result.Problems = append(result.Problems, fmt.Sprintf(format, args...))
@@ -230,7 +343,7 @@ func (s *security) set(ctx context.Context, config protocol.ServerConfig) protoc
 	if err != nil {
 		problem("proxy: %s", err)
 	}
-	err = s.ensureTunnel(ctx, config.TunnelToken)
+	err = s.ensureTunnel(ctx, file.TunnelToken)
 	if err != nil {
 		problem("Cloudflare Tunnel: %s", err)
 	}
@@ -238,8 +351,8 @@ func (s *security) set(ctx context.Context, config protocol.ServerConfig) protoc
 	// A tailnet joined by hand counts: the key only joins one.
 	ssh := config.WantSSH()
 	result.TailscaleIP = tailnetIP(ctx)
-	if config.TailscaleKey != "" && result.TailscaleIP == "" {
-		result.TailscaleIP, err = joinTailnet(ctx, config.TailscaleKey)
+	if ssh == protocol.SSHTailscale && file.TailscaleKey != "" && result.TailscaleIP == "" {
+		result.TailscaleIP, err = joinTailnet(ctx, file.TailscaleKey)
 		if err != nil {
 			problem("Tailscale: %s", err)
 		}
@@ -517,8 +630,9 @@ func applyFirewall(ctx context.Context, rules string) error {
 }
 
 // resetNetwork takes down the firewall and the tunnel an earlier server
-// entry set up, when the daemon registers again. The new entry starts with
-// both off; the hub sends its config on connect when it has more.
+// entry set up, when the daemon registers again, and forgets its secrets.
+// The new entry starts with both off; the hub sends its config on connect
+// when it has more.
 func resetNetwork(ctx context.Context, dir string) {
 	if err := removeFirewall(ctx); err != nil {
 		slog.Warn("remove the firewall of the earlier server entry", "error", err)

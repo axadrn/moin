@@ -5,7 +5,6 @@ package daemon
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
@@ -38,8 +37,9 @@ func TestRenameDocker(t *testing.T) {
 
 	compose := "services:\n  web:\n    image: alpine:latest\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    volumes:\n      - data:/data\nvolumes:\n  data: {}\n"
 	source := tarball(t, map[string]string{"compose.yml": compose})
-	sum := sha256.Sum256(source)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
+	defer func(old string) { githubAPI = old }(githubAPI)
+	githubAPI = server.URL
 	defer server.Close()
 
 	docker := func(args ...string) string {
@@ -81,7 +81,7 @@ func TestRenameDocker(t *testing.T) {
 	})
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
-		a.deploy(ctx, start)
+		a.deploy(ctx, start, nil)
 		mu.Lock()
 		defer mu.Unlock()
 		if last := done[len(done)-1]; !last.OK {
@@ -99,7 +99,7 @@ func TestRenameDocker(t *testing.T) {
 
 	// The first deploy after the update keeps the volume and its name and
 	// replaces the old containers.
-	deploy(protocol.DeployStart{DeployID: "d1", App: folder, Name: folder, AppID: appID, Number: 1, SourceURL: server.URL, SHA256: hex.EncodeToString(sum[:])})
+	deploy(protocol.DeployStart{DeployID: "d1", App: folder, Name: folder, AppID: appID, Number: 1, SourceURL: server.URL + "/repos/me/blog/tarball/abc123"})
 	if got := running(project(folder)); len(got) != 0 {
 		t.Fatalf("the old containers still exist: %v", got)
 	}

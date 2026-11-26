@@ -26,14 +26,16 @@ Connecting always happens on github.com. The CLI, the API and MCP give you the l
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from**, **GitHub**, pick the repo and the branch, **Link and deploy**
 CLI: moin link <owner>/<repo> --branch main
-TUI: on the app, `W` opens its Deploys tab in the web
+TUI: on the app, `W` opens it in the web, then **Deploys**
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
-Deploy every push is on by default. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy.
+Deploy every push is on by default, on every surface. The API and MCP turn it off with `auto_deploy: false`. On the web, **Link and deploy** links and deploys in one step. Elsewhere, link first and then deploy. Or run [`moin deploy`](/docs/guides/deploy#deploy-what-you-pushed) in the pushed repo: it links the app and deploys, without deploys on push.
 
-An app deploys from one place at a time: [your folder, GitHub or CI](/docs/guides/deploy#deploy-from). Linking a repo turns the deploy hook off, so moin asks first. `--yes` skips it.
+An app deploys from one place at a time: [GitHub or CI](/docs/guides/deploy#deploy-from). Deploy every push turns the deploy hook off, so moin asks first. `--yes` skips it.
+
+An app with a deploy hook links without deploy on push on the web, and in the API and MCP when `auto_deploy` is left out. The CLI asks first, or add `--auto=false`. Then CI keeps deploying, and each image deploy takes `compose.yml` from the repo: [Build in CI](/docs/guides/ci).
 
 ## Deploy from GitHub
 
@@ -51,7 +53,7 @@ moin deploy --ref v1.4.0    # a tag
 moin deploy --ref 3f2a9c1   # a commit
 ```
 
-Empty means the linked branch. The API takes `{"ref": "v1.4.0"}`.
+Empty means the linked branch. The API takes `{"ref": "v1.4.0"}`. A commit named by its SHA, here or from CI, must be on the linked branch: GitHub also serves a fork's commits through the repo they forked, and moin never deploys one of those.
 
 Your server downloads the commit straight from GitHub, with a short-lived token. The code never passes through moin.
 
@@ -77,20 +79,22 @@ live ✓      the commit gets a green
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from**, **GitHub**, **Deploy every push**
 CLI: moin link <owner>/<repo> --auto=false
-TUI: on the app, `W` opens its Deploys tab in the web
+TUI: on the app, `W` opens it in the web, then **Deploys**
 API: PUT /api/v1/apps/{app}/repo
 MCP: link_repo
 ```
 
 `--auto=false` turns it off. `moin link <owner>/<repo>` turns it on again. The API and MCP call it `auto_deploy`. A push while a deploy runs is skipped. The next push, or **Deploy**, takes the newest commit.
 
+Turning it on turns the [deploy hook](/docs/guides/ci) off. Turning the hook on turns it off. While the hook is on, the web shows no switch: turn the hook off first.
+
 ## See the repos and branches
 
 ```surfaces
-Web: the app, **GitHub**; the **Branch** select after you choose the repo
+Web: the app's **Deploys** tab, **Deploy from**, **GitHub**: the **Repo** select, then the **Branch** select
 CLI: moin github repos
 CLI: moin github branches <owner>/<repo>
-TUI: on the app, `W` opens its Deploys tab in the web
+TUI: on the app, `W` opens it in the web, then **Deploys**
 API: GET /api/v1/github/repos
 API: GET /api/v1/github/repos/{owner}/{repo}/branches
 MCP: list_repos
@@ -104,9 +108,9 @@ Your repo is missing? Every surface links to the page on github.com where you ch
 The app stops following the repo and keeps running.
 
 ```surfaces
-Web: the app's **Deploys** tab, **GitHub**, **Unlink**
+Web: the app's **Deploys** tab, **Deploy from**, **GitHub**, **Unlink**
 CLI: moin unlink
-TUI: on the app, `W` opens its Deploys tab in the web
+TUI: on the app, `W` opens it in the web, then **Deploys**
 API: DELETE /api/v1/apps/{app}/repo
 MCP: unlink_repo
 ```

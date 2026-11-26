@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"encoding/json"
 	"net/url"
 	"slices"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/axadrn/moin/internal/find"
 
+	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
@@ -20,6 +20,16 @@ import (
 type CatalogEntryView struct {
 	Entry    catalog.Entry
 	Versions []catalog.Version
+	// Similar are other apps of its category, on its public page.
+	Similar []catalog.Entry
+}
+
+// catalogBackup says what moin backs up of an app, from its database.
+func catalogBackup(entry catalog.Entry) string {
+	if !entry.BackedUp() {
+		return entry.DatabaseNote()
+	}
+	return brand.Name + " copies its " + entry.DatabaseName() + " database into your own bucket, hourly unless you change it. Every day it checks that a copy restores."
 }
 
 // Latest is the newest release; ok is false before the registry answered.
@@ -208,8 +218,7 @@ func catalogJSONLD(view CatalogEntryView, url string) string {
 	if latest, ok := view.Latest(); ok {
 		data["softwareVersion"] = strings.TrimPrefix(latest.Tag, "v")
 	}
-	body, _ := json.Marshal(data)
-	return `<script type="application/ld+json">` + string(body) + `</script>`
+	return jsonLD(data)
 }
 
 // versionOptions are the releases for the version select, newest first.

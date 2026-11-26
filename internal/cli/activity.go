@@ -75,8 +75,7 @@ func when(t time.Time) string {
 // team lists the members of the token's workspace, invites one, sends
 // or revokes an invitation, or renames the workspace.
 func team(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("team", "team, team invite <email> [--admin], team resend <email>, team revoke <email> [--yes], or team rename <name>").withYes()
-	admin := flags.Bool("admin", false, "invite as admin, who may invite others")
+	flags := newFlags("team", "team, team invite <email>, team resend <email>, team revoke <email> [--yes], or team rename <name>").withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -94,15 +93,12 @@ func team(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		if len(rest) != 1 {
 			return fmt.Errorf("name the email: %s team invite ada@example.com", build.Name)
 		}
-		role := "member"
-		if *admin {
-			role = "admin"
-		}
-		err = api.Invite(ctx, rest[0], role)
+		// The CLI invites members. An admin is invited in the web.
+		err = api.Invite(ctx, rest[0], "member")
 		if err != nil {
 			return err
 		}
-		done(stdout, "Invited %s as %s. The invitation is in their inbox for seven days.", rest[0], role)
+		done(stdout, "Invited %s as member. The invitation is in their inbox for seven days.", rest[0])
 		return nil
 	case "rename":
 		if len(rest) == 0 {

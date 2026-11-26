@@ -20,7 +20,8 @@ type bearerTestEnvironment struct {
 	database     *sqlx.DB
 	auth         *service.AuthService
 	authenticate func(http.Handler) http.Handler
-	tokens       *service.APITokenService
+	connections  *service.ConnectionService
+	ciTokens     *service.CITokenService
 	tokenAuth    func(http.Handler) http.Handler
 
 	workspaces    *service.WorkspaceService
@@ -51,19 +52,19 @@ func newBearerTestEnvironment(t *testing.T) bearerTestEnvironment {
 		false,
 		7*24*time.Hour,
 		24*time.Hour,
-		time.Hour,
 		24*time.Hour,
-		10*time.Minute,
 	)
 	files := service.NewFileService(repository.NewFiles(database), testutil.NewMemoryStorage())
 	userService := service.NewUserService(users, files, email, workspaces)
-	tokens := service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
+	connections := service.NewConnectionService(repository.NewConnections(database), workspaces)
+	ciTokens := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), workspaces)
 	return bearerTestEnvironment{
 		database:      database,
 		auth:          auth,
 		authenticate:  AuthMiddleware(auth, userService),
-		tokens:        tokens,
-		tokenAuth:     APITokenAuth(tokens, userService),
+		connections:   connections,
+		ciTokens:      ciTokens,
+		tokenAuth:     BearerAuth(connections, ciTokens, userService),
 		workspaces:    workspaces,
 		subscriptions: subscriptions,
 	}
@@ -93,50 +94,22 @@ func startCookieSession(t *testing.T, auth *service.AuthService, userID string) 
 	return recorder.Result().Cookies()[0]
 }
 
-func TestAuthMiddlewareAcceptsBearerToken(t *testing.T) {
+// A session lives in its cookie only: its token sent as a bearer token
+// signs in nobody.
+func TestAuthMiddlewareIgnoresASessionAsBearer(t *testing.T) {
 	environment := newBearerTestEnvironment(t)
-	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{
-		ID:       "bearer-user",
-		Email:    "bearer@example.com",
-		Name:     "Bearer User",
-		Password: "correct horse battery staple",
-		Verified: true,
-	})
-	session, token, err := environment.auth.CreateSession(httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", nil), fixture.User.ID)
-	if err != nil {
-		t.Fatalf("CreateSession() error = %v", err)
-	}
-
-	var checked bool
-	next := RequireAuthAPI(func(w http.ResponseWriter, r *http.Request) {
-		user := ctxkeys.User(r.Context())
-		if user == nil || user.ID != fixture.User.ID {
-			t.Fatalf("context user = %#v", user)
-		}
-		if user.PasswordHash != nil || !user.PasswordSet {
-			t.Fatalf("context exposed password hash or lost password state: %#v", user)
-		}
-		currentSession := ctxkeys.Session(r.Context())
-		if currentSession == nil || currentSession.ID != session.ID {
-			t.Fatalf("context session = %#v", currentSession)
-		}
-		if ctxkeys.BearerToken(r.Context()) != token || !ctxkeys.IsBearer(r.Context()) {
-			t.Fatal("context does not mark the request as bearer")
-		}
-		checked = true
-		w.WriteHeader(http.StatusNoContent)
-	})
+	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "cookie-user", Name: "Cookie User", Verified: true})
+	cookie := startCookieSession(t, environment.auth, fixture.User.ID)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/account", nil)
-	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Authorization", "Bearer "+cookie.Value)
 	recorder := httptest.NewRecorder()
-	environment.authenticate(next).ServeHTTP(recorder, request)
+	environment.authenticate(RequireAuthAPI(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("a session bearer reached the handler as %#v", ctxkeys.User(r.Context()))
+	})).ServeHTTP(recorder, request)
 
-	if !checked || recorder.Code != http.StatusNoContent {
-		t.Fatalf("checked = %t, status = %d", checked, recorder.Code)
-	}
-	if len(recorder.Result().Cookies()) != 0 {
-		t.Fatalf("bearer request set cookies %#v", recorder.Result().Cookies())
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", recorder.Code)
 	}
 }
 
@@ -176,8 +149,8 @@ func TestAuthMiddlewareUsesCookieWithOtherAuthorizationSchemes(t *testing.T) {
 	request.AddCookie(cookie)
 	recorder := httptest.NewRecorder()
 	environment.authenticate(RequireAuthAPI(func(w http.ResponseWriter, r *http.Request) {
-		if ctxkeys.User(r.Context()).ID != fixture.User.ID || ctxkeys.IsBearer(r.Context()) {
-			t.Fatalf("context user = %#v, bearer = %t", ctxkeys.User(r.Context()), ctxkeys.IsBearer(r.Context()))
+		if ctxkeys.User(r.Context()).ID != fixture.User.ID {
+			t.Fatalf("context user = %#v", ctxkeys.User(r.Context()))
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})).ServeHTTP(recorder, request)
@@ -198,9 +171,6 @@ func TestAuthMiddlewareFallsBackToCookieWithoutAuthorization(t *testing.T) {
 	environment.authenticate(RequireAuthAPI(func(w http.ResponseWriter, r *http.Request) {
 		if ctxkeys.User(r.Context()).ID != fixture.User.ID {
 			t.Fatalf("context user = %#v", ctxkeys.User(r.Context()))
-		}
-		if ctxkeys.IsBearer(r.Context()) {
-			t.Fatal("cookie request is marked as bearer")
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})).ServeHTTP(recorder, request)
@@ -318,9 +288,9 @@ func TestWithWorkspaceAPIAnswersJSONNotFound(t *testing.T) {
 func TestBearerRequestSkipsCSRFAndCookieRequestNeedsIt(t *testing.T) {
 	environment := newBearerTestEnvironment(t)
 	fixture := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "chain-user", Name: "Chain User", Verified: true})
-	_, token, err := environment.auth.CreateSession(httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", nil), fixture.User.ID)
+	_, token, err := environment.ciTokens.Create(service.Actor{UserID: fixture.User.ID, WorkspaceID: fixture.Workspace.ID}, service.NewCIToken{Name: "Script"})
 	if err != nil {
-		t.Fatalf("CreateSession() error = %v", err)
+		t.Fatalf("Create() error = %v", err)
 	}
 	cookie := startCookieSession(t, environment.auth, fixture.User.ID)
 	handler := Chain(
@@ -329,6 +299,7 @@ func TestBearerRequestSkipsCSRFAndCookieRequestNeedsIt(t *testing.T) {
 		})),
 		CSRFProtection(false, NewClientIPResolver(nil)),
 		environment.authenticate,
+		environment.tokenAuth,
 	)
 
 	bearerRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)

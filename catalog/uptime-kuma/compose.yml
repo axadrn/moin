@@ -1,0 +1,6 @@
+services:
+  web:
+    image: louislam/uptime-kuma:${VERSION}
+    expose: ["3001"]
+    volumes:
+      - ./data:/app/data

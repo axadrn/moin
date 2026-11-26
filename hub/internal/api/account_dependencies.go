@@ -2,7 +2,7 @@ package api
 
 import "github.com/axadrn/moin/hub/internal/service"
 
-// AccountHandler serves profile, email, password, avatar and account deletion.
+// AccountHandler serves profile, email, avatar and account deletion.
 type AccountHandler struct {
 	authService *service.AuthService
 	userService *service.UserService

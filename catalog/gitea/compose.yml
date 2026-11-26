@@ -1,0 +1,8 @@
+services:
+  web:
+    image: gitea/gitea:${VERSION}
+    expose: ["3000"]
+    environment:
+      GITEA__database__DB_TYPE: sqlite3
+    volumes:
+      - ./data:/data

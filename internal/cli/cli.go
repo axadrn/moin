@@ -31,16 +31,17 @@ Usage
   moin <command>      Run one command
 
 Account
-  login              Log in through the browser: login [--url <url>]; --token <token> or the token on stdin for CI
-  logout             Forget the token and what the TUI kept on this machine
+  login              Connect this computer through the browser, with the rights you pick: login [--url <url>] [--web]; --token <token> or a CI token on stdin for CI
+  logout             End this computer's connection and forget it, and what the TUI kept on this machine
+  connections        Your connections and the CI tokens of the workspace; remove one: connections rm <id> [--yes]
   status             Is everything OK? What needs you, updates, what runs; exits 1 when something needs you
-  activity           Who deployed, restored or changed what: activity [--limit 30]
+  activity           Who deployed, restored or changed what: activity [--app <app>] [--server <server>] [--user <email>] [--limit 30]
   alerts             Email me when a site or server goes down or a deploy fails, on by default: alerts [on|off]; also lists the destinations
   alerts add         Send alerts to Slack, Discord, Telegram or a webhook: alerts add slack|discord|telegram|webhook <name> [--chat <id>] [--events a,b], URL or bot token on stdin
   alerts test        Send a test alert: alerts test <name>
   alerts rm          Remove a destination: alerts rm <name> [--yes]
   team               Members and open invitations of your workspace
-  team invite        Invite someone: team invite ada@example.com [--admin]
+  team invite        Invite someone as member: team invite ada@example.com
   team resend        Send an invitation again: team resend ada@example.com
   team revoke        Take an invitation back: team revoke ada@example.com [--yes]
   team rename        Rename the workspace: team rename "Acme Inc"
@@ -53,21 +54,21 @@ Servers
   servers install-command  A new one-time install command, to install or move the daemon: servers install-command web-1
   servers update     Update the daemon to the hub's version now: servers update [web-1]
   servers auto-update  Daemons update by themselves, on by default: servers auto-update [on|off]
-  servers secure     Lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]
-  servers rules      The server's own rules for moin, from /etc/moin/rules on it
-  integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare, key on stdin
-  integrations rm    Remove one: integrations rm cloudflare|tailscale [--yes]
+  servers secure     How it is reached; lock it down: servers secure web-1 [--tunnel on|off] [--ssh tailscale|everyone|off] [--firewall on|off] [--yes]
+  servers rules      The server's own rules for moin, from /etc/moin/rules on it: servers rules web-1
+  integrations       Cloudflare token and Tailscale key; set one: integrations cloudflare|tailscale [--server web-1], key on stdin
+  integrations rm    Remove one: integrations rm cloudflare|tailscale [--server web-1] [--yes]
 
 Apps
   apps               List apps; one app with its domains and deploys: apps <app>
-  apps add           Add an app: apps add --server <server> <name>
+  apps add           Add an app; shows its password once: apps add --server <server> <name>
   apps rename        Rename an app; links, data and backups stay: apps rename my-app blog
   apps rm            Remove an app; its data stays on the server: apps rm <app> [--confirm <app>]
   apps pin           Keep an app above the others that run fine: apps pin [app]; apps unpin [app]
 
 Deploys
-  deploy             Deploy this directory: deploy [--dir <dir>] [--server <server>] [--detach] [--yes] [app]; a new app asks first
-  deploy --image     Deploy a CI image with the compose file of an earlier deploy: deploy --image <image> [app]
+  deploy             Deploy the pushed commit of this repo from GitHub: deploy [--server <server>] [--detach] [--yes] [app]; a new app asks first
+  deploy --image     Deploy a CI image with the compose file of a commit: deploy --image <image> [--ref <commit>] [app]
   deploy --ref       Deploy a branch, tag or commit from GitHub: deploy --ref main
   redeploy           Build the newest source or pull the image again, with the current env
   restart            Start the live deploy again with the current env and domains: restart [app]
@@ -76,21 +77,21 @@ Deploys
   deploys            Deploy history: deploys [app]; one deploy with its log: deploys [app] v3
   rollback           Start an earlier deploy again: rollback [app] [v<number>] [--yes]
   logs               Show the last lines of the app: logs [--tail 200] [app]
-  exec               Run a command in a container, no shell: exec [app] [--service web] -- rails db:migrate
+  exec               Run a command in a container, no shell: exec [app] [--service web] [--timeout 10m] -- rails db:migrate
+  compose            The compose file moin runs, without secret values, to run it elsewhere: compose [app] > compose.yml
 
 Domains
   domains            List domains and their DNS: domains [app]
   domains add        Add domains: domains add my-app.example.com www.my-app.example.com, or for another service: --service api api.my-app.example.com
   domains rm         Remove domains: domains rm www.my-app.example.com [--yes]
   domains canonical  Redirect the others to one: domains canonical my-app.example.com|none
-  instant            The instant address, https://<app>.<ip>.sslip.io: instant [--show] [app]
+  instant            The instant address, https://<app>.<ip>.sslip.io: instant [app]
   instant <provider> Pick sslip.io or nip.io, or off: instant nip.io [app]
-  instant open       No password on the instant address; protect puts it back: instant open [app]
-  protect            Ask for a password: protect [--user moin], password on stdin
-  protect off        Make the app public again: protect off [app] [--yes]
+  password           The app's domains and its instant address ask for a password: password [--user moin] [app], yours on stdin, or none and moin makes one
+  password off       No domain asks for a password: password off [app] [--yes]
 
 Uptime
-  uptime             Uptime of every domain, 24 hours, 7 and 30 days, and the last outages: uptime [app]
+  uptime             Uptime of every domain that serves, 24 hours, 7 and 30 days, and the last outages: uptime [app]
   uptime path        The path uptime visits on a domain: uptime path my-app.example.com /health, or default
   uptime pause       Pause uptime of a domain: uptime pause my-app.example.com
   uptime resume      Visit it every minute again: uptime resume my-app.example.com
@@ -103,19 +104,19 @@ GitHub
   github             Where the moin GitHub App is installed, and the link to install it
   github repos       Repos moin may read, and where to give it more
   github branches    Branches of a repo: github branches owner/name
-  link               Follow a repo; turns the deploy hook off: link owner/name [--branch main] [--auto=false] [--yes]
+  link               Follow a repo; deploy on push turns the deploy hook off: link owner/name [--branch main] [--auto=false] [--yes]
   unlink             Stop following it: unlink [app] [--yes]
 
 CI
-  hook               New deploy hook URL for CI; unlinks the repo: hook [app] [--yes]
+  hook               New deploy hook URL for CI; pushes no longer deploy: hook [app] [--yes]
   hook off           Turn the deploy hook off; CI can no longer deploy: hook off [app] [--yes]
-  registry           List registry logins for private images
-  registry set       Save a login: registry set <host> <username>
+  registry           List registry logins for private images, and the servers that keep each
+  registry set       Hand a server a login: registry set <host> <username> [--server web-1], password on stdin
   registry rm        Remove a login: registry rm <host> [--yes]
 
 Catalog
-  catalog            Open source apps to install in one click, with their newest release
-  catalog <app>      An app of the catalog with every release: catalog umami
+  catalog            Open source apps to install in one click, with their newest version
+  catalog <app>      An app of the catalog with every version: catalog umami
   catalog install    Install one: catalog install umami --server web-1 [--version 3.4.1] [--name stats] [--domain stats.example.com]
 
 Data
@@ -127,24 +128,23 @@ Data
 
 Backups
   backups            The copies of each database, the moments to go back to, how often: backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d]
-  restore            Go back to a copy; can be undone: restore [app] --to before-v12|14:01 [--confirm <app>]
+  restore            Go back to a copy; can be undone: restore [app] --to before-v12|14:01 [--db <path>] [--confirm <app>]
   backup download    Save a copy of a database from your bucket: backup download [app] [--db <path>] [--to <moment>] [--link]
 
 Buckets
-  buckets            Your buckets, the default first, and the apps that use each
-  buckets add        Add one: buckets add <name> --endpoint https://… --bucket … --access-key … [--default], secret key on stdin
-  buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret]
+  buckets            Your buckets, the default first, the apps that use each and the servers that keep its key
+  buckets add        Add one: buckets add <name> --endpoint https://… --bucket … --access-key … [--default] [--server web-1], secret key on stdin
+  buckets edit       Change one: buckets edit <name> [--name …] [--bucket …] [--access-key …] [--secret] [--server web-1]
+  buckets key        Hand one more server the key: buckets key <name> --server web-2, secret key on stdin
   buckets default    Make one the default for apps without their own: buckets default <name>
   buckets rm         Remove one nothing uses; what is in it stays: buckets rm <name> [--confirm <name>]
-  buckets use        Move an app's uploads and backups: buckets use <bucket> [app], or --default
+  buckets use        Move an app's backups: buckets use <bucket> [app], or --default
 
 Env
-  env                List env vars: env [--show] [app]
+  env                List env vars and when each changed; values are write-only: env [app]
   env set            Set env vars: env set [app] KEY=value ...
   env rm             Remove env vars: env rm KEY ... [--yes]
-  env pull           Write the env vars to .env: env pull [file] [--yes]
   env push           Replace all env vars with a .env, after a yes: env push [file] [--yes]
-  run                Run a command with the env vars: run -- go run .
 
 Daemon
   daemon register    Connect this server with an install token
@@ -157,9 +157,9 @@ Daemon
   help               Show this help
 
 Commands that work on an app take it as an argument or from --app, then
-from x-moin.app in compose.yml, then from the name of the current directory.
-Flags may come before or after the arguments. Commands that remove or
-replace something ask first; --yes skips the question, and without a
+the app that follows the GitHub repo of the current directory, then the
+directory's name. Flags may come before or after the arguments. Commands
+that remove or replace something ask first; --yes skips the question, and without a
 terminal they need it. Every command shows its usage with --help.
 
 Docs: https://moin.run/docs, or /docs on your own hub.
@@ -244,15 +244,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		if err := noArguments(command, rest); err != nil {
 			return err
 		}
-		err := client.RemoveConfig()
-		if err != nil {
-			return err
-		}
-		if err := tui.ForgetCache(); err != nil {
-			return err
-		}
-		done(stdout, "Logged out")
-		return nil
+		return logout(ctx, stdout)
+	case "connections":
+		return connections(ctx, rest, stdin, stdout)
 	case "status":
 		return status(ctx, rest, stdout)
 	case "activity":
@@ -275,6 +269,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return redeploy(ctx, rest, stdout)
 	case "logs":
 		return logs(ctx, rest, stdout)
+	case "compose":
+		return compose(ctx, rest, stdout)
 	case "db":
 		return db(ctx, rest, stdout)
 	case "sql":
@@ -303,8 +299,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return domains(ctx, rest, stdin, stdout)
 	case "instant":
 		return instant(ctx, rest, stdout)
-	case "protect":
-		return protect(ctx, rest, stdin, stdout)
+	case "password":
+		return password(ctx, rest, stdin, stdout)
 	case "catalog":
 		return catalog(ctx, rest, stdout)
 	case "uptime":
@@ -317,8 +313,6 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return stop(ctx, rest, stdin, stdout)
 	case "registry":
 		return registry(ctx, rest, stdin, stdout)
-	case "run":
-		return runWithEnv(ctx, rest, stdin, stdout)
 	case "exec":
 		return execCommand(ctx, rest, stdout)
 	case "daemon":
@@ -365,8 +359,22 @@ func openTUI(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			return client.SaveConfig(signedIn)
+			return saveLogin(ctx, signedIn)
 		}})
+}
+
+// saveLogin saves a new login. When this computer had a connection
+// already, it ends now, so logging in again, in the CLI or the TUI, never
+// leaves one behind.
+func saveLogin(ctx context.Context, config client.Config) error {
+	previous, _ := client.LoadSaved()
+	if err := client.SaveConfig(config); err != nil {
+		return err
+	}
+	if previous.RefreshToken != "" && previous.RefreshToken != config.RefreshToken {
+		_ = client.Logout(ctx, previous)
+	}
+	return nil
 }
 
 func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -374,9 +382,9 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	flags := newFlags("login", "login [--url <hub>] [--web] [--token <token>], or the token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
+	flags := newFlags("login", "login [--url <hub>] [--web] [--token <token>], or a CI token on stdin: echo \"$TOKEN\" | "+build.Name+" login")
 	baseURL := flags.String("url", config.URL, "hub URL")
-	token := flags.String("token", "", "personal API token, for CI and scripts; without it "+build.Name+" logs in through the browser, or reads the token from stdin")
+	token := flags.String("token", "", "CI token, for CI and scripts; without it "+build.Name+" logs in through the browser, or reads the token from stdin")
 	web := flags.Bool("web", false, "log in through the browser even without a terminal")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -389,7 +397,9 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err := client.CheckURL(config.URL); err != nil {
 		return err
 	}
-	config.Token, config.TokenFromEnv = *token, false
+	// A new login replaces all of the old one: a CI token has no refresh
+	// token.
+	config = client.Config{URL: config.URL, Token: *token}
 	switch {
 	case config.Token != "":
 	case *web || isTerminal(stdin):
@@ -416,8 +426,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	if err != nil {
 		return err
 	}
-	err = client.SaveConfig(config)
-	if err != nil {
+	if err := saveLogin(ctx, config); err != nil {
 		return err
 	}
 	who := account.Email
@@ -431,14 +440,37 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	return nil
 }
 
+// logout ends this computer's connection at the hub, then forgets it and
+// what the TUI kept. A CI token stays valid: remove it in Settings.
+func logout(ctx context.Context, stdout io.Writer) error {
+	saved, err := client.LoadSaved()
+	if err != nil {
+		return err
+	}
+	if err := client.Logout(ctx, saved); err != nil {
+		step(stdout, "The hub did not answer: %v. Remove the connection in Settings, Connections.", err)
+	}
+	if err := client.RemoveConfig(); err != nil {
+		return err
+	}
+	if err := tui.ForgetCache(); err != nil {
+		return err
+	}
+	done(stdout, "Logged out")
+	if saved.Token != "" && saved.RefreshToken == "" {
+		hint(stdout, "The CI token still works. Remove it in the web: Settings, Connections, or with", build.Name+" connections rm <id>")
+	}
+	return nil
+}
+
 // showDeviceLogin prints the code and the page of a login in the browser,
 // and opens the page when it can.
 func showDeviceLogin(stdout io.Writer, login client.DeviceLogin) {
 	step(stdout, "Your code: %s", style.Bold.Render(login.UserCode))
 	if openBrowser(login.VerificationURIComplete) == nil {
-		step(stdout, "Opened %s in your browser. Check the code and approve it there.", login.VerificationURIComplete)
+		step(stdout, "Opened %s in your browser. Check the code, pick the rights and allow it there.", login.VerificationURIComplete)
 	} else {
-		step(stdout, "Open %s in a browser, check the code and approve it.", style.Bold.Render(login.VerificationURIComplete))
+		step(stdout, "Open %s in a browser, check the code, pick the rights and allow it.", style.Bold.Render(login.VerificationURIComplete))
 	}
 	step(stdout, "Waiting for the browser...")
 }
@@ -816,7 +848,7 @@ func printRules(ctx context.Context, api *client.Client, nameOrID string, stdout
 		lines := server.Rules.Lines()
 		if len(lines) == 0 {
 			fmt.Fprintf(stdout, "%s has no rules: %s may do everything there.\n", style.Bold.Render(server.Name), build.Name)
-			hint(stdout, "Write them on the server in", "/etc/moin/rules")
+			hint(stdout, "Edit them on the server in", "/etc/moin/rules")
 			return nil
 		}
 		fmt.Fprintf(stdout, "/etc/moin/rules on %s:\n\n", style.Bold.Render(server.Name))

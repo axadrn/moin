@@ -29,7 +29,7 @@ The palette is a box in the middle of the screen. Type what you want. Press `ent
 
 ## What it finds
 
-- **Every page**: Overview, Apps, Catalog, Servers, Settings, Team, Alerts, Bucket, Registries, Activity, and each section of every app.
+- **Every page**: Overview, Apps, New app, Catalog, Servers, Settings, Team, Alerts, Bucket, Registries, Integrations, Activity, Account, Security, Connections, Billing, and each section of every app and server.
 - **Every app and every server**.
 - **Actions**: deploy, restart, start, roll back, open the app's domain. In the web the harmless ones run at once; rolling back asks first. In the terminal UI deploy, restart, stop and roll back ask first: `y` does it.
 - **The catalog**: an app you can install, such as ntfy or Umami (web only).
@@ -95,6 +95,7 @@ The terminal UI has more keys on an app, such as `R` to redeploy and `P` to roll
 | Keys | Page |
 | --- | --- |
 | `g` `h` or `g` `o` | Overview |
+| `g` `a` | Apps |
 | `g` `s` | Servers |
 | `g` `,` | Settings |
 | `g` `t` | Team |

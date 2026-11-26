@@ -96,19 +96,20 @@ func TestImpersonationCannotConnectGitHub(t *testing.T) {
 	}
 }
 
-// TestImpersonationHidesPrivateData: env values, database rows and app logs
-// stay hidden from an operator, on the web and in the API.
+// TestImpersonationHidesPrivateData: database rows, database copies and app
+// logs stay hidden from an operator, on the web and in the API. Env vars
+// show only keys anywhere, so they are not private.
 func TestImpersonationHidesPrivateData(t *testing.T) {
 	operatorID := "operator"
 	for path, private := range map[string]bool{
-		"/app/acme/apps/blog/env?show=1":              true,
 		"/app/acme/apps/blog/env":                     false,
 		"/app/acme/apps/blog/logs":                    true,
 		"/app/acme/apps/blog/data?db=app.db":          true,
+		"/app/acme/apps/blog/backups/download":        true,
 		"/app/acme/apps/blog/backups":                 false,
 		"/app/acme/apps/logs":                         false,
 		"/app/acme/apps/data/detail":                  false,
-		"/api/v1/apps/blog/env":                       true,
+		"/api/v1/apps/blog/env":                       false,
 		"/api/v1/apps/blog/logs":                      true,
 		"/api/v1/apps/blog/databases/rows?table=user": true,
 		"/api/v1/apps/blog/databases/tables":          false,
@@ -131,14 +132,14 @@ func TestImpersonationHidesPrivateData(t *testing.T) {
 	}
 
 	// The user's own session still sees everything.
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/apps/blog/env", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/apps/blog/logs", nil)
 	request = request.WithContext(ctxkeys.WithSession(request.Context(), &model.Session{ID: "session-1"}))
 	if !privateDuringImpersonation(request) {
-		t.Fatal("the env API is not marked private")
+		t.Fatal("the logs API is not marked private")
 	}
 	called := false
 	BlockImpersonatedWrites(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })).ServeHTTP(httptest.NewRecorder(), request)
 	if !called {
-		t.Fatal("an ordinary session cannot read its env")
+		t.Fatal("an ordinary session cannot read its logs")
 	}
 }

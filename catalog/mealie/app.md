@@ -1,0 +1,14 @@
+---
+name: Mealie
+pitch: Your recipes, meal plans and shopping lists in one place.
+category: Productivity
+website: "https://mealie.io"
+source: github.com/mealie-recipes/mealie
+license: AGPL-3.0
+image: ghcr.io/mealie-recipes/mealie
+database: sqlite
+login: Sign in as changeme@example.com with the password MyPassword, then change both.
+logo: https://github.com/mealie-recipes/mealie/blob/HEAD/frontend/public/icons/apple-touch-icon.png
+---
+
+Import a recipe from any website with its URL, plan the week and shop from one list, for the whole family. Stored in SQLite on your server.

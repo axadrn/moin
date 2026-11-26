@@ -353,9 +353,8 @@ func (b *backups) prune(ctx context.Context, app string, database protocol.Datab
 }
 
 // loop starts the work of the backups: the copies every minute, the daily
-// checks, and every hour the sweep of the uploads and the search for new
-// databases. Each runs on its own, so a copy that takes hours holds up
-// nothing else.
+// checks, and every hour the search for new databases. Each runs on its
+// own, so a copy that takes hours holds up nothing else.
 func (b *backups) loop(ctx context.Context) {
 	minute := time.NewTicker(time.Minute)
 	defer minute.Stop()
@@ -368,7 +367,6 @@ func (b *backups) loop(ctx context.Context) {
 		case <-minute.C:
 			go b.tick(ctx)
 		case <-hourly.C:
-			go b.sweepUploads(ctx)
 			go b.searchDatabases(ctx)
 			hourly.Reset(time.Hour)
 		case <-daily.C:
@@ -796,7 +794,7 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 	}
 	// The switch is one step: whatever is live is whole, so the app
 	// starts either way.
-	startErr := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeFile(mark.App), func(string, ...any) {}, "start")
+	startErr := b.apps.compose(context.WithoutCancel(ctx), mark.App, b.apps.composeJSON(mark.App), func(string, ...any) {}, "start")
 	if err != nil {
 		slog.Error("backup: how a restore the daemon stopped in ended is not known yet", "app", mark.App, "database", mark.Database, "error", err)
 		return
@@ -814,8 +812,12 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 func (b *backups) sweepTemp() {
 	for _, databases := range b.running() {
 		for _, database := range databases {
-			if !database.Postgres() {
-				sweepTemp(database.HostPath)
+			if database.Postgres() {
+				continue
+			}
+			if root, name, err := databaseFolder(database); err == nil {
+				sweepTemp(root, name)
+				root.Close()
 			}
 		}
 	}
@@ -828,10 +830,16 @@ func (b *backups) busy(app string) bool {
 	return b.restoring[app] > 0
 }
 
-// writeState writes a file whole: a temp file, synced, renamed over the
-// old one, the folder synced. A crash leaves the old file or the new one.
+// writeState writes value as JSON, whole (writeWhole).
 func writeState(name string, value any) error {
 	body, _ := json.Marshal(value)
+	return writeWhole(name, body)
+}
+
+// writeWhole writes a file whole, 0600: a temp file, synced, renamed over
+// the old one, the folder synced. A crash leaves the old file or the new
+// one.
+func writeWhole(name string, body []byte) error {
 	temp := name + ".new"
 	err := errors.Join(os.MkdirAll(filepath.Dir(name), 0o700), os.WriteFile(temp, body, 0o600))
 	if err == nil {

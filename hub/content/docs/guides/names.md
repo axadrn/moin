@@ -1,6 +1,6 @@
 ---
 title: "Names and links"
-description: "Rename apps, servers, buckets and the workspace"
+description: "Rename apps, servers, buckets and the workspace. What changes with the name, and what keeps working."
 group: "Apps"
 order: 8
 ---
@@ -45,7 +45,7 @@ Nothing is lost:
 
 The app's ID is at the end of its **Settings**, with a copy button. Its folder in your bucket is named by it.
 
-Set `x-moin.app: blog` after the rename. Otherwise `moin deploy` in a folder called `my-app` offers to make a new app.
+Every command still finds it in a folder called `my-app`: moin takes the app that follows the folder's repo.
 
 ## Rename the rest
 

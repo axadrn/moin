@@ -52,10 +52,10 @@
   :is(a, button, label).moin-item:is(:hover, :focus-visible)::after,
   a.moin-item[aria-current]::after,
   label.moin-item:is(:has(:checked), :has(:focus-visible))::after {
-    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+    background: var(--hover);
   }
   :is(a, button, label).moin-item:active::after {
-    background: color-mix(in oklab, var(--foreground) 7%, transparent);
+    background: var(--active);
   }
   /* A lit item and the lines next to it give way. */
   :is(a, button, label).moin-item:is(:hover, :focus-visible)::before,

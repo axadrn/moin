@@ -34,10 +34,14 @@ in iOS and macOS), not a website and not a dashboard template.
   draw the scene, the user's app in ink; color stays status
   and long flat shadows give depth. `moin` appears only in the logo, never
   on a ship or a container. Light enough to read on both grounds, simple
-  shapes, still. The hero is a wall of containers under the headline:
+  shapes, still. The home page's last card, the way in, ends on a wall of containers:
   `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`: 20-foot
   containers from the side, staggered, only your-app and two others pulled
-  out, the whole wall resting on the foot of the first screen.
+  out, the whole wall resting on the card's bottom edge.
+- **The overview video.** Under the headline, in the first screen, the
+  landing page plays the overview film (`homeVideo` in `internal/ui/pages/marketing_home.templ`):
+  real moin only, recorded on throwaway servers. It plays without sound
+  and loops; its controls turn the sound on.
 
 Never: an accent color, gradients, glows or blurred blobs, glassmorphism,
 emoji, sparkles, rocket icons, three generic icon cards in a row, small
@@ -82,8 +86,12 @@ instead of on every page.
 
 Overlays (the palette, a select's list, the keys, the confirm dialog) float:
 one step lighter than what they cover (`--popover`: white in light, #2c2c2e
-in dark), a shadow, no border. What is lit inside them is the foreground at 8 %,
-so it shows on any surface.
+in dark), a shadow, no border.
+
+What the pointer is on is lit with `--hover`, the foreground at 8 %, and
+pressed with `--active`, at 12 %: cards, rows, items, everywhere. One value
+in `theme.css`, so it shows on any surface. On a white card in light mode
+that is a step darker than the page, as in iOS.
 
 Never a card in a card. Marketing illustrations (terminal, chat, the
 product frame) keep their own shapes.
@@ -273,7 +281,7 @@ Every status shows as a colored dot or symbol plus a word, everywhere:
 
 ## Activity
 
-Every change in a workspace goes through one helper, `record` in `internal/service/activity.go`, with a `service.Actor`: the member, how it came in (`Source`: web, cli, tui, api, mcp, hook, github or system, the API token by name, the client IP and user agent) and what it touched. moin itself acts as `service.System(workspaceID)`.
+Every change in a workspace goes through one helper, `record` in `internal/service/activity.go`, with a `service.Actor`: the member, how it came in (`Source`: web, cli, tui, api, mcp, hook, github or system, the connection or CI token by name, the client IP and user agent) and what it touched. moin itself acts as `service.System(workspaceID)`.
 
 - **What we log:** the exact time in UTC, who, how, the app and server, and the settings before and after: names, on and off, domains, branches, roles, counts, durations, versions, release numbers, exit codes and error messages.
 - **What we never log:** env var values, secrets, tokens, passwords, SQL text, row contents or cell values, file contents and app log lines. A SQL write keeps the kind of statement, its tables and the row count; a row edit the table, row and column names.
@@ -302,18 +310,19 @@ notes say it under Changed.
 
 | Word | Means | Not |
 | --- | --- | --- |
-| hub | the moin web app and API every server reports to; "moin hub", or your own when you self-host | hub, dashboard, panel, backend, console |
+| hub | the moin web app and API every server reports to; "moin hub", or your own when you self-host | control plane, dashboard, panel, backend, console |
 | daemon | the moin process on a server (`moin daemon`, service `moin-daemon`); it only dials out | agent, node agent, connector |
 | server | a machine with the daemon; named `web-1`, `web-2` … unless you name it | node, host, machine (in copy) |
 | app | what you deploy | project, service (a service is one container of an app's compose file) |
 | deploy | one version of an app, v12; also the verb | release (in copy), build, rollout |
 | restart | start the live deploy again, applying the changes that wait | apply, reload |
 | domain | a name the app answers on, the instant address included | address, route, routing (in copy) |
+| password | the one password of an app; its domains and its instant address ask for it | protection, protect |
 | backup | a copy of an app's database in your bucket, on the schedule you pick | snapshot, dump, history, point in time |
 | restore | going back to a copy; it can be undone as long as the copies are kept | rollback (that is for deploys), recover |
 | check | only the daily test that the newest copy restores | drill, verification, restore check; never for uptime |
 | uptime | whether a domain answers, visited every minute | uptime check, health check (that is for deploys) |
-| bucket | the S3-compatible bucket you bring, for backups and uploads | storage, S3 (alone), object storage (in copy) |
+| bucket | the S3-compatible bucket you bring, for backups | storage, S3 (alone), object storage (in copy) |
 | workspace | the space apps, servers and the team belong to | organization, account, team (for the space) |
 | team | the people in a workspace | members (in copy), users |
 | AI agent | an AI that uses moin through MCP, such as Claude or Cursor | agent (alone) |

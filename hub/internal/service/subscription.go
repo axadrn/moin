@@ -78,6 +78,25 @@ func (s *SubscriptionService) Subscription(workspaceID string) (*model.Subscript
 	return sub, nil
 }
 
+// StartTrial starts the trial of a workspace that waits for its first
+// server. A started trial, a paid plan and the free plan stay as they are,
+// so a second server changes nothing.
+func (s *SubscriptionService) StartTrial(workspaceID string) error {
+	if access.Product.Signup.Mode != access.SignupTrial {
+		return nil
+	}
+	now := time.Now().UTC()
+	endsAt := access.TrialEnd(now)
+	started, err := s.repo.StartTrial(workspaceID, endsAt, now)
+	if err != nil || !started {
+		return err
+	}
+	recordActivity(s.activity, now, System(workspaceID), "billing.trial_started", "subscription", workspaceID, map[string]string{
+		"ends": endsAt.Format("Jan 2, 2006"),
+	})
+	return nil
+}
+
 func (s *SubscriptionService) Access(workspaceID string) (access.Access, error) {
 	subscription, err := s.Subscription(workspaceID)
 	if err != nil {

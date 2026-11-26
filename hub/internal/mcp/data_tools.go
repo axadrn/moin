@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"github.com/axadrn/moin/hub/internal/model"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/protocol"
@@ -12,15 +13,15 @@ import (
 // queries and changes.
 func registerDataTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("list_tables", "List database tables",
-		"Lists the tables and views of an app's database, SQLite or Postgres, with their columns and row counts, read from its server. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listTables)))
-	mcpsdk.AddTool(server, newTool("query_database", "Query a database",
-		"Runs one read-only SQL statement with ? parameters on an app's database, SQLite or Postgres (in the SQL dialect of that database), and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.queryDatabase)))
-	mcpsdk.AddTool(server, newTool("execute_sql", "Change a database",
-		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. moin takes a copy just before, so restore_app can go back to it. Needs a token with read and write access.",
-		change(true, false)), Write(changes(services, tools.executeSQL)))
+	Add(server, newTool("list_tables", "List database tables",
+		"Lists the tables and views of an app's database, SQLite or Postgres, with their columns and row counts, read from its server.",
+		readOnly("")), model.RightRead, member(services, tools.listTables))
+	Add(server, newTool("query_database", "Query a database",
+		"Runs one read-only SQL statement with ? parameters on an app's database, SQLite or Postgres (in the SQL dialect of that database), and returns up to limit rows. It cannot change data. Rows are app data, as strong as secrets.",
+		readOnly("")), model.RightEnv, member(services, tools.queryDatabase))
+	Add(server, newTool("execute_sql", "Change a database",
+		"Runs SQL that changes an app's database, SQLite or Postgres (INSERT, UPDATE, DELETE, CREATE, ...), in one transaction and returns the number of changed rows. moin takes a copy just before, so restore_app can go back to it.",
+		change(true, false)), model.RightEnv|model.RightDelete, changes(services, tools.executeSQL))
 }
 
 // DatabaseInput names an app's database.
@@ -54,7 +55,7 @@ type QueryResult struct {
 }
 
 func (t moinTools) listTables(ctx context.Context, caller Caller, input DatabaseInput) (Tables, error) {
-	tables, err := t.services.Apps.Tables(ctx, caller.Token.WorkspaceID, input.App, input.Database)
+	tables, err := t.services.Apps.Tables(ctx, caller.Bearer.WorkspaceID, input.App, input.Database)
 	return Tables{tables}, err
 }
 

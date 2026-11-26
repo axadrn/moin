@@ -16,8 +16,8 @@ var (
 	ErrTokenUsed     = errors.New("token has already been used")
 )
 
-// Tokens stores the one-time tokens that email links carry: magic links,
-// email verification, password resets and email changes.
+// Tokens stores the one-time tokens that email links carry: email
+// changes.
 type Tokens struct {
 	db *sqlx.DB
 }

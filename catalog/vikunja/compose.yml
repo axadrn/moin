@@ -1,0 +1,13 @@
+services:
+  web:
+    image: vikunja/vikunja:${VERSION}
+    expose: ["3456"]
+    user: "0"
+    environment:
+      VIKUNJA_SERVICE_SECRET: ${SECRET}
+      VIKUNJA_CORS_ENABLE: "false"
+      VIKUNJA_DATABASE_TYPE: sqlite
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+    volumes:
+      - ./data/db:/db
+      - ./data/files:/app/vikunja/files

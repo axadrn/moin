@@ -67,7 +67,7 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			var grant map[string]string
 			json.NewDecoder(r.Body).Decode(&grant)
 			tokens := map[string]string{"code-axadrn": "ghu_axadrn", "code-mallory": "ghu_mallory", "code-nobody": "ghu_nobody"}
-			if grant["client_id"] != "Iv1.test" || grant["client_secret"] != "client-secret" || tokens[grant["code"]] == "" {
+			if grant["client_id"] != "Iv1.test" || grant["client_secret"] != "client-secret" || tokens[grant["code"]] == "" || !strings.HasPrefix(grant["redirect_uri"], "https://") {
 				json.NewEncoder(w).Encode(map[string]string{"error": "bad_verification_code"})
 				return
 			}
@@ -82,6 +82,21 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{"total_count": len(found), "installations": found})
+		case r.URL.Path == "/user":
+			users := map[string]map[string]any{"Bearer ghu_axadrn": {"id": 1, "login": "axadrn", "name": "Ax"}, "Bearer ghu_mallory": {"id": 2, "login": "mallory", "name": nil}}
+			if _, ok := users[auth]; !ok {
+				http.Error(w, "token", http.StatusUnauthorized)
+				return
+			}
+			json.NewEncoder(w).Encode(users[auth])
+		case r.URL.Path == "/user/emails":
+			// axadrn has a verified primary and a secondary address;
+			// mallory added someone else's as primary, unverified.
+			emails := map[string][]map[string]any{
+				"Bearer ghu_axadrn":  {{"email": "work@example.com", "primary": false, "verified": true}, {"email": "ada@example.com", "primary": true, "verified": true}},
+				"Bearer ghu_mallory": {{"email": "victim@example.com", "primary": true, "verified": false}, {"email": "mallory@example.com", "primary": false, "verified": true}},
+			}
+			json.NewEncoder(w).Encode(emails[auth])
 		case auth != "token ghs_test":
 			http.Error(w, "token", http.StatusUnauthorized)
 		case r.URL.Path == "/installation/repositories":
@@ -90,6 +105,15 @@ func (f *fakeGitHub) serve(t *testing.T) *httptest.Server {
 			json.NewEncoder(w).Encode([]map[string]string{{"name": "main"}, {"name": "dev"}})
 		case r.URL.Path == "/repos/axadrn/blog/commits/main" || r.URL.Path == "/repos/axadrn/blog/commits/abc123":
 			json.NewEncoder(w).Encode(map[string]any{"sha": "abc123", "commit": map[string]string{"message": "Fix the footer\n\nLonger text"}})
+		// c0ffee1 is on main; f0f0f0f is a fork's commit GitHub serves
+		// through the repo, and not on main.
+		case r.URL.Path == "/repos/axadrn/blog/commits/c0ffee1" || r.URL.Path == "/repos/axadrn/blog/commits/f0f0f0f":
+			sha := strings.TrimPrefix(r.URL.Path, "/repos/axadrn/blog/commits/")
+			json.NewEncoder(w).Encode(map[string]any{"sha": sha, "commit": map[string]string{"message": "A commit"}})
+		case r.URL.Path == "/repos/axadrn/blog/compare/main...c0ffee1":
+			json.NewEncoder(w).Encode(map[string]string{"status": "behind"})
+		case r.URL.Path == "/repos/axadrn/blog/compare/main...f0f0f0f":
+			json.NewEncoder(w).Encode(map[string]string{"status": "diverged"})
 		case strings.HasPrefix(r.URL.Path, "/repos/axadrn/blog/commits/"):
 			http.Error(w, "No commit found", http.StatusUnprocessableEntity)
 		case r.URL.Path == "/repos/axadrn/blog/tarball/abc123":
@@ -152,7 +176,7 @@ func TestGitHubDeploys(t *testing.T) {
 	if !errors.Is(err, ErrGitHubOff) {
 		t.Fatalf("without the app: err = %v", err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 
 	link, err := apps.GitHubInstallURL(owner)
@@ -204,34 +228,58 @@ func TestGitHubDeploys(t *testing.T) {
 	if events, _ := servers.activity.ListPage(owner.WorkspaceID, model.ActivityFilter{}, "", 50); slices.ContainsFunc(events, func(e model.ActivityEvent) bool { return e.Action == "repo.unlinked" }) {
 		t.Fatal("unlink without a repo shows in the activity")
 	}
-	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", true); !errors.Is(err, ErrRepo) {
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "someone/else", "", new(true)); !errors.Is(err, ErrRepo) {
 		t.Fatalf("link a repo moin cannot read: err = %v", err)
 	}
-	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "nope", true); !errors.Is(err, ErrBranch) {
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "nope", new(true)); !errors.Is(err, ErrBranch) {
 		t.Fatalf("link a branch GitHub does not have: err = %v", err)
 	}
-	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", false); err != nil || app.Branch != "dev" {
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", new(false)); err != nil || app.Branch != "dev" {
 		t.Fatalf("link dev = %+v, %v", app, err)
 	}
-	app, err := apps.LinkRepo(ctx, owner, "blog", "https://github.com/axadrn/blog.git", "", true)
+	app, err := apps.LinkRepo(ctx, owner, "blog", "https://github.com/axadrn/blog.git", "", new(true))
 	if err != nil || app.Repo != "axadrn/blog" || app.Branch != "main" || !app.AutoDeploy || app.InstallationID != 7 {
 		t.Fatalf("link = %+v, %v", app, err)
 	}
-	// One thing brings new versions: a deploy hook unlinks the repo, and
-	// linking a repo turns the hook off.
+	// One thing brings new versions: a deploy hook turns deploy on push
+	// off and keeps the repo for the compose file; turning deploy on push
+	// on turns the hook off.
 	if _, err := apps.RotateDeployHook(owner, "blog"); err != nil {
 		t.Fatal(err)
 	}
-	if hooked, _ := apps.Get(owner.WorkspaceID, "blog"); hooked.Repo != "" || hooked.DeployHookHash == nil {
-		t.Fatalf("a deploy hook kept the repo: %+v", hooked)
+	if hooked, _ := apps.Get(owner.WorkspaceID, "blog"); hooked.Repo != "axadrn/blog" || hooked.AutoDeploy || hooked.DeployHookHash == nil || hooked.DeployFrom() != "ci" {
+		t.Fatalf("a deploy hook: %+v", hooked)
 	}
-	app, err = apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", true)
-	if err != nil || app.Repo != "axadrn/blog" || app.DeployHookHash != nil {
-		t.Fatalf("a link kept the deploy hook: %+v, %v", app, err)
+	// Without a word on deploy on push, an app with a deploy hook keeps it:
+	// CI keeps deploying, as on the web.
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", nil); err != nil || app.AutoDeploy || app.DeployHookHash == nil {
+		t.Fatalf("link without auto_deploy, with a hook: %+v, %v", app, err)
+	}
+	app, err = apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", new(true))
+	if err != nil || app.Repo != "axadrn/blog" || !app.AutoDeploy || app.DeployHookHash != nil || app.DeployFrom() != "github" {
+		t.Fatalf("deploy on push kept the deploy hook: %+v, %v", app, err)
+	}
+	// Without a word on deploy on push and without a hook, it is on, as on
+	// the web and in the CLI.
+	if _, err := apps.SetAutoDeploy(owner, "blog", false); err != nil {
+		t.Fatal(err)
+	}
+	if app, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "dev", nil); err != nil || !app.AutoDeploy || app.Branch != "dev" {
+		t.Fatalf("link without auto_deploy: %+v, %v", app, err)
+	}
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", new(true)); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := apps.DeployRef(ctx, owner, "blog", "nope"); !errors.Is(err, ErrRef) {
 		t.Fatalf("deploy an unknown ref: err = %v", err)
 	}
+	if _, err := apps.DeployRef(ctx, owner, "blog", "f0f0f0f"); !errors.Is(err, ErrNotOnBranch) {
+		t.Fatalf("deploy a fork's commit: err = %v", err)
+	}
+	if deploy, err := apps.DeployRef(ctx, owner, "blog", "c0ffee1"); err != nil || deploy.CommitSHA != "c0ffee1" {
+		t.Fatalf("deploy a commit on the branch: %+v, %v", deploy, err)
+	}
+	finishDeploys(t, apps, app.ID)
 
 	deploy, err := apps.DeployRef(ctx, owner, "blog", "")
 	if err != nil {
@@ -264,7 +312,7 @@ func TestGitHubDeploys(t *testing.T) {
 	apps.GitHubPush(ctx, 7, "axadrn/blog", "other-branch", "abc123")
 	apps.GitHubPush(ctx, 7, "axadrn/blog", "main", "abc123")
 	_, deploys, err := apps.Deploys(owner.WorkspaceID, "blog", 10)
-	if err != nil || len(deploys) != 2 || deploys[0].CommitSHA != "abc123" {
+	if err != nil || len(deploys) != 3 || deploys[0].CommitSHA != "abc123" {
 		t.Fatalf("after the push: %d deploys, %v", len(deploys), err)
 	}
 	// A push deploy names the branch, not the commit twice.
@@ -298,7 +346,7 @@ func TestGitHubChecksInstaller(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 	stateOf := func(actor Actor) string {
 		link, _ := apps.GitHubInstallURL(actor)
@@ -341,15 +389,18 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apps.SetGitHub(github)
+	apps.UseGitHubApp(githubAppOf(github))
 	ctx := context.Background()
 
 	link, err := apps.GitHubConnectURL(owner)
-	if err != nil || !strings.HasPrefix(link, githubServer.URL+"/login/oauth/authorize?client_id=Iv1.test&state=") {
+	if err != nil || !strings.HasPrefix(link, githubServer.URL+"/login/oauth/authorize?client_id=Iv1.test&redirect_uri=") {
 		t.Fatalf("connect link = %q, %v", link, err)
 	}
 	parsed, _ := url.Parse(link)
 	state := parsed.Query().Get("state")
+	if redirect := parsed.Query().Get("redirect_uri"); !strings.HasSuffix(redirect, "/app/github/setup") {
+		t.Fatalf("redirect_uri = %q, want the setup URL", redirect)
+	}
 
 	// After a change of the repos ("Redirect on update") GitHub sends the
 	// installation without a code: moin asks for a sign-in with the same
@@ -376,5 +427,140 @@ func TestGitHubAlreadyInstalled(t *testing.T) {
 	}
 	if installations, _ := apps.GitHubInstallations(other.WorkspaceID); len(installations) != 0 {
 		t.Fatalf("other workspace installations = %+v", installations)
+	}
+}
+
+// TestImageDeploysTakeTheCommit: an image deploy of an app that follows a
+// repo takes the compose file of a commit there, the one CI sends to the
+// hook or names by hand, else the head of the branch. Turning the hook
+// off leaves the link as it is.
+func TestImageDeploysTakeTheCommit(t *testing.T) {
+	apps, servers, server, daemon := newAppService(t)
+	githubServer := (&fakeGitHub{}).serve(t)
+	defer githubServer.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	github, err := NewGitHub("123", "moin-test", string(keyPEM), "hook-secret", "", "", githubServer.URL, githubServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apps.UseGitHubApp(githubAppOf(github))
+	ctx := context.Background()
+	link, _ := apps.GitHubInstallURL(owner)
+	parsed, _ := url.Parse(link)
+	if _, err := apps.ConnectGitHub(ctx, owner, 7, parsed.Query().Get("state"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.Create(owner, "blog", server.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apps.LinkRepo(ctx, owner, "blog", "axadrn/blog", "", new(true)); err != nil {
+		t.Fatal(err)
+	}
+	hook, err := apps.RotateDeployHook(owner, "blog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := hook[strings.LastIndex(hook, "/")+1:]
+	deployed := func(deploy *model.Deploy, image, ref string) {
+		t.Helper()
+		var start protocol.DeployStart
+		daemon.last(t, protocol.TypeDeployStart, &start)
+		if start.Image != image || !strings.HasSuffix(start.SourceURL, "/repos/axadrn/blog/tarball/abc123") || !start.SourceStripTop {
+			t.Fatalf("deploy.start = %+v", start)
+		}
+		if deploy.Image != image || deploy.Ref != ref || deploy.CommitSHA != "abc123" || deploy.CommitMessage != "Fix the footer" {
+			t.Fatalf("deploy = %+v", deploy)
+		}
+		daemonSays(t, servers, server.ID, protocol.TypeDeployDone, protocol.DeployDone{DeployID: deploy.ID, OK: true})
+	}
+
+	// By hand: the head of the branch, or the ref named.
+	first, err := apps.Deploy(ctx, owner, "blog", "ghcr.io/me/blog:v1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deployed(first, "ghcr.io/me/blog:v1", "main")
+	second, err := apps.Deploy(ctx, owner, "blog", "ghcr.io/me/blog:v2", "abc123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deployed(second, "ghcr.io/me/blog:v2", "abc123")
+
+	// The hook: the commit CI sends, else the head of the branch.
+	_, deploy, err := apps.DeployHook(ctx, token, "ghcr.io/me/blog:abc", "abc123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deployed(deploy, "ghcr.io/me/blog:abc", "abc123")
+	if _, deploy, err = apps.DeployHook(ctx, token, "ghcr.io/me/blog:def", ""); err != nil {
+		t.Fatal(err)
+	}
+	deployed(deploy, "ghcr.io/me/blog:def", "main")
+	if _, _, err := apps.DeployHook(ctx, token, "ghcr.io/me/blog:ghi", "--upload-pack=x"); !errors.Is(err, ErrRefName) {
+		t.Fatalf("a commit that is no name: err = %v", err)
+	}
+	if _, _, err := apps.DeployHook(ctx, token, "ghcr.io/me/blog:ghi", "def456"); !errors.Is(err, ErrRef) {
+		t.Fatalf("a commit GitHub does not know: err = %v", err)
+	}
+	var refused *HookImageError
+	if _, _, err := apps.DeployHook(ctx, token, "nginx:1.27", "abc123"); !errors.As(err, &refused) {
+		t.Fatalf("hook deployed another image: err = %v", err)
+	}
+
+	// Turning the hook off leaves the link; pushes still do not deploy.
+	if _, err := apps.RemoveDeployHook(owner, "blog"); err != nil {
+		t.Fatal(err)
+	}
+	if app, _ := apps.Get(owner.WorkspaceID, "blog"); app.Repo != "axadrn/blog" || app.AutoDeploy || app.DeployFrom() != "github" {
+		t.Fatalf("after the hook: %+v", app)
+	}
+	// Deploy on push turns a hook off.
+	if _, err := apps.RotateDeployHook(owner, "blog"); err != nil {
+		t.Fatal(err)
+	}
+	if app, err := apps.SetAutoDeploy(owner, "blog", true); err != nil || !app.AutoDeploy || app.DeployHookHash != nil {
+		t.Fatalf("deploy on push = %+v, %v", app, err)
+	}
+}
+
+// TestGitHubAccount: a sign-in with the app gives the GitHub account with
+// its verified primary email only. A secondary address or an unverified
+// primary one never counts.
+func TestGitHubAccount(t *testing.T) {
+	githubServer := (&fakeGitHub{}).serve(t)
+	defer githubServer.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	github, err := NewGitHub("123", "moin-test", string(keyPEM), "hook-secret", "Iv1.test", "client-secret", githubServer.URL, githubServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	const callback = "https://moin.example.com/auth/github/callback"
+
+	link, _ := url.Parse(github.AuthorizeURL("state-1", callback))
+	if link.Query().Get("redirect_uri") != callback || link.Query().Get("state") != "state-1" || link.Query().Get("client_id") != "Iv1.test" {
+		t.Fatalf("authorize URL = %s", link)
+	}
+	account, err := github.Account(ctx, "code-axadrn", callback)
+	if err != nil || account != (GitHubAccount{ID: 1, Login: "axadrn", Name: "Ax", Email: "ada@example.com"}) {
+		t.Fatalf("Account() = %+v, %v", account, err)
+	}
+	account, err = github.Account(ctx, "code-mallory", callback)
+	if err != nil || account.ID != 2 || account.Email != "" {
+		t.Fatalf("an unverified primary email: Account() = %+v, %v", account, err)
+	}
+	if _, err := github.Account(ctx, "code-wrong", callback); err == nil {
+		t.Fatal("a wrong code signed in")
+	}
+	if _, err := github.Account(ctx, "code-axadrn", ""); err == nil {
+		t.Fatal("a code without the redirect URI signed in")
 	}
 }

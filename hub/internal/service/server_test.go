@@ -21,7 +21,7 @@ func newServerService(t *testing.T) *ServerService {
 	return NewServerService(repository.NewServers(database), repository.NewActivity(database), "https://moin.example.com/")
 }
 
-var testHello = protocol.Hello{ProtocolVersion: protocol.Version, DaemonVersion: "v0.1.0", Hostname: "box", OS: "linux", Arch: "arm64"}
+var testHello = protocol.Hello{ProtocolVersion: protocol.Version, DaemonVersion: "v1.0.0-beta.35", Hostname: "box", OS: "linux", Arch: "arm64"}
 
 func TestInstallTokenWorksOnce(t *testing.T) {
 	servers := newServerService(t)
@@ -302,5 +302,80 @@ func TestRegisterCleansHello(t *testing.T) {
 	}
 	if len(server.DaemonVersion) > 128 || !utf8.ValidString(server.DaemonVersion) {
 		t.Fatalf("version = %q", server.DaemonVersion)
+	}
+}
+
+// TestTheTrialStartsWithTheFirstServer: a workspace without a server has
+// no trial clock, the first daemon that connects starts it, and a second
+// server does not start it again.
+func TestTheTrialStartsWithTheFirstServer(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "owner"})
+	subscriptionRepository := repository.NewSubscriptions(database)
+	fixture.Subscription.PlanID, fixture.Subscription.Status = access.PlanPro, access.StatusTrialing
+	if err := subscriptionRepository.Update(fixture.Subscription); err != nil {
+		t.Fatal(err)
+	}
+	subscriptions := NewSubscriptionService(subscriptionRepository, repository.NewAdmin(database))
+	activity := repository.NewActivity(database)
+	subscriptions.UseActivity(activity)
+	servers := NewServerService(repository.NewServers(database), activity, "https://moin.example.com/")
+	servers.RequirePlanFor(subscriptions.Access)
+	servers.StartTrialWith(subscriptions.StartTrial)
+
+	trial := func() *time.Time {
+		t.Helper()
+		subscription, err := subscriptionRepository.ByWorkspaceID(owner.WorkspaceID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if current := subscription.Access(); current.State != access.StateTrial || !current.Has(access.FeatureChanges) {
+			t.Fatalf("access = %s, changes %v", current.State, current.Has(access.FeatureChanges))
+		}
+		return subscription.CurrentPeriodEnd
+	}
+	connect := func(name string) {
+		t.Helper()
+		server, installToken, err := servers.Create(owner, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := servers.Register(installToken, testHello); err != nil {
+			t.Fatal(err)
+		}
+		servers.Connect(server, testHello, "203.0.113.5", func() {}, func(protocol.Message) error { return nil })
+	}
+
+	// Added but not connected yet: the trial still waits.
+	if _, _, err := servers.Create(owner, "web-1"); err != nil {
+		t.Fatal(err)
+	}
+	if ends := trial(); ends != nil {
+		t.Fatalf("a server that never connected started the trial until %s", ends)
+	}
+
+	connect("web-2")
+	first := trial()
+	if first == nil || first.Before(time.Now().AddDate(0, 0, 29)) || first.After(time.Now().AddDate(0, 0, 31)) {
+		t.Fatalf("the first server started the trial until %v, want 30 days", first)
+	}
+
+	connect("web-3")
+	if second := trial(); second == nil || !second.Equal(*first) {
+		t.Fatalf("a second server moved the trial end from %s to %v", first, second)
+	}
+
+	events, err := activity.ListByWorkspace(owner.WorkspaceID, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := 0
+	for _, event := range events {
+		if event.Action == "billing.trial_started" {
+			started++
+		}
+	}
+	if started != 1 {
+		t.Fatalf("the activity has %d trial starts, want 1", started)
 	}
 }

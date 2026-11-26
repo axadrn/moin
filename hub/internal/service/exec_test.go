@@ -41,14 +41,11 @@ func message(t *testing.T, messageType protocol.MessageType, data any) protocol.
 }
 
 // TestExec: an owner runs a command, its output arrives in pieces, and the
-// activity records the command with the app's secrets masked and the exit
-// code, never the output. A member may not run one.
+// activity records the command as the daemon masked it and the exit code,
+// never the output. A member may not run one.
 func TestExec(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
 	if _, err := apps.Create(owner, "shop", "web-1"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := apps.SetEnv(owner, "shop", map[string]string{"DB_PASSWORD": "hunter2-secret"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	ownerMember := &model.WorkspaceMember{WorkspaceID: owner.WorkspaceID, UserID: "owner", Role: model.WorkspaceRoleOwner}
@@ -65,7 +62,7 @@ func TestExec(t *testing.T) {
 	go daemonStreams(servers, server.ID, daemon, protocol.TypeExecStart,
 		message(t, protocol.TypeExecOutput, protocol.ExecOutput{Data: "ALTER "}),
 		message(t, protocol.TypeExecOutput, protocol.ExecOutput{Data: "ROLE\n"}),
-		message(t, protocol.TypeExecDone, protocol.ExecDone{ExitCode: 3}))
+		message(t, protocol.TypeExecDone, protocol.ExecDone{ExitCode: 3, Command: "psql -c 'alter user shop password •••'"}))
 	var output strings.Builder
 	result, err := apps.Exec(context.Background(), ownerMember, Source{}, "shop", input, func(piece string) { output.WriteString(piece) })
 	if err != nil || result.ExitCode != 3 || output.String() != "ALTER ROLE\n" {
@@ -90,8 +87,8 @@ func TestExec(t *testing.T) {
 	if details == nil || details["exit_code"] != "3" || details["service"] != "db" {
 		t.Fatalf("activity = %v", details)
 	}
-	if strings.Contains(details["command"], "hunter2-secret") || !strings.Contains(details["command"], "•••") {
-		t.Errorf("activity command not masked: %q", details["command"])
+	if details["command"] != "psql -c 'alter user shop password •••'" {
+		t.Errorf("activity command = %q, want the daemon's", details["command"])
 	}
 	for _, value := range details {
 		if strings.Contains(value, "ROLE") {
@@ -114,14 +111,5 @@ func TestExecOldDaemon(t *testing.T) {
 	var daemonErr *DaemonError
 	if !errors.As(err, &daemonErr) || !strings.Contains(daemonErr.Message, "update it") {
 		t.Fatalf("old daemon: %v", err)
-	}
-}
-
-// TestMaskValues: the longest value masks first, so a value inside another
-// leaves nothing of the longer one.
-func TestMaskValues(t *testing.T) {
-	got := maskValues("pw=abcdef123 short=abcdef", []string{"abcdef", "abcdef123"})
-	if got != "pw=••• short=•••" {
-		t.Errorf("maskValues = %q", got)
 	}
 }

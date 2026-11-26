@@ -1,0 +1,6 @@
+services:
+  web:
+    image: kanboard/kanboard:${VERSION}
+    expose: ["80"]
+    volumes:
+      - ./data:/var/www/app/data

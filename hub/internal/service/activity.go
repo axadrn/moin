@@ -28,8 +28,8 @@ const (
 	ViaSystem = "system"
 )
 
-// Source is how a change came in: the surface, the API token by name, and
-// the client IP and user agent of the member's own request.
+// Source is how a change came in: the surface, the connection or CI token
+// by name, and the client IP and user agent of the member's own request.
 type Source struct {
 	Via       string
 	Token     string
@@ -37,14 +37,14 @@ type Source struct {
 	UserAgent string
 }
 
-// RequestSource is how a request came in. A session is the web. An API token
-// is the CLI or the TUI by their user agent, and the API for anything else;
-// MCP sets its own Via.
+// RequestSource is how a request came in. A session is the web. A
+// connection or a CI token is the CLI or the TUI by their user agent, and
+// the API for anything else; MCP sets its own Via.
 func RequestSource(ctx context.Context) Source {
 	client := ctxkeys.ClientOf(ctx)
 	source := Source{Via: ViaWeb, IP: client.IP, UserAgent: client.UserAgent}
-	if token := ctxkeys.APIToken(ctx); token != nil {
-		source.Token = token.Name
+	if bearer := ctxkeys.Bearer(ctx); bearer != nil {
+		source.Token = bearer.Name
 		source.Via = viaOf(client.UserAgent)
 	}
 	return source

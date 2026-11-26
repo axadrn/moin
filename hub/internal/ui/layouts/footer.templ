@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/compare"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
@@ -20,11 +21,12 @@ func footerColumns(billing bool) []components.FooterColumn {
 		product = append(product, components.FooterLink{Label: "Pricing", Href: "/#pricing"})
 	}
 	product = append(product,
+		components.FooterLink{Label: "Blog", Href: "/blog"},
 		components.FooterLink{Label: "Changelog", Href: "/changelog"},
 		components.FooterLink{Label: "Roadmap", Href: "/roadmap"},
 		components.FooterLink{Label: "Next", Href: "/next"},
 	)
-	return []components.FooterColumn{
+	columns := []components.FooterColumn{
 		{Title: "Product", Links: product},
 		{Title: "Docs", Links: []components.FooterLink{
 			{Label: "Get started", Href: "/docs/getting-started"},
@@ -43,6 +45,20 @@ func footerColumns(billing bool) []components.FooterColumn {
 			{Label: "Privacy", Href: "/legal/privacy"},
 		}},
 	}
+	// The comparisons, like the legal pages, belong to the hosted service.
+	if billing {
+		columns = append(columns, components.FooterColumn{Title: "Compare", Links: compareLinks()})
+	}
+	return columns
+}
+
+// compareLinks are every comparison and the page with all of them.
+func compareLinks() []components.FooterLink {
+	links := make([]components.FooterLink, 0, len(compare.Competitors)+1)
+	for _, competitor := range compare.Competitors {
+		links = append(links, components.FooterLink{Label: brand.Name + " vs " + competitor.Name, Href: "/compare/" + competitor.Slug})
+	}
+	return append(links, components.FooterLink{Label: "All comparisons", Href: "/compare"})
 }
 
 // Footer is the site footer: the wordmark and the promise, the columns, then

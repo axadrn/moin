@@ -82,3 +82,19 @@ func TestBuckets(t *testing.T) {
 		t.Errorf("remove in use: code %d, stderr %q", code, stderr)
 	}
 }
+
+// TestBucketKeyForAnotherServer: a server without the key is named in the
+// list with the command that fills it, and buckets key hands it the key.
+func TestBucketKeyForAnotherServer(t *testing.T) {
+	list := `{"items":[{"name":"backups","default":true,"bucket":"moin","access_key":"AKIA1","servers":[{"server":"server-1","updated_at":"2026-11-24T10:00:00Z"}],"missing_on":["server-2"]}]}`
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/buckets": list}}
+	code, stdout, stderr := runCLI(t, api, "buckets")
+	if code != 0 || !strings.Contains(stdout, "server-1; not on server-2") || !strings.Contains(stdout, "buckets key backups --server server-2") {
+		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	api = &fakeAPI{answers: map[string]string{"PUT /api/v1/buckets/backups/key": `{"name":"backups","servers":[{"server":"server-1"},{"server":"server-2"}]}`}}
+	code, stdout, stderr = runWithStdin(t, api, "the-secret\n", "buckets", "key", "backups", "--server", "server-2")
+	if code != 0 || !strings.Contains(stdout, "on server-1, server-2 now") || !api.seen(`PUT /api/v1/buckets/backups/key {"secret_key":"the-secret","server":"server-2"}`) {
+		t.Fatalf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+}

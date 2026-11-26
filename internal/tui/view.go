@@ -198,11 +198,7 @@ func (m model) viewKeys() []kb {
 		case tBackups:
 			ks = append(ks, kb{"enter", "go back"}, kb{"t", "a time"}, kb{"c", "download a copy"})
 		case tEnv:
-			v := "show values"
-			if m.shown {
-				v = "hide values"
-			}
-			ks = append(ks, kb{"a", "set"}, kb{"x", "remove"}, kb{"v", v}, kb{"E", "editor"})
+			ks = append(ks, kb{"a", "set"}, kb{"x", "remove"}, kb{"E", "editor"})
 		case tDomains:
 			ks = append(ks, kb{"a", "add"}, kb{"x", "remove"}, kb{"c", "canonical"}, kb{"p", "password"})
 		case tUptime:

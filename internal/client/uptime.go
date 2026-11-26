@@ -53,7 +53,7 @@ func (c *Client) Uptime(ctx context.Context, app string) (Uptime, error) {
 }
 
 // SetUptime changes the path of a domain's visit, nil keeps it and ""
-// goes back to the health path or /, and pauses or resumes it, nil keeps it.
+// goes back to /, and pauses or resumes it, nil keeps it.
 func (c *Client) SetUptime(ctx context.Context, app, domain string, path *string, paused *bool) (UptimeDomain, error) {
 	body := map[string]any{}
 	if path != nil {

@@ -46,7 +46,9 @@ func (e *apiEnvironment) upload(t *testing.T, token, field, filename string, con
 	body, contentType := multipartBody(t, field, filename, content)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/account/avatar", body)
 	request.Header.Set("Content-Type", contentType)
-	request.Header.Set("Authorization", "Bearer "+token)
+	request.AddCookie(&http.Cookie{Name: "session_token", Value: token})
+	request.AddCookie(&http.Cookie{Name: "csrf_token", Value: testCSRFToken})
+	request.Header.Set("X-CSRF-Token", testCSRFToken)
 	recorder := httptest.NewRecorder()
 	e.handler.ServeHTTP(recorder, request)
 	return recorder
@@ -65,7 +67,7 @@ func TestUploadAndDeleteAvatar(t *testing.T) {
 	if uploaded.AvatarURL == nil || *uploaded.AvatarURL == "" {
 		t.Fatalf("avatar_url = %v", uploaded.AvatarURL)
 	}
-	account := decodeBody[map[string]any](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}))
+	account := decodeBody[map[string]any](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token}))
 	if account["avatar_url"] != *uploaded.AvatarURL {
 		t.Fatalf("account avatar_url = %#v, want %s", account["avatar_url"], *uploaded.AvatarURL)
 	}
@@ -77,9 +79,9 @@ func TestUploadAndDeleteAvatar(t *testing.T) {
 		t.Fatalf("files = %d, err = %v, want the replaced avatar only", len(files), err)
 	}
 
-	deleted := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/avatar", bearer: token})
+	deleted := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/avatar", cookie: token})
 	expectStatus(t, deleted, http.StatusNoContent)
-	account = decodeBody[map[string]any](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}))
+	account = decodeBody[map[string]any](t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token}))
 	if account["avatar_url"] != nil {
 		t.Fatalf("avatar_url = %#v after delete", account["avatar_url"])
 	}
@@ -100,7 +102,7 @@ func TestUploadAvatarValidation(t *testing.T) {
 	if detail.Fields["file"] != "Choose an image to upload." {
 		t.Fatalf("fields = %#v", detail.Fields)
 	}
-	jsonBody := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/avatar", body: `{}`, bearer: token})
+	jsonBody := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/account/avatar", body: `{}`, cookie: token})
 	expectError(t, jsonBody, http.StatusBadRequest, "invalid_body")
 	tooLarge := environment.upload(t, token, "file", "huge.png", make([]byte, api.MaxAvatarBytes+1))
 	expectError(t, tooLarge, http.StatusBadRequest, "invalid_body")

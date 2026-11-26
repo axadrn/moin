@@ -52,17 +52,16 @@ const appSelect = `
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), 0) AS latest_number,
 		COALESCE((SELECT status FROM deploys WHERE app_id = a.id ORDER BY number DESC LIMIT 1), '') AS latest_status,
 		COALESCE((SELECT number FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), 0) AS live_number,
-		COALESCE((SELECT image FROM deploys WHERE app_id = a.id AND status = 'succeeded' AND (image != '' OR source_key != '' OR from_number > 0) ORDER BY number DESC LIMIT 1), '') AS live_image,
-		COALESCE((SELECT detected FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1), '') AS live_detected
+		COALESCE((SELECT image FROM deploys WHERE app_id = a.id AND status = 'succeeded' AND (image != '' OR source_key != '' OR from_number > 0) ORDER BY number DESC LIMIT 1), '') AS live_image
 	FROM apps a JOIN servers s ON s.id = a.server_id JOIN workspaces w ON w.id = a.workspace_id`
 
 func (r *Apps) Create(app *model.App) error {
 	if app.Folder == "" {
 		app.Folder = app.Name
 	}
-	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.CreatedAt)
+	_, err := r.db.Exec(`INSERT INTO apps (id, workspace_id, server_id, name, folder, password, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		app.ID, app.WorkspaceID, app.ServerID, app.Name, app.Folder, app.Password, app.CreatedAt)
 	if err != nil && (strings.Contains(err.Error(), "UNIQUE constraint failed: apps.workspace_id, apps.name") || strings.Contains(err.Error(), "duplicate key value")) {
 		return ErrDuplicateApp
 	}
@@ -72,6 +71,7 @@ func (r *Apps) Create(app *model.App) error {
 	return err
 }
 
+// get finds one app with its domains.
 func (r *Apps) get(query string, args ...any) (*model.App, error) {
 	app := &model.App{}
 	err := r.db.Get(app, query, args...)
@@ -81,7 +81,27 @@ func (r *Apps) get(query string, args ...any) (*model.App, error) {
 	if err != nil {
 		return nil, err
 	}
+	app.Domains, err = r.Domains(app.ID)
+	if err != nil {
+		return nil, err
+	}
 	return app, nil
+}
+
+// list finds apps, each with its domains.
+func (r *Apps) list(query string, args ...any) ([]model.App, error) {
+	apps := []model.App{}
+	err := r.db.Select(&apps, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	for i := range apps {
+		apps[i].Domains, err = r.Domains(apps[i].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return apps, nil
 }
 
 // ByIDOrNameForWorkspace finds an app of the workspace by its ID or its
@@ -123,9 +143,7 @@ func (r *Apps) ByID(id string) (*model.App, error) {
 }
 
 func (r *Apps) ListByWorkspaceID(workspaceID string) ([]model.App, error) {
-	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.workspace_id = $1 ORDER BY a.name, a.id`, workspaceID)
-	return apps, err
+	return r.list(appSelect+` WHERE a.workspace_id = $1 ORDER BY a.name, a.id`, workspaceID)
 }
 
 func (r *Apps) DeleteForWorkspace(id, workspaceID string) error {
@@ -142,10 +160,10 @@ func (r *Apps) DeleteForWorkspace(id, workspaceID string) error {
 // CreateDeploy numbers the deploy after the newest one of its app.
 func (r *Apps) CreateDeploy(deploy *model.Deploy) error {
 	return r.db.QueryRow(`
-		INSERT INTO deploys (id, app_id, number, status, source_key, source_sha256, from_number, image, ref, commit_sha, commit_message, created_at)
-		VALUES ($1, $2, (SELECT COALESCE(MAX(number), 0) + 1 FROM deploys WHERE app_id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO deploys (id, app_id, number, status, source_key, from_number, image, ref, commit_sha, commit_message, created_at)
+		VALUES ($1, $2, (SELECT COALESCE(MAX(number), 0) + 1 FROM deploys WHERE app_id = $2), $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING number
-	`, deploy.ID, deploy.AppID, deploy.Status, deploy.SourceKey, deploy.SourceSHA256, deploy.FromNumber, deploy.Image, deploy.Ref, deploy.CommitSHA, deploy.CommitMessage, deploy.CreatedAt).Scan(&deploy.Number)
+	`, deploy.ID, deploy.AppID, deploy.Status, deploy.SourceKey, deploy.FromNumber, deploy.Image, deploy.Ref, deploy.CommitSHA, deploy.CommitMessage, deploy.CreatedAt).Scan(&deploy.Number)
 }
 
 func (r *Apps) getDeploy(query string, args ...any) (*model.Deploy, error) {
@@ -160,31 +178,44 @@ func (r *Apps) getDeploy(query string, args ...any) (*model.Deploy, error) {
 	return deploy, nil
 }
 
+// deployColumns are the columns of a deploy with its log. The table keeps
+// source_sha256 of the removed folder uploads, unused.
+const deployColumns = `id, app_id, number, status, source_key, from_number, image, ref, commit_sha, commit_message, error, log, detected, created_at, finished_at`
+
 func (r *Apps) Deploy(appID string, number int) (*model.Deploy, error) {
-	return r.getDeploy(`SELECT * FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
+	return r.getDeploy(`SELECT `+deployColumns+` FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
 }
 
 func (r *Apps) DeployByID(id string) (*model.Deploy, error) {
-	return r.getDeploy(`SELECT * FROM deploys WHERE id = $1`, id)
+	return r.getDeploy(`SELECT `+deployColumns+` FROM deploys WHERE id = $1`, id)
 }
 
 // ListDeploys returns the newest deploys first, without their logs.
 func (r *Apps) ListDeploys(appID string, limit int) ([]model.Deploy, error) {
 	deploys := []model.Deploy{}
 	err := r.db.Select(&deploys, `
-		SELECT id, app_id, number, status, source_key, source_sha256, from_number, image, ref, commit_sha, commit_message, error, '' AS log, detected, created_at, finished_at
+		SELECT id, app_id, number, status, source_key, from_number, image, ref, commit_sha, commit_message, error, '' AS log, detected, created_at, finished_at
 		FROM deploys WHERE app_id = $1 ORDER BY number DESC LIMIT $2
 	`, appID, limit)
 	return deploys, err
 }
 
-// FinishDeploy ends a running deploy. A deploy that already ended stays as it is.
-func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected string, at time.Time) error {
+// FinishDeploy ends a running deploy, with the compose file the daemon
+// made for it. A deploy that already ended stays as it is.
+func (r *Apps) FinishDeploy(id, status, errorMessage, log, detected, composeFile string, at time.Time) error {
 	_, err := r.db.Exec(`
-		UPDATE deploys SET status = $1, error = $2, log = $3, detected = CASE WHEN $4 = '' THEN detected ELSE $4 END, finished_at = $5
-		WHERE id = $6 AND status = 'running'
-	`, status, errorMessage, log, detected, at, id)
+		UPDATE deploys SET status = $1, error = $2, log = $3, detected = CASE WHEN $4 = '' THEN detected ELSE $4 END, compose_file = $5, finished_at = $6
+		WHERE id = $7 AND status = 'running'
+	`, status, errorMessage, log, detected, composeFile, at, id)
 	return err
+}
+
+// ComposeFile is the compose file of deploy number of an app, "" when its
+// daemon sent none.
+func (r *Apps) ComposeFile(appID string, number int) (string, error) {
+	var text string
+	err := r.db.Get(&text, `SELECT compose_file FROM deploys WHERE app_id = $1 AND number = $2`, appID, number)
+	return text, err
 }
 
 // SetDeployDetected replaces what a deploy has in it.
@@ -193,34 +224,50 @@ func (r *Apps) SetDeployDetected(id, detected string) error {
 	return err
 }
 
-func (r *Apps) Env(appID string) (map[string]string, error) {
-	rows := []struct {
-		Key   string `db:"key"`
-		Value string `db:"value"`
-	}{}
-	err := r.db.Select(&rows, `SELECT key, value FROM app_env WHERE app_id = $1`, appID)
-	if err != nil {
-		return nil, err
-	}
-	env := make(map[string]string, len(rows))
-	for _, row := range rows {
-		env[row.Key] = row.Value
-	}
-	return env, nil
+// EnvVars lists the env vars of an app by key, without their values.
+func (r *Apps) EnvVars(appID string) ([]model.EnvVar, error) {
+	vars := []model.EnvVar{}
+	err := r.db.Select(&vars, `SELECT key, updated_at FROM app_env WHERE app_id = $1 ORDER BY key`, appID)
+	return vars, err
 }
 
-// SetEnv writes and removes env vars in one transaction.
-func (r *Apps) SetEnv(appID string, set map[string]string, unset []string, at time.Time) error {
+// KeepEnv makes keys the env keys of an app, as its server reported them:
+// new ones count from at, the others keep their date.
+func (r *Apps) KeepEnv(appID string, keys []string, at time.Time) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	for key, value := range set {
+	query, args, err := sqlx.In(`DELETE FROM app_env WHERE app_id = ? AND key NOT IN (?)`, appID, append([]string{""}, keys...))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(tx.Rebind(query), args...); err != nil {
+		return err
+	}
+	for _, key := range keys {
+		_, err := tx.Exec(`INSERT INTO app_env (app_id, key, updated_at) VALUES ($1, $2, $3) ON CONFLICT (app_id, key) DO NOTHING`, appID, key, at)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SetEnv notes the keys set, as changed at, and forgets the keys removed,
+// in one transaction. The values are only on the server.
+func (r *Apps) SetEnv(appID string, set, unset []string, at time.Time) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, key := range set {
 		_, err = tx.Exec(`
-			INSERT INTO app_env (app_id, key, value, updated_at) VALUES ($1, $2, $3, $4)
-			ON CONFLICT (app_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-		`, appID, key, value, at)
+			INSERT INTO app_env (app_id, key, updated_at) VALUES ($1, $2, $3)
+			ON CONFLICT (app_id, key) DO UPDATE SET updated_at = excluded.updated_at
+		`, appID, key, at)
 		if err != nil {
 			return err
 		}
@@ -258,9 +305,9 @@ func (r *Apps) Registries(workspaceID string) ([]model.Registry, error) {
 
 func (r *Apps) SetRegistry(registry model.Registry) error {
 	_, err := r.db.Exec(`
-		INSERT INTO registries (workspace_id, host, username, password, created_at) VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (workspace_id, host) DO UPDATE SET username = excluded.username, password = excluded.password
-	`, registry.WorkspaceID, registry.Host, registry.Username, registry.Password, registry.CreatedAt)
+		INSERT INTO registries (workspace_id, host, username, created_at) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (workspace_id, host) DO UPDATE SET username = excluded.username
+	`, registry.WorkspaceID, registry.Host, registry.Username, registry.CreatedAt)
 	return err
 }
 
@@ -275,21 +322,9 @@ func (r *Apps) DeleteRegistry(workspaceID, host string) error {
 	return nil
 }
 
-// SetDomains stores the domains (a JSON array) and the canonical domain.
-func (r *Apps) SetDomains(appID, domains, canonical string) error {
-	_, err := r.db.Exec(`UPDATE apps SET domains = $1, canonical = $2 WHERE id = $3`, domains, canonical, appID)
-	return err
-}
-
-// SetServiceDomains stores the domains of the other services, a JSON object.
-func (r *Apps) SetServiceDomains(appID, domains string) error {
-	_, err := r.db.Exec(`UPDATE apps SET service_domains = $1 WHERE id = $2`, domains, appID)
-	return err
-}
-
-// SetInstant stores the instant address provider and whether it is open.
-func (r *Apps) SetInstant(appID, provider string, open bool) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant = $1, instant_open = $2 WHERE id = $3`, provider, open, appID)
+// SetInstant stores the instant address provider.
+func (r *Apps) SetInstant(appID, provider string) error {
+	_, err := r.db.Exec(`UPDATE apps SET instant = $1 WHERE id = $2`, provider, appID)
 	return err
 }
 
@@ -299,29 +334,25 @@ func (r *Apps) SetInstantHost(appID, host string) error {
 	return err
 }
 
-// SetInstantPassword stores the sealed password moin made for the instant
-// address.
-func (r *Apps) SetInstantPassword(appID, sealed string) error {
-	_, err := r.db.Exec(`UPDATE apps SET instant_password = $1 WHERE id = $2`, sealed, appID)
-	return err
-}
-
-// SetProtect stores the htpasswd line, or clears it.
-func (r *Apps) SetProtect(appID, protect string) error {
-	_, err := r.db.Exec(`UPDATE apps SET protect = $1 WHERE id = $2`, protect, appID)
+// SetPassword stores the htpasswd line, or clears it.
+func (r *Apps) SetPassword(appID, password string) error {
+	_, err := r.db.Exec(`UPDATE apps SET password = $1 WHERE id = $2`, password, appID)
 	return err
 }
 
 // CatalogApps are the apps of every workspace installed from the
 // catalog entry slug.
 func (r *Apps) CatalogApps(slug string) ([]model.App, error) {
-	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.catalog = $1 ORDER BY a.created_at`, slug)
-	return apps, err
+	return r.list(appSelect+` WHERE a.catalog = $1 ORDER BY a.created_at`, slug)
 }
 
 func (r *Apps) SetCatalogNotified(appID, version string) error {
 	_, err := r.db.Exec(`UPDATE apps SET catalog_notified = $1 WHERE id = $2`, version, appID)
+	return err
+}
+
+func (r *Apps) SetCatalogVersion(appID, version string) error {
+	_, err := r.db.Exec(`UPDATE apps SET catalog_version = $1 WHERE id = $2`, version, appID)
 	return err
 }
 
@@ -475,8 +506,7 @@ func (r *Apps) GitHubInstallation(installationID int64) (*model.GitHubInstallati
 	if err != nil {
 		return nil, nil, err
 	}
-	apps := []model.App{}
-	err = r.db.Select(&apps, appSelect+` WHERE a.installation_id = $1`, installationID)
+	apps, err := r.list(appSelect+` WHERE a.installation_id = $1`, installationID)
 	return installation, apps, err
 }
 
@@ -504,9 +534,7 @@ func (r *Apps) SetAutoDeploy(appID string, on bool) error {
 }
 
 func (r *Apps) AppsForPush(installationID int64, repo, branch string) ([]model.App, error) {
-	apps := []model.App{}
-	err := r.db.Select(&apps, appSelect+` WHERE a.installation_id = $1 AND lower(a.repo) = lower($2) AND a.branch = $3 AND a.auto_deploy = 1`, installationID, repo, branch)
-	return apps, err
+	return r.list(appSelect+` WHERE a.installation_id = $1 AND lower(a.repo) = lower($2) AND a.branch = $3 AND a.auto_deploy = 1`, installationID, repo, branch)
 }
 
 // SetPinned pins or unpins an app.

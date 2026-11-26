@@ -54,12 +54,12 @@ The CLI prints the next `--cursor`. In the API and MCP, send `next_cursor` back 
 ## What it records
 
 - **When**: the exact time, stored in UTC.
-- **Who**: the person, the API token, a deploy hook, a GitHub push, or moin itself.
+- **Who**: the person, the connection or CI token, a deploy hook, a GitHub push, or moin itself.
 - **How**: the web, the CLI, the TUI, the API, MCP, a deploy hook or GitHub.
 - **Where from**: the IP address and browser. Only admins and owners see them.
 - **What**: the action, what it touched, and the settings before and after.
 
-It covers every change: deploys, restarts, env vars, domains, buckets, backups, restores, daily checks, SQL writes, row edits, servers, alerts, API tokens, plan changes and the team.
+It covers every change: deploys, restarts, env vars, domains, buckets, backups, restores, daily checks, SQL writes, row edits, servers, alerts, connections and their rights, CI tokens, plan changes and the team.
 
 ## What it never records
 

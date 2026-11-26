@@ -23,7 +23,7 @@ func TestMetaNamesTheProjectTheSupportAddressAndTheVersion(t *testing.T) {
 func TestMetaIsOpenToReadTokens(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	owner := seedTokenOwner(t, environment, "reader")
-	created := createAPIToken(t, environment, owner, `"name":"Reader"`)
+	created := createCIToken(t, environment, owner, `"name":"Reader","rights":[]`)
 
 	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/meta", bearer: created.Token})
 

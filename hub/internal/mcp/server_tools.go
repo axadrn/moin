@@ -1,9 +1,9 @@
 package mcp
 
 import (
-	"cmp"
 	"context"
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/model"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -15,33 +15,33 @@ import (
 // renaming them, their daemon, and how they are reached and locked down.
 func registerServerTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, newTool("list_servers", "List servers",
-		"Lists the user's servers with online status, OS, arch, daemon version and rules: what the owner allows moin to do on each server, from /etc/moin/rules there. The daemon refuses what its rules do not allow; nobody can change them through moin. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.listServers)))
-	mcpsdk.AddTool(server, newTool("add_server", "Add a server",
-		"Adds a server and returns its one-time install command. The user runs it as root on the server within an hour; the daemon then connects. Needs a token with read and write access.",
-		change(false, false)), Write(changes(services, tools.addServer)))
-	mcpsdk.AddTool(server, newTool("remove_server", "Remove a server",
-		"Removes a server and disconnects its daemon. Fails with server_has_apps while it is online and has apps; an offline server goes with its apps, listed in apps, which stay on the server if it comes back. The daemon stays installed on the server: returns uninstall_command, which the user runs on the server to remove it, empty when no daemon ever connected; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.removeServer)))
-	mcpsdk.AddTool(server, newTool("new_install_command", "New install command",
-		"Makes a new one-time install command for a server and returns it, for a lost command or to move the daemon to another server. It works once within an hour; moin stores only a fingerprint, so it is shown this once. The old install command stops working, and a daemon that registers with the new one takes over from the old daemon. Needs a token with read and write access.",
-		change(true, false)), Write(changes(services, tools.newInstallCommand)))
-	mcpsdk.AddTool(server, newTool("rename_server", "Rename a server",
-		"Gives a server a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Its apps stay on it. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.renameServer)))
-	mcpsdk.AddTool(server, newTool("update_daemon", "Update the daemon of a server",
-		"Has the daemon of a server download the moin binary this hub serves, check its SHA-256, swap it in and restart, and returns the server once the new daemon is back, within three minutes. list_servers shows each daemon's version; get it to the hub's. The daemon refuses while a deploy runs and when the server has rules; then the owner updates it on the server. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.updateDaemon)))
-	mcpsdk.AddTool(server, newTool("get_integrations", "Get integrations",
-		"Says whether Cloudflare (an API token, for tunnels) and Tailscale (an auth key, for the tailnet) are connected, as in Settings, Integrations; the keys never come back. Needs the read scope.",
-		readOnly("")), Read(member(services, tools.getIntegrations)))
-	mcpsdk.AddTool(server, newTool("set_integrations", "Set integrations",
-		"Connects Cloudflare with an API token (checked first) and Tailscale with an auth key, stored encrypted. A missing field keeps its key, an empty one disconnects it. With Cloudflare connected, every new server gets a tunnel. Needs a token with read and write access.",
-		change(false, true)), Write(changes(services, tools.setIntegrations)))
-	mcpsdk.AddTool(server, newTool("set_server_security", "Lock down a server",
-		"Sets how a server is reached, all three at once: tunnel routes visitors through a Cloudflare Tunnel and closes 80 and 443 (needs Cloudflare connected, no_cloudflare otherwise), ssh is tailscale (SSH only through Tailscale; needs Tailscale connected or a tailnet joined by hand, no_tailscale otherwise), everyone, or off (the daemon stops sshd), firewall drops every other inbound connection. The daemon keeps it: it puts back what drifts and the activity says so. Returns the server with security, what the daemon last saw: proxy, ssh, firewall, open_ports, tailscale_ip and problems. Ask the user first. Needs a token with read and write access.",
-		change(true, true)), Write(changes(services, tools.setServerSecurity)))
+	Add(server, newTool("list_servers", "List servers",
+		"Lists the user's servers with online status, OS, arch, daemon version and rules: what the owner allows moin to do on each server, from /etc/moin/rules there. The daemon refuses what its rules do not allow; nobody can change them through moin.",
+		readOnly("")), model.RightRead, member(services, tools.listServers))
+	Add(server, newTool("add_server", "Add a server",
+		"Adds a server and returns its one-time install command. The user runs it as root on the server within an hour; the daemon then connects.",
+		change(false, false)), model.RightServers, changes(services, tools.addServer))
+	Add(server, newTool("remove_server", "Remove a server",
+		"Removes a server and disconnects its daemon. Fails with server_has_apps while it is online and has apps; an offline server goes with its apps, listed in apps, which stay on the server if it comes back. The daemon stays installed on the server: returns uninstall_command, which the user runs on the server to remove it, empty when no daemon ever connected; the apps there keep running with their data unless it gets --apps. Ask the user first: confirm must be the server's name, typed out.",
+		change(true, true)), model.RightServers|model.RightDelete, changes(services, tools.removeServer))
+	Add(server, newTool("new_install_command", "New install command",
+		"Makes a new one-time install command for a server and returns it, for a lost command or to move the daemon to another server. It works once within an hour; moin stores only a fingerprint, so it is shown this once. The old install command stops working, and a daemon that registers with the new one takes over from the old daemon.",
+		change(true, false)), model.RightServers, changes(services, tools.newInstallCommand))
+	Add(server, newTool("rename_server", "Rename a server",
+		"Gives a server a new name, 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit, unique in the workspace, and returns it. Its apps stay on it.",
+		change(false, true)), model.RightServers, changes(services, tools.renameServer))
+	Add(server, newTool("update_daemon", "Update the daemon of a server",
+		"Has the daemon of a server download the release of the hub's version from GitHub, check its signature and its SHA-256, swap it in and restart, and returns the server once the new daemon is back, within three minutes. list_servers shows each daemon's version; get it to the hub's. Servers with rules update the same way. The daemon refuses while a deploy runs; a daemon from before signed updates, or one without systemd, is updated on the server.",
+		change(false, true)), model.RightServers, changes(services, tools.updateDaemon))
+	Add(server, newTool("get_integrations", "Get integrations",
+		"Says whether Cloudflare is connected (an API token for tunnels, which the hub keeps), and which servers keep a Tailscale auth key (tailscale.servers) and which do not (tailscale.missing_on), as in Settings, Integrations; the keys never come back.",
+		readOnly("")), model.RightRead, member(services, tools.getIntegrations))
+	Add(server, newTool("set_integrations", "Set integrations",
+		"Connects Cloudflare with an API token (checked first, kept encrypted by the hub, which uses it). Gives server (empty for the workspace's only server) a Tailscale auth key, which only that server keeps; call it once per server. A missing field keeps its key, an empty one removes it (the Tailscale key from server). With Cloudflare connected, every new server gets a tunnel.",
+		change(false, true)), model.RightServers, changes(services, tools.setIntegrations))
+	Add(server, newTool("set_server_security", "Lock down a server",
+		"Sets how a server is reached, all three at once: tunnel routes visitors through a Cloudflare Tunnel and closes 80 and 443 (needs Cloudflare connected, no_cloudflare otherwise), ssh is tailscale (SSH only through Tailscale; needs a Tailscale key on the server or a tailnet joined by hand, no_tailscale otherwise), everyone, or off (the daemon stops sshd), firewall drops every other inbound connection. The daemon keeps it: it puts back what drifts and the activity says so. Returns the server with security, what the daemon last saw: proxy, ssh, firewall, open_ports, tailscale_ip and problems. Ask the user first.",
+		change(true, true)), model.RightServers, changes(services, tools.setServerSecurity))
 }
 
 // RemoveServerInput is the input of remove_server.
@@ -50,14 +50,10 @@ type RemoveServerInput struct {
 	Confirm string `json:"confirm" jsonschema:"the server's name, typed out, after the user agreed"`
 }
 
-// ServerInput names one server. name is the old spelling of server, still
-// accepted.
+// ServerInput names one server.
 type ServerInput struct {
-	Server string `json:"server,omitempty" jsonschema:"the server name or ID"`
-	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
+	Server string `json:"server" jsonschema:"the server name or ID"`
 }
-
-func (i ServerInput) server() string { return cmp.Or(i.Server, i.Name) }
 
 // RenameServerInput is the input of rename_server.
 type RenameServerInput struct {
@@ -68,13 +64,13 @@ type RenameServerInput struct {
 // AddServerInput is the input of add_server.
 type AddServerInput struct {
 	Server string `json:"server,omitempty" jsonschema:"the server name: lowercase letters, digits and dashes; empty gets the next free web-1, web-2 …"`
-	Name   string `json:"name,omitempty" jsonschema:"the old name of the server field; use server"`
 }
 
 // IntegrationsInput is the input of set_integrations.
 type IntegrationsInput struct {
 	CloudflareToken *string `json:"cloudflare_token,omitempty" jsonschema:"a Cloudflare API token with Account Cloudflare Tunnel Edit and Zone DNS Edit (Zone Settings Edit optional, for Always Use HTTPS); empty removes it"`
-	TailscaleKey    *string `json:"tailscale_key,omitempty" jsonschema:"a reusable Tailscale auth key, tskey-...; empty removes it"`
+	TailscaleKey    *string `json:"tailscale_key,omitempty" jsonschema:"a reusable Tailscale auth key, tskey-...; it goes to server, never back; empty removes it from server"`
+	Server          string  `json:"server,omitempty" jsonschema:"the server that keeps the Tailscale key; empty for the workspace's only server"`
 }
 
 // SecurityInput is the input of set_server_security.
@@ -117,7 +113,7 @@ func (l ServerList) Summary() string {
 }
 
 func (t moinTools) listServers(_ context.Context, caller Caller, _ NoInput) (ServerList, error) {
-	servers, err := t.services.Servers.List(caller.Token.WorkspaceID)
+	servers, err := t.services.Servers.List(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return ServerList{}, err
 	}
@@ -147,7 +143,7 @@ func (n NewInstall) Summary() string {
 }
 
 func (t moinTools) newInstallCommand(_ context.Context, caller Caller, input ServerInput) (NewInstall, error) {
-	server, installToken, err := t.services.Servers.NewInstallToken(caller.actor(), input.server())
+	server, installToken, err := t.services.Servers.NewInstallToken(caller.actor(), input.Server)
 	if err != nil {
 		return NewInstall{}, err
 	}
@@ -160,7 +156,7 @@ func (t moinTools) newInstallCommand(_ context.Context, caller Caller, input Ser
 }
 
 func (t moinTools) addServer(_ context.Context, caller Caller, input AddServerInput) (CreatedServer, error) {
-	server, installToken, err := t.services.Servers.Create(caller.actor(), cmp.Or(input.Server, input.Name))
+	server, installToken, err := t.services.Servers.Create(caller.actor(), input.Server)
 	if err != nil {
 		return CreatedServer{}, err
 	}
@@ -182,7 +178,7 @@ type RemovedServer struct {
 func (r RemovedServer) Summary() string { return r.Message }
 
 func (t moinTools) removeServer(_ context.Context, caller Caller, input RemoveServerInput) (RemovedServer, error) {
-	server, err := t.services.Servers.Get(caller.Token.WorkspaceID, input.Server)
+	server, err := t.services.Servers.Get(caller.Bearer.WorkspaceID, input.Server)
 	if err != nil {
 		return RemovedServer{}, err
 	}
@@ -215,7 +211,7 @@ func (t moinTools) renameServer(_ context.Context, caller Caller, input RenameSe
 }
 
 func (t moinTools) updateDaemon(ctx context.Context, caller Caller, input ServerInput) (ServerOutput, error) {
-	server, err := t.services.Servers.UpdateDaemon(ctx, caller.actor(), input.server())
+	server, err := t.services.Servers.UpdateDaemon(ctx, caller.actor(), input.Server)
 	if err != nil {
 		return ServerOutput{}, err
 	}
@@ -223,15 +219,15 @@ func (t moinTools) updateDaemon(ctx context.Context, caller Caller, input Server
 }
 
 func (t moinTools) getIntegrations(_ context.Context, caller Caller, _ struct{}) (Integrations, error) {
-	integrations, err := t.services.Apps.Integrations(caller.Token.WorkspaceID)
+	integrations, err := t.services.Apps.Integrations(caller.Bearer.WorkspaceID)
 	if err != nil {
 		return Integrations{}, err
 	}
-	return Integrations{api.Integrations{Cloudflare: integrations.Cloudflare, CloudflareAccount: integrations.CloudflareAccount, Tailscale: integrations.Tailscale}}, nil
+	return Integrations{api.NewIntegrations(integrations)}, nil
 }
 
 func (t moinTools) setIntegrations(ctx context.Context, caller Caller, input IntegrationsInput) (Integrations, error) {
-	err := t.services.Apps.SetIntegrations(ctx, caller.actor(), input.CloudflareToken, input.TailscaleKey)
+	err := t.services.Apps.SetIntegrations(ctx, caller.actor(), service.IntegrationsInput{CloudflareToken: input.CloudflareToken, TailscaleKey: input.TailscaleKey, TailscaleServer: input.Server})
 	if err != nil {
 		return Integrations{}, err
 	}

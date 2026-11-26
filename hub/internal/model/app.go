@@ -1,11 +1,8 @@
 package model
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // App is a compose project on one server. The deploy fields come from its
@@ -24,22 +21,20 @@ type App struct {
 	Pinned         bool      `db:"pinned"`
 	CreatedAt      time.Time `db:"created_at"`
 	DeployHookHash *string   `db:"deploy_hook_hash"`
-	// Domains is a JSON array; use DomainList.
-	Domains   string `db:"domains"`
-	Canonical string `db:"canonical"`
-	// Protect is an htpasswd line when a password protects the app.
-	Protect string `db:"protect"`
-	// ServiceDomains is a JSON object of the domains of the app's other
-	// services, by service; use ServiceDomainMap.
-	ServiceDomains string `db:"service_domains"`
+	// Domains are the domains of the app, oldest first, from the domains
+	// table.
+	Domains []Domain `db:"-"`
+	// Password is the app's password as an htpasswd line, user:bcrypt
+	// hash, empty when it is off. When it is on, its domains and its
+	// instant address ask for it.
+	Password string `db:"password"`
+	// NewPassword is the password moin just made, only in the answer of
+	// Create: moin keeps its hash, never the password.
+	NewPassword string `db:"-"`
 	// Instant is the provider of the instant address, such as sslip.io, or
-	// off; InstantHost the address the last deploy served it at. A password
-	// guards it unless InstantOpen: Protect when set, else InstantPassword,
-	// sealed.
-	Instant         string `db:"instant"`
-	InstantHost     string `db:"instant_host"`
-	InstantOpen     bool   `db:"instant_open"`
-	InstantPassword string `db:"instant_password"`
+	// off; InstantHost the address the last deploy served it at.
+	Instant     string `db:"instant"`
+	InstantHost string `db:"instant_host"`
 	// Repo is owner/name on GitHub when the app follows one, with its
 	// branch; AutoDeploy deploys every push to it.
 	Repo           string `db:"repo"`
@@ -59,8 +54,11 @@ type App struct {
 	// CatalogNotified is the newest release an update.available alert
 	// went out for.
 	CatalogNotified string `db:"catalog_notified"`
-	// BucketID is the bucket the app's uploads and backups go to; nil
-	// uses the workspace's default bucket. BucketName is its name.
+	// CatalogVersion is the release a catalog app runs, the value moin
+	// gives its env var VERSION.
+	CatalogVersion string `db:"catalog_version"`
+	// BucketID is the bucket the app's backups go to; nil uses the
+	// workspace's default bucket. BucketName is its name.
 	BucketID *string `db:"bucket_id"`
 	// BackupEvery is how often the daemon copies the app's databases, in
 	// minutes; BackupKeep how many days it keeps each copy.
@@ -76,9 +74,14 @@ type App struct {
 	// succeeded deploy that set what runs (a build, an image or a rollback;
 	// a restart keeps it). Empty when it was built from the app's repo.
 	LiveImage string `db:"live_image"`
-	// LiveDetected is what the daemon found in the live deploy, as JSON;
-	// empty before the first.
-	LiveDetected string `db:"live_detected"`
+}
+
+// EnvVar is an env var of an app as moin shows it: its key and when it
+// last changed. Its value is write-only: it goes to the server, never back
+// to a person.
+type EnvVar struct {
+	Key       string    `db:"key"`
+	UpdatedAt time.Time `db:"updated_at"`
 }
 
 // Deploy statuses.
@@ -90,14 +93,13 @@ const (
 
 // Deploy is one version of an app, v12.
 type Deploy struct {
-	ID           string `db:"id"`
-	AppID        string `db:"app_id"`
-	Number       int    `db:"number"`
-	Status       string `db:"status"`
-	SourceKey    string `db:"source_key"`
-	SourceSHA256 string `db:"source_sha256"`
-	FromNumber   int    `db:"from_number"`
-	Image        string `db:"image"`
+	ID         string `db:"id"`
+	AppID      string `db:"app_id"`
+	Number     int    `db:"number"`
+	Status     string `db:"status"`
+	SourceKey  string `db:"source_key"`
+	FromNumber int    `db:"from_number"`
+	Image      string `db:"image"`
 	// Ref and CommitSHA name the GitHub commit a deploy came from.
 	Ref           string     `db:"ref"`
 	CommitSHA     string     `db:"commit_sha"`
@@ -109,26 +111,27 @@ type Deploy struct {
 	FinishedAt    *time.Time `db:"finished_at"`
 }
 
-// Registry is a login for a container registry. Password is sealed.
+// Registry is a login for a container registry. Its password lives only
+// on the servers (ServerSecret).
 type Registry struct {
 	WorkspaceID string    `db:"workspace_id"`
 	Host        string    `db:"host"`
 	Username    string    `db:"username"`
-	Password    string    `db:"password"`
 	CreatedAt   time.Time `db:"created_at"`
 }
 
 // DeployFrom is where new versions of the app come from, one place at a
-// time: "github" when it follows a repo, "ci" when it has a deploy hook,
-// else "folder", deploys from your folder with moin deploy.
+// time: "ci" when it has a deploy hook, which takes the compose file from
+// the repo the app follows, if any; "github" when it follows a repo
+// without one; else "", neither yet.
 func (a App) DeployFrom() string {
 	switch {
-	case a.Repo != "":
-		return "github"
 	case a.DeployHookHash != nil:
 		return "ci"
+	case a.Repo != "":
+		return "github"
 	}
-	return "folder"
+	return ""
 }
 
 // HookImage is the image the deploy hook may deploy: the one running now,
@@ -162,56 +165,50 @@ func ImageName(ref string) string {
 	return host + "/" + path
 }
 
-// ServiceDomainMap returns the domains of the app's other services.
-func (a App) ServiceDomainMap() map[string][]string {
-	domains := map[string][]string{}
-	_ = json.Unmarshal([]byte(a.ServiceDomains), &domains)
-	return domains
+// Domain is a name visitors reach an app on, saved in moin. Service is
+// the compose service it reaches, "" for the app's main service. Main
+// marks the one the others of its service redirect to, the canonical one.
+type Domain struct {
+	ID        int64     `db:"id"`
+	AppID     string    `db:"app_id"`
+	Service   string    `db:"service"`
+	Name      string    `db:"name"`
+	Main      bool      `db:"main"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
-// DomainList returns the app's domains.
-func (a App) DomainList() []string {
-	domains := []string{}
-	_ = json.Unmarshal([]byte(a.Domains), &domains)
-	return domains
-}
-
-// ComposeDomains are the domains x-moin.domains in the live deploy's
-// compose.yml sets for the main service, and its canonical one; none when
-// it sets none for it.
-func (a App) ComposeDomains() (domains []string, canonical string) {
-	var detected protocol.Detected
-	if a.LiveDetected == "" || json.Unmarshal([]byte(a.LiveDetected), &detected) != nil || detected.Config == nil {
-		return nil, ""
+// DomainsOf returns the saved domains of a service, the main one for "",
+// and its canonical domain, "" for none.
+func (a App) DomainsOf(service string) (names []string, canonical string) {
+	names = []string{}
+	for _, domain := range a.Domains {
+		if domain.Service != service {
+			continue
+		}
+		names = append(names, domain.Name)
+		if domain.Main {
+			canonical = domain.Name
+		}
 	}
-	if len(detected.Config.Domains) == 0 && len(detected.Config.ServiceDomains[detected.Service]) == 0 {
-		return nil, ""
-	}
-	return detected.Domains, detected.Canonical
+	return names, canonical
 }
 
-// MainDomains are the domains the main service answers on, and its
-// canonical one: the ones compose.yml sets, else the ones saved in moin.
-// Every view shows these.
-func (a App) MainDomains() (domains []string, canonical string) {
-	if domains, canonical := a.ComposeDomains(); len(domains) > 0 {
-		return domains, canonical
+// ServiceDomains returns the saved domains of the app's other services,
+// by service.
+func (a App) ServiceDomains() map[string][]string {
+	services := map[string][]string{}
+	for _, domain := range a.Domains {
+		if domain.Service != "" {
+			services[domain.Service] = append(services[domain.Service], domain.Name)
+		}
 	}
-	return a.DomainList(), a.Canonical
+	return services
 }
 
-// DomainsOf returns the domains of a service, the main one for "", and its
-// canonical domain: only the main service has one.
-func (a App) DomainsOf(service string) (domains []string, canonical string) {
-	if service == "" {
-		return a.DomainList(), a.Canonical
-	}
-	return a.ServiceDomainMap()[service], ""
-}
-
-// Bucket is one of a workspace's S3-compatible buckets, where the uploads
-// and backups of its apps go. SecretKey is sealed. One bucket of a
-// workspace is its default: apps without a bucket of their own use it.
+// Bucket is one of a workspace's S3-compatible buckets, where the backups
+// of its apps go. Its secret key lives only on the servers
+// (ServerSecret). One bucket of a workspace is its default: apps without a
+// bucket of their own use it.
 type Bucket struct {
 	ID          string    `db:"id"`
 	WorkspaceID string    `db:"workspace_id"`
@@ -222,7 +219,6 @@ type Bucket struct {
 	Bucket      string    `db:"bucket"`
 	Path        string    `db:"path"`
 	AccessKey   string    `db:"access_key"`
-	SecretKey   string    `db:"secret_key"`
 	CreatedAt   time.Time `db:"created_at"`
 }
 

@@ -1,0 +1,4 @@
+services:
+  web:
+    image: corentinth/it-tools:${VERSION}
+    expose: ["80"]

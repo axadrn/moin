@@ -100,10 +100,11 @@ type Subscription struct {
 	StatusChangedAt  *time.Time
 }
 
+// InitialSubscription is what a new workspace starts on. A trial starts
+// without an end: it waits for the workspace's first server.
 type InitialSubscription struct {
-	PlanID           string
-	Status           string
-	CurrentPeriodEnd *time.Time
+	PlanID string
+	Status string
 }
 
 type Access struct {
@@ -128,7 +129,8 @@ func Resolve(subscription Subscription, now time.Time) Access {
 
 	switch subscription.Status {
 	case StatusTrialing:
-		if subscription.CurrentPeriodEnd != nil && now.Before(*subscription.CurrentPeriodEnd) {
+		// A trial without an end waits for the first server.
+		if subscription.CurrentPeriodEnd == nil || now.Before(*subscription.CurrentPeriodEnd) {
 			return Access{PlanID: plan.ID, State: StateTrial, TrialEndsAt: subscription.CurrentPeriodEnd, plan: plan}
 		}
 		return fallbackAccess(Product.Signup.TrialFallback)
@@ -157,14 +159,13 @@ func Resolve(subscription Subscription, now time.Time) Access {
 	}
 }
 
-func Initial(now time.Time) InitialSubscription {
+func Initial() InitialSubscription {
 	switch Product.Signup.Mode {
 	case SignupTrial:
 		if _, exists := PlanByID(Product.Signup.TrialPlanID); !exists || Product.Signup.TrialDays <= 0 {
 			return InitialSubscription{PlanID: PlanFree, Status: StatusBlocked}
 		}
-		endsAt := now.AddDate(0, 0, Product.Signup.TrialDays)
-		return InitialSubscription{PlanID: Product.Signup.TrialPlanID, Status: StatusTrialing, CurrentPeriodEnd: &endsAt}
+		return InitialSubscription{PlanID: Product.Signup.TrialPlanID, Status: StatusTrialing}
 	case SignupPaidOnly:
 		return InitialSubscription{PlanID: PlanFree, Status: StatusBlocked}
 	case SignupFreemium:
@@ -172,6 +173,11 @@ func Initial(now time.Time) InitialSubscription {
 	default:
 		return InitialSubscription{PlanID: PlanFree, Status: StatusBlocked}
 	}
+}
+
+// TrialEnd is when a trial that starts now ends.
+func TrialEnd(now time.Time) time.Time {
+	return now.AddDate(0, 0, Product.Signup.TrialDays)
 }
 
 func (a Access) RequireProduct() error {

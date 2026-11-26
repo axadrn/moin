@@ -17,16 +17,20 @@ import (
 
 type authHandler struct {
 	authService      *service.AuthService
-	userService      *service.UserService
 	workspaceService *service.WorkspaceService
-	cfg              *config.Config
+	// githubApp signs people in; nil, or without an app, nobody signs in
+	// with GitHub.
+	githubApp *service.GitHubAppService
+	passkeys  *service.PasskeyService
+	cfg       *config.Config
 }
 
-func NewAuthHandler(authService *service.AuthService, userService *service.UserService, workspaceService *service.WorkspaceService, cfg *config.Config) *authHandler {
+func NewAuthHandler(authService *service.AuthService, workspaceService *service.WorkspaceService, githubApp *service.GitHubAppService, passkeys *service.PasskeyService, cfg *config.Config) *authHandler {
 	return &authHandler{
 		authService:      authService,
-		userService:      userService,
 		workspaceService: workspaceService,
+		githubApp:        githubApp,
+		passkeys:         passkeys,
 		cfg:              cfg,
 	}
 }
@@ -46,171 +50,76 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func (h *authHandler) ForgotPasswordPage(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.AuthForgotPassword(""))
-}
-
-func (h *authHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
-	email := strings.TrimSpace(r.FormValue("email"))
-
-	if email == "" {
-		authFieldError(w, r, pages.AuthForgotPasswordForm("Enter your email."), "Link not sent", "email", "Enter your email.")
-		return
-	}
-
-	err := validation.ValidateEmail(email)
-	if err != nil {
-		authFieldError(w, r, pages.AuthForgotPasswordForm("Enter a valid email address."), "Link not sent", "email", "Enter a valid email address.")
-		return
-	}
-
-	err = h.authService.SendForgotPasswordLink(email)
-	if err != nil {
-		// Don't reveal specific errors to user
-		slog.Warn("forgot password link send failed", "error", err)
-	}
-
-	// Always show success message to prevent email enumeration
-	setAuthEmailCookie(w, r, email)
-	redirect(w, r, "/auth/forgot-password-sent", http.StatusSeeOther)
-}
-
-func (h *authHandler) VerifyForgotPassword(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-
-	user, err := h.authService.VerifyMagicLink(token)
-	if err != nil {
-		slog.Warn("forgot password verification failed", "error", err)
-		render(w, r, pages.Auth("Invalid or expired link. Please try again."))
-		return
-	}
-
-	err = h.authService.RevokeAllAccess(user.ID)
-	if err != nil {
-		slog.Error("failed to revoke access during forgot password flow", "error", err, "user_id", user.ID)
-		render(w, r, pages.Auth("An error occurred. Please try again."))
-		return
-	}
-
-	if user.HasPassword() {
-		err = h.authService.RemovePassword(user.ID)
-		if err != nil {
-			slog.Error("failed to remove password during forgot password flow", "error", err, "user_id", user.ID)
-			render(w, r, pages.Auth("An error occurred. Please try again."))
-			return
-		}
-		slog.Info("password removed via forgot password flow", "user_id", user.ID)
-	}
-
-	_, err = h.authService.StartFreshSession(w, r, user.ID)
-	if err != nil {
-		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		render(w, r, pages.Auth("An error occurred. Please try again."))
-		return
-	}
-
-	slog.Info("user logged in via forgot password flow", "user_id", user.ID)
-
-	members, listErr := h.workspaceService.ListForUser(user.ID)
-	if listErr != nil || len(members) == 0 {
-		redirect(w, r, "/app", http.StatusSeeOther)
-		return
-	}
-	redirect(w, r, members[0].Path()+"/settings/account?tab=security&password_removed=1", http.StatusSeeOther)
-}
-
+// VerifyEmailChange takes the link sent to a new address. It changes the
+// email and signs the user out everywhere; only a browser signed in as
+// that user stays in, with the session it had. Anyone else goes to sign in.
 func (h *authHandler) VerifyEmailChange(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-
-	user, err := h.authService.VerifyEmailChange(token)
-	if err != nil {
+	user, signedIn, err := h.authService.ConfirmEmailChange(r, r.PathValue("token"))
+	if user == nil {
 		slog.Warn("email change verification failed", "error", err)
 		render(w, r, pages.VerifyEmailError("It expired or was used already."))
 		return
 	}
-
-	_, err = h.authService.StartFreshSession(w, r, user.ID)
 	if err != nil {
-		slog.Error("failed to create session after email change", "error", err, "user_id", user.ID)
-		render(w, r, pages.VerifyEmailError("Something went wrong. Open the link again."))
+		slog.Error("failed to end the sessions after an email change", "error", err, "user_id", user.ID)
+	}
+	slog.Info("email changed", "user_id", user.ID)
+	if !signedIn {
+		redirect(w, r, "/auth?email=changed", http.StatusSeeOther)
 		return
 	}
-
-	slog.Info("email changed", "user_id", user.ID)
 	render(w, r, pages.VerifyEmailSuccess())
 }
 
-func (h *authHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
-	email := strings.TrimSpace(r.FormValue("email"))
-
-	if email == "" {
-		authFieldError(w, r, pages.AuthMagicLinkForm("Enter your email."), "Link not sent", "email", "Enter your email.")
-		return
-	}
-
-	err := validation.ValidateEmail(email)
-	if err != nil {
-		authFieldError(w, r, pages.AuthMagicLinkForm("Enter a valid email address."), "Link not sent", "email", "Enter a valid email address.")
-		return
-	}
-
-	err = h.authService.SendMagicLink(email)
-	if errors.Is(err, service.ErrPrivate) {
-		renderAuthPage(w, r, pages.AuthPrivate())
-		return
-	}
-	if err != nil {
-		// Don't reveal specific errors to prevent email enumeration
-		slog.Warn("magic link send failed", "error", err)
-	}
-
-	if r.URL.Query().Get("resend") == "true" {
-		render(w, r, pages.AuthMagicLinkResend(email, true))
-		return
-	}
-
-	setAuthEmailCookie(w, r, email)
-	redirect(w, r, "/auth/magic-link-sent", http.StatusSeeOther)
-}
-
-func (h *authHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-
-	user, err := h.authService.VerifyMagicLink(token)
-	if err != nil {
-		slog.Warn("magic link verification failed", "error", err)
-		render(w, r, pages.Auth("Invalid or expired magic link. Please try again."))
-		return
-	}
-
-	_, err = h.authService.StartSession(w, r, user.ID)
-	if err != nil {
-		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		render(w, r, pages.Auth("An error occurred. Please try again."))
-		return
-	}
-
-	needsOnboarding, err := h.authService.NeedsOnboarding(user.ID)
-	if err != nil {
-		slog.Warn("failed to check onboarding status", "error", err, "user_id", user.ID)
-	}
-
-	if needsOnboarding {
-		slog.Info("new user needs onboarding", "user_id", user.ID)
-		redirect(w, r, "/auth/onboarding", http.StatusSeeOther)
-		return
-	}
-
-	slog.Info("user logged in via magic link", "user_id", user.ID)
-	h.redirectAfterAuth(w, r, user)
-}
-
+// AuthPage is the way in: GitHub where the GitHub App is set up, else the
+// recovery key from the terminal.
+// After an email change from a link it says so.
 func (h *authHandler) AuthPage(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Auth(""))
+	note := ""
+	if r.URL.Query().Get("email") == "changed" {
+		note = "Your email is changed. Sign in again."
+	}
+	render(w, r, pages.Auth(note, ""))
 }
 
-func (h *authHandler) PasswordPage(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.AuthPassword(""))
+// KeyPage takes a recovery key.
+func (h *authHandler) KeyPage(w http.ResponseWriter, r *http.Request) {
+	render(w, r, pages.AuthKey(""))
+}
+
+// SignInWithKey signs in with a recovery key, once. It ends every other
+// session of the user, whose GitHub account the key disconnected and whose
+// passkeys it deleted, and leads to the security settings to connect
+// GitHub and add a passkey again.
+func (h *authHandler) SignInWithKey(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimSpace(r.FormValue("key"))
+	if key == "" {
+		authFieldError(w, r, pages.AuthKeyForm("Enter the key."), "Not signed in", "key", "Enter the key.")
+		return
+	}
+	user, err := h.authService.SignInWithRecoveryKey(key)
+	if errors.Is(err, service.ErrRecoveryKeyInvalid) {
+		message := "This key is wrong, used or expired."
+		authFieldError(w, r, pages.AuthKeyForm(message), "Not signed in", "key", message)
+		return
+	}
+	if err != nil {
+		slog.Error("recovery key sign-in failed", "error", err)
+		answerFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
+		return
+	}
+	if _, err := h.authService.StartFreshSession(w, r, user.ID); err != nil {
+		slog.Error("failed to create session", "error", err, "user_id", user.ID)
+		answerFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
+		return
+	}
+	slog.Info("user signed in with a recovery key", "user_id", user.ID)
+	members, err := h.workspaceService.ListForUser(user.ID)
+	if user.Name == "" || err != nil || len(members) == 0 {
+		h.redirectAfterAuth(w, r, user)
+		return
+	}
+	redirect(w, r, members[0].Path()+"/settings/account?tab=security", http.StatusSeeOther)
 }
 
 func (h *authHandler) OnboardingPage(w http.ResponseWriter, r *http.Request) {
@@ -268,8 +177,8 @@ func (h *authHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		redirect(w, r, "/workspaces/invitations/"+pendingInvitation, http.StatusSeeOther)
 		return
 	}
-	if device, ok := pendingDevice(r); ok {
-		redirect(w, r, device, http.StatusSeeOther)
+	if approval, ok := pendingApproval(r); ok {
+		redirect(w, r, approval, http.StatusSeeOther)
 		return
 	}
 	redirect(w, r, workspace.Path()+"/overview", http.StatusSeeOther)
@@ -280,58 +189,25 @@ func onboardingFieldError(w http.ResponseWriter, r *http.Request, form pages.Onb
 	authFieldError(w, r, pages.AuthOnboardingForm(form), "Not saved", field, message)
 }
 
-func (h *authHandler) PasswordAuth(w http.ResponseWriter, r *http.Request) {
-	email := strings.TrimSpace(r.FormValue("email"))
-	password := r.FormValue("password")
-
-	if email == "" {
-		authFieldError(w, r, pages.AuthPasswordForm(email, "Enter your email."), "Not signed in", "email", "Enter your email.")
-		return
-	}
-	if password == "" {
-		authFieldError(w, r, pages.AuthPasswordForm(email, "Enter your password."), "Not signed in", "password", "Enter your password.")
-		return
-	}
-
-	err := validation.ValidateEmail(email)
-	if err != nil {
-		authFieldError(w, r, pages.AuthPasswordForm(email, "Enter a valid email address."), "Not signed in", "email", "Enter a valid email address.")
-		return
-	}
-
-	user, err := h.authService.Login(email, password)
-	if err != nil {
-		slog.Warn("password login failed", "error", err)
-		authFieldError(w, r, pages.AuthPasswordForm(email, "Wrong email or password."), "Not signed in", "password", "Wrong email or password.")
-		return
-	}
-
-	_, err = h.authService.StartSession(w, r, user.ID)
-	if err != nil {
-		slog.Error("failed to create session", "error", err, "user_id", user.ID)
-		answerFailed(w, r, "Not signed in", "Something went wrong. Please try again.")
-		return
-	}
-
-	slog.Info("user logged in with password", "user_id", user.ID)
-	h.redirectAfterAuth(w, r, user)
+func (h *authHandler) redirectAfterAuth(w http.ResponseWriter, r *http.Request, user *model.User) {
+	redirect(w, r, h.afterAuth(w, r, user), http.StatusSeeOther)
 }
 
-func (h *authHandler) redirectAfterAuth(w http.ResponseWriter, r *http.Request, user *model.User) {
+// afterAuth is where a sign-in leads: the invitation, or the approval of
+// moin login or an AI agent, this browser opened before, else the user's
+// first workspace.
+func (h *authHandler) afterAuth(w http.ResponseWriter, r *http.Request, user *model.User) string {
 	if invitation, ok := h.pendingInvitationForUser(w, r, user); ok {
-		redirect(w, r, "/workspaces/invitations/"+invitation, http.StatusSeeOther)
-		return
+		return "/workspaces/invitations/" + invitation
 	}
-	if device, ok := pendingDevice(r); ok {
-		redirect(w, r, device, http.StatusSeeOther)
-		return
+	if approval, ok := pendingApproval(r); ok {
+		return approval
 	}
 	members, err := h.workspaceService.ListForUser(user.ID)
 	if err != nil || len(members) == 0 {
-		redirect(w, r, "/workspaces/new", http.StatusSeeOther)
-		return
+		return "/workspaces/new"
 	}
-	redirect(w, r, members[0].Path()+"/overview", http.StatusSeeOther)
+	return members[0].Path() + "/overview"
 }
 
 func (h *authHandler) pendingInvitationForUser(w http.ResponseWriter, r *http.Request, user *model.User) (string, bool) {

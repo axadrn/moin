@@ -5,14 +5,12 @@ package tui
 // through the inbox.
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/client"
 )
 
@@ -179,7 +177,7 @@ func (m model) loadDomains(app string) tea.Cmd {
 			return tabErrMsg{app, tDomains, err}
 		}
 		msg := domainsMsg{app: app, checks: checks}
-		if instant, err := api.Instant(ctx, app, false); err == nil {
+		if instant, err := api.Instant(ctx, app); err == nil {
 			msg.instant = &instant
 		}
 		return msg
@@ -299,7 +297,7 @@ func (m model) stopApp(app string) tea.Cmd {
 }
 
 func (m model) deployImage(app, image string) tea.Cmd {
-	return m.started(app, "deploy", func() (client.Deploy, error) { return m.api.DeployImage(m.ctx, app, image) })
+	return m.started(app, "deploy", func() (client.Deploy, error) { return m.api.DeployImage(m.ctx, app, image, "") })
 }
 
 func (m model) deployRef(app, ref string) tea.Cmd {
@@ -315,23 +313,6 @@ func (m model) updateCatalogApp(app string) tea.Cmd {
 
 // dirApp is the app the directory the TUI started in deploys to.
 func (m model) dirApp() string { return client.AppName("", m.dir) }
-
-// deployDir packs the directory the TUI started in and deploys it to its
-// app, which must exist; `moin deploy` creates new ones.
-func (m model) deployDir() tea.Cmd {
-	app := m.dirApp()
-	return m.started(app, "deploy", func() (client.Deploy, error) {
-		var source bytes.Buffer
-		if _, err := client.Pack(m.dir, &source); err != nil {
-			return client.Deploy{}, err
-		}
-		d, err := m.api.Deploy(m.ctx, app, source.Bytes())
-		if client.IsNotFound(err) {
-			return d, fmt.Errorf("no app %s yet: run `%s deploy` in %s once", app, build.Name, m.dir)
-		}
-		return d, err
-	})
-}
 
 func (m model) restoreCmd(app, database, moment string, at *time.Time) tea.Cmd {
 	api, ctx := m.api, m.ctx
@@ -369,7 +350,7 @@ func (m model) setEnv(app string, set map[string]string, unset []string) tea.Cmd
 		}
 		return tea.BatchMsg{
 			func() tea.Msg { return envMsg{app, env} },
-			func() tea.Msg { return noticeMsg("Saved. The next deploy of " + app + " gets it; R redeploys now") },
+			func() tea.Msg { return noticeMsg("Saved. " + app + " gets it when it restarts; T restarts now") },
 		}
 	}
 }
@@ -389,33 +370,34 @@ func (m model) setDomains(app, service string, domains []string, canonical strin
 		if err != nil {
 			return errMsg{err}
 		}
-		notice := "Saved. " + app + " takes it with its next deploy or start"
-		switch {
-		case change.Unchanged:
-			notice = "Nothing changed"
-		case change.Deploy != nil:
-			notice = fmt.Sprintf("Saved. v%d of %s applies it now", change.Deploy.Number, app)
+		if change.Unchanged {
+			return reloadMsg{notice: "Nothing changed"}
 		}
-		return reloadMsg{notice: notice}
+		return reloadMsg{notice: "Saved. " + app + " takes it with its next deploy or start"}
 	}
 }
 
-func (m model) protect(app, user, password string) tea.Cmd {
+// setPassword turns the app's password on with the user's own. A
+// password moin makes is shown once, so the TUI leaves that to the web and
+// the CLI.
+func (m model) setPassword(app, user, password string) tea.Cmd {
 	api, ctx := m.api, m.ctx
 	return func() tea.Msg {
-		var err error
-		if user == "" {
-			_, err = api.RemoveProtection(ctx, app)
-		} else {
-			_, err = api.SetProtection(ctx, app, user, password)
-		}
-		if err != nil {
+		if _, err := api.SetPassword(ctx, app, user, password); err != nil {
 			return errMsg{err}
 		}
-		if user == "" {
-			return reloadMsg{notice: app + " is open again"}
+		return reloadMsg{notice: app + " asks for a password on its domains and its instant address now"}
+	}
+}
+
+// removePassword turns the app's password off.
+func (m model) removePassword(app string) tea.Cmd {
+	api, ctx := m.api, m.ctx
+	return func() tea.Msg {
+		if _, err := api.RemovePassword(ctx, app); err != nil {
+			return errMsg{err}
 		}
-		return reloadMsg{notice: app + " asks for a password now"}
+		return reloadMsg{notice: app + " asks for no password now"}
 	}
 }
 

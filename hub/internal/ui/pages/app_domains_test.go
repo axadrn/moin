@@ -8,49 +8,39 @@ import (
 	"github.com/axadrn/moin/hub/internal/service"
 )
 
-// Domains x-moin sets are marked and offer no remove, canonical or add,
-// because moin cannot change them.
-func TestDomainsMarkComposeDomains(t *testing.T) {
-	view := DomainsView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true, FromCompose: true}}}
+// Every domain offers remove and the page offers add: moin keeps them all.
+func TestDomainsOfferChanges(t *testing.T) {
+	view := DomainsView{App: model.App{Name: "shop"}, Checks: []service.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true}}}
 	var html strings.Builder
-	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
-		t.Fatal(err)
-	}
-	page := html.String()
-	if !strings.Contains(page, "from compose.yml") || !strings.Contains(page, "data-domains-from-compose") {
-		t.Errorf("no compose marker: %s", page)
-	}
-	if strings.Contains(page, "Remove shop.example.com") || strings.Contains(page, "data-add-domain") {
-		t.Errorf("compose domains offer changes: %s", page)
-	}
-
-	view.Checks[0].FromCompose = false
-	html.Reset()
 	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(html.String(), "Remove shop.example.com") || !strings.Contains(html.String(), "data-add-domain") {
-		t.Errorf("moin domains lost their actions")
+		t.Errorf("a domain lost its actions")
 	}
 }
 
-// The instant address shows with its password hidden, and a domain of
-// another service shows its service and no canonical action.
+// The instant address shows with its provider and no password of its
+// own. A domain of another service shows its service and no canonical
+// action.
 func TestDomainsInstantAndServices(t *testing.T) {
 	view := DomainsView{
 		App:     model.App{Name: "shop"},
 		Checks:  []service.DomainCheck{{Domain: "shop.example.com"}, {Domain: "www.shop.example.com", Canonical: true}, {Domain: "api.shop.example.com", Service: "api"}},
-		Instant: service.Instant{Provider: "sslip.io", Host: "shop.203-0-113-7.sslip.io", URL: "https://shop.203-0-113-7.sslip.io", User: "moin"},
+		Instant: service.Instant{Provider: "sslip.io", Host: "shop.203-0-113-7.sslip.io", URL: "https://shop.203-0-113-7.sslip.io"},
 	}
 	var html strings.Builder
 	if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
 		t.Fatal(err)
 	}
 	page := html.String()
-	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-show", `data-domain-service="api"`, "Remove api.shop.example.com", "canonical", `/apps/shop/domains/remove"`, `/apps/shop/domains/detail?show=true"`, `id="app-domains"`} {
+	for _, want := range []string{"https://shop.203-0-113-7.sslip.io", "data-instant-provider", `data-domain-service="api"`, "Remove api.shop.example.com", "canonical", `/apps/shop/domains/remove"`, `id="app-domains"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("no %s", want)
 		}
+	}
+	if strings.Contains(page, "instant-password") || strings.Contains(page, "instant-new") {
+		t.Errorf("the instant address has a password of its own")
 	}
 	if !strings.Contains(page, "data-canonical") || strings.Contains(page, `value="api.shop.example.com"`) {
 		t.Errorf("no canonical choice of the main domains")
@@ -66,6 +56,32 @@ func TestDomainsInstantAndServices(t *testing.T) {
 	}
 	if !strings.Contains(html.String(), "data-instant-reason") || strings.Contains(html.String(), "data-instant-url") {
 		t.Errorf("no reason for the missing address")
+	}
+}
+
+// The password is one switch for the domains and the instant address:
+// off says anyone gets in, on who signs in; a password moin just made
+// shows once. The fields set your own.
+func TestDomainsPasswordSwitch(t *testing.T) {
+	render := func(view DomainsView) string {
+		t.Helper()
+		var html strings.Builder
+		if err := AppDomains(view).Render(projectPageContext("/app/tiny-rocket-co/apps/shop"), &html); err != nil {
+			t.Fatal(err)
+		}
+		return html.String()
+	}
+	off := render(DomainsView{App: model.App{Name: "shop"}})
+	if !strings.Contains(off, "data-password-switch") || strings.Contains(off, "checked") || !strings.Contains(off, "Anyone with the link") || !strings.Contains(off, "Use your own password") {
+		t.Errorf("off: %s", off)
+	}
+	on := render(DomainsView{App: model.App{Name: "shop", Password: "ada:$2a$10$hash"}})
+	if !strings.Contains(on, "checked") || !strings.Contains(on, "Sign in as ada") || strings.Contains(on, "data-new-password") || strings.Contains(on, "unprotect") {
+		t.Errorf("on: %s", on)
+	}
+	made := render(DomainsView{App: model.App{Name: "shop", Password: "moin:$2a$10$hash"}, NewPassword: "fresh-password-123"})
+	if !strings.Contains(made, "fresh-password-123") || !strings.Contains(made, "Shown once.") || !strings.Contains(made, "data-new-password") {
+		t.Errorf("the new password is not shown once: %s", made)
 	}
 }
 
@@ -90,14 +106,14 @@ func TestDomainsShowTheCheck(t *testing.T) {
 	}
 }
 
-// The overview lists the domains compose.yml sets, like the Domains page.
-func TestOverviewListsComposeDomains(t *testing.T) {
-	app := model.App{Name: "my-app", LiveNumber: 3, LiveDetected: `{"service":"web","domains":["my-app.example.com"],"config":{"domains":["my-app.example.com"]}}`}
+// The overview lists the app's domains, like the Domains page.
+func TestOverviewListsTheDomains(t *testing.T) {
+	app := model.App{Name: "my-app", LiveNumber: 3, Domains: []model.Domain{{Name: "my-app.example.com", Main: true}}}
 	var html strings.Builder
 	if err := appHomeSection(AppPageView{App: app}).Render(projectPageContext("/app/tiny-rocket-co/apps/my-app"), &html); err != nil {
 		t.Fatal(err)
 	}
 	if page := html.String(); !strings.Contains(page, `href="https://my-app.example.com"`) || strings.Contains(page, "No domain yet") {
-		t.Errorf("the overview lacks the domain from compose.yml: %s", page)
+		t.Errorf("the overview lacks the domain: %s", page)
 	}
 }

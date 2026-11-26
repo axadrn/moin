@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"encoding/json"
+
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
@@ -16,11 +18,12 @@ type IntegrationsView struct {
 	Keys           service.Integrations
 }
 
-// Integrations are the accounts a workspace connects once, for every app
-// and server: GitHub for repos, Cloudflare for tunnels, Tailscale for the
-// tailnet. Each says whether it is connected. A connected one takes a new
-// key, which replaces the old one; disconnecting sits at the end.
-// Connecting, replacing or disconnecting answers the whole page.
+// Integrations are the accounts a workspace connects, for every app and
+// server: GitHub for repos, Cloudflare for tunnels, Tailscale for the
+// tailnet. The hub keeps the Cloudflare token; the Tailscale key goes to a
+// server, which keeps it, and the page says which servers have it. A
+// connected one takes a new key, which replaces the old one;
+// disconnecting sits at the end. Every change answers the whole page.
 templ Integrations(view IntegrationsView) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("Integrations") {
@@ -46,29 +49,45 @@ templ Integrations(view IntegrationsView) {
 						@components.List(templ.Attributes{"data-integration": "cloudflare"}) {
 							@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected", Note: "Account " + view.Keys.CloudflareAccount})
 						}
-						@keyForm("cloudflare-token", "cloudflare_token", "New key", "Replaces the API token. Tunnels keep running.", "Save")
+						@keyForm("cloudflare-token", "cloudflare_token", "New key", "Replaces the API token. Tunnels keep running.", "Save", nil)
 					} else {
-						@keyForm("cloudflare-token", "cloudflare_token", "API token", "Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit turns on Always Use HTTPS.", "Connect")
+						@keyForm("cloudflare-token", "cloudflare_token", "API token", "Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit turns on Always Use HTTPS.", "Connect", nil)
 					}
 				}
+				{{ tailscale := view.Keys.Tailscale }}
+				{{ servers := secretServerNames(tailscale) }}
 				@components.Card(components.CardProps{Title: "Tailscale"}) {
-					if view.Keys.Tailscale {
-						@components.List(templ.Attributes{"data-integration": "tailscale"}) {
-							@components.Item(components.ItemProps{Lead: connectedDot(true), Name: "Connected", Note: "A server joins your tailnet for SSH only through Tailscale"})
+					@components.List(templ.Attributes{"data-integration": "tailscale"}) {
+						for _, on := range tailscale.On {
+							@components.Item(components.ItemProps{Lead: connectedDot(true), Name: on.Server, Note: "Keeps the auth key. Joins your tailnet for SSH only through Tailscale"})
 						}
-						@keyForm("tailscale-key", "tailscale_key", "New key", "Replaces the auth key. Servers stay in your tailnet.", "Save")
+						if len(tailscale.On) > 0 {
+							for _, server := range tailscale.MissingOn {
+								@missingSecret(missingSecretProps{
+									Server:   server,
+									Sentence: server + " has no Tailscale key.",
+									Action:   base + "/integrations",
+									Target:   "#integrations",
+									Field:    "tailscale_key",
+									Label:    "Auth key",
+								})
+							}
+						}
+					}
+					if len(tailscale.On) > 0 {
+						@keyForm("tailscale-key", "tailscale_key", "New key", "Replaces the auth key on the server. It stays in your tailnet.", "Save", servers)
 					} else {
-						@keyForm("tailscale-key", "tailscale_key", "Auth key", "A reusable auth key, tskey-auth-…", "Connect")
+						@keyForm("tailscale-key", "tailscale_key", "Auth key", "A reusable auth key, tskey-auth-…. It goes to the server, never back.", "Connect", servers)
 					}
 				}
-				if view.Keys.Cloudflare || view.Keys.Tailscale {
+				if view.Keys.Cloudflare || len(tailscale.On) > 0 {
 					@components.Card(components.CardProps{}) {
 						@components.List() {
 							if view.Keys.Cloudflare {
-								@disconnectButton("cloudflare", "Disconnect Cloudflare", "Disconnect Cloudflare? Turn the tunnels off first: without the token moin cannot delete them.")
+								@disconnectButton("cloudflare", "", "Disconnect Cloudflare", "Disconnect Cloudflare? Turn the tunnels off first: without the token moin cannot delete them.")
 							}
-							if view.Keys.Tailscale {
-								@disconnectButton("tailscale", "Disconnect Tailscale", "Disconnect Tailscale? Servers stay in your tailnet. New servers no longer join it.")
+							for _, on := range tailscale.On {
+								@disconnectButton("tailscale", on.Server, "Remove the Tailscale key from "+on.Server, "Remove the Tailscale key from "+on.Server+"? It stays in your tailnet.")
 							}
 						}
 					}
@@ -85,12 +104,18 @@ templ connectedDot(on bool) {
 
 // keyForm connects an account with its key, or replaces the key of a
 // connected one: the field and the button in one row, a hint under it.
-templ keyForm(id, name, label, hint, button string) {
+// With more than one server, it picks the server that keeps the key.
+templ keyForm(id, name, label, hint, button string, servers []string) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	<form hx-post={ base + "/integrations" } hx-target="#integrations" hx-select="#integrations" hx-swap="outerHTML" hx-disable="find button[type='submit']" data-integration-form={ name }>
 		@components.CSRF()
 		@components.Field(components.FieldProps{Label: label, For: id, Hint: hint}) {
 			<div class="moin-row" data-gap="2" data-phone="stack">
+				if len(servers) > 1 {
+					<div class="moin-width" style="--width:12rem">
+						@components.Select(components.SelectProps{ID: id + "-server", Name: "server", Label: "Server", Options: nameOptions(servers), Value: servers[0]})
+					</div>
+				}
 				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": id, "aria-describedby": id + "-hint", "name": name, "type": "password", "autocomplete": "off", "required": true}})
 				@components.Button(components.ButtonProps{Type: "submit"}) {
 					{ button }
@@ -100,12 +125,13 @@ templ keyForm(id, name, label, hint, button string) {
 	</form>
 }
 
-// disconnectButton takes one account's key away, after one question.
-templ disconnectButton(key, label, question string) {
+// disconnectButton takes one account's key away, after one question: the
+// one of server for a key a server keeps.
+templ disconnectButton(key, server, label, question string) {
 	{{ base := ctxkeys.AppBasePath(ctx) }}
 	@components.Item(components.ItemProps{Button: true, Danger: true, Name: label, Attrs: templ.Attributes{
 		"hx-post":         base + "/integrations",
-		"hx-vals":         `{"remove":"` + key + `"}`,
+		"hx-vals":         removeValues(key, server),
 		"hx-target":       "#integrations",
 		"hx-select":       "#integrations",
 		"hx-swap":         "outerHTML",
@@ -113,4 +139,10 @@ templ disconnectButton(key, label, question string) {
 		"hx-confirm":      question,
 		"data-remove-key": key,
 	}})
+}
+
+// removeValues are the form values of a disconnect button, as hx-vals.
+func removeValues(key, server string) string {
+	body, _ := json.Marshal(map[string]string{"remove": key, "server": server})
+	return string(body)
 }

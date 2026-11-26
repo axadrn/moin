@@ -13,7 +13,7 @@ func TestAppsRename(t *testing.T) {
 	for _, from := range []string{"my-app", id, "my-app-" + id} {
 		api := &fakeAPI{answers: map[string]string{"PATCH /api/v1/apps/" + from: answer}}
 		code, stdout, stderr := runCLI(t, api, "apps", "rename", from, "blog")
-		if code != 0 || !api.seen(`PATCH /api/v1/apps/`+from+` {"name":"blog"}`) || !strings.Contains(stdout, "Renamed "+from+" to blog") || !strings.Contains(stdout, "moin restart blog") || !strings.Contains(stdout, "x-moin.app: blog") {
+		if code != 0 || !api.seen(`PATCH /api/v1/apps/`+from+` {"name":"blog"}`) || !strings.Contains(stdout, "Renamed "+from+" to blog") || !strings.Contains(stdout, "moin restart blog") {
 			t.Errorf("%s: code %d, stdout %q, stderr %q, requests %v", from, code, stdout, stderr, api.requests)
 		}
 	}

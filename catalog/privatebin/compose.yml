@@ -1,0 +1,6 @@
+services:
+  web:
+    image: privatebin/nginx-fpm-alpine:${VERSION}
+    expose: ["8080"]
+    volumes:
+      - ./data:/srv/data

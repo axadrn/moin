@@ -349,7 +349,7 @@ func (a *alertSender) post(ctx context.Context, address string, body any, header
 func sendFailure(err error) string {
 	var netErr net.Error
 	switch {
-	case errors.Is(err, ErrBucketPrivate):
+	case errors.Is(err, ErrPrivateAddress):
 		return "the address is not on the public internet"
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
 		return fmt.Sprintf("no answer within %s", alertTimeout)

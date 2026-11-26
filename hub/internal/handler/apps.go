@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -78,8 +81,8 @@ func (h *AppsHandler) SetPinned(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.PinSwitch(*stored))
 }
 
-// Create adds an app and answers the reset form. The event stream reloads the table.
-// Create adds an app and opens its page.
+// Create adds an app and shows its password once, with a link to its
+// page.
 func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Create(actor(r), r.FormValue("name"), r.FormValue("server"))
 	if errors.Is(err, repository.ErrServerNotFound) {
@@ -91,7 +94,10 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	answerDone(w, r, app.Name+" added", "Link its repo, or run moin deploy "+app.Name+" in its folder.")
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), http.StatusSeeOther)
+	// Shown in place of the form: a new page would lose the password.
+	w.Header().Set("HX-Retarget", "#app-add-form")
+	w.Header().Set("HX-Reswap", "outerHTML")
+	render(w, r, pages.AppAdded(ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), app.Name, app.NewPassword))
 }
 
 // AppSection answers one section of an app (app, deploys, domains, logs
@@ -116,17 +122,17 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		renderError(w, "load app failed", err)
 		return
 	}
-	env, err := h.apps.Env(workspace.ID, app.ID)
+	env, err := h.apps.EnvVars(workspace.ID, app.ID)
 	if err != nil {
 		renderError(w, "load env failed", err)
 		return
 	}
-	view := pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), EnvKeys: sortedKeys(env), Section: section}
+	view := pages.AppPageView{App: *app, Deploys: api.NewDeploys(deploys, app.LiveNumber), Env: env, Section: section}
 	view.Selected, _ = strconv.Atoi(r.PathValue("number"))
 	switch section {
 	case "app":
 		if h.catalogs != nil {
-			view.Catalog = catalogUpdate(h.catalogs, workspace.ID, app)
+			view.Catalog = catalogUpdate(h.catalogs, app)
 		}
 	case "deploys":
 		repo, err := h.repoView(r, app, false)
@@ -148,6 +154,12 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 				view.Logs.Message = errorMessage(err)
 			}
 		}
+	case "settings":
+		_, text, err := h.apps.ComposeFile(workspace.ID, app.ID)
+		view.ComposeFile = &pages.ComposeFileView{Text: text}
+		if err != nil {
+			view.ComposeFile.Message = errorMessage(err)
+		}
 	case "domains":
 		if domains, err := h.domainsView(r, ""); err == nil {
 			view.Domains = &domains
@@ -157,6 +169,24 @@ func (h *AppsHandler) appPage(w http.ResponseWriter, r *http.Request, section st
 		}
 	}
 	render(w, r, pages.AppPage(view))
+}
+
+// ComposeFile downloads the compose file of the app's live deploy as
+// compose.yml.
+func (h *AppsHandler) ComposeFile(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	_, text, err := h.apps.ComposeFile(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		status, detail, known := api.ErrorFor(err)
+		if !known {
+			slog.Error("load the compose file failed", "error", err)
+		}
+		http.Error(w, detail.Message, status)
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="compose.yml"`)
+	_, _ = io.WriteString(w, text)
 }
 
 // Detail answers the state and the buttons of an app, after a change. The
@@ -250,7 +280,7 @@ func (h *AppsHandler) Stop(w http.ResponseWriter, r *http.Request) {
 
 // DeployImage deploys an image built elsewhere. The page follows the new deploy.
 func (h *AppsHandler) DeployImage(w http.ResponseWriter, r *http.Request) {
-	deploy, err := h.apps.Deploy(actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")))
+	deploy, err := h.apps.Deploy(r.Context(), actor(r), r.PathValue("app"), strings.TrimSpace(r.FormValue("image")), "")
 	if err != nil {
 		failed(w, r, "Image not deployed", err, map[string]string{"image": "image-ref"})
 		return
@@ -294,8 +324,8 @@ func (h *AppsHandler) RotateHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderSourceWith(w, r, false, url)
-	if before.Repo != "" {
-		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once. "+before.Repo+" is unlinked.")
+	if before.AutoDeploy {
+		answerDone(w, r, "Deploy hook created", "Copy the URL now: it shows only once. Pushes to "+before.Repo+" no longer deploy.")
 		return
 	}
 	if before.DeployHookHash == nil {
@@ -325,23 +355,24 @@ func (h *AppsHandler) Registries(w http.ResponseWriter, r *http.Request) {
 }
 
 // registryFields are the fields of the registry form, by API field name.
-var registryFields = map[string]string{"host": "registry-host", "password": "registry-password"}
+var registryFields = map[string]string{"host": "registry-host", "password": "registry-password", "server": "registry-server"}
 
-// SetRegistry saves a registry login from the form on Registries.
+// SetRegistry hands a registry login from a form on Registries to a
+// server: the new login's, or a server's that has none yet.
 func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 	host := strings.TrimSpace(r.FormValue("host"))
-	err := h.apps.SetRegistry(actor(r), host, r.FormValue("username"), r.FormValue("password"))
+	err := h.apps.SetRegistry(r.Context(), actor(r), host, r.FormValue("username"), r.FormValue("password"), r.FormValue("server"))
 	if err != nil {
 		failed(w, r, "Login not saved", err, registryFields)
 		return
 	}
 	h.renderRegistries(w, r)
-	answerDone(w, r, "Login for "+host+" saved", "Your servers pull private images from it now.")
+	answerDone(w, r, "Login for "+host+" saved", "The server keeps it and pulls private images from it now. moin keeps no copy.")
 }
 
 // DeleteRegistry removes a registry login.
 func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.RemoveRegistry(actor(r), r.PathValue("host"))
+	err := h.apps.RemoveRegistry(r.Context(), actor(r), r.PathValue("host"))
 	if err != nil {
 		failed(w, r, "Login not removed", err, nil)
 		return
@@ -351,12 +382,27 @@ func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AppsHandler) renderRegistries(w http.ResponseWriter, r *http.Request) {
-	logins, err := h.apps.Registries(ctxkeys.Workspace(r.Context()).ID)
+	workspace := ctxkeys.Workspace(r.Context())
+	logins, err := h.apps.Registries(workspace.ID)
 	if err != nil {
 		renderError(w, "list registries failed", err)
 		return
 	}
-	render(w, r, pages.Registries(logins))
+	servers, err := h.servers.List(workspace.ID)
+	if err != nil {
+		renderError(w, "list servers failed", err)
+		return
+	}
+	render(w, r, pages.Registries(logins, serverNames(servers)))
+}
+
+// serverNames are the names of servers, for a server select.
+func serverNames(servers []model.Server) []string {
+	names := make([]string, 0, len(servers))
+	for _, server := range servers {
+		names = append(names, server.Name)
+	}
+	return names
 }
 
 // logLines is how many of the last lines of an app's containers the Logs
@@ -375,27 +421,24 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.AppLogs(lines, ""))
 }
 
-// Env answers the env table; with show=1 the values are visible, with
-// text=1 they are one .env text to edit.
+// Env answers the env table; with text=1 the empty box that takes them
+// all as one .env text.
 func (h *AppsHandler) Env(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("text") == "1" {
 		app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
-		var env map[string]string
-		if err == nil {
-			env, err = h.apps.Env(app.WorkspaceID, app.ID)
-		}
 		if err != nil {
 			renderError(w, "load env failed", err)
 			return
 		}
-		render(w, r, pages.AppEnvText(app.Link(), dotenv.Format(env), ""))
+		render(w, r, pages.AppEnvText(app.Link(), "", ""))
 		return
 	}
-	h.renderEnv(w, r, r.URL.Query().Get("show") == "1")
+	h.renderEnv(w, r)
 }
 
-// EnvText takes the env vars as one .env text: first it shows what changes,
-// with confirm=1 it replaces them, with back=1 it goes back to the text.
+// EnvText takes the env vars as one .env text: first it shows which keys
+// change, with confirm=1 it replaces them, with back=1 it goes back to the
+// text.
 func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
 	if err != nil {
@@ -413,33 +456,37 @@ func (h *AppsHandler) EnvText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.FormValue("confirm") != "1" {
-		current, err := h.apps.Env(ctxkeys.Workspace(r.Context()).ID, name)
+		vars, err := h.apps.EnvVars(ctxkeys.Workspace(r.Context()).ID, name)
 		if err != nil {
 			renderError(w, "load env failed", err)
 			return
 		}
-		change := dotenv.Diff(current, next)
+		keys := make([]string, len(vars))
+		for index, envVar := range vars {
+			keys[index] = envVar.Key
+		}
+		change := dotenv.Diff(keys, next)
 		if change.None() {
-			h.renderEnv(w, r, false)
-			answerDone(w, r, "Nothing changed", "The text has the env vars there are.")
+			h.renderEnv(w, r)
+			answerDone(w, r, "Nothing changed", "The text has no env vars, and the app has none.")
 			return
 		}
 		render(w, r, pages.AppEnvReview(link, text, change))
 		return
 	}
-	change, err := h.apps.ReplaceEnv(actor(r), name, next)
+	change, err := h.apps.ReplaceEnv(r.Context(), actor(r), name, next)
 	if err != nil {
 		render(w, r, pages.AppEnvText(link, text, errorMessage(err)+" Nothing changed."))
 		return
 	}
-	h.renderEnv(w, r, false)
+	h.renderEnv(w, r)
 	answerDone(w, r, "Env vars replaced", "It "+change.String()+". The next deploy or restart hands them to the app.")
 }
 
 // SetEnv sets one env var from the add form.
 func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
-	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), map[string]string{key: r.FormValue("value")}, nil)
+	_, err := h.apps.SetEnv(r.Context(), actor(r), r.PathValue("app"), map[string]string{key: r.FormValue("value")}, nil)
 	if errors.Is(err, service.ErrEnvValue) {
 		fieldError(w, key+" not saved", "env-value", errorMessage(err))
 		return
@@ -448,37 +495,33 @@ func (h *AppsHandler) SetEnv(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Variable not saved", err, map[string]string{"set": "env-key"})
 		return
 	}
-	h.renderEnv(w, r, false)
+	h.renderEnv(w, r)
 	answerDone(w, r, key+" saved", "The next deploy or restart hands it to the app.")
 }
 
 // UnsetEnv removes one env var.
 func (h *AppsHandler) UnsetEnv(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), nil, []string{key})
+	_, err := h.apps.SetEnv(r.Context(), actor(r), r.PathValue("app"), nil, []string{key})
 	if err != nil {
 		failed(w, r, key+" not removed", err, nil)
 		return
 	}
-	h.renderEnv(w, r, false)
+	h.renderEnv(w, r)
 	answerDone(w, r, key+" removed", "The next deploy or restart drops it.")
 }
 
-func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request, show bool) {
+func (h *AppsHandler) renderEnv(w http.ResponseWriter, r *http.Request) {
 	app, err := h.apps.Get(ctxkeys.Workspace(r.Context()).ID, r.PathValue("app"))
-	var env map[string]string
+	var env []model.EnvVar
 	if err == nil {
-		env, err = h.apps.Env(app.WorkspaceID, app.ID)
+		env, err = h.apps.EnvVars(app.WorkspaceID, app.ID)
 	}
 	if err != nil {
 		renderError(w, "load env failed", err)
 		return
 	}
-	values := map[string]string{}
-	if show {
-		values = env
-	}
-	render(w, r, pages.AppEnv(app.Link(), sortedKeys(env), values))
+	render(w, r, pages.AppEnv(app.Link(), env))
 }
 
 // Delete stops the app on its server and removes it, then goes to the list.
@@ -489,15 +532,6 @@ func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("HX-Redirect", ctxkeys.AppBasePath(r.Context())+"/apps")
-}
-
-func sortedKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // DomainsDetail answers the domains of an app, its instant address and its
@@ -569,7 +603,7 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 			provider = protocol.InstantProviders[0]
 		}
 	}
-	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider, nil)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), provider)
 	if err != nil {
 		if _, ok := h.renderDomains(w, r, ""); ok {
 			answerError(w, r, "Instant address not changed", errorMessage(err))
@@ -583,55 +617,48 @@ func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	h.domainsChanged(w, r, done, changed, "")
 }
 
-// SetInstantPassword is the switch that puts the password in front of the
-// instant address, or takes it away. It answers the panel as stored, so a
-// failed save flips the switch back.
-func (h *AppsHandler) SetInstantPassword(w http.ResponseWriter, r *http.Request) {
-	open := r.FormValue("on") != "1"
-	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), "", &open)
-	done := "Password on the instant address"
-	if open {
-		done = "Instant address open to everyone"
+// Password turns the app's password on or off. Its switch (switch=1) turns
+// it off, or on with a password moin makes and shows once; the fields set
+// one of your own. A wrong field says the rule of its hint line again, in
+// red; a failed switch flips back.
+func (h *AppsHandler) Password(w http.ResponseWriter, r *http.Request) {
+	if r.FormValue("switch") == "1" && r.FormValue("on") != "1" {
+		changed, err := h.apps.RemovePassword(actor(r), r.PathValue("app"))
+		if err != nil {
+			if _, ok := h.renderDomains(w, r, ""); ok {
+				answerError(w, r, "Password not turned off", errorMessage(err))
+			}
+			return
+		}
+		h.domainsChanged(w, r, "Password off", changed, "")
+		return
 	}
+	made, changed, err := h.apps.SetPassword(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
 	switch {
+	case errors.Is(err, service.ErrPasswordUser):
+		fieldError(w, "Password not set", "password-user", "No spaces or colons.")
+		return
+	case errors.Is(err, service.ErrPassword):
+		fieldError(w, "Password not set", "password-value", "Use 8 to 72 characters.")
+		return
 	case err != nil:
 		if _, ok := h.renderDomains(w, r, ""); ok {
-			answerError(w, r, "Password not changed", errorMessage(err))
+			answerError(w, r, "Password not set", errorMessage(err))
 		}
-	default:
-		h.domainsChanged(w, r, done, changed, "")
-	}
-}
-
-// Protect puts a password in front of the app. A wrong field says the
-// rule of its hint line again, in red.
-func (h *AppsHandler) Protect(w http.ResponseWriter, r *http.Request) {
-	changed, err := false, service.ErrProtect
-	if r.FormValue("password") != "" {
-		changed, err = h.apps.SetProtection(actor(r), r.PathValue("app"), r.FormValue("username"), r.FormValue("password"))
-	}
-	switch {
-	case errors.Is(err, service.ErrProtectUser):
-		fieldError(w, "Password not set", "protect-user", "No spaces or colons.")
-		return
-	case errors.Is(err, service.ErrProtect):
-		fieldError(w, "Password not set", "protect-password", "Use 8 to 72 characters.")
-		return
-	case err != nil:
-		failed(w, r, "Password not set", err, nil)
 		return
 	}
-	h.domainsChanged(w, r, "Password set", changed, "")
-}
-
-// Unprotect makes the app public again.
-func (h *AppsHandler) Unprotect(w http.ResponseWriter, r *http.Request) {
-	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	if made == "" {
+		h.domainsChanged(w, r, "Password set", changed, "")
+		return
+	}
+	view, err := h.domainsView(r, "")
 	if err != nil {
-		failed(w, r, "Password not removed", err, nil)
+		renderError(w, "load domains failed", err)
 		return
 	}
-	h.domainsChanged(w, r, "Password removed", changed, "")
+	view.NewPassword = made
+	render(w, r, pages.AppDomains(view))
+	answerDone(w, r, "Password on", "Shown once. "+view.App.Name+" takes it on its next restart.")
 }
 
 // domainsChanged answers a saved change of the domains or the password: the
@@ -695,11 +722,11 @@ func (h *AppsHandler) domainsView(r *http.Request, check string) (pages.DomainsV
 	if err != nil {
 		return pages.DomainsView{}, err
 	}
-	instant, err := h.apps.Instant(workspace.ID, app.ID, r.URL.Query().Get("show") == "true", ctxkeys.APIToken(r.Context()))
+	instant, err := h.apps.Instant(workspace.ID, app.ID)
 	if err != nil {
 		return pages.DomainsView{}, err
 	}
-	view := pages.DomainsView{App: *app, Checks: checks, Instant: instant, File: h.apps.FileConfig(app)}
+	view := pages.DomainsView{App: *app, Checks: checks, Instant: instant}
 	if server, err := h.servers.Get(workspace.ID, app.ServerID); err == nil {
 		view.Server = *server
 	}

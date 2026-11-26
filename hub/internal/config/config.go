@@ -21,7 +21,6 @@ type Environment string
 const (
 	EnvironmentDevelopment Environment = "development"
 	EnvironmentProduction  Environment = "production"
-	GoogleOAuthEnabled                 = false
 )
 
 type Config struct {
@@ -42,25 +41,19 @@ type Config struct {
 	DBConnection string
 
 	// Security
-	SessionExpiry            time.Duration
-	TokenEmailVerifyExpiry   time.Duration
-	TokenPasswordResetExpiry time.Duration
-	TokenEmailChangeExpiry   time.Duration
-	TokenMagicLinkExpiry     time.Duration
-	TrustedProxyCIDRs        []netip.Prefix
+	SessionExpiry          time.Duration
+	TokenEmailVerifyExpiry time.Duration
+	TokenEmailChangeExpiry time.Duration
+	TrustedProxyCIDRs      []netip.Prefix
 
-	// OAuth
-	APIURL             string
-	GitHubClientID     string
-	GitHubClientSecret string
-
-	// The moin GitHub App, which connects repos. Without an app ID the
-	// hub runs without it.
+	// The moin GitHub App, which signs people in and connects repos.
+	// Without an app ID the hub runs without it.
 	GitHubAppID            string
 	GitHubAppSlug          string
 	GitHubAppPrivateKey    string
 	GitHubAppWebhookSecret string
-	// The app's client ID and secret check who installed it.
+	// The app's client ID and secret sign people in with GitHub and check
+	// who installed the app.
 	GitHubAppClientID     string
 	GitHubAppClientSecret string
 	GitHubAPIURL          string
@@ -76,8 +69,9 @@ type Config struct {
 	CloudflareAccountID string
 	CloudflareAPIToken  string
 
-	// SecretsKey seals app env vars: 32 bytes, base64. Development falls
-	// back to a fixed key.
+	// SecretsKey seals what the hub uses itself: the Cloudflare API token,
+	// alert targets and webhook signing secrets. 32 bytes, base64.
+	// Development falls back to a fixed key.
 	SecretsKey []byte
 	// Billing off runs a self-hosted hub: no Stripe, no prices,
 	// every workspace gets everything.
@@ -106,8 +100,11 @@ type Config struct {
 	// first connect, since the proxy serves the hub too.
 	SameServer bool
 	// Payment, Stripe
-	StripeSecretKey         string
-	StripeWebhookSecret     string
+	StripeSecretKey     string
+	StripeWebhookSecret string
+	// StripeProductIDPro is the hosted product: every price of it is the
+	// pro plan. The two prices are what a new checkout sells.
+	StripeProductIDPro      string
 	StripePriceIDProMonthly string
 	StripePriceIDProYearly  string
 	// Analytics
@@ -145,9 +142,13 @@ type RenderConfig struct {
 	GoogleAnalyticsID string
 	Billing           bool
 	SignupsOpen       bool
-	// GitHubLogin shows "Continue with GitHub": only with a client ID and
-	// secret, so the button never leads to a broken GitHub page.
+	// GitHubLogin says people sign in with GitHub: the hub's GitHub App
+	// is there with its client ID and secret. The routes set it from the
+	// GitHubAppService on every request.
 	GitHubLogin bool
+	// Passkeys says the hub offers passkeys, for the sign-in page, the
+	// settings and the banner. The routes set it from the PasskeyService.
+	Passkeys bool
 }
 
 func Load() (*Config, error) {
@@ -166,11 +167,9 @@ func Load() (*Config, error) {
 		AdminEmails:  r.emails("ADMIN_EMAILS"),
 		DBConnection: r.string("DB_CONNECTION", "./data/acme.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"),
 
-		SessionExpiry:            r.duration("SESSION_EXPIRY", 168*time.Hour),
-		TokenEmailVerifyExpiry:   r.duration("TOKEN_EMAIL_VERIFY_EXPIRY", 24*time.Hour),
-		TokenPasswordResetExpiry: r.duration("TOKEN_PASSWORD_RESET_EXPIRY", time.Hour),
-		TokenEmailChangeExpiry:   r.duration("TOKEN_EMAIL_CHANGE_EXPIRY", 24*time.Hour),
-		TokenMagicLinkExpiry:     r.duration("TOKEN_MAGIC_LINK_EXPIRY", 10*time.Minute),
+		SessionExpiry:          r.duration("SESSION_EXPIRY", 168*time.Hour),
+		TokenEmailVerifyExpiry: r.duration("TOKEN_EMAIL_VERIFY_EXPIRY", 24*time.Hour),
+		TokenEmailChangeExpiry: r.duration("TOKEN_EMAIL_CHANGE_EXPIRY", 24*time.Hour),
 		TrustedProxyCIDRs: r.prefixes("TRUSTED_PROXY_CIDRS", []netip.Prefix{
 			netip.MustParsePrefix("127.0.0.0/8"),
 			netip.MustParsePrefix("::1/128"),
@@ -185,6 +184,7 @@ func Load() (*Config, error) {
 		UpdateCheck:             r.boolean("UPDATE_CHECK", true),
 		StripeSecretKey:         r.string("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:     r.string("STRIPE_WEBHOOK_SECRET", ""),
+		StripeProductIDPro:      r.string("STRIPE_PRODUCT_ID_PRO", ""),
 		StripePriceIDProMonthly: r.string("STRIPE_PRICE_ID_PRO_MONTHLY", ""),
 		StripePriceIDProYearly:  r.string("STRIPE_PRICE_ID_PRO_YEARLY", ""),
 		UmamiWebsiteID:          r.string("UMAMI_WEBSITE_ID", ""),
@@ -214,9 +214,6 @@ func Load() (*Config, error) {
 	cfg.BackupDatabase = r.boolean("BACKUP_DATABASE", cfg.IsProduction() && cfg.S3Bucket != "")
 	cfg.Uptime = r.boolean("UPTIME", cfg.IsProduction())
 	cfg.SameServer = r.boolean("SAME_SERVER", false)
-	cfg.APIURL = r.string("API_URL", cfg.AppURL)
-	cfg.GitHubClientID = r.string("GITHUB_CLIENT_ID", "")
-	cfg.GitHubClientSecret = r.string("GITHUB_CLIENT_SECRET", "")
 	cfg.GitHubAppID = r.string("GITHUB_APP_ID", "")
 	cfg.GitHubAppSlug = r.string("GITHUB_APP_SLUG", "")
 	cfg.GitHubAppPrivateKey = r.string("GITHUB_APP_PRIVATE_KEY", "")
@@ -245,7 +242,7 @@ func Load() (*Config, error) {
 }
 
 // secretsKey decodes SECRETS_KEY. Development without one gets a fixed key,
-// so env vars survive restarts; it protects nothing.
+// so sealed values survive restarts; it protects nothing.
 func secretsKey(raw string, development bool) []byte {
 	if raw == "" && development {
 		key := sha256.Sum256([]byte("ops development secrets key"))
@@ -276,18 +273,6 @@ func (c *Config) validate() []error {
 	if c.SessionExpiry <= 0 {
 		errs = append(errs, errors.New("SESSION_EXPIRY must be greater than zero"))
 	}
-	if c.APIURL != c.AppURL {
-		apiURLErr := validateAPIURL(c.APIURL)
-		if apiURLErr != nil {
-			errs = append(errs, apiURLErr)
-		}
-	}
-	errOAuthPair := func(provider, clientID, clientSecret string) {
-		if (clientID == "") != (clientSecret == "") {
-			errs = append(errs, fmt.Errorf("%s OAuth requires both client ID and client secret", provider))
-		}
-	}
-	errOAuthPair("GitHub", c.GitHubClientID, c.GitHubClientSecret)
 
 	if c.EmailFrom == "" {
 		errs = append(errs, errors.New("EMAIL_FROM is required"))
@@ -297,8 +282,8 @@ func (c *Config) validate() []error {
 	if (c.CloudflareAccountID == "") != (c.CloudflareAPIToken == "") {
 		errs = append(errs, errors.New("email delivery requires both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN"))
 	} else if c.CloudflareAccountID == "" && !c.IsDevelopment() && c.Billing {
-		// A self-hosted hub may start without email: sign-in links
-		// go to its log, and moin-server sign-in-link prints one.
+		// A self-hosted hub may start without email: mails go to its
+		// log.
 		errs = append(errs, errors.New("CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required for email delivery outside development"))
 	}
 
@@ -344,6 +329,10 @@ func (c *Config) validatePayments() []error {
 		require("STRIPE_PRICE_ID_PRO_MONTHLY", c.StripePriceIDProMonthly)
 		require("STRIPE_PRICE_ID_PRO_YEARLY", c.StripePriceIDProYearly)
 	}
+	// A price sells the product: without it, no subscription gets its plan.
+	if c.IsProduction() || c.StripePriceIDProMonthly != "" || c.StripePriceIDProYearly != "" {
+		require("STRIPE_PRODUCT_ID_PRO", c.StripeProductIDPro)
+	}
 
 	return errs
 }
@@ -353,23 +342,6 @@ func validateAppURL(value string) error {
 		return errors.New("APP_URL is required")
 	}
 	return validateAbsoluteHTTPURL("APP_URL", value)
-}
-
-// validateAPIURL checks an explicit API_URL, the public origin of this server.
-// OAuth providers return to API_URL/auth/{provider}/callback, so it carries no path.
-func validateAPIURL(value string) error {
-	err := validateAbsoluteHTTPURL("API_URL", value)
-	if err != nil {
-		return err
-	}
-	parsed, err := url.Parse(value)
-	if err != nil {
-		return err
-	}
-	if parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
-		return errors.New("API_URL must be an origin without a path, for example https://api.example.com")
-	}
-	return nil
 }
 
 func validateAbsoluteHTTPURL(key, value string) error {
@@ -492,7 +464,6 @@ func (c *Config) Render() RenderConfig {
 		GoogleAnalyticsID: c.GoogleAnalyticsID,
 		Billing:           c.Billing,
 		SignupsOpen:       c.SignupsOpen,
-		GitHubLogin:       c.GitHubClientID != "" && c.GitHubClientSecret != "",
 	}
 }
 

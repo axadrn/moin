@@ -11,7 +11,8 @@ import (
 )
 
 // WorkspaceInvitation asks whether to join the workspace someone invited
-// you to: who, as what, and one button.
+// you to: who, as what, and one button. A guest signs in with GitHub first,
+// and any GitHub account may take the invitation.
 templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage string) {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ seo := layouts.SEOProps{Title: "Workspace invitation", Description: "Accept a workspace invitation"} }}
@@ -26,6 +27,21 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 				}
 			</div>
 		}
+	} else if user == nil {
+		@authScreen(seo, "Join "+invitation.WorkspaceName) {
+			@authLine() {
+				{ "This invitation is for " + invitation.Email + "." }
+			}
+			@authStack() {
+				if ctxkeys.RenderConfig(ctx).GitHubLogin {
+					@continueWithGitHub()
+				} else {
+					@authLink("/auth") {
+						Sign in
+					}
+				}
+			}
+		}
 	} else {
 		@authScreen(seo, "Join "+invitation.WorkspaceName) {
 			@authStack() {
@@ -34,19 +50,17 @@ templ WorkspaceInvitation(invitation *model.WorkspaceInvitation, errorMessage st
 						@factRow("From", invitation.InviterName)
 						@factRow("Role", model.WorkspaceRoleLabel(invitation.Role))
 						@factRow("For", invitation.Email)
-						if user != nil && !strings.EqualFold(user.Email, invitation.Email) {
+						if !strings.EqualFold(user.Email, invitation.Email) {
 							@factRow("You", user.Email)
 						}
 					}
 				}
-				if user != nil {
-					<form action={ templ.SafeURL(ctxkeys.URLPath(ctx)) } method="POST" class="moin-stack">
-						@components.CSRF()
-						@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-							{ "Join " + invitation.WorkspaceName }
-						}
-					</form>
-				}
+				<form action={ templ.SafeURL(ctxkeys.URLPath(ctx)) } method="POST" class="moin-stack">
+					@components.CSRF()
+					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
+						{ "Join " + invitation.WorkspaceName }
+					}
+				</form>
 				if errorMessage != "" {
 					<p class="moin-message moin-center" data-state="failed" role="alert">{ errorMessage }</p>
 				}

@@ -55,17 +55,6 @@ MCP: set_backups
 
 The CLI takes `15m`, `1h` or `1d`, and `1d`, `3d`, `7d` or `30d`. The API and MCP take `every_minutes` (15, 60 or 1440) and `keep_days` (1, 3, 7 or 30).
 
-The schedule can also live in your repo:
-
-```yaml
-x-moin:
-  backups:
-    every: 15m
-    keep: 30d
-```
-
-Then the file decides. moin shows the schedule locked, marked **from compose.yml**. Changing it elsewhere answers `schedule_in_file`. [Who decides](/docs/guides/config#who-decides).
-
 ## Extra copies
 
 moin also takes one copy right before each of these:
@@ -81,7 +70,7 @@ The moments you can go back to have names:
 - **At 14:00**: a copy from your schedule. From another day: **Nov 6 at 14:00**
 - **Before v12**: right before a deploy started v12
 - **Before the update to 3.4.1**: right before a catalog update
-- **Before your SQL change**, **Before your edit in users**, **Before the row added to users**: right before a data edit
+- **Before your SQL change**, **Before your edit in users**, **Before the row added to users**, **Before the row deleted from users**: right before a data edit
 - **Before the restore at 14:05**: going back to it undoes the restore
 
 Times are in UTC. [How a copy is made](/docs/concepts/backups#how-a-copy-is-made).
@@ -106,7 +95,7 @@ API: POST /api/v1/apps/{app}/restores
 MCP: restore_app
 ```
 
-`--to` takes a moment from `moin backups`, by its ID or label: `before-v12`, `20261107T140000Z`. Or a time in UTC: `14:01` for today, or `"2026-11-07 14:01"`. A time takes the newest copy at or before it.
+`--to` takes a moment from `moin backups`, by its ID or label: `before-v12`, `20261107T140000Z-482913`. Or a time in UTC: `14:01` for today, or `"2026-11-07 14:01"`. A time takes the newest copy at or before it.
 
 The API and MCP take `moment` or `at`. Two moments with the same label need the moment's ID. With more than one database, name one: `--db /data/app.db` or `--db postgres-db`.
 
@@ -116,7 +105,7 @@ Every restore keeps the database as it was right before, as long as you keep cop
 
 ```surfaces
 Web: the app, **Data**, a database: **Before the restore at 14:05**, **Restore**
-CLI: moin restore my-app --to undo-20261107T140500Z
+CLI: moin restore my-app --to undo-20261107T140500Z-482913
 TUI: on the app, `b`, pick **Before the restore at …**, `enter`
 API: POST /api/v1/apps/{app}/restores
 MCP: restore_app
@@ -124,7 +113,7 @@ MCP: restore_app
 
 ## Download a copy
 
-A link to a copy in your bucket: the newest one, or the one you name. It works for 15 minutes. The file comes straight from your bucket, not through moin.
+A link to a copy in your bucket: the newest one, or the one you name. It works for 15 minutes. The app's server signs it with the bucket's key, so the server must be online. The file comes straight from your bucket, not through moin.
 
 ```surfaces
 Web: the app, **Data**, a database, **Download a copy**
@@ -135,6 +124,8 @@ MCP: download_backup
 ```
 
 The CLI saves it in the current folder. `--link` prints the link instead. `--to before-v12` takes another copy.
+
+A server whose [rules](/docs/guides/security#rules) say `data: off` refuses the link. Download the copy from your bucket yourself, or remove that line.
 
 A SQLite copy is gzipped: `gunzip` it and open it with `sqlite3`. A Postgres copy is a `pg_dump`: `pg_restore` puts it into any Postgres. You need no moin for either.
 

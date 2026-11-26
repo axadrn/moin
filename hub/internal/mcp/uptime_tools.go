@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/model"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -12,14 +13,14 @@ import (
 // registerUptimeTools registers the tools of uptime.
 func registerUptimeTools(server *mcpsdk.Server, services Services) {
 	tools := moinTools{services: services}
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_uptime", Title: "Get uptime", Annotations: readOnly("Get uptime"),
-		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the visit goes, its state, the last visit with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. moin visits every domain once a minute like a visitor; an answer below 500 is up. Needs the read scope.",
-	}, Read(member(services, tools.getUptime)))
+	Add(server, &mcpsdk.Tool{Name: "get_uptime", Title: "Get uptime", Annotations: readOnly("Get uptime"),
+		Description: "Returns the uptime of an app: one state for all its domains (up, down, pending, paused, stopped or no_domains), whether its server is online, and per domain where the visit goes, its state, the last visit with HTTP status, response time and certificate expiry, uptime in percent over 24 hours, 7 and 30 days, and the last outages. moin visits every domain that serves something once a minute like a visitor, not one that only redirects to the main domain; an answer below 500 is up; a domain goes down after 3 failed visits in a row and back up after 3 answers in a row.",
+	}, model.RightRead, member(services, tools.getUptime))
 	writeTool := change(false, true)
 	writeTool.Title = "Set uptime"
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "set_uptime", Title: "Set uptime", Annotations: writeTool,
-		Description: "Changes the path uptime visits on one domain of an app (empty goes back to the health path from x-moin.health, or /), or pauses and resumes it. A missing field keeps its setting. Returns the domain. Needs a token with read and write access.",
-	}, Write(changes(services, tools.setUptime)))
+	Add(server, &mcpsdk.Tool{Name: "set_uptime", Title: "Set uptime", Annotations: writeTool,
+		Description: "Changes the path uptime visits on one domain of an app (empty goes back to /), or pauses and resumes it. A missing field keeps its setting. Returns the domain.",
+	}, model.RightDeploy, changes(services, tools.setUptime))
 }
 
 // Uptime is the output of get_uptime.
@@ -70,12 +71,12 @@ func (d UptimeDomain) Summary() string {
 type UptimeInput struct {
 	App    string  `json:"app" jsonschema:"the app name or ID"`
 	Domain string  `json:"domain" jsonschema:"one of the app's domains"`
-	Path   *string `json:"path,omitempty" jsonschema:"the path to visit, like /health; empty for the health path or /"`
+	Path   *string `json:"path,omitempty" jsonschema:"the path to visit, like /health; empty for /"`
 	Paused *bool   `json:"paused,omitempty" jsonschema:"true pauses uptime of the domain, false resumes it"`
 }
 
 func (t moinTools) getUptime(_ context.Context, caller Caller, input AppInput) (Uptime, error) {
-	app, uptime, err := t.services.Apps.Uptime(caller.Token.WorkspaceID, input.app())
+	app, uptime, err := t.services.Apps.Uptime(caller.Bearer.WorkspaceID, input.App)
 	if err != nil {
 		return Uptime{}, err
 	}

@@ -1,0 +1,9 @@
+services:
+  web:
+    image: ghcr.io/advplyr/audiobookshelf:${VERSION}
+    expose: ["80"]
+    volumes:
+      - ./data/config:/config
+      - ./data/metadata:/metadata
+      - ./data/audiobooks:/audiobooks
+      - ./data/podcasts:/podcasts

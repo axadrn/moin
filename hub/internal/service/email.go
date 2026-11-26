@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/axadrn/moin/hub/internal/service/mailer"
 )
@@ -20,20 +21,6 @@ func NewEmailService(provider mailer.Mailer, appURL, appName string) *EmailServi
 		appURL:  appURL,
 		appName: appName,
 	}
-}
-
-func (s *EmailService) SendForgotPasswordEmail(email, token, name string) error {
-	signInURL := fmt.Sprintf("%s/auth/forgot-password/%s", s.appURL, token)
-	return s.send("forgot_password", email, forgotPasswordEmailTemplate(signInURL, s.appName))
-}
-
-func (s *EmailService) SendMagicLinkEmail(email, token, name string) error {
-	return s.send("magic_link", email, magicLinkEmailTemplate(s.MagicLinkURL(token), s.appName))
-}
-
-// MagicLinkURL is the sign-in link of a magic link token.
-func (s *EmailService) MagicLinkURL(token string) string {
-	return fmt.Sprintf("%s/auth/magic-link/%s", s.appURL, token)
 }
 
 func (s *EmailService) SendWelcomeEmail(email, name string) error {
@@ -53,6 +40,11 @@ func (s *EmailService) SendEmailChangeVerification(newEmail, token, userName str
 
 func (s *EmailService) SendEmailChangeNotification(oldEmail, newEmail, userName string) error {
 	return s.send("email_change_notification", oldEmail, emailChangeNotificationTemplate(userName, newEmail, s.appName))
+}
+
+// SendPasskeyAdded tells the user a passkey was added to their account, at.
+func (s *EmailService) SendPasskeyAdded(email, name string, at time.Time) error {
+	return s.send("passkey_added", email, passkeyAddedTemplate(name, at, s.appName))
 }
 
 func (s *EmailService) SendAccountDeletedEmail(email, name string) error {

@@ -22,7 +22,10 @@ var uiBlockGroups = []struct{ prefix, title string }{
 	{"states", "States"},
 }
 
-var blockTitle = regexp.MustCompile(`<title>(.*?)</title>`)
+var (
+	blockTitle       = regexp.MustCompile(`<title>(.*?)</title>`)
+	blockDescription = regexp.MustCompile(`<meta name="description" content="(.*?)">`)
+)
 
 // UIBlocks reads blocks/ in files: every block under its topic.
 func UIBlocks(files fs.FS) ([]model.UIBlockGroup, error) {
@@ -46,8 +49,12 @@ func UIBlocks(files fs.FS) ([]model.UIBlockGroup, error) {
 			if title == nil {
 				return nil, fmt.Errorf("the block %s has no title", slug)
 			}
+			description := blockDescription.FindSubmatch(source)
+			if description == nil {
+				return nil, fmt.Errorf("the block %s has no description", slug)
+			}
 			kept.Blocks = append(kept.Blocks, model.UIBlock{
-				Slug: slug, Title: string(title[1]),
+				Slug: slug, Title: string(title[1]), Description: string(description[1]),
 				Code: strings.ReplaceAll(string(source), `"../moin.`, `"ui/moin.`),
 			})
 		}

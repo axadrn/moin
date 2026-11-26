@@ -7,34 +7,30 @@ import (
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
-	"github.com/axadrn/moin/internal/build"
 )
 
 // AppSource is the "Deploy from" card of the Deploys section: one tab per
-// place new versions come from, your folder, GitHub or your CI, each with
-// an icon; a green dot marks the one in use. One at a time: linking a repo
-// turns the deploy hook off, a hook unlinks the repo. Under a tab only its
-// own part, almost no words; the docs explain. Every action in it answers
-// the whole card.
+// place new versions come from, GitHub or your CI, each with an icon; a
+// green dot marks the one in use, none while neither is set up. One at a
+// time: a hook turns deploy on push off and keeps the repo linked, whose
+// compose file CI deploys take; deploy on push turns the hook off.
+// Under a tab only its own part, almost no words; the docs explain. Every
+// action in it answers the whole card.
 templ AppSource(view RepoView) {
 	{{ app := view.App }}
 	{{ current := app.DeployFrom() }}
-	{{ shown := cmp.Or(view.Show, current) }}
+	{{ shown := cmp.Or(view.Show, current, "github") }}
 	<div id="app-source">
 		@components.Card(components.CardProps{Title: "Deploy from"}) {
 			<div class="moin-stack" data-gap="6">
 				@components.Tabs(components.TabsProps{ID: "source-tabs", Label: "Deploy from", Tabs: []components.Tab{
-					sourceTab(ctx, app, "folder", "Folder", "folder", shown, current),
 					sourceTab(ctx, app, "github", "GitHub", "git-hub", shown, current),
 					sourceTab(ctx, app, "ci", "CI", "package", shown, current),
 				}})
-				switch shown {
-					case "github":
-						@AppRepo(view)
-					case "ci":
-						@appCI(view)
-					default:
-						@sourceFolder(app, current)
+				if shown == "ci" {
+					@appCI(view)
+				} else {
+					@AppRepo(view)
 				}
 			</div>
 		}
@@ -52,22 +48,4 @@ func sourceTab(ctx context.Context, app model.App, value, label, icon, shown, cu
 		"hx-swap":     "outerHTML",
 		"data-source": value,
 	}}
-}
-
-// sourceFolder is "Folder": the command, which always works. While GitHub
-// or CI is in use, the one button that goes back to the folder.
-templ sourceFolder(app model.App, current string) {
-	<div class="moin-stack" data-gap="4" data-source-folder>
-		@components.Command(components.CommandProps{Text: build.Name + " deploy " + app.Name})
-		switch current {
-			case "github":
-				<div>
-					@unlinkButton(app, "Use folder")
-				</div>
-			case "ci":
-				<div>
-					@hookOffButton(app, false, "Use folder")
-				</div>
-		}
-	</div>
 }

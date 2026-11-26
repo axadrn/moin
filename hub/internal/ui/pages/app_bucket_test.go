@@ -33,6 +33,34 @@ func TestBucketsPage(t *testing.T) {
 	}
 }
 
+// The secret key of a bucket lives on the servers: the page says which
+// keep it, takes it for one that does not, and picks the server that
+// checks a new bucket when there are several.
+func TestBucketKeysOnServers(t *testing.T) {
+	view := BucketView{
+		Buckets: []service.Bucket{{Name: "default", Default: true, Bucket: "acme", Servers: service.SecretServers{On: []service.SecretOn{{Server: "server-1"}}, MissingOn: []string{"server-2"}}}},
+		Servers: []string{"server-1", "server-2"},
+	}
+	var html strings.Builder
+	if err := Bucket(view).Render(projectPageContext("/app/tiny-rocket-co/bucket"), &html); err != nil {
+		t.Fatal(err)
+	}
+	page := html.String()
+	for _, want := range []string{"On server-1", "server-2 has no key for this bucket.", `data-secret-missing="server-2"`, `hx-post="/app/tiny-rocket-co/bucket/default/key"`, `name="server" value="server-2"`, `id="bucket-new-server"`, "Goes to the server, never back"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page has no %q", want)
+		}
+	}
+	html.Reset()
+	view.Servers = []string{"server-1"}
+	if err := Bucket(view).Render(projectPageContext("/app/tiny-rocket-co/bucket"), &html); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html.String(), `id="bucket-new-server"`) {
+		t.Error("one server, and still a server to pick")
+	}
+}
+
 // Data picks the app's bucket among several, says in one row how the
 // backup stands, how often and how long, lists the moments to go back
 // to and offers the newest copy.

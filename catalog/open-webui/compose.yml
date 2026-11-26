@@ -1,0 +1,8 @@
+services:
+  web:
+    image: ghcr.io/open-webui/open-webui:${VERSION}
+    expose: ["8080"]
+    environment:
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+    volumes:
+      - ./data:/app/backend/data

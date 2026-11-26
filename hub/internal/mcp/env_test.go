@@ -23,13 +23,14 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// environment serves /mcp through the token middleware the router uses,
+// environment serves /mcp through the bearer middleware the router uses,
 // against a fresh database.
 type environment struct {
-	database *sqlx.DB
-	mailer   *testutil.MemoryMailer
-	tokens   *service.APITokenService
-	services mcp.Services
+	database    *sqlx.DB
+	mailer      *testutil.MemoryMailer
+	ciTokens    *service.CITokenService
+	connections *service.ConnectionService
+	services    mcp.Services
 	// updates is where the updater of the self-hosted test hub
 	// keeps its files; ada@example.com is its admin.
 	updates string
@@ -74,14 +75,18 @@ func newEnvironment(t *testing.T) *environment {
 	env.services.Updates = service.NewUpdateService("v0.2.0", releases.URL, env.updates, true, true, []string{"ada@example.com"}, repository.NewActivity(database))
 	env.services.Alerts = service.NewAlertService(email, repository.NewWorkspaces(database), repository.NewWorkspaceMembers(database), repository.NewApps(database, database), repository.NewAlertDestinations(database), repository.NewActivity(database), box)
 	env.services.Status = service.NewStatusService(env.services.Apps, env.services.Servers, nil)
-	env.tokens = service.NewAPITokenService(repository.NewAPITokens(database), workspaces)
-	tokenAuth := middleware.APITokenAuth(env.tokens, env.services.Users)
+	env.ciTokens = service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), workspaces)
+	env.connections = service.NewConnectionService(repository.NewConnections(database), workspaces)
+	tokenAuth := middleware.BearerAuth(env.connections, env.ciTokens, env.services.Users)
 	env.server = mcp.NewServer(env.services)
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", mcp.Handler(env.server))
+	mux.Handle("/mcp", mcp.Handler(env.server, testResourceMetadata))
 	env.handler = middleware.Chain(mux, middleware.CSRFProtection(false, middleware.NewClientIPResolver(nil)), tokenAuth)
 	return env
 }
+
+// testResourceMetadata is where the 401 of /mcp points MCP clients.
+const testResourceMetadata = "https://app.example.com/.well-known/oauth-protected-resource/mcp"
 
 // owner is a seeded user with a workspace.
 type owner struct {
@@ -100,19 +105,26 @@ func seedOwner(t *testing.T, env *environment, id string) owner {
 	return owner{user: fixture.User, workspace: fixture.Workspace}
 }
 
-// createToken creates a personal API token for the owner and returns the
-// model and the raw token.
-func createToken(t *testing.T, env *environment, owner owner, scopes ...string) (*model.APIToken, string) {
+// allRights are every right a CI token can have.
+var allRights = []string{"deploy", "env", "delete", "servers"}
+
+// createToken makes a CI token of the owner with the rights named, read
+// alone without any, and returns who it acts for and the raw token.
+func createToken(t *testing.T, env *environment, owner owner, rights ...string) (*model.Bearer, string) {
 	t.Helper()
-	token, raw, err := env.tokens.Create(owner.user.ID, service.CreateAPITokenInput{
-		Name:        "Claude",
-		Scopes:      scopes,
-		WorkspaceID: owner.workspace.ID,
-	})
+	parsed, ok := model.ParseRights(rights...)
+	if !ok {
+		t.Fatalf("rights %v", rights)
+	}
+	_, raw, err := env.ciTokens.Create(service.Actor{UserID: owner.user.ID, WorkspaceID: owner.workspace.ID}, service.NewCIToken{Name: "Claude", Rights: parsed})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	return token, raw
+	bearer, err := env.ciTokens.Authenticate(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bearer, raw
 }
 
 // connectHTTP connects an MCP client to /mcp over Streamable HTTP with the
@@ -129,12 +141,12 @@ func connectHTTP(t *testing.T, env *environment, raw string) *mcpsdk.ClientSessi
 }
 
 // connectMemory connects an MCP client to server over the SDK's in-memory
-// transport, as the owner with token. The context carries what the token
+// transport, as the owner with bearer. The context carries what the bearer
 // middleware puts there for HTTP requests.
-func connectMemory(t *testing.T, server *mcpsdk.Server, owner owner, token *model.APIToken) *mcpsdk.ClientSession {
+func connectMemory(t *testing.T, server *mcpsdk.Server, owner owner, bearer *model.Bearer) *mcpsdk.ClientSession {
 	t.Helper()
 	ctx := ctxkeys.WithUser(context.Background(), owner.user)
-	ctx = ctxkeys.WithAPIToken(ctx, token)
+	ctx = ctxkeys.WithBearer(ctx, bearer)
 	serverTransport, clientTransport := mcpsdk.NewInMemoryTransports()
 	return connect(t, ctx, server, clientTransport, serverTransport)
 }
@@ -222,4 +234,15 @@ func text(result *mcpsdk.CallToolResult) string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+// online puts a server of the owner online, with a daemon that keeps every
+// env value and secret it gets, and returns what takes it offline again.
+func online(t *testing.T, env *environment, o owner, name string) (offline func()) {
+	t.Helper()
+	server, err := env.services.Servers.Get(o.workspace.ID, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return env.services.Servers.Connect(server, testutil.Hello, "203.0.113.5", func() {}, testutil.AnswerOK(env.services.Servers.Receive, server.ID))
 }

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -38,15 +37,15 @@ type App struct {
 	LiveNumber   int      `json:"live_number"`
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
-	Protected    bool     `json:"protected"`
+	// Password says the app's password is on: its domains and its
+	// instant address ask for it. The password itself is never here.
+	Password bool `json:"password"`
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
 	// Instant is the app's instant address, "" when it has none;
-	// InstantProvider its provider or off; InstantOpen says no password
-	// guards it.
+	// InstantProvider its provider or off.
 	Instant         string `json:"instant"`
 	InstantProvider string `json:"instant_provider"`
-	InstantOpen     bool   `json:"instant_open"`
 	// Stopped is set when the app was stopped; a deploy, restart or start
 	// runs it again.
 	Stopped bool `json:"stopped"`
@@ -60,15 +59,16 @@ type App struct {
 	AutoDeploy bool   `json:"auto_deploy"`
 	// Pinned keeps the app above the others that run fine, in every list.
 	Pinned bool `json:"pinned"`
-	// Bucket is the bucket the app uploads and backs up to; empty uses
-	// the workspace's default bucket.
+	// Bucket is the bucket the app backs up to; empty uses the
+	// workspace's default bucket.
 	Bucket string `json:"bucket"`
 	// Hook says the app has a deploy hook URL; the URL itself is shown
 	// only once, when it is made.
 	Hook bool `json:"hook"`
-	// DeployFrom is where new versions come from, one at a time: folder
-	// (moin deploy), github (every push to the linked branch) or ci (the
-	// deploy hook). Linking a repo or making a hook switches it.
+	// DeployFrom is where new versions come from, one at a time: ci (the
+	// deploy hook, with the compose file from the linked repo when there
+	// is one) or github (the linked repo); empty while neither is set up.
+	// Making a hook or turning deploy on push on switches it.
 	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the deploy hook deploys new tags of: the one
 	// running now, without its tag. Empty while the app runs from its
@@ -114,9 +114,25 @@ type AppDetail struct {
 	Deploys []Deploy `json:"deploys"`
 }
 
-// Env is the answer of GET /api/v1/apps/{app}/env.
+// Env is the answer of GET /api/v1/apps/{app}/env: the keys and when they
+// changed. Values are write-only: no answer ever holds one.
 type Env struct {
-	Items map[string]string `json:"items"`
+	Items []EnvVar `json:"items"`
+}
+
+// EnvVar is one env var of an app, without its value.
+type EnvVar struct {
+	Key       string    `json:"key"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// NewEnv is the answer for the env vars of an app.
+func NewEnv(vars []model.EnvVar) Env {
+	items := make([]EnvVar, len(vars))
+	for index, envVar := range vars {
+		items[index] = EnvVar{Key: envVar.Key, UpdatedAt: envVar.UpdatedAt.UTC()}
+	}
+	return Env{Items: items}
 }
 
 // Logs is the answer of GET /api/v1/apps/{app}/logs.
@@ -129,14 +145,12 @@ type createAppRequest struct {
 	Server string `json:"server"`
 }
 
-// deployRequest is the body of a deploy: a source the CLI uploaded to the
-// user's bucket with its SHA-256, an image built elsewhere, or a ref of the
-// GitHub repo the app follows. An empty body deploys the linked branch.
+// deployRequest is the body of a deploy: an image built elsewhere, a ref
+// of the GitHub repo the app follows, or both: the image with the compose
+// file of the ref. An empty body deploys the linked branch.
 type deployRequest struct {
-	Upload string `json:"upload"`
-	SHA256 string `json:"sha256"`
-	Image  string `json:"image"`
-	Ref    string `json:"ref"`
+	Image string `json:"image"`
+	Ref   string `json:"ref"`
 }
 
 type rollbackRequest struct {
@@ -149,7 +163,7 @@ type envRequest struct {
 }
 
 func NewApp(app model.App) App {
-	domains, canonical := app.MainDomains()
+	domains, canonical := app.DomainsOf("")
 	return App{
 		ID:              link.ID(app.ID),
 		Name:            app.Name,
@@ -160,11 +174,10 @@ func NewApp(app model.App) App {
 		LiveNumber:      app.LiveNumber,
 		Domains:         domains,
 		Canonical:       canonical,
-		Protected:       app.Protect != "",
-		ServiceDomains:  app.ServiceDomainMap(),
+		Password:        app.Password != "",
+		ServiceDomains:  app.ServiceDomains(),
 		Instant:         instantURL(app.InstantHost),
 		InstantProvider: app.Instant,
-		InstantOpen:     app.InstantOpen,
 		Stopped:         app.Stopped,
 		ChangesWaiting:  app.ChangesWaiting,
 		Repo:            app.Repo,
@@ -187,22 +200,31 @@ func instantURL(host string) string {
 	return "https://" + host
 }
 
-// Instant is the instant address of an app: its URL, or why it has none,
-// and the password in front of it when asked for.
+// Instant is the instant address of an app: its URL, or why it has none.
+// The app's password guards it like the app's domains.
 type Instant struct {
 	URL      string `json:"url"`
 	Provider string `json:"provider"`
 	Reason   string `json:"reason,omitempty"`
-	Open     bool   `json:"open"`
-	User     string `json:"user,omitempty"`
-	// Password is the one moin made, with show=true; OwnPassword says the
-	// app's own password, the one of its domains, guards it instead.
-	Password    string `json:"password,omitempty"`
-	OwnPassword bool   `json:"own_password"`
 }
 
 func NewInstant(instant service.Instant) Instant {
-	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason, Open: instant.Open, User: instant.User, Password: instant.Password, OwnPassword: instant.OwnPassword}
+	return Instant{URL: instant.URL, Provider: instant.Provider, Reason: instant.Reason}
+}
+
+// CreatedApp is the answer of POST /api/v1/apps: the app and its
+// password, user moin, which its domains and its instant address ask
+// for: shown this once.
+type CreatedApp struct {
+	App      App    `json:"app"`
+	Password string `json:"password,omitempty"`
+}
+
+// NewPassword is the answer of PUT /api/v1/apps/{app}/password: the
+// change, and the password when moin made it, the one time moin shows it.
+type NewPassword struct {
+	Change
+	Password string `json:"password,omitempty"`
 }
 
 func NewDeploy(deploy model.Deploy) Deploy {
@@ -270,7 +292,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, NewApp(*app))
+	JSON(w, http.StatusCreated, CreatedApp{App: NewApp(*app), Password: app.NewPassword})
 }
 
 // Get returns an app with its newest deploys.
@@ -289,9 +311,9 @@ type renameAppRequest struct {
 	Name string `json:"name"`
 }
 
-// Rename gives an app a new name and answers it. Links count its ID, so
-// they keep working; its data, backups and instant address stay, and the
-// next restart names its containers after it.
+// Rename gives an app a new name and answers it. Links name the app by its
+// name, so they follow it; its data, backups and instant address stay, and
+// the next restart names its containers after it.
 func (h *AppsHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	var request renameAppRequest
 	if !Decode(w, r, &request) {
@@ -316,14 +338,11 @@ func (h *AppsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// CreateDeploy starts a deploy. A gzipped source tarball as the body builds
-// on the server, optionally with ?image= for the main service; a JSON body
-// {"image": "..."} deploys an image built elsewhere.
+// CreateDeploy starts a deploy: {"image": "..."} deploys an image built
+// elsewhere, with the compose file of "ref" in the linked repo, its branch
+// by default; {"ref": "..."} alone a branch, tag or commit of the linked
+// repo, built on the server.
 func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		Error(w, http.StatusUnsupportedMediaType, "update_ops", "This moin is too old: sources go to your own bucket now. Update it with curl -fsSL <hub>/cli.sh | sh.")
-		return
-	}
 	var request deployRequest
 	if !Decode(w, r, &request) {
 		return
@@ -331,10 +350,8 @@ func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 	var deploy *model.Deploy
 	var err error
 	switch {
-	case request.Upload != "":
-		deploy, err = h.apps.DeployUpload(r.Context(), actor(r), r.PathValue("app"), request.Upload, request.SHA256)
 	case request.Image != "":
-		deploy, err = h.apps.Deploy(actor(r), r.PathValue("app"), request.Image)
+		deploy, err = h.apps.Deploy(r.Context(), actor(r), r.PathValue("app"), request.Image, request.Ref)
 	default:
 		deploy, err = h.apps.DeployRef(r.Context(), actor(r), r.PathValue("app"), request.Ref)
 	}
@@ -343,24 +360,6 @@ func (h *AppsHandler) CreateDeploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusAccepted, NewDeploy(*deploy))
-}
-
-// UploadResponse is the answer of POST /api/v1/apps/{app}/uploads.
-type UploadResponse struct {
-	Upload string `json:"upload"`
-	URL    string `json:"url"`
-}
-
-// CreateUpload signs a link the CLI uploads a source to, in the user's own
-// bucket. moin never sees the code.
-func (h *AppsHandler) CreateUpload(w http.ResponseWriter, r *http.Request) {
-	workspace := ctxkeys.Workspace(r.Context())
-	upload, err := h.apps.Upload(r.Context(), workspace.ID, r.PathValue("app"))
-	if err != nil {
-		ServiceError(w, err)
-		return
-	}
-	JSON(w, http.StatusCreated, UploadResponse{Upload: upload.ID, URL: upload.URL})
 }
 
 // Redeploy builds the newest source again with the env as it is now.
@@ -481,16 +480,33 @@ func (h *AppsHandler) Logs(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, Logs{Lines: lines})
 }
 
-// GetEnv returns the env vars in plain text. Tokens need the write scope:
-// reading secrets is as strong as writing them.
-func (h *AppsHandler) GetEnv(w http.ResponseWriter, r *http.Request) {
+// ComposeFile is the compose file of an app's live deploy, YAML: everything
+// moin runs for the app, without a secret value.
+type ComposeFile struct {
+	Number int    `json:"number"`
+	Text   string `json:"compose_file"`
+}
+
+// ComposeFile answers the compose file of the app's live deploy.
+func (h *AppsHandler) ComposeFile(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	number, text, err := h.apps.ComposeFile(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, Env{Items: env})
+	JSON(w, http.StatusOK, ComposeFile{Number: number, Text: text})
+}
+
+// GetEnv lists the env vars by key, without their values.
+func (h *AppsHandler) GetEnv(w http.ResponseWriter, r *http.Request) {
+	workspace := ctxkeys.Workspace(r.Context())
+	vars, err := h.apps.EnvVars(workspace.ID, r.PathValue("app"))
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewEnv(vars))
 }
 
 // UpdateEnv sets and removes env vars. The next deploy gets them.
@@ -500,17 +516,17 @@ func (h *AppsHandler) UpdateEnv(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	_, err := h.apps.SetEnv(actor(r), r.PathValue("app"), request.Set, request.Unset)
+	_, err := h.apps.SetEnv(r.Context(), actor(r), r.PathValue("app"), request.Set, request.Unset)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	vars, err := h.apps.EnvVars(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, Env{Items: env})
+	JSON(w, http.StatusOK, NewEnv(vars))
 }
 
 // replaceEnvRequest is every env var of an app, by key.
@@ -518,9 +534,9 @@ type replaceEnvRequest struct {
 	Env map[string]string `json:"env"`
 }
 
-// ReplacedEnv is the env vars after a replace and what changed.
+// ReplacedEnv is the env vars after a replace and what changed, by key.
 type ReplacedEnv struct {
-	Items map[string]string `json:"items"`
+	Items []EnvVar `json:"items"`
 	dotenv.Change
 }
 
@@ -535,17 +551,17 @@ func (h *AppsHandler) ReplaceEnv(w http.ResponseWriter, r *http.Request) {
 	if request.Env == nil {
 		request.Env = map[string]string{}
 	}
-	change, err := h.apps.ReplaceEnv(actor(r), r.PathValue("app"), request.Env)
+	change, err := h.apps.ReplaceEnv(r.Context(), actor(r), r.PathValue("app"), request.Env)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	env, err := h.apps.Env(workspace.ID, r.PathValue("app"))
+	vars, err := h.apps.EnvVars(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, ReplacedEnv{Items: env, Change: change})
+	JSON(w, http.StatusOK, ReplacedEnv{Items: NewEnv(vars).Items, Change: change})
 }
 
 // Events streams the app list: once on connect and again after every change.
@@ -647,11 +663,42 @@ func (h *AppsHandler) RemoveHook(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// Registry is a registry login without its password.
+// Registry is a registry login without its password, which only the
+// servers keep: Servers are the ones that keep it, MissingOn the others.
 type Registry struct {
 	Host      string    `json:"host"`
 	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
+	SecretServers
+}
+
+// NewRegistry is the JSON shape of a registry login.
+func NewRegistry(login service.RegistryLogin) Registry {
+	return Registry{Host: login.Host, Username: login.Username, CreatedAt: login.CreatedAt.UTC(), SecretServers: NewSecretServers(login.Servers)}
+}
+
+// SecretOn is a server that keeps a secret, and since when.
+type SecretOn struct {
+	Server    string    `json:"server"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SecretServers says which servers keep a secret and which do not.
+type SecretServers struct {
+	Servers   []SecretOn `json:"servers"`
+	MissingOn []string   `json:"missing_on"`
+}
+
+// NewSecretServers is the JSON shape of where a secret is.
+func NewSecretServers(where service.SecretServers) SecretServers {
+	out := SecretServers{Servers: make([]SecretOn, 0, len(where.On)), MissingOn: where.MissingOn}
+	if out.MissingOn == nil {
+		out.MissingOn = []string{}
+	}
+	for _, on := range where.On {
+		out.Servers = append(out.Servers, SecretOn{Server: on.Server, UpdatedAt: on.UpdatedAt.UTC()})
+	}
+	return out
 }
 
 // RegistryList is the answer of GET /api/v1/registries.
@@ -659,9 +706,12 @@ type RegistryList struct {
 	Items []Registry `json:"items"`
 }
 
+// registryRequest is a login for one server: server may be empty when
+// the workspace has one.
 type registryRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Server   string `json:"server"`
 }
 
 func (h *AppsHandler) registryList(workspaceID string) (RegistryList, error) {
@@ -671,7 +721,7 @@ func (h *AppsHandler) registryList(workspaceID string) (RegistryList, error) {
 	}
 	list := RegistryList{Items: make([]Registry, 0, len(logins))}
 	for _, login := range logins {
-		list.Items = append(list.Items, Registry{Host: login.Host, Username: login.Username, CreatedAt: login.CreatedAt.UTC()})
+		list.Items = append(list.Items, NewRegistry(login))
 	}
 	return list, nil
 }
@@ -687,13 +737,14 @@ func (h *AppsHandler) Registries(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, list)
 }
 
-// SetRegistry stores the login for one registry host.
+// SetRegistry hands the login for one registry host to a server, which
+// keeps it; the hub keeps the host and the username.
 func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 	var request registryRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	err := h.apps.SetRegistry(actor(r), r.PathValue("host"), request.Username, request.Password)
+	err := h.apps.SetRegistry(r.Context(), actor(r), r.PathValue("host"), request.Username, request.Password, request.Server)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -703,7 +754,7 @@ func (h *AppsHandler) SetRegistry(w http.ResponseWriter, r *http.Request) {
 
 // DeleteRegistry removes the login for one registry host.
 func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
-	err := h.apps.RemoveRegistry(actor(r), r.PathValue("host"))
+	err := h.apps.RemoveRegistry(r.Context(), actor(r), r.PathValue("host"))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -711,13 +762,12 @@ func (h *AppsHandler) DeleteRegistry(w http.ResponseWriter, r *http.Request) {
 	NoContent(w)
 }
 
-// Change is the answer to a change of the domains: the app, and the deploy that
-// applies it to the live deploy, or null when the next deploy will.
-// Unchanged is set when the app had it so already; nothing restarts.
+// Change is the answer to a change of the domains: the app as it is now.
+// The app takes it with its next restart, start or deploy. Unchanged is set
+// when the app had it so already.
 type Change struct {
-	App       App     `json:"app"`
-	Deploy    *Deploy `json:"deploy"`
-	Unchanged bool    `json:"unchanged,omitempty"`
+	App       App  `json:"app"`
+	Unchanged bool `json:"unchanged,omitempty"`
 }
 
 type domainsRequest struct {
@@ -729,10 +779,9 @@ type domainsRequest struct {
 
 type instantRequest struct {
 	Provider string `json:"provider"`
-	Open     *bool  `json:"open"`
 }
 
-type protectionRequest struct {
+type passwordRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
@@ -749,8 +798,6 @@ type DomainCheck struct {
 	Advice string   `json:"advice"`
 	Found  []string `json:"found"`
 	Points bool     `json:"points"`
-	// FromCompose says x-moin.domains in compose.yml sets the domain.
-	FromCompose bool `json:"from_compose"`
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
 	Service string `json:"service,omitempty"`
@@ -768,28 +815,22 @@ func NewDomainChecks(checks []service.DomainCheck) DomainChecks {
 		if found == nil {
 			found = []string{}
 		}
-		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, FromCompose: check.FromCompose, Service: check.Service})
+		out.Items = append(out.Items, DomainCheck{Domain: check.Domain, Canonical: check.Canonical, Address: check.Address, IPv4: check.IPv4, IPv6: check.IPv6, Advice: check.Advice, Found: found, Points: check.Points, Service: check.Service})
 	}
 	return out
 }
 
-// NewChange is the answer to a change of app: the app as it is now, and
-// the deploy that applies it, if one does.
-func NewChange(apps *service.AppService, workspaceID, app string, deploy *model.Deploy, changed bool) (Change, error) {
+// NewChange is the answer to a change of app: the app as it is now.
+func NewChange(apps *service.AppService, workspaceID, app string, changed bool) (Change, error) {
 	current, err := apps.Get(workspaceID, app)
 	if err != nil {
 		return Change{}, err
 	}
-	answer := Change{App: NewApp(*current), Unchanged: !changed}
-	if deploy != nil {
-		applied := NewDeploy(*deploy)
-		answer.Deploy = &applied
-	}
-	return answer, nil
+	return Change{App: NewApp(*current), Unchanged: !changed}, nil
 }
 
-func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, deploy *model.Deploy, changed bool) {
-	answer, err := NewChange(h.apps, workspaceID, app, deploy, changed)
+func (h *AppsHandler) change(w http.ResponseWriter, workspaceID, app string, changed bool) {
+	answer, err := NewChange(h.apps, workspaceID, app, changed)
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -820,15 +861,13 @@ func (h *AppsHandler) SetDomains(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), changed)
 }
 
-// GetInstant answers the app's instant address; with show=true the
-// password moin made for it, which needs a token that may write.
+// GetInstant answers the app's instant address, without the password.
 func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	show := r.URL.Query().Get("show") == "true"
-	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"), show, ctxkeys.APIToken(r.Context()))
+	instant, err := h.apps.Instant(workspace.ID, r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
@@ -836,50 +875,53 @@ func (h *AppsHandler) GetInstant(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, NewInstant(instant))
 }
 
-// SetInstant picks the provider of the app's instant address, or off, and
-// whether a password guards it.
+// SetInstant picks the provider of the app's instant address, or off.
 func (h *AppsHandler) SetInstant(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
 	var request instantRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider, request.Open)
+	changed, err := h.apps.SetInstant(actor(r), r.PathValue("app"), request.Provider)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), changed)
 }
 
-// SetProtection puts a password in front of the app.
-func (h *AppsHandler) SetProtection(w http.ResponseWriter, r *http.Request) {
+// SetPassword turns the app's password on for its domains and its
+// instant address.
+// Without a password moin makes one and answers it, the one time it shows
+// it.
+func (h *AppsHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	var request protectionRequest
+	var request passwordRequest
 	if !Decode(w, r, &request) {
 		return
 	}
-	if request.Password == "" {
-		ValidationError(w, map[string]string{"password": "Enter a password of at least 8 characters."})
-		return
-	}
-	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), request.Username, request.Password)
+	made, changed, err := h.apps.SetPassword(actor(r), r.PathValue("app"), request.Username, request.Password)
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	answer, err := NewChange(h.apps, workspace.ID, r.PathValue("app"), changed)
+	if err != nil {
+		ServiceError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, NewPassword{Change: answer, Password: made})
 }
 
-// DeleteProtection takes the password away.
-func (h *AppsHandler) DeleteProtection(w http.ResponseWriter, r *http.Request) {
+// DeletePassword turns the app's password off: no domain asks for one.
+func (h *AppsHandler) DeletePassword(w http.ResponseWriter, r *http.Request) {
 	workspace := ctxkeys.Workspace(r.Context())
-	changed, err := h.apps.SetProtection(actor(r), r.PathValue("app"), "", "")
+	changed, err := h.apps.RemovePassword(actor(r), r.PathValue("app"))
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	h.change(w, workspace.ID, r.PathValue("app"), nil, changed)
+	h.change(w, workspace.ID, r.PathValue("app"), changed)
 }
 
 // Restart starts the live deploy again with the env and domains as they

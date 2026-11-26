@@ -1,0 +1,8 @@
+services:
+  web:
+    image: gotify/server:${VERSION}
+    expose: ["80"]
+    environment:
+      GOTIFY_DEFAULTUSER_PASS: ${ADMIN_PASSWORD}
+    volumes:
+      - ./data:/app/data

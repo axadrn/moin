@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/ui/components"
@@ -13,7 +14,7 @@ import (
 templ DocsHome(groups []model.DocGroup) {
 	@layouts.Home(layouts.SEOProps{
 		Title:        "Docs",
-		Description:  "Get started, every guide and the reference of moin.",
+		Description:  "Get started, every guide and the reference of " + brand.Name + ".",
 		Path:         "/docs",
 		MarkdownPath: "/docs.md",
 	}) {
@@ -49,6 +50,7 @@ templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
 		Path:         ctxkeys.URLPath(ctx),
 		MarkdownPath: docsMarkdownURL(page),
 	}) {
+		@templ.Raw(docsJSONLD(page, ctxkeys.RenderConfig(ctx).AppURL))
 		<main class="moin-page moin-narrow moin-content">
 			@components.Header(components.HeaderProps{Back: components.Back{Label: "Docs", Href: "/docs"}, Title: page.Title})
 			<article>

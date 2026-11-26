@@ -143,7 +143,7 @@ func (m model) deploysTab(u ui, w, h int, a client.App) string {
 	}
 	deploys := m.app.detail.Deploys
 	if len(deploys) == 0 {
-		return u.panel("Deploys", "", []string{"", u.muted("No deploys yet. ") + u.text("D") + u.muted(" deploys this directory, ") + u.text("I") + u.muted(" an image.")}, w, h, true)
+		return u.panel("Deploys", "", []string{"", u.muted("No deploys yet. ") + u.text("D") + u.muted(" deploys the pushed commit of this directory, ") + u.text("I") + u.muted(" an image.")}, w, h, true)
 	}
 	wide := w >= 110
 	lw := w
@@ -233,7 +233,8 @@ func deployState(d client.Deploy, live int) (string, string) {
 	return d.Status, d.Status
 }
 
-// source says in a few words what a deploy shipped.
+// source says in a few words what a deploy shipped; nothing for a restart
+// or a catalog deploy.
 func source(d client.Deploy) string {
 	switch {
 	case d.CommitMessage != "":
@@ -246,7 +247,7 @@ func source(d client.Deploy) string {
 	case d.Ref != "":
 		return d.Ref
 	}
-	return "upload"
+	return ""
 }
 
 func short(sha string) string { return sha[:min(7, len(sha))] }
@@ -378,7 +379,7 @@ func (m model) backupStatusLines(u ui, backups *client.AppBackups, innerWidth in
 	}
 	if backups.Bucket != "" {
 		lines = append(lines, "", backupField(u, "bucket", u.text(backups.Bucket)))
-		lines = append(lines, backupField(u, "schedule", u.text(scheduleText(backups.BackupSchedule))+u.faint("  w: change it on the web")))
+		lines = append(lines, backupField(u, "schedule", u.text(scheduleText(backups.BackupSchedule))+u.faint("  w changes it on the web")))
 	}
 	lines = append(lines, backupField(u, "a copy", u.faint("c downloads the newest")))
 	return lines
@@ -450,38 +451,29 @@ func (m model) envTab(u ui, w, h int) string {
 	if m.app.env == nil {
 		return u.panel("Env", "", loading(u), w, h, true)
 	}
-	keys := m.envKeys()
+	vars := m.app.env
 	iw := inner(w)
-	note := u.faint(fmt.Sprintf("%d vars · values hidden", len(keys)))
-	if m.shown {
-		note = u.warn("values shown")
-	}
-	if len(keys) == 0 {
+	note := u.faint(fmt.Sprintf("%d vars · values are write-only", len(vars)))
+	if len(vars) == 0 {
 		return u.panel("Env", note, []string{"", u.muted("No env vars. a sets one, E opens all of them in your editor.")}, w, h, true)
 	}
 	kw := 8
-	for _, k := range keys {
-		kw = max(kw, min(wid(k)+2, iw/2))
+	for _, v := range vars {
+		kw = max(kw, min(wid(v.Key)+2, iw/2))
 	}
-	body := []string{u.row([]cell{u.head("key", kw, false), u.head("value", 0, false)}, iw, false)}
+	body := []string{u.row([]cell{u.head("key", kw, false), u.head("changed", 0, false)}, iw, false)}
 	n := h - chrome - 2
-	at := m.at("env", len(keys))
-	start := max(0, min(at-n+1, len(keys)-n))
-	for i := start; i < len(keys) && i < start+n; i++ {
-		k := keys[i]
-		v := u.faint("••••••••")
-		if m.shown {
-			v = u.text(m.app.env[k])
-			if m.app.env[k] == "" {
-				v = u.faint("empty")
-			}
-		}
-		body = append(body, u.row([]cell{{u.strong(k), kw, false}, {v, 0, false}}, iw, i == at))
+	at := m.at("env", len(vars))
+	start := max(0, min(at-n+1, len(vars)-n))
+	now := m.now()
+	for i := start; i < len(vars) && i < start+n; i++ {
+		v := vars[i]
+		body = append(body, u.row([]cell{{u.strong(v.Key), kw, false}, {u.muted(human.Ago(v.UpdatedAt, now)), 0, false}}, iw, i == at))
 	}
 	for len(body) < h-chrome-1 {
 		body = append(body, "")
 	}
-	body = append(body, u.faint("Changes take effect with the next deploy. R redeploys now."))
+	body = append(body, u.faint("The app gets changes when it restarts. T restarts now."))
 	return u.panel("Env", note, body, w, h, true)
 }
 
@@ -513,8 +505,6 @@ func (m model) domainsTab(u ui, w, h int, a client.App) string {
 		switch {
 		case !d.Points && d.Advice != "":
 			note = d.Advice
-		case d.FromCompose:
-			note = "from compose.yml"
 		case d.Canonical:
 			note = "canonical, the others redirect here"
 		}
@@ -528,20 +518,14 @@ func (m model) domainsTab(u ui, w, h int, a client.App) string {
 	if in := m.app.instant; in != nil {
 		switch {
 		case in.URL != "":
-			v := u.text(in.URL)
-			if in.Open {
-				v += u.faint("  open")
-			} else {
-				v += u.faint("  behind a password")
-			}
-			body = append(body, kv("instant address", v))
+			body = append(body, kv("instant address", u.text(in.URL)))
 		case in.Reason != "":
 			body = append(body, kv("instant address", u.faint(in.Reason)))
 		}
 	}
-	prot := u.faint("off · p protects it")
-	if a.Protected {
-		prot = u.warn("on") + u.faint(" · p removes it")
+	prot := u.faint("off · p turns it on")
+	if a.Password {
+		prot = u.warn("on") + u.faint(", domains and instant address · p turns it off")
 	}
 	body = append(body, kv("password", prot))
 	return u.panel("Domains", u.faint(fmt.Sprint(len(m.app.domains))), body, w, h, true)

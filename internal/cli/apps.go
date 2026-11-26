@@ -1,14 +1,11 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"os"
-	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -99,12 +96,13 @@ func appsAdd(ctx context.Context, call appsCall) error {
 	if flags.NArg() != 1 || *server == "" {
 		return flags.wrong()
 	}
-	app, err := call.api.AddApp(ctx, flags.Arg(0), *server)
+	created, err := call.api.AddApp(ctx, flags.Arg(0), *server)
 	if err != nil {
 		return err
 	}
-	done(call.stdout, "Added %s on %s", style.Bold.Render(app.Name), app.ServerName)
-	hint(call.stdout, "Deploy it with", build.Name+" deploy "+app.Name)
+	done(call.stdout, "Added %s on %s", style.Bold.Render(created.App.Name), created.App.ServerName)
+	printPassword(call.stdout, passwordUser, created.Password)
+	hint(call.stdout, "Deploy it with", build.Name+" deploy "+created.App.Name)
 	return nil
 }
 
@@ -150,7 +148,6 @@ func appsRename(ctx context.Context, call appsCall) error {
 	}
 	done(call.stdout, "Renamed %s to %s. Its links, data and backups stay", flags.Arg(0), style.Bold.Render(renamed.Name))
 	hint(call.stdout, "Its containers take the name on the next restart:", build.Name+" restart "+renamed.Name)
-	hint(call.stdout, "In its repo, set x-moin.app: "+renamed.Name+" in compose.yml for", build.Name+" deploy")
 	return nil
 }
 
@@ -203,7 +200,6 @@ func appsShow(ctx context.Context, call appsCall) error {
 func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 	app := detail.App
 	fmt.Fprintln(stdout, style.Bold.Render(app.Name)+" "+badge(stdout, style.App(app), app.Status()))
-	domains, canonical, fromCompose := app.Domains, app.Canonical, false
 	built := ""
 	for _, deploy := range detail.Deploys {
 		if deploy.Number == app.LiveNumber && deploy.Detected != nil {
@@ -212,22 +208,15 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 				built = "Railpack: " + deploy.Detected.Builder
 			}
 		}
-		// The live deploy says what it answers on; x-moin wins there.
-		if deploy.Number == app.LiveNumber && deploy.Detected != nil && deploy.Detected.Config != nil && len(deploy.Detected.Config.Domains) > 0 {
-			domains, canonical, fromCompose = deploy.Detected.Domains, deploy.Detected.Canonical, true
-		}
 	}
 	domainText := "none"
-	if len(domains) > 0 {
-		domainText = strings.Join(domains, ", ")
-		if canonical != "" {
-			domainText += " (canonical " + canonical + ")"
-		}
-		if fromCompose {
-			domainText += ", from compose.yml"
+	if len(app.Domains) > 0 {
+		domainText = strings.Join(app.Domains, ", ")
+		if app.Canonical != "" {
+			domainText += " (canonical " + app.Canonical + ")"
 		}
 	}
-	from := "your folder, " + build.Name + " deploy"
+	from := "neither yet: " + build.Name + " link follows a repo, " + build.Name + " hook turns on CI"
 	switch app.DeployFrom {
 	case "github":
 		auto := "every push"
@@ -240,17 +229,17 @@ func printApp(stdout io.Writer, detail client.AppDetail, now time.Time) {
 		if app.HookImage != "" {
 			from += ": new tags of " + app.HookImage
 		}
+		if app.Repo != "" {
+			from += ", compose.yml from " + app.Repo
+		}
 	}
 	password := "off"
-	if app.Protected {
+	if app.Password {
 		password = "on"
 	}
 	instantText := "none"
 	if app.Instant != "" {
 		instantText = app.Instant
-		if !app.InstantOpen {
-			instantText += ", with a password"
-		}
 	} else if app.InstantProvider == "off" {
 		instantText = "off"
 	}
@@ -286,23 +275,21 @@ func PrintApps(stdout io.Writer, list []client.App) {
 	table(stdout, []string{"NAME", "SERVER", "STATUS"}, rows)
 }
 
-// deploy packs the directory, uploads it and follows the deploy. An app that
-// does not exist yet is created after a question, so a typo makes no new
-// app: on the server x-moin or --server names, or on the only server.
+// deploy starts a deploy and follows it: the pushed commit of the GitHub
+// repo of this folder, a --ref of it, or an --image built elsewhere.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [--dir <dir>] [--server <server>] [--image <image>] [--ref <ref>] [--detach] [--yes] [app]").withApp().withYes()
-	dir := flags.String("dir", ".", "directory to deploy")
+	flags := newFlags("deploy", "deploy [--server <server>] [--image <image>] [--ref <ref>] [--detach] [--yes] [app]").withApp().withYes()
 	server := flags.String("server", "", "server for a new app")
 	detach := flags.Bool("detach", false, "start the deploy and do not wait for it")
-	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service; needs one deploy of the repo before, whose compose file it reuses")
-	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo")
+	image := flags.String("image", "", "deploy this image, built elsewhere, as the main service, with the compose file of --ref in the linked GitHub repo")
+	ref := flags.String("ref", "", "deploy this branch, tag or commit of the linked GitHub repo; default its branch")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 1 {
 		return flags.wrong()
 	}
-	name, err := flags.appIn(flags.Arg(0), *dir)
+	name, err := flags.app(flags.Arg(0))
 	if err != nil {
 		return err
 	}
@@ -313,81 +300,138 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if *ref != "" && !protocol.ValidRefName(*ref) {
 		return fmt.Errorf("%q is not a valid branch, tag or commit name", *ref)
 	}
-	if *ref != "" {
-		// The hub downloads the commit from GitHub; nothing is
-		// uploaded.
-		step(stdout, "Deploying %s from GitHub", *ref)
-		started, err := api.DeployRef(ctx, name, *ref)
-		if err != nil {
-			return err
-		}
-		if started.Commit != "" {
-			step(stdout, "commit %s %s", started.Commit[:min(7, len(started.Commit))], style.Muted.Render(started.CommitMessage))
-		}
-		return follow(ctx, api, name, started, "Deploy", *detach, stdout)
-	}
 	if *image != "" {
-		// The server keeps the compose file of the live deploy and pulls
-		// the image; nothing is uploaded.
+		// The server takes the compose file of the ref from GitHub, or
+		// keeps the one of the live deploy for an app without a repo, and
+		// pulls the image.
 		step(stdout, "Deploying %s", *image)
-		started, err := api.DeployImage(ctx, name, *image)
+		started, err := api.DeployImage(ctx, name, *image, *ref)
 		if err != nil {
 			return err
 		}
+		printCommit(stdout, started)
 		return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 	}
-	_, err = api.App(ctx, name)
-	if client.IsNotFound(err) {
-		err = confirm(stdin, stdout, flags.yes(), "App "+name+" does not exist. Create it?")
-		if err == nil {
-			err = createApp(ctx, api, name, *server, *dir, stdout)
+	from, commit := *ref, *ref
+	if commit == "" {
+		// This folder deploys what it has on GitHub, the commit it is at.
+		from, commit, err = client.PushedCommit(".")
+		if err != nil {
+			return err
+		}
+		err = followRepo(ctx, api, name, *server, from, flags.yes(), stdin, stdout)
+		if err != nil {
+			return err
 		}
 	}
+	// The server downloads the commit from GitHub and builds it.
+	step(stdout, "Deploying %s from GitHub", from)
+	started, err := api.DeployRef(ctx, name, commit)
 	if err != nil {
 		return err
 	}
-
-	var source bytes.Buffer
-	files, err := client.Pack(*dir, &source)
-	if err != nil {
-		return fmt.Errorf("pack %s: %w", *dir, err)
-	}
-	noun := "files"
-	if files == 1 {
-		noun = "file"
-	}
-	step(stdout, "Uploading %d %s to your bucket %s", files, noun, style.Muted.Render("("+human.Size(float64(source.Len()))+")"))
-	started, err := api.Deploy(ctx, name, source.Bytes())
-	var apiErr *client.Error
-	if errors.As(err, &apiErr) && apiErr.Code == "no_bucket" {
-		return fmt.Errorf("%s deploy puts your code into your own bucket, never on ours: add one with %s buckets add, or deploy from GitHub with %s deploy --ref main", build.Name, build.Name, build.Name)
-	}
-	if err != nil {
-		return err
-	}
+	printCommit(stdout, started)
 	return follow(ctx, api, name, started, "Deploy", *detach, stdout)
 }
 
-func createApp(ctx context.Context, api *client.Client, name, server, dir string, stdout io.Writer) error {
-	if server == "" {
-		server = client.ReadLocalConfig(dir).Server
+// repoApp is the app that follows the GitHub repo of this folder, with
+// the repo: "" when the folder has no GitHub repo or no app follows it. Two
+// apps that follow it are an error, so no command guesses.
+func repoApp() (name, repo string, err error) {
+	repo = client.OriginRepo(".")
+	if repo == "" {
+		return "", "", nil
 	}
+	api, err := apiClient()
+	if err != nil {
+		return "", "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	apps, err := api.Apps(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	following := []string{}
+	for _, app := range apps {
+		if strings.EqualFold(app.Repo, repo) {
+			following = append(following, app.Name)
+		}
+	}
+	switch len(following) {
+	case 0:
+		return "", repo, nil
+	case 1:
+		return following[0], repo, nil
+	}
+	return "", repo, fmt.Errorf("%s all follow %s: name one with --app", strings.Join(following, ", "), repo)
+}
+
+// printCommit names the GitHub commit a deploy came from, if any.
+func printCommit(stdout io.Writer, started client.Deploy) {
+	if started.Commit != "" {
+		step(stdout, "commit %s %s", started.Commit[:min(7, len(started.Commit))], style.Muted.Render(started.CommitMessage))
+	}
+}
+
+// followRepo makes the app follow repo before moin deploy deploys a commit
+// of it. An app that does not exist yet is created after a question, so a
+// typo makes no new app: on the server --server names, or on the only
+// server. An app that follows no repo is linked to this one, without
+// deploys on push.
+func followRepo(ctx context.Context, api *client.Client, name, server, repo string, yes bool, stdin io.Reader, stdout io.Writer) error {
+	detail, err := api.App(ctx, name)
+	if client.IsNotFound(err) {
+		err = confirm(stdin, stdout, yes, "App "+name+" does not exist. Create it?")
+		if err == nil {
+			err = createApp(ctx, api, name, server, stdout)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	switch {
+	case strings.EqualFold(detail.App.Repo, repo):
+		return nil
+	case detail.App.Repo != "":
+		return fmt.Errorf("%s follows %s, and this folder is %s: link it with %s link %s %s, then deploy again", name, detail.App.Repo, repo, build.Name, repo, name)
+	}
+	app, err := linkRepo(ctx, api, name, repo, "", false)
+	if err != nil {
+		return err
+	}
+	done(stdout, "%s follows %s@%s", app.Name, app.Repo, app.Branch)
+	return nil
+}
+
+func createApp(ctx context.Context, api *client.Client, name, server string, stdout io.Writer) error {
 	if server == "" {
 		servers, err := api.Servers(ctx)
 		if err != nil {
 			return err
 		}
 		if len(servers) != 1 {
-			return fmt.Errorf("app %s does not exist yet: pass --server or set x-moin.server, you have %d servers", name, len(servers))
+			return fmt.Errorf("app %s does not exist yet: pass --server, you have %d servers", name, len(servers))
 		}
 		server = servers[0].Name
 	}
-	app, err := api.AddApp(ctx, name, server)
+	created, err := api.AddApp(ctx, name, server)
 	if err != nil {
 		return err
 	}
-	done(stdout, "Created app %s on %s", style.Bold.Render(app.Name), app.ServerName)
+	done(stdout, "Created app %s on %s", style.Bold.Render(created.App.Name), created.App.ServerName)
+	printPassword(stdout, passwordUser, created.Password)
 	return nil
+}
+
+// printPassword shows the password moin made for an app, which its
+// domains and its instant address ask for: the one time moin shows it.
+func printPassword(stdout io.Writer, user, password string) {
+	if password == "" {
+		return
+	}
+	fmt.Fprintln(stdout, "  "+style.Warning.Render("The app's domains and its instant address ask for this password. Shown only this once:"))
+	fmt.Fprintln(stdout, "  user "+user+", password "+password)
 }
 
 // follow prints the deploy log and fails when the deploy fails. what is
@@ -449,8 +493,8 @@ func follow(ctx context.Context, api *client.Client, name string, started client
 }
 
 // printLive is the moin moment after a deploy: ✓ moin. and where the app
-// answers, its domains and its instant address, with how to get past its
-// password.
+// answers, its domains and its instant address, and whether they ask for
+// its password.
 func printLive(app client.App, checks []client.DomainCheck, took string, stdout io.Writer) {
 	urls := []string{}
 	for _, check := range checks {
@@ -467,8 +511,8 @@ func printLive(app client.App, checks []client.DomainCheck, took string, stdout 
 	if len(urls) > 1 {
 		fmt.Fprintln(stdout, "  also at "+strings.Join(urls[1:], ", "))
 	}
-	if app.Instant != "" && !app.InstantOpen && !app.Protected {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("A password guards "+app.Instant+": see it with "+build.Name+" instant --show "+app.Name))
+	if app.Password {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Its domains and its instant address ask for the app's password, shown once when it was made. Turn it off: "+build.Name+" password off "+app.Name))
 	}
 }
 
@@ -677,7 +721,7 @@ func redeploy(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // hook gives the app a new deploy hook URL for CI. It asks first when the
-// old URL stops working or the repo unlinks.
+// old URL stops working or pushes stop deploying.
 func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("hook", "hook [app] [--yes], or hook off [app] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
@@ -706,15 +750,16 @@ func hook(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if err != nil {
 		return err
 	}
-	// Only a hook that exists stops working, and only a linked repo
-	// unlinks: one thing brings new versions. The first hook of an app
-	// without a repo asks nothing.
+	// Only a hook that exists stops working, and only deploy on push
+	// turns off: one thing brings new versions. The repo stays linked for
+	// the compose file. The first hook of an app without deploy on push
+	// asks nothing.
 	question := ""
 	if detail.App.Hook {
 		question = fmt.Sprintf("Make a new deploy hook for %s? The old one stops working.", name)
 	}
-	if detail.App.Repo != "" {
-		question = fmt.Sprintf("Make a deploy hook for %s? It unlinks %s. Pushes no longer deploy it.", name, detail.App.Repo)
+	if detail.App.AutoDeploy {
+		question = fmt.Sprintf("Make a deploy hook for %s? Pushes to %s no longer deploy it; CI does.", name, detail.App.Repo)
 	}
 	if question != "" {
 		err = confirm(stdin, stdout, flags.yes(), question)
@@ -788,12 +833,18 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		rows := make([][]string, 0, len(list))
 		for _, login := range list {
-			rows = append(rows, []string{login.Host, login.Username, login.CreatedAt.Local().Format("Jan 2 2006")})
+			rows = append(rows, []string{login.Host, login.Username, login.CreatedAt.Local().Format("Jan 2 2006"), keptOn(login.Servers, login.MissingOn)})
 		}
-		table(stdout, []string{"HOST", "USERNAME", "ADDED"}, rows)
+		table(stdout, []string{"HOST", "USERNAME", "ADDED", "LOGIN ON"}, rows)
+		for _, login := range list {
+			for _, server := range login.MissingOn {
+				hint(stdout, server+" has no login for "+login.Host+". Enter it:", build.Name+" registry set "+login.Host+" "+login.Username+" --server "+server)
+			}
+		}
 		return nil
 	case "set":
-		flags := newFlags("registry set", "registry set <host> <username>, then the password or token on stdin")
+		flags := newFlags("registry set", "registry set <host> <username> [--server <server>], then the password or token on stdin")
+		server := flags.String("server", "", "the server that keeps the login; needed with more than one")
 		if err := flags.parse(args); err != nil {
 			return err
 		}
@@ -814,11 +865,11 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err != nil {
 			return err
 		}
-		err = api.SetRegistry(ctx, host, username, password)
+		err = api.SetRegistry(ctx, host, username, password, *server)
 		if err != nil {
 			return err
 		}
-		done(stdout, "Saved the login for %s. Image deploys from it pull with it.", host)
+		done(stdout, "Saved the login for %s on the server. Image deploys from it pull with it.", host)
 		return nil
 	case "rm":
 		flags := newFlags("registry rm", "registry rm <host> [--yes]").withYes()
@@ -840,7 +891,7 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err != nil {
 			return err
 		}
-		done(stdout, "Removed the login for %s.", host)
+		done(stdout, "Removed the login for %s, also from the servers.", host)
 		return nil
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "registry "+command, build.Name)
@@ -876,12 +927,38 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
+// compose prints the compose file of the app's live deploy, as it is, so
+// it pipes to a file: compose > compose.yml.
+func compose(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("compose", "compose [app]").withApp()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 1 {
+		return flags.wrong()
+	}
+	name, err := flags.app(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	api, err := apiClient()
+	if err != nil {
+		return err
+	}
+	file, err := api.ComposeFile(ctx, name)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(stdout, file.Text)
+	return err
+}
+
 // envCommands are the subcommands of env. Any other first argument is the
 // app whose env vars to list.
-var envCommands = []string{"set", "rm", "pull", "push"}
+var envCommands = []string{"set", "rm", "push"}
 
-// env lists the env vars of an app, and sets, removes, pulls and pushes
-// them. In every one, usage mistakes show before a missing login.
+// env lists the env vars of an app, and sets, removes and pushes them. In
+// every one, usage mistakes show before a missing login.
 func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	command := ""
 	if len(args) > 0 && slices.Contains(envCommands, args[0]) {
@@ -894,18 +971,16 @@ func env(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return envSet(ctx, args, stdout)
 	case "rm":
 		return envRm(ctx, args, stdin, stdout)
-	case "pull":
-		return envPull(ctx, args, stdin, stdout)
 	case "push":
 		return envPush(ctx, args, stdin, stdout)
 	}
 	return fmt.Errorf("unknown command %q. Run `%s help`", "env "+command, build.Name)
 }
 
-// envList lists the env vars of an app, the values hidden without --show.
+// envList lists the env vars of an app: each key and when it changed.
+// Values are write-only, so there is none to show.
 func envList(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("env", "env [--show] [app]").withApp()
-	show := flags.Bool("show", false, "show the values")
+	flags := newFlags("env", "env [app]").withApp()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -920,24 +995,23 @@ func envList(ctx context.Context, args []string, stdout io.Writer) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	values, err := api.Env(ctx, name)
+	vars, err := api.Env(ctx, name)
 	if err != nil {
 		return err
 	}
-	if len(values) == 0 {
+	if len(vars) == 0 {
 		fmt.Fprintf(stdout, "%s has no env vars.\n", name)
 		hint(stdout, "Set one with", build.Name+" env set KEY=value")
 		return nil
 	}
-	for _, key := range sortedKeys(values) {
-		value := style.Muted.Render("••••••")
-		if *show {
-			value = values[key]
-		}
-		fmt.Fprintln(stdout, key+style.Muted.Render("=")+value)
+	var rows [][]string
+	now := time.Now()
+	for _, envVar := range vars {
+		rows = append(rows, []string{envVar.Key, human.Ago(envVar.UpdatedAt, now)})
 	}
-	if !*show && isTTY(stdout) {
-		hint(stdout, "Values hidden. Show them with", build.Name+" env --show")
+	table(stdout, []string{"KEY", "CHANGED"}, rows)
+	if isTTY(stdout) {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Values are write-only: you see the name and when it changed, never the value."))
 	}
 	return nil
 }
@@ -1006,7 +1080,7 @@ func envRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	}
 	var remove, missing []string
 	for _, key := range flags.Args() {
-		if _, ok := current[key]; ok {
+		if slices.ContainsFunc(current, func(envVar client.EnvVar) bool { return envVar.Key == key }) {
 			remove = append(remove, key)
 		} else {
 			missing = append(missing, key)
@@ -1032,45 +1106,8 @@ func envRm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 	return nil
 }
 
-// envPull writes the env vars of an app to a file, .env by default, and
-// asks before it replaces one.
-func envPull(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("env pull", "env pull [--app <app>] [file] [--yes]").withApp().withYes()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	api, apiErr := apiClient()
-	path, err := envFile(flags)
-	if err != nil {
-		return err
-	}
-	name, err := flags.app("")
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stat(path); err == nil {
-		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Replace %s with the env vars of %s?", path, name))
-		if err != nil {
-			return err
-		}
-	}
-	if apiErr != nil {
-		return apiErr
-	}
-	values, err := api.Env(ctx, name)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(path, []byte(dotenv.Format(values)), 0o600)
-	if err != nil {
-		return err
-	}
-	done(stdout, "Wrote %d %s of %s to %s", len(values), pluralWord(int64(len(values)), "env var", "env vars"), style.Bold.Render(name), path)
-	return nil
-}
-
 // envPush replaces the env vars of an app with a file, .env by default:
-// it shows the keys that change and asks first.
+// it shows which keys it adds, replaces and removes, and asks first.
 func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("env push", "env push [--app <app>] [file] [--yes]").withApp().withYes()
 	if err := flags.parse(args); err != nil {
@@ -1100,9 +1137,13 @@ func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
-	change := dotenv.Diff(current, next)
+	keys := make([]string, len(current))
+	for index, envVar := range current {
+		keys[index] = envVar.Key
+	}
+	change := dotenv.Diff(keys, next)
 	if change.None() {
-		fmt.Fprintf(stdout, "%s matches the env vars of %s. Nothing changes.\n", path, name)
+		fmt.Fprintf(stdout, "%s has no env vars, and %s has none. Nothing changes.\n", path, name)
 		return nil
 	}
 	printEnvChange(stdout, change)
@@ -1122,7 +1163,7 @@ func envPush(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	return nil
 }
 
-// envFile is the file env pull and push work on: the one argument, or .env.
+// envFile is the file env push reads: the one argument, or .env.
 func envFile(flags *flagSet) (string, error) {
 	switch flags.NArg() {
 	case 0:
@@ -1133,54 +1174,18 @@ func envFile(flags *flagSet) (string, error) {
 	return "", flags.wrong()
 }
 
-// printEnvChange lists the keys a push adds, changes and removes. The keys
+// printEnvChange lists the keys a push adds, replaces and removes. The keys
 // only, never a value: the terminal may be shared or recorded.
 func printEnvChange(stdout io.Writer, change dotenv.Change) {
 	for _, line := range []struct {
 		mark string
 		keys []string
 		tint lipgloss.Style
-	}{{"+", change.Added, style.Success}, {"~", change.Changed, style.Warning}, {"-", change.Removed, style.Danger}} {
+	}{{"+", change.Added, style.Success}, {"~", change.Replaced, style.Warning}, {"-", change.Removed, style.Danger}} {
 		for _, key := range line.keys {
 			fmt.Fprintln(stdout, "  "+line.tint.Render(line.mark)+" "+key)
 		}
 	}
-}
-
-// runWithEnv starts a local command with the env vars of an app, without a file.
-func runWithEnv(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("run", "run [--app <app>] -- <command> [args]").withApp()
-	// The command's own flags stay its own.
-	if err := flags.parseStrict(args); err != nil {
-		return err
-	}
-	if flags.NArg() == 0 {
-		return flags.wrong()
-	}
-	name, err := flags.app("")
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	values, err := api.Env(ctx, name)
-	if err != nil {
-		return err
-	}
-	command := exec.CommandContext(ctx, flags.Arg(0), flags.Args()[1:]...)
-	command.Stdin, command.Stdout, command.Stderr = stdin, stdout, os.Stderr
-	command.Env = os.Environ()
-	for _, key := range sortedKeys(values) {
-		command.Env = append(command.Env, key+"="+values[key])
-	}
-	err = command.Run()
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		os.Exit(exitErr.ExitCode())
-	}
-	return err
 }
 
 func sortedKeys(values map[string]string) []string {

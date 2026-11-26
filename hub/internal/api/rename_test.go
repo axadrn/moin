@@ -19,7 +19,7 @@ func TestRenameAppAndNameOrID(t *testing.T) {
 	t.Cleanup(func() { access.Product = saved })
 	environment := newAPIEnvironment(t)
 	ada := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Name: "Ada", Verified: true})
-	writer := environment.token(t, "ada", ada.Workspace.ID, "read", "write")
+	writer := environment.token(t, "ada", ada.Workspace.ID, allRights...)
 
 	created := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/servers", bearer: writer, body: `{"name":"web-1"}`})
 	expectStatus(t, created, http.StatusCreated)
@@ -29,7 +29,7 @@ func TestRenameAppAndNameOrID(t *testing.T) {
 	}
 	answer := environment.send(t, apiRequest{method: http.MethodPost, path: "/api/v1/apps", bearer: writer, body: `{"name":"blog","server":"` + server.ID + `"}`})
 	expectStatus(t, answer, http.StatusCreated)
-	app := decodeBody[api.App](t, answer)
+	app := decodeBody[api.CreatedApp](t, answer).App
 	if len(app.ID) != 32 || app.ServerID != server.ID {
 		t.Fatalf("app = %+v", app)
 	}

@@ -61,7 +61,7 @@ func (h *SessionsHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		ServiceError(w, err)
 		return
 	}
-	if sessionID == currentSessionID(r) && !ctxkeys.IsBearer(r.Context()) {
+	if sessionID == currentSessionID(r) {
 		h.authService.ClearSessionCookie(w)
 	}
 	NoContent(w)

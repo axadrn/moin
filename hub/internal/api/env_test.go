@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/api"
+	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/middleware"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/secret"
@@ -18,8 +19,6 @@ import (
 	"github.com/axadrn/moin/hub/internal/testutil"
 	"github.com/jmoiron/sqlx"
 )
-
-const testPassword = "correct horse battery staple"
 
 // testSupportEmail is the support address GET /api/v1/meta answers.
 const testSupportEmail = "support@example.com"
@@ -31,17 +30,20 @@ var testCSRFToken = strings.Repeat("c", 43)
 // apiEnvironment runs API requests through the same middleware the router
 // uses, against a fresh database.
 type apiEnvironment struct {
-	database   *sqlx.DB
-	mailer     *testutil.MemoryMailer
-	auth       *service.AuthService
-	users      *service.UserService
-	workspaces *service.WorkspaceService
-	tokens     *service.APITokenService
-	devices    *service.DeviceLoginService
-	files      *service.FileService
-	storage    *testutil.MemoryStorage
-	admin      *service.AdminService
-	payments   *paymentStub
+	database    *sqlx.DB
+	mailer      *testutil.MemoryMailer
+	auth        *service.AuthService
+	users       *service.UserService
+	workspaces  *service.WorkspaceService
+	connections *service.ConnectionService
+	ciTokens    *service.CITokenService
+	passkeys    *service.PasskeyService
+	devices     *service.DeviceLoginService
+	oauth       *service.OAuthService
+	files       *service.FileService
+	storage     *testutil.MemoryStorage
+	admin       *service.AdminService
+	payments    *paymentStub
 	// updates is a hosted hub's: no release, no update.
 	updates *service.UpdateService
 	routes  []api.Route
@@ -77,9 +79,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		false,
 		7*24*time.Hour,
 		24*time.Hour,
-		time.Hour,
 		24*time.Hour,
-		10*time.Minute,
 	)
 	environment.storage = testutil.NewMemoryStorage()
 	files := service.NewFileService(repository.NewFiles(database), environment.storage)
@@ -91,10 +91,13 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	billingHandler := api.NewBillingHandler(environment.payments, environment.workspaces)
 	accountHandler := api.NewAccountHandler(environment.auth, environment.users, environment.files)
 	sessionsHandler := api.NewSessionsHandler(environment.auth)
-	environment.tokens = service.NewAPITokenService(repository.NewAPITokens(database), environment.workspaces)
-	tokenAuth := middleware.APITokenAuth(environment.tokens, environment.users)
-	environment.auth.UseAPITokens(environment.tokens)
-	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.tokens)
+	environment.connections = service.NewConnectionService(repository.NewConnections(database), environment.workspaces)
+	environment.ciTokens = service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), environment.workspaces)
+	tokenAuth := middleware.BearerAuth(environment.connections, environment.ciTokens, environment.users)
+	environment.auth.UseBearers(environment.connections, environment.ciTokens)
+	environment.passkeys = service.NewPasskeyService(repository.NewPasskeys(database), userRepository, email, nil)
+	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.connections, environment.passkeys)
+	environment.oauth = service.NewOAuthService(repository.NewOAuth(database), environment.connections, environment.passkeys, "https://app.example.com")
 	environment.admin = service.NewAdminService(repository.NewAdmin(database), userRepository, environment.auth, []string{testAdminEmail})
 	adminHandler := api.NewAdminHandler(environment.admin)
 
@@ -114,7 +117,10 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Auth:        authHandler,
 		Account:     accountHandler,
 		Sessions:    sessionsHandler,
-		Tokens:      api.NewAPITokensHandler(environment.tokens),
+		Passkeys:    api.NewPasskeysHandler(environment.passkeys),
+		Connections: api.NewConnectionsHandler(environment.connections, environment.passkeys),
+		CITokens:    api.NewCITokensHandler(environment.ciTokens, environment.passkeys),
+		Token:       api.NewTokenHandler(environment.devices, environment.connections, environment.oauth),
 		Billing:     billingHandler,
 		Admin:       adminHandler,
 		Workspaces:  api.NewWorkspaceHandler(environment.workspaces),
@@ -123,13 +129,13 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		Apps:        api.NewAppsHandler(apps),
 		Servers:     api.NewServersHandler(servers),
 		Status:      api.NewStatusHandler(service.NewStatusService(apps, servers, nil)),
+		Catalog:     api.NewCatalogHandler(service.NewCatalogService(catalog.NewStore(nil, catalog.Registry{}), apps)),
 		Device:      api.NewDeviceHandler(environment.devices, "https://app.example.com"),
+		OAuth:       api.NewOAuthHandler(environment.oauth),
 	}
 	routeMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
 		RequireOnboarded:      middleware.RequireOnboardedAPI,
-		RateLimitAuth:         middleware.RateLimitAuth(clientIPs),
-		RateLimitAuthEmail:    middleware.RateLimitAuthEmail(clientIPs),
 		RateLimitEmailChanges: middleware.RateLimitUserEmailChanges(),
 		RequireAdmin:          middleware.RequireAdminAPI,
 		Workspace: func(next http.HandlerFunc) http.HandlerFunc {
@@ -137,10 +143,18 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		},
 		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(middleware.NewWorkspaceInvitationLimiter()),
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(environment.workspaces, subscriptions)(next))
+			return middleware.RequireOnboardedAPI(middleware.WithBearerWorkspace(environment.workspaces, subscriptions)(next))
 		},
 		RateLimitDevice:     middleware.RateLimitDeviceLogin(clientIPs),
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
+		RateLimitRegister:   middleware.RateLimit(clientIPs, 60, time.Hour),
+		AppID: func(workspaceID, name string) (string, error) {
+			app, err := apps.Get(workspaceID, name)
+			if err != nil {
+				return "", err
+			}
+			return app.ID, nil
+		},
 	}
 	environment.routes = api.Routes(handlers, routeMiddleware)
 	mux := http.NewServeMux()
@@ -148,6 +162,9 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 		mux.HandleFunc(route.Pattern, route.Handler)
 	}
 	mux.HandleFunc("/api/", middleware.APINotFound)
+	mux.HandleFunc("GET "+api.ProtectedResourcePath, handlers.OAuth.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", handlers.OAuth.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", handlers.OAuth.AuthorizationServer)
 
 	environment.handler = middleware.Chain(
 		mux,
@@ -160,14 +177,19 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	return environment
 }
 
-// apiRequest describes one call. Bearer sends an Authorization header,
-// Cookie sends a session cookie together with a valid CSRF token.
+// apiRequest describes one call. Bearer sends an Authorization header, such
+// as a CI token; Cookie sends a session cookie together with a valid CSRF
+// token. Form sends the body as a form, as OAuth does.
 type apiRequest struct {
 	method string
 	path   string
 	body   string
 	bearer string
 	cookie string
+	form   bool
+	// workspace names the workspace of a session, as the Moin-Workspace
+	// header does.
+	workspace string
 	// cookies are sent as they are, for example an impersonation cookie.
 	cookies []*http.Cookie
 }
@@ -180,10 +202,16 @@ func (e *apiEnvironment) send(t *testing.T, request apiRequest) *httptest.Respon
 	} else {
 		httpRequest = httptest.NewRequest(request.method, request.path, strings.NewReader(request.body))
 		httpRequest.Header.Set("Content-Type", "application/json")
+		if request.form {
+			httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
 	}
 	httpRequest.Header.Set("User-Agent", "moin-test/1.0")
 	if request.bearer != "" {
 		httpRequest.Header.Set("Authorization", "Bearer "+request.bearer)
+	}
+	if request.workspace != "" {
+		httpRequest.Header.Set("Moin-Workspace", request.workspace)
 	}
 	if request.cookie != "" {
 		httpRequest.AddCookie(&http.Cookie{Name: "session_token", Value: request.cookie})
@@ -212,7 +240,7 @@ func (e *apiEnvironment) sendWithCookieOnly(t *testing.T, request apiRequest, se
 // signIn creates a session for userID and returns its raw token.
 func (e *apiEnvironment) signIn(t *testing.T, userID string) string {
 	t.Helper()
-	_, token, err := e.auth.CreateSession(httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", nil), userID)
+	_, token, err := e.auth.CreateSession(httptest.NewRequest(http.MethodGet, "/auth/github/callback", nil), userID)
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}

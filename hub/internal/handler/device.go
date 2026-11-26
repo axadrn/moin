@@ -1,31 +1,40 @@
 package handler
 
 import (
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
+	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
-// pendingDeviceCookie keeps the code of `moin login` while the user signs
-// in, so every way to sign in comes back to the approval.
-const pendingDeviceCookie = "pending_device"
+// pendingApprovalCookie keeps the approval page, of `moin login` or an AI
+// agent, while the person signs in, so every way to sign in comes back to
+// it.
+const pendingApprovalCookie = "pending_approval"
 
-// DeviceHandler is the page where `moin login` is approved in the browser.
+// DeviceHandler is the page where `moin login` is approved in the browser:
+// which workspace, which rights, and the person's passkey or a fresh
+// sign-in to allow it.
 type DeviceHandler struct {
 	logins     *service.DeviceLoginService
 	workspaces *service.WorkspaceService
+	passkeys   *service.PasskeyService
+	auth       *service.AuthService
 	cfg        *config.Config
 }
 
-func NewDeviceHandler(logins *service.DeviceLoginService, workspaces *service.WorkspaceService, cfg *config.Config) *DeviceHandler {
-	return &DeviceHandler{logins: logins, workspaces: workspaces, cfg: cfg}
+func NewDeviceHandler(logins *service.DeviceLoginService, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, auth *service.AuthService, cfg *config.Config) *DeviceHandler {
+	return &DeviceHandler{logins: logins, workspaces: workspaces, passkeys: passkeys, auth: auth, cfg: cfg}
 }
 
 // Show asks for the code, or with ?code= shows the login to approve. Without
@@ -34,7 +43,7 @@ func (h *DeviceHandler) Show(w http.ResponseWriter, r *http.Request) {
 	code := service.FormatUserCode(r.URL.Query().Get("code"))
 	user := ctxkeys.User(r.Context())
 	if user == nil || user.Name == "" {
-		h.setPending(w, code)
+		setPendingApproval(w, h.cfg, devicePath(code))
 		next := "/auth"
 		if user != nil {
 			next = "/auth/onboarding"
@@ -42,62 +51,126 @@ func (h *DeviceHandler) Show(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, next, http.StatusSeeOther)
 		return
 	}
-	clearPendingDevice(w, h.cfg)
+	clearPendingApproval(w, h.cfg)
 	if code == "" {
 		render(w, r, pages.Device(pages.DeviceView{}))
 		return
 	}
-	login, err := h.logins.Pending(code)
+	view, err := h.view(r, code, "", model.DefaultRights)
 	if err != nil {
 		h.codeError(w, r, code, err)
 		return
 	}
-	view, err := h.view(r, code, "")
-	if err != nil {
-		slog.Error("failed to list workspaces for device login", "error", err, "user_id", user.ID)
-		w.WriteHeader(http.StatusInternalServerError)
-		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Login unavailable", "Your workspaces could not be loaded. Please try again."))
-		return
-	}
-	view.Login = login
 	render(w, r, pages.Device(view))
 }
 
-// Approve lets the computer in. Its next poll gets the token.
+// PasskeyOptions starts the passkey ceremony that allows a login.
+func (h *DeviceHandler) PasskeyOptions(w http.ResponseWriter, r *http.Request) {
+	options, ceremony, err := h.passkeys.BeginConfirm(ctxkeys.Session(r.Context()))
+	if err != nil {
+		passkeyFailed(w, err)
+		return
+	}
+	setPasskeyCeremony(w, r, ceremony)
+	api.JSON(w, http.StatusOK, options)
+}
+
+// Approve makes the connection, with the person's passkey or a fresh
+// sign-in. The computer's next poll gets its tokens.
 func (h *DeviceHandler) Approve(w http.ResponseWriter, r *http.Request) {
-	user := ctxkeys.User(r.Context())
 	code := service.FormatUserCode(r.FormValue("code"))
 	workspaceID := r.FormValue("workspace_id")
-	login, err := h.logins.Approve(user.ID, code, workspaceID)
-	if errors.Is(err, service.ErrAPITokenWorkspace) {
-		view, viewErr := h.view(r, code, workspaceID)
-		pending, pendingErr := h.logins.Pending(code)
-		if viewErr == nil && pendingErr == nil {
-			view.Login = pending
-			view.WorkspaceError = "Choose one of your workspaces."
+	rights, ok := model.ParseRights(r.Form["rights"]...)
+	if !ok {
+		view, err := h.view(r, code, workspaceID, model.DefaultRights)
+		if err != nil {
+			h.codeError(w, r, code, err)
+			return
+		}
+		view.AllowError = "Choose from the rights shown."
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		render(w, r, pages.Device(view))
+		return
+	}
+	login, connection, err := h.logins.Approve(service.Approval{
+		UserCode:    code,
+		WorkspaceID: workspaceID,
+		Rights:      rights,
+		Presence: service.Presence{
+			Session:  ctxkeys.Session(r.Context()),
+			Ceremony: takePasskeyCeremony(w, r),
+			Answer:   []byte(r.FormValue("passkey")),
+		},
+		Source: service.RequestSource(r.Context()),
+	})
+	if message, workspace, ok := approveError(err); ok {
+		view, viewErr := h.view(r, code, workspaceID, rights)
+		if viewErr == nil {
+			if workspace {
+				view.WorkspaceError = message
+			} else {
+				view.AllowError = message
+			}
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			render(w, r, pages.Device(view))
 			return
 		}
+		err = viewErr
 	}
 	if err != nil {
 		h.codeError(w, r, code, err)
 		return
 	}
-	slog.Info("device login approved", "login_id", login.ID, "user_id", user.ID)
+	slog.Info("device login approved", "login_id", login.ID, "connection_id", connection.ID)
 	render(w, r, pages.DeviceDone(login, true))
+}
+
+// approveError is what the page says when Allow did not work, and whether
+// it is about the workspace. ok is false for errors about the code.
+func approveError(err error) (message string, workspace, ok bool) {
+	switch {
+	case errors.Is(err, service.ErrConnectionWorkspace):
+		return "Choose one of your workspaces.", true, true
+	case errors.Is(err, service.ErrPresencePasskey):
+		return "Allow with your passkey.", false, true
+	case errors.Is(err, service.ErrPresenceSignIn):
+		return "Your sign-in is older than five minutes. Sign in again, any way you like, then allow.", false, true
+	case errors.Is(err, service.ErrPasskeyRefused):
+		slog.Warn("passkey refused", "error", err)
+		return "This passkey did not work. Try again.", false, true
+	case errors.Is(err, service.ErrPasskeyExpired):
+		return "This took too long. Please try again.", false, true
+	case errors.Is(err, service.ErrImpersonating):
+		return "Impersonation is read-only.", false, true
+	case errors.Is(err, service.ErrConnectionLimit):
+		return "You have 50 connections. Remove one in Settings, Connections.", false, true
+	}
+	return "", false, false
+}
+
+// Reauth signs the person out and sends them to sign in again, any way
+// in, and back here after: an account without a passkey allows a login
+// only with a sign-in less than five minutes old.
+func (h *DeviceHandler) Reauth(w http.ResponseWriter, r *http.Request) {
+	setPendingApproval(w, h.cfg, devicePath(r.FormValue("code")))
+	if err := h.auth.EndSession(r); err != nil {
+		h.codeError(w, r, r.FormValue("code"), err)
+		return
+	}
+	h.auth.ClearSessionCookie(w)
+	// Any way in counts, so the person picks one.
+	redirect(w, r, "/auth", http.StatusSeeOther)
 }
 
 // Deny turns the login down. Its next poll hears so and stops.
 func (h *DeviceHandler) Deny(w http.ResponseWriter, r *http.Request) {
-	user := ctxkeys.User(r.Context())
 	code := service.FormatUserCode(r.FormValue("code"))
-	login, err := h.logins.Deny(user.ID, code)
+	login, err := h.logins.Deny(code)
 	if err != nil {
 		h.codeError(w, r, code, err)
 		return
 	}
-	slog.Info("device login denied", "login_id", login.ID, "user_id", user.ID)
+	slog.Info("device login denied", "login_id", login.ID, "user_id", ctxkeys.User(r.Context()).ID)
 	render(w, r, pages.DeviceDone(login, false))
 }
 
@@ -112,17 +185,38 @@ func (h *DeviceHandler) codeError(w http.ResponseWriter, r *http.Request, code s
 	render(w, r, pages.Device(pages.DeviceView{Code: code, CodeError: message}))
 }
 
-// view lists the workspaces the computer can be let into, the chosen one or
-// the first selected.
-func (h *DeviceHandler) view(r *http.Request, code, workspaceID string) (pages.DeviceView, error) {
-	user := ctxkeys.User(r.Context())
-	memberships, err := h.workspaces.ListForUser(user.ID)
+// view is the approval of the pending login of code.
+func (h *DeviceHandler) view(r *http.Request, code, workspaceID string, rights model.Rights) (pages.DeviceView, error) {
+	login, err := h.logins.Pending(code)
 	if err != nil {
 		return pages.DeviceView{}, err
 	}
-	view := pages.DeviceView{Code: code, WorkspaceID: workspaceID}
+	approval, err := approvalView(r, h.workspaces, h.passkeys, workspaceID, rights)
+	if err != nil {
+		return pages.DeviceView{}, err
+	}
+	return pages.DeviceView{Code: code, Login: login, Approval: approval}, nil
+}
+
+// approvalView is how the approval page asks this person, for `moin login`
+// and an AI agent alike: the workspaces the client can go into, the chosen
+// one or the first, the rights, and how Allow works for them.
+func approvalView(r *http.Request, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, workspaceID string, rights model.Rights) (pages.Approval, error) {
+	user := ctxkeys.User(r.Context())
+	memberships, err := workspaces.ListForUser(user.ID)
+	if err != nil {
+		return pages.Approval{}, err
+	}
+	passkey, err := passkeys.NeedsPasskey(user.ID)
+	if err != nil {
+		return pages.Approval{}, err
+	}
+	view := pages.Approval{WorkspaceID: workspaceID, Rights: rights, Passkey: passkey, Passkeys: passkeys.On()}
+	if session := ctxkeys.Session(r.Context()); session != nil {
+		view.Fresh = time.Since(session.CreatedAt) < service.FreshSignIn
+	}
 	for _, membership := range memberships {
-		view.Workspaces = append(view.Workspaces, pages.APITokenWorkspace{ID: membership.ID, Name: membership.Name})
+		view.Workspaces = append(view.Workspaces, pages.WorkspaceChoice{ID: membership.ID, Name: membership.Name})
 	}
 	if view.WorkspaceID == "" && len(view.Workspaces) > 0 {
 		view.WorkspaceID = view.Workspaces[0].ID
@@ -130,33 +224,49 @@ func (h *DeviceHandler) view(r *http.Request, code, workspaceID string) (pages.D
 	return view, nil
 }
 
-func (h *DeviceHandler) setPending(w http.ResponseWriter, code string) {
+// devicePath is the approval page of a code of `moin login`.
+func devicePath(code string) string {
+	code = service.FormatUserCode(code)
+	if code == "" {
+		return "/device"
+	}
+	return "/device?code=" + url.QueryEscape(code)
+}
+
+// setPendingApproval remembers path, an approval page, while the person
+// signs in.
+func setPendingApproval(w http.ResponseWriter, cfg *config.Config, path string) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     pendingDeviceCookie,
-		Value:    service.NormalizeUserCode(code),
+		Name:     pendingApprovalCookie,
+		Value:    base64.RawURLEncoding.EncodeToString([]byte(path)),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   h.cfg.IsProduction(),
+		Secure:   cfg != nil && cfg.IsProduction(),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(service.DeviceLoginLifetime.Seconds()),
 	})
 }
 
-func clearPendingDevice(w http.ResponseWriter, cfg *config.Config) {
+func clearPendingApproval(w http.ResponseWriter, cfg *config.Config) {
 	secure := cfg != nil && cfg.IsProduction()
-	http.SetCookie(w, &http.Cookie{Name: pendingDeviceCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: pendingApprovalCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
 }
 
-// pendingDevice is where to go after signing in when `moin login` sent the
-// user: the approval page, with the code when there is one.
-func pendingDevice(r *http.Request) (string, bool) {
-	cookie, err := r.Cookie(pendingDeviceCookie)
+// pendingApproval is where to go after signing in when `moin login` or an
+// AI agent sent the person: the approval page. Only the two approval pages
+// of this hub count, so the cookie never leads elsewhere.
+func pendingApproval(r *http.Request) (string, bool) {
+	cookie, err := r.Cookie(pendingApprovalCookie)
 	if err != nil {
 		return "", false
 	}
-	code := service.NormalizeUserCode(cookie.Value)
-	if code == "" {
-		return "/device", true
+	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return "", false
 	}
-	return "/device?code=" + url.QueryEscape(service.FormatUserCode(code)), true
+	target, err := url.Parse(string(raw))
+	if err != nil || target.Scheme != "" || target.Host != "" || target.Opaque != "" || (target.Path != "/device" && target.Path != "/oauth/authorize") {
+		return "", false
+	}
+	return target.String(), true
 }

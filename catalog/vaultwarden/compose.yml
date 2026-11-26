@@ -1,0 +1,6 @@
+services:
+  web:
+    image: ghcr.io/dani-garcia/vaultwarden:${VERSION}
+    expose: ["80"]
+    volumes:
+      - ./data:/data

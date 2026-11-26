@@ -18,13 +18,15 @@ type DomainsView struct {
 	// Server runs the app.
 	Server  model.Server
 	Instant service.Instant
-	// File is the x-moin block of the live deploy: what it sets is locked.
-	File protocol.Config
+	// NewPassword is the password of the app moin just made: the one time
+	// it shows it.
+	NewPassword string
 }
 
 // AppDomains is where an app is reached: its domains, the instant address
-// and the password in front of it. A domain says whether it points at the
-// server once it was added or checked; opening the page waits on no DNS.
+// and the one password they ask for. A domain says whether it points at
+// the server once it was added or checked; opening the page waits on no
+// DNS.
 templ AppDomains(view DomainsView) {
 	{{ domainsPath := ctxkeys.AppBasePath(ctx) + "/apps/" + view.App.Link() + "/domains" }}
 	<div id="app-domains" class="moin-stack" data-gap="6">
@@ -37,21 +39,15 @@ templ AppDomains(view DomainsView) {
 					for _, check := range view.Checks {
 						@domainRow(check, view.App.Name, domainsPath)
 					}
-					if options := canonicalOptions(view.Checks); len(options) > 2 && !fromCompose(view.Checks) {
-						@canonicalRow(options, view.App.Canonical, domainsPath)
+					if options := canonicalOptions(view.Checks); len(options) > 2 {
+						@canonicalRow(options, canonicalDomain(view.Checks), domainsPath)
 					}
-					if fromCompose(view.Checks) {
-						@components.Item(components.ItemProps{Attrs: templ.Attributes{"data-domains-from-compose": true}}) {
-							<p class="moin-fill moin-text moin-muted">Change them in compose.yml (<span class="moin-mono">x-moin.domains</span>) and deploy.</p>
-						}
-					} else {
-						@addDomainRow(domainsPath)
-					}
+					@addDomainRow(domainsPath)
 				}
 			}
 		</section>
-		@instantSection(view, domainsPath)
-		@passwordSection(view.App, domainsPath, view.File.Protect)
+		@instantSection(view.Instant, domainsPath)
+		@passwordSection(view, domainsPath)
 	</div>
 }
 
@@ -64,7 +60,7 @@ templ canonicalRow(options []components.Option, canonical, domainsPath string) {
 }
 
 // domainRow is one domain: its name, a quiet word for what it is
-// (canonical, a service, from compose.yml), what its DNS says once checked,
+// (canonical, a service), what its DNS says once checked,
 // and its actions. On a phone the actions go under the name when they do
 // not fit next to it.
 templ domainRow(check service.DomainCheck, appName, domainsPath string) {
@@ -104,20 +100,18 @@ templ domainRow(check service.DomainCheck, appName, domainsPath string) {
 			}}) {
 				Check
 			}
-			if !check.FromCompose {
-				@components.Button(components.ButtonProps{Icon: true, Kind: components.Danger, Attrs: templ.Attributes{
-					"aria-label":          "Remove " + check.Domain,
-					"title":               "Remove " + check.Domain,
-					"hx-post":             domainsPath + "/remove",
-					"hx-vals":             `{"domain": "` + check.Domain + `", "service": "` + check.Service + `"}`,
-					"hx-target":           "#app-domains",
-					"hx-swap":             "outerHTML",
-					"hx-disable":          "this",
-					"hx-confirm":          "Remove " + check.Domain + "? " + appName + " stops answering on it at the next restart.",
-					"data-confirm-action": "Remove",
-				}}) {
-					@components.Icon("x")
-				}
+			@components.Button(components.ButtonProps{Icon: true, Kind: components.Danger, Attrs: templ.Attributes{
+				"aria-label":          "Remove " + check.Domain,
+				"title":               "Remove " + check.Domain,
+				"hx-post":             domainsPath + "/remove",
+				"hx-vals":             `{"domain": "` + check.Domain + `", "service": "` + check.Service + `"}`,
+				"hx-target":           "#app-domains",
+				"hx-swap":             "outerHTML",
+				"hx-disable":          "this",
+				"hx-confirm":          "Remove " + check.Domain + "? " + appName + " stops answering on it at the next restart.",
+				"data-confirm-action": "Remove",
+			}}) {
+				@components.Icon("x")
 			}
 		</div>
 	}
@@ -146,9 +140,8 @@ templ addDomainRow(domainsPath string) {
 }
 
 // instantSection is the instant address: a switch, where it is or why the
-// app has none, its provider and its password.
-templ instantSection(view DomainsView, domainsPath string) {
-	{{ instant := view.Instant }}
+// app has none, and its provider.
+templ instantSection(instant service.Instant, domainsPath string) {
 	{{ on := instant.Provider != "" && instant.Provider != "off" }}
 	<section class="moin-section">
 		<div class="moin-section-head">
@@ -169,35 +162,12 @@ templ instantSection(view DomainsView, domainsPath string) {
 								<div class="moin-strong moin-muted" data-instant-reason>Off</div>
 							}
 						</div>
-						if view.File.Instant == "" {
-							@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true}})
-						} else {
-							<span class="moin-item-value" data-instant-in-file>from compose.yml</span>
-						}
+						@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-on", "name": "on", "value": "1", "checked": on, "aria-label": "Instant address", "data-instant-switch": true}})
 					}
 					if on {
-						if view.File.Instant == "" {
-							@components.Item(components.ItemProps{Form: true, For: "instant-provider", Name: "Provider", Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "data-instant-provider": true}}) {
-								@components.CSRF()
-								@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
-							}
-						}
-						if instant.URL != "" {
-							@components.Item(components.ItemProps{Form: true, For: "instant-password-on", Name: "Password", Note: instantSignIn(instant), Attrs: templ.Attributes{"hx-post": domainsPath + "/instant-password", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
-								@components.CSRF()
-								<input type="hidden" name="password" value="1"/>
-								@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "instant-password-on", "name": "on", "value": "1", "checked": !instant.Open}})
-							}
-							if !instant.Open && !instant.OwnPassword {
-								if instant.Password != "" {
-									@components.Item(components.ItemProps{}) {
-										<span class="moin-fill moin-truncate moin-mono moin-text" data-instant-password>{ instant.Password }</span>
-										@copyButton(instant.Password, "", "Copy the password")
-									}
-								} else {
-									@components.Item(components.ItemProps{Button: true, Name: "Show password", Attrs: templ.Attributes{"hx-get": domainsPath + "/detail?show=true", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "this", "data-instant-show": true}})
-								}
-							}
+						@components.Item(components.ItemProps{Form: true, For: "instant-provider", Name: "Provider", Attrs: templ.Attributes{"hx-post": domainsPath + "/instant", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "data-instant-provider": true}}) {
+							@components.CSRF()
+							@components.Select(components.SelectProps{ID: "instant-provider", Name: "provider", Label: "Provider", Options: instantOptions(), Value: instant.Provider})
 						}
 					}
 				}
@@ -206,62 +176,59 @@ templ instantSection(view DomainsView, domainsPath string) {
 	</section>
 }
 
-// passwordSection is the password in front of the app: off, a switch
-// opens its fields; on, who signs in and Remove.
-templ passwordSection(app model.App, domainsPath string, required bool) {
+// passwordSection is the app's one password: a switch that its domains
+// and its instant address ask for it. On, moin makes the password and
+// shows it once; the fields set one of your own.
+templ passwordSection(view DomainsView, domainsPath string) {
+	{{ on := view.App.Password != "" }}
 	<section class="moin-section">
 		<div class="moin-section-head">
 			<h2>Password</h2>
 		</div>
-		if app.Protect != "" {
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					@components.Item(components.ItemProps{Name: "Sign in as " + protectUser(app)}) {
-						<span class="moin-small moin-muted" data-protected>On</span>
-					}
-					if required {
-						@components.Item(components.ItemProps{}) {
-							<p class="moin-fill moin-text moin-muted" data-protect-in-file>Required by compose.yml.</p>
-						}
-					} else {
-						@components.Item(components.ItemProps{Button: true, Danger: true, Name: "Remove password", Attrs: templ.Attributes{
-							"hx-post":        domainsPath + "/unprotect",
-							"hx-target":      "#app-domains",
-							"hx-swap":        "outerHTML",
-							"hx-disable":     "this",
-							"hx-confirm":     "Remove the password? Anyone with the link can open " + app.Name + " after the next restart.",
-							"data-unprotect": true,
-						}})
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Form: true, For: "password-on", Name: "Ask for a password", Note: passwordNote(view.App), Attrs: templ.Attributes{"hx-post": domainsPath + "/password", "hx-trigger": "change", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find input[type='checkbox']"}}) {
+					@components.CSRF()
+					<input type="hidden" name="switch" value="1"/>
+					@components.Switch(components.SwitchProps{Attrs: templ.Attributes{"id": "password-on", "name": "on", "value": "1", "checked": on, "data-password-switch": true}})
+				}
+				if view.NewPassword != "" {
+					@components.Item(components.ItemProps{Name: "New password", Note: "Shown once. " + view.App.Name + " takes it on its next restart."}) {
+						<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ view.NewPassword }</span>
+						@copyButton(view.NewPassword, "", "Copy the password")
 					}
 				}
-			}
-		} else {
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					@components.Expand(components.ExpandProps{Name: "Ask for a password"}) {
-						@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"id": "protect-form", "hx-post": domainsPath + "/protect", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}}) {
-							@components.CSRF()
-							<div class="moin-stack moin-fill" data-gap="4">
-								<div class="moin-grid">
-									@components.Field(components.FieldProps{Label: "Username", For: "protect-user"}) {
-										@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-user", "name": "username", "type": "text", "value": "moin", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
-									}
-									@components.Field(components.FieldProps{Label: "Password", For: "protect-password"}) {
-										@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "protect-password", "name": "password", "type": "password", "autocomplete": "new-password", "required": true, "minlength": "8", "maxlength": "72", "placeholder": "8 to 72 characters"}})
-									}
-								</div>
-								<div class="moin-row" data-end>
-									@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-protect": true}}) {
-										Set password
-									}
-								</div>
+				@components.Expand(components.ExpandProps{Name: "Use your own password"}) {
+					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"id": "password-form", "hx-post": domainsPath + "/password", "hx-target": "#app-domains", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']"}}) {
+						@components.CSRF()
+						<div class="moin-stack moin-fill" data-gap="4">
+							<div class="moin-grid">
+								@components.Field(components.FieldProps{Label: "Username", For: "password-user"}) {
+									@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "password-user", "name": "username", "type": "text", "value": passwordUser(view.App), "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "required": true}})
+								}
+								@components.Field(components.FieldProps{Label: "Password", For: "password-value"}) {
+									@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "password-value", "name": "password", "type": "password", "autocomplete": "new-password", "required": true, "minlength": "8", "maxlength": "72", "placeholder": "8 to 72 characters"}})
+								}
 							</div>
-						}
+							<div class="moin-row" data-end>
+								@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"data-password-set": true}}) {
+									Set password
+								}
+							</div>
+						</div>
 					}
 				}
 			}
 		}
 	</section>
+}
+
+// passwordNote says who signs in, or that anyone with the link gets in.
+func passwordNote(app model.App) string {
+	if app.Password == "" {
+		return "Off. Anyone with the link opens " + app.Name + "."
+	}
+	return "Its domains and its instant address ask for it. Sign in as " + passwordUser(app) + "."
 }
 
 // instantOptions are the providers of the instant address.
@@ -273,19 +240,7 @@ func instantOptions() []components.Option {
 	return options
 }
 
-// instantSignIn is who signs in on the instant address, and with what.
-func instantSignIn(instant service.Instant) string {
-	switch {
-	case instant.Open:
-		return ""
-	case instant.OwnPassword:
-		return "Sign in as " + instant.User + " with the app's password"
-	}
-	return "Sign in as " + instant.User
-}
-
-// domainNote is the quiet words under a domain: canonical, its service,
-// from compose.yml.
+// domainNote is the quiet words under a domain: canonical, its service.
 func domainNote(check service.DomainCheck) string {
 	var words []string
 	if check.Canonical {
@@ -293,9 +248,6 @@ func domainNote(check service.DomainCheck) string {
 	}
 	if check.Service != "" {
 		words = append(words, "service "+check.Service)
-	}
-	if check.FromCompose {
-		words = append(words, "from compose.yml")
 	}
 	return strings.Join(words, " · ")
 }
@@ -312,10 +264,15 @@ func canonicalOptions(checks []service.DomainCheck) []components.Option {
 	return options
 }
 
-// fromCompose says x-moin.domains in compose.yml sets the domains of the
-// main service.
-func fromCompose(checks []service.DomainCheck) bool {
-	return len(checks) > 0 && checks[0].FromCompose && checks[0].Service == ""
+// canonicalDomain is the domain of the main service the others redirect
+// to, "" for none.
+func canonicalDomain(checks []service.DomainCheck) string {
+	for _, check := range checks {
+		if check.Canonical && check.Service == "" {
+			return check.Domain
+		}
+	}
+	return ""
 }
 
 func orDash(value string) string {
@@ -325,11 +282,11 @@ func orDash(value string) string {
 	return value
 }
 
-func protectUser(app model.App) string {
-	for index, char := range app.Protect {
-		if char == ':' {
-			return app.Protect[:index]
-		}
+// passwordUser is who signs in with the app's password, PasswordUser when
+// it has none.
+func passwordUser(app model.App) string {
+	if user, _, found := strings.Cut(app.Password, ":"); found {
+		return user
 	}
-	return "moin"
+	return service.PasswordUser
 }

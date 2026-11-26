@@ -14,18 +14,18 @@ import (
 // names, numbers and settings, never values, passwords, tokens or rows.
 func TestActivityNeverHoldsSecrets(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
-	secrets := []string{"env-value-7f3a", "registry-password-9c1d", "protect-password-2b8e", "row-value-ada@private.example", "sql-literal-5e6f"}
+	secrets := []string{"env-value-7f3a", "registry-password-9c1d", "app-password-2b8e", "row-value-ada@private.example", "sql-literal-5e6f"}
 
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetEnv(owner, "blog", map[string]string{"DATABASE_URL": secrets[0]}, nil); err != nil {
+	if _, err := apps.SetEnv(context.Background(), owner, "blog", map[string]string{"DATABASE_URL": secrets[0]}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.SetRegistry(owner, "ghcr.io", "ada", secrets[1]); err != nil {
+	if err := apps.SetRegistry(context.Background(), owner, "ghcr.io", "ada", secrets[1], ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.SetProtection(owner, "blog", "ada", secrets[2]); err != nil {
+	if _, _, err := apps.SetPassword(owner, "blog", "ada", secrets[2]); err != nil {
 		t.Fatal(err)
 	}
 	hook, err := apps.RotateDeployHook(owner, "blog")
@@ -34,7 +34,7 @@ func TestActivityNeverHoldsSecrets(t *testing.T) {
 	}
 	secrets = append(secrets, hook[strings.LastIndex(hook, "/")+1:])
 
-	deploy, err := deployUpload(apps)
+	deploy, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestActivityNeverHoldsSecrets(t *testing.T) {
 			}
 		}
 	}
-	for _, action := range []string{"env.set", "registry.set", "app.protected", "app.hook_rotated", "app.deployed", "deploy.succeeded", "data.sql"} {
+	for _, action := range []string{"env.set", "registry.set", "app.password_set", "app.hook_rotated", "app.deployed", "deploy.succeeded", "data.sql"} {
 		if !actions[action] {
 			t.Errorf("no %s in the activity: %v", action, actions)
 		}

@@ -1,6 +1,6 @@
 ---
 title: "Domains"
-description: "The instant address, your own domains with HTTPS, the www redirect and a password"
+description: "The instant address, your own domains with HTTPS, the www redirect and the app's password"
 group: "Apps"
 order: 2
 ---
@@ -39,6 +39,8 @@ MCP: set_domains
 
 Then, where you bought the domain, add an **A record**: the domain as the name, the server's IPv4 address as the value. If the server has IPv6, add an **AAAA record** too.
 
+One app may use a domain once. Two apps may use the same one: then both ask for the same visitors, so give each app its own.
+
 moin says whether the domain already points at the server. **Check** asks again later. Once DNS points at the server, the domain gets HTTPS by itself.
 
 Behind a [Cloudflare Tunnel](/docs/guides/security#web), moin sets the DNS for you when the domain is in your Cloudflare account.
@@ -52,21 +54,15 @@ https://<app>.<ip-dashes>.sslip.io
 https://my-app.203-0-113-7.sslip.io
 ```
 
-The name carries the server's IP, so it needs no DNS. A password guards it by default, user `moin`: the app's own [password](#protect-with-a-password) when it has one, else one moin made.
+The name carries the server's IP, so it needs no DNS. The app's [password](#password) guards it, like every domain of the app.
+
+`moin instant` shows the address, `GET /api/v1/apps/{app}/instant` and `get_instant` the same.
+
+Switch the provider, or turn the address off:
 
 ```surfaces
-Web: the app, **Instant address**, **Show password**
-CLI: moin instant --show
-TUI: on the app, `o`: the instant address
-API: GET /api/v1/apps/{app}/instant?show=true
-MCP: get_instant
-```
-
-Switch the provider, drop the password, or turn the address off:
-
-```surfaces
-Web: the app, **Instant address**, **Provider** or the **Password** switch
-CLI: moin instant nip.io, moin instant open, moin instant protect, moin instant off
+Web: the app, **Instant address**, **Provider** or its switch
+CLI: moin instant nip.io, moin instant off
 TUI: on the app, `W`
 API: PUT /api/v1/apps/{app}/instant
 MCP: set_instant
@@ -116,27 +112,43 @@ MCP: set_domains
 
 `moin domains canonical none` turns the redirect off. The API and MCP take it as `canonical`.
 
-## Protect with a password
+## Password
 
-A username and password in front of the app, for staging or a preview. Visitors see their browser's sign-in box. moin stores only a hash.
+One rule: an app has one password. When it is on, every domain of the app asks for it: the instant address, the app's own domains and those of its other services. When it is off, none does. Visitors see their browser's sign-in box. moin stores only a hash.
 
-```surfaces
-Web: the app page, **Domains**, **Ask for a password**, then **Set password**
-CLI: moin protect --user <username>
-TUI: on the app, `o`, `p`, then type `<username>:<password>`
-API: PUT /api/v1/apps/{app}/protection
-MCP: set_protection
-```
+A new app starts with it on. So nobody else gets in before you, also not to the setup page of an app where the first visitor becomes the admin. moin makes the password, user `moin`, and shows it once: on the web, in `moin apps add`, `moin deploy` and `moin catalog install`, in the API and MCP answer as `password`. Keep it in your password manager.
 
-The username is `moin` unless you pick one. The CLI reads the password from stdin. To make the app public again:
+Turn it off for an app the world should see:
 
 ```surfaces
-Web: the app page, **Domains**, **Remove password**
-CLI: moin protect off
+Web: the app page, **Domains**, the **Ask for a password** switch
+CLI: moin password off
 TUI: on the app, `o`, `p`, then `y`
-API: DELETE /api/v1/apps/{app}/protection
-MCP: remove_protection
+API: DELETE /api/v1/apps/{app}/password
+MCP: remove_password
 ```
+
+Turn it on again. moin makes a new password and shows it once. When it is on already, this changes nothing: lost the password? Turn it off, then on, or set your own.
+
+```surfaces
+Web: the app page, **Domains**, the **Ask for a password** switch
+CLI: moin password, with nothing on stdin
+TUI: opens the web: on the app, `W`, then **Domains**
+API: PUT /api/v1/apps/{app}/password with {}
+MCP: set_password
+```
+
+Or set your own, also to replace a password you lost:
+
+```surfaces
+Web: the app page, **Domains**, **Use your own password**, then **Set password**
+CLI: moin password --user <username>, the password on stdin
+TUI: on the app, `o`, `p`, then type `<username>:<password>`
+API: PUT /api/v1/apps/{app}/password with {"username", "password"}
+MCP: set_password with username and password
+```
+
+The username is `moin` unless you pick one. A password has 8 to 72 characters.
 
 ## Domains per service
 
@@ -150,33 +162,7 @@ API: PUT /api/v1/apps/{app}/domains with "service": "api"
 MCP: set_domains with service
 ```
 
-Each service gets its own port: `x-moin.ports`, else its `ports` or `expose`, then 8080. A domain reaches one service only.
-
-## In the repo
-
-Domains can live next to your code, in `compose.yml`:
-
-```yaml
-x-moin:
-  domains: [<domain>, www.<domain>]
-  canonical: <domain>
-  protect: true   # the password itself is set in moin, never in the repo
-  instant: nip.io # or sslip.io, off
-```
-
-For several services, `domains` takes a map and `ports` their ports:
-
-```yaml
-x-moin:
-  service: web
-  domains:
-    web: [<domain>]
-    api: [api.<domain>]
-  ports:
-    api: 5678
-```
-
-Once a deploy with `x-moin.domains` is live, those domains show **from compose.yml** and change only in the file. Trying it in moin says so (API code `domains_from_compose`). [Who decides](/docs/guides/config#who-decides).
+Each service gets its own port: its `ports` or `expose` in [compose.yml](/docs/guides/compose), else its env `PORT`, then 8080. A domain reaches one service only.
 
 ## Good to know
 

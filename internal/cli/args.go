@@ -36,7 +36,7 @@ func newFlags(name, usage string) *flagSet {
 
 // withApp adds --app.
 func (f *flagSet) withApp() *flagSet {
-	f.appFlag = f.String("app", "", "app name; default x-moin.app in compose.yml, then the directory name")
+	f.appFlag = f.String("app", "", "app name; default the directory name")
 	return f
 }
 
@@ -102,14 +102,9 @@ func (f *flagSet) confirmed() string {
 }
 
 // app picks the app the command works on: --app, then the argument, then
-// x-moin.app in compose.yml, then the directory name. A not found error
-// names it and where it came from.
+// the app that follows the GitHub repo of this folder, then the folder's
+// name. A not found error names it and where it came from.
 func (f *flagSet) app(argument string) (string, error) {
-	return f.appIn(argument, ".")
-}
-
-// appIn is app for the repo in dir.
-func (f *flagSet) appIn(argument, dir string) (string, error) {
 	flagValue := ""
 	if f.appFlag != nil {
 		flagValue = *f.appFlag
@@ -121,12 +116,19 @@ func (f *flagSet) appIn(argument, dir string) (string, error) {
 	if flagValue == "" {
 		flagValue, from = argument, "the argument"
 	}
-	name, source := client.PickApp(flagValue, dir)
+	name, source := client.PickApp(flagValue, ".")
 	if flagValue == "" {
 		from = source
+		followed, repo, err := repoApp()
+		if err != nil {
+			return "", err
+		}
+		if followed != "" {
+			name, from = followed, "the app that follows "+repo
+		}
 	}
 	if name == "" {
-		return "", errors.New("cannot tell the app: pass it with --app, or set x-moin.app in compose.yml")
+		return "", errors.New("cannot tell the app: pass it with --app")
 	}
 	picked = pickedApp{name: name, from: from}
 	return name, nil

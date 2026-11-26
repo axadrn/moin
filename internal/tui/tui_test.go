@@ -69,7 +69,7 @@ func (m model) withApp(name string, t tab) model {
 			Moments: []client.Moment{{ID: "before-v43", Label: "Before v43", At: now.Add(-2 * time.Hour), Kind: "deploy"}}},
 		{DatabaseBackup: client.DatabaseBackup{Database: "postgres", Kind: "postgres", Error: "the daily check failed: role missing", CheckError: "the daily check failed: role missing"}, Problem: "The daily check could not restore the newest copy."},
 	}}
-	m.app.env = map[string]string{"DATABASE_URL": "postgres://x", "STRIPE_KEY": "sk_live_secret", "DEBUG": ""}
+	m.app.env = []client.EnvVar{{Key: "DATABASE_URL", UpdatedAt: now.Add(-3 * time.Hour)}, {Key: "DEBUG", UpdatedAt: now.Add(-3 * time.Hour)}, {Key: "STRIPE_KEY", UpdatedAt: now.Add(-25 * time.Minute)}}
 	m.app.domains = []client.DomainCheck{{Domain: "shop.example.com", Canonical: true, Points: true}, {Domain: "www.shop.example.com", Points: false, Advice: "add an A record to 203.0.113.7"}}
 	m.app.instant = &client.Instant{URL: "https://shop-acme.moin.app"}
 	m.app.uptime = &client.Uptime{App: name, State: "up", Server: "web-1", ServerOnline: true, Domains: []client.UptimeDomain{

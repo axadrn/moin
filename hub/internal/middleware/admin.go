@@ -30,17 +30,18 @@ func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // BlockImpersonatedWrites keeps an impersonation read-only, and keeps the
-// user's secrets and data private: an operator sees how the account looks,
-// not its env values, database rows or app logs.
+// user's data private: an operator sees how the account looks, not its
+// database rows, its database copies or app logs. Env values no page
+// shows at all.
 func BlockImpersonatedWrites(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session := ctxkeys.Session(r.Context())
 		if session.IsImpersonating() && privateDuringImpersonation(r) {
 			if isAPIRequest(r) {
-				api.Error(w, http.StatusForbidden, "impersonation_private", "Impersonation does not show env values, database data or app logs.")
+				api.Error(w, http.StatusForbidden, "impersonation_private", "Impersonation does not show database data or app logs.")
 				return
 			}
-			renderMiddlewareError(w, r, http.StatusForbidden, "Private while impersonating", "Env values, database data and app logs stay hidden.")
+			renderMiddlewareError(w, r, http.StatusForbidden, "Private while impersonating", "Database data and app logs stay hidden.")
 			return
 		}
 		if session.IsImpersonating() && !allowedDuringImpersonation(r) {
@@ -70,8 +71,9 @@ func allowedDuringImpersonation(r *http.Request) bool {
 	if path == "/auth/onboarding" {
 		return true
 	}
-	// GitHub's return link connects an installation: a write behind a GET.
-	if path == "/app/github/setup" {
+	// GitHub's return links connect an installation or create the hub's
+	// GitHub App: writes behind a GET.
+	if path == "/app/github/setup" || path == "/app/github/created" {
 		return false
 	}
 	if path == "/app" || strings.HasPrefix(path, "/app/") {
@@ -88,7 +90,8 @@ func allowedDuringImpersonation(r *http.Request) bool {
 }
 
 // privateDuringImpersonation names the reads that show what a user keeps
-// private: env values, database rows and app logs. The web paths are
+// private: database rows, copies of a database and app logs. The web
+// paths are
 // /app/{workspace}/apps/{app}/..., the API paths /api/v1/apps/{app}/...,
 // so the app's sub page is the sixth segment in both.
 func privateDuringImpersonation(r *http.Request) bool {
@@ -103,11 +106,12 @@ func privateDuringImpersonation(r *http.Request) bool {
 		return false
 	case parts[5] == "logs":
 		return true
-	case parts[5] == "env":
-		// The web table hides values until show=1; the API always sends them.
-		return api || r.URL.Query().Get("show") == "1"
 	case parts[5] == "data":
 		return web
+	case parts[5] == "backups":
+		// The download is a GET on the web; the API's is a POST, which the
+		// read-only rule refuses anyway.
+		return web && len(parts) > 6 && parts[6] == "download"
 	case parts[5] == "databases":
 		return api && len(parts) > 6 && (parts[6] == "rows" || parts[6] == "query")
 	}

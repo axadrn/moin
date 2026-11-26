@@ -33,8 +33,9 @@ func (h *WorkspaceInvitationHandler) Show(w http.ResponseWriter, r *http.Request
 	}
 	user := ctxkeys.User(r.Context())
 	if user == nil {
+		// GitHub brings the guest back here, signed in.
 		h.setPendingCookie(w, token)
-		redirect(w, r, "/auth", http.StatusSeeOther)
+		render(w, r, pages.WorkspaceInvitation(invitation, ""))
 		return
 	}
 	if user.Name == "" {

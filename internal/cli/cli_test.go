@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -87,17 +88,21 @@ func runCLI(t *testing.T, api *fakeAPI, args ...string) (code int, stdout, stder
 }
 
 func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
-	env := `{"items":{"KEY":"secret"}}`
+	env := `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`
 	for _, args := range [][]string{
-		{"env", "--show", "shop"},
-		{"env", "--show", "--app", "shop"},
-		{"env", "--app", "shop", "--show"},
-		{"env", "shop", "--show"},
+		{"env", "shop"},
+		{"env", "--app", "shop"},
 	} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": env}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "KEY=secret") {
+		if code != 0 || !strings.Contains(stdout, "KEY") || !strings.Contains(stdout, "Jan 2, 2026") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
+		}
+	}
+	// Values are write-only: --show is gone, like env pull and run.
+	for _, args := range [][]string{{"env", "--show", "shop"}, {"env", "pull", "--app", "shop"}, {"run", "--app", "shop", "--", "env"}} {
+		if code, _, _ := runCLI(t, &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": env}}, args...); code == 0 {
+			t.Errorf("%v still runs", args)
 		}
 	}
 
@@ -122,6 +127,20 @@ func TestAppAsArgumentOrFlagAnywhere(t *testing.T) {
 	code, _, stderr = runCLI(t, &fakeAPI{}, "logs", "--app", "shop", "blog")
 	if code != 1 || !strings.Contains(stderr, "Two apps") {
 		t.Errorf("two apps: code %d, stderr %q", code, stderr)
+	}
+}
+
+// TestComposePrintsTheFile: compose prints the compose file as it is, to
+// pipe to a file, and says why there is none.
+func TestComposePrintsTheFile(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/compose": `{"number":3,"compose_file":"name: shop\nservices:\n  web:\n    build:\n      context: .\n"}`}}
+	code, stdout, stderr := runCLI(t, api, "compose", "shop")
+	if code != 0 || stdout != "name: shop\nservices:\n  web:\n    build:\n      context: .\n" || stderr != "" {
+		t.Errorf("compose: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, stderr = runCLI(t, &fakeAPI{conflicts: map[string]string{"GET /api/v1/apps/shop/compose": "no_compose_file"}}, "compose", "--app", "shop")
+	if code != 1 || stdout != "" || stderr == "" {
+		t.Errorf("without a file: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
 
@@ -190,7 +209,7 @@ func TestDestructiveCommandsAsk(t *testing.T) {
 		{"integrations", "rm", "tailscale"},
 		{"sql", "--app", "shop", "--write", "DROP TABLE orders"},
 	} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "GET /api/v1/integrations": `{"tailscale":true}`}}
+		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","domains":["blog.example.com"],"hook":true,"repo":"me/shop"}}`, "GET /api/v1/apps/shop/env": `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`, "GET /api/v1/integrations": `{"tailscale":{"servers":[{"server":"server-1"}],"missing_on":[]}}`}}
 		code, _, stderr := runCLI(t, api, args...)
 		// The big ones want the name, the others --yes.
 		if code != 1 || (!strings.Contains(stderr, "--yes") && !strings.Contains(stderr, "--confirm "+args[2])) {
@@ -325,36 +344,19 @@ func TestSQLWrite(t *testing.T) {
 	}
 }
 
-func TestEnvPullAsksBeforeReplacing(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := os.WriteFile(".env", []byte("LOCAL=1\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"secret"}}`}}
-	code, _, stderr := runCLI(t, api, "env", "pull", "--app", "shop")
-	body, _ := os.ReadFile(".env")
-	if code != 1 || !strings.Contains(stderr, "--yes") || string(body) != "LOCAL=1\n" {
-		t.Errorf("without --yes: code %d, stderr %q, .env %q", code, stderr, body)
-	}
-	code, _, stderr = runCLI(t, api, "env", "pull", "--app", "shop", "--yes")
-	body, _ = os.ReadFile(".env")
-	if code != 0 || string(body) != "KEY=secret\n" {
-		t.Errorf("with --yes: code %d, stderr %q, .env %q", code, stderr, body)
-	}
-}
-
-// env push shows the keys that change, asks, and replaces them all.
+// env push shows which keys it adds, replaces and removes, without the
+// values there are, asks, and replaces them all.
 func TestEnvPush(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.WriteFile(".env", []byte("KEEP=1\nEDIT=new\nNEW=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/apps/shop/env": `{"items":{"KEEP":"1","EDIT":"old","GONE":"secret"}}`,
-		"PUT /api/v1/apps/shop/env": `{"items":{"KEEP":"1","EDIT":"new","NEW":"1"},"added":["NEW"],"changed":["EDIT"],"removed":["GONE"]}`,
+		"GET /api/v1/apps/shop/env": `{"items":[{"key":"EDIT","updated_at":"2026-01-02T03:04:05Z"},{"key":"GONE","updated_at":"2026-01-02T03:04:05Z"},{"key":"KEEP","updated_at":"2026-01-02T03:04:05Z"}]}`,
+		"PUT /api/v1/apps/shop/env": `{"items":[],"added":["NEW"],"replaced":["EDIT","KEEP"],"removed":["GONE"]}`,
 	}}
 	code, stdout, stderr := runCLI(t, api, "env", "push", "--app", "shop")
-	if code != 1 || !strings.Contains(stderr, "--yes") || !strings.Contains(stdout, "- GONE") || strings.Contains(stdout, "secret") {
+	if code != 1 || !strings.Contains(stderr, "--yes") || !strings.Contains(stdout, "- GONE") || !strings.Contains(stdout, "~ KEEP") || strings.Contains(stdout, "new") {
 		t.Errorf("without --yes: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	code, stdout, stderr = runCLI(t, api, "env", "push", "--app", "shop", "--yes")
@@ -394,9 +396,9 @@ func TestLinkUnreadableRepo(t *testing.T) {
 // TestNothingChanged: a change the app had already says so and follows no
 // restart.
 func TestNothingChanged(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","protected":false},"deploys":[]}`}}
-	code, stdout, stderr := runCLI(t, api, "protect", "off", "shop")
-	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "public again") || api.seen("DELETE") {
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","password":false},"deploys":[]}`}}
+	code, stdout, stderr := runCLI(t, api, "password", "off", "shop")
+	if code != 0 || !strings.Contains(stdout, "Nothing changed") || strings.Contains(stdout, "no password now") || api.seen("DELETE") {
 		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
@@ -405,17 +407,17 @@ func TestNothingChanged(t *testing.T) {
 // or --yes, and change nothing without them.
 func TestAsksFirst(t *testing.T) {
 	answers := map[string]string{
-		"GET /api/v1/apps/shop":                         `{"app":{"name":"shop","protected":true,"hook":true},"deploys":[]}`,
+		"GET /api/v1/apps/shop":                         `{"app":{"name":"shop","password":true,"hook":true},"deploys":[]}`,
 		"GET /api/v1/servers":                           `{"items":[{"id":"s1","name":"web-1"}]}`,
 		"GET /api/v1/workspaces":                        `{"items":[{"workspace":{"slug":"acme"}}]}`,
 		"GET /api/v1/workspaces/acme":                   `{"workspace":{"name":"Acme","slug":"acme"},"invitations":[{"id":"i1","email":"ada@example.com","role":"member"}]}`,
-		"DELETE /api/v1/apps/shop/protection":           `{"app":{"name":"shop"},"deploy":null,"unchanged":true}`,
+		"DELETE /api/v1/apps/shop/password":             `{"app":{"name":"shop"},"unchanged":true}`,
 		"DELETE /api/v1/apps/shop/hook":                 ``,
 		"DELETE /api/v1/workspaces/acme/invitations/i1": ``,
 		"PUT /api/v1/servers/s1/security":               `{"id":"s1","name":"web-1","firewall":true}`,
 	}
 	for _, args := range [][]string{
-		{"protect", "off", "shop"},
+		{"password", "off", "shop"},
 		{"hook", "off", "shop"},
 		{"rollback", "shop"},
 		{"team", "revoke", "ada@example.com"},
@@ -436,7 +438,7 @@ func TestAsksFirst(t *testing.T) {
 
 // TestEnvRmMissing: a key the app does not have is not removed and says so.
 func TestEnvRmMissing(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"x"}}`, "PATCH /api/v1/apps/shop/env": `{"items":{}}`}}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":[{"key":"KEY","updated_at":"2026-01-02T03:04:05Z"}]}`, "PATCH /api/v1/apps/shop/env": `{"items":[]}`}}
 	code, stdout, stderr := runCLI(t, api, "env", "rm", "--app", "shop", "NOT_THERE", "--yes")
 	if code != 0 || !strings.Contains(stdout, "shop has no NOT_THERE") || strings.Contains(stdout, "Removed") || api.seen("PATCH") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
@@ -492,36 +494,23 @@ func TestOneNamePerCommand(t *testing.T) {
 
 // moin apps shop shows one app; a typo says what exists.
 func TestAppsWithANameShowsTheApp(t *testing.T) {
-	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":[],"repo":"me/shop","branch":"main","auto_deploy":true,"deploy_from":"github"},
-		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"],"config":{"domains":["shop.example.com"]}}}]}`
+	detail := `{"app":{"name":"shop","server_name":"web-1","latest_number":2,"latest_status":"succeeded","live_number":2,"domains":["shop.example.com"],"repo":"me/shop","branch":"main","auto_deploy":true,"deploy_from":"github"},
+		"deploys":[{"number":2,"status":"succeeded","detected":{"kind":"compose","service":"web","port":8080,"databases":[],"domains":["shop.example.com"]}}]}`
 	for _, args := range [][]string{{"apps", "shop"}} {
 		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": detail}}
 		code, stdout, stderr := runCLI(t, api, args...)
-		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com, from compose.yml") || !strings.Contains(stdout, "deploy from GitHub, me/shop, branch main, every push") || !strings.Contains(stdout, "v2") {
+		if code != 0 || !strings.Contains(stdout, "web-1") || !strings.Contains(stdout, "shop.example.com") || !strings.Contains(stdout, "deploy from GitHub, me/shop, branch main, every push") || !strings.Contains(stdout, "v2") {
 			t.Errorf("%v: code %d, stdout %q, stderr %q", args, code, stdout, stderr)
 		}
+	}
+	// An app that follows no repo and has no hook says so.
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","server_name":"web-1"},"deploys":[]}`}}
+	if code, stdout, _ := runCLI(t, api, "apps", "shop"); code != 0 || !strings.Contains(stdout, "deploy from") || !strings.Contains(stdout, "neither yet") {
+		t.Errorf("neither: code %d, stdout %q", code, stdout)
 	}
 	code, _, stderr := runCLI(t, &fakeAPI{}, "apps", "lsit")
 	if code != 1 || !strings.Contains(stderr, `No app or command "lsit"`) || !strings.Contains(stderr, "moin apps") {
 		t.Errorf("typo: code %d, stderr %q", code, stderr)
-	}
-}
-
-// Domains that x-moin sets are marked, with where to change them.
-func TestDomainsFromComposeAreMarked(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/domains": `{"items":[{"domain":"shop.example.com","canonical":true,"advice":"A record to 203.0.113.5","found":[],"points":false,"from_compose":true}]}`}}
-	code, stdout, stderr := runCLI(t, api, "domains", "shop")
-	if code != 0 || strings.Contains(stdout, "no domains yet") || !strings.Contains(stdout, "canonical, from compose.yml") || !strings.Contains(stdout, "change them there and deploy") {
-		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
-	}
-}
-
-func TestEnvPullCountsOneVar(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/env": `{"items":{"KEY":"secret"}}`}}
-	file := filepath.Join(t.TempDir(), "shop.env")
-	code, stdout, stderr := runCLI(t, api, "env", "pull", "--app", "shop", file)
-	if code != 0 || !strings.Contains(stdout, "Wrote 1 env var of shop") {
-		t.Errorf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
 
@@ -587,7 +576,7 @@ func TestActivityFilterThatMatchesNothing(t *testing.T) {
 }
 
 func TestIntegrationsRmWithoutAKeyChangesNothing(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/integrations": `{"cloudflare":true,"tailscale":false}`}}
+	api := &fakeAPI{answers: map[string]string{"GET /api/v1/integrations": `{"cloudflare":true,"tailscale":{"servers":[],"missing_on":["server-1"]}}`}}
 	code, stdout, stderr := runCLI(t, api, "integrations", "rm", "tailscale", "--yes")
 	if code != 0 || !strings.Contains(stdout, "Nothing changed: no tailscale key is stored.") || api.seen("PUT") || api.seen("PATCH") {
 		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
@@ -603,12 +592,118 @@ func TestStartRunningApp(t *testing.T) {
 	}
 }
 
+// inPushedRepo changes into a repo whose one commit is on GitHub, as git
+// push leaves it, and returns the commit.
+func inPushedRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "compose.yml"), []byte("services: {}\n"), 0o644)
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"remote", "add", "origin", "https://github.com/me/shop.git"},
+		{"add", "."},
+		{"-c", "user.name=Ada", "-c", "user.email=ada@example.com", "commit", "-q", "-m", "first"},
+		{"update-ref", "refs/remotes/origin/main", "HEAD"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Skipf("git %v: %v %s", args, err, out)
+		}
+	}
+	commit, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	return strings.TrimSpace(string(commit))
+}
+
 // A deploy to an app that does not exist asks first: a script without
 // --yes changes nothing, so a typo makes no new app.
 func TestDeployAsksBeforeCreatingAnApp(t *testing.T) {
+	inPushedRepo(t)
 	api := &fakeAPI{answers: map[string]string{}}
-	code, _, stderr := runCLI(t, api, "deploy", "--dir", t.TempDir(), "my-apps")
-	if code == 0 || !strings.Contains(stderr, "my-apps does not exist") || api.seen("POST") {
+	code, _, stderr := runCLI(t, api, "deploy", "my-apps")
+	if code == 0 || !strings.Contains(stderr, "my-apps does not exist") || api.seen("POST") || api.seen("PUT") {
 		t.Errorf("code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}
+
+// moin deploy in a folder deploys its pushed commit from GitHub: an app
+// that follows no repo yet is linked to it first, without deploys on push.
+func TestDeployDeploysThePushedCommit(t *testing.T) {
+	commit := inPushedRepo(t)
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps/shop":                  `{"app":{"name":"shop"},"deploys":[]}`,
+		"PUT /api/v1/apps/shop/repo":             `{"name":"shop","repo":"me/shop","branch":"main"}`,
+		"POST /api/v1/apps/shop/deploys":         `{"number":1,"status":"running","commit":"` + commit + `","commit_message":"first"}`,
+		"GET /api/v1/apps/shop/deploys/1/events": "event: done\ndata: {\"number\":1,\"status\":\"succeeded\"}\n\n",
+	}}
+	code, stdout, stderr := runCLI(t, api, "deploy", "--detach", "shop")
+	if code != 0 || !strings.Contains(stdout, "shop follows me/shop@main") || !api.seen(`PUT /api/v1/apps/shop/repo {"auto_deploy":false,"branch":"","repo":"me/shop"}`) || !api.seen(`POST /api/v1/apps/shop/deploys {"ref":"`+commit+`"}`) {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+
+	// An app that follows another repo deploys nothing from this one.
+	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop": `{"app":{"name":"shop","repo":"me/other","branch":"main"},"deploys":[]}`}}
+	code, _, stderr = runCLI(t, api, "deploy", "shop")
+	if code == 0 || !strings.Contains(stderr, "follows me/other, and this folder is me/shop") || api.seen("POST") || api.seen("PUT") {
+		t.Errorf("another repo: code %d, stderr %q, requests %v", code, stderr, api.requests)
+	}
+}
+
+// moin deploy without an app deploys the one app that follows the repo of
+// the folder, whatever the folder is called.
+func TestDeployTakesTheAppThatFollowsTheRepo(t *testing.T) {
+	commit := inPushedRepo(t)
+	api := &fakeAPI{answers: map[string]string{
+		"GET /api/v1/apps":                       `{"items":[{"name":"other","repo":"me/other"},{"name":"blog","repo":"Me/Shop"}]}`,
+		"GET /api/v1/apps/blog":                  `{"app":{"name":"blog","repo":"me/shop","branch":"main"},"deploys":[]}`,
+		"POST /api/v1/apps/blog/deploys":         `{"number":1,"status":"running","commit":"` + commit + `"}`,
+		"GET /api/v1/apps/blog/deploys/1/events": "event: done\ndata: {\"number\":1,\"status\":\"succeeded\"}\n\n",
+	}}
+	code, stdout, stderr := runCLI(t, api, "deploy", "--detach")
+	if code != 0 || !api.seen(`POST /api/v1/apps/blog/deploys {"ref":"`+commit+`"}`) {
+		t.Errorf("code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	// Every command finds it the same way.
+	api.answers["GET /api/v1/apps/blog/logs?tail=100"] = `{"lines":[]}`
+	runCLI(t, api, "logs")
+	if !api.seen("GET /api/v1/apps/blog/logs") {
+		t.Errorf("logs: requests %v", api.requests)
+	}
+	// Two apps that follow the repo: no command guesses.
+	api.answers["GET /api/v1/apps"] = `{"items":[{"name":"blog","repo":"me/shop"},{"name":"blog-staging","repo":"me/shop"}]}`
+	code, _, stderr = runCLI(t, api, "deploy", "--detach")
+	if code == 0 || !strings.Contains(stderr, "name one with --app") {
+		t.Errorf("two apps: code %d, stderr %q", code, stderr)
+	}
+}
+
+// TestPassword: moin shows the app's password once, when it makes the
+// app or turns the password on without one, never again. The instant
+// address has no password of its own.
+func TestPassword(t *testing.T) {
+	api := &fakeAPI{answers: map[string]string{"POST /api/v1/apps": `{"app":{"name":"shop","server_name":"server-1","password":true},"password":"pw-shown-once"}`}}
+	code, stdout, stderr := runCLI(t, api, "apps", "add", "--server", "server-1", "shop")
+	if code != 0 || !strings.Contains(stdout, "pw-shown-once") || !strings.Contains(stdout, "only this once") || !strings.Contains(stdout, "user moin") || !strings.Contains(stdout, "Added shop on server-1") {
+		t.Fatalf("add: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	api = &fakeAPI{answers: map[string]string{"PUT /api/v1/apps/shop/password": `{"app":{"name":"shop","password":true},"password":"pw-new"}`}}
+	code, stdout, stderr = runCLI(t, api, "password", "shop")
+	if code != 0 || !strings.Contains(stdout, "pw-new") || !strings.Contains(stdout, "instant address of shop") {
+		t.Fatalf("password: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if code, _, _ := runCLI(t, &fakeAPI{}, "protect", "shop"); code == 0 {
+		t.Error("protect still runs")
+	}
+	api = &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/instant": `{"url":"https://shop.203-0-113-7.sslip.io","provider":"sslip.io"}`}}
+	code, stdout, stderr = runCLI(t, api, "instant", "shop")
+	if code != 0 || !strings.Contains(stdout, "sslip.io") || strings.Contains(stdout, "password") {
+		t.Fatalf("show: code %d, stdout %q, stderr %q, requests %v", code, stdout, stderr, api.requests)
+	}
+	for _, gone := range []string{"password", "open", "protect"} {
+		if code, _, _ := runCLI(t, &fakeAPI{}, "instant", gone, "shop"); code == 0 {
+			t.Errorf("instant %s still runs", gone)
+		}
 	}
 }

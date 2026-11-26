@@ -44,8 +44,9 @@ fi
 # Docker and security updates.
 sh "$deploy/setup.sh" >/dev/null
 
-# The settings, once. Email and a bucket can follow; until then sign-in
-# links go to the log, and the hub keeps no backup of itself. Settings
+# The settings, once. Email, the GitHub App and a bucket can follow; until
+# then mail goes to the log, the admin signs in with a recovery key, and the
+# hub keeps no backup of itself. Settings
 # from before the rename, in /etc/moin-controlplane, move with update.sh.
 if [ ! -f "$env" ] && [ ! -d /etc/moin-controlplane ]; then
 	(
@@ -58,11 +59,11 @@ SAME_SERVER=true
 # The first address is the admin; only these may sign up.
 ADMIN_EMAILS=$email
 DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
-# Seals the secrets of your apps. Keep a copy somewhere safe.
+# Seals the Cloudflare token and alert targets the hub uses. Keep a copy.
 SECRETS_KEY=$(openssl rand -base64 32)
 # The proxy on this server is a Docker container.
 TRUSTED_PROXY_CIDRS=172.16.0.0/12
-# Email for sign-in links and invitations: Cloudflare Email Sending.
+# Email for invitations and alerts: Cloudflare Email Sending.
 EMAIL_FROM=moin@$domain
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_API_TOKEN=
@@ -105,12 +106,9 @@ done
 sh update.sh
 
 echo
-echo "moin runs. Open https://$domain and sign in with $email."
-if grep -q '^CLOUDFLARE_ACCOUNT_ID=$' "$env"; then
-	echo "Email is not set up yet, so here is a sign-in link, good for a few minutes:"
-	docker compose -f compose.yml exec -T hub ./main sign-in-link
-	echo "Later: docker compose -f $deploy/compose.yml exec hub ./main sign-in-link"
-fi
+echo "moin runs at https://$domain. Sign in as $email with this key:"
+docker compose -f compose.yml exec -T hub ./main recovery-key "$email"
+echo "A new key: docker compose -f $deploy/compose.yml exec hub ./main recovery-key $email"
 missing=$(grep -E '^(CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_API_TOKEN|S3_BUCKET|S3_ACCESS_KEY|S3_SECRET_KEY)=$' "$env" | cut -d= -f1 | tr '\n' ' ')
 if [ -n "$missing" ]; then
 	echo "Still empty in $env: $missing"

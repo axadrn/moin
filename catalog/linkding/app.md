@@ -1,0 +1,14 @@
+---
+name: linkding
+pitch: Bookmarks you keep. Tagged, searchable, yours.
+category: Productivity
+website: "https://linkding.link"
+source: github.com/sissbruecker/linkding
+license: MIT
+image: sissbruecker/linkding
+database: sqlite
+login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
+logo: https://github.com/sissbruecker/linkding/blob/HEAD/assets/logo.svg
+---
+
+Save links from the browser extension, tag them and find them again in a second. Archive pages so they never disappear. Everything in SQLite on your server.

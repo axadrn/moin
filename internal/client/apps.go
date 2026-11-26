@@ -1,10 +1,7 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,13 +25,15 @@ type App struct {
 	LiveNumber   int      `json:"live_number"`
 	Domains      []string `json:"domains"`
 	Canonical    string   `json:"canonical"`
-	Protected    bool     `json:"protected"`
+	// Password says the app's password is on: its domains and its
+	// instant address ask for it.
+	Password bool `json:"password"`
 	// ServiceDomains are the domains of the app's other services.
 	ServiceDomains map[string][]string `json:"service_domains"`
-	// Instant is the instant address, "" when the app has none.
+	// Instant is the instant address, "" when the app has none. The
+	// app's password guards it like the app's domains.
 	Instant         string `json:"instant"`
 	InstantProvider string `json:"instant_provider"`
-	InstantOpen     bool   `json:"instant_open"`
 	Stopped         bool   `json:"stopped"`
 	// ChangesWaiting counts the changes saved since the live deploy
 	// started; a restart applies them. Only App fills it.
@@ -46,18 +45,26 @@ type App struct {
 	Pinned     bool   `json:"pinned"`
 	// Hook says the app has a deploy hook URL.
 	Hook bool `json:"hook"`
-	// DeployFrom is folder, github or ci: where new versions come from.
+	// DeployFrom is ci or github, where new versions come from; empty
+	// while neither is set up.
 	DeployFrom string `json:"deploy_from"`
 	// HookImage is the image the hook deploys new tags of, the one running
 	// now; empty while the app runs from its repo.
 	HookImage string `json:"hook_image"`
-	// Bucket is the bucket the app uploads and backs up to; empty follows
+	// Bucket is the bucket the app backs up to; empty follows
 	// the workspace's default.
 	Bucket string `json:"bucket"`
 	// Catalog is the catalog entry the app was installed from; empty for
 	// an app of your own.
 	Catalog   string    `json:"catalog"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// CreatedApp is the answer of AddApp: the app and its password, user
+// moin, the one time moin shows it.
+type CreatedApp struct {
+	App      App    `json:"app"`
+	Password string `json:"password"`
 }
 
 // Deploy is one version of an app, v12.
@@ -115,8 +122,8 @@ func (c *Client) RenameApp(ctx context.Context, app, name string) (App, error) {
 }
 
 // AddApp creates an app on a server.
-func (c *Client) AddApp(ctx context.Context, name, server string) (App, error) {
-	var response App
+func (c *Client) AddApp(ctx context.Context, name, server string) (CreatedApp, error) {
+	var response CreatedApp
 	err := c.do(ctx, http.MethodPost, "/api/v1/apps", map[string]string{"name": name, "server": server}, &response)
 	return response, err
 }
@@ -125,37 +132,6 @@ func (c *Client) AddApp(ctx context.Context, name, server string) (App, error) {
 // confirm is the app's name, typed out; the hub checks it.
 func (c *Client) RemoveApp(ctx context.Context, app, confirm string) error {
 	return c.do(ctx, http.MethodDelete, appPath(app)+"?confirm="+url.QueryEscape(confirm), nil, nil)
-}
-
-// Deploy uploads a gzipped source tarball and starts a deploy.
-func (c *Client) Deploy(ctx context.Context, app string, source []byte) (Deploy, error) {
-	var upload struct {
-		Upload string `json:"upload"`
-		URL    string `json:"url"`
-	}
-	err := c.do(ctx, http.MethodPost, appPath(app, "uploads"), map[string]any{}, &upload)
-	if err != nil {
-		return Deploy{}, err
-	}
-	// The source goes straight into the user's bucket; moin only signed the
-	// link.
-	request, err := http.NewRequestWithContext(ctx, http.MethodPut, upload.URL, bytes.NewReader(source))
-	if err != nil {
-		return Deploy{}, err
-	}
-	request.ContentLength = int64(len(source))
-	response, err := c.http.Do(request)
-	if err != nil {
-		return Deploy{}, fmt.Errorf("cannot reach your bucket: %v", errors.Unwrap(err))
-	}
-	response.Body.Close()
-	if response.StatusCode >= 300 {
-		return Deploy{}, fmt.Errorf("upload to your bucket: %s", response.Status)
-	}
-	sum := sha256.Sum256(source)
-	var deploy Deploy
-	err = c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"upload": upload.Upload, "sha256": hex.EncodeToString(sum[:])}, &deploy)
-	return deploy, err
 }
 
 // Rollback starts an earlier successful release again. Number 0 is the one
@@ -184,14 +160,19 @@ func (c *Client) GetDeploy(ctx context.Context, app string, number int) (Deploy,
 // deploy once it ended.
 func (c *Client) FollowDeploy(ctx context.Context, app string, number int, line func(string)) (Deploy, error) {
 	var done Deploy
-	err := c.stream(ctx, appPath(app, "deploys", strconv.Itoa(number), "events"), func(event string, data []byte) error {
+	// The hub sends every line from the first on each stream, so after a
+	// reconnect the lines already printed are skipped.
+	printed, index := 0, 0
+	follow := func(event string, data []byte) error {
 		switch event {
 		case "line":
 			var payload struct {
 				Line string `json:"line"`
 			}
 			err := json.Unmarshal(data, &payload)
-			if err == nil {
+			index++
+			if err == nil && index > printed {
+				printed++
 				line(payload.Line)
 			}
 			return err
@@ -203,7 +184,13 @@ func (c *Client) FollowDeploy(ctx context.Context, app string, number int, line 
 			return errStreamDone
 		}
 		return nil
-	})
+	}
+	path := appPath(app, "deploys", strconv.Itoa(number), "events")
+	err := c.streamRequest(ctx, http.MethodGet, path, nil, follow)
+	for errors.Is(err, errStreamReconnect) && ctx.Err() == nil {
+		index = 0
+		err = c.streamRequest(ctx, http.MethodGet, path, nil, follow)
+	}
 	if err == nil && done.Number == 0 {
 		return done, fmt.Errorf("the deploy stream ended early")
 	}
@@ -219,26 +206,49 @@ func (c *Client) Logs(ctx context.Context, app string, tail int) ([]string, erro
 	return response.Lines, err
 }
 
-// Env returns the env vars of an app.
-func (c *Client) Env(ctx context.Context, app string) (map[string]string, error) {
+// ComposeFile is the compose file of an app's live deploy, YAML: everything
+// moin runs for it, without a secret value.
+type ComposeFile struct {
+	Number int    `json:"number"`
+	Text   string `json:"compose_file"`
+}
+
+// ComposeFile answers the compose file of the app's live deploy.
+func (c *Client) ComposeFile(ctx context.Context, app string) (ComposeFile, error) {
+	var response ComposeFile
+	err := c.do(ctx, http.MethodGet, appPath(app, "compose"), nil, &response)
+	return response, err
+}
+
+// EnvVar is an env var of an app: its key and when it changed. Values are
+// write-only: the hub never answers one.
+type EnvVar struct {
+	Key       string    `json:"key"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Env lists the env vars of an app, by key.
+func (c *Client) Env(ctx context.Context, app string) ([]EnvVar, error) {
 	var response struct {
-		Items map[string]string `json:"items"`
+		Items []EnvVar `json:"items"`
 	}
 	err := c.do(ctx, http.MethodGet, appPath(app, "env"), nil, &response)
 	return response.Items, err
 }
 
-// SetEnv sets and removes env vars. The next deploy gets them.
-func (c *Client) SetEnv(ctx context.Context, app string, set map[string]string, unset []string) (map[string]string, error) {
+// SetEnv sets and removes env vars and answers them all, by key. The next
+// deploy gets them.
+func (c *Client) SetEnv(ctx context.Context, app string, set map[string]string, unset []string) ([]EnvVar, error) {
 	var response struct {
-		Items map[string]string `json:"items"`
+		Items []EnvVar `json:"items"`
 	}
 	err := c.do(ctx, http.MethodPatch, appPath(app, "env"), map[string]any{"set": set, "unset": unset}, &response)
 	return response.Items, err
 }
 
 // ReplaceEnv makes env every env var of the app, like one .env file: keys
-// not in env are removed. It answers what changed. The next deploy gets them.
+// not in env are removed. It answers what changed, by key. The next deploy
+// gets them.
 func (c *Client) ReplaceEnv(ctx context.Context, app string, env map[string]string) (dotenv.Change, error) {
 	var response dotenv.Change
 	err := c.do(ctx, http.MethodPut, appPath(app, "env"), map[string]any{"env": env}, &response)
@@ -277,9 +287,11 @@ func (a App) Status() string {
 }
 
 // DeployImage deploys an image built elsewhere as the app's main service.
-func (c *Client) DeployImage(ctx context.Context, app, image string) (Deploy, error) {
+// An app that follows a GitHub repo takes the compose file of ref there;
+// an empty ref is the linked branch.
+func (c *Client) DeployImage(ctx context.Context, app, image, ref string) (Deploy, error) {
 	var response Deploy
-	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"image": image}, &response)
+	err := c.do(ctx, http.MethodPost, appPath(app, "deploys"), map[string]string{"image": image, "ref": ref}, &response)
 	return response, err
 }
 
@@ -305,11 +317,20 @@ func (c *Client) RemoveDeployHook(ctx context.Context, app string) error {
 	return c.do(ctx, http.MethodDelete, appPath(app, "hook"), nil, nil)
 }
 
-// Registry is a registry login without its password.
+// Registry is a registry login without its password, which only the
+// servers keep: Servers say which, MissingOn which do not.
 type Registry struct {
-	Host      string    `json:"host"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
+	Host      string     `json:"host"`
+	Username  string     `json:"username"`
+	CreatedAt time.Time  `json:"created_at"`
+	Servers   []SecretOn `json:"servers"`
+	MissingOn []string   `json:"missing_on"`
+}
+
+// SecretOn is a server that keeps a secret, and since when.
+type SecretOn struct {
+	Server    string    `json:"server"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Registries lists the workspace's registry logins.
@@ -321,9 +342,10 @@ func (c *Client) Registries(ctx context.Context) ([]Registry, error) {
 	return response.Items, err
 }
 
-// SetRegistry stores the login for a registry host.
-func (c *Client) SetRegistry(ctx context.Context, host, username, password string) error {
-	return c.do(ctx, http.MethodPut, "/api/v1/registries/"+url.PathEscape(host), map[string]string{"username": username, "password": password}, nil)
+// SetRegistry hands the login for a registry host to a server, which
+// keeps it; an empty server is the workspace's only one.
+func (c *Client) SetRegistry(ctx context.Context, host, username, password, server string) error {
+	return c.do(ctx, http.MethodPut, "/api/v1/registries/"+url.PathEscape(host), map[string]string{"username": username, "password": password, "server": server}, nil)
 }
 
 // RemoveRegistry deletes the login for a registry host.
@@ -341,18 +363,15 @@ type DomainCheck struct {
 	Advice    string   `json:"advice"`
 	Found     []string `json:"found"`
 	Points    bool     `json:"points"`
-	// FromCompose says x-moin.domains in compose.yml sets the domain.
-	FromCompose bool `json:"from_compose"`
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
 	Service string `json:"service"`
 }
 
-// Change is the app after a change of the domains, and the deploy that applies it,
-// nil when the next deploy will.
+// Change is the app after a change of its settings. Saving never restarts
+// it: the next restart, start or deploy applies the change.
 type Change struct {
-	App    App     `json:"app"`
-	Deploy *Deploy `json:"deploy"`
+	App App `json:"app"`
 	// Unchanged is set when the app had it so already; nothing restarts.
 	Unchanged bool `json:"unchanged"`
 }
@@ -382,50 +401,44 @@ func (c *Client) SetServiceDomains(ctx context.Context, app, service string, dom
 
 // Instant is the app's instant address, or why it has none.
 type Instant struct {
-	URL         string `json:"url"`
-	Provider    string `json:"provider"`
-	Reason      string `json:"reason"`
-	Open        bool   `json:"open"`
-	User        string `json:"user"`
-	Password    string `json:"password"`
-	OwnPassword bool   `json:"own_password"`
+	URL      string `json:"url"`
+	Provider string `json:"provider"`
+	Reason   string `json:"reason"`
 }
 
-// Instant reports the app's instant address; show includes the password
-// moin made for it.
-func (c *Client) Instant(ctx context.Context, app string, show bool) (Instant, error) {
+// Instant reports the app's instant address.
+func (c *Client) Instant(ctx context.Context, app string) (Instant, error) {
 	var response Instant
-	path := appPath(app, "instant")
-	if show {
-		path += "?show=true"
-	}
-	err := c.do(ctx, http.MethodGet, path, nil, &response)
+	err := c.do(ctx, http.MethodGet, appPath(app, "instant"), nil, &response)
 	return response, err
 }
 
-// SetInstant picks the provider of the instant address or off ("" keeps
-// it), and whether it is open (nil keeps it).
-func (c *Client) SetInstant(ctx context.Context, app, provider string, open *bool) (Change, error) {
+// SetInstant picks the provider of the instant address, or off.
+func (c *Client) SetInstant(ctx context.Context, app, provider string) (Change, error) {
 	var response Change
-	body := map[string]any{"provider": provider}
-	if open != nil {
-		body["open"] = *open
-	}
-	err := c.do(ctx, http.MethodPut, appPath(app, "instant"), body, &response)
+	err := c.do(ctx, http.MethodPut, appPath(app, "instant"), map[string]string{"provider": provider}, &response)
 	return response, err
 }
 
-// SetProtection puts a password in front of the app.
-func (c *Client) SetProtection(ctx context.Context, app, username, password string) (Change, error) {
-	var response Change
-	err := c.do(ctx, http.MethodPut, appPath(app, "protection"), map[string]string{"username": username, "password": password}, &response)
+// NewPassword is the answer of SetPassword: the change, and the password
+// moin made when none was given, the one time it shows it.
+type NewPassword struct {
+	Change
+	Password string `json:"password"`
+}
+
+// SetPassword turns the app's password on for its domains and its
+// instant address. An empty password lets moin make one.
+func (c *Client) SetPassword(ctx context.Context, app, username, password string) (NewPassword, error) {
+	var response NewPassword
+	err := c.do(ctx, http.MethodPut, appPath(app, "password"), map[string]string{"username": username, "password": password}, &response)
 	return response, err
 }
 
-// RemoveProtection takes the password away.
-func (c *Client) RemoveProtection(ctx context.Context, app string) (Change, error) {
+// RemovePassword turns the app's password off.
+func (c *Client) RemovePassword(ctx context.Context, app string) (Change, error) {
 	var response Change
-	err := c.do(ctx, http.MethodDelete, appPath(app, "protection"), nil, &response)
+	err := c.do(ctx, http.MethodDelete, appPath(app, "password"), nil, &response)
 	return response, err
 }
 

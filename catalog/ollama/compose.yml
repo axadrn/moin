@@ -1,0 +1,6 @@
+services:
+  web:
+    image: ollama/ollama:${VERSION}
+    expose: ["11434"]
+    volumes:
+      - ./data:/root/.ollama

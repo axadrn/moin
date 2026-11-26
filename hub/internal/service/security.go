@@ -18,7 +18,7 @@ import (
 
 var (
 	ErrNoCloudflare    = errors.New("connect Cloudflare in Settings, Integrations first")
-	ErrNoTailscale     = errors.New("connect Tailscale in Settings, Integrations first, or join the server to your tailnet by hand")
+	ErrNoTailscale     = errors.New("this server has no Tailscale key: enter one for it in Settings, Integrations, or join the server to your tailnet by hand")
 	ErrSSH             = errors.New("SSH is tailscale, everyone or off")
 	ErrCloudflareToken = errors.New("Cloudflare does not accept this token: it needs Account Cloudflare Tunnel Edit and Zone DNS Edit")
 	ErrTailscaleKey    = errors.New("a Tailscale auth key starts with tskey-")
@@ -30,32 +30,60 @@ var (
 // SetCloudflare turns on tunnels through this Cloudflare API client.
 func (s *AppService) SetCloudflare(cloudflare *Cloudflare) { s.cloudflare = cloudflare }
 
-// Integrations says which keys a user stored, without the keys.
+// Integrations says which keys a workspace has, without the keys: the
+// Cloudflare API token, which the hub keeps and uses itself, and the
+// servers that keep a Tailscale key.
 type Integrations struct {
 	Cloudflare        bool
 	CloudflareAccount string
-	Tailscale         bool
+	Tailscale         SecretServers
 }
 
-// Integrations returns which keys the user stored.
+// Integrations returns which keys the workspace has.
 func (s *AppService) Integrations(workspaceID string) (Integrations, error) {
 	stored, err := s.servers.servers.Integrations(workspaceID)
 	if err != nil {
 		return Integrations{}, err
 	}
-	return Integrations{Cloudflare: stored.CloudflareToken != "", CloudflareAccount: stored.CloudflareAccount, Tailscale: stored.TailscaleKey != ""}, nil
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return Integrations{}, err
+	}
+	return Integrations{Cloudflare: stored.CloudflareToken != "", CloudflareAccount: stored.CloudflareAccount, Tailscale: index.of(protocol.SecretTailscale)}, nil
 }
 
-// SetIntegrations stores the Cloudflare API token and the Tailscale auth
-// key. Nil keeps a key, empty removes it. A Cloudflare token is checked
-// against the API first.
-func (s *AppService) SetIntegrations(ctx context.Context, actor Actor, cloudflareToken, tailscaleKey *string) error {
-	stored, err := s.servers.servers.Integrations(actor.WorkspaceID)
-	if err != nil {
-		return err
+// IntegrationsInput changes the keys of a workspace. Nil keeps a key,
+// empty removes it. The Tailscale key goes to TailscaleServer, empty for
+// the workspace's only server, which keeps it; the hub never does.
+type IntegrationsInput struct {
+	CloudflareToken *string
+	TailscaleKey    *string
+	TailscaleServer string
+}
+
+// SetIntegrations stores the Cloudflare API token, checked against the API
+// first, and hands a server the Tailscale auth key.
+func (s *AppService) SetIntegrations(ctx context.Context, actor Actor, input IntegrationsInput) error {
+	if input.TailscaleKey != nil {
+		key := strings.TrimSpace(*input.TailscaleKey)
+		if key != "" && !strings.HasPrefix(key, "tskey-") {
+			return ErrTailscaleKey
+		}
+		server, err := s.servers.secretServer(actor.WorkspaceID, input.TailscaleServer)
+		if err != nil {
+			return err
+		}
+		if err := s.servers.setSecret(ctx, server, protocol.SecretTailscale, key); err != nil {
+			return err
+		}
+		s.servers.record(actor, "integration.tailscale", "integration", "tailscale", map[string]string{"on": strconv.FormatBool(key != ""), "server": server.Name})
 	}
-	if cloudflareToken != nil {
-		token := strings.TrimSpace(*cloudflareToken)
+	if input.CloudflareToken != nil {
+		stored, err := s.servers.servers.Integrations(actor.WorkspaceID)
+		if err != nil {
+			return err
+		}
+		token := strings.TrimSpace(*input.CloudflareToken)
 		if token == "" && stored.CloudflareToken != "" {
 			if err := s.noTunnels(actor.WorkspaceID); err != nil {
 				return err
@@ -70,27 +98,11 @@ func (s *AppService) SetIntegrations(ctx context.Context, actor Actor, cloudflar
 			}
 			stored.CloudflareToken, stored.CloudflareAccount = s.box.Seal(token, actor.WorkspaceID+"/cloudflare"), account
 		}
-	}
-	if tailscaleKey != nil {
-		key := strings.TrimSpace(*tailscaleKey)
-		stored.TailscaleKey = ""
-		if key != "" {
-			if !strings.HasPrefix(key, "tskey-") {
-				return ErrTailscaleKey
-			}
-			stored.TailscaleKey = s.box.Seal(key, actor.WorkspaceID+"/tailscale")
+		stored.WorkspaceID, stored.UpdatedAt = actor.WorkspaceID, s.now().UTC()
+		if err := s.servers.servers.SetIntegrations(stored); err != nil {
+			return err
 		}
-	}
-	stored.WorkspaceID, stored.UpdatedAt = actor.WorkspaceID, s.now().UTC()
-	err = s.servers.servers.SetIntegrations(stored)
-	if err != nil {
-		return err
-	}
-	if cloudflareToken != nil {
 		s.servers.record(actor, "integration.cloudflare", "integration", "cloudflare", map[string]string{"on": strconv.FormatBool(stored.CloudflareToken != "")})
-	}
-	if tailscaleKey != nil {
-		s.servers.record(actor, "integration.tailscale", "integration", "tailscale", map[string]string{"on": strconv.FormatBool(stored.TailscaleKey != "")})
 	}
 	s.servers.notify(actor.WorkspaceID)
 	return nil
@@ -163,12 +175,12 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	if err != nil {
 		return nil, err
 	}
-	stored, err := s.servers.servers.Integrations(actor.WorkspaceID)
+	index, err := s.servers.secretsIndex(actor.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
 	report := SecurityReport(*server)
-	if input.SSH == protocol.SSHTailscale && server.SSH != protocol.SSHTailscale && stored.TailscaleKey == "" && (report == nil || report.TailscaleIP == "") {
+	if input.SSH == protocol.SSHTailscale && server.SSH != protocol.SSHTailscale && !index.has(server.ID, protocol.SecretTailscale) && (report == nil || report.TailscaleIP == "") {
 		return nil, ErrNoTailscale
 	}
 	before := securityDetails(server)
@@ -178,8 +190,9 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 	defer cancel()
 	// Only turning the tunnel on points the domains at it. SSH and the
 	// firewall have nothing to do with DNS, and a domain added later is
-	// pointed when it is added.
-	turnedOn := input.Tunnel && server.TunnelID == ""
+	// pointed when it is added. Its token goes to the server at once, so
+	// an offline server gets its tunnel when it connects.
+	turnedOn := input.Tunnel && server.TunnelID == "" && s.servers.Online(server.ID)
 	if turnedOn {
 		if err := s.openTunnel(cloudflare, server); err != nil {
 			return nil, err
@@ -194,7 +207,7 @@ func (s *AppService) SetServerSecurity(ctx context.Context, actor Actor, idOrNam
 		if err != nil {
 			slog.Warn("delete tunnel failed", "server_id", server.ID, "error", err)
 		}
-		server.TunnelID, server.TunnelToken = "", ""
+		server.TunnelID = ""
 	}
 	server.Tunnel, server.SSH, server.Firewall = input.Tunnel, input.SSH, input.Firewall
 	err = s.servers.servers.SetSecurity(*server)
@@ -234,7 +247,9 @@ func onOff(on bool) string {
 }
 
 // openTunnel creates the server's tunnel in Cloudflare with the
-// workspace's token and keeps its token, sealed, on the server.
+// workspace's token and hands its token to the server, which keeps it:
+// the hub keeps only the tunnel's ID. A server that does not take the
+// token gets no tunnel.
 func (s *AppService) openTunnel(ctx context.Context, server *model.Server) error {
 	token, account, err := s.cloudflareToken(server.WorkspaceID)
 	if err != nil {
@@ -244,7 +259,14 @@ func (s *AppService) openTunnel(ctx context.Context, server *model.Server) error
 	if err != nil {
 		return fmt.Errorf("create the tunnel: %w", err)
 	}
-	server.TunnelID, server.TunnelToken = tunnelID, s.box.Seal(tunnelToken, server.ID+"/tunnel")
+	err = s.servers.setSecret(ctx, server, protocol.SecretTunnel, tunnelToken)
+	if err != nil {
+		if deleteErr := s.cloudflare.DeleteTunnel(ctx, token, account, tunnelID); deleteErr != nil {
+			slog.Warn("delete tunnel failed", "server_id", server.ID, "error", deleteErr)
+		}
+		return fmt.Errorf("hand the tunnel token to the server: %w", err)
+	}
+	server.TunnelID = tunnelID
 	return nil
 }
 
@@ -276,32 +298,25 @@ func (s *AppService) receiveSecurity(serverID string, report protocol.ServerConf
 	s.servers.notify(server.WorkspaceID)
 }
 
-// serverConfig is what the daemon of a server gets.
-func (s *AppService) serverConfig(server *model.Server) protocol.ServerConfig {
-	config := protocol.ServerConfig{SSH: server.SSH, SSHOnTailscale: server.SSH == protocol.SSHTailscale, Firewall: server.Firewall}
-	if server.Tunnel && server.TunnelToken != "" {
-		token, err := s.box.Open(server.TunnelToken, server.ID+"/tunnel")
-		if err == nil {
-			config.TunnelToken = token
-		}
-	}
-	stored, err := s.servers.servers.Integrations(server.WorkspaceID)
-	if err == nil && stored.TailscaleKey != "" && server.SSH == protocol.SSHTailscale {
-		key, err := s.box.Open(stored.TailscaleKey, server.WorkspaceID+"/tailscale")
-		if err == nil {
-			config.TailscaleKey = key
-		}
-	}
-	return config
+// serverConfig is what the daemon of a server gets: no secret, the
+// server keeps those.
+func serverConfig(server *model.Server) protocol.ServerConfig {
+	return protocol.ServerConfig{SSH: server.SSH, SSHOnTailscale: server.SSH == protocol.SSHTailscale, Firewall: server.Firewall}
 }
 
 // configureServer sends the server config and stores what the daemon set
-// up.
+// up. A server without a tunnel forgets the token of the one it had, such
+// as one turned off while it was offline.
 func (s *AppService) configureServer(ctx context.Context, server *model.Server, problems []string) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
+	if index, err := s.servers.secretsIndex(server.WorkspaceID); err == nil && server.TunnelID == "" && index.has(server.ID, protocol.SecretTunnel) {
+		if err := s.servers.setSecret(ctx, server, protocol.SecretTunnel, ""); err != nil {
+			problems = append(problems, "Cloudflare Tunnel: the server keeps the old token: "+err.Error())
+		}
+	}
 	var report protocol.ServerConfigResult
-	err := s.servers.Request(ctx, server.ID, protocol.TypeServerConfig, s.serverConfig(server), &report)
+	err := s.servers.Request(ctx, server.ID, protocol.TypeServerConfig, serverConfig(server), &report)
 	if err != nil {
 		report = protocol.ServerConfigResult{Problems: []string{"the daemon could not apply it: " + err.Error()}}
 	}
@@ -360,8 +375,7 @@ func leftOver(report *protocol.ServerConfigResult) bool {
 	return report != nil && (report.Firewall || report.Proxy == "tunnel" || report.SSH == protocol.SSHTailscale || report.SSH == protocol.SSHOff)
 }
 
-// tunnelHosts are the domains of every app on a server: the ones set
-// through moin and the ones x-moin set in the live deploy.
+// tunnelHosts are the domains of every app on a server.
 func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 	apps, err := s.apps.ListByWorkspaceID(server.WorkspaceID)
 	if err != nil {
@@ -372,16 +386,7 @@ func (s *AppService) tunnelHosts(server *model.Server) ([]string, error) {
 		if app.ServerID != server.ID {
 			continue
 		}
-		domains := app.DomainList()
-		if app.LiveNumber > 0 {
-			deploy, err := s.apps.Deploy(app.ID, app.LiveNumber)
-			if err == nil {
-				detected := Detected(*deploy)
-				if detected != nil && len(detected.Domains) > 0 {
-					domains = detected.Domains
-				}
-			}
-		}
+		domains, _ := app.DomainsOf("")
 		for _, domain := range domains {
 			if !slices.Contains(hosts, domain) {
 				hosts = append(hosts, domain)

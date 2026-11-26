@@ -96,6 +96,7 @@ func (h *CatalogHandler) Show(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.NotFound())
 		return
 	}
+	view.Similar = catalog.Similar(h.catalog.Store().Entries(), view.Entry, 4)
 	render(w, r, pages.CatalogApp(view, h.appURL))
 }
 
@@ -154,10 +155,11 @@ func (h *CatalogHandler) InstallPage(w http.ResponseWriter, r *http.Request) {
 	render(w, r, pages.CatalogInstall(pages.CatalogInstallView{App: view, Servers: servers}))
 }
 
-// Install installs the catalog app and opens its page, which follows the
-// deploy.
+// Install installs the catalog app. The form shows the secrets moin made
+// for it once instead, the password of its instant address and those the
+// first sign-in needs, with a link to its page, which follows the deploy.
 func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
-	app, _, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
+	app, _, login, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
 		Slug: r.PathValue("slug"), Version: r.FormValue("version"), Server: r.FormValue("server"),
 		Name: r.FormValue("name"), Domain: r.FormValue("domain"),
 	})
@@ -169,7 +171,11 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 		failed(w, r, "Not installed", err, map[string]string{"name": "catalog-name", "domain": "catalog-domain", "version": "catalog-version"})
 		return
 	}
-	redirect(w, r, ctxkeys.AppBasePath(r.Context())+"/apps/"+app.Link(), http.StatusSeeOther)
+	appPath := ctxkeys.AppBasePath(r.Context()) + "/apps/" + app.Link()
+	// Shown in place of the form: a new page would lose it.
+	w.Header().Set("HX-Retarget", "#catalog-install-form")
+	w.Header().Set("HX-Reswap", "outerHTML")
+	render(w, r, pages.CatalogInstalled(appPath, login, app.NewPassword))
 }
 
 // UpdatePanel is the catalog panel of an installed app; nothing for an
@@ -180,15 +186,15 @@ func (h *CatalogHandler) UpdatePanel(w http.ResponseWriter, r *http.Request) {
 	if err != nil || app == nil {
 		return
 	}
-	if view := catalogUpdate(h.catalog, workspace.ID, app); view != nil {
+	if view := catalogUpdate(h.catalog, app); view != nil {
 		render(w, r, pages.CatalogUpdate(*view))
 	}
 }
 
 // catalogUpdate is the update card of an app from the catalog, nil for
 // any other app.
-func catalogUpdate(catalogs *service.CatalogService, workspaceID string, app *model.App) *pages.CatalogUpdateView {
-	info, ok := catalogs.Info(workspaceID, app)
+func catalogUpdate(catalogs *service.CatalogService, app *model.App) *pages.CatalogUpdateView {
+	info, ok := catalogs.Info(app)
 	if !ok {
 		return nil
 	}

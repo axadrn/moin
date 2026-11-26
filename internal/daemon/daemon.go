@@ -89,11 +89,15 @@ func saveState(dir string, state State) error {
 	return os.WriteFile(filepath.Join(dir, stateFile), body, 0o600)
 }
 
-// Hello describes this daemon and server, with its rules.
-func Hello() protocol.Hello {
+// Hello describes this daemon and server, with its rules, the names of the
+// secrets it keeps in dir and the env keys of its apps: never a value.
+func Hello(dir string) protocol.Hello {
 	hostname, _ := os.Hostname()
 	rules, _ := LoadRules(RulesFile())
+	file, _ := loadServerFile(dir)
 	return protocol.Hello{
+		Secrets:         file.secretNames(),
+		Env:             newApps(dir, nil).allEnvKeys(),
 		Rules:           rules,
 		ProtocolVersion: protocol.Version,
 		DaemonVersion:   build.Version,
@@ -112,7 +116,7 @@ func Register(ctx context.Context, dir, baseURL, installToken string) (State, er
 	ctx, cancel := context.WithTimeout(ctx, registerLimit)
 	defer cancel()
 
-	body, err := json.Marshal(protocol.RegisterRequest{Hello: Hello()})
+	body, err := json.Marshal(protocol.RegisterRequest{Hello: Hello(dir)})
 	if err != nil {
 		return State{}, err
 	}
@@ -162,7 +166,10 @@ func Run(ctx context.Context, dir string, state State) error {
 	daemon.apps.backups = daemon.backups
 	daemon.security = newSecurity(dir, daemon.apps)
 	daemon.apps.proxyMode = daemon.security.proxyMode
+	daemon.apps.registryLogin = daemon.security.registryLogin
 	daemon.updater = newUpdater(state.URL)
+	// Before the hub hears from the daemon, so hello names the env keys.
+	daemon.apps.moveOldEnvs()
 	// A restore the daemon stopped in the middle of ends first: its
 	// switch is one step, so the database is whole; the app runs again
 	// and the result says which database it runs on.
@@ -228,9 +235,16 @@ type runner struct {
 	pending map[string]protocol.DeployDone
 }
 
-// send writes a message to the current session. Log lines without a session
-// are dropped; a deploy.done waits for the next session.
+// send writes a message to the current session and what it answers to the
+// log. Log lines without a session are dropped; a deploy.done waits for
+// the next session.
 func (r *runner) send(messageType protocol.MessageType, requestID string, data any) {
+	logAnswer(messageType, requestID, data)
+	r.write(messageType, requestID, data)
+}
+
+// write is send without the log, for a deploy.done sent again.
+func (r *runner) write(messageType protocol.MessageType, requestID string, data any) {
 	message, err := protocol.NewMessage(messageType, data)
 	if err != nil {
 		slog.Error("encode message failed", "type", messageType, "error", err)
@@ -281,7 +295,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 	defer conn.CloseNow()
 	conn.SetReadLimit(1 << 20)
 
-	hello, err := protocol.NewMessage(protocol.TypeHello, Hello())
+	hello, err := protocol.NewMessage(protocol.TypeHello, Hello(r.dir))
 	if err != nil {
 		return true, err
 	}
@@ -306,7 +320,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 		r.mu.Unlock()
 	}()
 	for _, done := range pending {
-		r.send(protocol.TypeDeployDone, "", done)
+		r.write(protocol.TypeDeployDone, "", done)
 	}
 	// The hub learns at once what is on the server and what was put back.
 	go r.reportSecurity(r.security.keep(ctx))
@@ -324,6 +338,7 @@ func (r *runner) session(ctx context.Context) (connected bool, err error) {
 
 // handle runs one request from the hub.
 func (r *runner) handle(ctx context.Context, message protocol.Message) {
+	logAsked(message)
 	// A rules file with a mistake refuses everything until it is fixed.
 	rules, err := LoadRules(r.rulesFile)
 	if err != nil {
@@ -354,6 +369,18 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 		r.serverConfig(ctx, message, rules)
 	case protocol.TypeBackupConfig:
 		r.backupConfig(message, rules)
+	case protocol.TypeEnvSet:
+		answer(r, message, protocol.TypeEnvResult, func(request protocol.EnvSet) (any, error) {
+			return r.apps.setEnv(request)
+		})
+	case protocol.TypeSecretSet:
+		r.secretSet(message, rules)
+	case protocol.TypeBucketSet:
+		r.bucketSet(ctx, message, rules)
+	case protocol.TypeBackupLink:
+		answer(r, message, protocol.TypeBackupLinkResult, func(request protocol.BackupLink) (any, error) {
+			return r.backupLink(ctx, request, rules)
+		})
 	case protocol.TypeBackupList:
 		answer(r, message, protocol.TypeBackupsResult, func(request protocol.BackupRequest) (any, error) {
 			return r.backups.list(ctx, request), nil
@@ -376,7 +403,7 @@ func (r *runner) handle(ctx context.Context, message protocol.Message) {
 	case protocol.TypeDaemonURL:
 		r.daemonURL(ctx, message)
 	case protocol.TypeDaemonUpdate:
-		r.daemonUpdate(ctx, message, rules)
+		r.daemonUpdate(ctx, message)
 	default:
 		if message.RequestID != "" {
 			r.fail(message, fmt.Errorf("this daemon does not know %q: update it", message.Type))

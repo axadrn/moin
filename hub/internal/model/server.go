@@ -20,16 +20,15 @@ type Server struct {
 	// separated: its IPv4 and IPv6 next to the one it connected from.
 	Addresses  string     `db:"addresses"`
 	LastSeenAt *time.Time `db:"last_seen_at"`
-	// Tunnel carries app traffic through a Cloudflare Tunnel; TunnelToken
-	// is sealed. SSH is who SSH answers: protocol.SSHTailscale,
+	// Tunnel carries app traffic through a Cloudflare Tunnel, whose token
+	// only the server keeps. SSH is who SSH answers: protocol.SSHTailscale,
 	// SSHEveryone or SSHOff. Firewall drops every other inbound
 	// connection. Security is the daemon's last report, as JSON.
-	Tunnel      bool   `db:"tunnel"`
-	TunnelID    string `db:"tunnel_id"`
-	TunnelToken string `db:"tunnel_token"`
-	SSH         string `db:"ssh"`
-	Firewall    bool   `db:"firewall"`
-	Security    string `db:"security"`
+	Tunnel   bool   `db:"tunnel"`
+	TunnelID string `db:"tunnel_id"`
+	SSH      string `db:"ssh"`
+	Firewall bool   `db:"firewall"`
+	Security string `db:"security"`
 	// Rules are the server's own rules for moin, as JSON; see
 	// service.ServerRules.
 	Rules     string    `db:"rules"`
@@ -37,13 +36,23 @@ type Server struct {
 	Online    bool      `db:"-"`
 }
 
-// Integrations are a user's keys for Cloudflare and Tailscale, sealed.
+// Integrations are a workspace's Cloudflare API token, sealed: the hub
+// uses it itself. The Tailscale key lives only on the servers
+// (ServerSecret).
 type Integrations struct {
 	WorkspaceID       string    `db:"workspace_id"`
 	CloudflareToken   string    `db:"cloudflare_token"`
 	CloudflareAccount string    `db:"cloudflare_account"`
-	TailscaleKey      string    `db:"tailscale_key"`
 	UpdatedAt         time.Time `db:"updated_at"`
+}
+
+// ServerSecret says that a server keeps a secret in its server.json, and
+// since when: Name is protocol.BucketSecret, RegistrySecret,
+// SecretTailscale or SecretTunnel. The value is never in the hub.
+type ServerSecret struct {
+	ServerID  string    `db:"server_id"`
+	Name      string    `db:"name"`
+	UpdatedAt time.Time `db:"updated_at"`
 }
 
 // DaemonUpdate is a daemon update that is not done yet: the note the hub

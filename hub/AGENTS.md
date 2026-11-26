@@ -15,6 +15,7 @@ moin stands on its own: it started from a starter template, but it follows only 
 - Go 1.26 with the standard library `net/http` router.
 - templ, htmx 4.0, vanilla JavaScript, and moin UI (`../ui`): native CSS, no build step.
 - sqlx with raw SQL and SQLite.
+- go-webauthn for passkeys: every WebAuthn check is security code we never write ourselves. The browser side uses only the native `PublicKeyCredential` JSON methods.
 - Cloudflare Email Sending for transactional email. Without credentials in development, emails go to the log.
 - Stripe for subscription billing.
 - S3-compatible object storage.
@@ -50,20 +51,21 @@ Tenant-owned data is scoped by `workspace_id`. Load workspace context with `midd
 
 - JSON handlers live in `internal/api` and call the same services as the HTML handlers. Never duplicate a rule or a permission check there.
 - Every route under `/api/v1` is listed once in `api.Routes` in `internal/api/routes.go`. `internal/api/openapi.yaml` documents each one and is served at `GET /api/v1/openapi.yaml`. `internal/api/openapi_test.go` fails when the two drift.
-- Clients sign in with an `/api/v1/auth` endpoint and send the returned token as `Authorization: Bearer <token>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`.
-- Personal API tokens (`pat_...`) let scripts and AI agents act for a user. Each route in `api.Routes` declares `TokenRead`, `TokenWrite` or the default `TokenDenied`. Open a new route to tokens only when an AI agent should reach it, and update its `apiTokenAuth` entry in `openapi.yaml`. A token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
+- People sign in in the browser, with GitHub through the moin GitHub App or with a passkey, and get the `session_token` cookie; a hub without the app takes a recovery key from `./main recovery-key <email>`. Cookie requests that change state send `X-CSRF-Token` with the token from `GET /api/v1/csrf`. The CLI, the TUI and AI agents are connections (`at_...` access tokens from `POST /api/v1/auth/token`); CI sends a CI token (`pat_...`); both as `Authorization: Bearer`. A session is never a bearer token.
+- A connection is a client the person let in from the browser (`service.ConnectionService`), a CI token one made by hand (`service.CITokenService`); both act with rights: read, deploy, env, delete, servers (`model.Rights`). Each route in `api.Routes` names the right it needs, or `api.NoToken` to keep them out; that table is the one place, and `content/docs/reference/rights.md` and the `bearerAuth` roles in `openapi.yaml` are checked against it. A right a handler can only tell from the body, like SQL that writes, is asked with `api.Allowed`. Rights never add to a role. A connection or CI token is bound to one workspace; `WithWorkspaceAPI` answers 404 for every other workspace.
+- `POST /api/v1/auth/token`, `/api/v1/auth/revoke` and `/api/v1/auth/register` follow OAuth (RFC 6749, 8628, 7009, 7591): forms in (registration is JSON), `{"error", "error_description"}` out, not the envelope.
 - Every non-2xx answer is the envelope `{"error":{"code","message","fields"}}`. Codes are stable lowercase snake case. `fields` appears only for `validation_failed`.
-- `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards.
-- Magic link, password reset, and email change emails link to the HTML routes under `APP_URL/auth/...`. An API client that receives the token another way calls the matching `/api/v1/auth/.../verify` endpoint.
+- `CORS_ALLOWED_ORIGINS` lists the browser origins that may call `/api/` with credentials. Origins match exactly, without wildcards. The public OAuth endpoints (the `/.well-known` metadata, `/api/v1/auth/register` and `/api/v1/auth/token`) answer every origin with `*` and never with credentials, for MCP clients in a web page (`middleware.CORS`).
+- Email change emails link to the HTML route under `APP_URL/auth/...`. An API client that receives the token another way calls `POST /api/v1/auth/email-change/verify`.
 
 ## MCP server
 
 - `internal/mcp` serves an MCP server at `/mcp`: Streamable HTTP, stateless, `POST` only. It is a third transport next to the HTML handlers and the JSON API. Tools call the same services and never repeat a rule or a permission check.
-- AI agents authenticate with a personal API token as `Authorization: Bearer pat_...`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, revoked or expired tokens.
-- Built-in tools: `whoami`, `list_workspaces`, `get_workspace`, `list_activity`, `get_billing`, `invite_member`, `rename_workspace`. `registerTools` in `internal/mcp/tools.go` registers them in one place.
-- Wrap a tool body in `mcp.Read` when it only reads and in `mcp.Write` when it changes data. A read-only token gets `insufficient_scope` from a `Write` tool. Workspace tools take an optional `workspace` slug, default to the token's workspace, and answer `not_found` for every other workspace.
+- AI agents authenticate as a connection or with a CI token, `Authorization: Bearer`. `/mcp` answers 401 `unauthenticated` to sessions, cookies, and unknown, removed or expired tokens, and 403 `app_only` to a CI token for one app.
+- Built-in tools: `whoami`, `list_workspaces`, `get_workspace`, `list_activity`, `get_billing`, `invite_member`, `resend_invitation`, `revoke_invitation`, `rename_workspace`, `set_email_alerts`. `registerTools` in `internal/mcp/tools.go` registers them in one place.
+- Register every tool with `mcp.Add` and the right it needs. Add ends the description with "Needs the deploy right.", puts the rights in the tool's `_meta`, and answers `missing_right` without them. The Right column of the tools table in `content/docs/guides/mcp.md` is checked against it. Workspace tools take an optional `workspace` slug, default to the connection's workspace, and answer `not_found` for every other workspace.
 - Failed calls return the JSON API error envelope as the tool result. Return service errors unchanged; `api.ErrorFor` maps them to the same codes as the API. Use `mcp.InvalidField` for a `validation_failed` field.
-- Tools are a curated list for AI agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, passwords, or email.
+- Tools are a curated list for AI agents, not a copy of the JSON API. Never add tools for checkout, billing management, account or workspace deletion, role changes, member removal, admin, impersonation, sign-in, or email.
 - `mcp.Services` in `internal/mcp/server.go` lists the services tools may call. Add your service there and pass it where `internal/routes/routes.go` calls `mcp.NewServer`.
 - Raise `mcp.Version` when the tool list or a tool's schema changes.
 
@@ -75,10 +77,10 @@ type nameInput struct {
 }
 
 func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
+	mcp.Add(server, &mcpsdk.Tool{
 		Name:        "set_display_name",
-		Description: "Changes the display name of the user this token acts for. Needs a token with read and write access.",
-	}, mcp.Write(func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
+		Description: "Changes the display name of the user this connection acts for.",
+	}, model.RightServers, func(ctx context.Context, caller mcp.Caller, input nameInput) (api.UserResponse, error) {
 		err := validation.ValidateName(input.Name)
 		if err != nil {
 			return api.UserResponse{}, mcp.InvalidField("name", api.FieldMessage(err))
@@ -88,18 +90,13 @@ func registerNameTool(server *mcpsdk.Server, services mcp.Services) {
 			return api.UserResponse{}, err
 		}
 		return api.UserResponse{User: api.NewUser(user)}, nil
-	}))
+	})
 }
 ```
 
-The description tells the AI agent what the tool returns or changes and which scope it needs. Add a test with the in-memory transport like `TestAddedToolRunsWithTheTokenScopes`.
+The description tells the AI agent what the tool returns or changes; Add says the right. Add a test with the in-memory transport like `TestAddedToolRunsWithItsRight`.
 
-Client setup, with a token from Settings, Tokens and the public URL of this server:
-
-- Claude Code: `claude mcp add --transport http app https://example.com/mcp --header "Authorization: Bearer pat_..."`
-- Claude Desktop and claude.ai: Customize, Connectors, Add custom connector, the `/mcp` URL, Authentication "No sign in", and the request header `Authorization: Bearer pat_...`. Claude connects from Anthropic's cloud, so the URL must be public. Request headers on custom connectors are in beta and not available to every organization yet. For a local server, or when your organization has no Request headers field, use the local `mcp-remote` bridge: run `npx mcp-remote http://localhost:8090/mcp --header Authorization:${AUTH_HEADER}` from `claude_desktop_config.json` with `AUTH_HEADER` set to `Bearer pat_...`.
-- Cursor: `.cursor/mcp.json` with `"mcpServers": {"app": {"url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${env:API_TOKEN}"}}}`.
-- VS Code: `.vscode/mcp.json` with `"servers": {"app": {"type": "http", "url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${input:api-token}"}}}` and a `promptString` input `api-token` with `"password": true`.
+Client setup: the `/mcp` URL is all an MCP client needs. Its 401 carries `WWW-Authenticate: Bearer resource_metadata=...` (RFC 9728), the client finds the hub's OAuth metadata (RFC 8414), registers itself (RFC 7591, `POST /api/v1/auth/register`), sends the person to `/oauth/authorize`, the approval page of `moin login`, and trades the code with PKCE S256 at `POST /api/v1/auth/token`. The result is a connection like any other, bound to `/mcp` (`service.OAuthService`). Clients without OAuth send a CI token as `Authorization: Bearer pat_...`. The steps per client are in `content/docs/guides/mcp.md`.
 
 ## Commands
 
@@ -127,10 +124,9 @@ Client setup, with a token from Settings, Tokens and the public URL of this serv
 - `internal/service/mailer` contains the selected mail adapter.
 - `internal/service/workspace.go` owns workspaces, roles, invitations, seats, and the activity.
 - `internal/storage` and `internal/service/file.go` own file storage.
-- `content/` is embedded in the binary (`content.FS`), read from disk in development. `content/docs` and `internal/service/docs.go` contain the Docs module.
+- `content/` is embedded in the binary (`content.FS`), read from disk in development. The catalog is `catalog/` at the root of the repo, built into the hub and the daemon. `content/docs` and `internal/service/docs.go` contain the Docs module.
 - `/ui` is the website of moin UI: `ui/docs` and `ui/blocks` at the repo root, `internal/handler/ui.go`, `internal/ui/pages/ui.templ`.
 
 ## Included product surface
-This project includes authentication with email links and passwords, email verification, password recovery, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.
-OAuth provider: GitHub.
+This project includes sign-in with GitHub through the moin GitHub App and with passkeys, one-time recovery keys from a server command, revocable database sessions, account settings, legal pages, SEO basics, security headers, structured logging, subscription billing, provider-agnostic product access, and a global operator Admin panel.
 It also includes workspaces with Owner, Admin, and Member roles, invitations, seat limits, workspace billing, and the activity.

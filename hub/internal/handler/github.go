@@ -145,7 +145,7 @@ func (h *AppsHandler) branches(r *http.Request, repo string) []string {
 
 // LinkRepo makes the app follow the chosen repo and branch.
 func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
-	app, err := h.apps.LinkRepo(r.Context(), actor(r), r.PathValue("app"), r.FormValue("repo"), r.FormValue("branch"), r.FormValue("auto_deploy") == "1")
+	app, err := h.apps.LinkRepo(r.Context(), actor(r), r.PathValue("app"), r.FormValue("repo"), r.FormValue("branch"), new(r.FormValue("auto_deploy") == "1"))
 	switch {
 	case errors.Is(err, service.ErrRepo):
 		fieldRefused(w, r, "Repo not linked", "link-repo", errorMessage(err))
@@ -160,6 +160,9 @@ func (h *AppsHandler) LinkRepo(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		answerDone(w, r, "Deploy v"+strconv.Itoa(deploy.Number)+" started", "It builds "+app.Branch+" at "+shortSHA(deploy.CommitSHA)+" from GitHub.")
+	case app.DeployHookHash != nil:
+		h.renderSource(w, r)
+		answerDone(w, r, app.Repo+" linked", "CI deploys take its compose.yml now.")
 	default:
 		h.renderSource(w, r)
 		answerDone(w, r, app.Repo+" linked", "Deploy a branch, tag or commit below.")

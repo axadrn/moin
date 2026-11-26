@@ -2,6 +2,8 @@ package pages
 
 import (
 	"github.com/axadrn/moin/hub/internal/ui/components"
+	"maps"
+	"slices"
 	"strconv"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
@@ -35,27 +38,65 @@ templ Catalog(view CatalogView) {
 }
 
 // CatalogApp is the public page of one catalog app: what it is, the way
-// to deploy it, its links and its versions.
+// to deploy it, what moin backs up, its compose.yml, its links, its
+// versions and the apps like it. All of it comes from its folder in the
+// catalog, so nothing on the page is kept by hand.
 templ CatalogApp(view CatalogEntryView, appURL string) {
 	@layouts.Home(layouts.SEOProps{
-		Title:       "Self-host " + view.Entry.Name + " on your own server",
-		Description: view.Entry.Name + ": " + view.Entry.Pitch + " Install it on your own server in one click, with its database backed up to your bucket.",
+		Title:       "Self-host " + view.Entry.Name + " with Docker Compose",
+		Description: catalogDescription(view.Entry),
 		Path:        "/catalog/" + view.Entry.Slug,
 	}) {
 		@templ.Raw(catalogJSONLD(view, appURL+"/catalog/"+view.Entry.Slug))
 		<main class="moin-page moin-content">
 			@catalogHead(components.Back{Label: "Catalog", Href: "/catalog"}, view.Entry)
-			if note := view.Entry.DatabaseNote(); note != "" {
-				<p class="moin-small moin-muted">
-					<span data-catalog-database-note>{ note }</span>
-				</p>
+			if view.Entry.Body != "" {
+				@components.Prose(components.ProseProps{HTML: string(view.Entry.Body)})
 			}
 			<div>
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/catalog/" + view.Entry.Slug + "/install", Attrs: templ.Attributes{"data-catalog-install": true}}) {
 					Deploy with { brand.Name }
 				}
 			</div>
+			if view.Entry.Database != "" {
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>Backups</h2>
+					</div>
+					<p class="moin-text" data-catalog-backup>
+						{ catalogBackup(view.Entry) }
+						<a href="/docs/guides/backups" class="moin-link moin-foreground" data-quiet>How backups work</a>
+					</p>
+				</section>
+			}
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>compose.yml</h2>
+				</div>
+				<p class="moin-text moin-muted">What { brand.Name } deploys. It fills in every <code>{ "${…}" }</code> on install: the version you pick, and new secrets.</p>
+				@components.Code(components.CodeProps{ID: "catalog-compose", Text: string(view.Entry.Compose)})
+			</section>
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>From the terminal</h2>
+				</div>
+				@components.Code(components.CodeProps{ID: "catalog-command", Text: brand.Name + " catalog install " + view.Entry.Slug + " --server web-1"})
+			</section>
 			@catalogFacts(view)
+			if len(view.Similar) > 0 {
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>More { view.Entry.Category }</h2>
+					</div>
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							for _, app := range view.Similar {
+								@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: components.AppIcon(components.AppIconProps{Name: app.Name, Initial: model.Initial(app.Name), Logo: catalogLogo(app)}), Name: app.Name, Note: app.Pitch})
+							}
+						}
+					}
+				</section>
+			}
 		</main>
 	}
 }
@@ -127,6 +168,43 @@ templ CatalogInstall(view CatalogInstallView) {
 			@catalogFacts(view.App)
 		}
 	}
+}
+
+// CatalogInstalled takes the place of the install form: the secrets the
+// first sign-in needs that moin made, such as ADMIN_PASSWORD, and the
+// app's password, which its domains and its instant address ask for.
+// moin keeps neither, so this is the one time they are shown.
+templ CatalogInstalled(appPath string, login map[string]string, password string) {
+	<div id="catalog-install-form" class="moin-stack" data-gap="4" data-catalog-installed>
+		<p class="moin-text">
+			Installed.
+			if password != "" {
+				The app's domains and its instant address ask for the password of { service.PasswordUser } until you turn it off.
+			}
+			Keep this in your password manager now: it is shown only this once.
+		</p>
+		@components.List() {
+			if password != "" {
+				@components.Item(components.ItemProps{}) {
+					<span class="moin-mono moin-text">{ service.PasswordUser }</span>
+					<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ password }</span>
+					@copyButton(password, "", "Copy the password")
+				}
+			}
+			for _, key := range slices.Sorted(maps.Keys(login)) {
+				@components.Item(components.ItemProps{}) {
+					<span class="moin-mono moin-text">{ key }</span>
+					<span class="moin-fill moin-truncate moin-mono moin-text" data-catalog-secret>{ login[key] }</span>
+					@copyButton(login[key], "", "Copy "+key)
+				}
+			}
+		}
+		<div class="moin-row" data-end>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: appPath}) {
+				Open the app
+			}
+		</div>
+	</div>
 }
 
 // ---------------------------------------------------------------- parts
@@ -298,7 +376,7 @@ templ CatalogUpdate(view CatalogUpdateView) {
 					hx-post={ basePath + "/apps/" + view.App.Link() + "/update" }
 					hx-swap="none"
 					hx-disable="find button[type='submit']"
-					hx-confirm={ "Deploy " + view.Entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one. moin backs it up first." }
+					hx-confirm={ catalogUpdateConfirm(view.Entry) }
 				>
 					@components.CSRF()
 					<div class="moin-width" style="--width:9rem">
@@ -329,6 +407,25 @@ func catalogUpdateLine(view CatalogUpdateView) string {
 }
 
 // catalogUpdateKind makes Update the primary button: it is the thing to do.
+// catalogDescription is what search shows for an app's page. It promises
+// a backup only for an app whose database moin backs up.
+func catalogDescription(entry catalog.Entry) string {
+	if entry.BackedUp() {
+		return entry.Name + ": " + entry.Pitch + " One click to your own server. Its database backed up."
+	}
+	return entry.Name + ": " + entry.Pitch + " One click to your own server, with HTTPS."
+}
+
+// catalogUpdateConfirm asks before a version switch. It names the copy
+// before the deploy only for an app whose database moin backs up.
+func catalogUpdateConfirm(entry catalog.Entry) string {
+	confirm := "Deploy " + entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one."
+	if entry.BackedUp() {
+		confirm += " " + brand.Name + " backs it up first."
+	}
+	return confirm
+}
+
 func catalogUpdateKind(newer bool) components.Kind {
 	if newer {
 		return components.Primary

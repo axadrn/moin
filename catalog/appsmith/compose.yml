@@ -1,0 +1,6 @@
+services:
+  web:
+    image: appsmith/appsmith-ce:${VERSION}
+    expose: ["80"]
+    volumes:
+      - ./data:/appsmith-stacks

@@ -3,6 +3,8 @@ package daemon
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,7 +36,7 @@ func TestRailpackPrepareArgs(t *testing.T) {
 }
 
 // TestRailpackSecrets: the build gets each env name as a secret read from
-// the environment, and a hash that changes with the values; no value lands
+// the env file, and a hash that changes with the values; no value lands
 // in the compose file.
 func TestRailpackSecrets(t *testing.T) {
 	build := func(env map[string]string) (map[string]any, string) {
@@ -66,9 +68,6 @@ func TestRailpackSecrets(t *testing.T) {
 	if len(config) != 0 || service["build"] != nil {
 		t.Errorf("a service not built gets no secrets: %v %v", config, service)
 	}
-	if env := buildEnv(map[string]string{"B": "2", "A": "1", "x y": "3"}); strings.Join(env, ",") != "A=1,B=2" {
-		t.Errorf("buildEnv = %v", env)
-	}
 }
 
 // TestRailpackSummary reads what prepare wrote about the repo.
@@ -96,9 +95,9 @@ func TestRailpackSummary(t *testing.T) {
 func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 	base := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": "/src", "args": map[string]any{"cache-key": "moin-shop"}}}}}
 	file := t.TempDir() + "/compose.json"
-	start := protocol.DeployStart{App: "shop", Number: 3, Env: map[string]string{"TOKEN": "abc"}}
+	start := protocol.DeployStart{App: "shop", Number: 3}
 	for kind, wantSecrets := range map[string]bool{"railpack": true, "dockerfile": false} {
-		err := finish(&release{start: start, config: base, detected: protocol.Detected{Kind: kind, Service: "web", Port: 8080}, composeFile: file})
+		err := finish(&release{start: start, config: base, detected: protocol.Detected{Kind: kind, Service: "web", Port: 8080}, composeJSON: file, envFile: "/state/apps/shop/app.env", env: map[string]string{"TOKEN": "abc"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,8 +111,51 @@ func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 		if has != wantSecrets {
 			t.Errorf("%s: secrets = %v:\n%s", kind, has, body)
 		}
-		if !strings.Contains(string(body), `"TOKEN": "abc"`) {
-			t.Errorf("%s: the container lacks its env:\n%s", kind, body)
+		if !strings.Contains(string(body), `"/state/apps/shop/app.env"`) || strings.Contains(string(body), `"abc"`) {
+			t.Errorf("%s: the container does not read its env file, or a value is in the file:\n%s", kind, body)
 		}
+	}
+}
+
+// TestSetEnv: env.set writes values compose reads back exactly into the
+// app's one env file, 0600; a key it removes is gone from the file.
+func TestSetEnv(t *testing.T) {
+	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	_, err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "OLD": "gone"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := a.setEnv(protocol.EnvSet{App: "shop", Remove: []string{"OLD"}})
+	if err != nil || !slices.Equal(keys.Keys, []string{"A", "B"}) || keys.ChangedAt.IsZero() {
+		t.Fatalf("keys = %+v, %v", keys, err)
+	}
+	// Hello names the keys of every app, never a value.
+	hello := Hello(filepath.Dir(a.dir))
+	if !slices.Equal(hello.Env["shop"].Keys, []string{"A", "B"}) || !hello.Env["shop"].ChangedAt.Equal(keys.ChangedAt) {
+		t.Fatalf("hello env = %+v", hello.Env)
+	}
+	if body, _ := json.Marshal(hello); strings.Contains(string(body), "line") {
+		t.Fatalf("hello carries a value: %s", body)
+	}
+	body, _ := os.ReadFile(a.envFile("shop"))
+	want := "A=\"1\"\nB=\"it's \\\"q\\\" \\\\ \\$HOME \\${X}\\nline\\r\"\n"
+	if string(body) != want {
+		t.Fatalf("app.env = %q, want %q", body, want)
+	}
+	if info, _ := os.Stat(a.envFile("shop")); info.Mode().Perm() != 0o600 {
+		t.Fatalf("app.env is %v", info.Mode())
+	}
+	if _, err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"x y": "3"}}); err == nil {
+		t.Fatal("a key a shell does not take was set")
+	}
+	if _, err := a.setEnv(protocol.EnvSet{App: "../etc", Set: map[string]string{"A": "1"}}); err == nil {
+		t.Fatal("an app name outside the apps was taken")
+	}
+	src := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, ".env"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if args := a.envArgs("shop", src); len(args) != 4 || args[1] != filepath.Join(src, ".env") || args[3] != a.envFile("shop") {
+		t.Fatalf("the source's .env goes first: %v", args)
 	}
 }

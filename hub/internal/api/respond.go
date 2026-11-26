@@ -19,11 +19,13 @@ type ErrorBody struct {
 }
 
 // ErrorDetail carries a stable lowercase snake case code, a message for
-// humans, and per-field messages for validation errors.
+// humans, per-field messages for validation errors, and for missing_right
+// the right that is missing.
 type ErrorDetail struct {
 	Code    string            `json:"code"`
 	Message string            `json:"message"`
 	Fields  map[string]string `json:"fields,omitempty"`
+	Right   string            `json:"right,omitempty"`
 }
 
 // JSON writes value as a JSON response with the given status.
@@ -98,9 +100,21 @@ func ErrorFor(err error) (int, ErrorDetail, bool) {
 	if errors.As(err, &hookImage) {
 		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"image": hookImage.Error()}}, true
 	}
+	var offline *service.OfflineError
+	if errors.As(err, &offline) {
+		return http.StatusConflict, ErrorDetail{Code: "server_offline", Message: offline.Error()}, true
+	}
+	var missing *service.MissingSecretError
+	if errors.As(err, &missing) {
+		return http.StatusConflict, ErrorDetail{Code: "secret_missing", Message: missing.Error()}, true
+	}
 	var inUse *service.BucketInUseError
 	if errors.As(err, &inUse) {
 		return http.StatusConflict, ErrorDetail{Code: "bucket_in_use", Message: inUse.Error()}, true
+	}
+	var used *repository.DomainUsedError
+	if errors.As(err, &used) {
+		return http.StatusUnprocessableEntity, ErrorDetail{Code: "validation_failed", Message: ValidationMessage, Fields: map[string]string{"domains": used.Error() + "."}}, true
 	}
 	for _, known := range serviceErrors {
 		if !errors.Is(err, known.err) {
@@ -170,26 +184,30 @@ type serviceError struct {
 }
 
 var serviceErrors = []serviceError{
-	{err: service.ErrInvalidCredentials, status: http.StatusUnauthorized, code: "invalid_credentials", message: "Invalid email or password."},
-	{err: service.ErrEmailNotVerified, status: http.StatusForbidden, code: "email_not_verified", message: "Verify your email address before signing in with a password."},
 	{err: service.ErrEmailAlreadyExists, status: http.StatusConflict, code: "email_taken", message: "An account with this email address already exists."},
 	{err: repository.ErrDuplicateEmail, status: http.StatusConflict, code: "email_taken", message: "An account with this email address already exists."},
 	{err: service.ErrInvalidEmail, field: "email", message: "Enter a valid email address."},
-	{err: service.ErrWeakPassword, field: "password", message: "Password must be at least 12 characters."},
-	{err: service.ErrCommonPassword, field: "password", message: "Password is too common. Choose a stronger one."},
 	{err: service.ErrNameRequired, field: "name", message: "Enter your name."},
-	{err: service.ErrInvalidCurrentPassword, field: "current_password", message: "Current password is incorrect."},
 	{err: repository.ErrTokenNotFound, status: http.StatusBadRequest, code: "invalid_token", message: "This link is invalid or has expired."},
 	{err: repository.ErrTokenExpired, status: http.StatusBadRequest, code: "invalid_token", message: "This link is invalid or has expired."},
 	{err: repository.ErrTokenUsed, status: http.StatusBadRequest, code: "invalid_token", message: "This link is invalid or has expired."},
 	{err: repository.ErrUserNotFound, status: http.StatusNotFound, code: "not_found", message: "The user was not found."},
 	{err: repository.ErrSessionNotFound, status: http.StatusNotFound, code: "not_found", message: "The session was not found."},
-	{err: repository.ErrAPITokenNotFound, status: http.StatusNotFound, code: "not_found", message: "The API token was not found."},
-	{err: service.ErrAPITokenName, field: "name", message: "Name must contain between 1 and 64 characters."},
-	{err: service.ErrAPITokenScope, field: "scopes", message: "Choose read, or read and write."},
-	{err: service.ErrAPITokenExpiry, field: "expires_in_days", message: "Choose between 1 and 365 days, or no expiry."},
-	{err: service.ErrAPITokenLimit, status: http.StatusConflict, code: "token_limit", message: "You have reached the limit of 50 API tokens. Revoke one first."},
-	{err: service.ErrAPITokenWorkspace, field: "workspace_id", message: "Choose one of your workspaces."},
+	{err: repository.ErrPasskeyNotFound, status: http.StatusNotFound, code: "not_found", message: "The passkey was not found."},
+	{err: repository.ErrPasskeyLastWayIn, status: http.StatusConflict, code: "last_way_in", message: "This is your last way in. Add another first."},
+	{err: service.ErrImpersonating, status: http.StatusForbidden, code: "impersonation_read_only", message: "Impersonation is read-only. Return to Admin before making changes."},
+	{err: repository.ErrConnectionNotFound, status: http.StatusNotFound, code: "not_found", message: "The connection was not found."},
+	{err: repository.ErrCITokenNotFound, status: http.StatusNotFound, code: "not_found", message: "The CI token was not found."},
+	{err: service.ErrCITokenName, field: "name", message: "Name must contain between 1 and 64 characters."},
+	{err: service.ErrRightsUnknown, field: "rights", message: "Choose from read, deploy, env, delete and servers."},
+	{err: service.ErrCITokenExpiry, field: "expires_in_days", message: "Choose between 1 and 365 days, or no expiry."},
+	{err: service.ErrCITokenLimit, status: http.StatusConflict, code: "token_limit", message: "You have reached the limit of 50 CI tokens. Remove one first."},
+	{err: service.ErrCITokenMaker, status: http.StatusForbidden, code: "forbidden", message: "Only the person who made this CI token changes it."},
+	{err: service.ErrRightsBusy, status: http.StatusConflict, code: "conflict", message: "The rights changed meanwhile. Try again."},
+	{err: service.ErrPresencePasskey, status: http.StatusForbidden, code: "confirm_required", message: "Confirm with your passkey first: Settings, Connections, Confirm with passkey."},
+	{err: service.ErrPresenceSignIn, status: http.StatusForbidden, code: "confirm_required", message: "Sign in again first. Any sign-in in the last five minutes counts."},
+	{err: service.ErrConnectionLimit, status: http.StatusConflict, code: "connection_limit", message: "You have reached the limit of 50 connections. Remove one first."},
+	{err: service.ErrConnectionWorkspace, field: "workspace_id", message: "Choose one of your workspaces."},
 	{err: service.ErrAdminPermission, status: http.StatusForbidden, code: "forbidden", message: "Admin access is required."},
 	{err: service.ErrAdminSelfAction, status: http.StatusConflict, code: "admin_self_action", message: "This action is not available for your own account."},
 	{err: service.ErrAdminTargetIsOperator, status: http.StatusForbidden, code: "forbidden", message: "This action is not available for operator accounts."},
@@ -237,6 +255,8 @@ var serviceErrors = []serviceError{
 	{err: service.ErrTrialEnded, status: http.StatusPaymentRequired, code: "trial_ended", message: TrialEndedMessage},
 	{err: service.ErrSubscriptionRequired, status: http.StatusPaymentRequired, code: "subscription_required", message: "Subscribe to moin under Billing to add servers."},
 	{err: service.ErrNoDaemonBinary, status: http.StatusConflict, code: "no_daemon_binary", message: "This hub serves no daemon binary for the server's system. Update the daemon on the server instead."},
+	{err: service.ErrNoServer, status: http.StatusConflict, code: "no_server", message: "Add a server first: a secret lives on a server."},
+	{err: service.ErrServerRequired, field: "server", message: "Name the server that keeps it: this workspace has more than one."},
 	{err: service.ErrServerOffline, status: http.StatusConflict, code: "server_offline", message: "The server is offline. Start its daemon and try again."},
 	{err: service.ErrDaemonUpdating, status: http.StatusConflict, code: "daemon_updating", message: "The daemon of this server is updating. Try again in a minute."},
 	{err: repository.ErrAppNotFound, status: http.StatusNotFound, code: "not_found", message: "The app was not found."},
@@ -261,21 +281,17 @@ var serviceErrors = []serviceError{
 	{err: service.ErrDomain, field: "domains", message: "Use host names like my-app.example.com."},
 	{err: service.ErrCanonical, field: "canonical", message: "The canonical domain must be one of the domains."},
 	{err: service.ErrServiceCanonical, field: "canonical", message: "canonical is for the main service only."},
-	{err: service.ErrInstantShow, status: http.StatusForbidden, code: "insufficient_scope", message: "Showing the password needs a token with read and write access."},
-	{err: service.ErrUptimeDomain, field: "domain", message: "The app has no such domain."},
+	{err: service.ErrUptimeDomain, field: "domain", message: "Uptime visits no such domain of this app. A domain that only redirects to the main one is not visited."},
 	{err: service.ErrUptimePath, field: "path", message: "Use a path that starts with /, like /health, without spaces."},
 	{err: service.ErrMetricsRange, field: "range", message: "Use 1h, 24h, 7d or 30d."},
 	{err: service.ErrService, field: "service", message: "Use the name of a service in compose.yml: lowercase letters, digits, dashes, dots or underscores."},
 	{err: service.ErrMainService, field: "service", message: "This is the app's main service: set its domains without a service."},
-	{err: service.ErrDomainTaken, field: "domains", message: "A domain reaches one service of an app: remove it from the other one first."},
 	{err: service.ErrInstantProvider, field: "provider", message: "Choose sslip.io, nip.io or off."},
-	{err: service.ErrInstantInFile, status: http.StatusConflict, code: "instant_in_file", message: "The instant address is set in compose.yml. Change it there and deploy."},
-	{err: service.ErrProtectInFile, status: http.StatusConflict, code: "protect_in_file", message: "The password is required by compose.yml. Change it there and deploy."},
-	{err: service.ErrComposeDomains, status: http.StatusConflict, code: "domains_from_compose", message: "The domains of this app come from x-moin.domains in compose.yml. Change them there and deploy."},
-	{err: service.ErrProtectUser, field: "username", message: "Use a username without spaces or colons."},
-	{err: service.ErrProtect, field: "password", message: "Use a password of 8 to 72 characters."},
+	{err: service.ErrPasswordUser, field: "username", message: "Use a username without spaces or colons."},
+	{err: service.ErrPassword, field: "password", message: "Use a password of 8 to 72 characters."},
 	{err: service.ErrRunning, status: http.StatusConflict, code: "already_running", message: "The app is already running. Nothing changed."},
 	{err: service.ErrNotLive, status: http.StatusConflict, code: "not_live", message: "The app has no live deploy yet. Run moin deploy in the repo first."},
+	{err: service.ErrNoComposeFile, status: http.StatusConflict, code: "no_compose_file", message: "This deploy has no compose file. Deploy again; the deploy log says why if it stays empty."},
 	{err: service.ErrNoCommand, field: "command", message: "Give a command to run, like rails db:migrate."},
 	{err: service.ErrNoSource, status: http.StatusConflict, code: "no_source", message: "No deploy has a source or an image yet. Run moin deploy in the repo first."},
 	{err: service.ErrDeployGone, status: http.StatusConflict, code: "deploy_gone", message: "That deploy is no longer on the server: it keeps the last 5 builds. Deploy again or roll back to a newer deploy."},
@@ -291,26 +307,22 @@ var serviceErrors = []serviceError{
 	{err: service.ErrNoKey, status: http.StatusUnprocessableEntity, code: "invalid_row_key", message: "Name the row by every column of its primary key."},
 	{err: service.ErrSQL, field: "sql", message: "Enter a query."},
 	{err: service.ErrReadOnly, status: http.StatusConflict, code: "read_only_query", message: "This query changes data. Run it with execute_sql (MCP), --write (CLI) or Allow changes (web)."},
-	{err: service.ErrUploadBucket, status: http.StatusConflict, code: "no_bucket", message: "moin deploy uploads your code to your own bucket. Add one under Bucket first."},
 	{err: service.ErrCatalogApp, status: http.StatusNotFound, code: "not_found", message: "The catalog has no such app. List them with moin catalog."},
 	{err: service.ErrCatalogVersion, field: "version", message: "This version is not a release of the app. Pick one from moin catalog <app>."},
+	{err: service.ErrCatalogDaemon, status: http.StatusConflict, code: "daemon_too_old", message: "The daemon of this server is too old for the catalog. Update it with moin servers update."},
 	{err: service.ErrCatalogDomain, field: "domain", message: "This app needs a domain: its links and sign-in point to it. Give it one."},
 	{err: service.ErrNotCatalog, status: http.StatusConflict, code: "not_from_catalog", message: "This app was not installed from the catalog. Deploy it with moin deploy."},
-	{err: service.ErrUpload, field: "upload", message: "The upload is unknown or expired. Run moin deploy again."},
 	{err: service.ErrNoBackups, status: http.StatusConflict, code: "no_backups", message: "Backups are not set up. Add a bucket first."},
 	{err: service.ErrBackupEndpoint, field: "endpoint", message: "Use an https:// URL, or leave it empty for AWS S3."},
-	{err: service.ErrBucketPrivate, field: "endpoint", message: "This endpoint points to a private or local address. moin can only reach buckets on the public internet."},
 	{err: service.ErrBackupBucket, field: "bucket", message: "Enter the bucket, the access key and the secret key."},
 	{err: service.ErrBucketName, field: "name", message: "Name the bucket with 1 to 63 lowercase letters, digits or dashes, like client-a."},
 	{err: repository.ErrDuplicateBucket, field: "name", message: "A bucket with this name already exists."},
 	{err: repository.ErrBucketNotFound, status: http.StatusNotFound, code: "not_found", message: "The bucket was not found. List them with moin buckets."},
-	{err: service.ErrBackupAccess, field: "secret_key", message: "moin could not write to the bucket with these keys. Check the bucket name, the endpoint and that the key may write."},
 	{err: service.ErrRestoreTarget, field: "moment", message: "Pick a moment to go back to, from moin backups."},
 	{err: service.ErrMoment, field: "moment", message: "There is no such moment. Pick one from moin backups, like before-v12."},
 	{err: service.ErrRestoreDatabase, field: "database", message: "The app has several databases. Name the one."},
 	{err: service.ErrMomentOutside, field: "at", message: "There is no copy that old. Pick a moment from moin backups."},
 	{err: service.ErrNoCopy, status: http.StatusConflict, code: "no_copy", message: "There is no copy yet. The first one is taken within a minute of a deploy with a bucket."},
-	{err: service.ErrScheduleInFile, status: http.StatusConflict, code: "schedule_in_file", message: "The backup schedule is set in compose.yml. Change it there and deploy."},
 	{err: service.ErrBackupEvery, field: "every_minutes", message: "Copy every 15 minutes (15), hourly (60) or daily (1440)."},
 	{err: service.ErrBackupKeep, field: "keep_days", message: "Keep each copy 1, 3, 7 or 30 days."},
 	{err: service.ErrRestoreNotFound, status: http.StatusNotFound, code: "not_found", message: "There is no such restore. moin keeps how a restore ended for a week."},
@@ -320,16 +332,21 @@ var serviceErrors = []serviceError{
 	{err: service.ErrGitHubOff, status: http.StatusConflict, code: "github_off", message: "The GitHub App is not set up on this hub."},
 	{err: service.ErrGitHubState, status: http.StatusBadRequest, code: "github_state", message: "The GitHub install link expired or belongs to another account. Connect again."},
 	{err: service.ErrGitHubNotYours, status: http.StatusForbidden, code: "github_not_yours", message: "Your GitHub account cannot manage this installation. Install the app from an account you own, then connect again."},
+	{err: service.ErrGitHubAppNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this hub, in ADMIN_EMAILS, create its GitHub App."},
+	{err: service.ErrGitHubAppExists, status: http.StatusConflict, code: "github_app_exists", message: "This hub has its GitHub App already."},
+	{err: service.ErrGitHubAppState, status: http.StatusBadRequest, code: "github_state", message: "The link from GitHub expired or belongs to another account. Create the GitHub App again."},
+	{err: service.ErrGitHubAppAnswer, status: http.StatusBadGateway, code: "github_app_answer", message: "GitHub did not hand over the new app. Delete it on GitHub, under Settings, Developer settings, GitHub Apps, then create it again."},
 	{err: repository.ErrGitHubInstallationTaken, status: http.StatusConflict, code: "github_taken", message: "This GitHub account is connected to another workspace. Disconnect it there first."},
 	{err: service.ErrRepo, field: "repo", message: "moin cannot read this repo. Install the moin GitHub App on its account and give it the repo."},
 	{err: service.ErrRepoName, field: "repo", message: "Name the repo as owner/name."},
 	{err: service.ErrNoRepo, status: http.StatusConflict, code: "no_repo", message: "The app follows no repo. Link one first."},
 	{err: service.ErrRef, field: "ref", message: "GitHub knows no branch, tag or commit by this name."},
+	{err: service.ErrNotOnBranch, field: "ref", message: "This commit is not on the app's branch. Push it there, or deploy a branch or tag by name."},
 	{err: service.ErrBranch, field: "branch", message: "The repo on GitHub has no branch by this name. List them with moin github branches."},
 	{err: service.ErrRefName, field: "ref", message: "This is not a valid branch, tag or commit name. Use git's rules, at most 255 characters."},
 	{err: service.ErrNoCloudflare, status: http.StatusConflict, code: "no_cloudflare", message: "Connect Cloudflare in Settings, Integrations first."},
 	{err: service.ErrTunnelsOn, status: http.StatusConflict, code: "tunnels_on", message: "Turn the tunnels off first: without the token moin cannot delete them in Cloudflare."},
-	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "Connect Tailscale in Settings, Integrations first, or join the server to your tailnet by hand."},
+	{err: service.ErrNoTailscale, status: http.StatusConflict, code: "no_tailscale", message: "This server has no Tailscale key. Enter one for it in Settings, Integrations, or join the server to your tailnet by hand."},
 	{err: service.ErrCloudflareToken, field: "cloudflare_token", message: "Cloudflare does not accept this token. It needs Account Cloudflare Tunnel Edit and Zone DNS Edit. Zone Settings Edit is optional: with it moin turns on Always Use HTTPS."},
 	{err: service.ErrUpdateNotAllowed, status: http.StatusForbidden, code: "forbidden", message: "Only the admins of this hub, in ADMIN_EMAILS, update it."},
 	{err: service.ErrUpdateHosted, status: http.StatusConflict, code: "hosted", message: "The hosted hub updates itself with every release. Nothing to do."},

@@ -3,6 +3,9 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"github.com/axadrn/moin/hub/internal/model"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/api"
@@ -14,22 +17,22 @@ import (
 // apps moin installs in one click, and their updates.
 func registerCatalogTools(server *mcpsdk.Server, services Services) {
 	tools := catalogTools{services: services}
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "list_catalog", Title: "List the catalog", Annotations: readOnly("List the catalog"),
-		Description: "Lists the open source apps moin installs in one click, such as Umami or n8n: slug, name, what it does, category, the database moin backs up (postgres or sqlite) and the newest release. Needs the read scope.",
-	}, Read(member(services, tools.list)))
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "get_catalog_app", Title: "A catalog app", Annotations: readOnly("A catalog app"),
-		Description: "Returns one catalog app by slug with every release, newest first, with dates where the registry gives them, the secrets moin generates on install and how to sign in the first time. Needs the read scope.",
-	}, Read(member(services, tools.get)))
+	Add(server, &mcpsdk.Tool{Name: "list_catalog", Title: "List the catalog", Annotations: readOnly("List the catalog"),
+		Description: "Lists the open source apps moin installs in one click, such as Umami or n8n: slug, name, what it does, category, the database moin backs up (postgres or sqlite) and the newest release.",
+	}, model.RightRead, member(services, tools.list))
+	Add(server, &mcpsdk.Tool{Name: "get_catalog_app", Title: "A catalog app", Annotations: readOnly("A catalog app"),
+		Description: "Returns one catalog app by slug with every release, newest first, with dates where the registry gives them, the secrets moin generates on install and how to sign in the first time.",
+	}, model.RightRead, member(services, tools.get))
 	install := change(false, false)
 	install.Title = "Install a catalog app"
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "install_catalog_app", Title: install.Title, Annotations: install,
-		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. The workspace needs a bucket. Needs a token with read and write access.",
-	}, Write(changes(services, tools.install)))
+	Add(server, &mcpsdk.Tool{Name: "install_catalog_app", Title: install.Title, Annotations: install,
+		Description: "Installs a catalog app on a server: creates the app, generates its secrets as env vars, sets VERSION and deploys it. version empty takes the newest release, name empty the slug; domain is optional. Returns the app and the deploy; follow it with get_deploy. When the first sign-in needs a secret moin made, such as ADMIN_PASSWORD, login holds it, and password the app's password, user moin, which its domains and its instant address ask for: the one time they are shown, so hand them to the user to keep in their password manager.",
+	}, model.RightDeploy, changes(services, tools.install))
 	update := change(false, false)
 	update.Title = "Update a catalog app"
-	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "update_app", Title: update.Title, Annotations: update,
-		Description: "Sets an app installed from the catalog to a version, the newest release when empty, and deploys it. moin takes a copy of the data just before the deploy, so a restore can go back to it. An older version also goes, but its migrations may not go back: ask the user before going back. Returns the app and the deploy; follow it with get_deploy. Needs a token with read and write access.",
-	}, Write(changes(services, tools.update)))
+	Add(server, &mcpsdk.Tool{Name: "update_app", Title: update.Title, Annotations: update,
+		Description: "Sets an app installed from the catalog to a version, the newest release when empty, and deploys it. moin takes a copy of the data just before the deploy, so a restore can go back to it. An older version also goes, but its migrations may not go back: ask the user before going back. Returns the app and the deploy; follow it with get_deploy.",
+	}, model.RightDeploy, changes(services, tools.update))
 }
 
 type catalogTools struct {
@@ -88,7 +91,14 @@ type CatalogDeploy struct {
 }
 
 func (d CatalogDeploy) Summary() string {
-	return fmt.Sprintf("Deploy v%d of %s started.", d.Deploy.Number, d.App.Name)
+	summary := fmt.Sprintf("Deploy v%d of %s started.", d.Deploy.Number, d.App.Name)
+	if len(d.Login) > 0 {
+		summary += " The first sign-in needs " + strings.Join(slices.Sorted(maps.Keys(d.Login)), ", ") + ", in login: shown this once."
+	}
+	if d.Password != "" {
+		summary += " The app's domains and its instant address ask for user " + service.PasswordUser + " and the password in password: shown this once."
+	}
+	return summary
 }
 
 func (t catalogTools) list(_ context.Context, _ Caller, _ struct{}) (CatalogList, error) {
@@ -110,11 +120,11 @@ func (t catalogTools) get(_ context.Context, _ Caller, input CatalogSlugInput) (
 }
 
 func (t catalogTools) install(ctx context.Context, caller Caller, input CatalogInstallInput) (CatalogDeploy, error) {
-	app, deploy, err := t.services.Catalog.Install(ctx, caller.actor(), service.CatalogInstall{Slug: input.Slug, Version: input.Version, Server: input.Server, Name: input.Name, Domain: input.Domain})
+	app, deploy, login, err := t.services.Catalog.Install(ctx, caller.actor(), service.CatalogInstall{Slug: input.Slug, Version: input.Version, Server: input.Server, Name: input.Name, Domain: input.Domain})
 	if err != nil {
 		return CatalogDeploy{}, err
 	}
-	return CatalogDeploy{api.CatalogDeploy{App: api.NewApp(*app), Deploy: api.NewDeploy(*deploy)}}, nil
+	return CatalogDeploy{api.CatalogDeploy{App: api.NewApp(*app), Deploy: api.NewDeploy(*deploy), Login: login, Password: app.NewPassword}}, nil
 }
 
 func (t catalogTools) update(ctx context.Context, caller Caller, input AppUpdateInput) (CatalogDeploy, error) {

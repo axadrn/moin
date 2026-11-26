@@ -1,15 +1,21 @@
 package api
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/axadrn/moin/hub/internal/model"
+)
 
 // Route is one endpoint of the JSON API: a ServeMux pattern, its handler with
-// every middleware applied, and what a personal API token may do there.
+// every middleware applied, and the right a connection or CI token needs
+// there. This table is the one place that says it: the gate checks it, and
+// a test checks the docs' table of rights against it.
 type Route struct {
 	Pattern string
 	Handler http.HandlerFunc
-	// Tokens is TokenRead or TokenWrite for routes open to personal API
-	// tokens. The zero value denies tokens.
-	Tokens TokenAccess
+	// Right is what a connection or CI token needs, one right or two that
+	// must both be on. NoToken, the zero value, keeps them out.
+	Right model.Rights
 }
 
 // Wrap adds one middleware to a route handler.
@@ -21,7 +27,10 @@ type Handlers struct {
 	Auth        *AuthHandler
 	Account     *AccountHandler
 	Sessions    *SessionsHandler
-	Tokens      *APITokensHandler
+	Passkeys    *PasskeysHandler
+	Connections *ConnectionsHandler
+	CITokens    *CITokensHandler
+	Token       *TokenHandler
 	Billing     *BillingHandler
 	Admin       *AdminHandler
 	Workspaces  *WorkspaceHandler
@@ -33,6 +42,7 @@ type Handlers struct {
 	Catalog     *CatalogHandler
 	Status      *StatusHandler
 	Device      *DeviceHandler
+	OAuth       *OAuthHandler
 }
 
 // Middleware are the route middleware from internal/middleware. They are
@@ -42,10 +52,6 @@ type Middleware struct {
 	RequireAuth Wrap
 	// RequireOnboarded also answers 403 onboarding_required without a name.
 	RequireOnboarded Wrap
-	// RateLimitAuth limits sign-in attempts per client IP.
-	RateLimitAuth Wrap
-	// RateLimitAuthEmail limits emails per client IP and recipient.
-	RateLimitAuthEmail Wrap
 	// RateLimitEmailChanges limits email change requests per user and
 	// recipient.
 	RateLimitEmailChanges Wrap
@@ -57,157 +63,165 @@ type Middleware struct {
 	// RateLimitInvitations limits workspace invitation emails.
 	RateLimitInvitations Wrap
 	// InWorkspace requires onboarding and scopes a moin route to the
-	// workspace of the API token, or for a session to the workspace its
+	// workspace of the connection or CI token, or for a session to the workspace its
 	// Moin-Workspace header names.
 	InWorkspace Wrap
 	// RateLimitDevice limits the logins `moin login` starts per client IP.
 	RateLimitDevice Wrap
-	// RateLimitDevicePoll limits the polls of `moin login` per client IP.
+	// RateLimitDevicePoll limits the polls of `moin login` and the
+	// refreshes of the token endpoint per client IP.
 	RateLimitDevicePoll Wrap
+	// RateLimitRegister limits the MCP clients that register themselves per
+	// client IP.
+	RateLimitRegister Wrap
+	// AppID finds the ID of an app in a workspace by its name or ID, for
+	// CI tokens that may reach one app only.
+	AppID func(workspaceID, app string) (string, error)
 }
 
 // Routes lists every endpoint under /api/v1. The router registers exactly
 // these routes, and openapi_test.go checks them against openapi.yaml. Every
-// handler is wrapped by the token gate of its route: GET routes open to tokens
-// need the read scope, routes that change data need the write scope, and
-// everything else answers 403 to tokens.
+// handler is wrapped by the gate of its route: a connection or CI token
+// without the route's right gets 403 missing_right, and NoToken routes
+// answer 403 to them.
 func Routes(h Handlers, m Middleware) []Route {
 	routes := []Route{
-		{"GET /api/v1/openapi.yaml", OpenAPI, TokenRead},
-		{"GET /api/v1/csrf", CSRFToken, TokenRead},
-		{"GET /api/v1/meta", h.Meta.Meta, TokenRead},
-		{"GET /api/v1/version", m.RequireOnboarded(h.Version.Show), TokenRead},
-		{"POST /api/v1/version/update", m.InWorkspace(h.Version.Update), TokenWrite},
-		{"POST /api/v1/auth/password", m.RateLimitAuth(h.Auth.PasswordAuth), TokenDenied},
-		{"POST /api/v1/auth/magic-link", m.RateLimitAuthEmail(h.Auth.SendMagicLink), TokenDenied},
-		{"POST /api/v1/auth/magic-link/verify", h.Auth.VerifyMagicLink, TokenDenied},
-		{"POST /api/v1/auth/forgot-password", m.RateLimitAuthEmail(h.Auth.ForgotPassword), TokenDenied},
-		{"POST /api/v1/auth/forgot-password/verify", h.Auth.VerifyForgotPassword, TokenDenied},
-		{"POST /api/v1/auth/email-change/verify", h.Auth.VerifyEmailChange, TokenDenied},
-		{"POST /api/v1/auth/device", m.RateLimitDevice(h.Device.Start), TokenDenied},
-		{"POST /api/v1/auth/device/token", m.RateLimitDevicePoll(h.Device.Token), TokenDenied},
-		{"POST /api/v1/auth/onboarding", m.RequireAuth(h.Auth.CompleteOnboarding), TokenDenied},
-		{"POST /api/v1/auth/logout", m.RequireAuth(h.Auth.Logout), TokenDenied},
-		{"GET /api/v1/account", m.RequireAuth(h.Auth.Account), TokenRead},
-		{"PATCH /api/v1/account/name", m.RequireOnboarded(h.Account.UpdateName), TokenWrite},
-		{"PUT /api/v1/account/email-alerts", m.RequireOnboarded(h.Account.SetEmailAlerts), TokenWrite},
-		{"PATCH /api/v1/account/email", m.RequireOnboarded(m.RateLimitEmailChanges(h.Account.ChangeEmail)), TokenDenied},
-		{"POST /api/v1/account/password", m.RequireOnboarded(h.Account.ChangePassword), TokenDenied},
-		{"POST /api/v1/account/password/set", m.RequireOnboarded(h.Account.SetPassword), TokenDenied},
-		{"DELETE /api/v1/account/password", m.RequireOnboarded(h.Account.RemovePassword), TokenDenied},
-		{"DELETE /api/v1/account", m.RequireOnboarded(h.Account.DeleteAccount), TokenDenied},
-		{"GET /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.List), TokenDenied},
-		{"DELETE /api/v1/account/sessions/{id}", m.RequireOnboarded(h.Sessions.Revoke), TokenDenied},
-		{"DELETE /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.RevokeOthers), TokenDenied},
-		{"GET /api/v1/account/tokens", m.RequireOnboarded(h.Tokens.List), TokenDenied},
-		{"POST /api/v1/account/tokens", m.RequireOnboarded(h.Tokens.Create), TokenDenied},
-		{"DELETE /api/v1/account/tokens/{id}", m.RequireOnboarded(h.Tokens.Revoke), TokenDenied},
-		{"POST /api/v1/account/avatar", m.RequireOnboarded(h.Account.UploadAvatar), TokenWrite},
-		{"DELETE /api/v1/account/avatar", m.RequireOnboarded(h.Account.DeleteAvatar), TokenWrite},
-		{"GET /api/v1/workspaces", m.RequireOnboarded(h.Workspaces.List), TokenRead},
-		{"POST /api/v1/workspaces", m.RequireOnboarded(h.Workspaces.Create), TokenDenied},
-		{"GET /api/v1/workspaces/{workspaceSlug}", m.Workspace(h.Workspaces.Show), TokenRead},
-		{"DELETE /api/v1/workspaces/{workspaceSlug}", m.Workspace(h.Workspaces.Delete), TokenDenied},
-		{"PATCH /api/v1/workspaces/{workspaceSlug}/name", m.Workspace(h.Workspaces.UpdateName), TokenWrite},
-		{"POST /api/v1/workspaces/{workspaceSlug}/invitations", m.Workspace(m.RateLimitInvitations(h.Workspaces.Invite)), TokenWrite},
-		{"POST /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}/resend", m.Workspace(m.RateLimitInvitations(h.Workspaces.ResendInvitation)), TokenWrite},
-		{"DELETE /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}", m.Workspace(h.Workspaces.RevokeInvitation), TokenWrite},
-		{"PATCH /api/v1/workspaces/{workspaceSlug}/members/{memberID}/role", m.Workspace(h.Workspaces.ChangeRole), TokenDenied},
-		{"DELETE /api/v1/workspaces/{workspaceSlug}/members/{memberID}", m.Workspace(h.Workspaces.RemoveMember), TokenDenied},
-		{"POST /api/v1/workspaces/{workspaceSlug}/leave", m.Workspace(h.Workspaces.Leave), TokenDenied},
-		{"GET /api/v1/workspaces/{workspaceSlug}/activity", m.Workspace(h.Workspaces.Activity), TokenRead},
-		{"GET /api/v1/activity", m.InWorkspace(h.Workspaces.Activity), TokenRead},
-		{"GET /api/v1/invitations/{token}", h.Invitations.Show, TokenRead},
-		{"POST /api/v1/invitations/{token}/accept", m.RequireOnboarded(h.Invitations.Accept), TokenDenied},
-		{"GET /api/v1/workspaces/{workspaceSlug}/billing", m.Workspace(billingOn(h.Billing, h.Billing.Billing)), TokenRead},
-		{"POST /api/v1/workspaces/{workspaceSlug}/billing/checkout", m.Workspace(billingOn(h.Billing, h.Billing.CreateCheckout)), TokenDenied},
-		{"GET /api/v1/workspaces/{workspaceSlug}/billing/manage", m.Workspace(billingOn(h.Billing, h.Billing.BillingManagement)), TokenDenied},
-		{"GET /api/v1/servers", m.InWorkspace(h.Servers.List), TokenRead},
-		{"POST /api/v1/servers", m.InWorkspace(h.Servers.Create), TokenWrite},
-		{"DELETE /api/v1/servers/{id}", m.InWorkspace(h.Servers.Delete), TokenWrite},
-		{"PATCH /api/v1/servers/{id}", m.InWorkspace(h.Servers.Rename), TokenWrite},
-		{"POST /api/v1/servers/{id}/update", m.InWorkspace(h.Servers.Update), TokenWrite},
-		{"POST /api/v1/servers/{id}/install", m.InWorkspace(h.Servers.NewInstall), TokenWrite},
-		{"PUT /api/v1/servers/{id}/security", m.InWorkspace(h.Apps.SetSecurity), TokenWrite},
-		{"GET /api/v1/servers/{id}/metrics", m.InWorkspace(h.Apps.ServerMetrics), TokenRead},
-		{"GET /api/v1/integrations", m.InWorkspace(h.Apps.GetIntegrations), TokenRead},
-		{"PUT /api/v1/integrations", m.InWorkspace(h.Apps.SetIntegrations), TokenWrite},
-		{"GET /api/v1/daemon-updates", m.InWorkspace(h.Version.DaemonUpdates), TokenRead},
-		{"PUT /api/v1/daemon-updates", m.InWorkspace(h.Version.SetDaemonUpdates), TokenWrite},
-		{"GET /api/v1/servers/events", m.InWorkspace(streams.wrap(h.Servers.Events)), TokenRead},
-		{"GET /api/v1/status", m.InWorkspace(h.Status.Get), TokenRead},
-		{"GET /api/v1/catalog", m.InWorkspace(h.Catalog.List), TokenRead},
-		{"GET /api/v1/catalog/{slug}", m.InWorkspace(h.Catalog.Get), TokenRead},
-		{"POST /api/v1/catalog/{slug}/install", m.InWorkspace(h.Catalog.Install), TokenWrite},
-		{"GET /api/v1/apps", m.InWorkspace(h.Apps.List), TokenRead},
-		{"POST /api/v1/apps", m.InWorkspace(h.Apps.Create), TokenWrite},
-		{"PUT /api/v1/apps/{app}/pin", m.InWorkspace(h.Apps.SetPinned), TokenWrite},
-		{"GET /api/v1/apps/events", m.InWorkspace(streams.wrap(h.Apps.Events)), TokenRead},
-		{"GET /api/v1/apps/{app}", m.InWorkspace(h.Apps.Get), TokenRead},
-		{"PATCH /api/v1/apps/{app}", m.InWorkspace(h.Apps.Rename), TokenWrite},
-		{"DELETE /api/v1/apps/{app}", m.InWorkspace(h.Apps.Delete), TokenWrite},
-		{"POST /api/v1/apps/{app}/deploys", m.InWorkspace(h.Apps.CreateDeploy), TokenWrite},
-		{"POST /api/v1/apps/{app}/uploads", m.InWorkspace(h.Apps.CreateUpload), TokenWrite},
-		{"GET /api/v1/apps/{app}/deploys/{number}", m.InWorkspace(h.Apps.GetDeploy), TokenRead},
-		{"GET /api/v1/apps/{app}/deploys/{number}/events", m.InWorkspace(streams.wrap(h.Apps.DeployEvents)), TokenRead},
-		{"POST /api/v1/apps/{app}/rollback", m.InWorkspace(h.Apps.Rollback), TokenWrite},
-		{"POST /api/v1/apps/{app}/update", m.InWorkspace(h.Catalog.Update), TokenWrite},
-		{"POST /api/v1/apps/{app}/redeploy", m.InWorkspace(h.Apps.Redeploy), TokenWrite},
-		{"POST /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RotateHook), TokenWrite},
-		{"DELETE /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RemoveHook), TokenWrite},
-		{"POST /api/v1/apps/{app}/restart", m.InWorkspace(h.Apps.Restart), TokenWrite},
-		{"POST /api/v1/apps/{app}/start", m.InWorkspace(h.Apps.Start), TokenWrite},
-		{"POST /api/v1/apps/{app}/stop", m.InWorkspace(h.Apps.Stop), TokenWrite},
-		{"GET /api/v1/apps/{app}/domains", m.InWorkspace(h.Apps.Domains), TokenRead},
-		{"PUT /api/v1/apps/{app}/domains", m.InWorkspace(h.Apps.SetDomains), TokenWrite},
-		{"GET /api/v1/apps/{app}/instant", m.InWorkspace(h.Apps.GetInstant), TokenRead},
-		{"PUT /api/v1/apps/{app}/instant", m.InWorkspace(h.Apps.SetInstant), TokenWrite},
-		{"PUT /api/v1/apps/{app}/protection", m.InWorkspace(h.Apps.SetProtection), TokenWrite},
-		{"DELETE /api/v1/apps/{app}/protection", m.InWorkspace(h.Apps.DeleteProtection), TokenWrite},
-		{"GET /api/v1/registries", m.InWorkspace(h.Apps.Registries), TokenRead},
-		{"PUT /api/v1/registries/{host}", m.InWorkspace(h.Apps.SetRegistry), TokenWrite},
-		{"DELETE /api/v1/registries/{host}", m.InWorkspace(h.Apps.DeleteRegistry), TokenWrite},
-		{"GET /api/v1/apps/{app}/logs", m.InWorkspace(h.Apps.Logs), TokenRead},
-		{"POST /api/v1/apps/{app}/exec", m.InWorkspace(h.Apps.Exec), TokenWrite},
-		{"GET /api/v1/apps/{app}/databases", m.InWorkspace(h.Apps.Databases), TokenRead},
-		{"GET /api/v1/apps/{app}/databases/tables", m.InWorkspace(h.Apps.Tables), TokenRead},
-		{"GET /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.Rows), TokenWrite},
-		{"POST /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.InsertRow), TokenWrite},
-		{"PATCH /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.UpdateRow), TokenWrite},
-		{"DELETE /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.DeleteRow), TokenWrite},
-		{"POST /api/v1/apps/{app}/databases/query", m.InWorkspace(h.Apps.Query), TokenWrite},
-		{"GET /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.Backups), TokenRead},
-		{"PUT /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.SetBackupSchedule), TokenWrite},
-		{"POST /api/v1/apps/{app}/backups/download", m.InWorkspace(h.Apps.Download), TokenWrite},
-		{"POST /api/v1/apps/{app}/restores", m.InWorkspace(h.Apps.StartRestore), TokenWrite},
-		{"GET /api/v1/apps/{app}/restores/{restore}", m.InWorkspace(h.Apps.Restore), TokenRead},
-		{"GET /api/v1/apps/{app}/uptime", m.InWorkspace(h.Apps.Uptime), TokenRead},
-		{"PUT /api/v1/apps/{app}/uptime/{domain}", m.InWorkspace(h.Apps.SetUptime), TokenWrite},
-		{"GET /api/v1/alert-destinations", m.InWorkspace(h.Alerts.List), TokenRead},
-		{"POST /api/v1/alert-destinations", m.InWorkspace(h.Alerts.Create), TokenWrite},
-		{"DELETE /api/v1/alert-destinations/{destination}", m.InWorkspace(h.Alerts.Delete), TokenWrite},
-		{"POST /api/v1/alert-destinations/{destination}/test", m.InWorkspace(h.Alerts.Test), TokenWrite},
-		{"GET /api/v1/apps/{app}/metrics", m.InWorkspace(h.Apps.AppMetrics), TokenRead},
-		{"GET /api/v1/github", m.InWorkspace(h.Apps.GetGitHub), TokenRead},
-		{"GET /api/v1/github/repos", m.InWorkspace(h.Apps.GetGitHubRepos), TokenRead},
-		{"GET /api/v1/github/repos/{owner}/{repo}/branches", m.InWorkspace(h.Apps.GetGitHubBranches), TokenRead},
-		{"PUT /api/v1/apps/{app}/repo", m.InWorkspace(h.Apps.SetRepo), TokenWrite},
-		{"DELETE /api/v1/apps/{app}/repo", m.InWorkspace(h.Apps.DeleteRepo), TokenWrite},
-		{"GET /api/v1/buckets", m.InWorkspace(h.Apps.Buckets), TokenRead},
-		{"POST /api/v1/buckets", m.InWorkspace(h.Apps.AddBucket), TokenWrite},
-		{"GET /api/v1/buckets/{name}", m.InWorkspace(h.Apps.GetBucket), TokenRead},
-		{"PUT /api/v1/buckets/{name}", m.InWorkspace(h.Apps.EditBucket), TokenWrite},
-		{"DELETE /api/v1/buckets/{name}", m.InWorkspace(h.Apps.DeleteBucket), TokenWrite},
-		{"PUT /api/v1/apps/{app}/bucket", m.InWorkspace(h.Apps.SetAppBucket), TokenWrite},
-		{"GET /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.GetEnv), TokenWrite},
-		{"PATCH /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.UpdateEnv), TokenWrite},
-		{"PUT /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.ReplaceEnv), TokenWrite},
-		{"GET /api/v1/admin/users", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.Users))), TokenDenied},
-		{"GET /api/v1/admin/old-domain", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.OldDomain))), TokenDenied},
-		{"POST /api/v1/admin/users/{userID}/sessions/revoke", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions))), TokenDenied},
+		{"GET /api/v1/openapi.yaml", OpenAPI, model.RightRead},
+		{"GET /api/v1/csrf", CSRFToken, model.RightRead},
+		{"GET /api/v1/meta", h.Meta.Meta, model.RightRead},
+		{"GET /api/v1/version", m.RequireOnboarded(h.Version.Show), model.RightRead},
+		{"POST /api/v1/version/update", m.InWorkspace(h.Version.Update), model.RightServers},
+		{"POST /api/v1/auth/email-change/verify", h.Auth.VerifyEmailChange, NoToken},
+		{"POST /api/v1/auth/device", m.RateLimitDevice(h.Device.Start), NoToken},
+		{"POST /api/v1/auth/token", m.RateLimitDevicePoll(h.Token.Token), NoToken},
+		{"POST /api/v1/auth/revoke", m.RateLimitDevicePoll(h.Token.Revoke), NoToken},
+		{"POST /api/v1/auth/register", m.RateLimitRegister(h.OAuth.Register), NoToken},
+		{"POST /api/v1/auth/onboarding", m.RequireAuth(h.Auth.CompleteOnboarding), NoToken},
+		{"POST /api/v1/auth/logout", m.RequireAuth(h.Auth.Logout), NoToken},
+		{"GET /api/v1/account", m.RequireAuth(h.Auth.Account), model.RightRead},
+		{"PATCH /api/v1/account/name", m.RequireOnboarded(h.Account.UpdateName), model.RightServers},
+		{"PUT /api/v1/account/email-alerts", m.RequireOnboarded(h.Account.SetEmailAlerts), model.RightServers},
+		{"PATCH /api/v1/account/email", m.RequireOnboarded(m.RateLimitEmailChanges(h.Account.ChangeEmail)), NoToken},
+		{"DELETE /api/v1/account", m.RequireOnboarded(h.Account.DeleteAccount), NoToken},
+		{"GET /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.List), NoToken},
+		{"DELETE /api/v1/account/sessions/{id}", m.RequireOnboarded(h.Sessions.Revoke), NoToken},
+		{"DELETE /api/v1/account/sessions", m.RequireOnboarded(h.Sessions.RevokeOthers), NoToken},
+		{"GET /api/v1/account/passkeys", m.RequireOnboarded(h.Passkeys.List), NoToken},
+		{"DELETE /api/v1/account/passkeys/{id}", m.RequireOnboarded(h.Passkeys.Remove), NoToken},
+		{"GET /api/v1/account/connections", m.RequireOnboarded(h.Connections.List), model.RightRead},
+		{"PATCH /api/v1/account/connections/{id}", m.RequireOnboarded(h.Connections.SetRights), NoToken},
+		{"DELETE /api/v1/account/connections/{id}", m.RequireOnboarded(h.Connections.Remove), model.RightRead},
+		{"GET /api/v1/ci-tokens", m.InWorkspace(h.CITokens.List), model.RightRead},
+		{"POST /api/v1/ci-tokens", m.InWorkspace(h.CITokens.Create), NoToken},
+		{"PATCH /api/v1/ci-tokens/{id}", m.InWorkspace(h.CITokens.SetRights), NoToken},
+		{"DELETE /api/v1/ci-tokens/{id}", m.InWorkspace(h.CITokens.Remove), model.RightRead},
+		{"POST /api/v1/account/avatar", m.RequireOnboarded(h.Account.UploadAvatar), model.RightServers},
+		{"DELETE /api/v1/account/avatar", m.RequireOnboarded(h.Account.DeleteAvatar), model.RightServers},
+		{"GET /api/v1/workspaces", m.RequireOnboarded(h.Workspaces.List), model.RightRead},
+		{"POST /api/v1/workspaces", m.RequireOnboarded(h.Workspaces.Create), NoToken},
+		{"GET /api/v1/workspaces/{workspaceSlug}", m.Workspace(h.Workspaces.Show), model.RightRead},
+		{"DELETE /api/v1/workspaces/{workspaceSlug}", m.Workspace(h.Workspaces.Delete), NoToken},
+		{"PATCH /api/v1/workspaces/{workspaceSlug}/name", m.Workspace(h.Workspaces.UpdateName), model.RightServers},
+		{"POST /api/v1/workspaces/{workspaceSlug}/invitations", m.Workspace(m.RateLimitInvitations(h.Workspaces.Invite)), model.RightServers},
+		{"POST /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}/resend", m.Workspace(m.RateLimitInvitations(h.Workspaces.ResendInvitation)), model.RightServers},
+		{"DELETE /api/v1/workspaces/{workspaceSlug}/invitations/{invitationID}", m.Workspace(h.Workspaces.RevokeInvitation), model.RightServers},
+		{"PATCH /api/v1/workspaces/{workspaceSlug}/members/{memberID}/role", m.Workspace(h.Workspaces.ChangeRole), NoToken},
+		{"DELETE /api/v1/workspaces/{workspaceSlug}/members/{memberID}", m.Workspace(h.Workspaces.RemoveMember), NoToken},
+		{"POST /api/v1/workspaces/{workspaceSlug}/leave", m.Workspace(h.Workspaces.Leave), NoToken},
+		{"GET /api/v1/workspaces/{workspaceSlug}/activity", m.Workspace(h.Workspaces.Activity), model.RightRead},
+		{"GET /api/v1/activity", m.InWorkspace(h.Workspaces.Activity), model.RightRead},
+		{"GET /api/v1/invitations/{token}", h.Invitations.Show, model.RightRead},
+		{"POST /api/v1/invitations/{token}/accept", m.RequireOnboarded(h.Invitations.Accept), NoToken},
+		{"GET /api/v1/workspaces/{workspaceSlug}/billing", m.Workspace(billingOn(h.Billing, h.Billing.Billing)), model.RightRead},
+		{"POST /api/v1/workspaces/{workspaceSlug}/billing/checkout", m.Workspace(billingOn(h.Billing, h.Billing.CreateCheckout)), NoToken},
+		{"GET /api/v1/workspaces/{workspaceSlug}/billing/manage", m.Workspace(billingOn(h.Billing, h.Billing.BillingManagement)), NoToken},
+		{"GET /api/v1/servers", m.InWorkspace(h.Servers.List), model.RightRead},
+		{"POST /api/v1/servers", m.InWorkspace(h.Servers.Create), model.RightServers},
+		{"DELETE /api/v1/servers/{id}", m.InWorkspace(h.Servers.Delete), model.RightServers | model.RightDelete},
+		{"PATCH /api/v1/servers/{id}", m.InWorkspace(h.Servers.Rename), model.RightServers},
+		{"POST /api/v1/servers/{id}/update", m.InWorkspace(h.Servers.Update), model.RightServers},
+		{"POST /api/v1/servers/{id}/install", m.InWorkspace(h.Servers.NewInstall), model.RightServers},
+		{"PUT /api/v1/servers/{id}/security", m.InWorkspace(h.Apps.SetSecurity), model.RightServers},
+		{"GET /api/v1/servers/{id}/metrics", m.InWorkspace(h.Apps.ServerMetrics), model.RightRead},
+		{"GET /api/v1/integrations", m.InWorkspace(h.Apps.GetIntegrations), model.RightRead},
+		{"PUT /api/v1/integrations", m.InWorkspace(h.Apps.SetIntegrations), model.RightServers},
+		{"GET /api/v1/daemon-updates", m.InWorkspace(h.Version.DaemonUpdates), model.RightRead},
+		{"PUT /api/v1/daemon-updates", m.InWorkspace(h.Version.SetDaemonUpdates), model.RightServers},
+		{"GET /api/v1/servers/events", m.InWorkspace(streams.wrap(h.Servers.Events)), model.RightRead},
+		{"GET /api/v1/status", m.InWorkspace(h.Status.Get), model.RightRead},
+		{"GET /api/v1/catalog", m.InWorkspace(h.Catalog.List), model.RightRead},
+		{"GET /api/v1/catalog/{slug}", m.InWorkspace(h.Catalog.Get), model.RightRead},
+		{"POST /api/v1/catalog/{slug}/install", m.InWorkspace(h.Catalog.Install), model.RightDeploy},
+		{"GET /api/v1/apps", m.InWorkspace(h.Apps.List), model.RightRead},
+		{"POST /api/v1/apps", m.InWorkspace(h.Apps.Create), model.RightDeploy},
+		{"PUT /api/v1/apps/{app}/pin", m.InWorkspace(h.Apps.SetPinned), model.RightDeploy},
+		{"GET /api/v1/apps/events", m.InWorkspace(streams.wrap(h.Apps.Events)), model.RightRead},
+		{"GET /api/v1/apps/{app}", m.InWorkspace(h.Apps.Get), model.RightRead},
+		{"PATCH /api/v1/apps/{app}", m.InWorkspace(h.Apps.Rename), model.RightDeploy},
+		{"DELETE /api/v1/apps/{app}", m.InWorkspace(h.Apps.Delete), model.RightDelete},
+		{"POST /api/v1/apps/{app}/deploys", m.InWorkspace(h.Apps.CreateDeploy), model.RightDeploy},
+		{"GET /api/v1/apps/{app}/deploys/{number}", m.InWorkspace(h.Apps.GetDeploy), model.RightRead},
+		{"GET /api/v1/apps/{app}/deploys/{number}/events", m.InWorkspace(streams.wrap(h.Apps.DeployEvents)), model.RightRead},
+		{"POST /api/v1/apps/{app}/rollback", m.InWorkspace(h.Apps.Rollback), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/update", m.InWorkspace(h.Catalog.Update), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/redeploy", m.InWorkspace(h.Apps.Redeploy), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RotateHook), model.RightDeploy},
+		{"DELETE /api/v1/apps/{app}/hook", m.InWorkspace(h.Apps.RemoveHook), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/restart", m.InWorkspace(h.Apps.Restart), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/start", m.InWorkspace(h.Apps.Start), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/stop", m.InWorkspace(h.Apps.Stop), model.RightDeploy},
+		{"GET /api/v1/apps/{app}/domains", m.InWorkspace(h.Apps.Domains), model.RightRead},
+		{"PUT /api/v1/apps/{app}/domains", m.InWorkspace(h.Apps.SetDomains), model.RightDeploy},
+		{"GET /api/v1/apps/{app}/instant", m.InWorkspace(h.Apps.GetInstant), model.RightRead},
+		{"PUT /api/v1/apps/{app}/instant", m.InWorkspace(h.Apps.SetInstant), model.RightDeploy},
+		{"PUT /api/v1/apps/{app}/password", m.InWorkspace(h.Apps.SetPassword), model.RightEnv},
+		{"DELETE /api/v1/apps/{app}/password", m.InWorkspace(h.Apps.DeletePassword), model.RightEnv},
+		{"GET /api/v1/registries", m.InWorkspace(h.Apps.Registries), model.RightRead},
+		{"PUT /api/v1/registries/{host}", m.InWorkspace(h.Apps.SetRegistry), model.RightServers},
+		{"DELETE /api/v1/registries/{host}", m.InWorkspace(h.Apps.DeleteRegistry), model.RightServers},
+		{"GET /api/v1/apps/{app}/logs", m.InWorkspace(h.Apps.Logs), model.RightRead},
+		{"GET /api/v1/apps/{app}/compose", m.InWorkspace(h.Apps.ComposeFile), model.RightRead},
+		{"POST /api/v1/apps/{app}/exec", m.InWorkspace(h.Apps.Exec), model.RightDeploy | model.RightEnv | model.RightDelete},
+		{"GET /api/v1/apps/{app}/databases", m.InWorkspace(h.Apps.Databases), model.RightRead},
+		{"GET /api/v1/apps/{app}/databases/tables", m.InWorkspace(h.Apps.Tables), model.RightRead},
+		{"GET /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.Rows), model.RightEnv},
+		{"POST /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.InsertRow), model.RightEnv | model.RightDelete},
+		{"PATCH /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.UpdateRow), model.RightEnv | model.RightDelete},
+		{"DELETE /api/v1/apps/{app}/databases/rows", m.InWorkspace(h.Apps.DeleteRow), model.RightEnv | model.RightDelete},
+		{"POST /api/v1/apps/{app}/databases/query", m.InWorkspace(h.Apps.Query), model.RightEnv},
+		{"GET /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.Backups), model.RightRead},
+		{"PUT /api/v1/apps/{app}/backups", m.InWorkspace(h.Apps.SetBackupSchedule), model.RightDeploy},
+		{"POST /api/v1/apps/{app}/backups/download", m.InWorkspace(h.Apps.Download), model.RightEnv},
+		{"POST /api/v1/apps/{app}/restores", m.InWorkspace(h.Apps.StartRestore), model.RightDelete},
+		{"GET /api/v1/apps/{app}/restores/{restore}", m.InWorkspace(h.Apps.Restore), model.RightRead},
+		{"GET /api/v1/apps/{app}/uptime", m.InWorkspace(h.Apps.Uptime), model.RightRead},
+		{"PUT /api/v1/apps/{app}/uptime/{domain}", m.InWorkspace(h.Apps.SetUptime), model.RightDeploy},
+		{"GET /api/v1/alert-destinations", m.InWorkspace(h.Alerts.List), model.RightRead},
+		{"POST /api/v1/alert-destinations", m.InWorkspace(h.Alerts.Create), model.RightServers},
+		{"DELETE /api/v1/alert-destinations/{destination}", m.InWorkspace(h.Alerts.Delete), model.RightServers},
+		{"POST /api/v1/alert-destinations/{destination}/test", m.InWorkspace(h.Alerts.Test), model.RightServers},
+		{"GET /api/v1/apps/{app}/metrics", m.InWorkspace(h.Apps.AppMetrics), model.RightRead},
+		{"GET /api/v1/github", m.InWorkspace(h.Apps.GetGitHub), model.RightRead},
+		{"GET /api/v1/github/repos", m.InWorkspace(h.Apps.GetGitHubRepos), model.RightRead},
+		{"GET /api/v1/github/repos/{owner}/{repo}/branches", m.InWorkspace(h.Apps.GetGitHubBranches), model.RightRead},
+		{"PUT /api/v1/apps/{app}/repo", m.InWorkspace(h.Apps.SetRepo), model.RightDeploy},
+		{"DELETE /api/v1/apps/{app}/repo", m.InWorkspace(h.Apps.DeleteRepo), model.RightDeploy},
+		{"GET /api/v1/buckets", m.InWorkspace(h.Apps.Buckets), model.RightRead},
+		{"POST /api/v1/buckets", m.InWorkspace(h.Apps.AddBucket), model.RightServers},
+		{"GET /api/v1/buckets/{name}", m.InWorkspace(h.Apps.GetBucket), model.RightRead},
+		{"PUT /api/v1/buckets/{name}", m.InWorkspace(h.Apps.EditBucket), model.RightServers},
+		{"PUT /api/v1/buckets/{name}/key", m.InWorkspace(h.Apps.SetBucketKey), model.RightServers},
+		{"DELETE /api/v1/buckets/{name}", m.InWorkspace(h.Apps.DeleteBucket), model.RightDelete},
+		{"PUT /api/v1/apps/{app}/bucket", m.InWorkspace(h.Apps.SetAppBucket), model.RightDeploy},
+		{"GET /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.GetEnv), model.RightRead},
+		{"PATCH /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.UpdateEnv), model.RightEnv},
+		{"PUT /api/v1/apps/{app}/env", m.InWorkspace(h.Apps.ReplaceEnv), model.RightEnv},
+		{"GET /api/v1/admin/users", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.Users))), NoToken},
+		{"GET /api/v1/admin/old-domain", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.OldDomain))), NoToken},
+		{"POST /api/v1/admin/users/{userID}/sessions/revoke", hostedOnly(h.Billing, m.RequireOnboarded(m.RequireAdmin(h.Admin.RevokeUserSessions))), NoToken},
 	}
 	for index := range routes {
-		routes[index].Handler = routes[index].Tokens.wrap(routes[index].Handler)
+		routes[index].Handler = routes[index].gate(m.AppID)
 	}
 	return routes
 }

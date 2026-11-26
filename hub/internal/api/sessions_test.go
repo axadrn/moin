@@ -20,7 +20,7 @@ func TestListSessionsMarksCurrent(t *testing.T) {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", cookie: token})
 	expectStatus(t, recorder, http.StatusOK)
 	for _, hidden := range []string{"token_hash", "user_agent", "Mozilla"} {
 		if strings.Contains(recorder.Body.String(), hidden) {
@@ -51,7 +51,7 @@ func TestListSessionsMarksCurrent(t *testing.T) {
 
 func sessionIDs(t *testing.T, environment *apiEnvironment, token string) (string, []string) {
 	t.Helper()
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account/sessions", cookie: token})
 	expectStatus(t, recorder, http.StatusOK)
 	currentID := ""
 	var others []string
@@ -72,12 +72,12 @@ func TestRevokeOtherSession(t *testing.T) {
 	other := environment.signIn(t, user.ID)
 	_, others := sessionIDs(t, environment, token)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + others[0], bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + others[0], cookie: token})
 	expectStatus(t, recorder, http.StatusNoContent)
-	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: other}), http.StatusUnauthorized, "unauthenticated")
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusOK)
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: other}), http.StatusUnauthorized, "unauthenticated")
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token}), http.StatusOK)
 
-	missing := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + others[0], bearer: token})
+	missing := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + others[0], cookie: token})
 	expectError(t, missing, http.StatusNotFound, "not_found")
 }
 
@@ -89,9 +89,9 @@ func TestRevokeSessionOfAnotherUserIsNotFound(t *testing.T) {
 	strangerToken := environment.signIn(t, stranger.ID)
 	strangerID, _ := sessionIDs(t, environment, strangerToken)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + strangerID, bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + strangerID, cookie: token})
 	expectError(t, recorder, http.StatusNotFound, "not_found")
-	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: strangerToken}), http.StatusOK)
+	expectStatus(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: strangerToken}), http.StatusOK)
 }
 
 func TestRevokeCurrentSessionEndsIt(t *testing.T) {
@@ -100,9 +100,9 @@ func TestRevokeCurrentSessionEndsIt(t *testing.T) {
 	token := environment.signIn(t, user.ID)
 	currentID, _ := sessionIDs(t, environment, token)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + currentID, bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions/" + currentID, cookie: token})
 	expectStatus(t, recorder, http.StatusNoContent)
-	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token}), http.StatusUnauthorized, "unauthenticated")
+	expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token}), http.StatusUnauthorized, "unauthenticated")
 }
 
 func TestRevokeCurrentCookieSessionClearsCookie(t *testing.T) {
@@ -131,10 +131,10 @@ func TestRevokeAllOtherSessions(t *testing.T) {
 	first := environment.signIn(t, user.ID)
 	second := environment.signIn(t, user.ID)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions", bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodDelete, path: "/api/v1/account/sessions", cookie: token})
 	expectStatus(t, recorder, http.StatusNoContent)
 	for _, revoked := range []string{first, second} {
-		expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: revoked}), http.StatusUnauthorized, "unauthenticated")
+		expectError(t, environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: revoked}), http.StatusUnauthorized, "unauthenticated")
 	}
 	currentID, others := sessionIDs(t, environment, token)
 	if currentID == "" || len(others) != 0 {

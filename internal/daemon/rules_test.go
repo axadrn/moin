@@ -1,11 +1,14 @@
 package daemon
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -15,15 +18,39 @@ func TestRulesReadEveryRule(t *testing.T) {
 data: off
 logs: off   # no logs through moin
 network: locked
-deploy-from: github.com/acme/*, ghcr.io/acme/*, upload
+deploy-from: github.com/acme/*, ghcr.io/acme/*, catalog
 backups-to: s3.eu-central-1.amazonaws.com/acme-backups
 `, "rules")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := protocol.Rules{DataOff: true, LogsOff: true, NetworkLocked: true, DeployFrom: []string{"github.com/acme/*", "ghcr.io/acme/*", "upload"}, BackupsTo: "s3.eu-central-1.amazonaws.com/acme-backups"}
+	want := protocol.Rules{DataOff: true, LogsOff: true, NetworkLocked: true, DeployFrom: []string{"github.com/acme/*", "ghcr.io/acme/*", "catalog"}, BackupsTo: "s3.eu-central-1.amazonaws.com/acme-backups"}
 	if strings.Join(rules.DeployFrom, ",") != strings.Join(want.DeployFrom, ",") || rules.DataOff != want.DataOff || rules.LogsOff != want.LogsOff || rules.NetworkLocked != want.NetworkLocked || rules.BackupsTo != want.BackupsTo {
 		t.Fatalf("rules = %+v", rules)
+	}
+}
+
+// The rules file a new server gets allows what no file allows, names every
+// rule, and its examples are rules the daemon reads.
+func TestTheInstalledRulesAreTheDefaults(t *testing.T) {
+	text := protocol.DaemonRules(build.Name)
+	rules, err := parseRules(text, "rules")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*rules, protocol.Rules{}) {
+		t.Errorf("rules = %+v, want what no file allows", rules)
+	}
+	for _, rule := range []string{"data", "logs", "exec", "network", "server-access", "deploy-from", "backups-to", "mounts"} {
+		if !strings.Contains(text, "\n"+rule+": ") && !strings.Contains(text, "\n# "+rule+": ") {
+			t.Errorf("the file misses %s", rule)
+		}
+	}
+	examples := strings.ReplaceAll(text, "\n# deploy-from:", "\ndeploy-from:")
+	examples = strings.ReplaceAll(examples, "\n# backups-to:", "\nbackups-to:")
+	examples = strings.ReplaceAll(examples, "\n# mounts:", "\nmounts:")
+	if _, err := parseRules(examples, "rules"); err != nil {
+		t.Errorf("an example is no rule: %v", err)
 	}
 }
 
@@ -60,6 +87,10 @@ func TestDeployFrom(t *testing.T) {
 		{protocol.DeployStart{Image: "ghcr.io/evil/blog:v3"}, false},
 		{protocol.DeployStart{SourceNumber: 4}, true},
 		{protocol.DeployStart{FromNumber: 4}, true},
+		// An image with the compose file of a commit brings both sources.
+		{protocol.DeployStart{SourceURL: "https://api.github.com/repos/acme/blog/tarball/abc123", Image: "ghcr.io/acme/blog:v3"}, true},
+		{protocol.DeployStart{SourceURL: "https://api.github.com/repos/acme/blog/tarball/abc123", Image: "ghcr.io/evil/blog:v3"}, false},
+		{protocol.DeployStart{SourceURL: "https://api.github.com/repos/evil/blog/tarball/abc123", Image: "ghcr.io/acme/blog:v3"}, false},
 	}
 	for _, c := range cases {
 		err := checkDeploy(rules, "rules", c.start)
@@ -69,17 +100,27 @@ func TestDeployFrom(t *testing.T) {
 	}
 }
 
-func TestUploadsComeFromTheBucketOfBackupsTo(t *testing.T) {
-	rules := &protocol.Rules{DeployFrom: []string{"upload"}, BackupsTo: "s3.example.com/acme"}
-	for raw, ok := range map[string]bool{
-		"https://s3.example.com/acme/uploads/x.tar.gz?X-Amz-Signature=1": true,
-		"https://acme.s3.example.com/uploads/x.tar.gz":                   true,
-		"https://s3.example.com/other/uploads/x.tar.gz":                  false,
-		"https://evil.example/acme/uploads/x.tar.gz":                     false,
+// A source is the GitHub tarball of a commit, with rules or without:
+// the daemon downloads nothing else.
+func TestSourcesComeOnlyFromGitHub(t *testing.T) {
+	if name, err := sourceName("https://api.github.com/repos/acme/blog/tarball/abc123"); err != nil || name != "github.com/acme/blog" {
+		t.Fatalf("the GitHub tarball = %q, %v", name, err)
+	}
+	for _, raw := range []string{
+		"https://bucket.example/acme/uploads/x.tar.gz",
+		"https://api.github.com/repos/acme/blog/zipball/abc123",
+		"https://evil.example/repos/acme/blog/tarball/abc123",
+		"http://api.github.com/repos/acme/blog/tarball/abc123",
+		"https://api.github.com.evil.example/repos/acme/blog/tarball/abc123",
+		"https://api.github.com:8443/repos/acme/blog/tarball/abc123",
+		"file:///repos/acme/blog/tarball/abc123",
 	} {
-		err := checkDeploy(rules, "rules", protocol.DeployStart{SourceURL: raw})
-		if (err == nil) != ok {
+		err := download(context.Background(), protocol.DeployStart{SourceURL: raw}, t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "only from a GitHub repo") {
 			t.Errorf("%s: err = %v", raw, err)
+		}
+		if checkDeploy(&protocol.Rules{DeployFrom: []string{"*"}}, "rules", protocol.DeployStart{SourceURL: raw}) == nil {
+			t.Errorf("%s: the rules allow it", raw)
 		}
 	}
 }
@@ -101,7 +142,7 @@ func TestHelloCarriesTheRules(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "rules")
 	os.WriteFile(file, []byte("data: off\n"), 0o600)
 	t.Setenv("MOIN_RULES", file)
-	if hello := Hello(); hello.Rules == nil || !hello.Rules.DataOff {
+	if hello := Hello(t.TempDir()); hello.Rules == nil || !hello.Rules.DataOff {
 		t.Fatalf("hello = %+v", hello)
 	}
 }

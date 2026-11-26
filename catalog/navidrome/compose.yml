@@ -1,0 +1,7 @@
+services:
+  web:
+    image: deluan/navidrome:${VERSION}
+    expose: ["4533"]
+    volumes:
+      - ./data/navidrome:/data
+      - ./data/music:/music:ro

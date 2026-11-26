@@ -44,7 +44,7 @@ func TestCORSExposesRetryAfterOnRateLimitedAnswers(t *testing.T) {
 		w.Header().Set("Retry-After", "60")
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/magic-link", nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/device", nil)
 	request.Header.Set("Origin", testAllowedOrigin)
 	recorder := httptest.NewRecorder()
 
@@ -185,5 +185,36 @@ func expectHeaders(t *testing.T, recorder *httptest.ResponseRecorder, want map[s
 		if got != value {
 			t.Fatalf("%s = %q, want %q", name, got, value)
 		}
+	}
+}
+
+// TestCORSLetsEveryPageCallThePublicOAuthEndpoints: an MCP client in a web
+// page, like MCP Inspector, reads the metadata, registers and trades its
+// code from any origin, never with credentials. Every other path keeps its
+// rules.
+func TestCORSLetsEveryPageCallThePublicOAuthEndpoints(t *testing.T) {
+	for _, path := range []string{"/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-authorization-server", "/api/v1/auth/register", "/api/v1/auth/token"} {
+		request := httptest.NewRequest(http.MethodPost, path, nil)
+		request.Header.Set("Origin", "https://inspector.example.com")
+		recorder, called := serveCORS(t, request)
+		if !called {
+			t.Fatalf("%s: the request did not reach the handler", path)
+		}
+		expectHeaders(t, recorder, map[string]string{"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": ""})
+
+		preflight := httptest.NewRequest(http.MethodOptions, path, nil)
+		preflight.Header.Set("Origin", "https://inspector.example.com")
+		preflight.Header.Set("Access-Control-Request-Method", http.MethodPost)
+		recorder, called = serveCORS(t, preflight)
+		if called || recorder.Code != http.StatusNoContent {
+			t.Fatalf("%s preflight: called = %t, status = %d", path, called, recorder.Code)
+		}
+		expectHeaders(t, recorder, map[string]string{"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, MCP-Protocol-Version", "Access-Control-Allow-Credentials": ""})
+	}
+	for _, path := range []string{"/api/v1/auth/revoke", "/api/v1/account", "/oauth/authorize", "/mcp"} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Set("Origin", "https://inspector.example.com")
+		recorder, _ := serveCORS(t, request)
+		expectHeaders(t, recorder, map[string]string{"Access-Control-Allow-Origin": ""})
 	}
 }

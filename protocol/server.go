@@ -19,18 +19,24 @@ type Hello struct {
 	// Rules are the server's own rules for moin, from /etc/moin/rules. Nil
 	// means the server has none and moin may do everything.
 	Rules *Rules `json:"rules,omitempty"`
+	// Secrets are the names of the secrets the daemon keeps in its
+	// server.json (SecretSet), never their values.
+	Secrets []string `json:"secrets,omitempty"`
+	// Env are the env keys of every app on the server, by its folder,
+	// never their values. An app without an entry has no env there.
+	Env map[string]AppEnv `json:"env,omitempty"`
 }
 
 // Rules are what the owner of a server allows moin to do there, written in
 // /etc/moin/rules on the server. The hub cannot change them; the
 // daemon refuses every request they do not allow.
 type Rules struct {
-	// DataOff refuses tables, SQL and row edits.
+	// DataOff refuses tables, SQL, row edits and backup downloads.
 	DataOff bool `json:"data_off,omitempty"`
 	// LogsOff refuses container logs.
 	LogsOff bool `json:"logs_off,omitempty"`
 	// DeployFrom lists where deploys may come from, such as
-	// "github.com/acme/*", "ghcr.io/acme/*" or "upload". Empty allows all.
+	// "github.com/acme/*", "ghcr.io/acme/*" or "catalog". Empty allows all.
 	DeployFrom []string `json:"deploy_from,omitempty"`
 	// BackupsTo is the only bucket backups may go to and come from, as
 	// "<endpoint host>/<bucket>". Empty allows any.
@@ -39,6 +45,13 @@ type Rules struct {
 	NetworkLocked bool `json:"network_locked,omitempty"`
 	// ExecOff refuses running commands in containers.
 	ExecOff bool `json:"exec_off,omitempty"`
+	// Mounts are folders of the server an app may mount, such as
+	// "/mnt/media". Without them an app mounts only its own folders.
+	Mounts []string `json:"mounts,omitempty"`
+	// ServerAccess allows compose settings that reach beyond the app, such
+	// as privileged containers or a mount of the Docker socket. Without it
+	// the daemon refuses them, with or without a rules file.
+	ServerAccess bool `json:"server_access,omitempty"`
 }
 
 // Lines are the rules as written in the rules file, for every surface to
@@ -65,6 +78,12 @@ func (r *Rules) Lines() []string {
 	}
 	if r.ExecOff {
 		lines = append(lines, "exec: off")
+	}
+	if len(r.Mounts) > 0 {
+		lines = append(lines, "mounts: "+strings.Join(r.Mounts, ", "))
+	}
+	if r.ServerAccess {
+		lines = append(lines, "server-access: on")
 	}
 	return lines
 }
@@ -99,19 +118,19 @@ func ValidSSH(ssh string) bool {
 // TypeServerSecurity. It checks after each start too.
 const SecurityEvery = 5 * time.Minute
 
-// ServerConfig is how a server is reached and locked down.
+// ServerConfig is how a server is reached and locked down. It carries no
+// secret: the tunnel token and the Tailscale key are secrets the daemon
+// keeps (SecretTunnel, SecretTailscale).
 //
-// TunnelToken runs cloudflared, which carries all app traffic from
-// Cloudflare to Traefik; the proxy then opens no port. Without it Traefik
-// takes 80 and 443. TailscaleKey joins the server to the user's tailnet.
-// SSH says who SSH answers: SSHTailscale only through Tailscale, SSHEveryone, or SSHOff
+// With a tunnel token the daemon runs cloudflared, which carries all app
+// traffic from Cloudflare to Traefik; the proxy then opens no port. Without
+// it Traefik takes 80 and 443. The Tailscale key joins the server to the
+// user's tailnet when SSH is SSHTailscale. SSH says who SSH answers: SSHTailscale only through Tailscale, SSHEveryone, or SSHOff
 // with sshd stopped. Firewall drops every other inbound connection.
 //
 // SSHOnTailscale is SSH == SSHTailscale for daemons before SSH: the hub sends
 // both, and a daemon without SSH reads SSHOnTailscale.
 type ServerConfig struct {
-	TunnelToken    string `json:"tunnel_token,omitempty"`
-	TailscaleKey   string `json:"tailscale_key,omitempty"`
 	SSH            string `json:"ssh,omitempty"`
 	SSHOnTailscale bool   `json:"ssh_on_tailscale,omitempty"`
 	Firewall       bool   `json:"firewall,omitempty"`

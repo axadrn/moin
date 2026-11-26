@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
@@ -66,6 +67,11 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			default:
 				rules.ExecOff = value == "off"
 			}
+		case "server-access":
+			if value != "on" && value != "off" {
+				return nil, wrong("server-access is on or off")
+			}
+			rules.ServerAccess = value == "on"
 		case "network":
 			if value != "open" && value != "locked" {
 				return nil, wrong("network is open or locked")
@@ -75,9 +81,17 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			for _, source := range strings.Split(value, ",") {
 				source = strings.TrimSpace(source)
 				if _, err := path.Match(source, ""); err != nil || source == "" {
-					return nil, wrong("deploy-from lists sources like github.com/acme/*, ghcr.io/acme/* or upload")
+					return nil, wrong("deploy-from lists sources like github.com/acme/*, ghcr.io/acme/* or catalog")
 				}
 				rules.DeployFrom = append(rules.DeployFrom, source)
+			}
+		case "mounts":
+			for _, folder := range strings.Split(value, ",") {
+				folder = strings.TrimSpace(folder)
+				if !filepath.IsAbs(folder) || filepath.Clean(folder) != folder {
+					return nil, wrong("mounts lists folders of the server like /mnt/media, /srv/photos")
+				}
+				rules.Mounts = append(rules.Mounts, folder)
 			}
 		case "backups-to":
 			host, bucket, ok := strings.Cut(value, "/")
@@ -86,15 +100,18 @@ func parseRules(text, file string) (*protocol.Rules, error) {
 			}
 			rules.BackupsTo = value
 		default:
-			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to and network")
+			return nil, wrong("unknown rule; the rules are data, logs, exec, deploy-from, backups-to, network, mounts and server-access")
 		}
 	}
 	return rules, nil
 }
 
+// refusedByRules starts the answer to a request the rules do not allow.
+const refusedByRules = "refused by the rules of this server"
+
 // refused is the answer to a request the rules do not allow.
 func refused(file, what string) error {
-	return fmt.Errorf("refused by the rules of this server (%s): %s", file, what)
+	return fmt.Errorf("%s (%s): %s", refusedByRules, file, what)
 }
 
 // checkDeploy allows a deploy whose source the rules allow. A redeploy or a
@@ -107,8 +124,11 @@ func checkDeploy(rules *protocol.Rules, file string, start protocol.DeployStart)
 	if start.Image != "" {
 		sources = append(sources, imageName(start.Image))
 	}
+	if start.Catalog != "" {
+		sources = append(sources, "catalog")
+	}
 	if start.SourceURL != "" {
-		source, err := sourceName(start.SourceURL, rules.BackupsTo)
+		source, err := sourceName(start.SourceURL)
 		if err != nil {
 			return refused(file, err.Error())
 		}
@@ -141,36 +161,23 @@ func imageName(image string) string {
 	return image
 }
 
-// sourceName names where a source download comes from: a GitHub repo as
-// github.com/<owner>/<repo>, anything else as upload. With backups-to set,
-// an upload must come from that bucket.
-func sourceName(raw, backupsTo string) (string, error) {
+// githubAPI is the one place a source comes from; tests replace it.
+var githubAPI = "https://api.github.com"
+
+// sourceName names the GitHub repo a source download comes from, as
+// github.com/<owner>/<repo>. A source is only ever the tarball of a commit,
+// over https from api.github.com: anything else is refused.
+func sourceName(raw string) (string, error) {
 	link, err := url.Parse(raw)
 	if err != nil {
 		return "", fmt.Errorf("the source address %q is not a URL", raw)
 	}
+	from := link.Scheme + "://" + link.Host
 	parts := strings.Split(strings.Trim(link.Path, "/"), "/")
-	if len(parts) == 5 && parts[0] == "repos" && parts[3] == "tarball" {
-		host := link.Host
-		if host == "api.github.com" {
-			host = "github.com"
-		}
-		return host + "/" + parts[1] + "/" + parts[2], nil
+	if from == githubAPI && len(parts) == 5 && parts[0] == "repos" && parts[3] == "tarball" {
+		return "github.com/" + parts[1] + "/" + parts[2], nil
 	}
-	if backupsTo != "" && !inBucket(link, backupsTo) {
-		return "", fmt.Errorf("an upload from %s is not in the bucket of backups-to", link.Host)
-	}
-	return "upload", nil
-}
-
-// inBucket reports whether a link points into "<endpoint host>/<bucket>",
-// in path style or virtual-host style.
-func inBucket(link *url.URL, hostBucket string) bool {
-	host, bucket, _ := strings.Cut(hostBucket, "/")
-	if link.Host == host {
-		return strings.HasPrefix(link.Path, "/"+bucket+"/")
-	}
-	return link.Host == bucket+"."+host
+	return "", fmt.Errorf("a source comes only from a GitHub repo, over https from api.github.com, not from %s", from)
 }
 
 // checkBucket allows a bucket the rules allow.
@@ -178,16 +185,22 @@ func checkBucket(rules *protocol.Rules, file string, bucket *protocol.Bucket) er
 	if rules == nil || rules.BackupsTo == "" || bucket == nil {
 		return nil
 	}
+	if bucketPlace(bucket) != rules.BackupsTo {
+		return refused(file, fmt.Sprintf("backups-to allows only %s", rules.BackupsTo))
+	}
+	return nil
+}
+
+// bucketPlace is where a bucket is, as backups-to names it: <endpoint
+// host>/<bucket>, "" when its endpoint is no URL.
+func bucketPlace(bucket *protocol.Bucket) string {
 	host := "s3." + bucket.Region + ".amazonaws.com"
 	if bucket.Endpoint != "" {
 		endpoint, err := url.Parse(bucket.Endpoint)
 		if err != nil {
-			return refused(file, fmt.Sprintf("backups-to allows only %s", rules.BackupsTo))
+			return ""
 		}
 		host = endpoint.Host
 	}
-	if host+"/"+bucket.Bucket != rules.BackupsTo {
-		return refused(file, fmt.Sprintf("backups-to allows only %s", rules.BackupsTo))
-	}
-	return nil
+	return host + "/" + bucket.Bucket
 }

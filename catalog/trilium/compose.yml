@@ -1,0 +1,6 @@
+services:
+  web:
+    image: ghcr.io/triliumnext/trilium:${VERSION}
+    expose: ["8080"]
+    volumes:
+      - ./data:/home/node/trilium-data

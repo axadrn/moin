@@ -1,7 +1,9 @@
 package service
 
 import (
+	"cmp"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +21,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
 	"github.com/axadrn/moin/hub/internal/secret"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/dotenv"
 	"github.com/axadrn/moin/protocol"
 	"github.com/google/uuid"
@@ -31,30 +34,30 @@ const (
 	maxDeployLogLines = 5000
 	maxEnvVars        = 200
 	maxEnvValueSize   = 32 << 10
+	// maxComposeFile is the biggest compose file the hub keeps of a deploy.
+	maxComposeFile = 511 << 10
 )
 
 var (
-	ErrAppName        = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
-	ErrDeployRunning  = errors.New("a deploy of this app is still running")
-	ErrNoRollback     = errors.New("there is no earlier successful deploy to roll back to")
-	ErrDeployGone     = errors.New("that deploy is no longer on the server")
-	ErrNoSource       = errors.New("no deploy has a source yet")
-	ErrNotLive        = errors.New("the app has no live deploy yet")
-	ErrRunning        = errors.New("the app is already running")
-	ErrImage          = errors.New("image must be a reference like ghcr.io/me/app:tag")
-	ErrDeployHook     = errors.New("deploy hook is invalid")
-	ErrRegistryHost   = errors.New("registry host must be a host name like ghcr.io")
-	ErrRegistryLogin  = errors.New("registry username and password are required")
-	ErrDomain         = errors.New("domains must be host names like my-app.example.com")
-	ErrCanonical      = errors.New("the canonical domain must be one of the domains")
-	ErrInstantInFile  = errors.New("the instant address is set in compose.yml: change it there and deploy")
-	ErrProtectInFile  = errors.New("the password is required by compose.yml: change it there and deploy")
-	ErrComposeDomains = errors.New("the domains of this app come from x-moin.domains in compose.yml")
-	ErrProtect        = errors.New("protection needs a password of 8 to 72 characters")
-	ErrProtectUser    = errors.New("protection needs a username without spaces or colons")
-	ErrEnvKey         = errors.New("env keys are letters, digits and underscores and do not start with a digit")
-	ErrEnvValue       = errors.New("env values are at most 32 KB")
-	ErrEnvLimit       = errors.New("an app has at most 200 env vars")
+	ErrAppName       = errors.New("app name must be 1 to 63 lowercase letters, digits or dashes, starting with a letter or digit")
+	ErrDeployRunning = errors.New("a deploy of this app is still running")
+	ErrNoRollback    = errors.New("there is no earlier successful deploy to roll back to")
+	ErrDeployGone    = errors.New("that deploy is no longer on the server")
+	ErrNoSource      = errors.New("no deploy has a source yet")
+	ErrNotLive       = errors.New("the app has no live deploy yet")
+	ErrNoComposeFile = errors.New("this deploy has no compose file: deploy again; the deploy log says why if it stays empty")
+	ErrRunning       = errors.New("the app is already running")
+	ErrImage         = errors.New("image must be a reference like ghcr.io/me/app:tag")
+	ErrDeployHook    = errors.New("deploy hook is invalid")
+	ErrRegistryHost  = errors.New("registry host must be a host name like ghcr.io")
+	ErrRegistryLogin = errors.New("registry username and password are required")
+	ErrDomain        = errors.New("domains must be host names like my-app.example.com")
+	ErrCanonical     = errors.New("the canonical domain must be one of the domains")
+	ErrPassword      = errors.New("the app's password needs 8 to 72 characters")
+	ErrPasswordUser  = errors.New("the app's password needs a username without spaces or colons")
+	ErrEnvKey        = errors.New("env keys are letters, digits and underscores and do not start with a digit")
+	ErrEnvValue      = errors.New("env values are at most 32 KB")
+	ErrEnvLimit      = errors.New("an app has at most 200 env vars")
 )
 
 const deployHookMarker = "dph_"
@@ -90,11 +93,11 @@ type AppService struct {
 	apps       *repository.Apps
 	servers    *ServerService
 	box        *secret.Box
-	github     *GitHub
+	githubApp  *GitHubAppService
 	cloudflare *Cloudflare
 	now        func() time.Time
-	// publicBucketsOnly refuses buckets on private or local addresses.
-	publicBucketsOnly bool
+	// publicOnly has uptime checks refuse private or local addresses.
+	publicOnly bool
 	// proxyOnFirstConnect sends a server its config the first time its
 	// daemon connects, which starts the proxy; see ProxyOnFirstConnect.
 	proxyOnFirstConnect bool
@@ -141,11 +144,14 @@ func NewAppService(apps *repository.Apps, servers *ServerService, box *secret.Bo
 		}
 		service.configureServerOnConnect(serverID, workspaceID)
 		service.reconcileRestores(serverID)
+		service.forgetOldSecrets(serverID, workspaceID)
 	})
 	return service
 }
 
-// Create adds an app on one of the user's servers.
+// Create adds an app on one of the user's servers. A new app starts with
+// its password on, so nobody else can open it before its owner: the app it
+// returns carries the password moin made, the one time moin shows it.
 func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.App, error) {
 	name = strings.TrimSpace(name)
 	if !appNamePattern.MatchString(name) {
@@ -155,7 +161,11 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	if err != nil {
 		return nil, err
 	}
-	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, CreatedAt: s.now().UTC()}
+	password, line, err := newPassword(PasswordUser)
+	if err != nil {
+		return nil, err
+	}
+	app := &model.App{ID: uuid.New().String(), WorkspaceID: actor.WorkspaceID, ServerID: server.ID, Name: name, Password: line, CreatedAt: s.now().UTC()}
 	// The folder is the name, unless an app renamed away from it still
 	// has it: then my-app-2, my-app-3 …
 	for number := 1; ; number++ {
@@ -179,11 +189,16 @@ func (s *AppService) Create(actor Actor, name, serverIDOrName string) (*model.Ap
 	s.servers.record(actor, "app.created", "app", name, map[string]string{"server": server.Name})
 	s.notify(actor.WorkspaceID)
 	s.reconfigure(server.ID, actor.WorkspaceID)
-	return s.apps.ByID(app.ID)
+	created, err := s.apps.ByID(app.ID)
+	if err != nil {
+		return nil, err
+	}
+	created.NewPassword = password
+	return created, nil
 }
 
-// Rename gives an app a new name under the rules of Create. Links to it
-// keep working, since they count its ID. Its server keeps it under its
+// Rename gives an app a new name under the rules of Create. Links name an
+// app by its name, so they follow the new one. Its server keeps it under its
 // folder, so its data, its backups and its instant address stay; the
 // containers take the new name on the next deploy or restart.
 func (s *AppService) Rename(actor Actor, idOrName, name string) (*model.App, error) {
@@ -272,14 +287,32 @@ func (s *AppService) Deploys(workspaceID, idOrName string, limit int) (*model.Ap
 }
 
 // Deploy deploys an image built elsewhere, such as in CI, as the main
-// service; the server keeps the compose file of the live deploy.
-func (s *AppService) Deploy(actor Actor, idOrName, image string) (*model.Deploy, error) {
+// service. An app that follows a repo takes the compose file of ref there,
+// the linked branch when ref is empty, so code and compose file match. An
+// app without a repo keeps the compose file of the live deploy; a ref
+// means nothing there and is refused.
+func (s *AppService) Deploy(ctx context.Context, actor Actor, idOrName, image, ref string) (*model.Deploy, error) {
 	if !imagePattern.MatchString(image) {
 		return nil, ErrImage
+	}
+	// The ref goes into a GitHub URL.
+	ref = strings.TrimSpace(ref)
+	if ref != "" && !protocol.ValidRefName(ref) {
+		return nil, ErrRefName
 	}
 	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
 		return nil, err
+	}
+	if app.Repo != "" {
+		if s.gitHub() == nil {
+			return nil, ErrGitHubOff
+		}
+		ref = cmp.Or(ref, app.Branch)
+		return s.deployCommit(ctx, actor, app, ref, ref, image)
+	}
+	if ref != "" {
+		return nil, ErrNoRepo
 	}
 	deploy := s.newDeploy(app)
 	deploy.Image = image
@@ -293,8 +326,9 @@ func (s *AppService) newDeploy(app *model.App) *model.Deploy {
 
 // DeployHook deploys an image for the app whose deploy hook token this is.
 // CI calls it after pushing the image: a new tag or digest of the image
-// running now, never another image.
-func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy, error) {
+// running now, never another image. commit is the commit CI built the
+// image from, whose compose file the deploy takes; see Deploy.
+func (s *AppService) DeployHook(ctx context.Context, token, image, commit string) (*model.App, *model.Deploy, error) {
 	if !strings.HasPrefix(token, deployHookMarker) {
 		return nil, nil, ErrDeployHook
 	}
@@ -315,20 +349,22 @@ func (s *AppService) DeployHook(token, image string) (*model.App, *model.Deploy,
 	if app.HookImage() == "" || model.ImageName(image) != app.HookImage() {
 		return app, nil, &HookImageError{Image: app.HookImage()}
 	}
-	deploy, err := s.Deploy(Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaHook}}, app.ID, image)
+	deploy, err := s.Deploy(ctx, Actor{WorkspaceID: app.WorkspaceID, Source: Source{Via: ViaHook}}, app.ID, image, commit)
 	return app, deploy, err
 }
 
 // RotateDeployHook gives the app a new deploy hook URL, shown once. The old
-// one stops working. One thing brings new versions: a hook unlinks the
-// app's repo.
+// one stops working. CI deploys from then on: pushes to the app's repo no
+// longer do, and the repo stays linked for the compose file.
 func (s *AppService) RotateDeployHook(actor Actor, idOrName string) (string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return "", err
 	}
-	if err := s.UnlinkRepo(actor, app.ID); err != nil {
-		return "", err
+	if app.Repo != "" {
+		if _, err := s.SetAutoDeploy(actor, app.ID, false); err != nil {
+			return "", err
+		}
 	}
 	token := deployHookMarker + randomToken()
 	err = s.apps.SetDeployHookHash(app.ID, hashToken(token))
@@ -357,92 +393,100 @@ func (s *AppService) RemoveDeployHook(actor Actor, idOrName string) (bool, error
 	return true, nil
 }
 
-// RegistryLogin is a registry login without its password.
+// RegistryLogin is a registry login without its password, which only
+// the servers keep: Servers says which.
 type RegistryLogin struct {
 	Host      string
 	Username  string
 	CreatedAt time.Time
+	Servers   SecretServers
 }
 
-// Registries lists the user's registry logins.
+// Registries lists the workspace's registry logins.
 func (s *AppService) Registries(workspaceID string) ([]RegistryLogin, error) {
 	registries, err := s.apps.Registries(workspaceID)
 	if err != nil {
 		return nil, err
 	}
+	index, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return nil, err
+	}
 	logins := make([]RegistryLogin, 0, len(registries))
 	for _, registry := range registries {
-		logins = append(logins, RegistryLogin{Host: registry.Host, Username: registry.Username, CreatedAt: registry.CreatedAt})
+		logins = append(logins, RegistryLogin{Host: registry.Host, Username: registry.Username, CreatedAt: registry.CreatedAt, Servers: index.of(protocol.RegistrySecret(registry.Host))})
 	}
 	return logins, nil
 }
 
-// SetRegistry stores a login daemons use to pull the user's images from host.
-func (s *AppService) SetRegistry(actor Actor, host, username, password string) error {
+// SetRegistry hands a login for host to a server, which pulls the
+// workspace's images from there with it: the named one, or the only one.
+// The hub keeps the host and the username.
+func (s *AppService) SetRegistry(ctx context.Context, actor Actor, host, username, password, serverName string) error {
 	host = strings.ToLower(strings.TrimSpace(host))
+	username = strings.TrimSpace(username)
 	if !registryHostPattern.MatchString(host) {
 		return ErrRegistryHost
 	}
-	if strings.TrimSpace(username) == "" || password == "" {
+	if username == "" || strings.Contains(username, ":") || password == "" {
 		return ErrRegistryLogin
 	}
-	err := s.apps.SetRegistry(model.Registry{
-		WorkspaceID: actor.WorkspaceID,
-		Host:        host,
-		Username:    strings.TrimSpace(username),
-		Password:    s.box.Seal(password, actor.WorkspaceID+"/"+host),
-		CreatedAt:   s.now().UTC(),
-	})
+	server, err := s.servers.secretServer(actor.WorkspaceID, serverName)
 	if err != nil {
 		return err
 	}
-	s.servers.record(actor, "registry.set", "registry", host, map[string]string{"username": strings.TrimSpace(username)})
+	err = s.servers.setSecret(ctx, server, protocol.RegistrySecret(host), username+":"+password)
+	if err != nil {
+		return err
+	}
+	err = s.apps.SetRegistry(model.Registry{WorkspaceID: actor.WorkspaceID, Host: host, Username: username, CreatedAt: s.now().UTC()})
+	if err != nil {
+		return err
+	}
+	s.servers.record(actor, "registry.set", "registry", host, map[string]string{"username": username, "server": server.Name})
 	return nil
 }
 
-// RemoveRegistry deletes a registry login.
-func (s *AppService) RemoveRegistry(actor Actor, host string) error {
+// RemoveRegistry deletes a registry login, also from the servers.
+func (s *AppService) RemoveRegistry(ctx context.Context, actor Actor, host string) error {
 	host = strings.ToLower(strings.TrimSpace(host))
 	err := s.apps.DeleteRegistry(actor.WorkspaceID, host)
 	if err != nil {
 		return err
 	}
+	s.servers.dropSecret(ctx, actor.WorkspaceID, protocol.RegistrySecret(host))
 	s.servers.record(actor, "registry.removed", "registry", host, nil)
 	return nil
 }
 
-// registry returns the user's login for the registry of image, if any.
-func (s *AppService) registry(workspaceID, image string) (*protocol.Registry, error) {
-	host := registryHost(image)
-	registries, err := s.apps.Registries(workspaceID)
+// checkRegistry refuses a deploy of image when the workspace has a login
+// for its registry and the app's server does not keep it: the pull would
+// fail without it.
+func (s *AppService) checkRegistry(app *model.App, image string) error {
+	host := protocol.RegistryHost(image)
+	registries, err := s.apps.Registries(app.WorkspaceID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	for _, registry := range registries {
-		if registry.Host != host {
-			continue
-		}
-		password, err := s.box.Open(registry.Password, workspaceID+"/"+host)
-		if err != nil {
-			return nil, fmt.Errorf("registry %s: %w", host, err)
-		}
-		return &protocol.Registry{Host: host, Username: registry.Username, Password: password}, nil
+	if !slices.ContainsFunc(registries, func(registry model.Registry) bool { return registry.Host == host }) {
+		return nil
 	}
-	return nil, nil
-}
-
-// registryHost is the registry of an image reference: its first part when
-// that looks like a host, else Docker Hub.
-func registryHost(image string) string {
-	first, _, found := strings.Cut(image, "/")
-	if found && (strings.ContainsAny(first, ".:") || first == "localhost") {
-		return first
+	index, err := s.servers.secretsIndex(app.WorkspaceID)
+	if err != nil {
+		return err
 	}
-	return "docker.io"
+	if index.has(app.ServerID, protocol.RegistrySecret(host)) {
+		return nil
+	}
+	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	return &MissingSecretError{Message: server.Name + " has no login for " + host + ". Enter it for " + server.Name + " under Registries, then deploy again."}
 }
 
 // Redeploy runs the newest deploy that had a source or an image again, with
-// the env as it is now. Rollbacks are skipped.
+// the env as it is now on the server. Rollbacks are skipped.
 func (s *AppService) Redeploy(actor Actor, idOrName string) (*model.Deploy, error) {
 	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
@@ -457,13 +501,12 @@ func (s *AppService) Redeploy(actor Actor, idOrName string) (*model.Deploy, erro
 			continue
 		}
 		deploy := &model.Deploy{
-			ID:           uuid.New().String(),
-			AppID:        app.ID,
-			Status:       model.DeployRunning,
-			SourceKey:    previous.SourceKey,
-			SourceSHA256: previous.SourceSHA256,
-			Image:        previous.Image,
-			CreatedAt:    s.now().UTC(),
+			ID:        uuid.New().String(),
+			AppID:     app.ID,
+			Status:    model.DeployRunning,
+			SourceKey: previous.SourceKey,
+			Image:     previous.Image,
+			CreatedAt: s.now().UTC(),
 		}
 		// The server builds the source it kept of that deploy again.
 		start := protocol.DeployStart{Image: deploy.Image}
@@ -553,88 +596,113 @@ func (s *AppService) setMainDomains(actor Actor, idOrName string, domains []stri
 	if err != nil {
 		return false, err
 	}
-	// x-moin wins, so a change here would never reach the app.
-	if fromCompose, _ := app.ComposeDomains(); len(fromCompose) > 0 {
-		return false, ErrComposeDomains
-	}
 	clean, err := cleanDomains(domains)
 	if err != nil {
 		return false, err
-	}
-	for _, list := range app.ServiceDomainMap() {
-		for _, domain := range clean {
-			if slices.Contains(list, domain) {
-				return false, ErrDomainTaken
-			}
-		}
 	}
 	canonical = strings.ToLower(strings.TrimSpace(canonical))
 	if canonical != "" && !slices.Contains(clean, canonical) {
 		return false, ErrCanonical
 	}
-	if slices.Equal(clean, app.DomainList()) && canonical == app.Canonical {
+	saved, savedCanonical := app.DomainsOf("")
+	if sameDomains(clean, saved) && canonical == savedCanonical {
 		return false, nil
 	}
-	before := strings.Join(app.DomainList(), ", ")
-	body, _ := json.Marshal(clean)
-	err = s.apps.SetDomains(app.ID, string(body), canonical)
+	before := strings.Join(saved, ", ")
+	err = s.apps.SetDomains(app.ID, "", clean, canonical)
 	if err != nil {
 		return false, err
 	}
-	app.Domains = string(body)
 	s.syncTunnelOf(app)
 	s.servers.record(actor, "app.domains_set", "app", app.Name, map[string]string{"from": before, "domains": strings.Join(clean, ", "), "canonical": canonical})
 	s.notify(actor.WorkspaceID)
 	return true, nil
 }
 
-// SetProtection puts a password in front of the app, or takes it away when
-// password is empty. The app takes it on its next restart. changed is false
-// when the app had this password, or none, already.
-func (s *AppService) SetProtection(actor Actor, idOrName, username, password string) (changed bool, err error) {
+// PasswordUser is the username of the password moin makes for an app.
+const PasswordUser = build.Name
+
+// SetPassword turns the app's password on: the app's domains and its
+// instant address ask for it. Without a password
+// moin makes one and returns it as made: the one time moin shows it, it
+// keeps only its hash. An empty username is PasswordUser. The app takes
+// it on its next restart. changed is false when the app had this password
+// already.
+func (s *AppService) SetPassword(actor Actor, idOrName, username, password string) (made string, changed bool, err error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
+	if err != nil {
+		return "", false, err
+	}
+	username = cmp.Or(strings.TrimSpace(username), PasswordUser)
+	if strings.ContainsAny(username, ": ,") {
+		return "", false, ErrPasswordUser
+	}
+	// On already, and no password given: nothing changes. A new one is
+	// off, then on.
+	if password == "" && app.Password != "" {
+		return "", false, nil
+	}
+	var line string
+	if password == "" {
+		made, line, err = newPassword(username)
+		if err != nil {
+			return "", false, err
+		}
+	} else {
+		if len(password) < 8 || len(password) > 72 {
+			return "", false, ErrPassword
+		}
+		if user, hash, _ := strings.Cut(app.Password, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
+			return "", false, nil
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return "", false, err
+		}
+		line = username + ":" + string(hash)
+	}
+	err = s.apps.SetPassword(app.ID, line)
+	if err != nil {
+		return "", false, err
+	}
+	s.servers.record(actor, "app.password_set", "app", app.Name, nil)
+	s.notify(actor.WorkspaceID)
+	return made, true, nil
+}
+
+// RemovePassword turns the app's password off: no domain of the app
+// asks for one after its next restart. changed is false when it was off.
+func (s *AppService) RemovePassword(actor Actor, idOrName string) (changed bool, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return false, err
 	}
-	if password == "" && s.FileConfig(app).Protect {
-		return false, ErrProtectInFile
-	}
-	protect := ""
-	if password != "" {
-		username = strings.TrimSpace(username)
-		if username == "" || strings.ContainsAny(username, ": ") {
-			return false, ErrProtectUser
-		}
-		if len(password) < 8 || len(password) > 72 {
-			return false, ErrProtect
-		}
-		if user, hash, _ := strings.Cut(app.Protect, ":"); user == username && bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
-			return false, nil
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		if err != nil {
-			return false, err
-		}
-		protect = username + ":" + string(hash)
-	} else if app.Protect == "" {
+	if app.Password == "" {
 		return false, nil
 	}
-	err = s.apps.SetProtect(app.ID, protect)
+	err = s.apps.SetPassword(app.ID, "")
 	if err != nil {
 		return false, err
 	}
-	action := "app.protected"
-	if protect == "" {
-		action = "app.unprotected"
-	}
-	s.servers.record(actor, action, "app", app.Name, nil)
+	s.servers.record(actor, "app.password_removed", "app", app.Name, nil)
 	s.notify(actor.WorkspaceID)
 	return true, nil
 }
 
+// newPassword makes a password for user and its htpasswd line,
+// user:bcrypt hash.
+func newPassword(user string) (password, line string, err error) {
+	password = rand.Text()[:20]
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", "", err
+	}
+	return password, user + ":" + string(hash), nil
+}
+
 // waitingActions are the changes an app takes only on its next restart,
 // start or deploy: saving never restarts it (DESIGN.md, Feedback).
-var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.protected", "app.unprotected", "app.instant_set", "app.bucket_set", "app.renamed"}
+var waitingActions = []string{"env.set", "env.removed", "app.domains_set", "app.password_set", "app.password_removed", "app.instant_set", "app.bucket_set", "app.renamed"}
 
 // ChangesWaiting counts the changes made to an app since its live deploy
 // started, which its next restart applies. A stopped app or one never
@@ -667,9 +735,6 @@ type DomainCheck struct {
 	Points bool
 	// Checked says the domain was looked up, so Found and Points hold.
 	Checked bool
-	// FromCompose says x-moin.domains in compose.yml sets the domain, so
-	// it changes there, not in moin.
-	FromCompose bool
 	// Service is the service of compose.yml the domain reaches, empty for
 	// the main one.
 	Service string
@@ -688,30 +753,12 @@ func (s *AppService) liveDetected(app *model.App) *protocol.Detected {
 	return Detected(*deploy)
 }
 
-// FileConfig is the x-moin block of the live deploy, empty when there is
-// none. A setting in it is locked in moin: the file decides.
-func (s *AppService) FileConfig(app *model.App) protocol.Config {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil {
-		return protocol.Config{}
-	}
-	return *detected.Config
-}
-
-// composeServiceDomains are the domains x-moin.domains sets for the other
-// services in the live deploy, by service.
-func (s *AppService) composeServiceDomains(app *model.App) map[string][]string {
-	detected := s.liveDetected(app)
-	if detected == nil || detected.Config == nil {
-		return nil
-	}
-	set := map[string][]string{}
-	for service, domains := range detected.Config.ServiceDomains {
-		if service != detected.Service && len(domains) > 0 {
-			set[service] = domains
-		}
-	}
-	return set
+// otherServiceDomains are the domains of the app's other services, by
+// service.
+func (s *AppService) otherServiceDomains(app *model.App) map[string][]string {
+	services := app.ServiceDomains()
+	delete(services, s.mainService(app))
+	return services
 }
 
 // ServerAddresses are the IPv4 and IPv6 of a server: the address its daemon
@@ -822,30 +869,23 @@ func (s *AppService) domainChecks(ctx context.Context, workspaceID, idOrName str
 		return domain
 	}
 	checks := []DomainCheck{}
-	domains, canonical := app.MainDomains()
-	fromCompose, _ := app.ComposeDomains()
+	domains, canonical := app.DomainsOf("")
 	for _, domain := range domains {
-		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical, FromCompose: len(fromCompose) > 0}))
+		checks = append(checks, check(DomainCheck{Domain: domain, Canonical: domain == canonical}))
 	}
-	// Then the domains of the other services, by service: compose.yml's
-	// where it sets them, else moin'.
-	services := app.ServiceDomainMap()
-	fromComposeServices := s.composeServiceDomains(app)
-	maps.Copy(services, fromComposeServices)
-	main := s.mainService(app)
+	// Then the domains of the other services, by service.
+	services := s.otherServiceDomains(app)
 	for _, service := range slices.Sorted(maps.Keys(services)) {
-		if service == main {
-			continue
-		}
 		for _, domain := range services[service] {
-			checks = append(checks, check(DomainCheck{Domain: domain, Service: service, FromCompose: len(fromComposeServices[service]) > 0}))
+			checks = append(checks, check(DomainCheck{Domain: domain, Service: service}))
 		}
 	}
 	return checks, nil
 }
 
 // Rollback starts the images of an earlier successful deploy again, with
-// the env it had. Number 0 means the one before the live deploy.
+// the env as it is now on the server. Number 0 means the one before the
+// live deploy.
 func (s *AppService) Rollback(actor Actor, idOrName string, number int) (*model.Deploy, error) {
 	app, err := s.ready(actor.WorkspaceID, idOrName)
 	if err != nil {
@@ -953,28 +993,21 @@ func (s *AppService) ready(workspaceID, idOrName string) (*model.App, error) {
 // start stores the deploy, sends it to the daemon and records action in the
 // activity; an empty action records nothing.
 func (s *AppService) start(actor Actor, action string, app *model.App, deploy *model.Deploy, start protocol.DeployStart) (*model.Deploy, error) {
-	env, err := s.Env(app.WorkspaceID, app.ID)
-	if err != nil {
-		return nil, err
-	}
 	if start.Image != "" {
-		start.Registry, err = s.registry(app.WorkspaceID, start.Image)
-		if err != nil {
+		if err := s.checkRegistry(app, start.Image); err != nil {
 			return nil, err
 		}
 	}
-	err = s.apps.CreateDeploy(deploy)
+	err := s.apps.CreateDeploy(deploy)
 	if err != nil {
 		return nil, err
 	}
 	start.DeployID, start.App, start.Name, start.AppID, start.Number = deploy.ID, app.Folder, app.Name, app.ID, deploy.Number
-	start.Domains = &protocol.Domains{Domains: app.DomainList(), Canonical: app.Canonical, Protect: app.Protect, Services: serviceDomains(app)}
+	domains, canonical := app.DomainsOf("")
+	start.Domains = &protocol.Domains{Domains: domains, Canonical: canonical, Password: app.Password, Services: serviceDomains(app)}
 	err = s.fillInstant(app, start.Domains)
 	if err != nil {
 		return nil, err
-	}
-	if start.FromNumber == 0 {
-		start.Env = env
 	}
 	s.mu.Lock()
 	s.live[deploy.ID] = &liveDeploy{workspaceID: app.WorkspaceID, serverID: app.ServerID, followers: map[chan struct{}]struct{}{}}
@@ -982,6 +1015,10 @@ func (s *AppService) start(actor Actor, action string, app *model.App, deploy *m
 	s.notify(app.WorkspaceID)
 
 	err = s.servers.Send(app.ServerID, protocol.TypeDeployStart, start)
+	if errors.Is(err, ErrDaemonOutdated) {
+		s.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID, Error: ErrDaemonOutdated.Error()})
+		return nil, err
+	}
 	if err != nil {
 		s.finish(deploy.ID, protocol.DeployDone{DeployID: deploy.ID, Error: "the server went offline before the deploy started"})
 		return nil, ErrServerOffline
@@ -1073,6 +1110,14 @@ func (s *AppService) receive(serverID string, message protocol.Message) {
 			slog.Warn("daemon reported on a deploy of another server", "server_id", serverID, "deploy_id", done.DeployID)
 			return
 		}
+		// The env keys the deploy left: it may have made the secrets of
+		// a catalog app.
+		if done.Env != nil {
+			err := s.apps.KeepEnv(app.ID, cleanEnvKeys(done.Env.Keys), s.now().UTC())
+			if err != nil {
+				slog.Error("store the env keys of a deploy failed", "app_id", app.ID, "error", err)
+			}
+		}
 		s.rememberDeploy(done.DeployID, done)
 		s.finish(done.DeployID, done)
 	}
@@ -1100,7 +1145,15 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 	if live != nil {
 		log = strings.Join(live.lines, "\n")
 	}
-	err := s.apps.FinishDeploy(deployID, status, clipText(done.Error, 2000), log, detected, s.now().UTC())
+	composeFile := ""
+	if done.OK {
+		composeFile = done.ComposeFile
+	}
+	if len(composeFile) > maxComposeFile {
+		slog.Warn("the compose file of a deploy is too big to keep", "deploy_id", deployID, "bytes", len(composeFile))
+		composeFile = ""
+	}
+	err := s.apps.FinishDeploy(deployID, status, clipText(done.Error, 2000), log, detected, composeFile, s.now().UTC())
 	if err != nil {
 		slog.Error("store deploy result failed", "error", err, "deploy_id", deployID)
 	}
@@ -1119,16 +1172,12 @@ func (s *AppService) finish(deployID string, done protocol.DeployDone) {
 		if err == nil {
 			app, err := s.apps.ByID(deploy.AppID)
 			if err == nil {
-				// The instant address the release serves, which x-moin may
-				// have changed or turned off.
+				// The instant address the release serves.
 				if app.InstantHost != done.Detected.Instant {
 					_ = s.apps.SetInstantHost(app.ID, done.Detected.Instant)
 				}
 				if len(done.Detected.Domains) > 0 {
 					s.syncTunnelOf(app)
-				}
-				if done.Detected.Config != nil && done.Detected.Config.Backups != nil {
-					s.applyScheduleInFile(app, *done.Detected.Config.Backups)
 				}
 				s.forgetGoneDatabases(app)
 			}
@@ -1231,6 +1280,28 @@ func (s *AppService) DeployByNumber(workspaceID, idOrName string, number int) (*
 	return deploy, nil
 }
 
+// ComposeFile is the compose file of an app's live deploy, and its number:
+// everything moin runs for the app, written to run anywhere, without a
+// secret value. A live deploy without one, from a daemon before compose
+// files or one that could not make it, answers ErrNoComposeFile.
+func (s *AppService) ComposeFile(workspaceID, idOrName string) (int, string, error) {
+	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
+	if err != nil {
+		return 0, "", err
+	}
+	if app.LiveNumber == 0 {
+		return 0, "", ErrNotLive
+	}
+	text, err := s.apps.ComposeFile(app.ID, app.LiveNumber)
+	if err != nil {
+		return 0, "", err
+	}
+	if text == "" {
+		return app.LiveNumber, "", ErrNoComposeFile
+	}
+	return app.LiveNumber, text, nil
+}
+
 // Logs asks the daemon for the last lines of the app's containers.
 func (s *AppService) Logs(ctx context.Context, workspaceID, idOrName string, tail int) ([]string, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
@@ -1244,38 +1315,33 @@ func (s *AppService) Logs(ctx context.Context, workspaceID, idOrName string, tai
 	return result.Lines, err
 }
 
-// Env returns the app's env vars in plain text. The next deploy gets them.
-func (s *AppService) Env(workspaceID, idOrName string) (map[string]string, error) {
+// EnvVars lists the app's env vars, without their values: those are
+// write-only and go only to the app's server.
+func (s *AppService) EnvVars(workspaceID, idOrName string) ([]model.EnvVar, error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	sealed, err := s.apps.Env(app.ID)
-	if err != nil {
-		return nil, err
-	}
-	env := make(map[string]string, len(sealed))
-	for key, value := range sealed {
-		env[key], err = s.box.Open(value, app.ID+"/"+key)
-		if err != nil {
-			return nil, fmt.Errorf("env %s: %w", key, err)
-		}
-	}
-	return env, nil
+	return s.apps.EnvVars(app.ID)
 }
 
-// SetEnv sets and removes env vars. They take effect with the next deploy.
-// removed are the keys of unset the app had; the others were not set.
-func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string, unset []string) (removed []string, err error) {
+// SetEnv sets and removes env vars. The values go to the app's server,
+// which keeps them in the app's env file; the hub keeps only the keys and
+// when they changed. They take effect with the next deploy. removed are
+// the keys of unset the app had; the others were not set.
+func (s *AppService) SetEnv(ctx context.Context, actor Actor, idOrName string, set map[string]string, unset []string) (removed []string, err error) {
 	app, err := s.apps.ByIDOrNameForWorkspace(idOrName, actor.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
-	current, err := s.apps.Env(app.ID)
+	vars, err := s.apps.EnvVars(app.ID)
 	if err != nil {
 		return nil, err
 	}
-	sealed := make(map[string]string, len(set))
+	current := make(map[string]bool, len(vars))
+	for _, envVar := range vars {
+		current[envVar.Key] = true
+	}
 	for key, value := range set {
 		if !envKeyPattern.MatchString(key) {
 			return nil, ErrEnvKey
@@ -1283,8 +1349,7 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 		if len(value) > maxEnvValueSize {
 			return nil, ErrEnvValue
 		}
-		sealed[key] = s.box.Seal(value, app.ID+"/"+key)
-		current[key] = ""
+		current[key] = true
 	}
 	for _, key := range unset {
 		if !envKeyPattern.MatchString(key) {
@@ -1298,12 +1363,34 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	if len(current) > maxEnvVars {
 		return nil, ErrEnvLimit
 	}
-	err = s.apps.SetEnv(app.ID, sealed, unset, s.now().UTC())
+	keys := slices.Sorted(maps.Keys(set))
+	if len(keys) == 0 && len(removed) == 0 {
+		return nil, nil
+	}
+	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, secretTimeout)
+	defer cancel()
+	var kept protocol.AppEnv
+	err = s.servers.Request(ctx, server.ID, protocol.TypeEnvSet, protocol.EnvSet{App: app.Folder, Set: set, Remove: removed}, &kept)
+	if errors.Is(err, ErrServerOffline) {
+		return nil, &OfflineError{Server: server.Name}
+	}
+	if err != nil {
+		return nil, err
+	}
+	// The server's answer is the truth: the keys its env file has now.
+	now := s.now().UTC()
+	err = s.apps.KeepEnv(app.ID, cleanEnvKeys(kept.Keys), now)
+	if err == nil {
+		err = s.apps.SetEnv(app.ID, keys, nil, now)
+	}
 	if err != nil {
 		return nil, err
 	}
 	// The activity names the keys, never the values.
-	keys := slices.Sorted(maps.Keys(set))
 	if len(keys) > 0 {
 		s.servers.record(actor, "env.set", "app", app.Name, map[string]string{"keys": strings.Join(keys, ", ")})
 	}
@@ -1314,25 +1401,61 @@ func (s *AppService) SetEnv(actor Actor, idOrName string, set map[string]string,
 	return removed, nil
 }
 
-// ReplaceEnv makes env the app's env vars: it sets what is new or changed
-// and removes the keys env does not have. It returns what changed.
-func (s *AppService) ReplaceEnv(actor Actor, idOrName string, env map[string]string) (dotenv.Change, error) {
-	current, err := s.Env(actor.WorkspaceID, idOrName)
+// keepEnv makes the env keys of a server's apps what its daemon reported
+// in its hello: the hub never shows a key the server does not have. An
+// app the daemon reported nothing for has no env there.
+func (s *AppService) keepEnv(serverID, workspaceID string, env map[string]protocol.AppEnv, now time.Time) {
+	apps, err := s.apps.ListByWorkspaceID(workspaceID)
+	if err != nil {
+		slog.Error("list apps for their env keys failed", "server_id", serverID, "error", err)
+		return
+	}
+	for _, app := range apps {
+		if app.ServerID != serverID {
+			continue
+		}
+		reported := env[app.Folder]
+		at := reported.ChangedAt.UTC()
+		if at.IsZero() || at.After(now) {
+			at = now
+		}
+		if err := s.apps.KeepEnv(app.ID, cleanEnvKeys(reported.Keys), at); err != nil {
+			slog.Error("store the env keys a daemon reported failed", "app_id", app.ID, "error", err)
+		}
+	}
+}
+
+// cleanEnvKeys keeps the keys a daemon reports that are env keys, at most
+// maxEnvVars.
+func cleanEnvKeys(keys []string) []string {
+	clean := []string{}
+	for _, key := range keys {
+		if len(clean) < maxEnvVars && envKeyPattern.MatchString(key) && !slices.Contains(clean, key) {
+			clean = append(clean, key)
+		}
+	}
+	return clean
+}
+
+// ReplaceEnv makes env the app's env vars: it sets every key of env and
+// removes the keys env does not have. It returns what changed, by key.
+func (s *AppService) ReplaceEnv(ctx context.Context, actor Actor, idOrName string, env map[string]string) (dotenv.Change, error) {
+	vars, err := s.EnvVars(actor.WorkspaceID, idOrName)
 	if err != nil {
 		return dotenv.Change{}, err
 	}
 	if len(env) > maxEnvVars {
 		return dotenv.Change{}, ErrEnvLimit
 	}
+	current := make([]string, len(vars))
+	for index, envVar := range vars {
+		current[index] = envVar.Key
+	}
 	change := dotenv.Diff(current, env)
 	if change.None() {
 		return change, nil
 	}
-	set := make(map[string]string, len(change.Added)+len(change.Changed))
-	for _, key := range append(slices.Clone(change.Added), change.Changed...) {
-		set[key] = env[key]
-	}
-	_, err = s.SetEnv(actor, idOrName, set, change.Removed)
+	_, err = s.SetEnv(ctx, actor, idOrName, env, change.Removed)
 	return change, err
 }
 

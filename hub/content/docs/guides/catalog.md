@@ -19,9 +19,9 @@ API: POST /api/v1/catalog/{slug}/install
 MCP: install_catalog_app
 ```
 
-It creates the app, makes every secret as an encrypted env var, sets `VERSION` and deploys. Without a version it takes the newest.
+It creates the app, sets `VERSION` and deploys. The server makes every secret itself when it deploys, as an env var, so the hub never sees it. Without a version it takes the newest. The server must be online.
 
-Some apps have a first login. Its page in the catalog says so under **First sign-in**. `moin env --show` shows the passwords it made.
+Some apps have a first login. Its page in the catalog says so under **First sign-in**. When it needs a password, such as `ADMIN_PASSWORD`, the hub makes that one, passes it to the server once and shows it once: on the web in place of the form, in the CLI after the deploy, in the API and MCP answer as `login`. The app's own [password](/docs/guides/domains#password), user `moin`, shows the same way, once, as `password`. Every address of the app asks for it until you turn it off, so nobody else reaches the first sign-in before you. Keep them in your password manager. Env values are write-only, so moin never shows it again. A sign-in password a later version asks for is made by the server and never shown: set your own with `moin env set`.
 
 ## See the catalog
 
@@ -53,7 +53,7 @@ An older version may not undo the database changes of a newer one. Then [go back
 
 ## Add an app
 
-Missing one? Open an [issue](https://github.com/axadrn/moin/issues), or send a pull request: one folder, `hub/content/catalog/<app>`, two files.
+Missing one? Open an [issue](https://github.com/axadrn/moin/issues), or send a pull request: one folder, `catalog/<app>`, two files.
 
 `app.md` says what the app is:
 
@@ -67,8 +67,7 @@ source: github.com/miniflux/v2
 license: Apache-2.0
 image: miniflux/miniflux
 database: postgres
-port: 8080
-login: "Sign in as admin with the password in ADMIN_PASSWORD: moin env --show."
+login: "Sign in as admin with the password in ADMIN_PASSWORD, shown once when you install."
 ---
 
 Two or three plain sentences: what it does, and where its data lives.
@@ -77,16 +76,16 @@ Two or three plain sentences: what it does, and where its data lives.
 `compose.yml` runs it:
 
 ```yaml
-x-moin:
-  service: web
-  port: 8080
-  health: /healthcheck
-
 services:
   web:
     image: miniflux/miniflux:${VERSION}
+    expose: ["8080"]
     environment:
       DATABASE_URL: postgres://miniflux:${DB_PASSWORD}@db/miniflux?sslmode=disable
+      RUN_MIGRATIONS: "1"
+      CREATE_ADMIN: "1"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
@@ -110,9 +109,11 @@ The rules, which a test checks:
 | Rule | |
 | --- | --- |
 | Image | on Docker Hub or `ghcr.io`, for `amd64` and `arm64`, run as `<image>:${VERSION}` |
-| Secrets | every one a `${NAME}`, made on install: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
+| Port | `expose` on `web`, the port it listens on. The service that gets the traffic is `web` |
+| Secrets | every one a `${NAME}`, made by the server on install, and on an update that asks for a new one: 32 random bytes as URL-safe text; a name ending in `_HEX` gets 64 hex digits, `_HEX16` 32. Never write a password out |
+| First sign-in | a secret the person needs to sign in, named in `login:` like `ADMIN_PASSWORD`, is the one the install shows once |
 | Its own domain | `${APP_URL}` is `https://<its domain>`, `${APP_DOMAIN}` the domain alone; an app that uses either needs a domain on install |
-| Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data` |
+| Database | Postgres in the same compose file with a `pg_isready` health check the app waits for, or SQLite under `./data`. MySQL, MongoDB and ClickHouse run too, but moin does not back them up yet |
 | Versions | only tags like `1.2.3` or `v1.2.3` count, unless `versions:` sets a regular expression. A project that tags betas like versions sets `stable:` to its channel tag, such as `stable` |
 | Category | AI, Analytics, Automation, Monitoring, Communication, Websites, Productivity, Documents, Reading, Developer tools, Security, Marketing, Finance or Media |
 
@@ -120,5 +121,6 @@ Install it once on a server of your own with `moin catalog install` before you o
 
 ## Good to know
 
-- The workspace needs a [bucket](/docs/guides/bucket).
+- No bucket needed: the hub names the app and its version, and the server takes its compose file from the catalog built into its signed daemon. A server's daemon needs v1.0.0-beta.35 or newer.
+- A server with [`deploy-from`](/docs/guides/security#rules) rules installs catalog apps once its rules list `catalog`.
 - A catalog app is an ordinary app: logs, metrics, uptime, domains, rollback and backups all work.

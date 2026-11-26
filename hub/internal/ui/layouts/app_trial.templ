@@ -18,18 +18,23 @@ func trialDaysLeft(ends *time.Time, now time.Time) int {
 	return max(1, int(ends.Sub(now).Hours()/24+0.999))
 }
 
-// AppTrialCard is one quiet line over the page while the trial runs or
-// after it ended, with Subscribe for whoever may pay.
+// AppTrialCard is one quiet line over the page while the trial waits for
+// the first server, while it runs or after it ended. While it waits, its
+// button adds that server; after that, it is Subscribe for whoever may pay.
 templ AppTrialCard() {
 	{{ subscription := ctxkeys.Subscription(ctx) }}
 	{{ member := ctxkeys.WorkspaceMember(ctx) }}
 	if ctxkeys.RenderConfig(ctx).Billing && subscription != nil {
 		{{ current := subscription.Access() }}
+		{{ waits := current.State == access.StateTrial && current.TrialEndsAt == nil }}
 		if current.State == access.StateTrial || !current.Has(access.FeatureChanges) {
 			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-trial": string(current.State)}}) {
 				<div class="moin-row" data-gap="4" data-phone="stack">
 					<p class="moin-fill moin-text">
-						if current.State == access.StateTrial {
+						if waits {
+							<span class="moin-strong">{ TrialOffer() }</span>
+							<span class="moin-muted">No card.</span>
+						} else if current.State == access.StateTrial {
 							{{ days := trialDaysLeft(current.TrialEndsAt, time.Now()) }}
 							<span class="moin-strong" data-trial-days={ strconv.Itoa(days) }>{ trialLine(days) }</span>
 							<span class="moin-muted">After it, moin turns read-only. Your apps keep running.</span>
@@ -38,7 +43,11 @@ templ AppTrialCard() {
 							<span class="moin-muted">Your apps keep running, and you can stop and start them.</span>
 						}
 					</p>
-					if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
+					if waits {
+						@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/servers"}) {
+							Add server
+						}
+					} else if member != nil && member.Can(model.WorkspacePermissionManageBilling) {
 						@components.Button(components.ButtonProps{Kind: components.Primary, Href: ctxkeys.AppBasePath(ctx) + "/billing"}) {
 							Subscribe
 						}
@@ -49,6 +58,11 @@ templ AppTrialCard() {
 			}
 		}
 	}
+}
+
+// TrialOffer is the hosted trial in one sentence, the same on every page.
+func TrialOffer() string {
+	return strconv.Itoa(access.TrialDays) + " days free, starting when you connect your first server."
 }
 
 func trialLine(days int) string {

@@ -10,6 +10,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/link"
@@ -30,7 +31,7 @@ templ Apps(apps []model.App, servers []model.Server) {
 			if len(apps) == 0 {
 				@components.Card(components.CardProps{}) {
 					@components.List() {
-						@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from your folder, GitHub or the catalog."})
+						@components.Item(components.ItemProps{Href: basePath + "/new-app", Name: "No apps yet", Note: "Start one from GitHub, an image or the catalog."})
 					}
 				}
 			} else {
@@ -40,8 +41,8 @@ templ Apps(apps []model.App, servers []model.Server) {
 	}
 }
 
-// NewApp is where an app starts: from your folder, from GitHub, or from
-// the catalog. Each is one card; the overview lists the apps.
+// NewApp is where an app starts: from GitHub, or from the catalog. Each is
+// one card; the overview lists the apps.
 templ NewApp(servers []model.Server) {
 	{{ basePath := ctxkeys.AppBasePath(ctx) }}
 	@layouts.App("New app") {
@@ -54,15 +55,13 @@ templ NewApp(servers []model.Server) {
 					}
 				}
 			} else {
-				@components.Card(components.CardProps{Title: "From your folder"}) {
-					<p class="moin-small moin-muted">
-						Run this in the folder of your app. It finds compose.yml, a Dockerfile or a Go module and builds on your server.
-					</p>
-					@components.Command(components.CommandProps{Text: "moin deploy"})
-				}
 				@components.Card(components.CardProps{Title: "From GitHub"}) {
 					<p class="moin-small moin-muted">
-						Name it and pick its server. Then link its repo, and every push deploys.
+						Push your app to GitHub. Run this in its folder. Your server builds the pushed commit.
+					</p>
+					@components.Command(components.CommandProps{Text: "moin deploy"})
+					<p class="moin-small moin-muted">
+						Or name it here and pick its server. Then link its repo, and every push deploys.
 					</p>
 					@AppAddForm(servers)
 				}
@@ -106,6 +105,26 @@ templ AppAddForm(servers []model.Server) {
 	</form>
 }
 
+// AppAdded takes the place of the add form when an app was added: its
+// password, the one time moin shows it, with a link to the app.
+templ AppAdded(appPath, name, password string) {
+	<div id="app-add-form" class="moin-stack" data-gap="4" data-app-added>
+		<p class="moin-text">{ name } is added. Its domains and its instant address ask for this password until you turn it off. Keep it now: moin shows it only this once.</p>
+		@components.List() {
+			@components.Item(components.ItemProps{}) {
+				<span class="moin-mono moin-text">{ service.PasswordUser }</span>
+				<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ password }</span>
+				@copyButton(password, "", "Copy the password")
+			}
+		}
+		<div class="moin-row" data-end>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: appPath}) {
+				Open the app
+			}
+		</div>
+	</div>
+}
+
 func serverOptions(servers []model.Server) []components.Option {
 	options := make([]components.Option, 0, len(servers))
 	for _, server := range servers {
@@ -125,7 +144,7 @@ func plural(n int, one, many string) string {
 type AppPageView struct {
 	App     model.App
 	Deploys []api.Deploy
-	EnvKeys []string
+	Env     []model.EnvVar
 	// Section is app, deploys, domains, logs or settings; data has its
 	// own page.
 	Section string
@@ -145,6 +164,15 @@ type AppPageView struct {
 	// Logs is the container logs of the Logs section; nil when the daemon
 	// did not answer in time, and the section loads them itself.
 	Logs *AppLogsView
+	// ComposeFile is the compose file of the live deploy (Settings).
+	ComposeFile *ComposeFileView
+}
+
+// ComposeFileView is the compose file of the live deploy, or why there is
+// none.
+type ComposeFileView struct {
+	Text    string
+	Message string
 }
 
 // AppPage is an app: the head stays, the section under it answers one
@@ -163,7 +191,7 @@ templ AppPage(view AppPageView) {
 					case "logs":
 						@appLogsSection(app, view.Deploys, view.Logs)
 					case "settings":
-						@appSettingsSection(app, view.EnvKeys)
+						@appSettingsSection(app, view.Env, view.ComposeFile)
 					default:
 						@appHomeSection(view)
 				}
@@ -249,7 +277,7 @@ func appSectionValue(app model.App, id string) string {
 // appDomains are where the app answers: its domains, then its instant
 // address.
 func appDomains(app model.App) []string {
-	domains, _ := app.MainDomains()
+	domains, _ := app.DomainsOf("")
 	if app.InstantHost != "" {
 		domains = append(domains, app.InstantHost)
 	}
@@ -309,7 +337,7 @@ type AppLogsView struct {
 
 // appSettingsSection answers "how is it set up?": its name, its env, the
 // pin, and at the end what stops or removes it.
-templ appSettingsSection(app model.App, envKeys []string) {
+templ appSettingsSection(app model.App, env []model.EnvVar, composeFile *ComposeFileView) {
 	{{ appPath := ctxkeys.AppBasePath(ctx) + "/apps/" + app.Link() }}
 	@components.Card(components.CardProps{Title: "Name"}) {
 		<form
@@ -330,7 +358,10 @@ templ appSettingsSection(app model.App, envKeys []string) {
 			</div>
 		</form>
 	}
-	@AppEnv(app.Link(), envKeys, nil)
+	@AppEnv(app.Link(), env)
+	if composeFile != nil {
+		@appComposeFile(appPath, *composeFile)
+	}
 	@components.Card(components.CardProps{}) {
 		@components.List() {
 			@PinSwitch(app)
@@ -362,6 +393,30 @@ templ appSettingsSection(app model.App, envKeys []string) {
 		}
 	}
 	@idLine(app.ID)
+}
+
+// appComposeFile is the compose file of the live deploy, read only: what
+// moin runs for the app, to copy or download and run elsewhere.
+templ appComposeFile(appPath string, file ComposeFileView) {
+	<section id="compose-file" class="moin-section">
+		<div class="moin-section-head">
+			<h2>Compose file</h2>
+			if file.Text != "" {
+				@components.Button(components.ButtonProps{Href: appPath + "/compose.yml", Attrs: templ.Attributes{"download": "compose.yml", "data-compose-download": true}}) {
+					Download
+				}
+			}
+		</div>
+		<p class="moin-small moin-muted">Everything moin runs for this app, without your secret values.</p>
+		<p class="moin-small moin-muted">To run it elsewhere: save it, put a .env with your values next to it, run docker compose up -d.</p>
+		if file.Text != "" {
+			@components.Code(components.CodeProps{ID: "compose-file-text", Text: file.Text})
+		} else {
+			@components.Card(components.CardProps{}) {
+				<p class="moin-text moin-muted">{ file.Message }</p>
+			}
+		}
+	</section>
 }
 
 // idLine is the ID of a workspace, an app or a server, quietly at the end
@@ -598,11 +653,12 @@ func parseLogLine(line string) logLine {
 	return entry
 }
 
-// AppEnv is the env vars of an app, one row each, and the row that sets
-// one. values holds the shown values; keys without one show as dots. Saving
+// AppEnv is the env vars of an app, one row each with when it changed, and
+// the row that sets one. Values are write-only: no page shows one. Saving
 // never restarts the app: the head then says what waits for Restart.
-templ AppEnv(appLink string, keys []string, values map[string]string) {
+templ AppEnv(appLink string, env []model.EnvVar) {
 	{{ envPath := ctxkeys.AppBasePath(ctx) + "/apps/" + appLink + "/env" }}
+	{{ now := time.Now() }}
 	<div id="app-env">
 		<section class="moin-section">
 			<div class="moin-section-head">
@@ -611,38 +667,25 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 			</div>
 			@components.Card(components.CardProps{}) {
 				@components.List() {
-					if len(keys) == 0 {
+					if len(env) == 0 {
 						@components.Item(components.ItemProps{Name: "No env vars yet"})
 					}
-					for _, key := range keys {
+					for _, envVar := range env {
 						@components.Item(components.ItemProps{}) {
-							<span data-env={ key } class="moin-item-text moin-truncate moin-mono moin-text" title={ key }>{ key }</span>
-							<span class="moin-item-value moin-mono">
-								if value, ok := values[key]; ok {
-									<span data-env-value class="moin-foreground">{ value }</span>
-								} else {
-									<span aria-label="hidden">••••••</span>
-								}
-							</span>
+							<span data-env={ envVar.Key } class="moin-item-text moin-truncate moin-mono moin-text" title={ envVar.Key }>{ envVar.Key }</span>
+							<span class="moin-item-value moin-muted" title={ stamp(envVar.UpdatedAt) }>{ "changed " + human.Ago(envVar.UpdatedAt, now) }</span>
 							@components.Button(components.ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{
-								"aria-label":          "Remove " + key,
-								"title":               "Remove " + key,
-								"hx-delete":           envPath + "/" + key,
+								"aria-label":          "Remove " + envVar.Key,
+								"title":               "Remove " + envVar.Key,
+								"hx-delete":           envPath + "/" + envVar.Key,
 								"hx-target":           "#app-env",
 								"hx-swap":             "outerHTML",
 								"hx-disable":          "this",
-								"hx-confirm":          "Remove " + key + "? The next deploy or restart drops it.",
+								"hx-confirm":          "Remove " + envVar.Key + "? The next deploy or restart drops it.",
 								"data-confirm-action": "Remove",
 							}}) {
 								@components.Icon("x")
 							}
-						}
-					}
-					if len(keys) > 0 {
-						if len(values) == 0 {
-							@components.Item(components.ItemProps{Button: true, Name: "Show values", Attrs: templ.Attributes{"hx-get": envPath + "?show=1", "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-show": true}})
-						} else {
-							@components.Item(components.ItemProps{Button: true, Name: "Hide values", Attrs: templ.Attributes{"hx-get": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "data-env-hide": true}})
 						}
 					}
 					@components.Item(components.ItemProps{Form: true, Attrs: templ.Attributes{"hx-post": envPath, "hx-target": "#app-env", "hx-swap": "outerHTML", "hx-disable": "find button[type='submit']", "data-env-set": true}}) {
@@ -661,9 +704,13 @@ templ AppEnv(appLink string, keys []string, values map[string]string) {
 					}
 				}
 			}
+			<p class="moin-small moin-muted">{ envWriteOnly }</p>
 		</section>
 	</div>
 }
+
+// envWriteOnly says under every env form that a value never comes back.
+const envWriteOnly = "Values are write-only: you see the name and when it changed, never the value."
 
 // shortPath keeps the last three parts of a long path: …/volumes/data/app.db.
 func shortPath(path string) string {

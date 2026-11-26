@@ -57,13 +57,14 @@ func (r *DeviceLogins) Polled(id string, at time.Time, intervalSeconds int) erro
 	return err
 }
 
-// Decide approves or denies a pending login for a user. A login that is no
-// longer pending is not found, so a code is decided only once.
-func (r *DeviceLogins) Decide(id, status, userID string, workspaceID *string) error {
+// Decide approves a pending login with its connection, or denies it with
+// none. A login that is no longer pending is not found, so a code is
+// decided only once.
+func (r *DeviceLogins) Decide(id, status string, connectionID *string) error {
 	result, err := r.db.Exec(`
-		UPDATE device_logins SET status = $1, user_id = $2, workspace_id = $3
-		WHERE id = $4 AND status = 'pending'
-	`, status, userID, workspaceID, id)
+		UPDATE device_logins SET status = $1, connection_id = $2
+		WHERE id = $3 AND status = 'pending'
+	`, status, connectionID, id)
 	return oneRow(result, err)
 }
 

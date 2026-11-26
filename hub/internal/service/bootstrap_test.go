@@ -10,8 +10,8 @@ import (
 
 // TestBootstrap: the first run makes the account, one workspace and the
 // server with an install token; a second run makes nothing twice and gives
-// a new token; once the daemon registered, it gives none. The sign-in link
-// signs in once.
+// a new token; once the daemon registered, it gives none. The account's
+// email is verified, and its recovery key signs in once.
 func TestBootstrap(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
 	servers := NewServerService(repository.NewServers(environment.database), repository.NewActivity(environment.database), "https://moin.example.com")
@@ -47,11 +47,14 @@ func TestBootstrap(t *testing.T) {
 		t.Errorf("after the daemon registered: token %q, err %v", third, err)
 	}
 
-	link, err := environment.auth.SignInLink("admin@example.com")
-	if err != nil || !strings.HasPrefix(link, "http://localhost:8090/auth/magic-link/") {
-		t.Fatalf("link %q, err %v", link, err)
+	if user.EmailVerifiedAt == nil {
+		t.Error("the bootstrapped admin is not verified")
 	}
-	signedIn, err := environment.auth.VerifyMagicLink(strings.TrimPrefix(link, "http://localhost:8090/auth/magic-link/"))
+	key, err := environment.auth.CreateRecoveryKey("admin@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedIn, err := environment.auth.SignInWithRecoveryKey(key)
 	if err != nil || signedIn.ID != user.ID {
 		t.Fatalf("sign in: %v", err)
 	}

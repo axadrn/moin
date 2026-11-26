@@ -82,8 +82,10 @@ func (s *Subscription) HasProviderSubscription() bool {
 	return s.ProviderSubscriptionID != nil && *s.ProviderSubscriptionID != ""
 }
 
+// BlocksWorkspaceDeletion says whether the workspace must end its plan
+// first. A trial that waits for its first server never blocks.
 func (s *Subscription) BlocksWorkspaceDeletion(now time.Time) bool {
-	paid := s.PlanID != SubscriptionPlanFree && s.IsActiveAt(now)
+	paid := s.PlanID != SubscriptionPlanFree && s.IsActiveAt(now) && !s.TrialWaits()
 	pendingCheckout := s.CheckoutPendingUntil != nil && now.Before(*s.CheckoutPendingUntil)
 	return s.HasProviderSubscription() || paid || pendingCheckout
 }
@@ -115,16 +117,23 @@ func (s *Subscription) StartOffer(days int, couponID string, now time.Time) {
 }
 
 // EndForeverFree puts a forever free workspace back on what it would have
-// without it: the rest of the trial it started with, or the free plan once
-// that is over.
-func (s *Subscription) EndForeverFree(workspaceCreatedAt, now time.Time) {
-	initial := access.Initial(workspaceCreatedAt)
-	if initial.Status == access.StatusTrialing && initial.CurrentPeriodEnd != nil && now.Before(*initial.CurrentPeriodEnd) {
-		s.PlanID, s.Status, s.CurrentPeriodEnd = initial.PlanID, initial.Status, initial.CurrentPeriodEnd
+// without it: the trial, waiting for the first server, while the workspace
+// has used none; the free plan, read-only, once it has.
+func (s *Subscription) EndForeverFree(usedServer bool, now time.Time) {
+	initial := access.Initial()
+	if initial.Status == access.StatusTrialing && !usedServer {
+		s.PlanID, s.Status = initial.PlanID, initial.Status
 	} else {
-		s.PlanID, s.Status, s.CurrentPeriodEnd = SubscriptionPlanFree, SubscriptionStatusActive, nil
+		s.PlanID, s.Status = SubscriptionPlanFree, SubscriptionStatusActive
 	}
+	s.CurrentPeriodEnd = nil
 	s.UpdatedAt = now
+}
+
+// TrialWaits says whether the trial has not started yet: it starts when
+// the workspace's first server connects.
+func (s *Subscription) TrialWaits() bool {
+	return s.Status == SubscriptionStatusTrialing && s.CurrentPeriodEnd == nil
 }
 
 func (s *Subscription) ClearCheckout() {

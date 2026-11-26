@@ -22,8 +22,8 @@ const noBackupText = "moin cannot back up this database"
 // what moin backs up: every SQLite file on a mounted folder and every
 // Postgres service. The second is what looks like a database but moin
 // cannot back up.
-func (a *apps) scanDatabases(ctx context.Context, composeFile string) ([]protocol.Database, []protocol.Database, error) {
-	body, err := os.ReadFile(composeFile)
+func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protocol.Database, []protocol.Database, error) {
+	body, err := os.ReadFile(composeJSON)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -84,7 +84,7 @@ func addSQLiteFiles(databases []protocol.Database, folder, target string) []prot
 			continue
 		}
 		relative, _ := filepath.Rel(folder, file)
-		databases = append(databases, protocol.Database{Path: filepath.Join(target, relative), HostPath: file})
+		databases = append(databases, protocol.Database{Path: filepath.Join(target, relative), HostPath: file, HostFolder: folder})
 	}
 	return databases
 }
@@ -207,7 +207,7 @@ func (a *apps) findNewDatabases(ctx context.Context, app string) (protocol.Detec
 	if file == "" {
 		return detected, false
 	}
-	databases, noBackup, err := a.scanDatabases(ctx, a.composeFile(app))
+	databases, noBackup, err := a.scanDatabases(ctx, a.composeJSON(app))
 	if err != nil {
 		return detected, false
 	}

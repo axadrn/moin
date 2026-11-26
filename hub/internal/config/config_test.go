@@ -188,53 +188,6 @@ func TestLoadParsesTrustedProxyCIDRsWithLoopbackDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadDefaultsAPIURLToAppURL(t *testing.T) {
-	setCoreEnvironment(t)
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.APIURL != cfg.AppURL {
-		t.Fatalf("APIURL = %q, want APP_URL %q", cfg.APIURL, cfg.AppURL)
-	}
-}
-
-func TestLoadReadsAPIURL(t *testing.T) {
-	setCoreEnvironment(t)
-	t.Setenv("APP_URL", "https://app.example.com")
-	t.Setenv("API_URL", "https://api.example.com")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.APIURL != "https://api.example.com" || cfg.AppURL != "https://app.example.com" {
-		t.Fatalf("APIURL = %q, AppURL = %q", cfg.APIURL, cfg.AppURL)
-	}
-}
-
-func TestLoadRejectsInvalidAPIURL(t *testing.T) {
-	for _, value := range []string{
-		"api.example.com",
-		"ftp://api.example.com",
-		"https://api.example.com/",
-		"https://api.example.com/v1",
-		"https://api.example.com?x=1",
-		"https://user@api.example.com",
-	} {
-		t.Run(value, func(t *testing.T) {
-			setCoreEnvironment(t)
-			t.Setenv("API_URL", value)
-
-			_, err := Load()
-			if err == nil || !strings.Contains(err.Error(), "API_URL") {
-				t.Fatalf("Load() error = %v, want API_URL error", err)
-			}
-		})
-	}
-}
-
 func TestRenderIncludesOnlyPublicValues(t *testing.T) {
 	cfg := &Config{
 		AppEnv:            EnvironmentProduction,
@@ -268,7 +221,6 @@ func setCoreEnvironment(t *testing.T) {
 	for _, key := range []string{
 		"APP_ENV",
 		"APP_URL",
-		"API_URL",
 		"ADMIN_EMAILS",
 		"SESSION_EXPIRY",
 		"TRUSTED_PROXY_CIDRS",
@@ -278,8 +230,9 @@ func setCoreEnvironment(t *testing.T) {
 		"LOG_HTTP",
 		"GOOGLE_CLIENT_ID",
 		"GOOGLE_CLIENT_SECRET",
-		"GITHUB_CLIENT_ID",
-		"GITHUB_CLIENT_SECRET",
+		"GITHUB_APP_ID",
+		"GITHUB_APP_CLIENT_ID",
+		"GITHUB_APP_CLIENT_SECRET",
 		"EMAIL_FROM",
 		"RESEND_API_KEY",
 		"RESEND_AUDIENCE_ID",
@@ -358,5 +311,28 @@ func TestSelfHostedIsPrivateByDefault(t *testing.T) {
 		if cfg.SignupsOpen != test.wantOpen || cfg.RobotsNoIndex != test.wantNoIndex {
 			t.Fatalf("BILLING=%s SIGNUPS_OPEN=%q ROBOTS_NOINDEX=%q: open = %v, noindex = %v", test.billing, test.signupsOpen, test.noIndex, cfg.SignupsOpen, cfg.RobotsNoIndex)
 		}
+	}
+}
+
+// TestAPriceNeedsTheProduct: the hosted product is required in production
+// and wherever a price is set, also in development.
+func TestAPriceNeedsTheProduct(t *testing.T) {
+	for _, cfg := range []*Config{
+		{AppEnv: EnvironmentProduction, StripePriceIDProMonthly: "price_month", StripePriceIDProYearly: "price_year"},
+		{AppEnv: EnvironmentDevelopment, StripePriceIDProMonthly: "price_month"},
+		{AppEnv: EnvironmentDevelopment, StripePriceIDProYearly: "price_year"},
+	} {
+		cfg.StripeSecretKey, cfg.StripeWebhookSecret = "sk_test", "whsec_test"
+		errs := cfg.validatePayments()
+		if len(errs) != 1 || !strings.Contains(errs[0].Error(), "STRIPE_PRODUCT_ID_PRO") {
+			t.Fatalf("%s: errors = %v, want STRIPE_PRODUCT_ID_PRO", cfg.AppEnv, errs)
+		}
+		cfg.StripeProductIDPro = "prod_hosted"
+		if errs := cfg.validatePayments(); len(errs) != 0 {
+			t.Fatalf("%s: errors = %v", cfg.AppEnv, errs)
+		}
+	}
+	if errs := (&Config{AppEnv: EnvironmentDevelopment, StripeSecretKey: "sk_test", StripeWebhookSecret: "whsec_test"}).validatePayments(); len(errs) != 0 {
+		t.Fatalf("development without prices: errors = %v", errs)
 	}
 }

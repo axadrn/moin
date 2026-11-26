@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"cmp"
 	"context"
 	"strconv"
 
@@ -41,7 +40,7 @@ func member[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In,
 			return empty, err
 		}
 		for _, membership := range memberships {
-			if membership.ID == caller.Token.WorkspaceID {
+			if membership.ID == caller.Bearer.WorkspaceID {
 				return tool(ctx, caller, input)
 			}
 		}
@@ -54,7 +53,7 @@ func member[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In,
 func changes[In, Out any](services Services, tool ToolFunc[In, Out]) ToolFunc[In, Out] {
 	return member(services, func(ctx context.Context, caller Caller, input In) (Out, error) {
 		var empty Out
-		if err := services.Servers.RequireChanges(caller.Token.WorkspaceID); err != nil {
+		if err := services.Servers.RequireChanges(caller.Bearer.WorkspaceID); err != nil {
 			return empty, err
 		}
 		return tool(ctx, caller, input)
@@ -70,21 +69,9 @@ type moinTools struct {
 	services Services
 }
 
-// AppInput names one app. name is the old spelling of app, still accepted.
+// AppInput names one app.
 type AppInput struct {
-	App  string `json:"app,omitempty" jsonschema:"the app name or ID"`
-	Name string `json:"name,omitempty" jsonschema:"the old name of the app field; use app"`
-}
-
-func (i AppInput) app() string { return cmp.Or(i.App, i.Name) }
-
-// confirmed checks the confirm argument of a tool that removes or replaces
-// something big that cannot be undone: it must be the name, typed out.
-func confirmed(confirm, name string) error {
-	if confirm != name {
-		return InvalidField("confirm", "Ask the user first, then repeat the name "+name+" here to confirm.")
-	}
-	return nil
+	App string `json:"app" jsonschema:"the app name or ID"`
 }
 
 // Done is the output of tools that answer nothing but success.

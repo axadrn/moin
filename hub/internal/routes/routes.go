@@ -11,6 +11,7 @@ import (
 	"github.com/axadrn/moin/hub/assets"
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/app"
+	"github.com/axadrn/moin/hub/internal/config"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/handler"
 	"github.com/axadrn/moin/hub/internal/mcp"
@@ -29,7 +30,6 @@ type limiter = func(http.HandlerFunc) http.HandlerFunc
 func SetupRoutes(app *app.App) http.Handler {
 	clientIPs := middleware.NewClientIPResolver(app.Cfg.TrustedProxyCIDRs)
 	rateLimiter := middleware.RateLimitAuth(clientIPs)
-	authEmailRateLimiter := middleware.RateLimitAuthEmail(clientIPs)
 	deviceLimiter := middleware.RateLimitDeviceLogin(clientIPs)
 	emailChanges := middleware.RateLimitUserEmailChanges()
 	// Web, API and MCP invitations share one budget.
@@ -39,12 +39,14 @@ func SetupRoutes(app *app.App) http.Handler {
 	catalogPages := handler.NewCatalogHandler(app.CatalogService, app.AppService, app.ServerService, app.WorkspaceService, app.Cfg.AppURL)
 	mux := http.NewServeMux()
 	siteRoutes(mux, app, home, catalogPages)
-	authRoutes(mux, app, rateLimiter, authEmailRateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs))
-	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter))
+	// Signing in with a passkey and adding one share one budget.
+	passkeyLimiter := middleware.RateLimitPasskeys(clientIPs)
+	authRoutes(mux, app, rateLimiter, deviceLimiter, middleware.RateLimitGitHubLogin(clientIPs), passkeyLimiter)
+	workspaceRoutes(mux, app, emailChanges, middleware.RateLimitWorkspaceInvitations(invitationLimiter), passkeyLimiter)
 	appRoutes(mux, app, catalogPages)
 	adminRoutes(mux, app)
 	daemonRoutes(mux, app, clientIPs)
-	apiRoutes(mux, app, clientIPs, rateLimiter, authEmailRateLimiter, deviceLimiter, emailChanges, invitationLimiter)
+	apiRoutes(mux, app, clientIPs, deviceLimiter, emailChanges, invitationLimiter)
 	mcpRoutes(mux, app, invitationLimiter)
 	mux.HandleFunc("/api/", middleware.APINotFound)
 	mux.HandleFunc("/{path...}", home.NotFoundPage)
@@ -54,13 +56,14 @@ func SetupRoutes(app *app.App) http.Handler {
 		S3Endpoint:    app.Cfg.S3Endpoint,
 		UmamiHost:     app.Cfg.UmamiHost,
 		PlausibleHost: app.Cfg.PlausibleHost,
+		GitHubURL:     app.Cfg.GitHubURL,
 	}
 	securityHeaders := func(next http.Handler) http.Handler {
 		return middleware.SecurityHeaders(securityHeaderConfig, next)
 	}
 	return middleware.Chain(
 		mux,
-		middleware.RenderConfig(app.Cfg.Render()),
+		middleware.RenderConfig(renderConfig(app)),
 		middleware.NonceMiddleware,
 		securityHeaders,
 		middleware.RequestLogging(app.Cfg.LogHTTP, clientIPs),
@@ -69,11 +72,21 @@ func SetupRoutes(app *app.App) http.Handler {
 		middleware.CORS(app.Cfg.CORSAllowedOrigins),
 		middleware.CSRFProtection(app.Cfg.IsProduction(), clientIPs),
 		middleware.AuthMiddleware(app.AuthService, app.UserService),
-		middleware.APITokenAuth(app.APITokenService, app.UserService),
+		middleware.BearerAuth(app.ConnectionService, app.CITokenService, app.UserService),
+		middleware.RateLimitBearers(),
+		middleware.GitHubApp(app.GitHubAppService),
 		middleware.BlockImpersonatedWrites,
 		middleware.AdminContext(app.AdminService),
 		middleware.WithURLPath,
 	)
+}
+
+// renderConfig is what templates may know of the configuration, with
+// whether this hub offers passkeys.
+func renderConfig(app *app.App) config.RenderConfig {
+	render := app.Cfg.Render()
+	render.Passkeys = app.Passkeys.On()
+	return render
 }
 
 // uiAssets serves the ui folder under /assets/ui/. Only a block may be shown
@@ -166,7 +179,7 @@ func versioned(mux *http.ServeMux, prefix string, development bool) http.Handler
 }
 
 // siteRoutes are the public site: assets, the home page, docs, search, the
-// changelog, the catalog and the legal pages.
+// changelog, the blog, the catalog and the legal pages.
 func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, catalogPages *handler.CatalogHandler) {
 	seo := handler.NewSEOHandler(app.DocsService, app.UIDocsService, app.UIFiles, app.Cfg.AppURL, app.Texts, app.Cfg.RobotsNoIndex, app.Cfg.Billing)
 	legal := handler.NewLegalHandler(app.LegalService)
@@ -189,6 +202,9 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	mux.HandleFunc("GET /roadmap", handler.Roadmap(app.Texts))
 	mux.HandleFunc("GET /changelog", handler.Changelog(app.Texts))
 	mux.HandleFunc("GET /changelog.xml", handler.ChangelogFeed(app.Texts, app.Cfg.AppURL, build.Name))
+	mux.HandleFunc("GET /blog", handler.Blog(app.Texts))
+	mux.HandleFunc("GET /blog/{slug}", handler.BlogPost(app.Texts))
+	mux.HandleFunc("GET /blog.xml", handler.BlogFeed(app.Texts, app.Cfg.AppURL, build.Name))
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
@@ -197,30 +213,29 @@ func siteRoutes(mux *http.ServeMux, app *app.App, home *handler.HomeHandler, cat
 	// under its home page; a self-hosted hub answers them with not found.
 	if app.Cfg.Billing {
 		mux.HandleFunc("GET /legal/{page}", legal.ShowPage)
+		mux.HandleFunc("GET /compare", handler.CompareIndex)
 		mux.HandleFunc("GET /compare/{name}", handler.Compare)
 	}
 }
 
 // authRoutes sign people in and out, start a workspace, take an invitation
 // and approve moin login in the browser.
-func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimiter, deviceLimiter, githubLimiter limiter) {
-	auth := handler.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService, app.Cfg)
+func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, githubLimiter, passkeyLimiter limiter) {
+	auth := handler.NewAuthHandler(app.AuthService, app.WorkspaceService, app.GitHubAppService, app.Passkeys, app.Cfg)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
 	workspaceInvitation := handler.NewWorkspaceInvitationHandler(app.WorkspaceService, app.Cfg)
 	mux.HandleFunc("GET /auth", middleware.RequireGuest(auth.AuthPage))
-	mux.HandleFunc("GET /auth/password", middleware.RequireGuest(auth.PasswordPage))
-	mux.HandleFunc("GET /auth/forgot-password", middleware.RequireGuest(auth.ForgotPasswordPage))
-	mux.HandleFunc("GET /auth/forgot-password-sent", middleware.RequireGuest(auth.ForgotPasswordSentPage))
-	mux.HandleFunc("GET /auth/magic-link-sent", middleware.RequireGuest(auth.MagicLinkSentPage))
+	mux.HandleFunc("GET /auth/key", middleware.RequireGuest(auth.KeyPage))
+	mux.HandleFunc("POST /auth/key", rateLimiter(middleware.RequireGuest(auth.SignInWithKey)))
+	if app.Passkeys.On() {
+		mux.HandleFunc("POST /auth/passkey/options", passkeyLimiter(middleware.RequireGuest(auth.PasskeyOptions)))
+		mux.HandleFunc("POST /auth/passkey", passkeyLimiter(middleware.RequireGuest(auth.SignInWithPasskey)))
+	}
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
 	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
+	mux.HandleFunc("POST /auth/github/connect", githubLimiter(middleware.RequireAuth(auth.ConnectGitHub)))
 	mux.HandleFunc("GET /auth/github/callback", githubLimiter(auth.GitHubCallback))
-	mux.HandleFunc("GET /auth/magic-link/{token}", auth.VerifyMagicLink)
-	mux.HandleFunc("GET /auth/forgot-password/{token}", auth.VerifyForgotPassword)
 	mux.HandleFunc("GET /auth/verify-email-change/{token}", auth.VerifyEmailChange)
-	mux.HandleFunc("POST /auth/magic-link", authEmailRateLimiter(middleware.RequireGuest(auth.SendMagicLink)))
-	mux.HandleFunc("POST /auth/password", rateLimiter(middleware.RequireGuest(auth.PasswordAuth)))
-	mux.HandleFunc("POST /auth/forgot-password", authEmailRateLimiter(middleware.RequireGuest(auth.ForgotPassword)))
 	mux.HandleFunc("POST /auth/onboarding", middleware.RequireAuth(auth.CompleteOnboarding))
 	mux.HandleFunc("GET /workspaces/new", middleware.RequireAuth(workspaceHandler.NewPage))
 	mux.HandleFunc("POST /workspaces/new", middleware.RequireAuth(workspaceHandler.Create))
@@ -228,10 +243,31 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, authEmailRateLimi
 	mux.HandleFunc("GET /workspaces/invitations/{token}", workspaceInvitation.Show)
 	mux.HandleFunc("POST /workspaces/invitations/{token}", middleware.RequireAuth(workspaceInvitation.Accept))
 	// moin login in the browser: the page signs in first by itself.
-	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Cfg)
+	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Passkeys, app.AuthService, app.Cfg)
 	mux.HandleFunc("GET /device", deviceLimiter(device.Show))
+	if app.Passkeys.On() {
+		mux.HandleFunc("POST /device/passkey/options", passkeyLimiter(middleware.RequireAuth(device.PasskeyOptions)))
+	}
 	mux.HandleFunc("POST /device/approve", deviceLimiter(middleware.RequireAuth(device.Approve)))
+	mux.HandleFunc("POST /device/reauth", deviceLimiter(middleware.RequireAuth(device.Reauth)))
 	mux.HandleFunc("POST /device/deny", deviceLimiter(middleware.RequireAuth(device.Deny)))
+	// AI agents sign in on the same approval page, with OAuth; the page
+	// shares the budget of moin login.
+	oauth := handler.NewOAuthHandler(app.OAuthService, app.WorkspaceService, app.Passkeys, app.AuthService, app.Cfg)
+	mux.HandleFunc("GET /oauth/authorize", deviceLimiter(oauth.Authorize))
+	if app.Passkeys.On() {
+		mux.HandleFunc("POST /oauth/passkey/options", passkeyLimiter(middleware.RequireAuth(device.PasskeyOptions)))
+	}
+	mux.HandleFunc("POST /oauth/approve", deviceLimiter(middleware.RequireAuth(oauth.Approve)))
+	mux.HandleFunc("POST /oauth/reauth", deviceLimiter(middleware.RequireAuth(oauth.Reauth)))
+	mux.HandleFunc("POST /oauth/deny", deviceLimiter(middleware.RequireAuth(oauth.Deny)))
+	// How an MCP client finds all of it: the metadata of /mcp (RFC 9728),
+	// at its own path and at the root, and of the hub as an authorization
+	// server (RFC 8414).
+	metadata := api.NewOAuthHandler(app.OAuthService)
+	mux.HandleFunc("GET "+api.ProtectedResourcePath, metadata.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", metadata.ProtectedResource)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", metadata.AuthorizationServer)
 }
 
 // inWorkspace is the middleware of every page under /app/{workspaceSlug}:
@@ -244,10 +280,10 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 
 // workspaceRoutes are the pages of a workspace around its servers and apps:
 // the overview, settings, the account, billing, the team and alerts.
-func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations limiter) {
+func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations, passkeyLimiter limiter) {
 	workspace := inWorkspace(app)
-	settings := handler.NewSettingsHandler(app.AuthService, app.APITokenService, app.AppService, app.UpdateService)
-	apiTokens := handler.NewAPITokensHandler(app.APITokenService)
+	settings := handler.NewSettingsHandler(app.AuthService, app.Passkeys, app.AppService, app.UpdateService)
+	connections := handler.NewConnectionsHandler(app.ConnectionService, app.CITokenService, app.AppService, app.Passkeys, app.AuthService)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
@@ -267,16 +303,27 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	mux.HandleFunc("POST /app/{workspaceSlug}/integrations", workspace(settings.SetIntegrations))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions/{id}", workspace(settings.RevokeSession))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/sessions", workspace(settings.RevokeAllSessions))
-	mux.HandleFunc("POST /app/{workspaceSlug}/settings/api-tokens", workspace(apiTokens.Create))
-	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/api-tokens/{id}", workspace(apiTokens.Revoke))
+	if app.Passkeys.On() {
+		mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys/options", passkeyLimiter(workspace(settings.PasskeyOptions)))
+		mux.HandleFunc("POST /app/{workspaceSlug}/settings/passkeys", passkeyLimiter(workspace(settings.AddPasskey)))
+	}
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RemovePasskey))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections", workspace(connections.Page))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm/options", passkeyLimiter(workspace(connections.ConfirmOptions)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm", passkeyLimiter(workspace(connections.Confirm)))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/reauth", workspace(connections.Reauth))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.Connection))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/{id}/rights/{right}", workspace(connections.SetConnectionRight))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.RemoveConnection))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/ci-tokens", workspace(connections.CreateCIToken))
+	mux.HandleFunc("GET /app/{workspaceSlug}/settings/ci-tokens/{id}", workspace(connections.CIToken))
+	mux.HandleFunc("POST /app/{workspaceSlug}/settings/ci-tokens/{id}/rights/{right}", workspace(connections.SetCITokenRight))
+	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/ci-tokens/{id}", workspace(connections.RemoveCIToken))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/profile/name", workspace(profile.UpdateName))
 	mux.HandleFunc("POST /app/{workspaceSlug}/profile/email-alerts", workspace(profile.EmailAlerts))
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/account/email", workspace(emailChanges(account.ChangeEmail)))
-	mux.HandleFunc("POST /app/{workspaceSlug}/account/password", workspace(account.ChangePassword))
 	mux.HandleFunc("POST /app/{workspaceSlug}/account/avatar", workspace(account.UploadAvatar))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/account/avatar", workspace(account.DeleteAvatar))
-	mux.HandleFunc("POST /app/{workspaceSlug}/account/password/set", workspace(account.SetPassword))
-	mux.HandleFunc("DELETE /app/{workspaceSlug}/account/password", workspace(account.RemovePassword))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/account", workspace(account.DeleteAccount))
 	if app.Cfg.Billing {
 		billing := handler.NewBillingHandler(app.PaymentService, app.WorkspaceService)
@@ -334,6 +381,7 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/deploys/{number}/log", workspace(apps.DeployLog))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/domains", workspace(apps.AppSection("domains")))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/settings", workspace(apps.AppSection("settings")))
+	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/compose.yml", workspace(apps.ComposeFile))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/name", workspace(apps.RenameApp))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/detail", workspace(apps.Detail))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/apps/{app}", workspace(apps.Delete))
@@ -349,10 +397,8 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/add", workspace(apps.AddDomain))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/remove", workspace(apps.RemoveDomain))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/canonical", workspace(apps.MakeCanonical))
-	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/protect", workspace(apps.Protect))
-	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/unprotect", workspace(apps.Unprotect))
+	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/password", workspace(apps.Password))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/instant", workspace(apps.SetInstant))
-	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/domains/instant-password", workspace(apps.SetInstantPassword))
 	mux.HandleFunc("GET /app/{workspaceSlug}/registries", workspace(apps.Registries))
 	mux.HandleFunc("POST /app/{workspaceSlug}/registries", workspace(apps.SetRegistry))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/registries/{host}", workspace(apps.DeleteRegistry))
@@ -368,6 +414,8 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/servers/{id}/name", workspace(apps.RenameServer))
 	mux.HandleFunc("GET /app/{workspaceSlug}/github/install", workspace(apps.GitHubInstall))
 	mux.HandleFunc("GET /app/github/setup", middleware.RequireAuth(apps.GitHubSetup))
+	githubApp := handler.NewGitHubAppHandler(app.GitHubAppService, app.WorkspaceService)
+	mux.HandleFunc("GET /app/github/created", middleware.RequireAuth(githubApp.Created))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.Repo))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/repo", workspace(apps.LinkRepo))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/repo/branches", workspace(apps.RepoBranches))
@@ -386,6 +434,7 @@ func appRoutes(mux *http.ServeMux, app *app.App, catalogPages *handler.CatalogHa
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket", workspace(apps.AddBucket))
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket/{name}", workspace(apps.EditBucket))
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket/{name}/default", workspace(apps.DefaultBucket))
+	mux.HandleFunc("POST /app/{workspaceSlug}/bucket/{name}/key", workspace(apps.SetBucketKey))
 	mux.HandleFunc("POST /app/{workspaceSlug}/bucket/{name}/remove", workspace(apps.RemoveBucket))
 	mux.HandleFunc("POST /app/{workspaceSlug}/apps/{app}/bucket", workspace(apps.SetAppBucket))
 	mux.HandleFunc("GET /app/{workspaceSlug}/apps/{app}/env", workspace(apps.Env))
@@ -447,7 +496,7 @@ func daemonRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientI
 }
 
 // apiRoutes are the JSON API: every route comes from api.Routes.
-func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPResolver, rateLimiter, authEmailRateLimiter, deviceLimiter, emailChanges limiter, invitationLimiter *middleware.RateLimiter) {
+func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPResolver, deviceLimiter, emailChanges limiter, invitationLimiter *middleware.RateLimiter) {
 	var apiBilling *api.BillingHandler
 	if app.Cfg.Billing {
 		apiBilling = api.NewBillingHandler(app.PaymentService, app.WorkspaceService)
@@ -457,7 +506,10 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Auth:        api.NewAuthHandler(app.AuthService, app.UserService, app.WorkspaceService),
 		Account:     api.NewAccountHandler(app.AuthService, app.UserService, app.FileService),
 		Sessions:    api.NewSessionsHandler(app.AuthService),
-		Tokens:      api.NewAPITokensHandler(app.APITokenService),
+		Passkeys:    api.NewPasskeysHandler(app.Passkeys),
+		Connections: api.NewConnectionsHandler(app.ConnectionService, app.Passkeys),
+		CITokens:    api.NewCITokensHandler(app.CITokenService, app.Passkeys),
+		Token:       api.NewTokenHandler(app.DeviceLoginService, app.ConnectionService, app.OAuthService),
 		Billing:     apiBilling,
 		Admin:       api.NewAdminHandler(app.AdminService),
 		Workspaces:  api.NewWorkspaceHandler(app.WorkspaceService),
@@ -469,12 +521,11 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		Catalog:     api.NewCatalogHandler(app.CatalogService),
 		Status:      api.NewStatusHandler(app.StatusService),
 		Device:      api.NewDeviceHandler(app.DeviceLoginService, app.Cfg.AppURL),
+		OAuth:       api.NewOAuthHandler(app.OAuthService),
 	}
 	apiMiddleware := api.Middleware{
 		RequireAuth:           middleware.RequireAuthAPI,
 		RequireOnboarded:      middleware.RequireOnboardedAPI,
-		RateLimitAuth:         rateLimiter,
-		RateLimitAuthEmail:    authEmailRateLimiter,
 		RateLimitEmailChanges: emailChanges,
 		RequireAdmin:          middleware.RequireAdminAPI,
 		Workspace: func(next http.HandlerFunc) http.HandlerFunc {
@@ -482,10 +533,20 @@ func apiRoutes(mux *http.ServeMux, app *app.App, clientIPs middleware.ClientIPRe
 		},
 		RateLimitInvitations: middleware.RateLimitWorkspaceInvitations(invitationLimiter),
 		InWorkspace: func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.RequireOnboardedAPI(middleware.WithTokenWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
+			return middleware.RequireOnboardedAPI(middleware.WithBearerWorkspace(app.WorkspaceService, app.SubscriptionService)(next))
 		},
 		RateLimitDevice:     deviceLimiter,
 		RateLimitDevicePoll: middleware.RateLimitDevicePoll(clientIPs),
+		// MCP clients register once per sign-in. claude.ai registers from
+		// a few addresses for everyone, so the budget is generous.
+		RateLimitRegister: middleware.RateLimit(clientIPs, 60, time.Hour),
+		AppID: func(workspaceID, name string) (string, error) {
+			found, err := app.AppService.Get(workspaceID, name)
+			if err != nil {
+				return "", err
+			}
+			return found.ID, nil
+		},
 	}
 	for _, route := range api.Routes(apiHandlers, apiMiddleware) {
 		mux.HandleFunc(route.Pattern, route.Handler)
@@ -507,5 +568,5 @@ func mcpRoutes(mux *http.ServeMux, app *app.App, invitationLimiter *middleware.R
 		Status:        app.StatusService,
 		BillingOff:    !app.Cfg.Billing,
 	})
-	mux.Handle("/mcp", mcp.Handler(mcpServer))
+	mux.Handle("/mcp", mcp.Handler(mcpServer, app.OAuthService.Issuer()+api.ProtectedResourcePath))
 }

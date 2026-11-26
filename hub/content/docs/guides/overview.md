@@ -5,7 +5,7 @@ group: "Every day"
 order: 1
 ---
 
-The Overview answers one question: is everything OK? It says **All good.** Or it lists the few things that need you, each with a link to fix it.
+The Overview answers one question: is everything OK? It says **Everything runs.** (`moin status` says `All good.`) Or it lists the few things that need you, each with a link to fix it.
 
 ```surfaces
 Web: **Overview**, the first page of a workspace, or `g` then `o`
@@ -34,7 +34,7 @@ The most urgent first:
 - **A disk over 90%** on a server ([Metrics](/docs/guides/metrics)).
 - **A daemon behind** the hub ([Servers](/docs/guides/servers#updates)).
 
-Below that: what runs, the newest catalog updates, and the newest [activity](/docs/guides/activity).
+Below that: your pinned apps, the apps deployed last, and the newest catalog updates.
 
 ## Jump anywhere
 
@@ -42,7 +42,7 @@ Below that: what runs, the newest catalog updates, and the newest [activity](/do
 
 ## The bar and Settings
 
-The bar on every page holds the wordmark, the search and your picture. Your picture opens **Settings**: the workspace's **Team**, **GitHub**, **Alerts**, **Bucket**, **Activity** and **Billing**, your workspaces, and your **Account**.
+The bar on every page holds the wordmark, the search and your picture. Your picture opens **Settings**: the workspace's **Team**, **Alerts**, **Bucket**, **Registries**, **Integrations**, **Activity** and **Billing**, your workspaces, your **Account** and your **Connections**.
 
 ## Good to know
 

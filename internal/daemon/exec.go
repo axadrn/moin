@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/axadrn/moin/protocol"
@@ -16,8 +17,8 @@ import (
 // execArgs is docker's argv for a run: compose exec in the app's live
 // release, without a TTY. The command follows the service as words of its
 // own, so no shell ever reads it.
-func execArgs(project, composeFile, service string, argv []string) []string {
-	return append([]string{"compose", "-p", project, "-f", composeFile, "exec", "-T", service}, argv...)
+func (a *apps) execArgs(app, composeJSON, service string, argv []string) []string {
+	return append(a.composeArgs(app, composeJSON, "exec", "-T", service), argv...)
 }
 
 // execTimeout is the run's timeout in seconds: the default when none is
@@ -44,7 +45,6 @@ func (r *runner) execStart(ctx context.Context, message protocol.Message, rules 
 		r.fail(message, refused(r.rulesFile, "exec: off"))
 		return
 	}
-	slog.Info("exec", "app", start.App, "service", start.Service)
 	done, err := r.apps.runExec(ctx, start, func(data string) {
 		r.send(protocol.TypeExecOutput, message.RequestID, protocol.ExecOutput{Data: data})
 	})
@@ -70,10 +70,10 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 	if current == 0 {
 		return protocol.ExecDone{}, fmt.Errorf("%s has no live deploy: deploy it first", start.App)
 	}
-	composeFile := filepath.Join(a.releaseDir(start.App, current), "compose.json")
+	composeJSON := filepath.Join(a.releaseDir(start.App, current), "compose.json")
 	ctx, cancel := context.WithTimeout(ctx, execTimeout(start.Timeout))
 	defer cancel()
-	command := exec.CommandContext(ctx, "docker", execArgs(a.projectOf(start.App), composeFile, start.Service, start.Argv)...)
+	command := exec.CommandContext(ctx, "docker", a.execArgs(start.App, composeJSON, start.Service, start.Argv)...)
 	command.WaitDelay = 5 * time.Second
 	reader, writer := io.Pipe()
 	command.Stdout, command.Stderr = writer, writer
@@ -86,6 +86,7 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 	err := command.Run()
 	writer.Close()
 	<-copied
+	done.Command = a.maskedCommand(start.App, start.Argv)
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -98,6 +99,35 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 		return protocol.ExecDone{}, err
 	}
 	return done, nil
+}
+
+// maskedCommand is argv as one line for the activity, with the app's env
+// values masked, such as a password typed into the command. The hub never
+// sees the values, so it cannot mask them. Short values would mask
+// ordinary words, so only values of six characters or more count. When the
+// env file cannot be read, only the program is left.
+func (a *apps) maskedCommand(app string, argv []string) string {
+	env, err := a.env(app)
+	if err != nil {
+		return argv[0] + " …"
+	}
+	var values []string
+	for _, value := range env {
+		if len(value) >= 6 {
+			values = append(values, value)
+		}
+	}
+	return maskValues(protocol.JoinCommand(argv), values)
+}
+
+// maskValues replaces every value in text with •••, the longest first, so
+// a value inside another is masked as part of the longer one.
+func maskValues(text string, values []string) string {
+	slices.SortFunc(values, func(a, b string) int { return len(b) - len(a) })
+	for _, value := range values {
+		text = strings.ReplaceAll(text, value, "•••")
+	}
+	return text
 }
 
 // copyCapped hands what reader gives to output in pieces, at most limit

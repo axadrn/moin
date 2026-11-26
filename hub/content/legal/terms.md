@@ -1,7 +1,7 @@
 ---
 title: Terms of Service
 description: The plain-language rules for using the hosted moin service
-lastUpdated: November 15, 2026
+lastUpdated: November 25, 2026
 ---
 
 These terms are the agreement between you and us, Berry Good Ideas LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA, the company that runs the hosted moin service. They cover the website, the hub, its API and MCP server, and the `moin` command line tool and daemon when you use them with the hosted service. By creating an account you agree to them. How we handle data is in the [Privacy Policy](/legal/privacy).
@@ -10,7 +10,7 @@ These terms are the agreement between you and us, Berry Good Ideas LLC, 30 N Gou
 
 moin deploys, runs and watches apps on servers you own. You install the moin daemon on your server; it dials out to the hub and runs your deploys with Docker Compose.
 
-moin is open source under the GNU Affero General Public License 3.0. That license covers the code. These terms cover only the hosted service we run. A hub you host yourself is yours: these terms do not apply to it, and it shows no legal pages.
+moin is open source. Its [license](/docs/faq#is-moin-open-source) covers the code. These terms cover only the hosted service we run. A hub you host yourself is yours: these terms do not apply to it, and it shows no legal pages.
 
 ## Who can use moin
 
@@ -18,7 +18,7 @@ You must be at least 16 years old. If you sign up for a company or another organ
 
 ## Your account
 
-Keep your sign-in, API tokens and deploy hook URLs secret: anyone who has them can act as you. You are responsible for what happens with your account and your tokens. Tell us at [{{support_email}}](mailto:{{support_email}}) if you think someone else has access.
+Keep your sign-in, CI tokens and deploy hook URLs secret, and let only your own computers and AI agents connect: anyone who has them can act as you. You are responsible for what happens with your account, your connections and your tokens. Tell us at [{{support_email}}](mailto:{{support_email}}) if you think someone else has access.
 
 ## Your servers, apps and data
 
@@ -50,7 +50,7 @@ If you see abuse or content that infringes your rights and it involves moin, wri
 
 ## Plans and payment
 
-moin.run is for businesses only: you subscribe as a business, not as a consumer, and confirm it before you subscribe. moin is a subscription per workspace, monthly or yearly. A subscription covers one workspace, with all its servers, apps and members, within the limits shown for your plan. A new account gets a free trial for its first workspace, without a payment method. After the trial the workspace is read-only until you subscribe: your apps keep running on your servers, their backups continue, and you can still stop and start them, see everything and manage your account. Prices are shown before you buy.
+moin.run is for businesses only: you subscribe as a business, not as a consumer, and confirm it before you subscribe. moin is a subscription per workspace, monthly or yearly. A subscription covers one workspace, with all its servers, apps and team. A new account gets a free trial for its first workspace, without a payment method. The trial starts when the workspace's first server connects. After the trial the workspace is read-only until you subscribe: your apps keep running on your servers, their backups continue, and you can still stop and start them, see everything and manage your account. Prices are shown before you buy.
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: its checkout shows the price, tax and terms of the purchase, and Stripe handles invoices, receipts and refunds required by law. A subscription renews automatically until you cancel it. You can cancel at any time in the billing settings; your plan stays active until the end of the period you paid for. Payments already made are not refunded, except where the law requires it or these terms say so.
 
@@ -76,7 +76,7 @@ Your apps run on your servers, not on ours. If the hub is down, your apps keep r
 
 moin backs up the databases of your apps to the bucket you choose and checks the backups every day. These backups are best effort. Check that they are there and that you can restore them, and keep your own copy of anything you cannot afford to lose.
 
-You alone are responsible for your data. We are not responsible for data that is lost, damaged, leaked or not backed up, in any form and for any reason: on your servers, in your bucket or in moin, including through a deploy, rollback, update, migration, backup, restore, restore check, a command you or moin runs, or an outage of moin or of any service it uses.
+You alone are responsible for your data. We are not responsible for data that is lost, damaged, leaked or not backed up, in any form and for any reason: on your servers, in your bucket or in moin, including through a deploy, rollback, update, migration, backup, restore, check, a command you or moin runs, or an outage of moin or of any service it uses.
 
 ## Liability
 

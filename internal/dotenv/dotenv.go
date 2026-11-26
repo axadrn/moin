@@ -1,19 +1,22 @@
-// Package dotenv reads and writes the env vars of an app as one .env text,
-// KEY=value per line, and says what replacing them with such a text changes.
-// The CLI, the TUI and the hub share it, so a text means the same
-// everywhere.
+// Package dotenv reads the env vars of an app from one .env text, KEY=value
+// per line, writes them as one, and says what replacing them with such a
+// text changes. The CLI, the TUI, the hub and the daemon share it, so a text
+// means the same everywhere.
 package dotenv
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
 
-// Parse reads a .env text. Empty lines and lines starting with # are skipped,
-// "export " in front of a key is allowed. A value may be bare, in single
-// quotes (taken as it is) or in double quotes, where \n, \", \\ and \$
-// stand for a line break, a quote, a backslash and a dollar.
+// Parse reads a .env text. Empty lines and lines starting with # are
+// skipped, "export " in front of a key is allowed. A value may be bare, in
+// single quotes (taken as it is) or in double quotes, where \n, \", \\
+// and \$ stand for a line break, a quote, a backslash and a dollar; \r for
+// a carriage return. An error names the line by its number only, never by
+// what is on it: a broken line may hold a secret.
 func Parse(text string) (map[string]string, error) {
 	env := map[string]string{}
 	for number, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
@@ -24,10 +27,10 @@ func Parse(text string) (map[string]string, error) {
 		key, value, ok := strings.Cut(strings.TrimPrefix(line, "export "), "=")
 		key = strings.TrimSpace(key)
 		if !ok || key == "" {
-			return nil, fmt.Errorf("line %d is not KEY=value: %s", number+1, clip(line))
+			return nil, fmt.Errorf("line %d is not KEY=value", number+1)
 		}
 		if _, twice := env[key]; twice {
-			return nil, fmt.Errorf("line %d sets %s a second time", number+1, key)
+			return nil, fmt.Errorf("line %d sets a key a second time", number+1)
 		}
 		value, err := unquote(strings.TrimSpace(value))
 		if err != nil {
@@ -57,6 +60,8 @@ func unquote(value string) (string, error) {
 				switch next := value[index]; next {
 				case 'n':
 					out.WriteByte('\n')
+				case 'r':
+					out.WriteByte('\r')
 				case 't':
 					out.WriteByte('\t')
 				default:
@@ -75,55 +80,39 @@ func unquote(value string) (string, error) {
 	return value, nil
 }
 
-// Format writes env as a .env text, sorted by key. Parse reads it back as it
-// was.
+// Format writes env as a .env text Parse reads back exactly, and docker
+// compose too: one KEY="value" per line, sorted by key, with \, ", $ and
+// line breaks escaped, so compose fills in no ${VAR} of a value.
 func Format(env map[string]string) string {
-	var out strings.Builder
-	for _, key := range Keys(env) {
-		fmt.Fprintf(&out, "%s=%s\n", key, Quote(env[key]))
+	var text strings.Builder
+	for _, key := range slices.Sorted(maps.Keys(env)) {
+		text.WriteString(key + `="` + quote(env[key]) + "\"\n")
 	}
-	return out.String()
+	return text.String()
 }
 
-// Quote puts a value in double quotes when it needs them.
-func Quote(value string) string {
-	if value != "" && !strings.ContainsAny(value, " \t\n\"'\\$#") {
-		return value
-	}
-	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\t", `\t`, "$", `\$`)
-	return `"` + replacer.Replace(value) + `"`
-}
-
-// Keys are the keys of env, sorted.
-func Keys(env map[string]string) []string {
-	keys := make([]string, 0, len(env))
-	for key := range env {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
-}
+var quote = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`, "\r", `\r`).Replace
 
 // Change is what replacing the env vars with others does, by key, sorted.
+// Replaced are the keys there were and that come again: moin never reads a
+// value back, so it cannot tell a new value from the same one.
 type Change struct {
-	Added   []string `json:"added"`
-	Changed []string `json:"changed"`
-	Removed []string `json:"removed"`
+	Added    []string `json:"added"`
+	Replaced []string `json:"replaced"`
+	Removed  []string `json:"removed"`
 }
 
-// Diff compares the env vars there are with the ones that replace them.
-func Diff(current, next map[string]string) Change {
-	change := Change{Added: []string{}, Changed: []string{}, Removed: []string{}}
-	for _, key := range Keys(next) {
-		value, ok := current[key]
-		switch {
-		case !ok:
+// Diff compares the keys there are with the env vars that replace them.
+func Diff(current []string, next map[string]string) Change {
+	change := Change{Added: []string{}, Replaced: []string{}, Removed: []string{}}
+	for _, key := range slices.Sorted(maps.Keys(next)) {
+		if slices.Contains(current, key) {
+			change.Replaced = append(change.Replaced, key)
+		} else {
 			change.Added = append(change.Added, key)
-		case value != next[key]:
-			change.Changed = append(change.Changed, key)
 		}
 	}
-	for _, key := range Keys(current) {
+	for _, key := range slices.Sorted(slices.Values(current)) {
 		if _, ok := next[key]; !ok {
 			change.Removed = append(change.Removed, key)
 		}
@@ -133,16 +122,16 @@ func Diff(current, next map[string]string) Change {
 
 // None reports whether the change changes nothing.
 func (c Change) None() bool {
-	return len(c.Added)+len(c.Changed)+len(c.Removed) == 0
+	return len(c.Added)+len(c.Replaced)+len(c.Removed) == 0
 }
 
-// String says the change in one line: "adds A, changes B, removes C".
+// String says the change in one line: "adds A; replaces B; removes C".
 func (c Change) String() string {
 	var parts []string
 	for _, part := range []struct {
 		verb string
 		keys []string
-	}{{"adds", c.Added}, {"changes", c.Changed}, {"removes", c.Removed}} {
+	}{{"adds", c.Added}, {"replaces", c.Replaced}, {"removes", c.Removed}} {
 		if len(part.keys) > 0 {
 			parts = append(parts, part.verb+" "+strings.Join(part.keys, ", "))
 		}
@@ -151,11 +140,4 @@ func (c Change) String() string {
 		return "changes nothing"
 	}
 	return strings.Join(parts, "; ")
-}
-
-func clip(line string) string {
-	if len(line) > 40 {
-		return line[:40] + "…"
-	}
-	return line
 }

@@ -18,8 +18,9 @@ import (
 type RateLimiter struct {
 	mu        sync.RWMutex
 	requests  map[string][]time.Time
-	limit     int           // Max requests allowed
-	window    time.Duration // Time window for rate limiting
+	limit     int              // Max requests allowed
+	window    time.Duration    // Time window for rate limiting
+	now       func() time.Time // time.Now, or a test's clock
 	done      chan struct{}
 	closeOnce sync.Once
 }
@@ -44,6 +45,7 @@ func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 		requests: make(map[string][]time.Time),
 		limit:    limit,
 		window:   window,
+		now:      time.Now,
 		done:     make(chan struct{}),
 	}
 
@@ -62,14 +64,21 @@ func (rl *RateLimiter) Close() {
 
 // Allow checks if request from IP should be allowed
 func (rl *RateLimiter) Allow(ip string) bool {
+	allowed, _ := rl.allow(ip)
+	return allowed
+}
+
+// allow is Allow, and when it says no, also how long until the oldest
+// request leaves the window and one more fits again.
+func (rl *RateLimiter) allow(key string) (bool, time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	now := time.Now()
+	now := rl.now()
 	cutoff := now.Add(-rl.window)
 
-	// Get requests for this IP
-	requests := rl.requests[ip]
+	// Get requests for this key
+	requests := rl.requests[key]
 
 	// Remove old requests outside time window
 	validRequests := []time.Time{}
@@ -81,15 +90,15 @@ func (rl *RateLimiter) Allow(ip string) bool {
 
 	// Check if limit exceeded
 	if len(validRequests) >= rl.limit {
-		rl.requests[ip] = validRequests
-		return false
+		rl.requests[key] = validRequests
+		return false, validRequests[0].Add(rl.window).Sub(now)
 	}
 
 	// Add current request
 	validRequests = append(validRequests, now)
-	rl.requests[ip] = validRequests
+	rl.requests[key] = validRequests
 
-	return true
+	return true, 0
 }
 
 // cleanupLoop periodically removes old entries to prevent memory leak
@@ -112,7 +121,7 @@ func (rl *RateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	now := time.Now()
+	now := rl.now()
 	cutoff := now.Add(-rl.window * 2) // Keep data for 2x window
 
 	for ip, requests := range rl.requests {
@@ -132,16 +141,24 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// RateLimitAuth creates middleware for auth endpoints
-// Limits: 5 requests per 15 minutes per IP
+// RateLimitAuth limits guessing a recovery key: 5 tries per 15 minutes per
+// IP.
 func RateLimitAuth(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
 	return RateLimit(clientIPs, 5, 15*time.Minute)
 }
 
 // RateLimitGitHubLogin limits signing in with GitHub. One sign-in is two
-// requests, nothing can be guessed here, and it must not share the password
-// budget: a few tries would lock the callback out in the middle of a sign-in.
+// requests, nothing can be guessed here, and it must not share the budget
+// of the recovery key: a few tries would lock the callback out in the
+// middle of a sign-in.
 func RateLimitGitHubLogin(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
+	return RateLimit(clientIPs, 30, 15*time.Minute)
+}
+
+// RateLimitPasskeys limits signing in with a passkey and adding one. Each
+// is two requests, nothing can be guessed here, and like GitHub it keeps
+// its own budget, apart from the recovery key's.
+func RateLimitPasskeys(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
 	return RateLimit(clientIPs, 30, 15*time.Minute)
 }
 
@@ -170,33 +187,6 @@ func RateLimit(clientIPs ClientIPResolver, limit int, window time.Duration) func
 					"path", r.URL.Path,
 				)
 				writeRateLimitError(w, r, limiter)
-				return
-			}
-
-			next(w, r)
-		}
-	}
-}
-
-// RateLimitAuthEmail limits authentication email delivery by client and recipient.
-func RateLimitAuthEmail(clientIPs ClientIPResolver) func(http.HandlerFunc) http.HandlerFunc {
-	return rateLimitAuthEmail(clientIPs, NewRateLimiter(10, time.Hour), NewRateLimiter(3, time.Hour))
-}
-
-func rateLimitAuthEmail(clientIPs ClientIPResolver, ipLimiter, recipientLimiter *RateLimiter) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			ip := clientIPs.ClientIP(r)
-			if !ipLimiter.Allow(ip) {
-				slog.Warn("authentication email rate limit exceeded", "ip", ip, "path", r.URL.Path)
-				writeRateLimitError(w, r, ipLimiter)
-				return
-			}
-
-			email := requestEmail(r)
-			if email != "" && !recipientLimiter.Allow(rateLimitEmailKey(email)) {
-				slog.Warn("authentication email recipient rate limit exceeded", "path", r.URL.Path)
-				writeRateLimitError(w, r, recipientLimiter)
 				return
 			}
 

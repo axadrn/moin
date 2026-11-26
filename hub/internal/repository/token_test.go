@@ -17,7 +17,7 @@ func TestTokenCanBeConsumedOnlyOnce(t *testing.T) {
 	tokenRepository := repository.NewTokens(database)
 	token := &model.Token{
 		UserID:    fixture.User.ID,
-		Type:      model.TokenTypeMagicLink,
+		Type:      model.TokenTypeEmailVerify,
 		TokenHash: "single-use-token",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
@@ -46,7 +46,7 @@ func TestTokenConsumptionIsAtomic(t *testing.T) {
 	tokenRepository := repository.NewTokens(database)
 	token := &model.Token{
 		UserID:    fixture.User.ID,
-		Type:      model.TokenTypeMagicLink,
+		Type:      model.TokenTypeEmailVerify,
 		TokenHash: "concurrent-token",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
@@ -106,7 +106,7 @@ func TestDeleteByUserAndTypePreservesOtherTokens(t *testing.T) {
 	database := testutil.NewDatabase(t)
 	fixture := testutil.SeedUser(t, database, testutil.UserOptions{Verified: true})
 	tokenRepository := repository.NewTokens(database)
-	for _, tokenType := range []string{model.TokenTypeMagicLink, model.TokenTypeEmailChange} {
+	for _, tokenType := range []string{model.TokenTypeEmailVerify, model.TokenTypeEmailChange} {
 		token := &model.Token{
 			UserID:    fixture.User.ID,
 			Type:      tokenType,
@@ -118,10 +118,10 @@ func TestDeleteByUserAndTypePreservesOtherTokens(t *testing.T) {
 		}
 	}
 
-	if err := tokenRepository.DeleteByUserAndType(fixture.User.ID, model.TokenTypeMagicLink); err != nil {
+	if err := tokenRepository.DeleteByUserAndType(fixture.User.ID, model.TokenTypeEmailVerify); err != nil {
 		t.Fatalf("DeleteByUserAndType() error = %v", err)
 	}
-	if _, err := tokenRepository.ConsumeToken(model.TokenTypeMagicLink + "-token"); !errors.Is(err, repository.ErrTokenNotFound) {
+	if _, err := tokenRepository.ConsumeToken(model.TokenTypeEmailVerify + "-token"); !errors.Is(err, repository.ErrTokenNotFound) {
 		t.Fatalf("deleted token error = %v, want ErrTokenNotFound", err)
 	}
 	if _, err := tokenRepository.ConsumeToken(model.TokenTypeEmailChange + "-token"); err != nil {

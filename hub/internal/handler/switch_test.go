@@ -139,7 +139,7 @@ func TestAutoDeploySwitch(t *testing.T) {
 		t.Fatalf("without a repo the switch went on: %s", body)
 	}
 
-	if _, err := s.apps.LinkRepo(context.Background(), s.actor(), "blog", "axadrn/blog", "main", true); err == nil {
+	if _, err := s.apps.LinkRepo(context.Background(), s.actor(), "blog", "axadrn/blog", "main", new(true)); err == nil {
 		t.Fatal("linked without GitHub")
 	}
 	// No GitHub is set up here: linking needs it, the switch must not.
@@ -247,19 +247,23 @@ func TestUptimeSwitch(t *testing.T) {
 	}
 }
 
-// The instant password switch answers the domains section as stored.
-func TestInstantPasswordSwitch(t *testing.T) {
+// The password switch answers the domains section as stored: off, then
+// on again with a password moin made, shown once.
+func TestPasswordSwitch(t *testing.T) {
 	s := newSwitches(t)
-	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/domains/instant-password"
-	pattern := "/app/{workspaceSlug}/apps/{app}/domains/instant-password"
+	path := "/app/" + s.ada.Workspace.Slug + "/apps/blog/domains/password"
+	pattern := "/app/{workspaceSlug}/apps/{app}/domains/password"
 	for _, on := range []bool{false, true} {
-		form := url.Values{"password": {"1"}}
+		form := url.Values{"switch": {"1"}}
 		if on {
 			form.Set("on", "1")
 		}
-		s.post(pattern, path, form, s.handler.SetInstantPassword)
-		if s.app().InstantOpen == on {
-			t.Fatalf("password on %v: open %v", on, s.app().InstantOpen)
+		body := s.post(pattern, path, form, s.handler.Password)
+		if switchOn(t, body, "password-on") != on || (s.app().Password != "") != on {
+			t.Fatalf("password on %v: password %q, answer %s", on, s.app().Password, body)
+		}
+		if strings.Contains(body, "data-new-password") != on {
+			t.Fatalf("password on %v: the new password shows %v", on, !on)
 		}
 	}
 }

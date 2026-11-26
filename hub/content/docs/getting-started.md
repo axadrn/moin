@@ -1,6 +1,6 @@
 ---
 title: "Get started"
-description: "From a fresh server to a live app. Four steps."
+description: "From a fresh server to a live app in four steps. Connect it, deploy, add a domain and back it up."
 group: "Start"
 order: 2
 ---
@@ -21,9 +21,9 @@ Then four steps, and your app is live.
 moin login --url https://moin.example.com
 ```
 
-Your browser opens and shows a code. Check that it is the same code as in your terminal. Press **Approve**.
+Your browser opens and shows a code. Check that it is the same code as in your terminal. Pick the rights. Press **Allow with passkey**, or **Allow** without a passkey.
 
-No account yet? The same page signs you up, with GitHub or your email.
+No account yet? The same page signs you up, with GitHub.
 
 ## 2. Add a server
 
@@ -47,7 +47,7 @@ It installs Docker if it is missing. It starts the daemon, the little helper tha
 
 ## 3. Add your bucket
 
-Your bucket is your own box on the internet. Your backups and uploads go there, never to us.
+Your bucket is your own box on the internet. Your backups go there, never to us.
 
 Any S3-compatible one works: Cloudflare R2, AWS S3, Backblaze B2, Hetzner or Exoscale. Make a bucket, and a key that may read, write and delete.
 
@@ -66,7 +66,9 @@ The CLI asks for the secret key. For AWS S3, leave the endpoint out and set the 
 
 ## 4. Deploy
 
-A deploy puts a new version of your app live. Go to the folder of your app and type:
+A deploy puts a new version of your app live. Your server builds what you pushed to GitHub. So connect GitHub once: `moin github` prints the link. [GitHub](/docs/guides/github#connect-github) has the details.
+
+Push your app to GitHub. Then go to its folder and type:
 
 ```bash
 moin deploy
@@ -76,19 +78,27 @@ The app does not exist yet, so moin asks first. Answer `y`.
 
 ```text
 ? App my-app does not exist. Create it? [y/N] y
-Created app my-app on web-1
-Uploading 42 files to your bucket (18.3 KB)
-Deploy v1 of my-app started
-  detected go, service web on port 8080
-  v1 is live
-✓ moin. my-app is live at https://my-app.203-0-113-7.sslip.io
+✓ Created app my-app on web-1
+  The app's domains and its instant address ask for this password. Shown only this once:
+  user moin, password 7f3k…
+✓ my-app follows me/my-app@main
+→ Deploying me/my-app from GitHub
+→ commit 3f2a9c1 First version
+→ Deploy v1 of my-app started
+→ downloading the source
+→ detected go, service web on port 8080
+→ building
+→ starting
+✓ moin. my-app is live at https://my-app.203-0-113-7.sslip.io v1 in 48s
+  Its domains and its instant address ask for the app's password, shown once when it was made. Turn it off: moin password off my-app
+  See it run with moin logs my-app
 ```
 
 You need no Dockerfile. moin builds Node, Bun, Python, Ruby, PHP, Go and more. It also uses your `Dockerfile` or `compose.yml` if you have one.
 
-The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password. `moin instant --show` prints both.
+The app is online at once at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a [password](/docs/guides/domains#password). moin prints the password once, when it makes the app. Keep it in your password manager. `moin password off` opens the app to everyone.
 
-This page deploys from your folder. You can also deploy from GitHub or from CI. It all comes down to [three questions](/docs/guides/deploy#three-questions).
+This page deploys what you pushed. You can also deploy every push, or an image from CI. It all comes down to [three questions](/docs/guides/deploy#three-questions).
 
 ## Good to know
 

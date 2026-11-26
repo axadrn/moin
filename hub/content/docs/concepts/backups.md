@@ -33,7 +33,7 @@ Postgres: pg_dump
   (nothing waits on the disk)
 ```
 
-**SQLite.** `VACUUM INTO` makes a clean copy while your app keeps running. It can only write into a file, like a photocopier that needs paper. So the copy is a file next to the database for a moment, and the disk needs room for it. moin looks first.
+**SQLite.** `VACUUM INTO` makes a clean copy while your app keeps running. It can only write into a file, like a photocopier that needs paper. So the copy is a file in moin's own folder on the server for a moment, and the disk needs room for it. moin looks first.
 
 **Postgres.** `pg_dump` makes a clean copy while your app keeps running. It writes a stream, like water from a tap. moin points the tap straight at your bucket. It runs inside your Postgres container, so no password leaves it. It copies every database in it, each into a file of its own.
 
@@ -100,7 +100,6 @@ So "backed up" means "copied, then restored and read". The check needs room for 
    └─ <workspace>/
       └─ <app>/
          └─ <app-id>/
-            ├─ uploads/
             └─ <database>/
                └─ copies/
 ```
@@ -111,7 +110,6 @@ So "backed up" means "copied, then restored and read". The check needs room for 
 | `<workspace>/` | your workspace's ID, so two workspaces can share a bucket |
 | `<app>/` | the name the app was created with; it stays when you rename the app |
 | `<app-id>/` | a new app with the same name gets a new one, so copies never mix |
-| `uploads/` | your code on its way to the server |
 | `<database>/` | one per database: `data~app.db` for `/data/app.db`, `postgres-db` for the service `db`, `postgres-db~analytics` for another database in it |
 | `copies/` | the copies, named by their time in UTC |
 
@@ -119,7 +117,6 @@ So "backed up" means "copied, then restored and read". The check needs room for 
 
 - **Copies**: as long as the app keeps copies (**Keep**). The newest copy always stays.
 - **The undo of a restore**: as long as the app keeps copies.
-- **Uploads**: until the server has them, a day at most.
 
 moin never deletes the rest:
 

@@ -34,7 +34,6 @@ func TestEveryFrameFitsTheScreen(t *testing.T) {
 		{"restore typing", func(m model) model { return press(m.withApp("shop", tBackups), "t", "enter", "s") }},
 		{"restore", func(m model) model { return press(m.withApp("shop", tBackups), "enter") }},
 		{"env", func(m model) model { return m.withApp("shop", tEnv) }},
-		{"env shown", func(m model) model { return press(m.withApp("shop", tEnv), "v") }},
 		{"env prompt", func(m model) model { return press(m.withApp("shop", tEnv), "a", "X", "=") }},
 		{"domains", func(m model) model { return m.withApp("shop", tDomains) }},
 		{"uptime", func(m model) model { return m.withApp("shop", tUptime) }},
@@ -137,7 +136,7 @@ func TestAppTabsShowTheirData(t *testing.T) {
 		tDeploys: {"v43", "live", "Checkout shows the shipping cost", "v42", "failed", "Deploy", "4f9ac21"},
 		tLogs:    {"GET / 200 3ms", "ERROR db timeout", "live", "4 lines"},
 		tBackups: {"shop.db", "passed", "postgres", "The daily check could not", "Go back to", "Before v43", "c downloads the newest", "last copy", "hourly, kept 7 days"},
-		tEnv:     {"DATABASE_URL", "STRIPE_KEY", "••••••••", "values hidden"},
+		tEnv:     {"DATABASE_URL", "STRIPE_KEY", "25m ago", "write-only"},
 		tDomains: {"shop.example.com", "★", "points", "not yet", "add an A record", "instant address", "shop-acme.moin.app"},
 		tUptime:  {"shop.example.com", "100%", "99.98%", "200 in 41 ms", "Last outages", "502 Bad Gateway"},
 		tMetrics: {"CPU", "3.2%", "Memory", "2 containers", "1h"},
@@ -149,13 +148,6 @@ func TestAppTabsShowTheirData(t *testing.T) {
 				t.Errorf("tab %s lacks %q", tabName(tb), want)
 			}
 		}
-	}
-	shown := checkFrame(t, "env shown", press(fixture(120, 30).withApp("shop", tEnv), "v"))
-	if !strings.Contains(shown, "sk_live_secret") {
-		t.Error("v does not show the values")
-	}
-	if strings.Contains(checkFrame(t, "env", fixture(120, 30).withApp("shop", tEnv)), "sk_live_secret") {
-		t.Error("the env tab shows a value before v")
 	}
 }
 

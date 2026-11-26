@@ -12,7 +12,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// Home is the landing page: the promise over the container wall, how to
+// Home is the landing page: the promise over the overview video, how to
 // start, what it does, backups, security, how it compares,
 // open source, the prices, the questions people ask and the way in. Short: every row
 // links to the docs for the rest. open is what the changelog says about how
@@ -23,6 +23,7 @@ templ Home(network model.Network, open HomeOpen) {
 		Description: brand.Description,
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
+		@templ.Raw(homeJSONLD(ctxkeys.RenderConfig(ctx).AppURL, ctxkeys.RenderConfig(ctx).Billing))
 		<main>
 			@HomeHero()
 			<div class="moin-page">
@@ -63,8 +64,7 @@ func homeStartLabel(ctx context.Context) string {
 // ---------------------------------------------------------------- hero
 // HomeHero is the whole first screen, up behind the floating navbar, whose
 // height its top padding adds back: the promise and the two buttons on
-// top, and the wall of containers across the full width below, every
-// container an app.
+// top, and the overview video below.
 templ HomeHero() {
 	<section class="moin-hero">
 		<div class="moin-page">
@@ -83,11 +83,26 @@ templ HomeHero() {
 				}
 			</div>
 		</div>
-		<div>
-			@homeHarbor()
+		<div class="moin-page">
+			@homeVideo()
 		</div>
 	</section>
 }
+
+// ---------------------------------------------------------------- video
+// homeVideo is the overview film, 83 s: a DELETE at 3 AM and the way back,
+// then everything moin does, all of it the real moin. It plays without
+// sound and starts over; its controls turn the sound on. Square on a phone,
+// wide everywhere else. The files live in the media bucket, not here; a new
+// cut gets a new date in its name.
+templ homeVideo() {
+	<video autoplay muted loop playsinline controls preload="metadata" poster={ homeVideoURL + "-poster.jpg" } aria-label={ brand.Name + " in 83 seconds" }>
+		<source src={ homeVideoURL + "-1x1.mp4" } type="video/mp4" media="(max-width: 40rem)"/>
+		<source src={ homeVideoURL + "-16x9.mp4" } type="video/mp4"/>
+	</video>
+}
+
+const homeVideoURL = brand.Media + "/overview-2026-11-18"
 
 // HomeNext says what grows next to deploys, and where to read more.
 templ HomeNext() {
@@ -117,7 +132,7 @@ templ HomeLive(network model.Network) {
 		</h2>
 		<dl class="moin-grid" data-fit style="--min:9rem">
 			@homeLiveNumber(network.SelfHosted, "self-hosted hubs", "self-hosted")
-			@homeLiveNumber(network.HostedWorkspaces, "teams on hosted moin", "hosted")
+			@homeLiveNumber(network.HostedWorkspaces, "teams on hosted "+brand.Name, "hosted")
 			@homeLiveNumber(network.Servers, "servers", "servers")
 			@homeLiveNumber(network.Apps, "apps live", "apps")
 			@homeLiveNumber(network.Deploys, "deploys so far", "deploys")
@@ -156,10 +171,10 @@ type homeSurface struct {
 // homeSurfaces are the ways to do the four steps; none is the standard
 // one. Web comes first because it needs nothing installed.
 var homeSurfaces = []homeSurface{
-	{"web", "Web", [4]string{"GitHub or email", "Servers, Add server", "Settings, Bucket", "Deploys, GitHub, Deploy"}},
+	{"web", "Web", [4]string{"GitHub or a passkey", "Servers, Add server", "Settings, Bucket", "Deploys, GitHub, Deploy"}},
 	{"cli", "CLI", [4]string{"moin login", "moin servers add web-1", "moin buckets add default", "moin deploy"}},
 	{"tui", "TUI", [4]string{"moin", "w, then a", "w, then k", "D"}},
-	{"api", "API", [4]string{"An API token", "POST /api/v1/servers", "POST /api/v1/buckets", "POST /api/v1/apps/{app}/deploys"}},
+	{"api", "API", [4]string{"A CI token", "POST /api/v1/servers", "POST /api/v1/buckets", "POST /api/v1/apps/{app}/deploys"}},
 	{"mcp", "MCP", [4]string{"Connect your AI agent", "add_server", "add_bucket", "deploy_ref"}},
 }
 
@@ -261,7 +276,7 @@ templ HomeDoes() {
 					@homeInk("Your rules.", "You say what "+brand.Name+" may do.", "/docs/guides/security#rules")
 				</div>
 			}
-			@homeFeature("Deploy", "Any repo. A compose.yml. An image.", "/docs/guides/deploy")
+			@homeFeature("Deploy", "Any GitHub repo. A compose.yml. An image.", "/docs/guides/deploy")
 			@homeFeature("Domains", "HTTPS from the first deploy.", "/docs/guides/domains")
 			@homeFeature("GitHub", "Every push. Or one commit.", "/docs/guides/github")
 			@homeFeature("Catalog", "n8n. Umami. Open WebUI. And more.", "/catalog")
@@ -300,24 +315,24 @@ templ HomePricing() {
 			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem", "data-plan": "hosted"}}) {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Hosted</span>
-					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$29</span><span class="moin-small moin-muted">a month per workspace</span></span>
-					<span class="moin-small moin-muted" data-yearly-deal>Or $249 a year. 30 days free. No card.</span>
+					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$7</span><span class="moin-small moin-muted">a month per workspace</span></span>
+					<span class="moin-small moin-muted" data-yearly-deal>Or $49 a year. { layouts.TrialOffer() } No card.</span>
 				</div>
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 					{ homeStartLabel(ctx) }
 				}
-				@homePlanRows("Ready in minutes", "We run and update it", "GitHub and email set up", "Support by email")
+				@homePlanRows("Ready in minutes", "We run and update it", "Sign in with GitHub or a passkey", "Support by email")
 			}
 			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem", "data-plan": "self-hosted"}}) {
 				<div class="moin-stack" data-gap="1">
 					<span class="moin-strong">Self-hosted</span>
 					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever</span></span>
-					<span class="moin-small moin-muted">Your own moin hub. On your server. Open source.</span>
+					<span class="moin-small moin-muted">Your own { brand.Name } hub. On your server. Open source.</span>
 				</div>
 				@components.Button(components.ButtonProps{Href: "/docs/self-hosting"}) {
 					Host it yourself
 				}
-				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App. Email optional", "Help on GitHub")
+				@homePlanRows("One command on one server", "Update in one click", "Your GitHub App, passkeys, email optional", "Help on GitHub")
 			}
 		</div>
 		<p class="moin-lead" data-one-price>Unlimited servers. Unlimited apps. Unlimited team. Nothing to unlock.</p>
@@ -393,11 +408,15 @@ templ HomeEnd() {
 			</div>
 			<p class="moin-small moin-muted">
 				if ctxkeys.RenderConfig(ctx).Billing {
-					30 days free. No card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
+					{ layouts.TrialOffer() } No card. Or <a href="/docs/self-hosting" class="moin-link moin-foreground">host it yourself</a>, free forever.
 				} else {
 					Free and open source.
 				}
 			</p>
+			@homeGulls()
+			<div class="moin-bleed hub-harbor-in-card">
+				@homeHarbor()
+			</div>
 		}
 	</section>
 }

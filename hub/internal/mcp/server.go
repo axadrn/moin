@@ -1,7 +1,7 @@
 // Package mcp serves the MCP server at /mcp. It is a third transport next to
 // the HTML handlers and the JSON API: tools call the same services and report
-// errors with the codes of the JSON API envelope. AI agents authenticate with a
-// personal API token, and the scopes of that token decide which tools work.
+// errors with the codes of the JSON API envelope. AI agents authenticate as a
+// connection or with a CI token, and its rights decide which tools work.
 package mcp
 
 import (
@@ -17,14 +17,14 @@ import (
 
 // Version is the version the server reports to MCP clients. Raise it when the
 // tools change.
-const Version = "1.26.0"
+const Version = "1.35.0"
 
 // instructions tell the AI agent how the tools behave as a whole. Clients pass
 // them to the model when they connect.
-const instructions = "Every tool acts for the user who created the personal API token in the Authorization header. " +
-	"Tools that only read need the read scope. Tools that change data need a token with read and write access; " +
-	"with a read-only token they fail with the code insufficient_scope. " +
-	"The token is bound to one workspace. Workspace tools take an optional workspace slug and default to that workspace; other workspaces are not found. " +
+const instructions = "Every tool acts for the person who let this connection in, or who made the CI token in the Authorization header. " +
+	"Each tool needs one right, named at the end of its description: read, deploy, env, delete or servers. " +
+	"Without it a tool fails with the code missing_right; only the person changes the rights, in Settings, Connections. " +
+	"The connection is bound to one workspace. Workspace tools take an optional workspace slug and default to that workspace; other workspaces are not found. " +
 	"Failed calls return an error result whose text is {\"error\":{\"code\":...,\"message\":...,\"fields\":{...}}}, with the same codes as the JSON API."
 
 // Services are the services the tools call. Add your own services here and
@@ -62,8 +62,11 @@ func NewServer(services Services) *mcpsdk.Server {
 
 // Handler serves server over Streamable HTTP. It is stateless: every POST is
 // one complete exchange, so the server keeps no sessions and scales like the
-// JSON API. Requests without a personal API token get 401 unauthenticated.
-func Handler(server *mcpsdk.Server) http.Handler {
+// JSON API. Requests without a connection or CI token get 401
+// unauthenticated, whose WWW-Authenticate names resourceMetadata, the URL
+// of the metadata of /mcp (RFC 9728): from there an MCP client finds how to
+// sign in. A CI token for one app gets 403 app_only.
+func Handler(server *mcpsdk.Server, resourceMetadata string) http.Handler {
 	streamable := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
 		return server
 	}, &mcpsdk.StreamableHTTPOptions{
@@ -75,9 +78,18 @@ func Handler(server *mcpsdk.Server) http.Handler {
 		DisableLocalhostProtection: true,
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ctxkeys.APIToken(r.Context()) == nil {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="mcp"`)
-			api.Error(w, http.StatusUnauthorized, "unauthenticated", "Send a personal API token, which starts with pat_, as Authorization: Bearer <token>.")
+		bearer := ctxkeys.Bearer(r.Context())
+		if bearer == nil {
+			challenge := `Bearer resource_metadata="` + resourceMetadata + `"`
+			if r.Header.Get("Authorization") != "" {
+				challenge += `, error="invalid_token"`
+			}
+			w.Header().Set("WWW-Authenticate", challenge)
+			api.Error(w, http.StatusUnauthorized, "unauthenticated", unauthenticated)
+			return
+		}
+		if bearer.AppID != "" {
+			api.Error(w, http.StatusForbidden, "app_only", appOnly)
 			return
 		}
 		streamable.ServeHTTP(w, r)

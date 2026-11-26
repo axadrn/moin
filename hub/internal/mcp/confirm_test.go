@@ -15,19 +15,20 @@ func TestRemoveToolsNeedTheName(t *testing.T) {
 	env := newEnvironment(t)
 	owner := seedOwner(t, env, "confirm")
 	upgrade(t, env, owner)
-	token, _ := createToken(t, env, owner, "read", "write")
+	token, _ := createToken(t, env, owner, allRights...)
 	session := connectMemory(t, env.server, owner, token)
 	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	defer bucket.Close()
 
 	output[mcp.CreatedServer](t, call(t, session, "add_server", map[string]any{"server": "box-1"}))
-	output[mcp.App](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
+	online(t, env, owner, "box-1")
+	output[mcp.CreatedApp](t, call(t, session, "create_app", map[string]any{"app": "shop", "server": "box-1"}))
 	output[mcp.Bucket](t, call(t, session, "add_bucket", map[string]any{"name": "spare", "endpoint": bucket.URL, "bucket": "spare", "access_key": "k", "secret_key": "s"}))
 
 	// The app goes first: the bucket is the default every app uses.
 	for _, thing := range []struct{ tool, field, name string }{
 		{"remove_app", "app", "shop"},
-		{"remove_bucket", "bucket", "spare"},
+		{"remove_bucket", "name", "spare"},
 		{"remove_server", "server", "box-1"},
 	} {
 		for _, confirm := range []string{"", "blog"} {

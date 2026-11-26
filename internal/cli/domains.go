@@ -132,10 +132,9 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		return nil
 	}
 	rows := make([][]string, 0, len(checks))
-	advice, fromCompose := "", false
+	advice := ""
 	for _, check := range checks {
 		advice = check.Advice
-		fromCompose = fromCompose || check.FromCompose
 		state := badge(stdout, style.Badge(style.StatusLive, "points here"), "points here")
 		if !check.Points {
 			state = badge(stdout, style.Badge(style.StatusWaiting, "set DNS"), "set DNS")
@@ -147,9 +146,6 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		if check.Canonical {
 			roles = append(roles, "canonical")
 		}
-		if check.FromCompose {
-			roles = append(roles, "from compose.yml")
-		}
 		role := strings.Join(roles, ", ")
 		rows = append(rows, []string{check.Domain, state, strings.Join(check.Found, " "), role})
 	}
@@ -158,20 +154,18 @@ func printDomains(ctx context.Context, api *client.Client, name string, stdout i
 		fmt.Fprintln(stdout)
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each domain needs an "+advice+"."))
 	}
-	if fromCompose {
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("x-moin.domains in compose.yml sets the domains marked from compose.yml: change them there and deploy."))
-	}
 	return nil
 }
 
 // instantCommands are the subcommands of instant; anything else is the app.
-var instantCommands = append([]string{"open", "protect"}, append(slices.Clone(protocol.InstantProviders), "off")...)
+var instantCommands = append(slices.Clone(protocol.InstantProviders), "off")
 
-// instant shows the app's instant address, picks its provider or off, and
-// opens it or puts the password back.
+// passwordUser is the username of the password moin makes for an app.
+const passwordUser = build.Name
+
+// instant shows the app's instant address, or picks its provider or off.
 func instant(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("instant", "instant [--show] [app]; instant sslip.io|nip.io|off [app]; instant open|protect [app]").withApp()
-	show := flags.Bool("show", false, "show the password moin made for it")
+	flags := newFlags("instant", "instant [app]; instant sslip.io|nip.io|off [app]").withApp()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -191,32 +185,20 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	if command != "" {
-		var change client.Change
-		switch command {
-		case "open", "protect":
-			open := command == "open"
-			change, err = api.SetInstant(ctx, name, "", &open)
-		default:
-			change, err = api.SetInstant(ctx, name, command, nil)
-		}
+		change, err := api.SetInstant(ctx, name, command)
 		if err != nil {
 			return err
 		}
 		if !change.Unchanged {
-			switch command {
-			case "open":
-				done(stdout, "The instant address of %s is open to everyone now.", name)
-			case "protect":
-				done(stdout, "A password guards the instant address of %s again.", name)
-			case "off":
+			if command == "off" {
 				done(stdout, "%s has no instant address now.", name)
-			default:
+			} else {
 				done(stdout, "%s gets its instant address from %s now.", name, command)
 			}
 		}
 		reportChange(ctx, api, name, change, stdout)
 	}
-	address, err := api.Instant(ctx, name, *show)
+	address, err := api.Instant(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -227,28 +209,19 @@ func instant(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	}
-	rows := [][]string{{"address", address.URL}, {"provider", address.Provider}}
-	switch {
-	case address.Open:
-		rows = append(rows, []string{"password", "none: open to everyone"})
-	case address.OwnPassword:
-		rows = append(rows, []string{"password", "the app's own, user " + address.User})
-	case address.Password != "":
-		rows = append(rows, []string{"user", address.User}, []string{"password", address.Password})
-	default:
-		rows = append(rows, []string{"user", address.User}, []string{"password", "hidden: add --show"})
-	}
-	table(stdout, []string{"", ""}, rows)
+	table(stdout, []string{"", ""}, [][]string{{"address", address.URL}, {"provider", address.Provider}})
 	if command == "" {
 		hint(stdout, "Another provider, if this one is down:", build.Name+" instant nip.io "+name)
 	}
 	return nil
 }
 
-// protect puts a password in front of an app, or takes it away with off.
-func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("protect", "protect [--user moin] [app], password on stdin; protect off [app] [--yes]").withApp().withYes()
-	user := flags.String("user", "moin", "username for the password prompt in the browser")
+// password turns the app's password on, for its domains and its instant
+// address, or off with off. Without a password on stdin moin makes one
+// and prints it once.
+func password(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("password", "password [--user moin] [app], a password on stdin or none to let moin make one; password off [app] [--yes]").withApp().withYes()
+	user := flags.String("user", passwordUser, "username for the password prompt in the browser")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -273,15 +246,15 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		if !detail.App.Protected {
+		if !detail.App.Password {
 			done(stdout, "Nothing changed: %s has no password.", name)
 			return nil
 		}
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Take the password away from %s? Anyone with the link can open it again.", name))
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Turn the password of %s off? Anyone with the link can open its domains and its instant address.", name))
 		if err != nil {
 			return err
 		}
-		change, err := api.RemoveProtection(ctx, name)
+		change, err := api.RemovePassword(ctx, name)
 		if err != nil {
 			return err
 		}
@@ -289,30 +262,34 @@ func protect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 			done(stdout, "Nothing changed: %s has no password.", name)
 			return nil
 		}
-		done(stdout, "%s is public again.", name)
+		done(stdout, "%s asks for no password now.", name)
 		reportChange(ctx, api, name, change, stdout)
 		return nil
 	}
 	if isTerminal(stdin) {
-		fmt.Fprintf(stdout, "Password for %s (user %s): ", name, *user)
+		fmt.Fprintf(stdout, "Password for %s (user %s), empty to let %s make one: ", name, *user, build.Name)
 	}
-	password, err := readSecret(stdin)
+	secret, err := readSecret(stdin)
 	if isTerminal(stdin) {
 		fmt.Fprintln(stdout)
 	}
 	if err != nil {
 		return err
 	}
-	change, err := api.SetProtection(ctx, name, *user, password)
+	if *user == "" {
+		*user = passwordUser
+	}
+	answer, err := api.SetPassword(ctx, name, *user, secret)
 	if err != nil {
 		return err
 	}
-	if change.Unchanged {
+	if answer.Unchanged {
 		done(stdout, "Nothing changed: %s asks for user %s and this password already.", name, *user)
 		return nil
 	}
-	done(stdout, "%s asks for user %s and the password now.", name, *user)
-	reportChange(ctx, api, name, change, stdout)
+	done(stdout, "The domains and the instant address of %s ask for user %s and the password now.", name, *user)
+	printPassword(stdout, *user, answer.Password)
+	reportChange(ctx, api, name, answer.Change, stdout)
 	return nil
 }
 
@@ -381,15 +358,11 @@ func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 }
 
 // reportChange says when a saved change applies: saving never restarts an
-// app. An older hub that still restarts on its own is followed.
+// app.
 func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
 	switch {
 	case change.Unchanged:
 		done(stdout, "Nothing changed.")
-	case change.Deploy != nil:
-		if err := follow(ctx, api, name, *change.Deploy, "Restart", false, stdout); err != nil {
-			printError(stdout, err)
-		}
 	case change.App.Stopped:
 		hint(stdout, "It applies when the app starts:", build.Name+" start "+name)
 	case change.App.LiveNumber == 0:

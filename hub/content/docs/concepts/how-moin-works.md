@@ -25,9 +25,9 @@ workspace: team, bucket, servers
 └─ web-2: api
 
 your code
-  moin deploy ─▶ bucket ─▶ server
-  GitHub ────────────────▶ server
-  CI image ──────────────▶ server
+  GitHub ────▶ server
+  CI image ──▶ server
+  catalog ───▶ server (ships with the daemon)
 
 backups
   server ─▶ your bucket
@@ -76,11 +76,12 @@ The first five are in [moin in five words](/docs/moin-in-five-words). The rest:
 | **service** | one part of an app, such as its website or its database: one container of its `compose.yml` |
 | **restart** | starts the live deploy again, so the changes that wait take effect |
 | **domain** | the name people type to reach your app, such as `my-app.example.com`, always with HTTPS |
-| **env vars** | the settings and secrets of an app, kept encrypted |
+| **env vars** | the settings and secrets of an app, kept only on its server |
 | **restore** | going back to a copy. It can be undone |
 | **health check** | after a deploy, moin checks that the app starts and stays up |
 | **catalog** | the place with apps you install in one click |
-| **API token** | a key for the CLI, scripts and AI agents, for one workspace |
+| **Connection** | a client you let in from the browser, like the CLI of your laptop, with the rights you picked, for one workspace |
+| **CI token** | a key you make by hand for CI and scripts, with its own rights |
 | **MCP** | the way AI agents use moin |
 | **activity** | who did what, and when |
 
@@ -90,7 +91,7 @@ Your app runs in containers, with Docker. You do not need to know Docker. For a 
 
 Saving a setting never restarts your app. The change waits for you. The app page says how many changes wait.
 
-A restart applies them all, without a build. A deploy or a start applies them too. A change to a variable used as `${NAME}` in `compose.yml` takes a deploy.
+A restart applies them all, without a build. A deploy or a start applies them too. That holds for a variable used as `${NAME}` in `compose.yml`, unless it sits in the image, the ports, the volumes, the user, `PORT` or the build paths: those take a deploy. [In compose.yml](/docs/guides/env#in-composeyml)
 
 ## Your data survives every deploy
 
@@ -113,25 +114,24 @@ Keep your database in a mounted folder. If it is not in `/data`, mount its folde
 
 Builds run on **your** server.
 
-- `moin deploy` packs the files git knows, with uncommitted changes and new files that are not ignored. Outside a git repo, everything but `.git`.
-- A deploy from [GitHub](/docs/guides/github) goes from GitHub straight to your server, with a short-lived token. It needs no bucket.
+- A deploy from [GitHub](/docs/guides/github) goes from GitHub straight to your server, with a short-lived token. `moin deploy` in your repo deploys the commit you pushed this way.
 - A deploy from [CI](/docs/guides/ci) builds the image elsewhere. The server only pulls it.
+- A [catalog](/docs/guides/catalog) app comes with the daemon. The hub only names it.
 
 The hub only passes messages. It never stores or runs your code.
 
 ```text
-1 computer  moin deploy packs your
-     │      folder and puts it into
-     ▼      your bucket
-2 bucket    keeps it for a moment
+1 computer  git push, then
+     │      moin deploy
+     ▼
+2 GitHub    keeps the commit
      │
      ▼
-3 server    the daemon downloads it,
-            checks it, deletes it
-            from the bucket, builds it
+3 server    the daemon downloads
+            that commit, builds it
 ```
 
-moin only signs the links. Your code never passes through moin.
+The daemon downloads code from GitHub only. Your code never passes through moin.
 
 ### How moin builds a repo
 
@@ -139,25 +139,24 @@ moin only signs the links. Your code never passes through moin.
 | --- | --- |
 | `compose.yml` | uses it (`compose.yaml` and `docker-compose.yml` work too) |
 | only a `Dockerfile` | runs it as service `web`, mounts `./data` at `/data` |
-| a Go module | writes the Dockerfile too: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
+| a Go module | writes the Dockerfile too, into the compose file: it builds `.`, `./cmd/server` or the only package under `cmd/`, and sets `PORT` and `DATA_DIR=/data` |
 | none of these | builds it with [Railpack](https://railpack.com), the open source builder Railway made |
 
 Railpack finds the language, the version and the start command by itself. It covers Node, Bun, Python, Ruby, PHP, Deno, Rust, Elixir, Java, .NET, static sites and more. Your env vars reach the build as secrets. They never land in the image or a log.
 
 ### What a deploy does
 
-1. Gets the code from your bucket or GitHub, checks it and keeps it with the deploy.
-2. Reads the compose file and the [x-moin block](/docs/guides/config).
-3. Tags the built images, sets the env vars and `restart: unless-stopped`.
+1. Gets the code from GitHub, or the compose file of a catalog app, and keeps it with the deploy.
+2. Reads the [compose file](/docs/guides/compose): the services, the one that gets the traffic and its port.
+3. Tags the built images, points the app's services at its env file on the server and sets `restart: unless-stopped`. Every `${NAME}` stays a name: Docker fills it in from the env file when the containers start.
 4. Builds.
 5. Takes a copy of your databases, so **Before v12** can bring them back. The first deploy has none yet.
-6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds.
-7. Calls the health path, if x-moin sets one, until it answers below 500.
-8. Reports the databases it found and what it detected. The app page, `moin deploy`, the TUI, the API and `get_app` show it.
+6. Starts it, and checks that the main service runs for 10 seconds without a restart, within 30 seconds. A service with a Docker `healthcheck` must be healthy too.
+7. Reports the databases it found and what it detected. The app page, `moin deploy`, the TUI, the API and `get_app` show it.
 
-If the start or the health check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
+If the start or the check fails, the last good deploy starts again and the new one is marked **failed**. Its log ends with the last lines of the service that stopped.
 
-The server keeps the last 5 builds, with their images. A rollback can go to any of those.
+The server keeps the last 5 builds, with their images. A rollback can go to any of those, with the env, the domains and the password as they are now.
 
 ### How moin reads your database
 
@@ -175,4 +174,4 @@ The [data browser](/docs/guides/data) reads the live database on the server. Not
 
 ### The catalog
 
-Each [catalog](/docs/guides/catalog) app is a folder in the moin repo, `hub/content/catalog/<app>`. moin reads the image registry of each app once an hour. A self-hosted hub ships the same catalog and asks the registries itself. Nothing goes through us.
+Each [catalog](/docs/guides/catalog) app is a folder in the moin repo, `catalog/<app>`, built into the hub and into every daemon. To install one, the hub names the app and its version; the daemon runs the compose file of its own signed release, never one the hub sends. moin reads the image registry of each app once an hour. A self-hosted hub ships the same catalog and asks the registries itself. Nothing goes through us.

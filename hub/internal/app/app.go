@@ -7,8 +7,10 @@ import (
 	"github.com/axadrn/moin/internal/build"
 	"io/fs"
 	"log/slog"
+	"net/url"
 	"path/filepath"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/content"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
@@ -21,6 +23,8 @@ import (
 	"github.com/axadrn/moin/hub/internal/service/mailer"
 	"github.com/axadrn/moin/hub/internal/service/payment"
 	"github.com/axadrn/moin/hub/internal/storage"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -47,13 +51,18 @@ type App struct {
 	TelemetryService    *service.TelemetryService
 	UpdateService       *service.UpdateService
 	WorkspaceService    *service.WorkspaceService
-	APITokenService     *service.APITokenService
+	ConnectionService   *service.ConnectionService
+	CITokenService      *service.CITokenService
 	DeviceLoginService  *service.DeviceLoginService
+	OAuthService        *service.OAuthService
 	ServerService       *service.ServerService
 	AppService          *service.AppService
-	CatalogService      *service.CatalogService
-	StatusService       *service.StatusService
-	AlertService        *service.AlertService
+	// GitHubAppService is the GitHub App of the hub.
+	GitHubAppService *service.GitHubAppService
+	Passkeys         *service.PasskeyService
+	CatalogService   *service.CatalogService
+	StatusService    *service.StatusService
+	AlertService     *service.AlertService
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -131,8 +140,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 	auth := service.NewAuthService(
 		users, tokens, sessions, workspaceService, email,
-		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry,
-		cfg.TokenPasswordResetExpiry, cfg.TokenEmailChangeExpiry, cfg.TokenMagicLinkExpiry,
+		cfg.IsProduction(), cfg.SessionExpiry, cfg.TokenEmailVerifyExpiry, cfg.TokenEmailChangeExpiry,
 	)
 	beta := service.NewBetaService(cfg.SignupsOpen, cfg.AdminEmails, invitations, subscriptions)
 	auth.SetBeta(beta)
@@ -143,8 +151,10 @@ func New(cfg *config.Config) (*App, error) {
 		fileService,
 		email, workspaceService,
 	)
-	apiTokenService := service.NewAPITokenService(repository.NewAPITokens(database), workspaceService)
-	auth.UseAPITokens(apiTokenService)
+	passkeys := newPasskeys(cfg, users, email, repository.NewPasskeys(database))
+	connectionService := service.NewConnectionService(repository.NewConnections(database), workspaceService)
+	ciTokenService := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, history), workspaceService)
+	auth.UseBearers(connectionService, ciTokenService)
 	secrets, err := secret.New(cfg.SecretsKey)
 	if err != nil {
 		return nil, fmt.Errorf("initialize secrets: %w", err)
@@ -152,11 +162,12 @@ func New(cfg *config.Config) (*App, error) {
 	serverService := service.NewServerService(repository.NewServers(database), activity, cfg.AppURL)
 	appService := service.NewAppService(repository.NewApps(database, history), serverService, secrets)
 	serverService.RequirePlanFor(subscriptionService.Access)
-	// The catalog ships in content/catalog; its releases come from the
-	// registries, asked by this hub itself.
+	serverService.StartTrialWith(subscriptionService.StartTrial)
+	// The catalog ships in catalog/ at the root, built into the hub and the
+	// daemon; its releases come from the registries, asked by this hub itself.
 	texts := content.FS(cfg.IsDevelopment())
 	uiFiles := moin.UI(cfg.IsDevelopment())
-	entries, err := catalog.Load(texts)
+	entries, err := catalog.Load(catalogfiles.Files)
 	if err != nil {
 		return nil, fmt.Errorf("load the catalog: %w", err)
 	}
@@ -173,18 +184,23 @@ func New(cfg *config.Config) (*App, error) {
 	// Daemons older than the hub update to its version by
 	// themselves, unless their workspace turned it off.
 	serverService.UpdateDaemonsTo(build.Version)
-	github, err := service.NewGitHub(cfg.GitHubAppID, cfg.GitHubAppSlug, cfg.GitHubAppPrivateKey, cfg.GitHubAppWebhookSecret, cfg.GitHubAppClientID, cfg.GitHubAppClientSecret, cfg.GitHubAPIURL, cfg.GitHubURL)
+	// The GitHub App of GITHUB_APP_*, else the one an admin created with
+	// one click.
+	githubApp, err := service.NewGitHubAppService(service.GitHubAppSettings{
+		ID: cfg.GitHubAppID, Slug: cfg.GitHubAppSlug, PrivateKey: cfg.GitHubAppPrivateKey, WebhookSecret: cfg.GitHubAppWebhookSecret,
+		ClientID: cfg.GitHubAppClientID, ClientSecret: cfg.GitHubAppClientSecret,
+	}, repository.NewGitHubApps(database), secrets, activity, service.NewHubAdmins(cfg.AdminEmails), cfg.AppURL, cfg.GitHubAPIURL, cfg.GitHubURL)
 	if err != nil {
 		return nil, err
 	}
-	if github != nil && !github.ChecksInstaller() {
-		slog.Warn("GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET are not set: moin cannot check who installed the GitHub App, so a member could connect another account's installation by its ID. Set both and turn on \"Request user authorization (OAuth) during installation\" in the app settings")
+	if github := githubApp.GitHub(); github != nil && !github.ChecksInstaller() {
+		slog.Warn("GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET are not set: nobody signs in with GitHub, and moin cannot check who installed the GitHub App, so a member could connect another account's installation by its ID. Set both and turn on \"Request user authorization (OAuth) during installation\" in the app settings")
 	}
-	appService.SetGitHub(github)
-	// The hosted plane reaches only public buckets; in development it may
-	// use the local fake S3.
+	appService.UseGitHubApp(githubApp)
+	// The hosted hub's uptime checks reach only public addresses; in
+	// development they may check an app next to it.
 	if cfg.Billing && !cfg.IsDevelopment() {
-		appService.AllowOnlyPublicBuckets()
+		appService.AllowOnlyPublicAddresses()
 	}
 	appService.SetCloudflare(service.NewCloudflare(cfg.CloudflareAPIURL))
 	if cfg.SameServer {
@@ -225,10 +241,14 @@ func New(cfg *config.Config) (*App, error) {
 		// workflow updates the hosted one.
 		UpdateService:      service.NewUpdateService(build.Version, service.ReleasesURL, filepath.Join(dataDir, "update"), !cfg.Billing, cfg.UpdateCheck, cfg.AdminEmails, activity),
 		WorkspaceService:   workspaceService,
-		APITokenService:    apiTokenService,
-		DeviceLoginService: service.NewDeviceLoginService(repository.NewDeviceLogins(database), apiTokenService),
+		ConnectionService:  connectionService,
+		CITokenService:     ciTokenService,
+		DeviceLoginService: service.NewDeviceLoginService(repository.NewDeviceLogins(database), connectionService, passkeys),
+		OAuthService:       service.NewOAuthService(repository.NewOAuth(database), connectionService, passkeys, cfg.AppURL),
 		ServerService:      serverService,
 		AppService:         appService,
+		GitHubAppService:   githubApp,
+		Passkeys:           passkeys,
 		CatalogService:     catalogService,
 		StatusService:      service.NewStatusService(appService, serverService, catalogService),
 		AlertService:       alertService,
@@ -240,6 +260,36 @@ func New(cfg *config.Config) (*App, error) {
 		adminService.UseNetwork(application.TelemetryService.Network)
 	}
 	return application, nil
+}
+
+// newPasskeys is the passkeys of the hub, which belong to the domain of
+// APP_URL. Browsers make passkeys only over HTTPS or on localhost, and
+// go-webauthn takes only a host it can use as the relying party. Else
+// passkeys are off: the hub starts and says why once.
+func newPasskeys(cfg *config.Config, users *repository.Users, email *service.EmailService, passkeys *repository.Passkeys) *service.PasskeyService {
+	appURL, err := url.Parse(cfg.AppURL)
+	if err != nil || (appURL.Scheme != "https" && appURL.Hostname() != "localhost") {
+		slog.Warn("passkeys are off: APP_URL is not https or localhost", "app_url", cfg.AppURL)
+		return service.NewPasskeyService(passkeys, users, email, nil)
+	}
+	ceremony := webauthn.TimeoutConfig{Enforce: true, Timeout: service.PasskeyCeremonyExpiry, TimeoutUVD: service.PasskeyCeremonyExpiry}
+	webAuthn, err := webauthn.New(&webauthn.Config{
+		RPID:                  appURL.Hostname(),
+		RPDisplayName:         build.Name,
+		RPOrigins:             []string{appURL.Scheme + "://" + appURL.Host},
+		AttestationPreference: protocol.PreferNoAttestation,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			RequireResidentKey: protocol.ResidentKeyRequired(),
+			UserVerification:   protocol.VerificationRequired,
+		},
+		Timeouts: webauthn.TimeoutsConfig{Login: ceremony, Registration: ceremony},
+	})
+	if err != nil {
+		slog.Warn("passkeys are off: "+err.Error(), "app_url", cfg.AppURL)
+		return service.NewPasskeyService(passkeys, users, email, nil)
+	}
+	return service.NewPasskeyService(passkeys, users, email, webAuthn)
 }
 
 func (a *App) Close() error {

@@ -1,6 +1,6 @@
 ---
 title: "Terminal UI"
-description: "Every view and key of moin without a command"
+description: "Every view and key of the moin terminal UI: your apps, deploys, logs and backups without a command."
 group: "Reference"
 order: 4
 ---
@@ -11,10 +11,10 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 
 | | |
 | --- | --- |
-| Sign in | without a token, `moin` shows a code and opens the browser to confirm it, then lands on the overview. It saves the token where `moin login` does, so you sign in once for both. `esc` quits the sign-in |
+| Sign in | without a token, `moin` shows a code and opens the browser to confirm it, then lands on the overview. You pick its rights and allow it, with your passkey if you have one. It saves the login where `moin login` does, so you sign in once for both. `esc` quits the sign-in |
 | Last seen | `moin` starts with what it showed last time, marked **last seen** in the header until the hub answers; an app you come back to shows its tabs at once while they load again |
 | Cache | in your cache folder, readable only by you, without env values, logs or the token; `moin logout` removes it |
-| Screen | every view fills the screen, from 80 by 24 up. The header says where you are, the footer the keys you need most, and results (a few seconds) and errors (in red, a little longer) |
+| Screen | every view fills the screen, from 60 by 16 up. The header says where you are, the footer the keys you need most, and results (a few seconds) and errors (in red, a little longer) |
 | Colour | only a status: green live, amber running, red failed, always with a dot and a word. It follows a dark or light terminal. With `NO_COLOR` or no colour, plain text, and `›` marks the selected row |
 
 ## Views
@@ -34,7 +34,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 
 | Key | Does |
 | --- | --- |
-| `space` · `ctrl+k` · `/` | the palette, a box in the middle of the screen like `⌘K` on the web: finds every app, server, place and action and runs it. Type a few letters, like `my-app logs` or `redeploy api` (words in any order, matched letters bold, the last pick first), move with `↑` `↓` or `ctrl+n` `ctrl+p`, `enter` runs it, `esc` closes it. With nothing typed, what you can do to the app or server you are on comes first. Every entry shows its key at the right, the one that does the same without the palette. `/` works everywhere but in the logs. [Palette and keys](/docs/reference/palette) |
+| `space` · `ctrl+k` · `/` | the palette, a box in the middle of the screen like `⌘K` on the web: finds every app, server, place and action and runs it. Type a few letters, like `my-app logs` or `redeploy api` (words in any order, matched letters bold, the last pick first), move with `↑` `↓` or `ctrl+n` `ctrl+p`, `enter` runs it, `esc` closes it. With nothing typed, what you can do to the app or server you are on comes first. Every entry shows its key at the right, the one that does the same without the palette. `/` works everywhere but in the logs. In Run only `ctrl+k` opens it, the other keys type. [Palette and keys](/docs/reference/palette) |
 | `esc` | back one level; closes what is open first |
 | `?` | every key of this place and the ones that work everywhere; `↑` `↓` scroll them on a small screen |
 | `q` | quits on the overview, goes back elsewhere |
@@ -49,7 +49,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | | |
 | --- | --- |
 | A question, like "Stop my-app?" | `y` does it, `esc` cancels |
-| A restore | cannot be undone: type the app's name, then `enter`; paste works |
+| A restore | type the app's name, then `enter`; paste works. It can be undone |
 | A line to type into | `enter` takes it, `esc` cancels, `ctrl+u` clears it, `ctrl+w` deletes the last word |
 | A switch, a paused check, an env var | changes on the screen at once; if the hub refuses, the footer says why in red and the tab loads what is true again |
 
@@ -60,7 +60,7 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `tab` · `shift+tab` | the next panel: apps, servers, what needs you; the one before |
 | `enter` | opens the selected app, server or issue |
 | `s` · `a` · `w` | the servers, the activity, the web app |
-| `D` | deploys the directory `moin` started in to its app, after `y`; `moin deploy` creates a new app |
+| `D` | deploys the commit the directory `moin` started in has on GitHub, to its app, after `y`; `moin deploy` creates and links a new app |
 
 ## App
 
@@ -74,12 +74,12 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | `P` | rolls back to the deploy before the live one, after `y` |
 | `I` | deploys an image built in CI: type it, then `enter` |
 | `B` | deploys a branch, tag or commit of the linked GitHub repo; empty deploys the linked branch |
-| `D` | deploys the directory `moin` started in, when it is this app, after `y` |
+| `D` | deploys the commit the directory `moin` started in has on GitHub, when it is this app, after `y` |
 | `U` | updates a catalog app to its newest version, after `y` |
-| `N` | backs up the app's databases now |
 | `*` | pins the app, or unpins it: pinned apps stay above the others that run fine |
 | `X` | [runs a command](/docs/guides/exec) in the main service, no shell; start the line with `@service` for another one |
 | `W` | opens the app in the web app |
+| `C` | opens the app's [compose file](/docs/guides/compose#the-compose-file-moin-runs) in the web app, to copy or download |
 
 ## App tabs
 
@@ -93,18 +93,17 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 | Backups | `enter` | goes back to the picked moment once you typed the app's name; **Before the restore at …** undoes a restore |
 | Backups | `t` | goes back to a time you type, in UTC, like `14:01`, then the app's name: the newest copy at or before it |
 | Backups | `c` | downloads the newest copy: it opens the 15 minute link to your bucket in the browser |
-| Backups | `w` | how often and how long are set on the web; the tab shows them with the last copy and the daily check |
-| Env | `a` · `enter` | sets `KEY=value`; edits the picked one |
+| Backups | `w` | opens the picked database's page in the web, where how often and how long are set; the tab shows them with the last copy and the daily check |
+| Env | `a` · `enter` | sets `KEY=value`; sets the picked one again. Values are write-only: the tab shows names and when they changed |
 | Env | `x` | removes the picked one, after `y` |
-| Env | `v` | shows or hides the values |
-| Env | `E` | opens all env vars as one `.env` in `$EDITOR`, and asks before it saves what changed |
+| Env | `E` | opens an empty `.env` in `$EDITOR` that replaces all env vars, and asks before it saves which names it adds, replaces and removes |
 | Domains | `a` | adds a domain, or `service:domain` for another service of `compose.yml` |
 | Domains | `x` | removes the picked one, after `y` |
 | Domains | `c` | makes the picked domain the canonical one |
-| Domains | `p` | password protection: `user:password`, or removes it after `y` |
+| Domains | `p` | the app's password on every domain: your own as `user:password`, or turns it off after `y` |
 | Uptime | `p` | pauses or resumes uptime of the picked domain |
 | Uptime | `c` | sets the path it visits, empty for the default |
-| Uptime | `r` | visits again |
+| Uptime | `r` | loads the tab again |
 | Metrics | `[` `]` | the range: 1h, 24h, 7d, 30d |
 
 ## Deploy, run, servers, activity
@@ -125,18 +124,19 @@ The terminal UI is moin in your terminal. Run `moin` for the daily work, all liv
 
 ## Web app
 
-`w` on the overview, or `web app` in the palette, lists the pages that open in your browser, signed in as you. `enter` or the page's letter opens it.
+`w` on the overview, or `web app` in the palette, lists the pages that open in your browser. `enter` or the page's letter opens it.
 
 | Key | Page |
 | --- | --- |
-| `a` | Servers: add, rename, order and remove servers |
-| `p` | Apps: create, order and remove apps |
+| `a` | Servers: add, rename and remove servers |
+| `p` | Apps: create and remove apps |
 | `c` | Catalog |
 | `t` | Team: invite people and change roles |
 | `g` | Connect GitHub |
-| `k` | Bucket: where backups and uploads go |
+| `k` | Buckets: where backups go |
 | `r` | Registries: logins for private images |
 | `n` | Alerts: Slack, Discord, Telegram and webhooks |
 | `d` | Data: browse and edit the rows of the open app's databases |
-| `s` | Settings: your account and API tokens |
+| `s` | Settings: your account and connections |
+| `l` | Connections: what each login may do, and CI tokens |
 | `b` | Billing, on moin.run |

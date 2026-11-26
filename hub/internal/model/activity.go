@@ -10,8 +10,8 @@ import (
 
 // ActivityEvent is one change in the activity of a workspace.
 //
-// What goes in: the exact time in UTC, who did it (the member, the API token
-// by name, a deploy hook, a GitHub push or moin itself), how it came in, the
+// What goes in: the exact time in UTC, who did it (the member, the connection or
+// CI token by name, a deploy hook, a GitHub push or moin itself), how it came in, the
 // client IP and user agent of the member's own request, what it touched and
 // the settings before and after: names, on and off, domains, branches, roles,
 // counts, versions, release numbers and error messages.
@@ -36,7 +36,8 @@ type ActivityEvent struct {
 	// Via is how the change came in: web, cli, tui, api, mcp, github, hook or
 	// system. Events from before the CLI and TUI were told apart say api.
 	Via string `db:"via"`
-	// TokenName is the API token the change came with, by name.
+	// TokenName is the connection or CI token the change came with, by
+	// name.
 	TokenName string `db:"token_name"`
 	// IP and UserAgent are of the member's request; only admins see them.
 	IP        string `db:"ip"`

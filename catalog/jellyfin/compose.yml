@@ -1,0 +1,8 @@
+services:
+  web:
+    image: jellyfin/jellyfin:${VERSION}
+    expose: ["8096"]
+    volumes:
+      - ./data/config:/config
+      - ./data/cache:/cache
+      - ./data/media:/media

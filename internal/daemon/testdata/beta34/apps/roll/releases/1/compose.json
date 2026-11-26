@@ -1,0 +1,29 @@
+{
+  "name": "moin-roll",
+  "networks": {
+    "default": {
+      "ipam": {},
+      "name": "roll_default"
+    }
+  },
+  "services": {
+    "web": {
+      "command": [
+        "sleep",
+        "3600"
+      ],
+      "entrypoint": null,
+      "environment": {
+        "A": "one"
+      },
+      "image": "busybox:1.37",
+      "labels": {
+        "moin.app": "roll"
+      },
+      "networks": {
+        "default": null
+      },
+      "restart": "unless-stopped"
+    }
+  }
+}

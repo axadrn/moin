@@ -25,8 +25,6 @@ type BackupsView struct {
 	Databases []service.DatabaseBackups
 	// Restore is the newest restore of the open database of the last day.
 	Restore *service.Restore
-	// ScheduleInFile says compose.yml sets how often and how long.
-	ScheduleInFile bool
 	// Error says why the server could not report its backups.
 	Error string
 	Now   time.Time
@@ -105,7 +103,7 @@ templ AppBucketForm(view BackupsView) {
 		hx-select="#data-backups"
 		hx-swap="outerHTML"
 		hx-disable="find button[type='submit']"
-		hx-confirm={ "Move the uploads and backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
+		hx-confirm={ "Move the backups of " + view.App.Name + " to this bucket? Its copies start again there; what is in " + view.Bucket.Name + " stays." }
 		data-confirm-action="Move"
 	>
 		@components.CSRF()
@@ -178,11 +176,7 @@ templ DatabaseBackups(view BackupsView, database string) {
 					@components.List() {
 						@backupState(backup, known, database, view.Now)
 						@backupRestore(view, database)
-						if view.ScheduleInFile {
-							@scheduleInFile(view, backup)
-						} else {
-							@backupSchedule(view, backup, database)
-						}
+						@backupSchedule(view, backup, database)
 						@backupDownload(view, backup, database)
 					}
 				}
@@ -392,16 +386,6 @@ templ backupSchedule(view BackupsView, backup service.DatabaseBackups, database 
 		@components.CSRF()
 		@scheduleFields(view.App, database, "keep")
 		@components.Select(components.SelectProps{ID: "backup-keep", Name: "keep", Label: "Keep", Options: keepOptions(), Value: strconv.Itoa(view.App.BackupKeep)})
-	}
-}
-
-// scheduleInFile shows the schedule compose.yml sets. Only the file changes it.
-templ scheduleInFile(view BackupsView, backup service.DatabaseBackups) {
-	@components.Item(components.ItemProps{Name: "How often", Note: "from compose.yml"}) {
-		<span class="moin-item-value" data-schedule-in-file>{ service.EveryText(view.App.BackupEvery) }</span>
-	}
-	@components.Item(components.ItemProps{Name: "Keep", Note: "from compose.yml"}) {
-		<span class="moin-item-value">{ service.KeepText(view.App.BackupKeep) }</span>
 	}
 }
 

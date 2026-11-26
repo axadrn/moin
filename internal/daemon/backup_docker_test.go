@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -66,11 +67,11 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{database}})
 	os.WriteFile(filepath.Join(test.a.appDir(app), "current"), []byte("1"), 0o600)
 	os.WriteFile(filepath.Join(test.a.appDir(app), "app-id"), []byte(fmt.Sprintf("id-%d", time.Now().UnixNano())), 0o600)
-	composeFile := test.a.composeFile(app)
-	down := func() { exec.Command("docker", "compose", "-p", project(app), "-f", composeFile, "down", "-v").Run() }
+	composeJSON := test.a.composeJSON(app)
+	down := func() { exec.Command("docker", "compose", "-p", project(app), "-f", composeJSON, "down", "-v").Run() }
 	down()
 	t.Cleanup(down)
-	if out, err := exec.CommandContext(ctx, "docker", "compose", "-p", project(app), "-f", composeFile, "up", "-d").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, "docker", "compose", "-p", project(app), "-f", composeJSON, "up", "-d").CombinedOutput(); err != nil {
 		t.Fatalf("compose up: %v %s", err, out)
 	}
 	test.bucket = &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: "moin-test", Workspace: "ws-" + app, AccessKey: "x", SecretKey: "y"}
@@ -122,7 +123,7 @@ func (test *backupTest) stateOf(id string) protocol.RestoreState {
 
 // running says every service of the app runs.
 func (test *backupTest) running() bool {
-	out, _ := exec.Command("docker", "compose", "-p", project(test.app), "-f", test.a.composeFile(test.app), "ps", "-a", "--format", "{{.State}}").Output()
+	out, _ := exec.Command("docker", "compose", "-p", project(test.app), "-f", test.a.composeJSON(test.app), "ps", "-a", "--format", "{{.State}}").Output()
 	return len(strings.Fields(string(out))) > 0 && !strings.Contains(string(out), "exited")
 }
 
@@ -299,7 +300,11 @@ func TestBackupSQLite(t *testing.T) {
 		t.Fatal("the copy carries no note of its size")
 	}
 	downloaded := filepath.Join(t.TempDir(), "copy.db")
-	if err := (&sqliteEngine{}).build(test.ctx, from, downloaded); err != nil {
+	out, err := os.Create(downloaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		t.Fatal(err)
 	}
 	body.Close()
@@ -526,14 +531,22 @@ func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) pr
 	test.t.Helper()
 	live, built := test.database.HostPath, test.database.HostPath+".moin-restore"
 	from := mustCopy(test.t, test, copy)
-	engine := &sqliteEngine{b: test.b, app: test.app, database: test.database}
-	if err := engine.build(test.ctx, from, built); err != nil {
+	root, name, err := databaseFolder(test.database)
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	defer root.Close()
+	out, err := os.Create(built)
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		test.t.Fatal(err)
 	}
 	if _, err := test.b.apps.stopServices(test.ctx, test.app); err != nil {
 		test.t.Fatal(err)
 	}
-	if err := checkpoint(test.ctx, live); err != nil {
+	if err := checkpoint(test.ctx, root, name); err != nil {
 		test.t.Fatal(err)
 	}
 	mark := test.killed()

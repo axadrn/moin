@@ -70,10 +70,10 @@ var appSummaries = map[string]summarize{
 		return "stopped " + target
 	},
 	"app.domains_set": domainsSetSummary,
-	"app.protected": func(target string, d map[string]string) string {
+	"app.password_set": func(target string, d map[string]string) string {
 		return "put a password in front of " + target
 	},
-	"app.unprotected": func(target string, d map[string]string) string {
+	"app.password_removed": func(target string, d map[string]string) string {
 		return "took the password away from " + target
 	},
 	"app.hook_rotated": func(target string, d map[string]string) string {
@@ -87,7 +87,7 @@ var appSummaries = map[string]summarize{
 		if d["bucket"] != "" {
 			to = "the bucket " + d["bucket"]
 		}
-		return "moved the uploads and backups of " + target + " to " + to
+		return "moved the backups of " + target + " to " + to
 	},
 	"app.deleted": func(target string, d map[string]string) string {
 		if d["server"] != "" {
@@ -132,7 +132,7 @@ var appSummaries = map[string]summarize{
 	},
 	"uptime.path_set": func(target string, d map[string]string) string {
 		if d["path"] == "" {
-			return "set the uptime path of " + d["domain"] + " of " + target + " back to the health path or /"
+			return "set the uptime path of " + d["domain"] + " of " + target + " back to /"
 		}
 		return "set the uptime path of " + d["domain"] + " of " + target + " to " + d["path"]
 	},
@@ -314,6 +314,9 @@ var settingsSummaries = map[string]summarize{
 	"workspace.daemon_updates": func(target string, d map[string]string) string {
 		return onOff(d, "turned automatic daemon updates %s")
 	},
+	"hub.github_app_created": func(target string, d map[string]string) string {
+		return "created the GitHub App " + target + " of the hub"
+	},
 	"hub.update_started": func(target string, d map[string]string) string {
 		return "started the update of the hub from " + d["from"] + " to " + d["to"]
 	},
@@ -329,7 +332,7 @@ var settingsSummaries = map[string]summarize{
 }
 
 // teamSummaries are about the people of the workspace: invitations,
-// members, API tokens and the plan.
+// members, connections, CI tokens and the plan.
 var teamSummaries = map[string]summarize{
 	"workspace.updated": func(target string, d map[string]string) string {
 		if d["from"] != "" {
@@ -371,17 +374,61 @@ var teamSummaries = map[string]summarize{
 		return "deleted their account and left the workspace"
 	},
 	"api_token.created": func(target string, d map[string]string) string {
-		if d["kind"] == APITokenKindDevice {
+		if d["kind"] == "device" {
 			return "logged in " + d["name"] + " from the browser, with read and write access"
 		}
-		return "created the API token " + d["name"] + " with " + strings.ReplaceAll(d["scopes"], ",", " and ") + " access, expiring " + d["expires"]
+		return "created the CI token " + d["name"] + " with " + strings.ReplaceAll(d["scopes"], ",", " and ") + " access, expiring " + d["expires"]
 	},
 	"api_token.revoked": func(target string, d map[string]string) string {
-		return "revoked the API token " + d["name"]
+		return "removed the CI token " + d["name"]
+	},
+	"connection.approved": func(target string, d map[string]string) string {
+		return "let " + d["name"] + " in from the browser, with " + rightsText(d["rights"])
+	},
+	"connection.rights_changed": func(target string, d map[string]string) string {
+		return "changed what " + d["name"] + " may do from " + rightsText(d["from"]) + " to " + rightsText(d["to"])
+	},
+	"connection.ended": func(target string, d map[string]string) string {
+		switch d["reason"] {
+		case "removed":
+			return "removed the connection " + d["name"]
+		case "logged out":
+			return "logged " + d["name"] + " out"
+		}
+		return "the connection " + d["name"] + " ended: " + d["reason"]
+	},
+	"ci_token.created": func(target string, d map[string]string) string {
+		app := ""
+		if d["app"] != "" {
+			app = " for " + d["app"] + " only"
+		}
+		expires := ", never expiring"
+		if d["expires"] != "never" {
+			expires = ", expiring " + d["expires"]
+		}
+		return "created the CI token " + d["name"] + app + " with " + rightsText(d["rights"]) + expires
+	},
+	"ci_token.rights_changed": func(target string, d map[string]string) string {
+		return "changed what the CI token " + d["name"] + " may do from " + rightsText(d["from"]) + " to " + rightsText(d["to"])
+	},
+	"ci_token.removed": func(target string, d map[string]string) string {
+		return "removed the CI token " + d["name"]
 	},
 	"billing.plan_changed": func(target string, d map[string]string) string {
 		return "changed the plan from " + d["from"] + " (" + d["status_from"] + ") to " + d["to"] + " (" + d["status"] + ")"
 	},
+	"billing.trial_started": func(target string, d map[string]string) string {
+		return "started the trial with the first server, until " + d["ends"]
+	},
+}
+
+// rightsText names stored rights for a sentence: "read, deploy and env".
+func rightsText(stored string) string {
+	names := strings.Split(stored, ",")
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 func domainsSetSummary(target string, d map[string]string) string {

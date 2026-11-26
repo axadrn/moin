@@ -10,17 +10,12 @@ import (
 // uptime keeps the newest results in memory and writes here only when
 // something changes, and its counts in batches.
 
-// UptimeTargets are the apps with a live deploy that are not stopped.
-func (r *Apps) UptimeTargets() ([]model.UptimeTarget, error) {
-	targets := []model.UptimeTarget{}
-	err := r.db.Select(&targets, `
-		SELECT a.id, a.workspace_id, a.name, a.domains, d.detected
-		FROM apps a JOIN deploys d ON d.app_id = a.id AND d.number = (
-			SELECT number FROM deploys WHERE app_id = a.id AND status = 'succeeded' ORDER BY number DESC LIMIT 1
-		)
-		WHERE a.stopped = 0
+// LiveApps are the apps with a live deploy that are not stopped, each
+// with its domains: the apps uptime visits.
+func (r *Apps) LiveApps() ([]model.App, error) {
+	return r.list(appSelect + `
+		WHERE a.stopped = 0 AND EXISTS (SELECT 1 FROM deploys WHERE app_id = a.id AND status = 'succeeded')
 		ORDER BY a.id`)
-	return targets, err
 }
 
 // DomainUptimes returns the stored uptime of every domain.

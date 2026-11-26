@@ -14,7 +14,7 @@ import (
 func TestStatus(t *testing.T) {
 	environment := newAPIEnvironment(t)
 	ada := testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Name: "Ada", Verified: true})
-	reader := environment.token(t, "ada", ada.Workspace.ID, "read")
+	reader := environment.token(t, "ada", ada.Workspace.ID)
 
 	response := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/status", bearer: reader})
 	expectStatus(t, response, http.StatusOK)

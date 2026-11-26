@@ -12,14 +12,27 @@ import (
 // Version is the protocol version the daemon reports in Hello. Bump it when a
 // message changes in a way an older peer cannot read. Version 2 brought
 // backups as copies on a schedule, restores and undos; version 3 the daemon,
-// which was called the agent before (legacy.go).
-const Version = 3
+// which was called the agent before (legacy.go); version 4 the command the
+// daemon masks for the activity (ExecDone.Command); version 5 secrets that
+// live only on the server (secrets.go); version 6 compose.yml as plain
+// Docker, with every setting from the hub; version 7 one password for an
+// app's domains and its instant address (Domains.Password).
+const Version = 7
 
 // Needs is the protocol version a daemon must speak for a request: the
 // hub answers "update the daemon" to an older one instead of
-// sending it.
+// sending it. Since version 5 backups and the server config take their
+// secrets from the server: an older daemon would run them without. Since
+// version 6 a deploy takes its domains only from the hub: an older daemon
+// would still let compose.yml change them. Since version 7 the app's
+// password guards its instant address too: an older daemon would leave it
+// open.
 func Needs(messageType MessageType) int {
 	switch messageType {
+	case TypeDeployStart:
+		return 7
+	case TypeBackupConfig, TypeServerConfig, TypeEnvSet, TypeSecretSet, TypeBucketSet, TypeBackupLink:
+		return 5
 	case TypeBackupList, TypeBackupRestore, TypeBackupRestores:
 		return 2
 	}
@@ -96,6 +109,24 @@ const (
 	// or works again.
 	TypeBackupStatus MessageType = "backup.status"
 
+	// TypeEnvSet sets and removes env values of an app in its app.env on
+	// the server (EnvSet). The daemon answers with TypeEnvResult (AppEnv)
+	// or TypeError.
+	TypeEnvSet    MessageType = "env.set"
+	TypeEnvResult MessageType = "env.result"
+	// TypeSecretSet keeps a secret of the server in its server.json, or
+	// removes it (SecretSet). The daemon answers with TypeOK or TypeError.
+	TypeSecretSet MessageType = "secret.set"
+	// TypeBucketSet has the daemon write a test file to a bucket and keep
+	// its secret key when that works (BucketSet). The daemon answers with
+	// TypeOK or TypeError.
+	TypeBucketSet MessageType = "bucket.set"
+	// TypeBackupLink asks for a signed link to download a copy
+	// (BackupLink). The daemon answers with TypeBackupLinkResult or
+	// TypeError.
+	TypeBackupLink       MessageType = "backup.link"
+	TypeBackupLinkResult MessageType = "backup.link.result"
+
 	// TypeServerConfig sets how the server is reached and locked down
 	// (ServerConfig). The hub sends it after hello and whenever
 	// it changes. The daemon answers with TypeServerConfigResult.
@@ -107,10 +138,9 @@ const (
 	// hub that does not know it drops it.
 	TypeServerSecurity MessageType = "server.security"
 
-	// TypeDaemonUpdate has the daemon replace its binary with the one the
-	// hub serves under DownloadPath, check it against SHA256 and
-	// restart (DaemonUpdate). The daemon answers with TypeOK before it
-	// restarts, or with TypeError and changes nothing.
+	// TypeDaemonUpdate has the daemon replace its binary with the signed
+	// release of Version and restart (DaemonUpdate). The daemon answers
+	// with TypeOK before it restarts, or with TypeError and changes nothing.
 	TypeDaemonUpdate MessageType = "daemon.update"
 
 	// TypeDaemonURL tells the daemon the hub's address when it

@@ -1,5 +1,5 @@
 // Package catalog is the list of open source apps moin installs in one
-// click. Each entry is a folder in content/catalog: app.md with what the
+// click. Each entry is a folder in catalog/ at the root of the repo: app.md with what the
 // app is, compose.yml with how it runs, and an optional logo.svg. They ship
 // with moin, so a self-hosted hub has the same catalog. Versions
 // come from the image's registry, asked by every hub itself.
@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/markdown"
 )
 
@@ -35,8 +36,6 @@ type Entry struct {
 	// up, or mysql, mongodb or clickhouse, which it does not yet; empty
 	// for none.
 	Database string
-	// Port is what the app listens on.
-	Port int
 	// Filter picks the tags that are releases; empty takes x.y.z, with or
 	// without a v.
 	Filter *regexp.Regexp
@@ -60,36 +59,22 @@ type Entry struct {
 var Categories = []string{"AI", "Analytics", "Automation", "Monitoring", "Communication", "Websites", "Productivity", "Documents", "Reading", "Developer tools", "Security", "Marketing", "Finance", "Media"}
 
 var (
-	slugPattern     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
-	variablePattern = regexp.MustCompile(`\$\{([A-Z][A-Z0-9_]*)(:?[-?][^}]*)?\}`)
-	imagePattern    = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$|^[a-z0-9._-]+(/[a-z0-9._-]+)*$`)
+	slugPattern  = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
+	imagePattern = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$|^[a-z0-9._-]+(/[a-z0-9._-]+)*$`)
 	// defaultFilter takes 1.2.3 and v1.2.3: releases, not latest, nightly,
 	// rc or a commit.
 	defaultFilter = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+$`)
 )
 
-// VersionVar is the env var that holds the version: compose.yml uses it as
-// the image tag.
-const VersionVar = "VERSION"
-
-// URLVar is the app's own address, https://<its domain>, which moin sets on
-// install for an app whose compose.yml uses it: links, redirects and
-// cookies of such an app need it, so it needs a domain.
-const URLVar = "APP_URL"
-
-// DomainVar is the app's domain alone, without https://, for an app that
-// asks for its host name rather than its address.
-const DomainVar = "APP_DOMAIN"
-
 // NeedsURL reports whether the app needs its own address or domain, and so
 // a domain.
 func (e Entry) NeedsURL() bool {
-	return strings.Contains(string(e.Compose), "${"+URLVar+"}") || strings.Contains(string(e.Compose), "${"+DomainVar+"}")
+	return strings.Contains(string(e.Compose), "${"+catalogfiles.URLVar+"}") || strings.Contains(string(e.Compose), "${"+catalogfiles.DomainVar+"}")
 }
 
-// Load reads every entry under catalog/, sorted by name.
+// Load reads every entry of files, a folder each, sorted by name.
 func Load(files fs.FS) ([]Entry, error) {
-	folders, err := fs.ReadDir(files, "catalog")
+	folders, err := fs.ReadDir(files, ".")
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +84,7 @@ func Load(files fs.FS) ([]Entry, error) {
 		if !folder.IsDir() {
 			continue
 		}
-		entry, err := loadEntry(parser, files, path.Join("catalog", folder.Name()), folder.Name())
+		entry, err := loadEntry(parser, files, folder.Name(), folder.Name())
 		if err != nil {
 			return nil, fmt.Errorf("catalog %s: %w", folder.Name(), err)
 		}
@@ -131,14 +116,6 @@ func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, e
 		Image: text("image"), Database: text("database"), Login: text("login"), Stable: text("stable"),
 		Body: template.HTML(body),
 	}
-	switch port := meta["port"].(type) {
-	case int:
-		entry.Port = port
-	case uint64:
-		entry.Port = int(port)
-	case float64:
-		entry.Port = int(port)
-	}
 	entry.Filter = defaultFilter
 	if filter := text("versions"); filter != "" {
 		entry.Filter, err = regexp.Compile(filter)
@@ -161,7 +138,7 @@ func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, e
 		entry.Logo, entry.LogoType = body, logo.kind
 		break
 	}
-	entry.Secrets = Secrets(entry.Compose)
+	entry.Secrets = catalogfiles.Secrets(entry.Compose)
 	return entry, entry.validate()
 }
 
@@ -173,12 +150,10 @@ func (e Entry) validate() error {
 		return fmt.Errorf("category %q is none of %s", e.Category, strings.Join(Categories, ", "))
 	case !imagePattern.MatchString(e.Image):
 		return fmt.Errorf("image %q is not an image without a tag", e.Image)
-	case !strings.Contains(string(e.Compose), e.Image+":${"+VersionVar+"}"):
-		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, VersionVar)
+	case !strings.Contains(string(e.Compose), e.Image+":${"+catalogfiles.VersionVar+"}"):
+		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, catalogfiles.VersionVar)
 	case e.Database != "" && databaseNames[e.Database] == "":
 		return errors.New("database is postgres, sqlite, mysql, mongodb, clickhouse or empty")
-	case e.Port <= 0 || e.Port > 65535:
-		return errors.New("port is required")
 	case !strings.HasPrefix(e.Website, "https://"):
 		return errors.New("website must be an https:// link")
 	}
@@ -220,19 +195,25 @@ func (e Entry) BackupRequestURL() string {
 	return "https://github.com/axadrn/moin/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want moin to back up its "+e.DatabaseName()+".")
 }
 
-// Secrets lists the ${NAME}s compose uses, except VERSION and those with a
-// default, sorted: moin generates a value for each on install.
-func Secrets(compose []byte) []string {
+// LoginSecrets are the secrets the first sign-in needs: those Login names,
+// such as ADMIN_PASSWORD. moin shows their values once, on install.
+func (e Entry) LoginSecrets() []string {
 	var names []string
-	for _, match := range variablePattern.FindAllStringSubmatch(string(compose), -1) {
-		name, rest := match[1], match[2]
-		if name == VersionVar || name == URLVar || name == DomainVar || strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, ":-") {
-			continue
-		}
-		if !slices.Contains(names, name) {
+	for _, name := range e.Secrets {
+		if strings.Contains(e.Login, name) {
 			names = append(names, name)
 		}
 	}
-	slices.Sort(names)
 	return names
+}
+
+// Similar are up to n other apps of e's category, in the order of entries.
+func Similar(entries []Entry, e Entry, n int) []Entry {
+	var similar []Entry
+	for _, other := range entries {
+		if other.Category == e.Category && other.Slug != e.Slug && len(similar) < n {
+			similar = append(similar, other)
+		}
+	}
+	return similar
 }

@@ -13,59 +13,72 @@ There are many ways to deploy. They are only three questions.
 
 ```text
 Where does the code come from?
-  your folder    moin deploy
-  GitHub         git push
+  GitHub         git push, then moin deploy
   CI             a finished image
+  the catalog    an app by its name
 
 Who presses the button?
   CLI, TUI, web, API or MCP
 
 Where do settings live?
-  in the repo (x-moin), which wins
-  otherwise in moin
+  in moin, always
 ```
 
 All of them work. Mix them as you like.
 
-| Code from | Button | Needs a bucket |
-| --- | --- | --- |
-| [Your folder](#deploy-from-your-folder) | CLI, TUI, API | yes |
-| [GitHub](/docs/guides/github) | every push by itself, or web, CLI, TUI, API, MCP | no |
-| [CI](/docs/guides/ci) | a deploy hook, or web, CLI, TUI, API, MCP | no |
+| Code from | Button |
+| --- | --- |
+| [GitHub](#deploy-what-you-pushed) | every push by itself, `moin deploy` in the repo, or web, CLI, TUI, API, MCP |
+| [CI](/docs/guides/ci) | a deploy hook, or web, CLI, TUI, API, MCP |
+| [The catalog](/docs/guides/catalog) | web, CLI, API, MCP |
 
-The web and MCP cannot reach the files on your computer. Everything else does the same work.
+Code never comes from your computer. Your server builds what is on GitHub. So what runs is what you pushed.
 
 ## Deploy from
 
-An app deploys from one place at a time: your folder, GitHub or CI. The app's **Deploys** tab shows it as **Deploy from**, with a green dot on the one in use. Pick another to switch. moin asks first, because the old one stops.
+An app deploys from one place at a time: GitHub or CI. The app's **Deploys** tab shows it as **Deploy from**, with a green dot on the one in use. Pick another to switch. moin asks first, because the old one stops.
+
+CI still uses the repo. Each image deploy takes `compose.yml` from the commit the image was built from. So the repo stays linked while CI deploys. Only its pushes no longer deploy.
 
 ```surfaces
 Web: the app's **Deploys** tab, **Deploy from**
 CLI: moin apps <app-name>, the line deploy from
-API: GET /api/v1/apps/{app}, the field deploy_from: folder, github or ci
+API: GET /api/v1/apps/{app}, the field deploy_from: ci, github, or empty for neither yet
 MCP: get_app, deploy_from
 ```
 
-Switch with what turns one on: [link a repo](/docs/guides/github), [turn on the deploy hook](/docs/guides/ci). Unlinking or turning the hook off goes back to your folder.
+Switch with what turns one on: [deploy every push](/docs/guides/github#deploy-every-push), [turn on the deploy hook](/docs/guides/ci). Turning the hook off leaves the repo linked, without deploys on push. Unlinking leaves neither. `moin deploy` in the repo links it again.
 
-Settings: [who decides](/docs/guides/config#who-decides).
+Settings live in moin. [compose.yml](/docs/guides/compose) is plain Docker.
 
-## Deploy from your folder
+## Deploy what you pushed
 
-moin takes the code in your folder to the server. The server builds it and starts it.
+Push your repo to GitHub. Then run `moin deploy` in it. Your server downloads that commit from GitHub, builds it and starts it. The code never passes through moin.
 
 ```surfaces
+Web: the app's **Deploys** tab, **Deploy from**, **GitHub**, a commit, **Deploy**
 CLI: moin deploy
 TUI: `D` on the overview or the app
-API: POST /api/v1/apps/{app}/uploads
-API: POST /api/v1/apps/{app}/deploys
+API: POST /api/v1/apps/{app}/deploys {"ref": "<commit>"}
+MCP: deploy_ref
 ```
 
 ```bash
-moin deploy                                                  # the app of this folder
-moin deploy <app-name>                                       # a named app
-moin deploy --server <server-name> --dir ./site <app-name>   # a new app, from another folder
+moin deploy                                    # the app of this repo
+moin deploy <app-name>                         # a named app
+moin deploy --server <server-name> <app-name>  # a new app on that server
 ```
+
+moin reads the repo through the moin GitHub App. [Connect GitHub](/docs/guides/github#connect-github) once.
+
+Before a deploy, moin checks four things. If one fails, it says what to do.
+
+- You are in the top folder of the repo, and its `origin` is on GitHub.
+- Everything is committed. `git status` shows nothing.
+- The commit is pushed. `git push` first.
+- The commit is on the app's branch. Another branch? `moin deploy --ref <branch>`, or link that branch with `moin link`.
+
+The first deploy links the app to the repo, without deploys on push. Turn those on with [`moin link`](/docs/guides/github#link-a-repo). An app linked to another repo deploys nothing from this one.
 
 If the app does not exist, moin asks first: `[y/N]`. So a typo makes no new app. Scripts add `--yes`. The moin GitHub Action passes it for you.
 
@@ -86,8 +99,8 @@ If Railpack cannot tell how to build the repo, the deploy fails and says why. Th
 ## What a deploy does
 
 ```text
-your code   from a folder, GitHub
-   │        or CI
+your code   from GitHub, CI
+   │        or the catalog
    ▼
 build       on your server;
    │        v2 keeps running
@@ -96,9 +109,9 @@ start       v3 takes v2's place
    │
    ▼
 check       v3 runs 10 seconds
-   │        without a restart; the
-   │        health path, if set,
-   │        answers
+   │        without a restart; with
+   │        a healthcheck, Docker
+   │        says it is healthy
    ▼
 live ✓      v3 is live
 
@@ -127,7 +140,7 @@ MCP: list_apps
 An empty app on a [server](/docs/guides/servers), ready for its first deploy.
 
 ```surfaces
-Web: **Apps**, **Add app**
+Web: **Apps**, **New app**, a name and a server, **Add**
 CLI: moin apps add --server <server-name> <app-name>
 TUI: opens the web: `w`, then `p`
 API: POST /api/v1/apps
@@ -163,10 +176,10 @@ MCP: get_deploy
 
 ## Redeploy
 
-Builds the newest code again, with the env vars as they are now. Nothing is uploaded. An image deploy pulls the image again.
+Builds the newest code again, with the env vars as they are now. The server builds the code it kept. An image deploy pulls the image again.
 
 ```surfaces
-Web: the app, **Redeploy**
+Web: the app, **Deploy**
 CLI: moin redeploy <app-name>
 TUI: on the app, `R`, then `y`
 API: POST /api/v1/apps/{app}/redeploy
@@ -196,7 +209,7 @@ Stop takes the app offline. It stays off, also after a reboot. Its data and sett
 Start runs it again. A deploy starts it too.
 
 ```surfaces
-Web: the app, **Stop** or **Start**
+Web: the app's **Settings** tab, **Stop my-app**; **Start** at the top of the app
 CLI: moin stop <app-name>
 CLI: moin start <app-name>
 TUI: on the app, `S` (stop asks `y`)
@@ -208,7 +221,7 @@ MCP: start_app
 
 ## Roll back
 
-Starts an earlier good deploy again, with the env vars it had.
+Starts an earlier good deploy again: its code and images, with the env vars, the domains and the [password](/docs/guides/domains#password) as they are now.
 
 ```surfaces
 Web: the app, **Deploys**, **Roll back** on a deploy
@@ -225,7 +238,7 @@ A rollback is a new deploy, such as v4 with the note *rollback to v3*. Without a
 Pinned apps stay at the top of the overview, right under what needs you. A pin is for the whole workspace.
 
 ```surfaces
-Web: the star next to the app's name
+Web: the app's **Settings** tab, **Pin to the top**
 CLI: moin apps pin <app-name>, moin apps unpin <app-name>
 TUI: on the app, `*`
 API: PUT /api/v1/apps/{app}/pin {"pinned": true}
@@ -237,7 +250,7 @@ MCP: pin_app
 Stops the app and removes its containers and images. Its volumes and data stay on the server. Its backups stay in your bucket until you delete them: [How long things stay](/docs/concepts/backups#how-long-things-stay).
 
 ```surfaces
-Web: the app, **Remove app**
+Web: the app's **Settings** tab, **Remove my-app**
 CLI: moin apps rm <app-name>
 TUI: opens the web: `w`, then `p`
 API: DELETE /api/v1/apps/{app}
@@ -248,6 +261,7 @@ You type the app's name to confirm, and the hub checks it. A script passes it as
 
 ## Good to know
 
-- Commands on an app take its name as the last word. Without it, moin uses the app of your folder: `app` in [x-moin](/docs/guides/config), or the folder's name.
-- moin never stores your code. The archive passes through your bucket and is gone once the server has it.
+- Commands on an app take its name as the last word. Without it, moin takes the app that follows the folder's GitHub repo, else the folder's name. Two apps follow it? Name one.
+- moin never stores your code. Your server downloads it from GitHub.
 - Your data survives every deploy: [how](/docs/concepts/how-moin-works#your-data-survives-every-deploy).
+- A deploy refuses settings that reach beyond the app, like `privileged: true` or a mount of `/var/run/docker.sock`. A normal app needs none of them. [Containers that reach into the server](/docs/guides/security#containers-that-reach-into-the-server)

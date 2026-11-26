@@ -3,8 +3,7 @@ package service
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,14 +43,6 @@ func answerBackupConfigs(t *testing.T, servers *ServerService, serverID string, 
 	}()
 }
 
-// fakeBucket is an S3 endpoint that takes every write.
-func fakeBucket(t *testing.T) string {
-	t.Helper()
-	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
-	t.Cleanup(bucket.Close)
-	return bucket.URL
-}
-
 // TestBuckets: the bucket a workspace had stays its default, an app picks
 // another one, the daemon gets both in the old shape plus the app's own,
 // and a bucket in use is not removed.
@@ -59,7 +50,7 @@ func TestBuckets(t *testing.T) {
 	apps, servers, server, daemon := newAppService(t)
 	answerBackupConfigs(t, servers, server.ID, daemon)
 	ctx := context.Background()
-	endpoint := fakeBucket(t)
+	endpoint := "https://s3.example.com"
 	blog, err := apps.Create(owner, "blog", server.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +65,7 @@ func TestBuckets(t *testing.T) {
 		t.Fatalf("blog's bucket = %+v, %v", current, err)
 	}
 	config, _ := apps.backupConfig(owner.WorkspaceID, server.ID)
-	if config.Bucket == nil || config.Bucket.Bucket != "owner" || config.Bucket.SecretKey != "secret" || len(config.AppBuckets) != 0 {
+	if config.Bucket == nil || config.Bucket.Bucket != "owner" || config.Bucket.ID != "bucket-owner" || len(config.AppBuckets) != 0 || len(config.Paused) != 0 {
 		t.Fatalf("config with one bucket = %+v", config)
 	}
 
@@ -82,8 +73,14 @@ func TestBuckets(t *testing.T) {
 	// refused.
 	input := BucketInput{Name: "client-a", Endpoint: endpoint, Bucket: "client", AccessKey: "key-a", SecretKey: "secret-a"}
 	added, err := apps.AddBucket(ctx, owner, input)
-	if err != nil || added.Default || added.Region != "auto" {
+	if err != nil || added.Default || added.Region != "auto" || len(added.Servers.On) != 1 || added.Servers.On[0].Server != "web-1" {
 		t.Fatalf("add client-a = %+v, %v", added, err)
+	}
+	// The server checked it and keeps the key.
+	var set protocol.BucketSet
+	daemon.last(t, protocol.TypeBucketSet, &set)
+	if set.SecretKey != "secret-a" || set.Bucket.ID == "" || set.Bucket.Bucket != "client" || set.Bucket.Workspace != owner.WorkspaceID {
+		t.Fatalf("bucket.set = %+v", set)
 	}
 	if _, err := apps.AddBucket(ctx, owner, input); !errors.Is(err, repository.ErrDuplicateBucket) {
 		t.Fatalf("add client-a twice: err = %v", err)
@@ -94,7 +91,7 @@ func TestBuckets(t *testing.T) {
 		t.Fatalf("add a bad name: err = %v", err)
 	}
 
-	// blog moves: uploads and backups go to client-a, shop stays on the
+	// blog moves: its backups go to client-a, shop stays on the
 	// default, and the daemon still gets the default as Bucket.
 	moved, err := apps.SetAppBucket(owner, "blog", "client-a")
 	if err != nil || moved.BucketName != "client-a" {
@@ -104,18 +101,14 @@ func TestBuckets(t *testing.T) {
 	if config.Bucket == nil || config.Bucket.Bucket != "owner" {
 		t.Fatalf("the default for old daemons = %+v", config.Bucket)
 	}
-	if own := config.AppBuckets["blog"]; own == nil || own.Bucket != "client" || own.SecretKey != "secret-a" || own.Workspace != owner.WorkspaceID || own.Name != "client-a" {
+	if own := config.AppBuckets["blog"]; own == nil || own.Bucket != "client" || own.ID != set.Bucket.ID || own.Workspace != owner.WorkspaceID || own.Name != "client-a" {
 		t.Fatalf("blog's own bucket = %+v", config.AppBuckets)
 	}
 	if _, ok := config.AppBuckets["shop"]; ok {
 		t.Fatal("shop got a bucket of its own")
 	}
-	upload, err := apps.Upload(ctx, owner.WorkspaceID, "blog")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := endpoint + "/client/" + owner.WorkspaceID + "/blog/" + blog.ID + "/uploads/"; len(upload.URL) < len(want) || upload.URL[:len(want)] != want {
-		t.Fatalf("blog uploads to %s, want %s…", upload.URL, want)
+	if shown, err := apps.Bucket(owner.WorkspaceID, "client-a"); err != nil || shown.AppFolder(blog) != owner.WorkspaceID+"/blog/"+blog.ID+"/" {
+		t.Fatalf("blog's folder in client-a = %+v, %v", shown, err)
 	}
 	older, err := apps.OlderBuckets(moved)
 	if err != nil || len(older) != 1 || older[0].Name != "default" {
@@ -168,24 +161,47 @@ func TestBuckets(t *testing.T) {
 		t.Fatalf("buckets = %+v, %v", buckets, err)
 	}
 
-	// Renaming keeps the secret key when none comes.
+	// Renaming asks no server: the key stays where it is.
+	checks := daemon.count(protocol.TypeBucketSet)
 	renamed, err := apps.EditBucket(ctx, owner, "default", BucketInput{Name: "old", Endpoint: "https://s3.example.com", Bucket: "owner", AccessKey: "key"})
-	if err != nil || renamed.Name != "old" {
+	if err != nil || renamed.Name != "old" || daemon.count(protocol.TypeBucketSet) != checks || len(renamed.Servers.On) != 1 {
 		t.Fatalf("rename = %+v, %v", renamed, err)
 	}
-	stored, _ := apps.apps.Bucket(owner.WorkspaceID, "old")
-	if secret, err := apps.box.Open(stored.SecretKey, owner.WorkspaceID+"/backups"); err != nil || secret != "secret" {
-		t.Fatalf("secret after the rename = %q, %v", secret, err)
+	// A new path is checked by the server, with the key it keeps.
+	if _, err := apps.EditBucket(ctx, owner, "old", BucketInput{Endpoint: "https://s3.example.com", Bucket: "owner", Path: "moin", AccessKey: "key"}); err != nil {
+		t.Fatal(err)
+	}
+	set = protocol.BucketSet{}
+	daemon.last(t, protocol.TypeBucketSet, &set)
+	if set.SecretKey != "" || set.Bucket.Path != "moin" {
+		t.Fatalf("bucket.set for a new path = %+v", set)
+	}
+	// A bucket the server cannot write to is not stored.
+	daemon.mu.Lock()
+	daemon.refuse = map[protocol.MessageType]string{protocol.TypeBucketSet: "moin could not write to the bucket with these keys: AccessDenied"}
+	daemon.mu.Unlock()
+	input.Name = "refused"
+	var daemonErr *DaemonError
+	if _, err := apps.AddBucket(ctx, owner, input); !errors.As(err, &daemonErr) || !strings.Contains(err.Error(), "could not write") {
+		t.Fatalf("a refused bucket: err = %v", err)
+	}
+	if _, err := apps.Bucket(owner.WorkspaceID, "refused"); !errors.Is(err, repository.ErrBucketNotFound) {
+		t.Fatalf("a refused bucket was stored: %v", err)
 	}
 }
 
 // TestFirstBucketIsTheDefault: a workspace without a bucket gets its
 // first as the default, and the last bucket may go once no app uses it.
 func TestFirstBucketIsTheDefault(t *testing.T) {
-	apps, _, _, _ := newAppService(t)
+	apps, servers, _, _ := newAppService(t)
 	ctx := context.Background()
-	endpoint := fakeBucket(t)
-	if _, err := apps.AddBucket(ctx, other, BucketInput{Name: "first", Endpoint: endpoint, Bucket: "other", AccessKey: "key", SecretKey: "secret"}); err != nil {
+	input := BucketInput{Name: "first", Endpoint: "https://s3.example.com", Bucket: "other", AccessKey: "key", SecretKey: "secret"}
+	// Without a server there is no one to keep the key.
+	if _, err := apps.AddBucket(ctx, other, input); !errors.Is(err, ErrNoServer) {
+		t.Fatalf("a bucket without a server: err = %v", err)
+	}
+	connectServer(t, servers, other, "other-1")
+	if _, err := apps.AddBucket(ctx, other, input); err != nil {
 		t.Fatal(err)
 	}
 	bucket, err := apps.DefaultBucket(other.WorkspaceID)

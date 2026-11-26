@@ -58,7 +58,7 @@ func (r *Admin) ListUsers(query string, limit, offset int, now time.Time) ([]mod
 
 	users := []model.AdminUser{}
 	err := r.db.Select(&users, adminUserSelect+where+`
-		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.created_at
+		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.github_login, u.created_at
 		ORDER BY u.created_at DESC, u.id
 		LIMIT $3 OFFSET $4
 	`, pattern, now, limit, offset)
@@ -72,6 +72,7 @@ const adminUserSelect = `
 			u.email,
 			u.name,
 			u.email_verified_at,
+			u.github_login,
 			u.created_at,
 			COUNT(DISTINCT m.id) AS workspace_count,
 			COUNT(DISTINCT CASE WHEN s.expires_at > $2 THEN s.id END) AS active_session_count
@@ -86,7 +87,7 @@ func (r *Admin) User(id string, now time.Time) (*model.AdminUser, error) {
 	var user model.AdminUser
 	err := r.db.Get(&user, adminUserSelect+`
 		WHERE u.id = $1
-		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.created_at
+		GROUP BY u.id, u.email, u.name, u.email_verified_at, u.github_login, u.created_at
 	`, id, now)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound
@@ -177,4 +178,16 @@ func (r *Admin) FirstWorkspace(userID string) (*model.Workspace, error) {
 		return nil, err
 	}
 	return &workspace, nil
+}
+
+// UsedServer says whether the workspace has used a server: one connected
+// at least once, or the activity says one was installed. A server added
+// but never connected does not count.
+func (r *Admin) UsedServer(workspaceID string) (bool, error) {
+	var used bool
+	err := r.db.Get(&used, `
+		SELECT EXISTS (SELECT 1 FROM servers WHERE workspace_id = $1 AND last_seen_at IS NOT NULL)
+		    OR EXISTS (SELECT 1 FROM activity_events WHERE workspace_id = $1 AND action = 'server.installed')
+	`, workspaceID)
+	return used, err
 }

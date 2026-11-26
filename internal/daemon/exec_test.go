@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -11,14 +13,26 @@ import (
 
 // TestExecArgs: the command follows the service as its own words, so
 // nothing in it reaches a shell, and a word that looks like a flag of
-// compose is the command's.
+// compose is the command's. compose reads the env files that fill the
+// compose file, the release's .env and then the app's env.
 func TestExecArgs(t *testing.T) {
-	got := execArgs(project("shop"), "/var/lib/moin/apps/shop/releases/3/compose.json", "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
-	want := []string{"compose", "-p", "moin-shop", "-f", "/var/lib/moin/apps/shop/releases/3/compose.json", "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
+	a := newApps(t.TempDir(), nil)
+	release := a.releaseDir("shop", 3)
+	if err := os.MkdirAll(release, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range []string{filepath.Join(release, ".env"), a.envFile("shop")} {
+		if err := os.WriteFile(file, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	composeJSON := filepath.Join(release, "compose.json")
+	got := a.execArgs("shop", composeJSON, "web", []string{"sh", "-c", "echo $HOME; rm -rf /"})
+	want := []string{"compose", "-p", "moin-shop", "-f", composeJSON, "--env-file", filepath.Join(release, ".env"), "--env-file", a.envFile("shop"), "exec", "-T", "web", "sh", "-c", "echo $HOME; rm -rf /"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("execArgs = %q", got)
 	}
-	got = execArgs("shop", "c.json", "web", []string{"--help"})
+	got = a.execArgs("shop", "c.json", "web", []string{"--help"})
 	if got[len(got)-2] != "web" || got[len(got)-1] != "--help" {
 		t.Errorf("a flag-like command moved: %q", got)
 	}
@@ -71,6 +85,32 @@ func TestExecRefused(t *testing.T) {
 		if _, err := a.runExec(t.Context(), start, func(string) {}); err == nil {
 			t.Errorf("%+v ran", start)
 		}
+	}
+}
+
+// TestMaskedCommand: every env value of the app in its app.env, six
+// characters or more, is masked in the command, the longest first, so a
+// value inside another leaves nothing of the longer one. Values of the
+// compose file that are not env values stay. An env file moin cannot read
+// leaves only the program.
+func TestMaskedCommand(t *testing.T) {
+	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	_, err := a.setEnv(protocol.EnvSet{App: "web", Set: map[string]string{"DB_PASSWORD": "abcdef123", "PRICE": "$5-dollars", "SHORT": "abcde", "INNER": "abcdef"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := a.maskedCommand("web", []string{"psql", "pw=abcdef123", "short=abcdef", "abcde", "$5-dollars", "from-compose"})
+	if got != "psql pw=••• short=••• abcde '•••' from-compose" {
+		t.Errorf("maskedCommand = %q", got)
+	}
+	if got := a.maskedCommand("none", []string{"psql", "-c", "secret"}); got != "psql -c secret" {
+		t.Errorf("without env = %q", got)
+	}
+	if err := os.WriteFile(a.envFile("web"), []byte("not a line"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.maskedCommand("web", []string{"psql", "-c", "abcdef123"}); got != "psql …" {
+		t.Errorf("with a broken env file = %q", got)
 	}
 }
 

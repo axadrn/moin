@@ -6,8 +6,6 @@ package tui
 import (
 	"errors"
 	"github.com/axadrn/moin/internal/client"
-	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -62,11 +60,11 @@ func (m model) appActions(name string) []action {
 		}})
 	}
 	if m.dir != "" && m.dirApp() == name {
-		out = append(out, action{"D", "deploy this dir", func(m model) (tea.Model, tea.Cmd) { return m.confirmDeployDir() }})
+		out = append(out, action{"D", "deploy this dir's commit", func(m model) (tea.Model, tea.Cmd) { return m.confirmDeployDir() }})
 	}
 	if a.Catalog != "" {
-		out = append(out, action{"U", "update release", func(m model) (tea.Model, tea.Cmd) {
-			return m.ask1("Update "+name+"?", "It installs the newest release of "+a.Catalog+". A restore can go back to before it.", "update", false, m.updateCatalogApp(name)), nil
+		out = append(out, action{"U", "update version", func(m model) (tea.Model, tea.Cmd) {
+			return m.ask1("Update "+name+"?", "It installs the newest version of "+a.Catalog+". A restore can go back to before it.", "update", false, m.updateCatalogApp(name)), nil
 		}})
 	}
 	pinWord := "pin"
@@ -77,6 +75,9 @@ func (m model) appActions(name string) []action {
 	out = append(out,
 		action{"X", "run a command", func(m model) (tea.Model, tea.Cmd) { return m.openExec(name) }},
 		action{"W", "open in web", func(m model) (tea.Model, tea.Cmd) { return m.browse("/apps/" + m.appLink(name)) }},
+		action{"C", "compose file in web", func(m model) (tea.Model, tea.Cmd) {
+			return m.browse("/apps/" + m.appLink(name) + "/settings#compose-file")
+		}},
 	)
 	return out
 }
@@ -93,16 +94,17 @@ func (m model) webPages() []page {
 		data = page{"d", "Data of " + app, "Browse and edit the rows of its databases.", "/apps/" + m.appLink(app) + "/data"}
 	}
 	out := []page{
-		{"a", "Servers", "Add, rename, order and remove servers.", "/servers"},
-		{"p", "Apps", "Create, order and remove apps.", "/apps"},
+		{"a", "Servers", "Add, rename and remove servers.", "/servers"},
+		{"p", "Apps", "Create and remove apps.", "/apps"},
 		{"c", "Catalog", "Pick an app and fill in its form once.", "/catalog"},
 		{"t", "Team", "Invite people and change roles.", "/workspace"},
 		{"g", "Connect GitHub", "GitHub asks for a browser to install the app.", "/github/install"},
-		{"k", "Buckets", "Where backups and uploads go.", "/bucket"},
+		{"k", "Buckets", "Where backups go.", "/bucket"},
 		{"r", "Registries", "Logins for private images.", "/registries"},
 		{"n", "Alerts", "Slack, Discord, Telegram and webhooks.", "/alerts"},
 		data,
-		{"s", "Settings", "Your account and API tokens.", "/settings"},
+		{"s", "Settings", "Your account and connections.", "/settings"},
+		{"l", "Connections", "What each login may do, and CI tokens.", "/settings/connections"},
 	}
 	if !m.ws.selfHosted {
 		out = append(out, page{"b", "Billing", "Your card belongs to Stripe, not your terminal.", "/billing"})
@@ -192,32 +194,13 @@ func parseMoment(text string, now time.Time) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// envKeys are the keys of the env tab, in its order: by key.
 func (m model) envKeys() []string {
 	var keys []string
-	for k := range m.app.env {
-		keys = append(keys, k)
+	for _, v := range m.app.env {
+		keys = append(keys, v.Key)
 	}
-	sort.Strings(keys)
 	return keys
-}
-
-// mainDomains are the domains of the app's main service moin set, without
-// the ones compose.yml sets.
-func (m model) mainDomains() []string {
-	a, _ := m.findApp(m.cur.app)
-	var fromCompose []string
-	for _, d := range m.app.domains {
-		if d.FromCompose {
-			fromCompose = append(fromCompose, d.Domain)
-		}
-	}
-	var out []string
-	for _, d := range a.Domains {
-		if !slices.Contains(fromCompose, d) {
-			out = append(out, d)
-		}
-	}
-	return out
 }
 
 // filteredLogs are the log lines the filter lets through.

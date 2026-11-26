@@ -7,7 +7,7 @@ package tui
 
 import (
 	"fmt"
-	"maps"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -360,51 +360,55 @@ func (m model) backupsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 			database = moments[m.at("moments", len(moments))].db
 		}
 		return m, m.downloadCopy(a.Name, database)
+	case "w":
+		// How often and how long are set on the web, on the database's
+		// page in Data.
+		path := "/apps/" + m.appLink(a.Name) + "/data"
+		if len(moments) > 0 {
+			path += "?db=" + url.QueryEscape(moments[m.at("moments", len(moments))].db)
+		} else if m.app.backups != nil && len(m.app.backups.Databases) > 0 {
+			path += "?db=" + url.QueryEscape(m.app.backups.Databases[0].Database)
+		}
+		return m.browse(path)
 	}
 	return m, nil
 }
 
-// envTabKey shows, sets, removes and edits the env vars.
+// envTabKey sets, removes and replaces the env vars. Values are
+// write-only: nothing here shows one.
 func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 	keys := m.envKeys()
 	if d != 0 {
 		return m.cursor("env", len(keys), d), nil
 	}
 	switch s {
-	case "v":
-		m.shown = !m.shown
 	case "a", "enter":
 		value := ""
 		if s == "enter" && len(keys) > 0 {
-			k := keys[m.at("env", len(keys))]
-			value = k + "=" + m.app.env[k]
+			value = keys[m.at("env", len(keys))] + "="
 		}
-		return m.input("Set an env var of "+a.Name, "KEY=value · the next deploy gets it", value, func(m model, v string) (model, tea.Cmd) {
+		return m.input("Set an env var of "+a.Name, "KEY=value · the app gets it when it restarts", value, func(m model, v string) (model, tea.Cmd) {
 			key, val, ok := strings.Cut(v, "=")
 			key = strings.TrimSpace(key)
 			if !ok || key == "" {
 				m.fail(fmt.Errorf("type KEY=value"))
 				return m, nil
 			}
-			env := maps.Clone(m.app.env)
-			if env == nil {
-				env = map[string]string{}
-			}
-			env[key] = val
+			env := slices.DeleteFunc(slices.Clone(m.app.env), func(v client.EnvVar) bool { return v.Key == key })
+			env = append(env, client.EnvVar{Key: key, UpdatedAt: m.now()})
+			slices.SortFunc(env, func(a, b client.EnvVar) int { return strings.Compare(a.Key, b.Key) })
 			m.app.env = env
 			return m, m.setEnv(m.cur.app, map[string]string{key: val}, nil)
 		}), nil
 	case "x":
 		if len(keys) > 0 {
 			k := keys[m.at("env", len(keys))]
-			return m.ask1("Remove "+k+" from "+a.Name+"?", "The next deploy runs without it.", "remove", true, func() tea.Msg {
+			return m.ask1("Remove "+k+" from "+a.Name+"?", "The app runs without it once it restarts.", "remove", true, func() tea.Msg {
 				return optimisticMsg{do: func(m model) model {
 					if m.app.name != a.Name {
 						return m
 					}
-					env := maps.Clone(m.app.env)
-					delete(env, k)
-					m.app.env = env
+					m.app.env = slices.DeleteFunc(slices.Clone(m.app.env), func(v client.EnvVar) bool { return v.Key == k })
 					return m
 				}, cmd: m.setEnv(a.Name, nil, []string{k})}
 			}), nil
@@ -418,7 +422,7 @@ func (m model) envTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
 // domainsTabKey adds and removes domains, picks the canonical one and sets
 // the password.
 func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) {
-	doms := m.mainDomains()
+	doms := slices.Clone(a.Domains)
 	if d != 0 {
 		return m.cursor("domains", len(m.app.domains), d), nil
 	}
@@ -443,10 +447,6 @@ func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 			return m, nil
 		}
 		dc := m.app.domains[m.at("domains", len(m.app.domains))]
-		if dc.FromCompose {
-			m.say(dc.Domain + " comes from compose.yml: change it there and deploy")
-			return m, nil
-		}
 		if s == "c" {
 			if dc.Service != "" {
 				m.say("Only a domain of the main service can be the canonical one")
@@ -465,16 +465,16 @@ func (m model) domainsTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd)
 		}
 		return m.ask1("Remove "+dc.Domain+" from "+a.Name+"?", "It stops answering there.", "remove", true, m.setDomains(a.Name, "", rest, canonical)), nil
 	case "p":
-		if a.Protected {
-			return m.ask1("Remove the password of "+a.Name+"?", "Everyone can open it again.", "remove", true, m.protect(a.Name, "", "")), nil
+		if a.Password {
+			return m.ask1("Turn the password of "+a.Name+" off?", "Anyone with the link can open its domains and its instant address.", "turn off", true, m.removePassword(a.Name)), nil
 		}
-		return m.input("Protect "+a.Name+" with a password", "user:password", "", func(m model, v string) (model, tea.Cmd) {
+		return m.input("Ask for a password on the domains and the instant address of "+a.Name, "user:password", "", func(m model, v string) (model, tea.Cmd) {
 			user, pw, ok := strings.Cut(v, ":")
 			if !ok || user == "" || pw == "" {
 				m.fail(fmt.Errorf("type user:password"))
 				return m, nil
 			}
-			return m, m.protect(m.cur.app, user, pw)
+			return m, m.setPassword(m.cur.app, user, pw)
 		}), nil
 	}
 	return m, nil
@@ -502,7 +502,7 @@ func (m model) uptimeTabKey(s string, a client.App, d int) (tea.Model, tea.Cmd) 
 		m.app.uptime = &up
 		return m, m.setUptime(a.Name, ud.Domain, nil, &paused)
 	case "c":
-		return m.input("Check path of "+ud.Domain, "like /health · empty goes back to the default", ud.Path, func(m model, v string) (model, tea.Cmd) {
+		return m.input("Path uptime visits on "+ud.Domain, "like /health · empty goes back to the default", ud.Path, func(m model, v string) (model, tea.Cmd) {
 			path := v
 			return m, m.setUptime(m.cur.app, ud.Domain, &path, nil)
 		}), nil
@@ -634,13 +634,26 @@ func (m model) confirmRollback(app string, d client.Deploy) (tea.Model, tea.Cmd)
 	return m.ask1(fmt.Sprintf("Roll back %s to v%d?", app, d.Number), "Its images start again with today's env and domains.", "roll back", false, m.rollback(app, d.Number)), nil
 }
 
+// confirmDeployDir deploys the commit the directory the TUI started in has
+// on GitHub, to its app, which must follow that repo already: `moin deploy`
+// creates and links it.
 func (m model) confirmDeployDir() (tea.Model, tea.Cmd) {
 	app := m.dirApp()
-	if _, ok := m.findApp(app); !ok {
+	a, ok := m.findApp(app)
+	if !ok {
 		m.say("No app " + app + " for this directory yet: run `moin deploy` here once")
 		return m, nil
 	}
-	return m.ask1("Deploy "+m.dir+" to "+app+"?", "moin packs the directory, builds it on the server and swaps when it is healthy.", "deploy", false, m.deployDir()), nil
+	repo, commit, err := client.PushedCommit(m.dir)
+	if err != nil {
+		m.say(err.Error())
+		return m, nil
+	}
+	if !strings.EqualFold(a.Repo, repo) {
+		m.say(app + " does not follow " + repo + " yet: run `moin deploy` here once")
+		return m, nil
+	}
+	return m.ask1("Deploy "+short(commit)+" to "+app+"?", "The server builds this commit from GitHub and swaps when it is healthy.", "deploy", false, m.deployRef(app, commit)), nil
 }
 
 func (m model) execKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {

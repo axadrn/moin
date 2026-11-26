@@ -17,13 +17,15 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// A guest sees for whom the invitation is and signs in with GitHub, which
+// brings them back; a new account finishes its onboarding first.
 func TestInvitationShowPreservesGuestAndIncompleteOnboardingFlow(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		signedIn   bool
 		redirectTo string
 	}{
-		{name: "guest", redirectTo: "/auth"},
+		{name: "guest"},
 		{name: "authenticated incomplete profile", signedIn: true, redirectTo: "/auth/onboarding"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -35,7 +37,7 @@ func TestInvitationShowPreservesGuestAndIncompleteOnboardingFlow(t *testing.T) {
 			token := invitationToken(t, mailer)
 			request := httptest.NewRequest(http.MethodGet, "/workspaces/invitations/"+token, nil)
 			request.SetPathValue("token", token)
-			request = request.WithContext(ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{}))
+			request = request.WithContext(ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{GitHubLogin: true}))
 			if test.signedIn {
 				request = request.WithContext(ctxkeys.WithUser(request.Context(), invitee))
 			}
@@ -43,7 +45,12 @@ func TestInvitationShowPreservesGuestAndIncompleteOnboardingFlow(t *testing.T) {
 
 			NewWorkspaceInvitationHandler(workspaces, &config.Config{}).Show(recorder, request)
 
-			if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != test.redirectTo {
+			if test.redirectTo == "" {
+				body := recorder.Body.String()
+				if recorder.Code != http.StatusOK || !strings.Contains(body, "This invitation is for show@example.com.") || !strings.Contains(body, `href="/auth/github"`) {
+					t.Fatalf("status = %d, want the invitation with Continue with GitHub:\n%s", recorder.Code, body)
+				}
+			} else if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != test.redirectTo {
 				t.Fatalf("status = %d, location = %q", recorder.Code, recorder.Header().Get("Location"))
 			}
 			if pendingCookie(recorder) == nil || pendingCookie(recorder).Value != token {
@@ -206,8 +213,8 @@ func TestOnboardingValidatesPendingInvitationBeforeSkippingWorkspace(t *testing.
 				}
 			}
 			email := service.NewEmailService(testutil.NewMemoryMailer(), "https://app.example.com", "Test App")
-			auth := service.NewAuthService(repository.NewUsers(database), nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour)
-			handler := NewAuthHandler(auth, nil, workspaces, &config.Config{})
+			auth := service.NewAuthService(repository.NewUsers(database), nil, nil, workspaces, email, false, time.Hour, time.Hour, time.Hour)
+			handler := NewAuthHandler(auth, workspaces, nil, nil, &config.Config{})
 			form := url.Values{"name": {"Invited User"}, "workspace": {"Invited Team"}}
 			request := httptest.NewRequest(http.MethodPost, "/auth/onboarding", strings.NewReader(form.Encode()))
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")

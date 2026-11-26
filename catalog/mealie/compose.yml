@@ -1,0 +1,8 @@
+services:
+  web:
+    image: ghcr.io/mealie-recipes/mealie:${VERSION}
+    expose: ["9000"]
+    environment:
+      ALLOW_SIGNUP: "false"
+    volumes:
+      - ./data:/app/data

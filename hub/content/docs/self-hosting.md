@@ -15,7 +15,7 @@ Point a domain at the server with an A record, then run this as root on a fresh 
 curl -fsSL https://raw.githubusercontent.com/axadrn/moin/main/hub/deploy/install.sh | sh -s -- --domain moin.example.com --email you@example.com
 ```
 
-It installs Docker, writes the settings to `/etc/moin-hub/env`, starts the hub with your account and this server in it, and serves it on your domain with HTTPS. At the end it prints a sign-in link.
+It installs Docker, writes the settings to `/etc/moin-hub/env`, starts the hub with your account and this server in it, and serves it on your domain with HTTPS. At the end it prints a recovery key: open the hub, enter the key, and you are in. Then click **Create GitHub App** at the top ([Your own GitHub App](#your-own-github-app)), so you and your team sign in and deploy with GitHub, and add a passkey under **Settings**, **Account**, **Security**.
 
 Then point the CLI at it:
 
@@ -27,18 +27,20 @@ The rest of these docs apply as they are.
 
 ## Good to know
 
-- Keep a copy of `SECRETS_KEY`. It seals the secrets of your apps. Without it they are lost.
-- Email and a bucket can come later. Until email is set up, sign-in links go to the hub's log. `docker compose -f /opt/moin/compose.yml exec hub ./main sign-in-link` prints a new one.
-- Add `CLOUDFLARE_*` for email and `S3_*` with `BACKUP_DATABASE=true` for the hub's own backup, then run `sh /opt/moin/update.sh`.
+- Keep a copy of `SECRETS_KEY`. It seals the Cloudflare token, the alert targets and the keys of the GitHub App the hub keeps. Without it you enter them again, and the hub starts only with the old key back or `GITHUB_APP_*` set. Env values, bucket keys and registry logins live on your servers, never in the hub.
+- Email and a bucket can come later. Until email is set up, invitations go to the hub's log.
+- A new key any time: `docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com`. [Recovery key](#recovery-key)
+- Add `CLOUDFLARE_*` for email and `S3_*` for the hub's own backup, then run `sh /opt/moin/update.sh`.
 - Run the install command again any time: it keeps your settings and data.
 
 | | Self-hosted | Hosted |
 | --- | --- | --- |
-| Price | free forever | $29 a month or $249 a year, per workspace |
+| Price | free forever | $7 a month or $49 a year, per workspace |
 | Features; servers, apps, teammates | all; unlimited | all; unlimited |
 | Setup | one command on one server | ready to use |
 | Updates | one click, when a new version is out | by us, the day they ship |
-| GitHub App, email | you set them up | ready to use |
+| GitHub App | one click | ready to use |
+| Email | you set it up | ready to use |
 | Backup of the hub | yours to run | every day, by us |
 | Support | GitHub issues | email |
 | Your apps and data | your servers | your servers |
@@ -69,7 +71,7 @@ one server          two servers
                     └───────────────┘
 ```
 
-You need a small Ubuntu or Debian server and a domain for it, an S3-compatible bucket, Cloudflare Email Sending for sign-in links and invitations, and, if you like, a Cloudflare Tunnel and [your own GitHub App](#your-own-github-app).
+You need a small Ubuntu or Debian server and a domain for it, an S3-compatible bucket, Cloudflare Email Sending for invitations and alerts, [your own GitHub App](#your-own-github-app) to sign in with, and, if you like, a Cloudflare Tunnel.
 
 ### Run it
 
@@ -96,10 +98,10 @@ The files are in the repo, in `hub/deploy/`:
    APP_ENV=production
    APP_URL=https://moin.example.com
    BILLING=false
-   # You: the first admin. Sign up with this address.
+   # You: the first admin. Your GitHub account's primary email, or a recovery key.
    ADMIN_EMAILS=you@example.com
    DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
-   # openssl rand -base64 32. Keep a copy: it seals the secrets of your apps.
+   # openssl rand -base64 32. Keep a copy: it seals the Cloudflare token, the alert targets and the GitHub App's keys.
    SECRETS_KEY=
    EMAIL_FROM=hello@example.com
    CLOUDFLARE_ACCOUNT_ID=
@@ -111,17 +113,18 @@ The files are in the repo, in `hub/deploy/`:
    S3_SECRET_KEY=
    ```
 
-3. Start it with `sh update.sh`. It listens on `127.0.0.1:8090`. Put it on your domain with a **Cloudflare Tunnel** (no open port: a tunnel in Zero Trust, Networks, Tunnels, with a public hostname for your domain and the service `http://hub:8090`, then `TUNNEL_TOKEN=` and `TRUSTED_PROXY_CIDRS=172.16.0.0/12` in the settings and `update.sh` again) or **a proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`.
+3. Start it with `sh update.sh`. It listens on `127.0.0.1:8090`. Put it on your domain with a **Cloudflare Tunnel** (no open port: a tunnel in Zero Trust, Networks, Tunnels, with a public hostname for your domain and the service `http://hub:8090`, then `TUNNEL_TOKEN=` and `TRUSTED_PROXY_CIDRS=172.16.0.0/12` in the settings and `update.sh` again) or **a proxy of your own** with HTTPS, such as Caddy, pointed at `127.0.0.1:8090`. Behind your own proxy, set `TRUSTED_PROXY_CIDRS` to the network it comes from too. Without it every visitor counts as one address, and five wrong recovery keys lock everyone out for 15 minutes.
+4. Make a [recovery key](#recovery-key) for your address in `ADMIN_EMAILS`, sign in with it and click **Create GitHub App** ([Your own GitHub App](#your-own-github-app)). From the clone, in `moin/hub/deploy`, the command is `docker compose -f compose.yml exec hub ./main recovery-key you@example.com`.
 
 ### Settings
 
-`hub/.env.example` lists every setting. The ones these docs use:
+`hub/.env.example` lists the settings of the hub. The ones these docs use:
 
 | Setting | What it does |
 | --- | --- |
-| `APP_URL` | the address of the hub |
-| `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up without an invitation |
-| `SECRETS_KEY` | seals the secrets of your apps; keep a copy |
+| `APP_URL` | the address of the hub; [passkeys](#who-signs-in) belong to its domain |
+| `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up with GitHub without an invitation |
+| `SECRETS_KEY` | seals the secrets the hub keeps itself: the Cloudflare token, the alert targets and the GitHub App's keys; keep a copy |
 | `BILLING` | `false` turns off prices, checkout and the billing page |
 | `SIGNUPS_OPEN` | `true` lets anyone sign up; off by default without billing, keep it off on a hub the internet can reach |
 | `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | email through Cloudflare Email Sending |
@@ -135,7 +138,7 @@ The files are in the repo, in `hub/deploy/`:
 | `UPDATE_CHECK` | `false` stops the daily check for a new version |
 | `ROBOTS_NOINDEX` | asks search engines to stay away; on by default without billing |
 | `UMAMI_WEBSITE_ID`, `UMAMI_HOST` | count visitors with your own Umami; off by default |
-| `GITHUB_APP_*` | [your own GitHub App](#your-own-github-app) |
+| `GITHUB_APP_*` | a GitHub App [made by hand](#by-hand); wins over the one the hub created |
 
 ### Keep the settings in 1Password
 
@@ -153,7 +156,7 @@ Your apps stay public through their own tunnel or ports 80 and 443. GitHub and C
 
 ### Move from one server to two
 
-1. Turn on the hub's backup: `S3_*`, `BACKUP_DATABASE=true`, `sh /opt/moin/update.sh`. Use a bucket no other hub backs up to (folder `hub/litestream`).
+1. Turn on the hub's backup: set `S3_*`, then `sh /opt/moin/update.sh`. Use a bucket no other hub backs up to (folder `hub/litestream`).
 2. Wait a few seconds, then on the old server stop the hub and its updater: `docker compose -f /opt/moin/compose.yml --profile '*' down`. Your apps keep running.
 3. On the new server, [run it](#run-it) with the same settings, without `SAME_SERVER`, and above all the same `SECRETS_KEY`. It restores its database from the bucket on its first start. Point the domain at it.
 4. On the old server, run a new install command from `moin servers install-command <server>`: its daemon now dials your domain, as the same server.
@@ -161,14 +164,34 @@ Your apps stay public through their own tunnel or ports 80 and 443. GitHub and C
 
 ## Your own GitHub App
 
-For deploys from GitHub the hub needs its own GitHub App. Create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**:
+People sign in with GitHub, and deploys come from GitHub, through one GitHub App of your hub. The hub creates it with you, in one click:
 
-1. **Permissions:** Contents read, Commit statuses read and write. **Events:** Push and Installation.
-2. **Callback URL:** `{APP_URL}/app/github/setup`. Tick **Request user authorization (OAuth) during installation** and **Redirect on update**.
-3. **Webhook URL:** `{APP_URL}/webhooks/github`, with a secret of your own.
-4. Generate a private key and a client secret.
+1. Sign in with the [recovery key](#recovery-key). At the top of the web it says "No GitHub App yet."
+2. Click **Create GitHub App**. GitHub shows the new app, named like `moin-moin-example-com`. Change the name if GitHub says it is taken, then create it.
+3. GitHub sends you back. The hub keeps the app, its keys sealed with `SECRETS_KEY`, and uses it at once. No restart.
+4. Connect your GitHub under **Settings**, **Account**, **Security**, and give the app your repos with **Connect GitHub** on an app.
 
-Put the key at `/etc/moin-hub/github-app.pem`, add the rest and run `update.sh` again:
+Only the admins in `ADMIN_EMAILS` see the button, and only while the hub has no app. The app asks GitHub for what moin uses and nothing more: Contents read, Commit statuses read and write, Metadata read, and Email addresses read to sign people in; the events Push and Installation.
+
+The app is public on GitHub, so your team signs in with it and installs it on their own accounts and organizations. Sign-up stays as you set it: only invited people join, unless `SIGNUPS_OPEN` is on, and the hub checks who installed the app before a workspace uses an installation.
+
+### Start over
+
+1. Delete the app on GitHub: **Settings**, **Developer settings**, **GitHub Apps**, the app, **Advanced**, **Delete GitHub App**.
+2. Remove it from the hub, and restart the hub:
+
+   ```bash
+   docker compose -f /opt/moin/compose.yml exec hub sqlite3 data/app.db 'DELETE FROM github_app'
+   docker compose -f /opt/moin/compose.yml restart hub
+   ```
+
+3. Click **Create GitHub App** again, then **Connect GitHub** on each app.
+
+A create that stopped halfway can leave an app on GitHub the hub never got. Delete it the same way, as in step 1. It also frees its name.
+
+### By hand
+
+Or create it on GitHub under **Settings**, **Developer settings**, **GitHub Apps**, with the permissions and events above. Callback URLs: first `{APP_URL}/app/github/setup`, then `{APP_URL}/auth/github/callback`, in that order, with **Request user authorization (OAuth) during installation** and **Redirect on update** ticked. Webhook URL: `{APP_URL}/webhooks/github`, with a secret of your own. Installable on **Any account**. Generate a private key and a client secret, put the key at `/etc/moin-hub/github-app.pem`, add the rest and run `update.sh` again:
 
 ```bash
 GITHUB_APP_ID=
@@ -179,13 +202,28 @@ GITHUB_APP_CLIENT_ID=
 GITHUB_APP_CLIENT_SECRET=
 ```
 
-With the client ID and secret, moin connects an installation only for someone whose GitHub account may manage it, and **Connect GitHub** works when the app is already installed. Without them, moin trusts the installation in the link GitHub sends back, and says so in its log when it starts.
+`GITHUB_APP_*` wins over the app the hub created. Without the client ID and secret nobody signs in with GitHub, moin trusts the installation in the link GitHub sends back, and it says so in its log when it starts.
+
+A hub that had a separate OAuth app for sign-in: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` and `API_URL` are gone. Add the email permission and the second callback URL to your GitHub App, and delete the old OAuth app on GitHub.
 
 ## Who signs in
 
-- **You, first.** Sign up with your address from `ADMIN_EMAILS`, with a sign-in link. Add a password later under **Settings**, **Account**.
-- **Your team.** Invite teammates; they sign up with the invited address.
+Everyone signs up with GitHub, then signs in with GitHub or a [passkey](/docs/guides/account#add-a-passkey). No passwords, no links by email.
+
+- **You, first.** The install made your account. Sign in with the [recovery key](#recovery-key) it printed, then **Connect GitHub** under **Settings**, **Account**, **Security**. Or, once the GitHub App is set up, sign in with a GitHub account whose verified primary email is your address in `ADMIN_EMAILS`.
+- **Your team.** Invite teammates. The invitation link lets them in with any GitHub account, under the invited address.
 - **Nobody else.** If `ADMIN_EMAILS` is empty nobody can create the first account, and the log says so when the hub starts.
+- **Passkeys need a domain with HTTPS.** A passkey belongs to the domain in `APP_URL`, and browsers make one only over HTTPS. With `APP_URL` on plain HTTP or an IP address, the hub starts with passkeys off and says why in its log.
+
+### Recovery key
+
+A key from the server signs one account in, once, within an hour. It is the way in before the GitHub App is set up, and for someone who lost their GitHub account or passkey.
+
+```bash
+docker compose -f /opt/moin/compose.yml exec hub ./main recovery-key you@example.com
+```
+
+It prints the key and where to enter it, `{APP_URL}/auth/key`. A new key replaces the one before. The key goes to your terminal only, never to a log or a link. It resets every way in: it signs the account out everywhere, ends its connections and CI tokens, disconnects its GitHub, deletes its passkeys and drops an email change still waiting for its link. After it, connect GitHub and add a passkey again under **Settings**, **Account**, **Security**. A hub without the GitHub App asks for the key on its sign-in page, next to **Sign in with a passkey**.
 
 A self-hosted hub has no Admin. Its admins, the addresses in `ADMIN_EMAILS`, get the note with **Update now** at the top of the web ([Updates](#updates)) and see the hub backup in **Settings** ([Database backup](#database-backup)). Your team is in **Settings**, **Team**.
 
@@ -197,6 +235,7 @@ Before every update moin shows the whole release notes, under one line: "Read th
 
 - moin is away for about a minute; your apps keep running.
 - Before the database changes it keeps a copy next to it, like `/var/lib/moin-hub/backup-before-v0.3.0.db`; the last three stay.
+- `update.sh` keeps `/var/lib/moin-hub`, the hub's database, readable by root only.
 - If the new version is not up within two minutes, the old one starts again and the note says why.
 - `moin version` shows the version and whether a newer one is out. You only get published versions, never work in between.
 - **Update now** needs the updater next to the hub, the only part with access to Docker: someone who breaks into moin can at most ask for an official version, never run their own code. A hub set up before it gets it once with `git pull`, then `sh update.sh`.
@@ -221,6 +260,8 @@ A hub that starts without a database restores the newest one from the bucket by 
 ## A new domain
 
 Set `APP_URL` to the new one and put the old one in `OLD_URLS`, like `OLD_URLS=https://old.example.com`. A browser on the old domain goes on to the same page on the new one, daemons and the CLI move by themselves, and webhooks and API calls there keep working. A self-hosted hub does not show what still arrives there. Keep the old domain until your webhooks, CI and scripts call the new one, then it can go.
+
+Passkeys stay with the old domain: a new domain in `APP_URL` ends every passkey. Everyone signs in with GitHub once and adds a new passkey. Without GitHub, make them a [recovery key](#recovery-key).
 
 ## What it sends us
 

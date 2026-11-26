@@ -17,8 +17,7 @@ const (
 )
 
 // DomainUptime is what the hub keeps of the uptime of one domain:
-// its settings and its state. Path is empty for the default: the app's
-// health path, or /. State is "" until the first visit, then up or down.
+// its settings and its state. Path is empty for the default, /. State is "" until the first visit, then up or down.
 type DomainUptime struct {
 	AppID  string     `db:"app_id"`
 	Domain string     `db:"domain"`
@@ -68,16 +67,6 @@ type UptimeHour struct {
 	Domain string
 	Hour   time.Time
 	UptimeCounts
-}
-
-// UptimeTarget is a live app uptime visits: its domains and what its
-// live deploy detected, as JSON.
-type UptimeTarget struct {
-	AppID       string `db:"id"`
-	WorkspaceID string `db:"workspace_id"`
-	Name        string `db:"name"`
-	Domains     string `db:"domains"`
-	Detected    string `db:"detected"`
 }
 
 // ServerSeen is a server uptime watches: when its daemon was last

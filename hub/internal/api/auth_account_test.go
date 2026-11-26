@@ -10,11 +10,11 @@ func TestPaidAccountShape(t *testing.T) {
 	user := seedVerifiedUser(t, environment, "paid", "Paid User")
 	token := environment.signIn(t, user.ID)
 
-	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", bearer: token})
+	recorder := environment.send(t, apiRequest{method: http.MethodGet, path: "/api/v1/account", cookie: token})
 	expectStatus(t, recorder, http.StatusOK)
 	body := decodeBody[map[string]any](t, recorder)
 	account := body["user"].(map[string]any)
-	if account["id"] != "paid" || account["password_set"] != true || account["email_alerts"] != true || len(account) != 6 {
+	if account["id"] != "paid" || account["github_login"] != "" || account["email_alerts"] != true || len(account) != 6 {
 		t.Fatalf("user = %#v", account)
 	}
 	if body["onboarding_required"] != false {

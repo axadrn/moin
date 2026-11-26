@@ -113,22 +113,19 @@ func link(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	if err != nil {
 		return err
 	}
-	// One thing brings new versions: linking turns the deploy hook off.
+	// One thing brings new versions: deploy on push turns the deploy hook
+	// off. Without it, CI keeps deploying, with the repo's compose file.
 	detail, err := api.App(ctx, name)
 	if err != nil {
 		return err
 	}
-	if detail.App.Hook {
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Link %s to %s? Its deploy hook turns off. CI can no longer deploy it.", name, flags.Arg(0)))
+	if detail.App.Hook && *auto {
+		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Link %s to %s and deploy every push? Its deploy hook turns off. CI can no longer deploy it.", name, flags.Arg(0)))
 		if err != nil {
 			return err
 		}
 	}
-	app, err := api.LinkRepo(ctx, name, flags.Arg(0), *branch, *auto)
-	var apiErr *client.Error
-	if errors.As(err, &apiErr) && apiErr.Code == "validation_failed" && strings.Contains(apiErr.Message, "cannot read this repo") {
-		return fmt.Errorf("%s cannot read %s. Install the %s GitHub App on its account and give it the repo: `%s github` shows where it is installed and the link", build.Name, flags.Arg(0), build.Name, build.Name)
-	}
+	app, err := linkRepo(ctx, api, name, flags.Arg(0), *branch, *auto)
 	if err != nil {
 		return err
 	}
@@ -139,6 +136,17 @@ func link(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	}
 	hint(stdout, lead, build.Name+" deploy --ref "+app.Branch+" --app "+app.Name)
 	return nil
+}
+
+// linkRepo makes an app follow a repo, and says what to do when the moin
+// GitHub App cannot read it.
+func linkRepo(ctx context.Context, api *client.Client, name, repo, branch string, auto bool) (client.App, error) {
+	app, err := api.LinkRepo(ctx, name, repo, branch, auto)
+	var apiErr *client.Error
+	if errors.As(err, &apiErr) && apiErr.Code == "validation_failed" && strings.Contains(apiErr.Message, "cannot read this repo") {
+		return app, fmt.Errorf("%s cannot read %s. Install the %s GitHub App on its account and give it the repo: `%s github` shows where it is installed and the link", build.Name, repo, build.Name, build.Name)
+	}
+	return app, err
 }
 
 // unlink stops an app from following its repo.

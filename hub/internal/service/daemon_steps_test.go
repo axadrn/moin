@@ -113,7 +113,7 @@ func sqliteApp(t *testing.T) (*AppService, *ServerService, *model.Server, *model
 	if _, err := apps.Create(owner, "blog", "web-1"); err != nil {
 		t.Fatal(err)
 	}
-	first, err := deployUpload(apps)
+	first, err := deploySource(apps)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -48,3 +48,11 @@ jobs:
 
       - name: Test with race detector
         run: go test -race ./...
+
+      # Real Docker: no file of the daemon but app.env and htpasswd holds a
+      # secret of an app, and no message it sends does. The grep fails the
+      # step when the test is gone or renamed, as -run alone would pass.
+      - name: Test that no env value leaks
+        run: |
+          go test -tags docker -run '^TestNoEnvValueLeaks$' -v ./internal/daemon/ > "$RUNNER_TEMP/leak.log" 2>&1 || { cat "$RUNNER_TEMP/leak.log"; exit 1; }
+          grep -- '--- PASS: TestNoEnvValueLeaks' "$RUNNER_TEMP/leak.log"

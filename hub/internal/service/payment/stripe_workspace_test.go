@@ -67,38 +67,82 @@ func TestStripePeriodEndComesFromTheItemSinceBasil(t *testing.T) {
 	}
 }
 
-// TestStripeUnknownPriceKeepsThePlan: a subscription for a price moin does
-// not sell, or with no price, neither opens nor changes a plan.
-func TestStripeUnknownPriceKeepsThePlan(t *testing.T) {
+// stripeSubscription is a subscription event as Stripe sends it, for one
+// price of a product.
+func stripeSubscription(workspaceID, status, product string, periodEnd int64, cancelAtPeriodEnd bool) []byte {
+	payload, _ := json.Marshal(map[string]any{
+		"id":                   "sub-1",
+		"customer":             "stripe-customer-1",
+		"status":               status,
+		"cancel_at_period_end": cancelAtPeriodEnd,
+		"metadata":             map[string]string{"workspace_id": workspaceID},
+		"items": map[string]any{"data": []any{map[string]any{
+			"current_period_end": periodEnd,
+			"price":              map[string]any{"id": "price_old", "product": product, "unit_amount": 2900, "currency": "usd", "recurring": map[string]string{"interval": "month"}},
+		}}},
+	})
+	return payload
+}
+
+// TestStripeUnknownProductKeepsThePlan: a subscription for a product moin
+// does not sell, or with no product, neither opens nor changes a plan.
+func TestStripeUnknownProductKeepsThePlan(t *testing.T) {
 	database := testutil.NewDatabase(t)
-	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "stripe-unknown-price"})
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "stripe-unknown-product"})
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
-	provider := &StripeProvider{cfg: &config.Config{StripePriceIDProMonthly: "price_pro"}, subscriptionService: subscriptions}
+	provider := &StripeProvider{cfg: &config.Config{StripeProductIDPro: "prod_hosted", StripePriceIDProMonthly: "price_new"}, subscriptionService: subscriptions}
 	before, err := subscriptions.Subscription(fixture.Workspace.ID)
 	if err != nil {
 		t.Fatalf("Subscription() error = %v", err)
 	}
 
-	for _, price := range []string{"price_other", ""} {
-		payload, _ := json.Marshal(map[string]any{
-			"id":       "sub-unknown",
-			"customer": "stripe-customer-2",
-			"status":   "active",
-			"metadata": map[string]string{"workspace_id": fixture.Workspace.ID},
-			"items": map[string]any{"data": []any{map[string]any{
-				"current_period_end": 1800000000,
-				"price":              map[string]any{"id": price, "unit_amount": 100, "currency": "usd", "recurring": map[string]string{"interval": "month"}},
-			}}},
-		})
-		if err := provider.handleSubscriptionCreated(payload); err != nil {
-			t.Fatalf("handleSubscriptionCreated(%q) error = %v", price, err)
+	for _, product := range []string{"prod_other", ""} {
+		if err := provider.handleSubscriptionCreated(stripeSubscription(fixture.Workspace.ID, "active", product, 1800000000, false)); err != nil {
+			t.Fatalf("handleSubscriptionCreated(%q) error = %v", product, err)
 		}
 		after, err := subscriptions.Subscription(fixture.Workspace.ID)
 		if err != nil {
 			t.Fatalf("Subscription() error = %v", err)
 		}
 		if after.PlanID != before.PlanID || after.Status != before.Status || after.ProviderSubscriptionID != nil {
-			t.Fatalf("price %q changed the subscription: %#v", price, after)
+			t.Fatalf("product %q changed the subscription: %#v", product, after)
+		}
+	}
+}
+
+// TestStripeOldPriceOfTheProductKeepsThePlan: a subscription on a price
+// moin no longer sells, of the hosted product, stays the paid plan through
+// a renewal, cancel at period end and a failed payment.
+func TestStripeOldPriceOfTheProductKeepsThePlan(t *testing.T) {
+	database := testutil.NewDatabase(t)
+	fixture := testutil.SeedUser(t, database, testutil.UserOptions{ID: "stripe-old-price"})
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptions(database), repository.NewAdmin(database))
+	provider := &StripeProvider{cfg: &config.Config{StripeProductIDPro: "prod_hosted", StripePriceIDProMonthly: "price_new"}, subscriptionService: subscriptions}
+	workspaceID := fixture.Workspace.ID
+
+	if err := provider.handleSubscriptionCreated(stripeSubscription(workspaceID, "active", "prod_hosted", 1800000000, false)); err != nil {
+		t.Fatal(err)
+	}
+	steps := []struct {
+		name, status string
+		end          int64
+		cancel       bool
+		want         string
+	}{
+		{"renewal", "active", 1802592000, false, model.SubscriptionStatusActive},
+		{"cancel at period end", "active", 1802592000, true, model.SubscriptionStatusCancelled},
+		{"payment failed", "past_due", 1802592000, false, model.SubscriptionStatusPastDue},
+	}
+	for _, step := range steps {
+		if err := provider.handleSubscriptionUpdated(stripeSubscription(workspaceID, step.status, "prod_hosted", step.end, step.cancel)); err != nil {
+			t.Fatalf("%s: %v", step.name, err)
+		}
+		after, err := subscriptions.Subscription(workspaceID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after.PlanID != model.SubscriptionPlanPro || after.Status != step.want || after.CurrentPeriodEnd == nil || after.CurrentPeriodEnd.Unix() != step.end {
+			t.Fatalf("%s: plan %s, status %s, ends %v", step.name, after.PlanID, after.Status, after.CurrentPeriodEnd)
 		}
 	}
 }

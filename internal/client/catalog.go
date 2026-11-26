@@ -28,7 +28,6 @@ type CatalogEntry struct {
 	Database string `json:"database"`
 	// DatabaseNote says when moin does not back up the app's database.
 	DatabaseNote string `json:"database_note"`
-	Port         int    `json:"port"`
 	Login        string `json:"login"`
 	// NeedsDomain says the install needs --domain.
 	NeedsDomain bool             `json:"needs_domain"`
@@ -50,6 +49,13 @@ type CatalogInstall struct {
 type CatalogDeploy struct {
 	App    App    `json:"app"`
 	Deploy Deploy `json:"deploy"`
+	// Login, only from an install, holds the secrets the first sign-in
+	// needs, such as ADMIN_PASSWORD: the one time they are shown.
+	Login map[string]string `json:"login"`
+	// Password, only from an install, is the app's password, user moin,
+	// which its domains and its instant address ask for: the one time
+	// moin shows it.
+	Password string `json:"password"`
 }
 
 // Catalog lists the catalog with each app's newest release.

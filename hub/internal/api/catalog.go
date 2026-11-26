@@ -40,7 +40,6 @@ type CatalogEntry struct {
 	// DatabaseNote says so for a database moin does not back up; empty
 	// otherwise.
 	DatabaseNote string `json:"database_note"`
-	Port         int    `json:"port"`
 	// Login says how to sign in the first time.
 	Login string `json:"login"`
 	// NeedsDomain says the install needs a domain: moin sets APP_URL from it.
@@ -71,10 +70,15 @@ type AppUpdateRequest struct {
 }
 
 // CatalogDeploy is the answer of an install or an update: the app and
-// its new deploy, which streams like every deploy.
+// its new deploy, which streams like every deploy. Login, only on an
+// install, holds the secrets the first sign-in needs, such as
+// ADMIN_PASSWORD, and Password the app's password, user moin, which every
+// address of it asks for: the one time they are shown.
 type CatalogDeploy struct {
-	App    App    `json:"app"`
-	Deploy Deploy `json:"deploy"`
+	App      App               `json:"app"`
+	Deploy   Deploy            `json:"deploy"`
+	Login    map[string]string `json:"login,omitempty"`
+	Password string            `json:"password,omitempty"`
 }
 
 func newCatalogVersion(version catalog.Version) CatalogVersion {
@@ -91,7 +95,7 @@ func NewCatalogEntry(store *catalog.Store, entry catalog.Entry, withVersions boo
 	out := CatalogEntry{
 		Slug: entry.Slug, Name: entry.Name, Pitch: entry.Pitch, Category: entry.Category,
 		Website: entry.Website, Source: entry.Source, License: entry.License, Image: entry.Image,
-		Database: entry.Database, DatabaseNote: entry.DatabaseNote(), NeedsDomain: entry.NeedsURL(), Port: entry.Port, Login: entry.Login, Secrets: entry.Secrets,
+		Database: entry.Database, DatabaseNote: entry.DatabaseNote(), NeedsDomain: entry.NeedsURL(), Login: entry.Login, Secrets: entry.Secrets,
 	}
 	if out.Secrets == nil {
 		out.Secrets = []string{}
@@ -136,14 +140,14 @@ func (h *CatalogHandler) Install(w http.ResponseWriter, r *http.Request) {
 	if !Decode(w, r, &request) {
 		return
 	}
-	app, deploy, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
+	app, deploy, login, err := h.catalog.Install(r.Context(), actor(r), service.CatalogInstall{
 		Slug: r.PathValue("slug"), Version: request.Version, Server: request.Server, Name: request.Name, Domain: request.Domain,
 	})
 	if err != nil {
 		ServiceError(w, err)
 		return
 	}
-	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy)})
+	JSON(w, http.StatusAccepted, CatalogDeploy{App: NewApp(*app), Deploy: NewDeploy(*deploy), Login: login, Password: app.NewPassword})
 }
 
 // Update sets a catalog app to a version and deploys it.

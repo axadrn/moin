@@ -1,0 +1,6 @@
+services:
+  web:
+    image: actualbudget/actual-server:${VERSION}
+    expose: ["5006"]
+    volumes:
+      - ./data:/data

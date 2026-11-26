@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"regexp"
@@ -12,8 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/protocol"
 )
 
 var (
@@ -21,14 +21,16 @@ var (
 	ErrCatalogVersion = errors.New("this version is not a release of the app: pick one from its list")
 	ErrNotCatalog     = errors.New("this app was not installed from the catalog")
 	ErrCatalogDomain  = errors.New("this app needs a domain: its links and sign-in point to it")
+	ErrCatalogDaemon  = errors.New("the daemon of this server is too old for the catalog: update it")
 	// versionPattern is what an image tag may be.
 	versionPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
 )
 
 // CatalogService installs the apps of the catalog and updates them. An
 // install is an ordinary app: its compose.yml from the catalog goes to
-// the server like a deploy from the CLI, its secrets are env vars, and
-// VERSION picks the image tag.
+// the server like a deploy from the CLI, its secrets are env vars the
+// server makes itself, and VERSION picks the image tag. moin keeps the version in the app too, as
+// env values are write-only.
 type CatalogService struct {
 	store *catalog.Store
 	apps  *AppService
@@ -68,11 +70,7 @@ func (s *CatalogService) CheckUpdates(slug string) {
 		if app.CatalogNotified == latest.Tag {
 			continue
 		}
-		env, err := s.apps.Env(app.WorkspaceID, app.ID)
-		if err != nil {
-			continue
-		}
-		current := env[catalog.VersionVar]
+		current := app.CatalogVersion
 		if current == "" || catalog.Compare(latest.Tag, current) <= 0 {
 			continue
 		}
@@ -103,68 +101,82 @@ type CatalogApp struct {
 	Newer bool
 }
 
-// Install creates the app on a server, gives it its secrets and VERSION,
-// and deploys it.
-func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (*model.App, *model.Deploy, error) {
+// Install creates the app on a server, sets VERSION and deploys it; the
+// server makes the other secrets. login are the values of the secrets the
+// first sign-in needs (Entry.LoginSecrets), which the hub makes for the
+// person who installs: env values are write-only, so this is the one time
+// they are shown.
+func (s *CatalogService) Install(ctx context.Context, actor Actor, input CatalogInstall) (app *model.App, deploy *model.Deploy, login map[string]string, err error) {
 	entry, ok := s.store.Entry(strings.TrimSpace(input.Slug))
 	if !ok {
-		return nil, nil, ErrCatalogApp
+		return nil, nil, nil, ErrCatalogApp
 	}
 	version, err := s.version(entry, input.Version)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	domain := strings.ToLower(strings.TrimSpace(input.Domain))
 	if entry.NeedsURL() && domain == "" {
-		return nil, nil, ErrCatalogDomain
+		return nil, nil, nil, ErrCatalogDomain
 	}
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		name = entry.Slug
 	}
 	if !appNamePattern.MatchString(name) {
-		return nil, nil, ErrAppName
+		return nil, nil, nil, ErrAppName
 	}
 	// Check what would stop the deploy before the app exists.
 	server, err := s.apps.servers.servers.ByIDOrNameForWorkspace(strings.TrimSpace(input.Server), actor.WorkspaceID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if !s.apps.servers.Online(server.ID) {
-		return nil, nil, ErrServerOffline
+		return nil, nil, nil, ErrServerOffline
 	}
-	if _, err := s.apps.apps.DefaultBucket(actor.WorkspaceID); err != nil {
-		return nil, nil, ErrUploadBucket
+	if catalogTooOld(server.DaemonVersion) {
+		return nil, nil, nil, ErrCatalogDaemon
 	}
-	app, err := s.apps.Create(actor, name, server.ID)
+	app, err = s.apps.Create(actor, name, server.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	err = s.apps.apps.SetCatalog(app.ID, entry.Slug)
-	if err != nil {
-		return app, nil, err
+	if err == nil {
+		err = s.apps.apps.SetCatalogVersion(app.ID, version)
 	}
-	app.Catalog = entry.Slug
-	env := map[string]string{catalog.VersionVar: version}
-	for _, name := range entry.Secrets {
-		env[name] = newSecret(name)
+	if err != nil {
+		return app, nil, nil, err
+	}
+	app.Catalog, app.CatalogVersion = entry.Slug, version
+	// The server makes the secrets itself when it deploys, so the hub never
+	// sees them. The password to log in with is the one the hub makes: it
+	// shows it once.
+	env := map[string]string{catalogfiles.VersionVar: version}
+	login = map[string]string{}
+	for _, name := range entry.LoginSecrets() {
+		login[name] = catalogfiles.NewSecret(name)
+		env[name] = login[name]
 	}
 	if entry.NeedsURL() {
-		env[catalog.URLVar] = "https://" + domain
-		env[catalog.DomainVar] = domain
+		env[catalogfiles.URLVar] = "https://" + domain
+		env[catalogfiles.DomainVar] = domain
 	}
-	_, err = s.apps.SetEnv(actor, app.ID, env, nil)
+	_, err = s.apps.SetEnv(ctx, actor, app.ID, env, nil)
 	if err != nil {
-		return app, nil, err
+		return app, nil, nil, err
 	}
 	if domain != "" {
 		_, err = s.apps.SetDomains(actor, app.ID, "", []string{domain}, "")
 		if err != nil {
-			return app, nil, err
+			return app, nil, nil, err
 		}
 	}
-	deploy, err := s.deploy(ctx, actor, "app.installed", app, entry, version)
-	return app, deploy, err
+	deploy, err = s.deploy(ctx, actor, "app.installed", app, entry, version)
+	if err != nil {
+		return app, nil, nil, err
+	}
+	return app, deploy, login, nil
 }
 
 // Update sets the app to version, the newest release when empty, and
@@ -186,22 +198,17 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 	if err != nil {
 		return app, nil, err
 	}
-	current, err := s.apps.Env(actor.WorkspaceID, app.ID)
-	if err != nil {
-		return app, nil, err
-	}
-	env := map[string]string{catalog.VersionVar: version}
-	// A newer compose.yml may ask for a secret the app does not have yet.
-	for _, name := range entry.Secrets {
-		if current[name] == "" {
-			env[name] = newSecret(name)
+	// A newer compose.yml may ask for a secret the app does not have yet:
+	// the server makes it when it deploys.
+	if app.CatalogVersion != version {
+		_, err = s.apps.SetEnv(ctx, actor, app.ID, map[string]string{catalogfiles.VersionVar: version}, nil)
+		if err == nil {
+			err = s.apps.apps.SetCatalogVersion(app.ID, version)
 		}
-	}
-	if current[catalog.VersionVar] != version || len(env) > 1 {
-		_, err = s.apps.SetEnv(actor, app.ID, env, nil)
 		if err != nil {
 			return app, nil, err
 		}
+		app.CatalogVersion = version
 	}
 	deploy, err := s.deploy(ctx, actor, "app.updated", app, entry, version)
 	if err == nil {
@@ -213,12 +220,36 @@ func (s *CatalogService) Update(ctx context.Context, actor Actor, idOrName, vers
 // deploy sends the entry's compose.yml to the app's server and records
 // action with the version.
 func (s *CatalogService) deploy(ctx context.Context, actor Actor, action string, app *model.App, entry catalog.Entry, version string) (*model.Deploy, error) {
-	deploy, err := s.apps.DeployFiles(ctx, actor, "", app.ID, map[string][]byte{"compose.yml": entry.Compose})
+	// As it is now, with the env and domains the install just gave it.
+	app, err := s.apps.ready(actor.WorkspaceID, app.ID)
+	if err != nil {
+		return nil, err
+	}
+	server, err := s.apps.servers.Get(actor.WorkspaceID, app.ServerID)
+	if err != nil {
+		return nil, err
+	}
+	if catalogTooOld(server.DaemonVersion) {
+		return nil, ErrCatalogDaemon
+	}
+	// The hub names the app; the daemon takes its compose file from the
+	// catalog of its own signed release.
+	deploy := s.apps.newDeploy(app)
+	deploy.SourceKey = "server"
+	deploy, err = s.apps.start(actor, "", app, deploy, protocol.DeployStart{Catalog: entry.Slug})
 	if err != nil {
 		return nil, err
 	}
 	s.apps.servers.record(actor, action, "app", app.Name, map[string]string{"catalog": entry.Name, "version": version, "number": strconv.Itoa(deploy.Number)})
 	return deploy, nil
+}
+
+// catalogDaemon is the first daemon with the catalog built in. A daemon
+// built from a commit, not a release, is taken to have it.
+const catalogDaemon = "v1.0.0-beta.35"
+
+func catalogTooOld(daemon string) bool {
+	return build.IsRelease(daemon) && build.NewerVersion(catalogDaemon, daemon)
 }
 
 // version is the release to run: wanted, or the newest when empty. Before
@@ -249,7 +280,7 @@ func (s *CatalogService) version(entry catalog.Entry, wanted string) (string, er
 
 // Info says what the catalog knows of app; ok is false for an app of your
 // own.
-func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, bool) {
+func (s *CatalogService) Info(app *model.App) (CatalogApp, bool) {
 	if app.Catalog == "" {
 		return CatalogApp{}, false
 	}
@@ -257,30 +288,10 @@ func (s *CatalogService) Info(workspaceID string, app *model.App) (CatalogApp, b
 	if !ok {
 		return CatalogApp{}, false
 	}
-	info := CatalogApp{Entry: entry}
-	env, err := s.apps.Env(workspaceID, app.ID)
-	if err == nil {
-		info.Version = env[catalog.VersionVar]
-	}
+	info := CatalogApp{Entry: entry, Version: app.CatalogVersion}
 	if latest, ok := s.store.Latest(entry.Slug); ok {
 		info.Latest = latest
 		info.Newer = info.Version != "" && catalog.Compare(latest.Tag, info.Version) > 0
 	}
 	return info, true
-}
-
-// newSecret is 32 random bytes as URL-safe text: fine in a database URL,
-// a header or YAML. Some apps want a key in hex: a name that ends in _HEX
-// gets 32 bytes as 64 hex digits, one that ends in _HEX16 16 bytes as 32.
-func newSecret(name string) string {
-	size, encode := 32, base64.RawURLEncoding.EncodeToString
-	switch {
-	case strings.HasSuffix(name, "_HEX16"):
-		size, encode = 16, hex.EncodeToString
-	case strings.HasSuffix(name, "_HEX"):
-		encode = hex.EncodeToString
-	}
-	buffer := make([]byte, size)
-	_, _ = rand.Read(buffer)
-	return encode(buffer)
 }

@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
@@ -89,7 +90,7 @@ templ ServerSecurity(view SecurityView) {
 templ securityState(view SecurityView, securityPath string) {
 	{{ server := view.Server }}
 	{{ report := service.SecurityReport(server) }}
-	{{ tailscale := view.Integrations.Tailscale || (report != nil && report.TailscaleIP != "") }}
+	{{ tailscale := slices.ContainsFunc(view.Integrations.Tailscale.On, func(on service.SecretOn) bool { return on.Server == server.Name }) || (report != nil && report.TailscaleIP != "") }}
 	{{ web, ssh, firewall := webLine(server, report), sshLine(server, report), firewallLine(server, report) }}
 	<div id="security-state" hx-get={ securityPath } hx-trigger="servers from:body" hx-select="#security-state" hx-swap="outerHTML">
 		@components.Card(components.CardProps{}) {
@@ -100,7 +101,7 @@ templ securityState(view SecurityView, securityPath string) {
 					{Value: "off", Label: "Open", Attrs: templ.Attributes{"id": "security-tunnel-off"}},
 					{Value: "on", Label: "Cloudflare Tunnel", Attrs: templ.Attributes{"id": "security-tunnel-on", "disabled": !view.Integrations.Cloudflare && !server.Tunnel}},
 				})
-				@securityChoice(securityPath, "ssh", ssh, server.SSH, ifElse(tailscale, "", "Connect Tailscale"),
+				@securityChoice(securityPath, "ssh", ssh, server.SSH, ifElse(tailscale, "", "Add a Tailscale key"),
 					"Change who reaches SSH on "+server.Name+"? Keep another way in, like your provider's console.", []components.Option{
 						{Value: protocol.SSHEveryone, Label: "Everyone", Attrs: templ.Attributes{"id": "security-ssh-everyone"}},
 						{Value: protocol.SSHTailscale, Label: "Only through Tailscale", Attrs: templ.Attributes{"id": "security-ssh-tailscale", "disabled": !tailscale && server.SSH != protocol.SSHTailscale}},
@@ -274,7 +275,7 @@ templ serverRules(server model.Server) {
 						@components.Item(components.ItemProps{}) {
 							<div class="moin-fill">
 								<div class="moin-strong">None</div>
-								<div class="moin-small moin-muted">moin may do everything here. Write <code class="moin-mono moin-foreground">/etc/moin/rules</code> on the server to limit it.</div>
+								<div class="moin-small moin-muted">moin may do everything here. Edit <code class="moin-mono moin-foreground">/etc/moin/rules</code> on the server to limit it.</div>
 							</div>
 						}
 					}

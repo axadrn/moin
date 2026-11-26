@@ -17,21 +17,28 @@ import (
 
 // Every app lives in <state dir>/apps/<app>:
 //
+//	app.env                    the app's env, the values as they are now, 0600
 //	releases/<n>/src           the source of deploy n
-//	releases/<n>/compose.json  the resolved compose project moin runs, 0600
+//	releases/<n>/compose.json  the compose project moin runs, 0600
+//	releases/<n>/.env          a copy of the source's .env, when it has one
+//	releases/<n>/htpasswd      the app's password, when it has one, 0600
 //	releases/<n>/kind          build, apply or failed, for prune
 //	current                    the number of the running release
 //	volumes/                   bind mounts that are not part of the repo
 //
 // compose.json is the user's compose.yml after `docker compose config`, with
-// image tags per release, the env and the data mounts filled in. Starting an
-// old compose.json again is a rollback: same images, same env.
+// each ${VAR} kept, image tags per release and the data mounts filled in;
+// the services that get the env read app.env. Every compose command on it
+// reads .env and app.env (composeArgs), so Docker fills in ${VAR} when it
+// starts the containers, and no file but app.env holds a value of the env.
+// Starting an old compose.json again is a rollback: same images, the env
+// as it is now.
 const (
 	maxSourceSize = 200 << 20
-	waitTimeout   = 120 * time.Second
-	// healthTimeout is as long as compose waits: a JVM app such as Metabase
-	// takes a minute or more to answer on its first start.
-	healthTimeout = 120 * time.Second
+	// waitTimeout is how long compose waits for the services to run and be
+	// healthy: a JVM app with a healthcheck takes a minute or more on its
+	// first start.
+	waitTimeout = 120 * time.Second
 )
 
 var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
@@ -44,6 +51,11 @@ type apps struct {
 	backups *backups
 	// proxyMode is "direct" or "tunnel", from the server config.
 	proxyMode func() string
+	// registryLogin is the server's login for a registry host, as
+	// <username>:<password>, "" for none.
+	registryLogin func(host string) string
+	// envMu keeps the changes of env files in a row.
+	envMu sync.Mutex
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex
@@ -70,6 +82,10 @@ func (a *apps) lock(app string) func() {
 }
 
 func (a *apps) appDir(app string) string { return filepath.Join(a.dir, app) }
+
+// tempDir is the daemon's own folder for copies and checks, which no app
+// mounts: an app name never starts with a dot.
+func (a *apps) tempDir() string { return filepath.Join(a.dir, ".tmp") }
 
 func (a *apps) releaseDir(app string, number int) string {
 	return filepath.Join(a.appDir(app), "releases", strconv.Itoa(number))
@@ -169,11 +185,10 @@ func (a *apps) remove(ctx context.Context, app string) error {
 		return errors.New("invalid app name")
 	}
 	defer a.lock(app)()
-	args := []string{"compose", "-p", a.projectOf(app)}
-	if current := a.current(app); current > 0 {
-		args = append(args, "-f", filepath.Join(a.releaseDir(app, current), "compose.json"))
-	}
-	_, err := a.output(ctx, "docker", append(args, "down", "--rmi", "all", "--remove-orphans")...)
+	// By the project's name only: compose finds the containers, networks
+	// and images by their labels and reads no compose file, so a ${VAR}
+	// the env no longer has cannot stop the removal.
+	_, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "down", "--rmi", "all", "--remove-orphans")
 	if err != nil {
 		return err
 	}
@@ -182,6 +197,8 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
 	// Its containers are gone; volumes.json stays with the volumes.
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
+	// Its env goes with it: nothing runs that reads it.
+	_ = os.Remove(a.envFile(app))
 	return nil
 }
 
@@ -210,12 +227,12 @@ func (a *apps) stop(ctx context.Context, app string) error {
 	if current == 0 {
 		return errors.New("the app has no release on this server")
 	}
-	_, err := a.output(ctx, "docker", "compose", "-p", a.projectOf(app), "-f", filepath.Join(a.releaseDir(app, current), "compose.json"), "stop")
+	_, err := a.output(ctx, "docker", a.composeArgs(app, a.composeJSON(app), "stop")...)
 	return err
 }
 
-// composeFile is the compose file of the app's live deploy.
-func (a *apps) composeFile(app string) string {
+// composeJSON is the compose.json moin runs for the app's live deploy.
+func (a *apps) composeJSON(app string) string {
 	return filepath.Join(a.releaseDir(app, a.current(app)), "compose.json")
 }
 
