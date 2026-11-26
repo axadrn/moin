@@ -16,13 +16,42 @@ import (
 )
 
 // githubStateCookie holds the state of a trip to GitHub, so only this
-// browser can finish it. For "Connect GitHub" in the settings it also
-// names the user the GitHub account is for.
+// browser can finish it, and the githubTrip.
 const githubStateCookie = "oauth_state"
+
+// githubTrip is what a trip to GitHub is for. Empty is a sign-in. With
+// userID alone it connects the GitHub account to that user ("Connect
+// GitHub" in the settings); with next too it confirms it is them and goes
+// back there (ConfirmWithGitHub).
+type githubTrip struct {
+	userID string
+	next   string
+}
+
+// cookie is the value of the state cookie: the state, the user and, to
+// confirm, the way back, by dots. Neither the ID nor base64 has a dot.
+func (t githubTrip) cookie(state string) string {
+	value := state + "." + t.userID
+	if t.next != "" {
+		value += "." + base64.RawURLEncoding.EncodeToString([]byte(t.next))
+	}
+	return value
+}
+
+// readGitHubTrip is the state and the trip of a state cookie.
+func readGitHubTrip(value string) (string, githubTrip) {
+	state, rest, _ := strings.Cut(value, ".")
+	userID, next, _ := strings.Cut(rest, ".")
+	raw, err := base64.RawURLEncoding.DecodeString(next)
+	if err != nil {
+		return state, githubTrip{userID: userID}
+	}
+	return state, githubTrip{userID: userID, next: string(raw)}
+}
 
 // GitHubAuth sends a guest to GitHub to sign in.
 func (h *authHandler) GitHubAuth(w http.ResponseWriter, r *http.Request) {
-	h.startGitHub(w, r, "", http.StatusTemporaryRedirect)
+	h.startGitHub(w, r, githubTrip{}, http.StatusTemporaryRedirect)
 }
 
 // ConnectGitHub sends a signed-in user without a GitHub account to GitHub,
@@ -34,12 +63,12 @@ func (h *authHandler) ConnectGitHub(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, "/app", http.StatusSeeOther)
 		return
 	}
-	h.startGitHub(w, r, user.ID, http.StatusSeeOther)
+	h.startGitHub(w, r, githubTrip{userID: user.ID}, http.StatusSeeOther)
 }
 
 // startGitHub redirects to GitHub with status: a 303 after a POST, so the
 // browser goes there with a GET.
-func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID string, status int) {
+func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, trip githubTrip, status int) {
 	if !h.githubApp.SignsIn() {
 		redirect(w, r, "/auth", http.StatusSeeOther)
 		return
@@ -51,7 +80,7 @@ func (h *authHandler) startGitHub(w http.ResponseWriter, r *http.Request, userID
 	state := base64.RawURLEncoding.EncodeToString(random)
 	http.SetCookie(w, &http.Cookie{
 		Name:     githubStateCookie,
-		Value:    state + "." + userID,
+		Value:    trip.cookie(state),
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   h.cfg.IsProduction(),
@@ -67,14 +96,16 @@ func (h *authHandler) githubCallbackURL() string {
 	return strings.TrimRight(h.cfg.AppURL, "/") + "/auth/github/callback"
 }
 
-// GitHubCallback takes people back from GitHub: it signs them in, or
-// connects the GitHub account to the signed-in user who asked for it.
+// GitHubCallback takes people back from GitHub: it signs them in,
+// connects the GitHub account to the signed-in user who asked for it, or
+// confirms it is them.
 func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 	cookie, err := r.Cookie(githubStateCookie)
-	var expected, userID string
+	var expected string
+	var trip githubTrip
 	if err == nil {
-		expected, userID, _ = strings.Cut(cookie.Value, ".")
+		expected, trip = readGitHubTrip(cookie.Value)
 	}
 	if !h.githubApp.SignsIn() || state == "" || expected != state {
 		slog.Warn("github sign-in state does not match", "error", err)
@@ -95,8 +126,12 @@ func (h *authHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.AuthGitHubFailed("GitHub did not sign you in. Please try again."))
 		return
 	}
-	if userID != "" {
-		h.connectGitHub(w, r, userID, account)
+	if trip.next != "" {
+		h.confirmGitHub(w, r, trip, account)
+		return
+	}
+	if trip.userID != "" {
+		h.connectGitHub(w, r, trip.userID, account)
 		return
 	}
 
@@ -156,6 +191,28 @@ func (h *authHandler) connectGitHub(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 	redirect(w, r, members[0].Path()+"/settings/account?tab=security", http.StatusSeeOther)
+}
+
+// confirmGitHub notes that the signed-in user who asked for it confirmed
+// it is them with their own GitHub account, and goes back. The session
+// stays, and so do the others.
+func (h *authHandler) confirmGitHub(w http.ResponseWriter, r *http.Request, trip githubTrip, account service.GitHubAccount) {
+	user := ctxkeys.User(r.Context())
+	if user == nil || user.ID != trip.userID {
+		render(w, r, pages.AuthGitHubFailed("This GitHub sign-in is no longer valid. Please try again."))
+		return
+	}
+	err := h.authService.ConfirmWithGitHub(ctxkeys.Session(r.Context()), account)
+	if errors.Is(err, service.ErrGitHubOtherAccount) {
+		w.WriteHeader(http.StatusForbidden)
+		render(w, r, pages.ErrorPage(http.StatusForbidden, "Not confirmed", "This is not the GitHub account you sign in with. Sign in to GitHub with yours and try again."))
+		return
+	}
+	if err != nil {
+		renderError(w, "confirm with github failed", err)
+		return
+	}
+	redirect(w, r, localPath(trip.next), http.StatusSeeOther)
 }
 
 // pendingInvitation is the token of the invitation this browser opened

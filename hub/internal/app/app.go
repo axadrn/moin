@@ -151,7 +151,7 @@ func New(cfg *config.Config) (*App, error) {
 		fileService,
 		email, workspaceService,
 	)
-	passkeys := newPasskeys(cfg, users, email, repository.NewPasskeys(database))
+	passkeys := newPasskeys(cfg, users, sessions, email, repository.NewPasskeys(database))
 	connectionService := service.NewConnectionService(repository.NewConnections(database), workspaceService)
 	ciTokenService := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, history), workspaceService)
 	auth.UseBearers(connectionService, ciTokenService)
@@ -266,11 +266,11 @@ func New(cfg *config.Config) (*App, error) {
 // APP_URL. Browsers make passkeys only over HTTPS or on localhost, and
 // go-webauthn takes only a host it can use as the relying party. Else
 // passkeys are off: the hub starts and says why once.
-func newPasskeys(cfg *config.Config, users *repository.Users, email *service.EmailService, passkeys *repository.Passkeys) *service.PasskeyService {
+func newPasskeys(cfg *config.Config, users *repository.Users, sessions *repository.Sessions, email *service.EmailService, passkeys *repository.Passkeys) *service.PasskeyService {
 	appURL, err := url.Parse(cfg.AppURL)
 	if err != nil || (appURL.Scheme != "https" && appURL.Hostname() != "localhost") {
 		slog.Warn("passkeys are off: APP_URL is not https or localhost", "app_url", cfg.AppURL)
-		return service.NewPasskeyService(passkeys, users, email, nil)
+		return service.NewPasskeyService(passkeys, users, sessions, email, nil)
 	}
 	ceremony := webauthn.TimeoutConfig{Enforce: true, Timeout: service.PasskeyCeremonyExpiry, TimeoutUVD: service.PasskeyCeremonyExpiry}
 	webAuthn, err := webauthn.New(&webauthn.Config{
@@ -287,9 +287,9 @@ func newPasskeys(cfg *config.Config, users *repository.Users, email *service.Ema
 	})
 	if err != nil {
 		slog.Warn("passkeys are off: "+err.Error(), "app_url", cfg.AppURL)
-		return service.NewPasskeyService(passkeys, users, email, nil)
+		return service.NewPasskeyService(passkeys, users, sessions, email, nil)
 	}
-	return service.NewPasskeyService(passkeys, users, email, webAuthn)
+	return service.NewPasskeyService(passkeys, users, sessions, email, webAuthn)
 }
 
 // relyingPartyName is what a password manager calls the hub's passkeys:

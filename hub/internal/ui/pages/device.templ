@@ -32,10 +32,12 @@ type Approval struct {
 	WorkspaceError string
 	// Rights are the switches as they are, the default ones at first.
 	Rights model.Rights
-	// Passkey: Allow asks for the passkey. Without one, Fresh says the
-	// sign-in is new enough to allow; else Allow signs in again first.
-	Passkey bool
-	Fresh   bool
+	// Passkey: Allow asks for the passkey. Without one, Confirmed says the
+	// person confirmed it is them in the last five minutes; else the page
+	// asks them to, in place, and comes back to Next.
+	Passkey   bool
+	Confirmed bool
+	Next      string
 	// Passkeys says this hub offers passkeys, to suggest one.
 	Passkeys bool
 	// AllowError says why Allow did not work.
@@ -97,6 +99,7 @@ templ Device(view DeviceView) {
 				}
 				@approvalFields("/device", view.Approval)
 			</form>
+			@approvalConfirm(view.Approval)
 			if view.Passkey {
 				@passkeyScript()
 			}
@@ -106,7 +109,8 @@ templ Device(view DeviceView) {
 
 // approvalFields are the part of the approval page that is the same for
 // `moin login` and an AI agent: who, the workspace, the rights, and Allow
-// and Cancel, which post to base and the paths under it.
+// and Cancel, which post to base and the paths under it. The page puts
+// approvalConfirm after its form.
 templ approvalFields(base string, view Approval) {
 	@components.Card(components.CardProps{}) {
 		@components.List() {
@@ -137,21 +141,28 @@ templ approvalFields(base string, view Approval) {
 			@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"type": "button", "data-passkey": "confirm", "data-passkey-url": base + "/passkey"}}) {
 				Allow with passkey
 			}
-		case view.Fresh:
+		case view.Confirmed:
 			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 				Allow
 			}
 		default:
-			@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"formaction": base + "/reauth", "formnovalidate": true}}) {
-				Sign in again to allow
+			@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: components.OpenDialog(confirmDialogID)}) {
+				Confirm it's you
 			}
-			<p class="moin-small moin-muted moin-center">Allow needs a sign-in from the last five minutes. Any way in counts.</p>
 	}
 	if !view.Passkey && view.Passkeys {
 		<p class="moin-small moin-muted moin-center">Add a passkey to approve faster.</p>
 	}
 	@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"formaction": base + "/deny", "formnovalidate": true}}) {
 		Cancel
+	}
+}
+
+// approvalConfirm asks to confirm it is them, when Allow needs it. It sits
+// after the form of the page: a form never holds another.
+templ approvalConfirm(view Approval) {
+	if !view.Passkey && !view.Confirmed {
+		@ConfirmDialog("To allow this, confirm it's you.", view.Next)
 	}
 }
 

@@ -20,7 +20,7 @@ func TestPasskeysFollowAppURL(t *testing.T) {
 		"https://127.0.0.1":       false,
 		"https://127.1":           false,
 	} {
-		if got := newPasskeys(&config.Config{AppURL: appURL}, nil, nil, nil).On(); got != on {
+		if got := newPasskeys(&config.Config{AppURL: appURL}, nil, nil, nil, nil).On(); got != on {
 			t.Errorf("APP_URL %s: passkeys on = %v, want %v", appURL, got, on)
 		}
 	}

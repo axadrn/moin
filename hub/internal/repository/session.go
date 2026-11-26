@@ -31,14 +31,15 @@ func (r *Sessions) Create(session *model.Session) error {
 		session.ExpiresAt,
 		session.LastSeenAt,
 		session.CreatedAt,
+		session.ConfirmedAt,
 	)
 	return err
 }
 
 const insertSessionQuery = `
 		INSERT INTO sessions (
-			id, user_id, impersonator_user_id, token_hash, user_agent, expires_at, last_seen_at, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			id, user_id, impersonator_user_id, token_hash, user_agent, expires_at, last_seen_at, created_at, confirmed_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 func (r *Sessions) ReplaceAllForUser(session *model.Session) error {
@@ -63,10 +64,24 @@ func (r *Sessions) ReplaceAllForUser(session *model.Session) error {
 		session.ExpiresAt,
 		session.LastSeenAt,
 		session.CreatedAt,
+		session.ConfirmedAt,
 	); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// Confirm notes that the person of the session confirmed it is them at
+// at. A session that ended is ErrSessionNotFound.
+func (r *Sessions) Confirm(id string, at time.Time) error {
+	result, err := r.db.Exec(`UPDATE sessions SET confirmed_at = $1 WHERE id = $2`, at, id)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
 }
 
 func (r *Sessions) ByTokenHash(tokenHash string) (*model.Session, error) {

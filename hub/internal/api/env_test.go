@@ -95,7 +95,7 @@ func newAPIEnvironment(t *testing.T) *apiEnvironment {
 	environment.ciTokens = service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), environment.workspaces)
 	tokenAuth := middleware.BearerAuth(environment.connections, environment.ciTokens, environment.users)
 	environment.auth.UseBearers(environment.connections, environment.ciTokens)
-	environment.passkeys = service.NewPasskeyService(repository.NewPasskeys(database), userRepository, email, nil)
+	environment.passkeys = service.NewPasskeyService(repository.NewPasskeys(database), userRepository, repository.NewSessions(database), email, nil)
 	environment.devices = service.NewDeviceLoginService(repository.NewDeviceLogins(database), environment.connections, environment.passkeys)
 	environment.oauth = service.NewOAuthService(repository.NewOAuth(database), environment.connections, environment.passkeys, "https://app.example.com")
 	environment.admin = service.NewAdminService(repository.NewAdmin(database), userRepository, environment.auth, []string{testAdminEmail})
