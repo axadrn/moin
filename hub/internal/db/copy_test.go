@@ -71,3 +71,35 @@ func TestCopyBeforeMigrations(t *testing.T) {
 		t.Fatalf("current database: path %q, error %v; want no copy", path, err)
 	}
 }
+
+// TestCopyInto copies a database while the hub holds it open, with its
+// settings, and never writes it.
+func TestCopyInto(t *testing.T) {
+	dir := t.TempDir()
+	connection := filepath.Join(dir, "app.db") + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	database, err := Init(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if _, err := database.Exec(`CREATE TABLE users (id TEXT PRIMARY KEY); INSERT INTO users (id) VALUES ('u1')`); err != nil {
+		t.Fatal(err)
+	}
+	into := t.TempDir()
+	copyConnection, err := CopyInto(connection, into)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(into, "app.db") + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"; copyConnection != want {
+		t.Fatalf("connection = %q, want %q", copyConnection, want)
+	}
+	copied, err := Init(copyConnection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer copied.Close()
+	var id string
+	if err := copied.Get(&id, `SELECT id FROM users`); err != nil || id != "u1" {
+		t.Fatalf("copied user = %q, %v", id, err)
+	}
+}

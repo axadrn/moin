@@ -106,3 +106,24 @@ func pruneCopies(dir string) {
 		}
 	}
 }
+
+// CopyInto copies the database of connection into dir with VACUUM INTO,
+// which works while the running hub writes. It opens the database
+// read-only, so it never writes it. It returns the connection of the copy,
+// with the same settings.
+func CopyInto(connection, dir string) (string, error) {
+	file, settings, _ := strings.Cut(strings.TrimPrefix(connection, "file:"), "?")
+	path := filepath.Join(dir, filepath.Base(file))
+	source, err := sql.Open(databaseDriver, "file:"+file+"?mode=ro&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return "", err
+	}
+	defer source.Close()
+	if _, err := source.Exec(`VACUUM INTO ?`, path); err != nil {
+		return "", fmt.Errorf("copy %s: %w", file, err)
+	}
+	if settings != "" {
+		path += "?" + settings
+	}
+	return path, nil
+}
