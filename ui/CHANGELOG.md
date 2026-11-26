@@ -14,6 +14,7 @@ of the moin release it ships with.
 - **Themes**: A theme editor with light and dark, and twelve well-known dev themes.
 - **Tabs with an icon and a dot**: A tab can start with an icon, and `data-live` puts a green dot after it: the one in use.
 - **A folder icon**: `moin-icon-folder`.
+- **An X icon**: `moin-icon-x-logo`, the logo of X.
 - **A hint in an item**: `moin-item-hint` puts a sentence under an item's words that wraps.
 - **A pick opens its part**: In a list, `data-picked` after a pick item shows only while that one is picked, with no script.
 - **Stacks**: A page for each well-known stack, from Go and Rails to React and Astro: where the folder goes, how to link it, a list with real data.
