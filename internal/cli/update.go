@@ -83,7 +83,7 @@ func update(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	if flags.NArg() != 1 {
-		return flags.wrong()
+		return fmt.Errorf("%w. A self-hosted hub updates on its server: `sh /opt/moin/update.sh`", flags.wrong())
 	}
 	return updateApp(ctx, flags.Arg(0), *appVersion, stdout)
 }

@@ -30,6 +30,14 @@ func TestVersionShowsTheHubBackupToItsAdmins(t *testing.T) {
 	}
 }
 
+// update without an app says how a self-hosted hub updates.
+func TestUpdateWithoutAppSaysHowTheHubUpdates(t *testing.T) {
+	code, _, stderr := runCLI(t, &fakeAPI{}, "update")
+	if code == 0 || !strings.Contains(stderr, "update <app>") || !strings.Contains(stderr, "sh /opt/moin/update.sh") {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+}
+
 func TestDaemonAutoUpdate(t *testing.T) {
 	api := &fakeAPI{answers: map[string]string{
 		"GET /api/v1/daemon-updates": `{"auto":true}`,
