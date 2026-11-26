@@ -29,6 +29,7 @@ The most urgent first:
 
 - **A server offline**: its daemon stopped answering.
 - **A failed deploy**, with the version that still runs.
+- **A missing registry login**: the app's server has none for the registry of its image, so its next deploy stops ([Registry logins](/docs/guides/ci#registry-logins)).
 - **Backups that stopped**, and **a daily check that failed** ([Backups](/docs/guides/backups)).
 - **A domain down** ([Uptime](/docs/guides/uptime)).
 - **A disk over 90%** on a server ([Metrics](/docs/guides/metrics)).

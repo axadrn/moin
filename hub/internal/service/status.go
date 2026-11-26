@@ -13,16 +13,17 @@ import (
 
 // The kinds of trouble the overview shows, most urgent first.
 const (
-	IssueServerDown   = "server.down"
-	IssueDeployFailed = "deploy.failed"
-	IssueBackupFailed = "backup.failed"
-	IssueCheckFailed  = "check.failed"
-	IssueDomainDown   = "domain.down"
-	IssueDiskFull     = "disk.full"
-	IssueDaemonBehind = "daemon.behind"
+	IssueServerDown      = "server.down"
+	IssueDeployFailed    = "deploy.failed"
+	IssueRegistryMissing = "registry.missing"
+	IssueBackupFailed    = "backup.failed"
+	IssueCheckFailed     = "check.failed"
+	IssueDomainDown      = "domain.down"
+	IssueDiskFull        = "disk.full"
+	IssueDaemonBehind    = "daemon.behind"
 )
 
-var issueOrder = map[string]int{IssueServerDown: 0, IssueDeployFailed: 1, IssueBackupFailed: 2, IssueCheckFailed: 3, IssueDomainDown: 4, IssueDiskFull: 5, IssueDaemonBehind: 6}
+var issueOrder = map[string]int{IssueServerDown: 0, IssueDeployFailed: 1, IssueRegistryMissing: 2, IssueBackupFailed: 3, IssueCheckFailed: 4, IssueDomainDown: 5, IssueDiskFull: 6, IssueDaemonBehind: 7}
 
 // StatusIssue is one thing that needs you: what kind, on what, in words,
 // and where to fix it, as a path under the workspace.
@@ -100,6 +101,14 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDaemonBehind, Target: server.Name, Detail: "daemon " + server.DaemonVersion + ", update pending", Path: "/servers"})
 		}
 	}
+	registries, err := s.apps.apps.Registries(workspaceID)
+	if err != nil {
+		return status, err
+	}
+	secrets, err := s.servers.secretsIndex(workspaceID)
+	if err != nil {
+		return status, err
+	}
 	status.Apps = len(apps)
 	day := s.now().Add(-24 * time.Hour)
 	for _, app := range apps {
@@ -109,6 +118,13 @@ func (s *StatusService) Status(workspaceID string) (WorkspaceStatus, error) {
 		}
 		if app.LatestStatus == model.DeployFailed {
 			status.Issues = append(status.Issues, StatusIssue{Kind: IssueDeployFailed, Target: app.Name, Detail: deployFailedDetail(app), Path: path})
+		}
+		// The next deploy of the image that runs is refused while the
+		// server has no login for its registry (checkRegistry).
+		if app.LiveImage != "" {
+			if host := missingRegistryLogin(app.LiveImage, app.ServerID, registries, secrets); host != "" {
+				status.Issues = append(status.Issues, StatusIssue{Kind: IssueRegistryMissing, Target: app.Name, Detail: "deploys stopped: the server has no login for " + host + ": enter it under Registries", Path: "/registries"})
+			}
 		}
 		backups, err := s.apps.apps.BackupStatus(app.ID)
 		if err == nil {

@@ -280,6 +280,8 @@ templ overviewIssueIcon(kind string) {
 			@components.Icon("server-off")
 		case service.IssueDeployFailed:
 			@components.Icon("failed")
+		case service.IssueRegistryMissing:
+			@components.Icon("key")
 		case service.IssueBackupFailed, service.IssueCheckFailed:
 			@components.Icon("shield-off")
 		case service.IssueDomainDown:
