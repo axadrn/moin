@@ -293,3 +293,101 @@ func TestBuildAgainDropsTheSecretsHash(t *testing.T) {
 		t.Errorf("build = %v", service["build"])
 	}
 }
+
+// beta34Server copies testdata/beta34, the apps folder beta.34 left
+// behind, to a new state folder, with its paths, and moves the env as the
+// daemon does when it starts.
+func beta34Server(t *testing.T) *apps {
+	t.Helper()
+	dir := t.TempDir()
+	err := filepath.WalkDir("testdata/beta34", func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dir, strings.TrimPrefix(path, "testdata/beta34"))
+		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+			return err
+		}
+		return os.WriteFile(target, []byte(strings.ReplaceAll(string(body), "/var/lib/moin/", dir+"/")), 0o600)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(dir, nil)
+	a.moveOldEnvs()
+	return a
+}
+
+// TestComposeFileOfABeta34Restart: beta.34 wrote the values into
+// base.json, and a restart takes its compose file from there, so the
+// Postgres password of miniflux is in it. That file stays on the server.
+func TestComposeFileOfABeta34Restart(t *testing.T) {
+	a := beta34Server(t)
+	// Postgres's data, which the release mounts.
+	if err := os.MkdirAll(filepath.Join(a.appDir("feeds"), "volumes", "data", "postgres"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	release, err := a.newRelease(protocol.DeployStart{App: "feeds", Name: "feeds", Number: 3}, nil, func(string, ...any) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.prepareRelease(t.Context(), release); err != nil {
+		t.Fatal(err)
+	}
+	saveJSON(filepath.Join(release.dir, "detected.json"), release.detected)
+	text, err := a.composeFile("feeds", 3)
+	if err == nil || !strings.Contains(err.Error(), "it holds the value of DB_PASSWORD") || text != "" {
+		t.Fatalf("the compose file of a restart from beta.34: %v\n%s", err, text)
+	}
+	if strings.Contains(err.Error(), "db-password-value") {
+		t.Errorf("the error shows the value: %v", err)
+	}
+}
+
+// TestComposeFileHoldsNoSecret: a compose file that holds a value of the
+// app's env, or its password hash, is not made. A value where the deploy
+// fills it in on purpose, such as the version in the image or a domain in
+// the proxy's labels, is fine, and so is a short one.
+func TestComposeFileHoldsNoSecret(t *testing.T) {
+	hash := "$2y$05$" + strings.Repeat("h", 53)
+	for _, test := range []struct {
+		name, url string
+		password  bool
+		held      string
+	}{
+		{"names", "postgres://u:${DB_PASSWORD}@db/x", true, ""},
+		{"value", "postgres://u:s3cret$value@db/x", false, "the value of DB_PASSWORD"},
+		{"value as compose writes it", "postgres://u:s3cret$$value@db/x", false, "the value of DB_PASSWORD"},
+		{"hash", "postgres://u:${DB_PASSWORD}@db/x?h=$$2y$$05$$" + strings.Repeat("h", 53), true, "the hash of the app's password"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			a := newApps(t.TempDir(), nil)
+			env := map[string]string{"DB_PASSWORD": "s3cret$value", "VERSION": "2026.10.3", "DOMAIN": "my-app.example.com", "DEBUG": "true"}
+			if _, err := a.setEnv(protocol.EnvSet{App: "my-app", Set: env}); err != nil {
+				t.Fatal(err)
+			}
+			config := map[string]any{"services": map[string]any{"web": map[string]any{
+				"image":       "ghcr.io/me/my-app:2026.10.3",
+				"environment": map[string]any{"DATABASE_URL": test.url, "LOG": "true"},
+			}}}
+			start := protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"my-app.example.com"}}}
+			if test.password {
+				start.Domains.Password = "ada:" + hash
+			}
+			text, err := composeRelease(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, start, nil)
+			if test.held == "" {
+				if err != nil || !strings.Contains(text, "${DB_PASSWORD}") {
+					t.Fatalf("not made: %v\n%s", err, text)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "it holds "+test.held+", so it stays on the server") || text != "" {
+				t.Fatalf("made: %v\n%s", err, text)
+			}
+		})
+	}
+}

@@ -133,8 +133,12 @@ func logAnswer(messageType protocol.MessageType, requestID string, data any) {
 			slog.Info("done", "request", requestID, "exit_code", answer.ExitCode, "timed_out", answer.TimedOut)
 		}
 	case protocol.ServerConfigResult:
+		// The hub sends the config on its own when the daemon connects,
+		// without a request: that answer gets no line.
 		if len(answer.Problems) == 0 {
-			slog.Info("done", "request", requestID)
+			if requestID != "" {
+				slog.Info("done", "request", requestID)
+			}
 			break
 		}
 		// What each problem is about, such as SSH: the rest may carry

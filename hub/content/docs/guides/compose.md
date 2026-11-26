@@ -47,6 +47,8 @@ API: `GET /api/v1/apps/{app}/compose`. MCP: `get_compose_file`.
 
 It is the one of the live deploy. A deploy without one, such as one from before this feature, says so: deploy again. If it stays empty, the deploy log says why.
 
+Before the server sends the file, it checks it for every env value of 6 characters or more and the password's hash. A file that holds one stays on the server. That happens to a restart of a deploy from before moin 1.0.0-beta.35, which wrote the values into the file: deploy from source once to see it.
+
 ### Run it elsewhere
 
 The compose file is your way out. Nothing in it needs moin.

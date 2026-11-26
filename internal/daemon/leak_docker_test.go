@@ -30,6 +30,8 @@ import (
 // restart with a new password and rollbacks with it on and off. Yet no file of the daemon but app.env
 // and the htpasswd files holds the secret or a password hash, and neither
 // does any message the daemon sends, the compose file of each deploy too.
+// A release from before beta.35, with the value in its base.json, keeps
+// its compose file on the server.
 func TestNoEnvValueLeaks(t *testing.T) {
 	if exec.Command("docker", "inspect", proxyName).Run() == nil {
 		t.Skipf("a %s runs on this machine: the test would replace it", proxyName)
@@ -181,8 +183,32 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// A deploy from before beta.35 wrote the values into base.json, and a
+	// restart takes its compose file from there. That compose file stays
+	// on the server; a deploy from source writes ${DB_PASSWORD} again.
+	base := filepath.Join(a.releaseDir(app, 4), "base.json")
+	body, err := os.ReadFile(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(base, bytes.ReplaceAll(body, []byte("${DB_PASSWORD}"), []byte(changed)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	deploy(protocol.DeployStart{DeployID: "5", Number: 5})
+	seesValues(changed)
+	deploy(protocol.DeployStart{DeployID: "6", Number: 6, SourceURL: server.URL + "/repos/me/leak/tarball/abc123"})
+	seesValues(changed)
+
 	mu.Lock()
 	defer mu.Unlock()
+	if baked := done[4]; baked.ComposeFile != "" {
+		t.Errorf("the restart of a baked base.json sent its compose file:\n%s", baked.ComposeFile)
+	}
+	if !bytes.Contains(bytes.Join(sent, nil), []byte("it holds the value of DB_PASSWORD, so it stays on the server")) {
+		t.Error("the deploy log does not say why the compose file stays on the server")
+	}
+	done = append(done[:4], done[5])
 	// Every deploy sends its compose file, with ${DB_PASSWORD} as written.
 	// The scan of the messages below covers it, and docker compose reads
 	// it as it is, next to a .env, the repo's env file and a password.

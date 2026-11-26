@@ -1,0 +1,1 @@
+{"name":"moin-echo","networks":{"default":{"ipam":{},"name":"moin-echo_default"}},"services":{"web":{"command":["sh","-c","mkdir -p /www \u0026\u0026 echo \"greeting=$$GREETING token=$$API_TOKEN\" \u003e /www/index.html \u0026\u0026 exec httpd -f -p 8080 -h /www"],"entrypoint":null,"expose":["8080"],"image":"busybox:1.37","networks":{"default":null}}}}
