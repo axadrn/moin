@@ -41,6 +41,7 @@ A release waits for a maintainer to approve it in GitHub. Then the workflow sign
 
 - **moin.run** runs the last deploy or release.
 - **Your own hub** runs releases only. A new one shows up in the web UI, and one click updates. [Self-hosting](/docs/self-hosting#updates)
+- **Every hub update**, moin.run's too, first starts the new hub once with its real settings. If they fail, the update stops and the running hub stays.
 - **Daemons** run releases only. They update themselves, one server at a time, and your apps keep running. [How a daemon updates](#how-a-daemon-updates)
 
 ## How a daemon updates

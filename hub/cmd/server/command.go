@@ -12,6 +12,8 @@ import (
 
 // command runs a one-off task of the operator, such as from install.sh:
 //
+//	check                  prints ok: the settings load, so the hub
+//	                       starts with them; it opens nothing
 //	bootstrap <server>     the account of the first ADMIN_EMAILS address, a
 //	                       workspace and the server, named like this
 //	                       machine; prints its install token, or nothing
@@ -24,6 +26,9 @@ import (
 //	                       lost their GitHub account or passkey
 func command(cfg *config.Config, args []string) error {
 	switch args[0] {
+	case "check":
+		fmt.Println("ok")
+		return nil
 	case "bootstrap":
 		if len(args) != 2 {
 			return errors.New("usage: bootstrap <server name>")
@@ -62,5 +67,5 @@ func command(cfg *config.Config, args []string) error {
 		fmt.Println("It signs out everywhere, disconnects GitHub and deletes every passkey: connect GitHub and add a passkey again under Settings, Account, Security.")
 		return nil
 	}
-	return fmt.Errorf("unknown command %q: bootstrap <server name> or recovery-key <email>", args[0])
+	return fmt.Errorf("unknown command %q: check, bootstrap <server name> or recovery-key <email>", args[0])
 }
