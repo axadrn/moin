@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pressly/goose/v3"
 )
 
@@ -73,77 +72,34 @@ func TestCopyBeforeMigrations(t *testing.T) {
 	}
 }
 
-// TestPreflight migrates a copy of a database that misses migrations, while
-// the hub holds it open, and leaves the database as it was.
-func TestPreflight(t *testing.T) {
+// TestCopyInto copies a database while the hub holds it open, with its
+// settings, and never writes it.
+func TestCopyInto(t *testing.T) {
 	dir := t.TempDir()
-	connection := filepath.Join(dir, "app.db") + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
-	if err := Preflight(connection); err != nil {
-		t.Fatalf("no database yet: %v", err)
-	}
-	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
-		t.Fatalf("no database yet: preflight left %v", entries)
-	}
-
+	connection := filepath.Join(dir, "app.db") + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
 	database, err := Init(connection)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
-	if err := setupGoose(); err != nil {
+	if _, err := database.Exec(`CREATE TABLE users (id TEXT PRIMARY KEY); INSERT INTO users (id) VALUES ('u1')`); err != nil {
 		t.Fatal(err)
 	}
-	if err := goose.UpTo(database.DB, ".", 62); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.Exec(`INSERT INTO users (id, email) VALUES ('u1', 'ada@example.com')`); err != nil {
-		t.Fatal(err)
-	}
-	history, err := OpenHistory(HistoryConnection(connection))
+	into := t.TempDir()
+	copyConnection, err := CopyInto(connection, into)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := history.Close(); err != nil {
-		t.Fatal(err)
+	if want := filepath.Join(into, "app.db") + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"; copyConnection != want {
+		t.Fatalf("connection = %q, want %q", copyConnection, want)
 	}
-
-	if err := Preflight(connection); err != nil {
-		t.Fatal(err)
-	}
-	version, err := goose.GetDBVersion(database.DB)
-	if err != nil || version != 62 {
-		t.Fatalf("version after preflight = %d, %v; want 62", version, err)
-	}
-	if matches, _ := filepath.Glob(filepath.Join(dir, "preflight-*")); len(matches) != 0 {
-		t.Fatalf("copies left = %v", matches)
-	}
-}
-
-// TestPreflightFails reports a migration that fails and removes its copy.
-func TestPreflightFails(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "app.db")
-	database, err := Init(file)
+	copied, err := Init(copyConnection)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = database.Close() })
-	if _, err := database.Exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY); INSERT INTO sessions (id) VALUES ('s1')`); err != nil {
-		t.Fatal(err)
-	}
-
-	broken := func(copied *sqlx.DB) error {
-		_, err := copied.Exec(`ALTER TABLE sessions ADD COLUMN missing TEXT NOT NULL`)
-		return err
-	}
-	if err := preflightCopy(file, broken); err == nil {
-		t.Fatal("preflight passed a migration that fails")
-	}
-	var columns int
-	if err := database.Get(&columns, `SELECT count(*) FROM pragma_table_info('sessions')`); err != nil || columns != 1 {
-		t.Fatalf("columns of the database = %d, %v; want 1", columns, err)
-	}
-	if matches, _ := filepath.Glob(filepath.Join(dir, "preflight-*")); len(matches) != 0 {
-		t.Fatalf("copies left = %v", matches)
+	defer copied.Close()
+	var id string
+	if err := copied.Get(&id, `SELECT id FROM users`); err != nil || id != "u1" {
+		t.Fatalf("copied user = %q, %v", id, err)
 	}
 }
