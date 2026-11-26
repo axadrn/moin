@@ -80,7 +80,7 @@ func TestMoveOldEnv(t *testing.T) {
 	beta34("flux", 2, map[string]string{"VERSION": "2.1.0"})
 	beta34("flux", 3, old)
 
-	a.moveOldEnvs()
+	a.moveOldEnvs(t.Context())
 	info, err := os.Stat(a.envFile("flux"))
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +109,7 @@ func TestMoveOldEnv(t *testing.T) {
 	if _, err := a.setEnv(protocol.EnvSet{App: "blog", Set: map[string]string{"TOKEN": "new"}}); err != nil {
 		t.Fatal(err)
 	}
-	a.moveOldEnvs()
+	a.moveOldEnvs(t.Context())
 	if err := a.ensureEnv("blog"); err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestMoveOldEnvFromBeta34(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := newApps(dir, nil)
-	a.moveOldEnvs()
+	a.moveOldEnvs(t.Context())
 	want := map[string]map[string]string{
 		// Deployed without env, then env set and restarted.
 		"echo": {"GREETING": "hello-greeting", "API_TOKEN": "token-value"},
@@ -199,7 +199,7 @@ func TestMoveOldEnvSaysWhy(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := journal(t)
-	a.moveOldEnvs()
+	a.moveOldEnvs(t.Context())
 	log := out.String()
 	for _, want := range []string{
 		`level=WARN msg="no env found in the running release`,
@@ -220,5 +220,83 @@ func TestMoveOldEnvSaysWhy(t *testing.T) {
 	}
 	if env, err := a.env("echo"); err != nil || len(env) != 0 || !exists(a.envFile("echo")) {
 		t.Errorf("env = %v, %v", env, err)
+	}
+}
+
+// TestMoveOldEnvOfAPrunedCatalogApp: the release that wrote an app.env is
+// gone, so no app.env names a key. miniflux's ADMIN_PASSWORD has the
+// value base.json has, but the catalog's compose file names it, so the app
+// keeps it. An app of your own keeps the rule: without an app.env that
+// names it, SECRET_KEY: ${SECRET_KEY} looks like TZ: UTC, the compose
+// file's.
+func TestMoveOldEnvOfAPrunedCatalogApp(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(dir, nil)
+	for _, app := range []string{"feeds", "blog"} {
+		if err := os.RemoveAll(a.releaseDir(app, 1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a.moveOldEnvs(t.Context())
+	want := map[string]map[string]string{
+		"feeds": {"VERSION": "2.3.4", "DB_PASSWORD": "db-password-value", "ADMIN_PASSWORD": "admin-password-value"},
+		"blog":  {"TOKEN": "token-value", "ODD": "a$b \"c\" d\\e\nf"},
+	}
+	for app, env := range want {
+		if got, err := a.env(app); err != nil || !maps.Equal(got, env) {
+			t.Errorf("%s: env = %v, %v; want %v", app, got, err, env)
+		}
+	}
+}
+
+// TestRepairCatalogEnv: a server that moved its env with beta.35 has an
+// app.env without a catalog secret whose value base.json has too. The
+// daemon takes it from the running release when it starts, keeps every
+// value the file has, names the keys to the hub and logs no value. An app
+// of your own is left as it is.
+func TestRepairCatalogEnv(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
+		t.Fatal(err)
+	}
+	a := newApps(dir, nil)
+	beta35 := map[string]map[string]string{
+		"feeds": {"VERSION": "2.3.4", "DB_PASSWORD": "set-since"},
+		"blog":  {"TOKEN": "token-value"},
+	}
+	for app, env := range beta35 {
+		if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeEnv(a.envFile(app), env); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := journal(t)
+	a.moveOldEnvs(t.Context())
+	want := map[string]map[string]string{
+		"feeds": {"VERSION": "2.3.4", "DB_PASSWORD": "set-since", "ADMIN_PASSWORD": "admin-password-value"},
+		"blog":  beta35["blog"],
+	}
+	for app, env := range want {
+		if got, err := a.env(app); err != nil || !maps.Equal(got, env) {
+			t.Errorf("%s: env = %v, %v; want %v", app, got, err, env)
+		}
+	}
+	if keys := a.allEnvKeys()["feeds"].Keys; !slices.Equal(keys, []string{"ADMIN_PASSWORD", "DB_PASSWORD", "VERSION"}) {
+		t.Errorf("hello names %v", keys)
+	}
+	log := out.String()
+	if !strings.Contains(log, `level=INFO msg="env of the catalog app repaired" app=feeds keys=[ADMIN_PASSWORD]`) {
+		t.Errorf("the log names no repair:\n%s", log)
+	}
+	if strings.Contains(log, "admin-password-value") || strings.Contains(log, "set-since") {
+		t.Errorf("the log has a value:\n%s", log)
+	}
+	if strings.Contains(log, "app=blog") {
+		t.Errorf("an app of your own was repaired:\n%s", log)
 	}
 }
