@@ -9,6 +9,7 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
 // jsonLD is data for search engines, as a script tag. json.Marshal escapes
@@ -39,6 +40,7 @@ func homeJSONLD(appURL string, billing bool) string {
 			"url":      appURL,
 			"logo":     appURL + components.AssetURL("/assets/img/logo.svg"),
 			"email":    brand.SupportEmail,
+			"sameAs":   []string{layouts.GitHubURL, layouts.XURL},
 		},
 	})
 }
