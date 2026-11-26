@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/protocol"
 )
 
 // TestStatusAllGood: a workspace with an online server and an app that
@@ -153,5 +154,44 @@ func TestStatusStoppedNotChecked(t *testing.T) {
 	}
 	if got.Databases != 2 || got.BackupsChecked != 1 {
 		t.Errorf("backups checked = %d of %d, want 1 of 2", got.BackupsChecked, got.Databases)
+	}
+}
+
+// TestStatusRegistryLogin: an app whose image is on a registry the
+// workspace has a login for, which its server does not keep, needs you
+// before its next deploy is refused.
+func TestStatusRegistryLogin(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	status := NewStatusService(apps, servers, nil)
+	status.release = "dev"
+	for name, image := range map[string]string{"shop": "ghcr.io/me/shop:v1", "blog": "nginx:1.27"} {
+		app, err := apps.Create(owner, name, server.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		deploy := &model.Deploy{ID: app.ID + "-1", AppID: app.ID, Number: 1, Status: model.DeployRunning, Image: image}
+		if err := apps.apps.CreateDeploy(deploy); err != nil {
+			t.Fatal(err)
+		}
+		if err := apps.apps.FinishDeploy(deploy.ID, model.DeploySucceeded, "", "", "", "", time.Now().UTC()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := apps.apps.SetRegistry(model.Registry{WorkspaceID: owner.WorkspaceID, Host: "ghcr.io", Username: "me", CreatedAt: time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := status.Status(owner.WorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Issues) != 1 || got.Issues[0] != (StatusIssue{Kind: IssueRegistryMissing, Target: "shop", Detail: "deploys stopped: the server has no login for ghcr.io: enter it under Registries", Path: "/registries"}) {
+		t.Fatalf("issues = %+v", got.Issues)
+	}
+	if err := servers.servers.SetServerSecret(server.ID, protocol.RegistrySecret("ghcr.io"), false, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	got, err = status.Status(owner.WorkspaceID)
+	if err != nil || !got.OK() {
+		t.Fatalf("with the login: issues = %+v, %v", got.Issues, err)
 	}
 }

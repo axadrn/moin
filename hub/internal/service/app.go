@@ -463,19 +463,16 @@ func (s *AppService) RemoveRegistry(ctx context.Context, actor Actor, host strin
 // for its registry and the app's server does not keep it: the pull would
 // fail without it.
 func (s *AppService) checkRegistry(app *model.App, image string) error {
-	host := protocol.RegistryHost(image)
 	registries, err := s.apps.Registries(app.WorkspaceID)
 	if err != nil {
 		return err
-	}
-	if !slices.ContainsFunc(registries, func(registry model.Registry) bool { return registry.Host == host }) {
-		return nil
 	}
 	index, err := s.servers.secretsIndex(app.WorkspaceID)
 	if err != nil {
 		return err
 	}
-	if index.has(app.ServerID, protocol.RegistrySecret(host)) {
+	host := missingRegistryLogin(image, app.ServerID, registries, index)
+	if host == "" {
 		return nil
 	}
 	server, err := s.servers.servers.ByIDOrNameForWorkspace(app.ServerID, app.WorkspaceID)
@@ -483,6 +480,16 @@ func (s *AppService) checkRegistry(app *model.App, image string) error {
 		return err
 	}
 	return &MissingSecretError{Message: server.Name + " has no login for " + host + ". Enter it for " + server.Name + " under Registries, then deploy again."}
+}
+
+// missingRegistryLogin is the registry of image when the workspace has a
+// login for it that the server does not keep, else "".
+func missingRegistryLogin(image, serverID string, registries []model.Registry, index secretsIndex) string {
+	host := protocol.RegistryHost(image)
+	if !slices.ContainsFunc(registries, func(registry model.Registry) bool { return registry.Host == host }) || index.has(serverID, protocol.RegistrySecret(host)) {
+		return ""
+	}
+	return host
 }
 
 // Redeploy runs the newest deploy that had a source or an image again, with
