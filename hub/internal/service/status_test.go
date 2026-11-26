@@ -128,3 +128,30 @@ func TestStatusLateCopies(t *testing.T) {
 		t.Fatalf("issues = %+v %v", got.Issues, err)
 	}
 }
+
+// TestStatusStoppedNotChecked: a backup whose copies stopped is not
+// checked, even when its newest copy restored today.
+func TestStatusStoppedNotChecked(t *testing.T) {
+	apps, servers, server, _ := newAppService(t)
+	status := NewStatusService(apps, servers, nil)
+	status.release = "dev"
+	app, err := apps.Create(owner, "shop", server.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finishDeploy(t, apps, app.ID, 1, model.DeploySucceeded)
+	now := time.Now().UTC()
+	if err := apps.apps.SetBackupStatus(model.BackupStatus{AppID: app.ID, Database: "postgres-db", CopiedAt: &now, CheckedAt: &now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := apps.apps.SetBackupStatus(model.BackupStatus{AppID: app.ID, Database: "data-app.db", CopiedAt: &now, CheckedAt: &now, Error: "the server has no key", UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := status.Status(owner.WorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Databases != 2 || got.BackupsChecked != 1 {
+		t.Errorf("backups checked = %d of %d, want 1 of 2", got.BackupsChecked, got.Databases)
+	}
+}
