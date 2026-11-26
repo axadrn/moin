@@ -73,16 +73,16 @@ func TestCopyBeforeMigrations(t *testing.T) {
 	}
 }
 
-// TestCheck migrates a copy of a database that misses migrations, while
+// TestPreflight migrates a copy of a database that misses migrations, while
 // the hub holds it open, and leaves the database as it was.
-func TestCheck(t *testing.T) {
+func TestPreflight(t *testing.T) {
 	dir := t.TempDir()
 	connection := filepath.Join(dir, "app.db") + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
-	if err := Check(connection); err != nil {
+	if err := Preflight(connection); err != nil {
 		t.Fatalf("no database yet: %v", err)
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
-		t.Fatalf("no database yet: check left %v", entries)
+		t.Fatalf("no database yet: preflight left %v", entries)
 	}
 
 	database, err := Init(connection)
@@ -107,20 +107,20 @@ func TestCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Check(connection); err != nil {
+	if err := Preflight(connection); err != nil {
 		t.Fatal(err)
 	}
 	version, err := goose.GetDBVersion(database.DB)
 	if err != nil || version != 62 {
-		t.Fatalf("version after check = %d, %v; want 62", version, err)
+		t.Fatalf("version after preflight = %d, %v; want 62", version, err)
 	}
-	if matches, _ := filepath.Glob(filepath.Join(dir, "check-*")); len(matches) != 0 {
+	if matches, _ := filepath.Glob(filepath.Join(dir, "preflight-*")); len(matches) != 0 {
 		t.Fatalf("copies left = %v", matches)
 	}
 }
 
-// TestCheckFails reports a migration that fails and removes its copy.
-func TestCheckFails(t *testing.T) {
+// TestPreflightFails reports a migration that fails and removes its copy.
+func TestPreflightFails(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "app.db")
 	database, err := Init(file)
@@ -136,14 +136,14 @@ func TestCheckFails(t *testing.T) {
 		_, err := copied.Exec(`ALTER TABLE sessions ADD COLUMN missing TEXT NOT NULL`)
 		return err
 	}
-	if err := checkCopy(file, broken); err == nil {
-		t.Fatal("check passed a migration that fails")
+	if err := preflightCopy(file, broken); err == nil {
+		t.Fatal("preflight passed a migration that fails")
 	}
 	var columns int
 	if err := database.Get(&columns, `SELECT count(*) FROM pragma_table_info('sessions')`); err != nil || columns != 1 {
 		t.Fatalf("columns of the database = %d, %v; want 1", columns, err)
 	}
-	if matches, _ := filepath.Glob(filepath.Join(dir, "check-*")); len(matches) != 0 {
+	if matches, _ := filepath.Glob(filepath.Join(dir, "preflight-*")); len(matches) != 0 {
 		t.Fatalf("copies left = %v", matches)
 	}
 }

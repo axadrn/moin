@@ -13,7 +13,7 @@ import (
 
 // command runs a one-off task of the operator, such as from install.sh:
 //
-//	check                  prints ok: the settings load and the
+//	preflight              prints ok: the settings load and the
 //	                       migrations of this build run on a copy of the
 //	                       database, so this hub starts on its data; the
 //	                       database itself stays untouched, so an update
@@ -30,8 +30,8 @@ import (
 //	                       lost their GitHub account or passkey
 func command(cfg *config.Config, args []string) error {
 	switch args[0] {
-	case "check":
-		if err := db.Check(cfg.DBConnection); err != nil {
+	case "preflight":
+		if err := db.Preflight(cfg.DBConnection); err != nil {
 			return err
 		}
 		fmt.Println("ok")
@@ -74,5 +74,5 @@ func command(cfg *config.Config, args []string) error {
 		fmt.Println("It signs out everywhere, disconnects GitHub and deletes every passkey: connect GitHub and add a passkey again under Settings, Account, Security.")
 		return nil
 	}
-	return fmt.Errorf("unknown command %q: check, bootstrap <server name> or recovery-key <email>", args[0])
+	return fmt.Errorf("unknown command %q: preflight, bootstrap <server name> or recovery-key <email>", args[0])
 }
