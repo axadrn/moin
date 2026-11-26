@@ -155,7 +155,7 @@ S3_SECRET_KEY=
 
 | Setting | What it does |
 | --- | --- |
-| `COMPOSE_FILE` | the files of your way, joined by `:`. One server: `compose.yml:compose.same-server.yml`. Hub only: `compose.yml:compose.caddy.yml`. With a tunnel: `compose.yml:compose.tunnel.yml`. Your own proxy: `compose.yml`. Every way has its line. Without one, Compose takes `compose.yml` alone: your own proxy. |
+| `COMPOSE_FILE` | the files of your way, joined by `:`. One server: `compose.yml:compose.same-server.yml`. Hub only: `compose.yml:compose.caddy.yml`. With a tunnel: `compose.yml:compose.tunnel.yml`. Your own proxy: `compose.yml`. Every way needs its line: without one, `update.sh` stops. |
 | `DOMAIN` | the domain of the hub. The hub's address, `APP_URL`, is `https://` and it. [Passkeys](#who-signs-in) belong to it. |
 | `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up with GitHub without an invitation |
 | `SECRETS_KEY` | seals the secrets the hub keeps itself: the Cloudflare token, the alert targets and the GitHub App's keys; keep a copy |
