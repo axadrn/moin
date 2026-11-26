@@ -182,7 +182,7 @@ jobs:
           IMAGE: ${{ needs.box.outputs.image }}
         run: |
           tailscale ssh "root@$HOST" "mkdir -p /opt/moin"
-          for file in setup.sh update.sh compose.yml compose.same-server.yml compose.traefik.yml compose.tunnel.yml; do
+          for file in setup.sh update.sh compose.yml compose.same-server.yml compose.caddy.yml compose.tunnel.yml; do
             tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "hub/deploy/$file"
           done
           # moin.run only: its settings come from 1Password. The token in

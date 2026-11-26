@@ -7,10 +7,11 @@ cd "$(dirname "$0")"
 # The new version. The running hub keeps serving.
 docker compose pull
 
-# The new version proves itself on a copy of the database, with these
-# settings. If it fails, this stops here and the running hub stays.
-# traefik.enable=false: no visitor ever reaches this one.
+# The new version starts once, on a copy of the database, with these
+# settings. If it fails, this stops here and the running hub stays. Caddy
+# and cloudflared never reach it: a run container does not get the name
+# hub. traefik.enable=false keeps Traefik away from it.
 docker compose run --rm --no-deps -T -l traefik.enable=false hub ./main preflight
 
-# Only now switch.
-docker compose up -d --remove-orphans
+# Only now switch. --wait returns once the new hub is healthy.
+docker compose up -d --remove-orphans --wait

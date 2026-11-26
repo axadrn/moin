@@ -4,6 +4,9 @@
 # takes it over.
 services:
   hub:
+    environment:
+      # The daemon of this server starts its Traefik on its first connect.
+      SAME_SERVER: "true"
     networks: [default, moin-proxy]
     labels:
       traefik.enable: "true"

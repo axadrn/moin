@@ -49,8 +49,8 @@ A release waits for a maintainer to approve it in GitHub. Then the workflow sign
 Every hub updates the same way: `update.sh` in `/opt/moin`, with its settings in `/opt/moin/.env`.
 
 1. `docker compose pull` gets the new version. The running hub keeps serving.
-2. `./main preflight` runs in the new version, once. It loads the settings and runs the migrations on a copy of the database. If that fails, `update.sh` stops. The running hub stays.
-3. `docker compose up -d` switches to the new version.
+2. `./main preflight` starts the new hub once, on a copy of the database, with its settings. It runs the migrations on the copy and opens what the database keeps, such as the GitHub App with `SECRETS_KEY`. Then it removes the copy. No visitor reaches it. If it fails, `update.sh` stops. The running hub stays.
+3. `docker compose up -d --wait` switches to the new version and returns once it is healthy.
 
 moin.run gets one more step, from the Deploy workflow, through Tailscale:
 
@@ -59,7 +59,18 @@ moin.run gets one more step, from the Deploy workflow, through Tailscale:
 3. It runs `update.sh` with the image of the deploy or release, `MOIN_IMAGE=ghcr.io/axadrn/moin:<tag>`.
 4. It waits until the hub answers on `/healthz`.
 
-In `.env.tpl`, a value that can hold a `$` goes in single quotes, like `S3_SECRET_KEY='{{ op://vault/item/field }}'`. Compose would read `$` as a variable.
+In `.env.tpl`, a value that can hold a `$` goes in single quotes, like `S3_SECRET_KEY='{{ op://vault/item/field }}'`. Compose would read `$` as a variable. A new setting goes into the template, never into `.env` by hand: the next deploy writes `.env` fresh.
+
+### Once, before the first deploy with `/opt/moin/.env`
+
+Up to v1.0.0-beta.36 moin.run kept its template in `/etc/moin-hub/env.tpl`. Before the first deploy that brings `/opt/moin/.env`, as root on the server:
+
+1. `install -m 600 /etc/moin-hub/env.tpl /opt/moin/.env.tpl`
+2. In `/opt/moin/.env.tpl`: add `COMPOSE_FILE=compose.yml:compose.tunnel.yml` and `DOMAIN=` with the host of `APP_URL`. Delete `APP_URL`, and `SAME_SERVER` if it is there. Put every `op://` value that may hold a `$` in single quotes.
+3. Check it fills: `cd /opt/moin && OP_SERVICE_ACCOUNT_TOKEN=$(cat /etc/moin-hub/op-token) docker run --rm -i -e OP_SERVICE_ACCOUNT_TOKEN 1password/op:2 op inject < .env.tpl > /dev/null`
+4. Run the deploy. Once it is green: `rm -rf /etc/moin-hub/env /etc/moin-hub/env.tpl /opt/moin/updater.sh /var/lib/moin-hub/update`
+
+Without step 1 the deploy stops at `op inject`, and the running hub stays. Other templates in `/etc/moin-hub`, such as one for a key file, are no longer filled. The files they made stay as they are.
 
 ## How a daemon updates
 

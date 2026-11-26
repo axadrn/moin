@@ -384,6 +384,7 @@ A messenger someone bought cannot take your house: it never becomes root on the 
 
 - The journal shows each request, with the env keys it set: [See what the hub asked](#see-what-the-hub-asked).
 - The same holds for a stolen [connection or CI token](/docs/reference/rights), within its rights. The deploy right runs new code in an app, and new code sees the app's env and data. The servers right can invite a person, and a member deploys, sets env and runs SQL.
+- The hub itself never gets Docker. A self-hosted hub on its own server shares it with nothing that has Docker. On one server it shares the machine with the daemon. [Which way](/docs/self-hosting#which-way), [How moin.run runs](/docs/self-hosting#how-moinrun-runs)
 
 ## See what the hub asked
 

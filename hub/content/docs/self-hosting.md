@@ -29,26 +29,22 @@ The rest of these docs apply as they are.
 
 Pick one. Add its flags to the command above.
 
-| Way | Flags | When |
+| Way | Flags | Pick it when |
 | --- | --- | --- |
-| [One server](#one-server) | none | The start. The hub, the daemon and your apps on one machine. |
-| [Hub only](#hub-only) | `--hub-only` | Full separation. The hub on its own small server, your apps on others. |
-| [Hub only, with a tunnel](#with-a-tunnel) | `--hub-only --tunnel-token <token>` | No open port on the hub's server. |
+| [One server](#one-server) | none | You want the quick start. One machine for everything. |
+| [Hub only](#hub-only) | `--hub-only` | You want full separation. A hacked hub cannot touch the machine your apps run on. |
+| [With a tunnel](#with-a-tunnel) | `--hub-only --tunnel-token <token>` | You want no open port on the hub's server. |
+| [Your own proxy](#your-own-proxy) | `--hub-only --no-proxy` | You run a proxy already. |
 
 ```text
-one server          hub only
+one server      [ Traefik · hub · daemon · your apps ]
 
-┌───────────────┐   ┌───────────────┐
-│ hub           │   │ hub           │
-│ daemon        │   └───────▲───────┘
-│ your apps     │           │ daemons
-└───────────────┘           │ call out
-                    ┌───────┴───────┐
-                    │ app server    │
-                    │ daemon        │
-                    │ your apps     │
-                    └───────────────┘
+hub only        [ Caddy · hub ]        ◄── the daemons of your app servers call it
+with a tunnel   [ cloudflared · hub ]  ◄── the same, and no port is open
+your own proxy  [ your proxy · hub ]   ◄── the same, with the proxy you know
 ```
+
+The hub never gets Docker. With `--hub-only`, nothing next to it gets Docker either: Caddy and cloudflared only pass requests on. On one server, the hub shares the machine with the daemon and its Traefik. Both use Docker, because they run your apps.
 
 Run the install command again any time, with the same flags. It keeps your settings and data, and it fetches the newest deploy files.
 
@@ -58,7 +54,7 @@ The hub shares the machine with your apps. The daemon's Traefik serves the hub o
 
 ### Hub only
 
-The hub runs on its own server, with its own Traefik. It takes ports 80 and 443 and gets a certificate from Let's Encrypt. Your app servers call it.
+The hub runs on its own server, with Caddy in front of it. Caddy takes ports 80 and 443 and gets a certificate from Let's Encrypt. It has no access to Docker. Your app servers call the hub.
 
 A hub apart from your apps keeps working when an app server fails. You can still restore, roll back and see what happened.
 
@@ -72,22 +68,32 @@ A Cloudflare Tunnel carries all traffic. No port is open, and you need no A reco
 2. Give it a public hostname: your domain, with the service `http://hub:8090`.
 3. Copy its token, and install with `--hub-only --tunnel-token <token>`.
 
-`cloudflared` gets the token and nothing else.
+`cloudflared` gets only this one setting, the token.
+
+### Your own proxy
+
+Install with `--hub-only --no-proxy`. The hub answers on `127.0.0.1:8090`, on this machine only. Point your proxy at it. It serves HTTPS on your domain and sends the visitor's address in `X-Forwarded-For`, as Caddy and nginx do.
 
 ### On your tailnet
 
 The safest hub is one the internet cannot reach:
 
-1. Install with `--hub-only` and the server's tailnet name as the domain: `--domain <server>.<tailnet>.ts.net`.
-2. In `/opt/moin/.env`, set `COMPOSE_FILE=compose.yml`. No Traefik, no open port. Then run `sh /opt/moin/update.sh`.
-3. Run `sh /opt/moin/setup.sh --tailscale`, then `tailscale serve --bg 8090`. It serves the hub at `https://<server>.<tailnet>.ts.net`.
-4. Put each server on the tailnet with `tailscale up` before you install the daemon. Your computer too, for the web, the CLI and the TUI.
+1. Install with `--hub-only --no-proxy` and the server's tailnet name as the domain: `--domain <server>.<tailnet>.ts.net`.
+2. Run `sh /opt/moin/setup.sh --tailscale`, then `tailscale serve --bg 8090`. It serves the hub at `https://<server>.<tailnet>.ts.net`.
+3. Put each server on the tailnet with `tailscale up` before you install the daemon. Your computer too, for the web, the CLI and the TUI.
 
 Your apps stay public through their own tunnel or ports 80 and 443. GitHub and CI outside your tailnet cannot reach the hub, so **Deploy every push** and deploy hooks do not work. Deploy from the web, the CLI or a CI runner on your tailnet.
 
-### Your own proxy
+## How moin.run runs
 
-Install with `--hub-only`. Then set `COMPOSE_FILE=compose.yml` in `/opt/moin/.env` and run `sh /opt/moin/update.sh`. The hub answers on `127.0.0.1:8090`. Point your proxy, such as Caddy, at it, with HTTPS. Set `TRUSTED_PROXY_CIDRS` to the network your proxy comes from.
+moin.run is a hub like yours. It runs the tunnel way, with the same files you get.
+
+- It runs alone on its own server at Hetzner. Nothing else runs there. No app, no daemon.
+- No port is open. Web traffic comes through Cloudflare Tunnel, and we reach the server only over Tailscale.
+- Its settings live in 1Password. Every deploy fills them in fresh.
+- Every deploy runs the same `update.sh` as yours. The new hub proves itself first, on a copy of the database.
+
+[How a hub updates](/docs/reference/shipping#how-a-hub-updates)
 
 ## Good to know
 
@@ -121,7 +127,6 @@ All settings are in one file: `/opt/moin/.env`. Only root reads it. Docker Compo
 ```bash
 COMPOSE_FILE=compose.yml:compose.same-server.yml
 DOMAIN=moin.example.com
-SAME_SERVER=true
 APP_ENV=production
 BILLING=false
 # The first address is the admin. Only these may sign up.
@@ -129,7 +134,8 @@ ADMIN_EMAILS=you@example.com
 DB_CONNECTION=./data/app.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
 # Seals the Cloudflare token, the alert targets and the GitHub App's keys. Keep a copy.
 SECRETS_KEY=<from openssl rand -base64 32>
-TRUSTED_PROXY_CIDRS=172.16.0.0/12
+# The proxy in front of the hub comes from Docker's networks.
+TRUSTED_PROXY_CIDRS=172.16.0.0/12,192.168.0.0/16
 EMAIL_FROM=moin@moin.example.com
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_API_TOKEN=
@@ -140,6 +146,7 @@ S3_ACCESS_KEY=
 S3_SECRET_KEY=
 ```
 
+- **moin runs on HTTPS.** The hub's address, `APP_URL`, is always `https://` and your `DOMAIN`. You do not set it. On a tailnet or behind your own proxy, that proxy serves HTTPS on `DOMAIN` too.
 - **A value with `$`, `#` or a space goes in single quotes**, like `S3_SECRET_KEY='a$b'`. Without them, Compose reads `$b` as a variable.
 - **Files the settings point to**, like the key of a GitHub App, go in `/etc/moin-hub`. The hub sees them at `/run/moin-hub`.
 - **The database** is in `/var/lib/moin-hub`. Only root reads it.
@@ -148,7 +155,7 @@ S3_SECRET_KEY=
 
 | Setting | What it does |
 | --- | --- |
-| `COMPOSE_FILE` | the files of your way, joined by `:`. One server: `compose.yml:compose.same-server.yml`. Hub only: `compose.yml:compose.traefik.yml`. With a tunnel: `compose.yml:compose.tunnel.yml`. |
+| `COMPOSE_FILE` | the files of your way, joined by `:`. One server: `compose.yml:compose.same-server.yml`. Hub only: `compose.yml:compose.caddy.yml`. With a tunnel: `compose.yml:compose.tunnel.yml`. Your own proxy: `compose.yml`. Every way has its line. Without one, Compose takes `compose.yml` alone: your own proxy. |
 | `DOMAIN` | the domain of the hub. The hub's address, `APP_URL`, is `https://` and it. [Passkeys](#who-signs-in) belong to it. |
 | `ADMIN_EMAILS` | the admins, separated by commas; the only ones who may sign up with GitHub without an invitation |
 | `SECRETS_KEY` | seals the secrets the hub keeps itself: the Cloudflare token, the alert targets and the GitHub App's keys; keep a copy |
@@ -158,9 +165,8 @@ S3_SECRET_KEY=
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | the bucket of the hub |
 | `BACKUP_DATABASE` | backup of the hub's database; on by default in production once `S3_BUCKET` is set, `false` turns it off |
 | `UPTIME` | [uptime](/docs/guides/uptime); on in production, off in development |
-| `TUNNEL_TOKEN` | the token of your Cloudflare Tunnel; only `cloudflared` gets it |
-| `TRUSTED_PROXY_CIDRS` | the network Traefik, the tunnel or your proxy comes from. Without it every visitor counts as one address, and five wrong recovery keys lock everyone out for 15 minutes. |
-| `SAME_SERVER` | `true` when the hub runs on the same server as its apps, as on one server |
+| `TUNNEL_TOKEN` | the token of your Cloudflare Tunnel; `cloudflared` gets only this one setting |
+| `TRUSTED_PROXY_CIDRS` | where Traefik, Caddy, the tunnel or your proxy comes from: Docker's own networks, `172.16.0.0/12,192.168.0.0/16`. Gave Docker other address pools in `daemon.json`? Put those here. Without it every visitor counts as one address, and five wrong recovery keys lock everyone out for 15 minutes. |
 | `OLD_URLS` | old domains the hub still answers on, see [A new domain](#a-new-domain) |
 | `TELEMETRY` | `false` stops the count it sends us, see [What it sends us](#what-it-sends-us) |
 | `UPDATE_CHECK` | `false` stops the daily check for a new version |
@@ -176,7 +182,7 @@ They are in `/opt/moin`, from the repo's `hub/deploy/`:
 | --- | --- |
 | `compose.yml` | runs the hub |
 | `compose.same-server.yml` | one server: the hub joins the daemon's Traefik |
-| `compose.traefik.yml` | hub only: a Traefik of its own, for HTTPS |
+| `compose.caddy.yml` | hub only: Caddy, for HTTPS |
 | `compose.tunnel.yml` | with a tunnel: `cloudflared` |
 | `update.sh` | starts the hub, and later updates it |
 | `setup.sh` | Docker, security updates and the folders; with `--tailscale` SSH on your tailnet |
@@ -203,11 +209,65 @@ It does three things:
 - The daemons update themselves to the version of the hub, one server at a time, never during a deploy: [How a daemon updates](/docs/reference/shipping#how-a-daemon-updates).
 - Your hub runs the image `ghcr.io/axadrn/moin:stable`, the newest release. Which versions exist and when they come: [How moin ships](/docs/reference/shipping).
 
+### Go back to an older version
+
+```bash
+cd /opt/moin
+MOIN_IMAGE=ghcr.io/axadrn/moin:v1.0.0-beta.36 docker compose up -d
+```
+
+This skips the check on a copy on purpose: older versions do not have it. The next `sh update.sh` brings the newest version again.
+
+Did the newer version change the database? Then the older one may not start on it. Put back the copy from before the update. You lose what changed since.
+
+```bash
+cd /opt/moin
+docker compose stop hub
+cp /var/lib/moin-hub/backup-before-v1.0.0-beta.37.db /var/lib/moin-hub/app.db
+rm -f /var/lib/moin-hub/app.db-wal /var/lib/moin-hub/app.db-shm
+MOIN_IMAGE=ghcr.io/axadrn/moin:v1.0.0-beta.36 docker compose up -d
+```
+
+The copy is named after the version that changed the database.
+
+### Coming from before v1.0.0-beta.37
+
+Before v1.0.0-beta.37 the settings were in `/etc/moin-hub/env`, and an updater ran next to the hub. Now they are in `/opt/moin/.env`. Move them once, as root:
+
+1. Copy the settings: `install -m 600 /etc/moin-hub/env /opt/moin/.env`
+2. In `/opt/moin/.env`, add `DOMAIN=` with the host of your `APP_URL`, like `DOMAIN=moin.example.com`. Then delete the lines `APP_URL` and `SAME_SERVER`.
+3. Add the `COMPOSE_FILE` line of your way:
+
+   | You had | Add |
+   | --- | --- |
+   | `SAME_SERVER=true` | `COMPOSE_FILE=compose.yml:compose.same-server.yml` |
+   | `TUNNEL_TOKEN` | `COMPOSE_FILE=compose.yml:compose.tunnel.yml` |
+   | your own proxy | `COMPOSE_FILE=compose.yml` |
+
+4. Get the new files and start:
+   - One server: run the install command again, with the same `--domain` and `--email`. It keeps your settings and data.
+   - The hub on its own server:
+
+     ```bash
+     cd /opt/moin
+     for file in setup.sh update.sh compose.yml compose.same-server.yml compose.caddy.yml compose.tunnel.yml; do
+       curl -fsSL "https://raw.githubusercontent.com/axadrn/moin/main/hub/deploy/$file" -o "$file"
+     done
+     sh update.sh
+     ```
+
+5. Clean up: `rm -rf /etc/moin-hub/env /opt/moin/updater.sh /var/lib/moin-hub/update`
+
+The old updater goes away by itself with the update. Ran your hub from a git clone, in its `hub/deploy`? Stop it there first, with `docker compose --profile '*' down`, then start with step 1.
+
+- **Update now** in the web of v1.0.0-beta.35 or beta.36 still takes you to v1.0.0-beta.37. The update after that needs the new place.
+- Filling the settings from 1Password with `env.tpl` and `op-token` is gone. Put the values in `/opt/moin/.env` yourself. Then delete `/etc/moin-hub/env.tpl` and `/etc/moin-hub/op-token`.
+
 ## Move the hub to its own server
 
 1. Turn on the hub's backup: set `S3_*`, then `sh /opt/moin/update.sh`. Use a bucket no other hub backs up to (folder `hub/litestream`).
 2. Wait a few seconds. Then, on the old server, stop the hub: `cd /opt/moin && docker compose down`. Your apps keep running.
-3. Copy `/opt/moin` and `/etc/moin-hub` to the new server. In `/opt/moin/.env` there, set `COMPOSE_FILE=compose.yml:compose.traefik.yml` and delete `SAME_SERVER`. Keep the same `SECRETS_KEY` above all.
+3. Copy `/opt/moin` and `/etc/moin-hub` to the new server. In `/opt/moin/.env` there, set `COMPOSE_FILE=compose.yml:compose.caddy.yml`. Keep the same `SECRETS_KEY` above all.
 4. On the new server, run `sh /opt/moin/setup.sh`, then `sh /opt/moin/update.sh`. The hub restores its database from the bucket on its first start. Point the domain at it.
 5. On the old server, run a new install command from `moin servers install-command <server>`. Its daemon now dials your domain, as the same server.
 6. Once all works, on the old server: `rm -r /opt/moin /etc/moin-hub /var/lib/moin-hub`.
