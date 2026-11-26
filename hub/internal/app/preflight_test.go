@@ -114,3 +114,21 @@ func TestPreflightOpensTheGitHubApp(t *testing.T) {
 		t.Fatalf("preflight left %v", left)
 	}
 }
+
+// A copy that a stopped preflight left behind goes with the next one.
+func TestPreflightRemovesAnOldCopy(t *testing.T) {
+	cfg, _ := preflightHub(t)
+	old := filepath.Join(filepath.Dir(strings.Split(cfg.DBConnection, "?")[0]), "preflight-123")
+	if err := os.MkdirAll(old, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(old, "app.db"), []byte("copy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Preflight(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if left := preflightLeft(t, cfg); len(left) != 0 {
+		t.Fatalf("preflight left %v", left)
+	}
+}
