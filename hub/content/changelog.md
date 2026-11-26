@@ -3,6 +3,29 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.36
+
+November 26, 2026
+
+**In short:** Name your passkeys, confirm it's you without signing out, and catalog apps get back a secret that beta.35 left behind.
+
+### New
+- **Name your passkeys**: Name one right when you add it, or rename it later under **Settings**, **Account**, **Security**. moin suggests the name of your password manager. (#154)
+- **Confirm it's you**: Adding a passkey, more rights or a new connection asks you to confirm, and you stay signed in. With a passkey you confirm with it. Without one, a sign-in or GitHub from the last five minutes counts. (#156)
+
+### Changed
+- **Passkeys carry the hub's domain**: Your password manager files them under `moin.run`, or your own hub's domain. (#154)
+- **A hub update tries the new hub first**: It starts the new hub once with your settings. If one is missing or wrong, it says why, and the running hub stays. (#151)
+
+### Fixed
+- **A missing registry login shows under Needs you**: When the app's server has no login for the registry of its image, the overview says so before the next deploy stops. (#153)
+- **Catalog apps keep every secret**: beta.35 could leave out a secret of a catalog app, like Umami's `APP_SECRET`. The daemon now takes it back from the running app. (#150)
+- **Backups checked today**: The overview counts only backups that run. A stopped backup is not checked. (#152)
+- **Compose file of an older deploy**: moin says to deploy again, instead of pointing at an empty log. (#152)
+
+### Upgrade
+Self-hosted: **Update now**, or `sh update.sh`. Your daemons update by themselves. Coming from beta.34, read the Upgrade steps of beta.35 first.
+
 ## v1.0.0-beta.35
 
 November 26, 2026
