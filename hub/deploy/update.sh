@@ -92,6 +92,22 @@ fi
 # container runs as root, so it reads it.
 mkdir -p "$data"
 chmod 700 "$data"
+
+# The new hub tries these settings before the running one stops: a hub
+# that would not start never replaces one that runs. It runs once from
+# compose.yml alone, without the proxy's labels, so no visitor reaches it.
+# A hub before v1.0.0-beta.36 knows no settings command: it answers unknown
+# command, which it says only once its settings loaded.
+if ! out=$(docker compose -f compose.yml --progress quiet run --rm --no-deps -T --pull "$MOIN_PULL" hub ./main settings 2>&1); then
+	case "$out" in
+	*'unknown command "settings"'*) ;;
+	*)
+		echo "$out" >&2
+		echo "The new hub does not start with these settings. The running hub stays." >&2
+		exit 1
+		;;
+	esac
+fi
 # shellcheck disable=SC2086
 COMPOSE_PROFILES=$profiles docker compose $files up -d --pull "$MOIN_PULL" --remove-orphans "$@"
 echo "moin hub started."
