@@ -3,6 +3,30 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.37
+
+November 26, 2026
+
+**In short:** beta.36 did not start on a hub with people signed in. This fixes it, and an update now tries the new hub on a copy of your database before it replaces the running one.
+
+### New
+- **Every update tries first**: `update.sh` starts the new hub once on a copy of your database, with your settings. If that fails, it says why and stops. The running hub stays. (#159)
+- **Install your way**: One server stays the default. `--hub-only` runs the hub on its own server, with HTTPS from Caddy. Add `--tunnel-token` for a Cloudflare Tunnel and no open port, or `--no-proxy` for your own proxy. (#161)
+
+### Changed
+- **One settings file**: A self-hosted hub keeps its settings in `/opt/moin/.env`, next to its compose files. The domain is written once, as `DOMAIN`. One line, `COMPOSE_FILE`, says which way it runs. (#161)
+- **The tunnel gets only its token**: `cloudflared` no longer sees the hub's other settings. (#161)
+
+### Fixed
+- **beta.36 starts on every hub**: A change to the database stopped the hub when someone was signed in. It runs now, and keeps everyone signed in. (#158)
+
+### Removed
+- **Update now**: A self-hosted hub no longer updates itself from the web, `moin update` or the MCP tool `update_hub`. It shows what is new and the command. Run `sh /opt/moin/update.sh` on the server. The hub never gets Docker, not even to update itself. (#160)
+- **Settings from 1Password in `update.sh`**: `env.tpl` and `op-token` are no longer filled. Write your settings into `/opt/moin/.env`. (#161)
+
+### Upgrade
+Self-hosted, once: move your settings to `/opt/moin/.env` and fetch the new files. The steps: [Coming from before v1.0.0-beta.37](/docs/self-hosting#coming-from-before-v100-beta37). Your daemons update by themselves.
+
 ## v1.0.0-beta.36
 
 November 26, 2026
