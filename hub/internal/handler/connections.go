@@ -5,10 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/repository"
@@ -25,73 +23,27 @@ type ConnectionsHandler struct {
 	ciTokens    *service.CITokenService
 	apps        *service.AppService
 	passkeys    *service.PasskeyService
-	auth        *service.AuthService
 }
 
-func NewConnectionsHandler(connections *service.ConnectionService, ciTokens *service.CITokenService, apps *service.AppService, passkeys *service.PasskeyService, auth *service.AuthService) *ConnectionsHandler {
-	return &ConnectionsHandler{connections: connections, ciTokens: ciTokens, apps: apps, passkeys: passkeys, auth: auth}
+func NewConnectionsHandler(connections *service.ConnectionService, ciTokens *service.CITokenService, apps *service.AppService, passkeys *service.PasskeyService) *ConnectionsHandler {
+	return &ConnectionsHandler{connections: connections, ciTokens: ciTokens, apps: apps, passkeys: passkeys}
 }
 
-// confirmView is the card that asks the person to confirm, when they have
-// to before more rights or a new CI token.
+// confirmView is the card that asks the person to confirm it is them,
+// when they have to before more rights or a new CI token.
 func (h *ConnectionsHandler) confirmView(r *http.Request) pages.ConfirmView {
-	err := h.passkeys.Present(ctxkeys.Session(r.Context()))
-	if err == nil {
+	if h.passkeys.Present(ctxkeys.Session(r.Context())) == nil {
 		return pages.ConfirmView{}
 	}
-	return pages.ConfirmView{Needed: true, Passkey: errors.Is(err, service.ErrPresencePasskey), Next: r.URL.Path}
-}
-
-// Confirm checks the passkey's answer and goes back to the page it came
-// from: for five minutes, more rights and new CI tokens need nothing more.
-func (h *ConnectionsHandler) Confirm(w http.ResponseWriter, r *http.Request) {
-	base := ctxkeys.AppBasePath(r.Context())
-	next := r.FormValue("next")
-	if !strings.HasPrefix(next, base+"/settings/connections") && !strings.HasPrefix(next, base+"/settings/ci-tokens") {
-		next = base + "/settings/connections"
-	}
-	err := h.passkeys.Confirm(service.Presence{
-		Session:  ctxkeys.Session(r.Context()),
-		Ceremony: takePasskeyCeremony(w, r),
-		Answer:   []byte(r.FormValue("passkey")),
-	})
-	if err != nil {
-		slog.Warn("confirming with a passkey failed", "error", err)
-	}
-	redirect(w, r, next, http.StatusSeeOther)
-}
-
-// ConfirmOptions starts the passkey ceremony of Confirm.
-func (h *ConnectionsHandler) ConfirmOptions(w http.ResponseWriter, r *http.Request) {
-	options, ceremony, err := h.passkeys.BeginConfirm(ctxkeys.Session(r.Context()))
-	if err != nil {
-		passkeyFailed(w, err)
-		return
-	}
-	setPasskeyCeremony(w, r, ceremony)
-	api.JSON(w, http.StatusOK, options)
-}
-
-// Reauth signs the person out and sends them to sign in again, any way
-// in: an account without a passkey gives more rights only with a sign-in
-// less than five minutes old.
-func (h *ConnectionsHandler) Reauth(w http.ResponseWriter, r *http.Request) {
-	if err := h.auth.EndSession(r); err != nil {
-		renderError(w, "end session failed", err)
-		return
-	}
-	h.auth.ClearSessionCookie(w)
-	redirect(w, r, "/auth", http.StatusSeeOther)
+	return pages.ConfirmView{Needed: true, Next: r.URL.Path}
 }
 
 // presenceMessage is what a switch or the form says when the person has to
 // confirm first.
 func presenceMessage(err error) (string, bool) {
 	switch {
-	case errors.Is(err, service.ErrPresencePasskey):
-		return "Confirm with your passkey first, at the top of the page.", true
-	case errors.Is(err, service.ErrPresenceSignIn):
-		return "Sign in again first, at the top of the page. Any sign-in in the last five minutes counts.", true
+	case errors.Is(err, service.ErrConfirm):
+		return "Confirm it's you first, at the top of the page.", true
 	case errors.Is(err, service.ErrImpersonating):
 		return "Impersonation is read-only.", true
 	}

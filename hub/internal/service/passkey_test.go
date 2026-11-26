@@ -182,7 +182,7 @@ func newPasskeyEnvironment(t *testing.T) passkeyEnvironment {
 		t.Fatal(err)
 	}
 	emailService := NewEmailService(environment.mailer, "http://localhost:8090", "Test App")
-	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, emailService, webAuthn)
+	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, repository.NewSessions(environment.database), emailService, webAuthn)
 	return passkeyEnvironment{authFlowEnvironment: environment, passkeys: passkeys}
 }
 
@@ -441,7 +441,7 @@ func TestRecoveryKeyBeatsAPasskeyAddInFlight(t *testing.T) {
 // A hub without passkeys refuses them.
 func TestPasskeysOffRefuses(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
-	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, nil, nil)
+	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, repository.NewSessions(environment.database), nil, nil)
 	if _, _, err := passkeys.BeginSignIn(); !errors.Is(err, ErrPasskeysOff) {
 		t.Fatalf("BeginSignIn() error = %v, want ErrPasskeysOff", err)
 	}
@@ -502,5 +502,52 @@ func TestPasskeyRename(t *testing.T) {
 	listed, err := environment.passkeys.List("ada")
 	if err != nil || len(listed) != 1 || listed[0].Name != strings.Repeat("ä", 64) {
 		t.Fatalf("List() = %+v, %v", listed, err)
+	}
+}
+
+// Confirming with GitHub needs the GitHub account the user signs in with.
+// It confirms this session now and keeps it and every other one: nobody
+// signs out.
+func TestConfirmWithGitHubKeepsTheSessions(t *testing.T) {
+	environment := newPasskeyEnvironment(t)
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
+	if err := environment.auth.ConnectGitHub("ada", GitHubAccount{ID: 7, Login: "ada"}); err != nil {
+		t.Fatal(err)
+	}
+	session := environment.session(t, "ada")
+	other := environment.session(t, "ada")
+	sessions := repository.NewSessions(environment.database)
+	environment.database.MustExec(`UPDATE sessions SET confirmed_at = $1 WHERE id = $2`, time.Now().Add(-time.Hour).UTC(), session.ID)
+	session, err := sessions.ByTokenHash(session.TokenHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := environment.passkeys.Present(session); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("Present() an hour after signing in = %v, want ErrConfirm", err)
+	}
+
+	if err := environment.auth.ConfirmWithGitHub(session, GitHubAccount{ID: 8, Login: "mallory"}); !errors.Is(err, ErrGitHubOtherAccount) {
+		t.Fatalf("another GitHub account: error = %v, want ErrGitHubOtherAccount", err)
+	}
+	if stored, err := sessions.ByTokenHash(session.TokenHash); err != nil || environment.passkeys.Present(stored) == nil {
+		t.Fatalf("another GitHub account confirmed the session: %+v, %v", stored, err)
+	}
+	operator := "operator"
+	if err := environment.auth.ConfirmWithGitHub(&model.Session{ID: session.ID, UserID: "ada", ImpersonatorUserID: &operator}, GitHubAccount{ID: 7}); !errors.Is(err, ErrImpersonating) {
+		t.Fatalf("while impersonating: error = %v", err)
+	}
+
+	if err := environment.auth.ConfirmWithGitHub(session, GitHubAccount{ID: 7, Login: "ada"}); err != nil {
+		t.Fatalf("ConfirmWithGitHub() = %v", err)
+	}
+	stored, err := sessions.ByTokenHash(session.TokenHash)
+	if err != nil || environment.passkeys.Present(stored) != nil {
+		t.Fatalf("the session after confirming: %+v, %v", stored, err)
+	}
+	if _, err := sessions.ByTokenHash(other.TokenHash); err != nil {
+		t.Fatalf("the other session ended: %v", err)
+	}
+	if listed, err := sessions.ListByUserID("ada", time.Now()); err != nil || len(listed) != 2 {
+		t.Fatalf("sessions = %d, %v, want both", len(listed), err)
 	}
 }

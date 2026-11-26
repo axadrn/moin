@@ -28,17 +28,13 @@ type ConnectionsView struct {
 	Confirm ConfirmView
 }
 
-// ConfirmView is the card that asks the person to prove they are at the
-// browser before giving more rights or making a CI token: with their
-// passkey, or without one by signing in again. Needed is false while a
-// confirmation or a sign-in from the last five minutes counts.
+// ConfirmView is the card that asks the person to confirm it is them
+// before giving more rights or making a CI token. Needed is false while a
+// confirmation from the last five minutes counts.
 type ConfirmView struct {
-	Needed  bool
-	Passkey bool
-	// Next is the page to come back to after the passkey.
+	Needed bool
+	// Next is the page to come back to after confirming.
 	Next string
-	// Error says why the confirmation did not work.
-	Error string
 }
 
 // CITokenForm is the state of the form for a new CI token, with one message
@@ -156,12 +152,3 @@ func rightSwitchID(prefix string, right model.Rights) string {
 // editableRights are the rights a switch turns on and off: all but read,
 // which is always on.
 var editableRights = model.AllRights[1:]
-
-// confirmAction is where the card of ConfirmView sends its form: the
-// passkey's answer, or signing in again.
-func confirmAction(base string, passkey bool) string {
-	if passkey {
-		return base + "/settings/connections/confirm"
-	}
-	return base + "/settings/connections/reauth"
-}

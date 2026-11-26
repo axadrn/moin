@@ -57,6 +57,7 @@ func (e deviceLoginEnvironment) fresh(t *testing.T) *model.Session {
 	t.Helper()
 	session := e.session(t, e.user.User.ID)
 	session.CreatedAt = e.clock.now
+	session.ConfirmedAt = e.clock.now
 	return session
 }
 
@@ -212,16 +213,16 @@ func TestDeviceLoginRefusesWrongCodesAndForeignWorkspaces(t *testing.T) {
 	}
 }
 
-// TestApprovalNeedsAFreshSignInWithoutAPasskey: an account without a passkey
-// approves only with a sign-in less than five minutes old, and never while
-// an operator impersonates it.
-func TestApprovalNeedsAFreshSignInWithoutAPasskey(t *testing.T) {
+// TestApprovalNeedsAConfirmationWithoutAPasskey: an account without a
+// passkey approves only when it confirmed it is them in the last five
+// minutes, a sign-in included, and never while an operator impersonates it.
+func TestApprovalNeedsAConfirmationWithoutAPasskey(t *testing.T) {
 	e := newDeviceLoginEnvironment(t)
 	started := e.start(t)
 	old := e.fresh(t)
-	old.CreatedAt = e.clock.now.Add(-FreshSignIn - time.Second)
-	if _, err := e.approve(started.UserCode, model.DefaultRights, old); !errors.Is(err, ErrPresenceSignIn) {
-		t.Fatalf("Approve() with an old sign-in = %v, want ErrPresenceSignIn", err)
+	old.ConfirmedAt = e.clock.now.Add(-ConfirmedFor - time.Second)
+	if _, err := e.approve(started.UserCode, model.DefaultRights, old); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("Approve() with an old confirmation = %v, want ErrConfirm", err)
 	}
 	if _, err := e.approve(started.UserCode, model.DefaultRights, nil); !errors.Is(err, ErrImpersonating) {
 		t.Fatalf("Approve() without a session = %v, want ErrImpersonating", err)
@@ -353,30 +354,25 @@ func TestApprovalChecksTheWorkspaceBeforeThePasskey(t *testing.T) {
 	}
 }
 
-// TestPresentLastsFiveMinutes: an account without a passkey is present
-// for five minutes after any sign-in; one with a passkey for five minutes
-// after it confirmed with it on this session. Adding a passkey needs the
-// same.
+// TestPresentLastsFiveMinutes: a session counts as confirmed for five
+// minutes after it signed in or confirmed with a passkey, then no longer.
+// Adding a passkey needs the same.
 func TestPresentLastsFiveMinutes(t *testing.T) {
 	e := newDeviceLoginEnvironment(t)
 	session := e.fresh(t)
 	if err := e.passkeys.Present(session); err != nil {
 		t.Fatalf("Present() after signing in = %v", err)
 	}
-	e.clock.Add(FreshSignIn + time.Second)
-	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresenceSignIn) {
-		t.Fatalf("Present() later = %v, want ErrPresenceSignIn", err)
-	}
-	if _, _, err := e.passkeys.BeginAdd(session); !errors.Is(err, ErrPresenceSignIn) {
-		t.Fatalf("BeginAdd() on an old session = %v, want ErrPresenceSignIn", err)
-	}
-
-	session = e.fresh(t)
 	authenticator := newSoftAuthenticator(t)
 	e.add(t, session, authenticator)
-	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresencePasskey) {
-		t.Fatalf("Present() with a passkey, not confirmed = %v, want ErrPresencePasskey", err)
+	e.clock.Add(ConfirmedFor + time.Second)
+	if err := e.passkeys.Present(session); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("Present() later = %v, want ErrConfirm", err)
 	}
+	if _, _, err := e.passkeys.BeginAdd(session); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("BeginAdd() on an old confirmation = %v, want ErrConfirm", err)
+	}
+
 	options, ceremony, err := e.passkeys.BeginConfirm(session)
 	if err != nil {
 		t.Fatal(err)
@@ -388,19 +384,24 @@ func TestPresentLastsFiveMinutes(t *testing.T) {
 	if err := e.passkeys.Confirm(Presence{Session: session, Ceremony: ceremony, Answer: answer}); err != nil {
 		t.Fatalf("Confirm() = %v", err)
 	}
-	e.clock.Add(FreshSignIn - time.Second)
-	if err := e.passkeys.Present(session); err != nil {
+	// The session as the next request reads it.
+	stored, err := repository.NewSessions(e.database).ByTokenHash(session.TokenHash)
+	if err != nil || stored.ConfirmedAt.Sub(e.clock.now).Abs() > time.Second {
+		t.Fatalf("stored session = %+v, %v, want confirmed now", stored, err)
+	}
+	e.clock.Add(ConfirmedFor - time.Second)
+	if err := e.passkeys.Present(stored); err != nil {
 		t.Fatalf("Present() after confirming = %v", err)
 	}
-	if _, _, err := e.passkeys.BeginAdd(session); err != nil {
+	if _, _, err := e.passkeys.BeginAdd(stored); err != nil {
 		t.Fatalf("BeginAdd() after confirming = %v", err)
 	}
 	e.clock.Add(2 * time.Second)
-	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresencePasskey) {
-		t.Fatalf("Present() five minutes after confirming = %v, want ErrPresencePasskey", err)
+	if err := e.passkeys.Present(stored); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("Present() five minutes after confirming = %v, want ErrConfirm", err)
 	}
 	admin := "admin"
-	if err := e.passkeys.Present(&model.Session{ID: session.ID, UserID: session.UserID, ImpersonatorUserID: &admin}); !errors.Is(err, ErrImpersonating) {
+	if err := e.passkeys.Present(&model.Session{ID: session.ID, UserID: session.UserID, ConfirmedAt: e.clock.now, ImpersonatorUserID: &admin}); !errors.Is(err, ErrImpersonating) {
 		t.Fatalf("Present() impersonating = %v", err)
 	}
 }

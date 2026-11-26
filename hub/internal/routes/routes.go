@@ -231,7 +231,11 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, gi
 	if app.Passkeys.On() {
 		mux.HandleFunc("POST /auth/passkey/options", passkeyLimiter(middleware.RequireGuest(auth.PasskeyOptions)))
 		mux.HandleFunc("POST /auth/passkey", passkeyLimiter(middleware.RequireGuest(auth.SignInWithPasskey)))
+		mux.HandleFunc("POST /auth/confirm/passkey/options", passkeyLimiter(middleware.RequireAuth(auth.ConfirmPasskeyOptions)))
+		mux.HandleFunc("POST /auth/confirm/passkey", passkeyLimiter(middleware.RequireAuth(auth.ConfirmWithPasskey)))
 	}
+	// Confirm it's you, in place, before what needs it: no sign-out.
+	mux.HandleFunc("POST /auth/confirm/github", githubLimiter(middleware.RequireAuth(auth.ConfirmWithGitHub)))
 	mux.HandleFunc("GET /auth/onboarding", middleware.RequireAuth(auth.OnboardingPage))
 	mux.HandleFunc("GET /auth/github", githubLimiter(middleware.RequireGuest(auth.GitHubAuth)))
 	mux.HandleFunc("POST /auth/github/connect", githubLimiter(middleware.RequireAuth(auth.ConnectGitHub)))
@@ -244,23 +248,21 @@ func authRoutes(mux *http.ServeMux, app *app.App, rateLimiter, deviceLimiter, gi
 	mux.HandleFunc("GET /workspaces/invitations/{token}", workspaceInvitation.Show)
 	mux.HandleFunc("POST /workspaces/invitations/{token}", middleware.RequireAuth(workspaceInvitation.Accept))
 	// moin login in the browser: the page signs in first by itself.
-	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Passkeys, app.AuthService, app.Cfg)
+	device := handler.NewDeviceHandler(app.DeviceLoginService, app.WorkspaceService, app.Passkeys, app.Cfg)
 	mux.HandleFunc("GET /device", deviceLimiter(device.Show))
 	if app.Passkeys.On() {
 		mux.HandleFunc("POST /device/passkey/options", passkeyLimiter(middleware.RequireAuth(device.PasskeyOptions)))
 	}
 	mux.HandleFunc("POST /device/approve", deviceLimiter(middleware.RequireAuth(device.Approve)))
-	mux.HandleFunc("POST /device/reauth", deviceLimiter(middleware.RequireAuth(device.Reauth)))
 	mux.HandleFunc("POST /device/deny", deviceLimiter(middleware.RequireAuth(device.Deny)))
 	// AI agents sign in on the same approval page, with OAuth; the page
 	// shares the budget of moin login.
-	oauth := handler.NewOAuthHandler(app.OAuthService, app.WorkspaceService, app.Passkeys, app.AuthService, app.Cfg)
+	oauth := handler.NewOAuthHandler(app.OAuthService, app.WorkspaceService, app.Passkeys, app.Cfg)
 	mux.HandleFunc("GET /oauth/authorize", deviceLimiter(oauth.Authorize))
 	if app.Passkeys.On() {
 		mux.HandleFunc("POST /oauth/passkey/options", passkeyLimiter(middleware.RequireAuth(device.PasskeyOptions)))
 	}
 	mux.HandleFunc("POST /oauth/approve", deviceLimiter(middleware.RequireAuth(oauth.Approve)))
-	mux.HandleFunc("POST /oauth/reauth", deviceLimiter(middleware.RequireAuth(oauth.Reauth)))
 	mux.HandleFunc("POST /oauth/deny", deviceLimiter(middleware.RequireAuth(oauth.Deny)))
 	// How an MCP client finds all of it: the metadata of /mcp (RFC 9728),
 	// at its own path and at the root, and of the hub as an authorization
@@ -284,7 +286,7 @@ func inWorkspace(app *app.App) func(http.HandlerFunc) http.HandlerFunc {
 func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvitations, passkeyLimiter limiter) {
 	workspace := inWorkspace(app)
 	settings := handler.NewSettingsHandler(app.AuthService, app.Passkeys, app.AppService, app.UpdateService)
-	connections := handler.NewConnectionsHandler(app.ConnectionService, app.CITokenService, app.AppService, app.Passkeys, app.AuthService)
+	connections := handler.NewConnectionsHandler(app.ConnectionService, app.CITokenService, app.AppService, app.Passkeys)
 	profile := handler.NewProfileHandler(app.UserService)
 	account := handler.NewAccountHandler(app.AuthService, app.UserService, app.FileService)
 	workspaceHandler := handler.NewWorkspaceHandler(app.WorkspaceService)
@@ -311,9 +313,6 @@ func workspaceRoutes(mux *http.ServeMux, app *app.App, emailChanges, limitInvita
 	mux.HandleFunc("PATCH /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RenamePasskey))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/passkeys/{id}", workspace(settings.RemovePasskey))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections", workspace(connections.Page))
-	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm/options", passkeyLimiter(workspace(connections.ConfirmOptions)))
-	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/confirm", passkeyLimiter(workspace(connections.Confirm)))
-	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/reauth", workspace(connections.Reauth))
 	mux.HandleFunc("GET /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.Connection))
 	mux.HandleFunc("POST /app/{workspaceSlug}/settings/connections/{id}/rights/{right}", workspace(connections.SetConnectionRight))
 	mux.HandleFunc("DELETE /app/{workspaceSlug}/settings/connections/{id}", workspace(connections.RemoveConnection))

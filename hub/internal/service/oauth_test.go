@@ -333,7 +333,7 @@ func TestACodeNobodyTradedEndsItsConnection(t *testing.T) {
 }
 
 // TestOAuthApprovalNeedsPresenceAndAWorkspaceOfOnesOwn: the approval is
-// the one of `moin login`: a fresh sign-in or the passkey right then,
+// the one of `moin login`: a fresh confirmation or the passkey right then,
 // never an impersonation, and only into one's own workspace.
 func TestOAuthApprovalNeedsPresenceAndAWorkspaceOfOnesOwn(t *testing.T) {
 	e := newOAuthEnvironment(t)
@@ -347,9 +347,9 @@ func TestOAuthApprovalNeedsPresenceAndAWorkspaceOfOnesOwn(t *testing.T) {
 		return err
 	}
 	old := e.fresh(t)
-	old.CreatedAt = e.clock.now.Add(-FreshSignIn - time.Second)
-	if err := approve(e.user.Workspace.ID, Presence{Session: old}); !errors.Is(err, ErrPresenceSignIn) {
-		t.Fatalf("Approve() with an old sign-in = %v", err)
+	old.ConfirmedAt = e.clock.now.Add(-ConfirmedFor - time.Second)
+	if err := approve(e.user.Workspace.ID, Presence{Session: old}); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("Approve() with an old confirmation = %v", err)
 	}
 	operator := "operator"
 	impersonated := e.fresh(t)

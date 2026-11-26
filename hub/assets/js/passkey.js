@@ -5,13 +5,16 @@
 // checks everything; this only carries the JSON both ways, with the
 // browser's own PublicKeyCredential methods. On success the hub answers
 // where to go, like any sign-in. "confirm" puts the answer into the
-// button's form, in its passkey field, and sends the form.
+// button's form, in its passkey field, and sends the form. When the hub
+// answers 428, the person has to confirm it's them first: the page's
+// Confirm it's you dialog opens.
 (() => {
   if (window.moinPasskey) return;
   window.moinPasskey = true;
 
-  const say = (message) => {
-    const line = document.querySelector("[data-passkey-error]");
+  // The line in the button's dialog, else the page's.
+  const say = (button, message) => {
+    const line = button.closest("dialog")?.querySelector("[data-passkey-error]") || document.querySelector("[data-passkey-error]");
     if (!line) return;
     line.textContent = message;
     line.hidden = !message;
@@ -37,9 +40,9 @@
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-passkey]");
     if (!button || button.disabled) return;
-    say("");
+    say(button, "");
     if (!window.PublicKeyCredential?.parseCreationOptionsFromJSON) {
-      say("This browser cannot use passkeys here. Update it, or open the hub over HTTPS.");
+      say(button, "This browser cannot use passkeys here. Update it, or open the hub over HTTPS.");
       return;
     }
     const url = button.dataset.passkeyUrl;
@@ -47,7 +50,9 @@
     try {
       const options = await post(url + "/options");
       if (options.type === "opaqueredirect") return location.reload();
-      if (!options.ok) return say(await reason(options));
+      const confirm = document.getElementById("confirm-its-you");
+      if (options.status === 428 && confirm) return confirm.showModal();
+      if (!options.ok) return say(button, await reason(options));
       const json = await options.json();
       const credential =
         button.dataset.passkey === "add"
@@ -59,13 +64,13 @@
       }
       const answer = await post(url, JSON.stringify(credential.toJSON()));
       if (answer.type === "opaqueredirect") return location.reload();
-      if (!answer.ok) return say(await reason(answer));
+      if (!answer.ok) return say(button, await reason(answer));
       location.assign((await answer.json()).location);
     } catch (error) {
       // Closing the browser's dialog is no mistake.
       if (error.name === "NotAllowedError" || error.name === "AbortError") return;
-      if (error.name === "InvalidStateError") return say("This device has a passkey for your account already.");
-      say("Something went wrong. Please try again.");
+      if (error.name === "InvalidStateError") return say(button, "This device has a passkey for your account already.");
+      say(button, "Something went wrong. Please try again.");
     } finally {
       button.disabled = false;
     }
