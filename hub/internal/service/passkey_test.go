@@ -182,7 +182,7 @@ func newPasskeyEnvironment(t *testing.T) passkeyEnvironment {
 		t.Fatal(err)
 	}
 	emailService := NewEmailService(environment.mailer, "http://localhost:8090", "Test App")
-	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, emailService, webAuthn)
+	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, repository.NewSessions(environment.database), emailService, webAuthn)
 	return passkeyEnvironment{authFlowEnvironment: environment, passkeys: passkeys}
 }
 
@@ -208,6 +208,23 @@ func (e passkeyEnvironment) add(t *testing.T, session *model.Session, authentica
 		t.Fatalf("Add() error = %v", err)
 	}
 	return passkey
+}
+
+// confirm confirms session with authenticator, as Use passkey does: an
+// account with a passkey adds another only after that.
+func (e passkeyEnvironment) confirm(t *testing.T, session *model.Session, authenticator *softAuthenticator) {
+	t.Helper()
+	options, ceremony, err := e.passkeys.BeginConfirm(session)
+	if err != nil {
+		t.Fatalf("BeginConfirm() error = %v", err)
+	}
+	answer, err := io.ReadAll(authenticator.get(t, options, passkeyOrigin))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.passkeys.Confirm(Presence{Session: session, Ceremony: ceremony, Answer: answer}); err != nil {
+		t.Fatalf("Confirm() error = %v", err)
+	}
 }
 
 // signIn signs in with authenticator from origin.
@@ -368,11 +385,16 @@ func TestPasskeyKeepsTheLastWayIn(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	session := environment.session(t, "ada")
-	first := environment.add(t, session, newSoftAuthenticator(t))
+	firstKey := newSoftAuthenticator(t)
+	first := environment.add(t, session, firstKey)
 
 	if err := environment.passkeys.Remove(session, first.ID); !errors.Is(err, repository.ErrPasskeyLastWayIn) {
 		t.Fatalf("the last passkey: error = %v, want ErrPasskeyLastWayIn", err)
 	}
+	if _, _, err := environment.passkeys.BeginAdd(session); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("a second passkey without the first: error = %v, want ErrPresencePasskey", err)
+	}
+	environment.confirm(t, session, firstKey)
 	second := environment.add(t, session, newSoftAuthenticator(t))
 	if err := environment.passkeys.Remove(session, first.ID); err != nil {
 		t.Fatalf("one of two: error = %v", err)
@@ -441,7 +463,7 @@ func TestRecoveryKeyBeatsAPasskeyAddInFlight(t *testing.T) {
 // A hub without passkeys refuses them.
 func TestPasskeysOffRefuses(t *testing.T) {
 	environment := newAuthFlowEnvironment(t)
-	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, nil, nil)
+	passkeys := NewPasskeyService(repository.NewPasskeys(environment.database), environment.userRepository, repository.NewSessions(environment.database), nil, nil)
 	if _, _, err := passkeys.BeginSignIn(); !errors.Is(err, ErrPasskeysOff) {
 		t.Fatalf("BeginSignIn() error = %v, want ErrPasskeysOff", err)
 	}
@@ -456,6 +478,7 @@ func TestPasskeyIsNamedAfterItsPasswordManager(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	session := environment.session(t, "ada")
+	var last *softAuthenticator
 	for aaguid, want := range map[string]string{
 		"bada5566-a7aa-401f-bd96-45619a55120d": "1Password",
 		"fbfc3007-154e-4ecc-8c0b-6e020557d7bd": "Apple Passwords", // gitleaks:allow
@@ -465,6 +488,10 @@ func TestPasskeyIsNamedAfterItsPasswordManager(t *testing.T) {
 		authenticator := newSoftAuthenticator(t)
 		id := uuid.MustParse(aaguid)
 		authenticator.aaguid = id[:]
+		if last != nil {
+			environment.confirm(t, session, last)
+		}
+		last = authenticator
 		if passkey := environment.add(t, session, authenticator); passkey.Name != want {
 			t.Errorf("AAGUID %s: name = %q, want %q", aaguid, passkey.Name, want)
 		}
@@ -502,5 +529,52 @@ func TestPasskeyRename(t *testing.T) {
 	listed, err := environment.passkeys.List("ada")
 	if err != nil || len(listed) != 1 || listed[0].Name != strings.Repeat("ä", 64) {
 		t.Fatalf("List() = %+v, %v", listed, err)
+	}
+}
+
+// Confirming with GitHub needs the GitHub account the user signs in with.
+// It confirms this session now and keeps it and every other one: nobody
+// signs out.
+func TestConfirmWithGitHubKeepsTheSessions(t *testing.T) {
+	environment := newPasskeyEnvironment(t)
+	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
+	if err := environment.auth.ConnectGitHub("ada", GitHubAccount{ID: 7, Login: "ada"}); err != nil {
+		t.Fatal(err)
+	}
+	session := environment.session(t, "ada")
+	other := environment.session(t, "ada")
+	sessions := repository.NewSessions(environment.database)
+	environment.database.MustExec(`UPDATE sessions SET confirmed_at = $1 WHERE id = $2`, time.Now().Add(-time.Hour).UTC(), session.ID)
+	session, err := sessions.ByTokenHash(session.TokenHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := environment.passkeys.Present(session); !errors.Is(err, ErrConfirm) {
+		t.Fatalf("Present() an hour after signing in = %v, want ErrConfirm", err)
+	}
+
+	if err := environment.auth.ConfirmWithGitHub(session, GitHubAccount{ID: 8, Login: "mallory"}); !errors.Is(err, ErrGitHubOtherAccount) {
+		t.Fatalf("another GitHub account: error = %v, want ErrGitHubOtherAccount", err)
+	}
+	if stored, err := sessions.ByTokenHash(session.TokenHash); err != nil || environment.passkeys.Present(stored) == nil {
+		t.Fatalf("another GitHub account confirmed the session: %+v, %v", stored, err)
+	}
+	operator := "operator"
+	if err := environment.auth.ConfirmWithGitHub(&model.Session{ID: session.ID, UserID: "ada", ImpersonatorUserID: &operator}, GitHubAccount{ID: 7}); !errors.Is(err, ErrImpersonating) {
+		t.Fatalf("while impersonating: error = %v", err)
+	}
+
+	if err := environment.auth.ConfirmWithGitHub(session, GitHubAccount{ID: 7, Login: "ada"}); err != nil {
+		t.Fatalf("ConfirmWithGitHub() = %v", err)
+	}
+	stored, err := sessions.ByTokenHash(session.TokenHash)
+	if err != nil || environment.passkeys.Present(stored) != nil {
+		t.Fatalf("the session after confirming: %+v, %v", stored, err)
+	}
+	if _, err := sessions.ByTokenHash(other.TokenHash); err != nil {
+		t.Fatalf("the other session ended: %v", err)
+	}
+	if listed, err := sessions.ListByUserID("ada", time.Now()); err != nil || len(listed) != 2 {
+		t.Fatalf("sessions = %d, %v, want both", len(listed), err)
 	}
 }

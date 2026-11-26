@@ -31,14 +31,16 @@ func (r *Sessions) Create(session *model.Session) error {
 		session.ExpiresAt,
 		session.LastSeenAt,
 		session.CreatedAt,
+		session.ConfirmedAt,
+		session.ConfirmedWith,
 	)
 	return err
 }
 
 const insertSessionQuery = `
 		INSERT INTO sessions (
-			id, user_id, impersonator_user_id, token_hash, user_agent, expires_at, last_seen_at, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			id, user_id, impersonator_user_id, token_hash, user_agent, expires_at, last_seen_at, created_at, confirmed_at, confirmed_with
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 func (r *Sessions) ReplaceAllForUser(session *model.Session) error {
@@ -63,10 +65,26 @@ func (r *Sessions) ReplaceAllForUser(session *model.Session) error {
 		session.ExpiresAt,
 		session.LastSeenAt,
 		session.CreatedAt,
+		session.ConfirmedAt,
+		session.ConfirmedWith,
 	); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// Confirm notes that the person of the session confirmed it is them at
+// at, with a passkey or GitHub (model.ConfirmedWith...). A session that
+// ended is ErrSessionNotFound.
+func (r *Sessions) Confirm(id, with string, at time.Time) error {
+	result, err := r.db.Exec(`UPDATE sessions SET confirmed_at = $1, confirmed_with = $2 WHERE id = $3`, at, with, id)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
 }
 
 func (r *Sessions) ByTokenHash(tokenHash string) (*model.Session, error) {

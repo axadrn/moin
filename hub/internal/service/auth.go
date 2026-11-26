@@ -164,13 +164,15 @@ func (s *AuthService) newSession(r *http.Request, userID string) (*model.Session
 
 	now := time.Now()
 	session := &model.Session{
-		ID:         uuid.New().String(),
-		UserID:     userID,
-		TokenHash:  hashToken(token),
-		UserAgent:  truncateUserAgent(r.UserAgent()),
-		ExpiresAt:  now.Add(s.sessionExpiry),
-		LastSeenAt: now,
-		CreatedAt:  now,
+		ID:            uuid.New().String(),
+		UserID:        userID,
+		TokenHash:     hashToken(token),
+		UserAgent:     truncateUserAgent(r.UserAgent()),
+		ExpiresAt:     now.Add(s.sessionExpiry),
+		LastSeenAt:    now,
+		CreatedAt:     now,
+		ConfirmedAt:   now,
+		ConfirmedWith: model.ConfirmedWithSignIn,
 	}
 	return session, token, nil
 }

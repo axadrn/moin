@@ -35,7 +35,7 @@ func newOAuthHandlerTest(t *testing.T, passkeys bool) oauthHandlerTest {
 	}
 	return oauthHandlerTest{
 		deviceHandlerTest: device,
-		handler:           NewOAuthHandler(oauth, device.workspaces, device.passkeys, device.auth, &config.Config{}),
+		handler:           NewOAuthHandler(oauth, device.workspaces, device.passkeys, &config.Config{}),
 		oauth:             oauth,
 		client:            client,
 	}
@@ -152,9 +152,10 @@ func TestOAuthPageRefusesBadRequests(t *testing.T) {
 	}
 }
 
-// TestOAuthPageApprovesAndSendsBack: Allow with a fresh sign-in makes the
-// connection and sends the person back with the code, which gives its
-// tokens; an old sign-in allows nothing; Cancel sends access_denied.
+// TestOAuthPageApprovesAndSendsBack: Allow with a fresh confirmation makes
+// the connection and sends the person back with the code, which gives its
+// tokens; an old one allows nothing and the page asks to confirm, coming
+// back to the same request; Cancel sends access_denied.
 func TestOAuthPageApprovesAndSendsBack(t *testing.T) {
 	test := newOAuthHandlerTest(t, false)
 	redirect := "https://claude.example.com/callback"
@@ -162,11 +163,15 @@ func TestOAuthPageApprovesAndSendsBack(t *testing.T) {
 	form.Set("workspace_id", test.owner.Workspace.ID)
 	form["rights"] = []string{"deploy"}
 
-	old := test.session(t, service.FreshSignIn+time.Minute)
+	old := test.session(t, service.ConfirmedFor+time.Minute)
 	recorder := httptest.NewRecorder()
 	test.handler.Approve(recorder, deviceRequest(http.MethodPost, "/oauth/approve", form, test.owner.User, old))
-	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "older than five minutes") || recorder.Header().Get("Refresh") != "" {
-		t.Fatalf("old sign-in: status %d, body %s", recorder.Code, recorder.Body.String())
+	body := recorder.Body.String()
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(body, "Confirm it&#39;s you first.") || recorder.Header().Get("Refresh") != "" {
+		t.Fatalf("old confirmation: status %d, body %s", recorder.Code, body)
+	}
+	if !strings.Contains(body, `data-open-dialog="confirm-its-you"`) || !strings.Contains(body, "To allow this, confirm it&#39;s you.") {
+		t.Fatalf("old confirmation: the page asks nothing: %s", body)
 	}
 
 	recorder = httptest.NewRecorder()
@@ -189,13 +194,6 @@ func TestOAuthPageApprovesAndSendsBack(t *testing.T) {
 	denied, _ := url.Parse(strings.TrimPrefix(recorder.Header().Get("Refresh"), "0; url="))
 	if recorder.Code != http.StatusOK || denied.Query().Get("error") != "access_denied" || denied.Query().Get("code") != "" || !strings.Contains(recorder.Body.String(), "Nothing got access") {
 		t.Fatalf("deny: status %d, sent to %s", recorder.Code, denied)
-	}
-
-	// Sign in again: back to the same request after.
-	recorder = httptest.NewRecorder()
-	test.handler.Reauth(recorder, deviceRequest(http.MethodPost, "/oauth/reauth", form, test.owner.User, old))
-	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != "/auth" || approvalCookie(recorder) == nil {
-		t.Fatalf("reauth: status %d, location %q", recorder.Code, recorder.Header().Get("Location"))
 	}
 }
 

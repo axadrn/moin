@@ -20,12 +20,11 @@ type OAuthHandler struct {
 	oauth      *service.OAuthService
 	workspaces *service.WorkspaceService
 	passkeys   *service.PasskeyService
-	auth       *service.AuthService
 	cfg        *config.Config
 }
 
-func NewOAuthHandler(oauth *service.OAuthService, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, auth *service.AuthService, cfg *config.Config) *OAuthHandler {
-	return &OAuthHandler{oauth: oauth, workspaces: workspaces, passkeys: passkeys, auth: auth, cfg: cfg}
+func NewOAuthHandler(oauth *service.OAuthService, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, cfg *config.Config) *OAuthHandler {
+	return &OAuthHandler{oauth: oauth, workspaces: workspaces, passkeys: passkeys, cfg: cfg}
 }
 
 // authorizePath is the authorization endpoint.
@@ -58,7 +57,7 @@ func (h *OAuthHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 }
 
 // Approve makes the connection, with the person's passkey or a fresh
-// sign-in, and sends the person back to the client with the code.
+// confirmation, and sends the person back to the client with the code.
 func (h *OAuthHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	form := posted(r)
 	authorization, ok := h.check(w, r, service.ParseAuthorizationRequest(form))
@@ -101,23 +100,6 @@ func (h *OAuthHandler) Deny(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendBack(w, r, pages.OAuthDoneView{Host: authorization.RedirectHost(), Target: h.oauth.Deny(authorization)})
-}
-
-// Reauth signs the person out and sends them to sign in again and back
-// here after: an account without a passkey allows only with a sign-in less
-// than five minutes old.
-func (h *OAuthHandler) Reauth(w http.ResponseWriter, r *http.Request) {
-	authorization, ok := h.check(w, r, service.ParseAuthorizationRequest(posted(r)))
-	if !ok {
-		return
-	}
-	setPendingApproval(w, h.cfg, authorizePath+"?"+authorization.Request.Values().Encode())
-	if err := h.auth.EndSession(r); err != nil {
-		h.failed(w, r, err)
-		return
-	}
-	h.auth.ClearSessionCookie(w)
-	redirect(w, r, "/auth", http.StatusSeeOther)
 }
 
 // posted is the posted form. One that cannot be read is empty, which check
@@ -167,7 +149,7 @@ func (h *OAuthHandler) again(w http.ResponseWriter, r *http.Request, authorizati
 }
 
 func (h *OAuthHandler) view(r *http.Request, authorization *service.Authorization, workspaceID string, rights model.Rights) (pages.OAuthView, error) {
-	approval, err := approvalView(r, h.workspaces, h.passkeys, workspaceID, rights)
+	approval, err := approvalView(r, h.workspaces, h.passkeys, workspaceID, rights, authorizePath+"?"+authorization.Request.Values().Encode())
 	if err != nil {
 		return pages.OAuthView{}, err
 	}

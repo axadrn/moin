@@ -60,3 +60,21 @@ func TestSettingsListsPasskeys(t *testing.T) {
 		}
 	}
 }
+
+// Confirm it's you offers only the passkey to an account that has one, as
+// only it counts then, and GitHub to one without.
+func TestConfirmDialogOffersThePasskeyFirst(t *testing.T) {
+	githubID := int64(5)
+	for passkeys, want := range map[int]string{1: "Use passkey", 0: "Continue with GitHub"} {
+		ctx := ctxkeys.WithRenderConfig(context.Background(), config.RenderConfig{Passkeys: true, GitHubLogin: true})
+		ctx = ctxkeys.WithUser(ctx, &model.User{ID: "ada", Passkeys: passkeys, GitHubID: &githubID})
+		page := renderPage(t, ctx, ConfirmDialog("To add a passkey, confirm it's you.", "/device"))
+		other := "Continue with GitHub"
+		if passkeys == 0 {
+			other = "Use passkey"
+		}
+		if !strings.Contains(page, want) || strings.Contains(page, other) || !strings.Contains(page, `name="next" value="/device"`) {
+			t.Fatalf("%d passkeys: %s", passkeys, page)
+		}
+	}
+}

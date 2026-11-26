@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/axadrn/moin/hub/internal/api"
 	"github.com/axadrn/moin/hub/internal/brand"
@@ -24,17 +23,16 @@ const pendingApprovalCookie = "pending_approval"
 
 // DeviceHandler is the page where `moin login` is approved in the browser:
 // which workspace, which rights, and the person's passkey or a fresh
-// sign-in to allow it.
+// confirmation to allow it.
 type DeviceHandler struct {
 	logins     *service.DeviceLoginService
 	workspaces *service.WorkspaceService
 	passkeys   *service.PasskeyService
-	auth       *service.AuthService
 	cfg        *config.Config
 }
 
-func NewDeviceHandler(logins *service.DeviceLoginService, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, auth *service.AuthService, cfg *config.Config) *DeviceHandler {
-	return &DeviceHandler{logins: logins, workspaces: workspaces, passkeys: passkeys, auth: auth, cfg: cfg}
+func NewDeviceHandler(logins *service.DeviceLoginService, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, cfg *config.Config) *DeviceHandler {
+	return &DeviceHandler{logins: logins, workspaces: workspaces, passkeys: passkeys, cfg: cfg}
 }
 
 // Show asks for the code, or with ?code= shows the login to approve. Without
@@ -76,7 +74,7 @@ func (h *DeviceHandler) PasskeyOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 // Approve makes the connection, with the person's passkey or a fresh
-// sign-in. The computer's next poll gets its tokens.
+// confirmation. The computer's next poll gets its tokens.
 func (h *DeviceHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	code := service.FormatUserCode(r.FormValue("code"))
 	workspaceID := r.FormValue("workspace_id")
@@ -133,8 +131,8 @@ func approveError(err error) (message string, workspace, ok bool) {
 		return "Choose one of your workspaces.", true, true
 	case errors.Is(err, service.ErrPresencePasskey):
 		return "Allow with your passkey.", false, true
-	case errors.Is(err, service.ErrPresenceSignIn):
-		return "Your sign-in is older than five minutes. Sign in again, any way you like, then allow.", false, true
+	case errors.Is(err, service.ErrConfirm):
+		return "Confirm it's you first.", false, true
 	case errors.Is(err, service.ErrPasskeyRefused):
 		slog.Warn("passkey refused", "error", err)
 		return "This passkey did not work. Try again.", false, true
@@ -146,20 +144,6 @@ func approveError(err error) (message string, workspace, ok bool) {
 		return "You have 50 connections. Remove one in Settings, Connections.", false, true
 	}
 	return "", false, false
-}
-
-// Reauth signs the person out and sends them to sign in again, any way
-// in, and back here after: an account without a passkey allows a login
-// only with a sign-in less than five minutes old.
-func (h *DeviceHandler) Reauth(w http.ResponseWriter, r *http.Request) {
-	setPendingApproval(w, h.cfg, devicePath(r.FormValue("code")))
-	if err := h.auth.EndSession(r); err != nil {
-		h.codeError(w, r, r.FormValue("code"), err)
-		return
-	}
-	h.auth.ClearSessionCookie(w)
-	// Any way in counts, so the person picks one.
-	redirect(w, r, "/auth", http.StatusSeeOther)
 }
 
 // Deny turns the login down. Its next poll hears so and stops.
@@ -191,7 +175,7 @@ func (h *DeviceHandler) view(r *http.Request, code, workspaceID string, rights m
 	if err != nil {
 		return pages.DeviceView{}, err
 	}
-	approval, err := approvalView(r, h.workspaces, h.passkeys, workspaceID, rights)
+	approval, err := approvalView(r, h.workspaces, h.passkeys, workspaceID, rights, devicePath(code))
 	if err != nil {
 		return pages.DeviceView{}, err
 	}
@@ -200,8 +184,9 @@ func (h *DeviceHandler) view(r *http.Request, code, workspaceID string, rights m
 
 // approvalView is how the approval page asks this person, for `moin login`
 // and an AI agent alike: the workspaces the client can go into, the chosen
-// one or the first, the rights, and how Allow works for them.
-func approvalView(r *http.Request, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, workspaceID string, rights model.Rights) (pages.Approval, error) {
+// one or the first, the rights, and how Allow works for them. next is the
+// page itself, to come back to after confirming.
+func approvalView(r *http.Request, workspaces *service.WorkspaceService, passkeys *service.PasskeyService, workspaceID string, rights model.Rights, next string) (pages.Approval, error) {
 	user := ctxkeys.User(r.Context())
 	memberships, err := workspaces.ListForUser(user.ID)
 	if err != nil {
@@ -211,10 +196,8 @@ func approvalView(r *http.Request, workspaces *service.WorkspaceService, passkey
 	if err != nil {
 		return pages.Approval{}, err
 	}
-	view := pages.Approval{WorkspaceID: workspaceID, Rights: rights, Passkey: passkey, Passkeys: passkeys.On()}
-	if session := ctxkeys.Session(r.Context()); session != nil {
-		view.Fresh = time.Since(session.CreatedAt) < service.FreshSignIn
-	}
+	view := pages.Approval{WorkspaceID: workspaceID, Rights: rights, Passkey: passkey, Passkeys: passkeys.On(), Next: next}
+	view.Confirmed = passkeys.Present(ctxkeys.Session(r.Context())) == nil
 	for _, membership := range memberships {
 		view.Workspaces = append(view.Workspaces, pages.WorkspaceChoice{ID: membership.ID, Name: membership.Name})
 	}

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/axadrn/moin/hub/internal/model"
@@ -47,19 +46,15 @@ var (
 type PasskeyService struct {
 	passkeys *repository.Passkeys
 	users    *repository.Users
+	sessions *repository.Sessions
 	email    *EmailService
 	// webAuthn is nil on a hub without passkeys (app.newPasskeys).
 	webAuthn *webauthn.WebAuthn
 	now      func() time.Time
-	// confirmed is when each session last confirmed with a passkey, for
-	// Present. It lives as long as the hub runs: after a restart the
-	// person confirms again.
-	mu        sync.Mutex
-	confirmed map[string]time.Time
 }
 
-func NewPasskeyService(passkeys *repository.Passkeys, users *repository.Users, email *EmailService, webAuthn *webauthn.WebAuthn) *PasskeyService {
-	return &PasskeyService{passkeys: passkeys, users: users, email: email, webAuthn: webAuthn, now: time.Now, confirmed: map[string]time.Time{}}
+func NewPasskeyService(passkeys *repository.Passkeys, users *repository.Users, sessions *repository.Sessions, email *EmailService, webAuthn *webauthn.WebAuthn) *PasskeyService {
+	return &PasskeyService{passkeys: passkeys, users: users, sessions: sessions, email: email, webAuthn: webAuthn, now: time.Now}
 }
 
 // On says this hub offers passkeys. The sign-in page, the settings, the
@@ -138,23 +133,22 @@ func (s *PasskeyService) used(user *model.User, passkeys []model.Passkey, creden
 	return ErrPasskeyRefused
 }
 
-// FreshSignIn is how recent a sign-in must be to approve a connection
-// without a passkey, and how long a passkey confirmation counts for
-// Present.
-const FreshSignIn = 5 * time.Minute
+// ConfirmedFor is how long a confirmation counts: adding a passkey,
+// approving a connection and giving more rights need one this recent.
+const ConfirmedFor = 5 * time.Minute
 
 var (
+	// ErrConfirm asks a person without a passkey to confirm it is them:
+	// with GitHub, or by a sign-in. Nobody signs out for it.
+	ErrConfirm = errors.New("confirm it's you: it counts for five minutes")
 	// ErrPresencePasskey asks for the passkey: the account has one, so
-	// an approval needs it, right then.
+	// only the passkey confirms.
 	ErrPresencePasskey = errors.New("confirm with your passkey")
-	// ErrPresenceSignIn asks to sign in again: the account has no passkey
-	// and its sign-in, any way in, is older than FreshSignIn.
-	ErrPresenceSignIn = errors.New("sign in again: any sign-in in the last five minutes counts")
 )
 
 // Presence is the proof that the person is at the browser now, for an
 // approval: the browser's answer to a passkey ceremony begun for it, or
-// nothing when the account has no passkey and signed in just now.
+// nothing when the session confirmed just now.
 type Presence struct {
 	Session  *model.Session
 	Ceremony string
@@ -201,27 +195,24 @@ func (s *PasskeyService) BeginConfirm(session *model.Session) (*protocol.PublicK
 }
 
 // ConfirmPresence checks that the person of an approval is at the browser
-// now. An account with a passkey answers a ceremony from BeginConfirm with
-// it; go-webauthn checks the answer, the user and user verification. An
-// account without one, or on a hub without passkeys, must have signed in
-// less than FreshSignIn ago. Impersonation never approves.
+// now: with the passkey's answer to a ceremony from BeginConfirm, which
+// confirms the session (Confirm), then as Present says.
 func (s *PasskeyService) ConfirmPresence(presence Presence) error {
+	if len(presence.Answer) > 0 {
+		if err := s.Confirm(presence); err != nil {
+			return err
+		}
+	}
+	return s.Present(presence.Session)
+}
+
+// Confirm checks the passkey's answer to a ceremony from BeginConfirm;
+// go-webauthn checks the answer, the user and user verification. Then the
+// session counts as confirmed now. Impersonation never confirms.
+func (s *PasskeyService) Confirm(presence Presence) error {
 	session := presence.Session
 	if session == nil || session.IsImpersonating() {
 		return ErrImpersonating
-	}
-	needs, err := s.NeedsPasskey(session.UserID)
-	if err != nil {
-		return err
-	}
-	if !needs {
-		if s.now().Sub(session.CreatedAt) > FreshSignIn {
-			return ErrPresenceSignIn
-		}
-		return nil
-	}
-	if len(presence.Answer) == 0 {
-		return ErrPresencePasskey
 	}
 	data, err := s.takeCeremony(presence.Ceremony)
 	if err != nil {
@@ -243,33 +234,23 @@ func (s *PasskeyService) ConfirmPresence(presence Presence) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrPasskeyRefused, err)
 	}
-	return s.used(user, passkeys, credential)
-}
-
-// Confirm checks presence as ConfirmPresence does and remembers it for the
-// session: for FreshSignIn, Present says yes. Giving a connection or CI
-// token more rights asks Present, so a few switches need one passkey.
-func (s *PasskeyService) Confirm(presence Presence) error {
-	if err := s.ConfirmPresence(presence); err != nil {
+	if err := s.used(user, passkeys, credential); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := s.now()
-	for id, at := range s.confirmed {
-		if now.Sub(at) > FreshSignIn {
-			delete(s.confirmed, id)
-		}
+	now := s.now().UTC()
+	if err := s.sessions.Confirm(session.ID, model.ConfirmedWithPasskey, now); err != nil {
+		return err
 	}
-	s.confirmed[presence.Session.ID] = now
+	session.ConfirmedAt, session.ConfirmedWith = now, model.ConfirmedWithPasskey
 	return nil
 }
 
-// Present reports whether the person of session proved just now that they
-// are at the browser, as an approval asks: an account with a passkey
-// confirmed with it on this session in the last five minutes (Confirm), an
-// account without one signed in in the last five minutes. It answers
-// ErrPresencePasskey or ErrPresenceSignIn otherwise. Impersonation never is.
+// Present is the one rule for what needs the person right now: adding a
+// passkey, approving a connection, more rights and new CI tokens. The
+// session confirmed it is them in the last ConfirmedFor: an account with a
+// passkey with that passkey (Confirm), else ErrPresencePasskey; an account
+// without one at sign-in or with GitHub (AuthService.ConfirmWithGitHub),
+// else ErrConfirm. Impersonation never is.
 func (s *PasskeyService) Present(session *model.Session) error {
 	if session == nil || session.IsImpersonating() {
 		return ErrImpersonating
@@ -278,36 +259,14 @@ func (s *PasskeyService) Present(session *model.Session) error {
 	if err != nil {
 		return err
 	}
-	now := s.now()
-	if !needs {
-		if now.Sub(session.CreatedAt) > FreshSignIn {
-			return ErrPresenceSignIn
-		}
-		return nil
-	}
-	s.mu.Lock()
-	at, ok := s.confirmed[session.ID]
-	s.mu.Unlock()
-	if !ok || now.Sub(at) > FreshSignIn {
+	fresh := s.now().Sub(session.ConfirmedAt) <= ConfirmedFor
+	switch {
+	case needs && (!fresh || session.ConfirmedWith != model.ConfirmedWithPasskey):
 		return ErrPresencePasskey
+	case !fresh:
+		return ErrConfirm
 	}
 	return nil
-}
-
-// freshForPasskey refuses to add a passkey on a session older than
-// FreshSignIn, unless it confirmed with a passkey in that time: a passkey
-// approves connections, so a stolen session must not add its own.
-func (s *PasskeyService) freshForPasskey(session *model.Session) error {
-	if s.now().Sub(session.CreatedAt) <= FreshSignIn {
-		return nil
-	}
-	s.mu.Lock()
-	at, ok := s.confirmed[session.ID]
-	s.mu.Unlock()
-	if ok && s.now().Sub(at) <= FreshSignIn {
-		return nil
-	}
-	return ErrPresenceSignIn
 }
 
 // BeginAdd starts adding a passkey to the user of session. It returns the
@@ -320,7 +279,7 @@ func (s *PasskeyService) BeginAdd(session *model.Session) (*protocol.PublicKeyCr
 	if s.webAuthn == nil {
 		return nil, "", ErrPasskeysOff
 	}
-	if err := s.freshForPasskey(session); err != nil {
+	if err := s.Present(session); err != nil {
 		return nil, "", err
 	}
 	user, err := s.users.ByID(session.UserID)
@@ -346,14 +305,16 @@ func (s *PasskeyService) BeginAdd(session *model.Session) (*protocol.PublicKeyCr
 }
 
 // Add checks the browser's answer to the options of the ceremony and
-// stores the new passkey, named after its password manager (passkeyMaker). Only the user who began the ceremony adds with it,
-// and only while session is live and fresh (freshForPasskey). An email tells the user, so a passkey
-// nobody expected does not go unseen.
+// stores the new passkey, named after its password manager (passkeyMaker).
+// Only the user who began the ceremony adds with it, and only while
+// session is live and confirmed (Present): a passkey approves connections,
+// so a stolen session must not add its own. An email tells the user, so a
+// passkey nobody expected does not go unseen.
 func (s *PasskeyService) Add(session *model.Session, ceremony string, answer io.Reader) (*model.Passkey, error) {
 	if session == nil || session.IsImpersonating() {
 		return nil, ErrImpersonating
 	}
-	if err := s.freshForPasskey(session); err != nil {
+	if err := s.Present(session); err != nil {
 		return nil, err
 	}
 	data, err := s.takeCeremony(ceremony)

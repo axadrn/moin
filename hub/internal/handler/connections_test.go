@@ -40,7 +40,7 @@ func newConnectionsTest(t *testing.T) connectionsTest {
 	servers := service.NewServerService(repository.NewServers(database), repository.NewActivity(database), "https://app.example.com")
 	apps := service.NewAppService(repository.NewApps(database, database), servers, box)
 	ciTokens := service.NewCITokenService(repository.NewCITokens(database), repository.NewApps(database, database), device.workspaces)
-	return connectionsTest{deviceHandlerTest: device, handler: NewConnectionsHandler(device.connections, ciTokens, apps, device.passkeys, device.auth), ciTokens: ciTokens, signedIn: device.session(t, 0)}
+	return connectionsTest{deviceHandlerTest: device, handler: NewConnectionsHandler(device.connections, ciTokens, apps, device.passkeys), ciTokens: ciTokens, signedIn: device.session(t, 0)}
 }
 
 // request runs the page of pattern at path as the owner, from htmx when
@@ -178,10 +178,11 @@ func TestCITokenFromThePage(t *testing.T) {
 	}
 }
 
-// TestMoreRightsNeedAFreshSignIn: with a sign-in older than five minutes
-// and no passkey, turning a right on and making a CI token are refused and
-// the page asks to sign in again; turning one off and removing are not.
-func TestMoreRightsNeedAFreshSignIn(t *testing.T) {
+// TestMoreRightsNeedAConfirmation: with a confirmation older than five
+// minutes, turning a right on and making a CI token are refused and the
+// page asks to confirm it's you, in place; turning one off and removing
+// are not.
+func TestMoreRightsNeedAConfirmation(t *testing.T) {
 	test := newConnectionsTest(t)
 	test.signedIn = test.session(t, 10*time.Minute)
 	connection, err := test.connections.Create(service.NewConnection{UserID: test.owner.User.ID, WorkspaceID: test.owner.Workspace.ID, ClientName: "moin CLI on host-1", Rights: model.DefaultRights})
@@ -192,11 +193,11 @@ func TestMoreRightsNeedAFreshSignIn(t *testing.T) {
 	path := base + "/settings/connections/" + link.ID(connection.ID)
 
 	detail := test.request(t, http.MethodGet, "/app/{workspaceSlug}/settings/connections/{id}", path, nil, test.handler.Connection)
-	if !strings.Contains(detail.Body.String(), "Confirm it&#39;s you") || !strings.Contains(detail.Body.String(), base+"/settings/connections/reauth") {
+	if !strings.Contains(detail.Body.String(), "Confirm it&#39;s you") || !strings.Contains(detail.Body.String(), "More rights and new CI tokens need it.") || strings.Contains(detail.Body.String(), "reauth") {
 		t.Fatalf("detail asks nothing: %s", detail.Body.String())
 	}
 	on := test.request(t, http.MethodPost, "/app/{workspaceSlug}/settings/connections/{id}/rights/{right}", path+"/rights/servers", url.Values{"on": {"1"}}, test.handler.SetConnectionRight)
-	if strings.Contains(on.Body.String(), `value="1" checked`) || !strings.Contains(on.Body.String(), "Sign in again first") {
+	if strings.Contains(on.Body.String(), `value="1" checked`) || !strings.Contains(on.Body.String(), "Confirm it&#39;s you first") {
 		t.Fatalf("servers on: %d %s", on.Code, on.Body.String())
 	}
 	off := test.request(t, http.MethodPost, "/app/{workspaceSlug}/settings/connections/{id}/rights/{right}", path+"/rights/deploy", url.Values{}, test.handler.SetConnectionRight)

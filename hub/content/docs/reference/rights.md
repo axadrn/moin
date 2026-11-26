@@ -28,7 +28,7 @@ Every client that acts for you has rights: the CLI and the TUI of a computer, an
 - **no token**: a connection or CI token never calls it, whatever its rights: your sessions, passkeys and email, rights themselves, new CI tokens, roles, leaving or deleting a workspace or the account, billing, admin. A signed-in browser does, and nobody needs to be signed in for the steps of signing in.
 - A CI token for one app reaches only the endpoints of that app, `GET /api/v1/account` and `GET /api/v1/meta`. Everything else answers `403` `app_only`, MCP too.
 
-Giving more is guarded like letting a client in. Turning a right on and making a CI token need your passkey, or without one a sign-in from the last five minutes, any way in. A passkey counts for five minutes, so a few switches need it once. Turning a right off and removing never ask.
+Giving more is guarded like letting a client in. Turning a right on and making a CI token need you to confirm it's you: with your passkey if you have one, else with GitHub or a sign-in. It counts for five minutes, so a few switches need it once. Turning a right off and removing never ask.
 
 The MCP tools say their right in the [tools table](/docs/guides/mcp#tools) and at the end of their description.
 

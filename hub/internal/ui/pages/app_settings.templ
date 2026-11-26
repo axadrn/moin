@@ -32,6 +32,7 @@ templ Settings(sessions []model.Session, currentSessionID string, passkeys []mod
 					}
 					if ctxkeys.RenderConfig(ctx).Passkeys {
 						@SettingsPasskeysSection(passkeys, naming)
+						@ConfirmDialog("To add a passkey, confirm it's you.", settingsPath+"?tab=security")
 						@passkeyScript()
 					}
 					@SettingsSessionsSection(sessions, currentSessionID)

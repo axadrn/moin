@@ -244,34 +244,17 @@ templ SettingsCIToken(view CITokenView) {
 	}
 }
 
-// ConfirmCard asks the person to confirm before more rights or a new CI
-// token, as the approval of a login does: with the passkey, which counts
-// for five minutes, or without one by signing in again, any way in.
-// Turning a right off and removing never ask.
+// ConfirmCard asks the person to confirm it is them before more rights or
+// a new CI token, as the approval of a login does: with their passkey or
+// GitHub, in place. It counts for five minutes. Turning a right off and
+// removing never ask.
 templ ConfirmCard(confirm ConfirmView) {
-	{{ base := ctxkeys.AppBasePath(ctx) }}
 	if confirm.Needed {
 		@components.Card(components.CardProps{Title: "Confirm it's you"}) {
-			<form method="post" action={ templ.SafeURL(confirmAction(base, confirm.Passkey)) } class="moin-stack" data-gap="3">
-				@components.CSRF()
-				if confirm.Passkey {
-					<p class="moin-small moin-muted">More rights and new CI tokens need your passkey. It counts for five minutes.</p>
-					<input type="hidden" name="passkey" value=""/>
-					<input type="hidden" name="next" value={ confirm.Next }/>
-					<p class="moin-message" data-state="failed" role="alert" data-passkey-error hidden?={ confirm.Error == "" }>{ confirm.Error }</p>
-					@components.Button(components.ButtonProps{Kind: components.Primary, Attrs: templ.Attributes{"type": "button", "data-passkey": "confirm", "data-passkey-url": base + "/settings/connections/confirm"}}) {
-						Confirm with passkey
-					}
-				} else {
-					<p class="moin-small moin-muted">More rights and new CI tokens need a sign-in from the last five minutes. Any way in counts.</p>
-					@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
-						Sign in again
-					}
-				}
-			</form>
-		}
-		if confirm.Passkey {
-			@passkeyScript()
+			<div class="moin-stack" data-gap="3">
+				<p class="moin-small moin-muted">More rights and new CI tokens need it. It counts for five minutes.</p>
+				@confirmWays(confirm.Next)
+			</div>
 		}
 	}
 }

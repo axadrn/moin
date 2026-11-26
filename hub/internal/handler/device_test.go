@@ -47,12 +47,12 @@ func newDeviceHandlerTest(t *testing.T, passkeys bool) deviceHandlerTest {
 			t.Fatal(err)
 		}
 	}
-	passkeyService := service.NewPasskeyService(repository.NewPasskeys(database), users, email, webAuthn)
+	passkeyService := service.NewPasskeyService(repository.NewPasskeys(database), users, repository.NewSessions(database), email, webAuthn)
 	connections := service.NewConnectionService(repository.NewConnections(database), workspaces)
 	logins := service.NewDeviceLoginService(repository.NewDeviceLogins(database), connections, passkeyService)
 	auth := service.NewAuthService(users, repository.NewTokens(database), repository.NewSessions(database), workspaces, email, false, time.Hour, time.Hour, time.Hour)
 	return deviceHandlerTest{
-		handler:     NewDeviceHandler(logins, workspaces, passkeyService, auth, &config.Config{}),
+		handler:     NewDeviceHandler(logins, workspaces, passkeyService, &config.Config{}),
 		logins:      logins,
 		connections: connections,
 		workspaces:  workspaces,
@@ -63,7 +63,8 @@ func newDeviceHandlerTest(t *testing.T, passkeys bool) deviceHandlerTest {
 	}
 }
 
-// session is a session of the owner that signed in age ago.
+// session is a session of the owner that signed in, and last confirmed it
+// is them, age ago.
 func (test deviceHandlerTest) session(t *testing.T, age time.Duration) *model.Session {
 	t.Helper()
 	session, _, err := test.auth.CreateSession(httptest.NewRequest(http.MethodGet, "/", nil), test.owner.User.ID)
@@ -71,6 +72,7 @@ func (test deviceHandlerTest) session(t *testing.T, age time.Duration) *model.Se
 		t.Fatal(err)
 	}
 	session.CreatedAt = time.Now().Add(-age)
+	session.ConfirmedAt = session.CreatedAt
 	return session
 }
 
@@ -179,38 +181,40 @@ func TestDevicePageApprovesWithTheRightsPicked(t *testing.T) {
 	}
 }
 
-// TestDevicePageAsksToSignInAgain: without a passkey, a sign-in older than
-// five minutes allows nothing; the page signs out and comes back after a
-// new sign-in.
-func TestDevicePageAsksToSignInAgain(t *testing.T) {
+// TestDevicePageAsksToConfirm: without a passkey, a confirmation older
+// than five minutes allows nothing; the page asks to confirm it's you in
+// place, with GitHub, and comes back to itself. Nobody signs out.
+func TestDevicePageAsksToConfirm(t *testing.T) {
 	test := newDeviceHandlerTest(t, false)
 	started, err := test.logins.Start("host-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	old := test.session(t, service.FreshSignIn+time.Minute)
+	old := test.session(t, service.ConfirmedFor+time.Minute)
+	user := *test.owner.User
+	githubID := int64(5)
+	user.GitHubID = &githubID
+	request := deviceRequest(http.MethodGet, "/device?code="+started.UserCode, nil, &user, old)
+	request = request.WithContext(ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{GitHubLogin: true}))
 	recorder := httptest.NewRecorder()
-	test.handler.Show(recorder, deviceRequest(http.MethodGet, "/device?code="+started.UserCode, nil, test.owner.User, old))
-	if body := recorder.Body.String(); !strings.Contains(body, "Sign in again to allow") || !strings.Contains(body, `formaction="/device/reauth"`) {
-		t.Fatalf("old sign-in: body %s", body)
+	test.handler.Show(recorder, request)
+	body := recorder.Body.String()
+	for _, want := range []string{"Confirm it's you", `data-open-dialog="confirm-its-you"`, "To allow this, confirm it&#39;s you.", `action="/auth/confirm/github"`, `name="next" value="/device?code=` + started.UserCode + `"`, "Continue with GitHub"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("old confirmation: the page lacks %s: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "reauth") || strings.Contains(body, "Sign in again") {
+		t.Fatalf("the page still signs out: %s", body)
 	}
 	form := url.Values{"code": {started.UserCode}, "workspace_id": {test.owner.Workspace.ID}}
 	recorder = httptest.NewRecorder()
 	test.handler.Approve(recorder, deviceRequest(http.MethodPost, "/device/approve", form, test.owner.User, old))
-	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "older than five minutes") {
-		t.Fatalf("approve with an old sign-in: status %d, body %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "Confirm it&#39;s you first.") {
+		t.Fatalf("approve with an old confirmation: status %d, body %s", recorder.Code, recorder.Body.String())
 	}
 	if connections, _ := test.connections.List(test.owner.User.ID); len(connections) != 0 {
-		t.Fatalf("an old sign-in made a connection: %+v", connections)
-	}
-
-	recorder = httptest.NewRecorder()
-	test.handler.Reauth(recorder, deviceRequest(http.MethodPost, "/device/reauth", form, test.owner.User, old))
-	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != "/auth" {
-		t.Fatalf("reauth: status %d, location %q", recorder.Code, recorder.Header().Get("Location"))
-	}
-	if cookie := deviceCookie(recorder); cookie == nil || cookie.Value != base64.RawURLEncoding.EncodeToString([]byte("/device?code="+started.UserCode)) {
-		t.Fatalf("reauth kept no pending code: %#v", cookie)
+		t.Fatalf("an old confirmation made a connection: %+v", connections)
 	}
 }
 
