@@ -138,12 +138,12 @@ func (s *PasskeyService) used(user *model.User, passkeys []model.Passkey, creden
 const ConfirmedFor = 5 * time.Minute
 
 var (
-	// ErrConfirm asks the person to confirm it is them: with a passkey or
-	// with GitHub. A sign-in counts too. Nobody signs out for it.
+	// ErrConfirm asks a person without a passkey to confirm it is them:
+	// with GitHub, or by a sign-in. Nobody signs out for it.
 	ErrConfirm = errors.New("confirm it's you: it counts for five minutes")
-	// ErrPresencePasskey asks for the passkey: the account has one, so an
-	// approval needs it, right then.
-	ErrPresencePasskey = errors.New("allow with your passkey")
+	// ErrPresencePasskey asks for the passkey: the account has one, so
+	// only the passkey confirms.
+	ErrPresencePasskey = errors.New("confirm with your passkey")
 )
 
 // Presence is the proof that the person is at the browser now, for an
@@ -195,22 +195,13 @@ func (s *PasskeyService) BeginConfirm(session *model.Session) (*protocol.PublicK
 }
 
 // ConfirmPresence checks that the person of an approval is at the browser
-// now. An account with a passkey answers a ceremony from BeginConfirm with
-// it, right then (Confirm). An account without one, or on a hub without
-// passkeys, must have confirmed in the last ConfirmedFor (Present).
+// now: with the passkey's answer to a ceremony from BeginConfirm, which
+// confirms the session (Confirm), then as Present says.
 func (s *PasskeyService) ConfirmPresence(presence Presence) error {
-	if presence.Session == nil || presence.Session.IsImpersonating() {
-		return ErrImpersonating
-	}
 	if len(presence.Answer) > 0 {
-		return s.Confirm(presence)
-	}
-	needs, err := s.NeedsPasskey(presence.Session.UserID)
-	if err != nil {
-		return err
-	}
-	if needs {
-		return ErrPresencePasskey
+		if err := s.Confirm(presence); err != nil {
+			return err
+		}
 	}
 	return s.Present(presence.Session)
 }
@@ -247,22 +238,32 @@ func (s *PasskeyService) Confirm(presence Presence) error {
 		return err
 	}
 	now := s.now().UTC()
-	if err := s.sessions.Confirm(session.ID, now); err != nil {
+	if err := s.sessions.Confirm(session.ID, model.ConfirmedWithPasskey, now); err != nil {
 		return err
 	}
-	session.ConfirmedAt = now
+	session.ConfirmedAt, session.ConfirmedWith = now, model.ConfirmedWithPasskey
 	return nil
 }
 
-// Present is the one rule for what needs the person right now: the
-// session confirmed it is them in the last ConfirmedFor, at sign-in, with
-// a passkey (Confirm) or with GitHub (AuthService.ConfirmWithGitHub). Else
-// ErrConfirm. Impersonation never is.
+// Present is the one rule for what needs the person right now: adding a
+// passkey, approving a connection, more rights and new CI tokens. The
+// session confirmed it is them in the last ConfirmedFor: an account with a
+// passkey with that passkey (Confirm), else ErrPresencePasskey; an account
+// without one at sign-in or with GitHub (AuthService.ConfirmWithGitHub),
+// else ErrConfirm. Impersonation never is.
 func (s *PasskeyService) Present(session *model.Session) error {
 	if session == nil || session.IsImpersonating() {
 		return ErrImpersonating
 	}
-	if s.now().Sub(session.ConfirmedAt) > ConfirmedFor {
+	needs, err := s.NeedsPasskey(session.UserID)
+	if err != nil {
+		return err
+	}
+	fresh := s.now().Sub(session.ConfirmedAt) <= ConfirmedFor
+	switch {
+	case needs && (!fresh || session.ConfirmedWith != model.ConfirmedWithPasskey):
+		return ErrPresencePasskey
+	case !fresh:
 		return ErrConfirm
 	}
 	return nil

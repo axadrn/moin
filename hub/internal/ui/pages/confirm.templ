@@ -23,8 +23,10 @@ templ ConfirmDialog(why, next string) {
 	}
 }
 
-// confirmWays are the ways this person confirms it is them: their passkey,
-// the GitHub account they sign in with, or both. Each comes back to next.
+// confirmWays are the ways this person confirms it is them: their passkey
+// when they have one, as only it counts then (service.PasskeyService.
+// Present), else the GitHub account they sign in with. Each comes back to
+// next.
 templ confirmWays(next string) {
 	{{ user := ctxkeys.User(ctx) }}
 	{{ passkey := ctxkeys.RenderConfig(ctx).Passkeys && user.Passkeys > 0 }}
@@ -42,11 +44,11 @@ templ confirmWays(next string) {
 			<p class="moin-message" data-state="failed" role="alert" data-passkey-error hidden></p>
 			@passkeyScript()
 		}
-		if github {
+		if github && !passkey {
 			<form method="post" action="/auth/confirm/github">
 				@components.CSRF()
 				<input type="hidden" name="next" value={ next }/>
-				@components.Button(components.ButtonProps{Kind: githubKind(passkey), Type: "submit"}) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit"}) {
 					Continue with GitHub
 				}
 			</form>
@@ -57,13 +59,4 @@ templ confirmWays(next string) {
 			<p class="moin-text moin-muted">Sign in again to confirm.</p>
 		}
 	</div>
-}
-
-// githubKind makes Continue with GitHub the primary button, unless the
-// passkey is.
-func githubKind(passkey bool) components.Kind {
-	if passkey {
-		return ""
-	}
-	return components.Primary
 }

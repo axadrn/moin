@@ -42,6 +42,8 @@ func (h *ConnectionsHandler) confirmView(r *http.Request) pages.ConfirmView {
 // confirm first.
 func presenceMessage(err error) (string, bool) {
 	switch {
+	case errors.Is(err, service.ErrPresencePasskey):
+		return "Confirm with your passkey first, at the top of the page.", true
 	case errors.Is(err, service.ErrConfirm):
 		return "Confirm it's you first, at the top of the page.", true
 	case errors.Is(err, service.ErrImpersonating):

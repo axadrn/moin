@@ -354,17 +354,16 @@ func TestApprovalChecksTheWorkspaceBeforeThePasskey(t *testing.T) {
 	}
 }
 
-// TestPresentLastsFiveMinutes: a session counts as confirmed for five
-// minutes after it signed in or confirmed with a passkey, then no longer.
-// Adding a passkey needs the same.
+// TestPresentLastsFiveMinutes: without a passkey, a session counts as
+// confirmed for five minutes after it signed in. With a passkey only the
+// passkey counts: not the sign-in, not GitHub, for five minutes after
+// Confirm. Adding a passkey needs the same.
 func TestPresentLastsFiveMinutes(t *testing.T) {
 	e := newDeviceLoginEnvironment(t)
 	session := e.fresh(t)
 	if err := e.passkeys.Present(session); err != nil {
 		t.Fatalf("Present() after signing in = %v", err)
 	}
-	authenticator := newSoftAuthenticator(t)
-	e.add(t, session, authenticator)
 	e.clock.Add(ConfirmedFor + time.Second)
 	if err := e.passkeys.Present(session); !errors.Is(err, ErrConfirm) {
 		t.Fatalf("Present() later = %v, want ErrConfirm", err)
@@ -373,21 +372,22 @@ func TestPresentLastsFiveMinutes(t *testing.T) {
 		t.Fatalf("BeginAdd() on an old confirmation = %v, want ErrConfirm", err)
 	}
 
-	options, ceremony, err := e.passkeys.BeginConfirm(session)
-	if err != nil {
-		t.Fatal(err)
+	session = e.fresh(t)
+	authenticator := newSoftAuthenticator(t)
+	e.add(t, session, authenticator)
+	if err := e.passkeys.Present(session); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("Present() with a passkey, just signed in = %v, want ErrPresencePasskey", err)
 	}
-	answer, err := io.ReadAll(authenticator.get(t, options, passkeyOrigin))
-	if err != nil {
-		t.Fatal(err)
+	github := *session
+	github.ConfirmedWith = model.ConfirmedWithGitHub
+	if err := e.passkeys.Present(&github); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("Present() with a passkey, confirmed with GitHub = %v, want ErrPresencePasskey", err)
 	}
-	if err := e.passkeys.Confirm(Presence{Session: session, Ceremony: ceremony, Answer: answer}); err != nil {
-		t.Fatalf("Confirm() = %v", err)
-	}
+	e.confirm(t, session, authenticator)
 	// The session as the next request reads it.
 	stored, err := repository.NewSessions(e.database).ByTokenHash(session.TokenHash)
-	if err != nil || stored.ConfirmedAt.Sub(e.clock.now).Abs() > time.Second {
-		t.Fatalf("stored session = %+v, %v, want confirmed now", stored, err)
+	if err != nil || stored.ConfirmedWith != model.ConfirmedWithPasskey || stored.ConfirmedAt.Sub(e.clock.now).Abs() > time.Second {
+		t.Fatalf("stored session = %+v, %v, want confirmed with the passkey now", stored, err)
 	}
 	e.clock.Add(ConfirmedFor - time.Second)
 	if err := e.passkeys.Present(stored); err != nil {
@@ -397,11 +397,11 @@ func TestPresentLastsFiveMinutes(t *testing.T) {
 		t.Fatalf("BeginAdd() after confirming = %v", err)
 	}
 	e.clock.Add(2 * time.Second)
-	if err := e.passkeys.Present(stored); !errors.Is(err, ErrConfirm) {
-		t.Fatalf("Present() five minutes after confirming = %v, want ErrConfirm", err)
+	if err := e.passkeys.Present(stored); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("Present() five minutes after confirming = %v, want ErrPresencePasskey", err)
 	}
 	admin := "admin"
-	if err := e.passkeys.Present(&model.Session{ID: session.ID, UserID: session.UserID, ConfirmedAt: e.clock.now, ImpersonatorUserID: &admin}); !errors.Is(err, ErrImpersonating) {
+	if err := e.passkeys.Present(&model.Session{ID: session.ID, UserID: session.UserID, ConfirmedAt: e.clock.now, ConfirmedWith: model.ConfirmedWithPasskey, ImpersonatorUserID: &admin}); !errors.Is(err, ErrImpersonating) {
 		t.Fatalf("Present() impersonating = %v", err)
 	}
 }

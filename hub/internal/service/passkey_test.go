@@ -210,6 +210,23 @@ func (e passkeyEnvironment) add(t *testing.T, session *model.Session, authentica
 	return passkey
 }
 
+// confirm confirms session with authenticator, as Use passkey does: an
+// account with a passkey adds another only after that.
+func (e passkeyEnvironment) confirm(t *testing.T, session *model.Session, authenticator *softAuthenticator) {
+	t.Helper()
+	options, ceremony, err := e.passkeys.BeginConfirm(session)
+	if err != nil {
+		t.Fatalf("BeginConfirm() error = %v", err)
+	}
+	answer, err := io.ReadAll(authenticator.get(t, options, passkeyOrigin))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.passkeys.Confirm(Presence{Session: session, Ceremony: ceremony, Answer: answer}); err != nil {
+		t.Fatalf("Confirm() error = %v", err)
+	}
+}
+
 // signIn signs in with authenticator from origin.
 func (e passkeyEnvironment) signIn(t *testing.T, authenticator *softAuthenticator, origin string) (*model.User, error) {
 	t.Helper()
@@ -368,11 +385,16 @@ func TestPasskeyKeepsTheLastWayIn(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	session := environment.session(t, "ada")
-	first := environment.add(t, session, newSoftAuthenticator(t))
+	firstKey := newSoftAuthenticator(t)
+	first := environment.add(t, session, firstKey)
 
 	if err := environment.passkeys.Remove(session, first.ID); !errors.Is(err, repository.ErrPasskeyLastWayIn) {
 		t.Fatalf("the last passkey: error = %v, want ErrPasskeyLastWayIn", err)
 	}
+	if _, _, err := environment.passkeys.BeginAdd(session); !errors.Is(err, ErrPresencePasskey) {
+		t.Fatalf("a second passkey without the first: error = %v, want ErrPresencePasskey", err)
+	}
+	environment.confirm(t, session, firstKey)
 	second := environment.add(t, session, newSoftAuthenticator(t))
 	if err := environment.passkeys.Remove(session, first.ID); err != nil {
 		t.Fatalf("one of two: error = %v", err)
@@ -456,6 +478,7 @@ func TestPasskeyIsNamedAfterItsPasswordManager(t *testing.T) {
 	environment := newPasskeyEnvironment(t)
 	testutil.SeedUser(t, environment.database, testutil.UserOptions{ID: "ada", Email: "ada@example.com", Name: "Ada", Verified: true})
 	session := environment.session(t, "ada")
+	var last *softAuthenticator
 	for aaguid, want := range map[string]string{
 		"bada5566-a7aa-401f-bd96-45619a55120d": "1Password",
 		"fbfc3007-154e-4ecc-8c0b-6e020557d7bd": "Apple Passwords", // gitleaks:allow
@@ -465,6 +488,10 @@ func TestPasskeyIsNamedAfterItsPasswordManager(t *testing.T) {
 		authenticator := newSoftAuthenticator(t)
 		id := uuid.MustParse(aaguid)
 		authenticator.aaguid = id[:]
+		if last != nil {
+			environment.confirm(t, session, last)
+		}
+		last = authenticator
 		if passkey := environment.add(t, session, authenticator); passkey.Name != want {
 			t.Errorf("AAGUID %s: name = %q, want %q", aaguid, passkey.Name, want)
 		}

@@ -27,7 +27,7 @@ API: POST /api/v1/auth/device, then POST /api/v1/auth/token
 Only allow a code you started yourself. Someone who sends you a link to `/device` wants your access.
 
 - The rights start at read, deploy and env. Delete and servers are off. Turn on what this computer needs.
-- **Allow** needs your passkey right then, also when you just signed in. An account without a passkey allows within five minutes of signing in. After that the page says **Confirm it's you**: continue with GitHub, and you are back on the page, still signed in. [Add a passkey](#add-a-passkey) to approve faster.
+- **Allow** needs your passkey from the last five minutes, also when you just signed in. An account without a passkey allows within five minutes of signing in. After that the page says **Confirm it's you**: continue with GitHub, and you are back on the page, still signed in. [Add a passkey](#add-a-passkey) to approve faster.
 - No browser here? Open the address moin prints on any other device.
 - The code is good once, for ten minutes.
 - The CLI keeps the login in its config file, readable only by you. It renews itself every hour.
@@ -50,7 +50,7 @@ MCP: whoami, the rights of its own connection
 
 Each right is a switch. It counts from the connection's next request, and a live stream comes back with it within the hour. Only you, signed in in the browser, change rights: no connection gives itself more.
 
-Turning a right on asks you to confirm it's you, at the top of the page: **Use passkey** or **Continue with GitHub**. You stay signed in, and it counts for five minutes. Turning a right off never asks.
+Turning a right on asks you to confirm it's you, at the top of the page: **Use passkey**, or without a passkey **Continue with GitHub**. You stay signed in, and it counts for five minutes. Turning a right off never asks.
 
 ```surfaces
 Web: **Settings**, **Connections**, the connection, **Rights**
@@ -125,7 +125,7 @@ Web: **Settings**, **Account**, **Security** tab, **Passkeys**, **Add passkey**
 - Your browser asks where to keep it. Pick your password manager to have it on every device.
 - Then moin asks for its name, filled in with your password manager's, like 1Password, or "Passkey" when moin does not know it. Keep it or type your own. Your password manager lists it under your hub's address, like `moin.run`.
 - moin emails you when a passkey is added, so one you did not add does not go unseen.
-- Adding one needs a sign-in or a confirmation from the last five minutes. Otherwise **Add passkey** asks **Confirm it's you**: with a passkey you have or with GitHub, and you stay signed in. A passkey lets clients in, so a stolen session cannot add its own.
+- Adding one needs a confirmation from the last five minutes: with a passkey you have, or without one a sign-in or GitHub. Otherwise **Add passkey** asks **Confirm it's you**, and you stay signed in. A passkey lets clients in, so a stolen session cannot add its own.
 - Until you have one, every page asks: **Secure your account: add a passkey.**
 - On the sign-in page, **Sign in with a passkey**. No email to type: the passkey knows your account.
 

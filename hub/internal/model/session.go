@@ -14,10 +14,19 @@ type Session struct {
 	ExpiresAt          time.Time `db:"expires_at"`
 	LastSeenAt         time.Time `db:"last_seen_at"`
 	CreatedAt          time.Time `db:"created_at"`
-	// ConfirmedAt is when the person last confirmed it is them: at sign-in,
-	// with a passkey or with GitHub (PasskeyService.Present).
-	ConfirmedAt time.Time `db:"confirmed_at"`
+	// ConfirmedAt is when the person last confirmed it is them, and
+	// ConfirmedWith how: at sign-in, with a passkey or with GitHub
+	// (PasskeyService.Present).
+	ConfirmedAt   time.Time `db:"confirmed_at"`
+	ConfirmedWith string    `db:"confirmed_with"`
 }
+
+// How a session confirmed it is them, its ConfirmedWith.
+const (
+	ConfirmedWithSignIn  = "sign-in"
+	ConfirmedWithPasskey = "passkey"
+	ConfirmedWithGitHub  = "github"
+)
 
 func (s *Session) IsExpired(now time.Time) bool {
 	return !s.ExpiresAt.After(now)
