@@ -318,7 +318,7 @@ func beta34Server(t *testing.T) *apps {
 		t.Fatal(err)
 	}
 	a := newApps(dir, nil)
-	a.moveOldEnvs()
+	a.moveOldEnvs(t.Context())
 	return a
 }
 

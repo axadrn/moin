@@ -169,7 +169,7 @@ func Run(ctx context.Context, dir string, state State) error {
 	daemon.apps.registryLogin = daemon.security.registryLogin
 	daemon.updater = newUpdater(state.URL)
 	// Before the hub hears from the daemon, so hello names the env keys.
-	daemon.apps.moveOldEnvs()
+	daemon.apps.moveOldEnvs(ctx)
 	// A restore the daemon stopped in the middle of ends first: its
 	// switch is one step, so the database is whole; the app runs again
 	// and the result says which database it runs on.
