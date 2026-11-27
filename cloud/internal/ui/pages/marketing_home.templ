@@ -69,7 +69,6 @@ templ HomeHero() {
 					<span class="moin-muted">Lose nothing.</span>
 				</h1>
 				<p class="moin-lead moin-center"><a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground moin-hero-open" data-quiet>Open source.</a>{ " " }<br class="moin-only-phone"/>One command to your own server.<br/>Every backup proven, every day.</p>
-				<p class="moin-text moin-muted moin-center">The open source alternative to Coolify and Kamal. No open SSH port.</p>
 			</div>
 			<div class="moin-stack moin-hero-start" data-gap="6">
 				@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
