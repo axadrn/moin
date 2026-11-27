@@ -1,11 +1,13 @@
 ---
 title: "Security"
-description: "How moin keeps your servers safe, even if someone breaks into moin. Passkeys, sign-in, secrets, web, SSH, firewall, rules, the journal and signed updates."
+description: "How moin keeps your servers safe, even if someone breaks into moin. An open source daemon, passkeys, secrets, SSH, firewall, rules and signed updates."
 group: "Servers and data"
 order: 2
 ---
 
 How moin keeps your servers safe. First in pictures, then the facts.
+
+The daemon runs as root on your server, and every line of it is open source: [read the code](https://github.com/axadrn/moin/tree/main/internal/daemon).
 
 ## Add a passkey. Everyone should.
 

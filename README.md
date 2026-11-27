@@ -2,7 +2,9 @@
   <img src="hub/assets/img/og.png" alt="moin. Deploy anything. Lose nothing." width="100%">
 </p>
 
-Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule. Checked every day. Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP.
+Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule. Checked every day. For SQLite and Postgres, with web, CLI, terminal UI and MCP.
+
+All of moin is open source, in this repo. The daemon runs as root on your server, and you can read every line: [`internal/daemon`](internal/daemon). Host it yourself for free, with every feature.
 
 ```bash
 moin login              # log in through the browser

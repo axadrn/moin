@@ -31,6 +31,7 @@ func homeJSONLD(appURL string, billing bool) string {
 			"applicationCategory": "DeveloperApplication",
 			"operatingSystem":     "Linux",
 			"url":                 appURL,
+			"license":             layouts.GitHubURL + "/blob/main/LICENSE",
 			"offers":              homeOffers(billing),
 		},
 		{

@@ -19,5 +19,5 @@ const (
 	Media = "https://media.moin.run"
 	// Description is Promise with a few words for search engines, at most
 	// 160 characters: the description of the home page.
-	Description = Promise + " Open source. SQLite and Postgres. Web, CLI, terminal UI and MCP."
+	Description = Promise + " Open source, free to host yourself. SQLite and Postgres. Web, CLI, terminal UI and MCP."
 )
