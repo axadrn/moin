@@ -17,7 +17,7 @@ import (
 )
 
 // DefaultConfig is where the watcher reads its config.
-const DefaultConfig = "/etc/moin/watcher.yml"
+const DefaultConfig = "/etc/" + build.Name + "/watcher.yml"
 
 // Config is the watcher's one file:
 //
@@ -34,6 +34,7 @@ type Config struct {
 	Alerts   []alert.Destination `yaml:"alerts"`
 }
 
+// serverName is what a server may be called: a name or user@host.
 var serverName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@._-]{0,126}$`)
 
 // LoadConfig reads and checks the config at path.
@@ -63,6 +64,11 @@ func LoadConfig(path string) (Config, error) {
 			return config, fmt.Errorf("%s: %s and %s have the same token", path, other, name)
 		}
 		seen[token] = name
+	}
+	for _, d := range config.Alerts {
+		if d.Kind != "telegram" && d.Kind != "slack" && d.Kind != "discord" && d.Kind != "webhook" {
+			return config, fmt.Errorf("%s: unknown alert kind %q: use telegram, slack, discord or webhook", path, d.Kind)
+		}
 	}
 	return config, nil
 }

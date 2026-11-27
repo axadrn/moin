@@ -270,6 +270,7 @@ func TestLoadConfig(t *testing.T) {
 		"password: p\nservers:\n  prod: 0123456789abcdef0\n  web-1: 0123456789abcdef0\n",
 		"password: p\nservers:\n  'a b': 0123456789abcdef0\n",
 		"password: p\nunknown: 1\n",
+		"password: p\nalerts:\n  - kind: mail\n",
 	} {
 		if _, err := LoadConfig(write(bad)); err == nil {
 			t.Errorf("LoadConfig(%q) = nil, want an error", bad)

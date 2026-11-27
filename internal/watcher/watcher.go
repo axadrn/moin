@@ -38,7 +38,7 @@ const (
 )
 
 // DefaultDir is where the watcher keeps what it knows.
-const DefaultDir = "/var/lib/moin/watcher"
+const DefaultDir = "/var/lib/" + build.Name + "/watcher"
 
 // watcher holds the config and the state. mu guards state.
 type watcher struct {
