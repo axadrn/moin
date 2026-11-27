@@ -228,7 +228,33 @@ func overview(ctx context.Context, name string, args []string, stdout io.Writer)
 		return printJSON(stdout, overviewJSON(rows))
 	}
 	printApps(stdout, rows)
+	printNeeds(stdout, rows)
 	return nil
+}
+
+// printNeeds says under the table what needs you: a server nobody
+// watches, an app that does not run.
+func printNeeds(stdout io.Writer, rows []serverRow) {
+	var needs []string
+	for _, row := range rows {
+		if row.err != nil {
+			continue
+		}
+		if len(row.status.Watchers) == 0 {
+			needs = append(needs, fmt.Sprintf("%s reports to no watcher: nobody notices when it is gone. `%s watcher connect %s <url> <token>`", row.server, build.Name, row.server))
+		}
+		for _, app := range row.status.Apps {
+			if !app.Running {
+				needs = append(needs, fmt.Sprintf("%s does not run. See why with `%s logs %s`, start it with `%s start %s`", app.Name, build.Name, app.Name, build.Name, app.Name))
+			}
+		}
+	}
+	if len(needs) > 0 {
+		fmt.Fprintln(stdout)
+	}
+	for _, need := range needs {
+		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+commands(stdout, need))
+	}
 }
 
 // askServers asks every server at once and waits for all, at most

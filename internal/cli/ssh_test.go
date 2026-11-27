@@ -31,6 +31,15 @@ func TestGoArch(t *testing.T) {
 	}
 }
 
+// TestServerName drops the user of user@host.
+func TestServerName(t *testing.T) {
+	for server, want := range map[string]string{"prod": "prod", "root@203.0.113.7": "203.0.113.7"} {
+		if got := serverName(server); got != want {
+			t.Errorf("serverName(%q) = %q, want %q", server, got, want)
+		}
+	}
+}
+
 // TestReleaseNumber reads v3 and 3, nothing else.
 func TestReleaseNumber(t *testing.T) {
 	for text, want := range map[string]int{"v3": 3, "12": 12} {

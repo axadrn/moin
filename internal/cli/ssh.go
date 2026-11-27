@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/style"
 )
 
 // The CLI reaches a server the way `ssh <server>` does: the server is a
@@ -80,16 +81,22 @@ func sshOutput(ctx context.Context, server, line string, stdin io.Reader) ([]byt
 
 // sshLog runs line on server as root and shows what it says on stderr as a
 // deploy log: steps with →, tool output dimmed, a spinner on a terminal.
-// It returns what the server printed on stdout.
+// It returns what the server printed on stdout. When moin there fails,
+// its own ✗ line becomes the error.
 func sshLog(ctx context.Context, server, line string, stdin io.Reader, stdout io.Writer, first string) ([]byte, error) {
 	reader, writer := io.Pipe()
 	shown := make(chan struct{})
 	progress := newProgress(stdout, first)
+	failure := ""
 	go func() {
 		defer close(shown)
 		scanner := bufio.NewScanner(reader)
 		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 		for scanner.Scan() {
+			if message, ok := strings.CutPrefix(scanner.Text(), style.SymbolFailed+" "); ok {
+				failure = message
+				continue
+			}
 			progress.line(scanner.Text())
 		}
 	}()
@@ -98,6 +105,10 @@ func sshLog(ctx context.Context, server, line string, stdin io.Reader, stdout io
 	writer.Close()
 	<-shown
 	progress.end()
+	var code exitCode
+	if errors.As(err, &code) && failure != "" {
+		return nil, errors.New(failure)
+	}
 	return out.Bytes(), err
 }
 

@@ -64,7 +64,7 @@ Servers
 
 Watcher
   watcher run              Run a watcher, on another machine than your servers
-  watcher token            On the watcher: the line that connects a server: watcher token prod
+  watcher token            On the watcher: the line that connects a server: watcher token prod --url https://watcher.example.com
   watcher connect          On your laptop: the server reports there: watcher connect prod <url> <token>
   watcher disconnect       It no longer does: watcher disconnect prod <url>
 
@@ -160,14 +160,17 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 // checksUpdates reports whether the command looks for a newer release
-// first: the commands you type on your laptop, not those of a server.
+// first: the commands you type on your laptop, not those of a server or
+// a watcher.
 func checksUpdates(args []string) bool {
 	if len(args) == 0 {
 		return true
 	}
 	switch args[0] {
-	case "here", "daemon", "watcher", "version", "--version", "update":
+	case "here", "daemon", "version", "--version", "update":
 		return false
+	case "watcher":
+		return len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
 	}
 	return true
 }
@@ -216,9 +219,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "bucket":
 		return bucket(ctx, rest, stdin, stdout)
 	case "alerts":
-		return alerts(ctx, rest, stdout)
-	case "watchers":
-		return watchers(ctx, rest, stdout)
+		return alerts(ctx, rest, stdin, stdout)
 	case "watcher":
 		if len(rest) > 0 && (rest[0] == "connect" || rest[0] == "disconnect") {
 			return watchers(ctx, rest, stdout)

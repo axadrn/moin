@@ -37,20 +37,25 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
-	from, err := deploySource(ctx, *image, *catalogApp, stdout)
+	// With --json, stdout is for the JSON alone: the log goes to stderr.
+	log := stdout
+	if flags.json() {
+		log = os.Stderr
+	}
+	from, err := deploySource(ctx, *image, *catalogApp, log)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "%s · %s → %s\n", style.Bold.Render(app), from, server)
-	if err := setUp(ctx, server, app, flags.yes(), stdin, stdout); err != nil {
+	fmt.Fprintf(log, "%s · %s → %s\n", style.Bold.Render(app), from, server)
+	if err := setUp(ctx, server, app, flags.yes(), stdin, log); err != nil {
 		return err
 	}
 	if *image != "" {
-		if err := sendImage(ctx, server, *image, stdout); err != nil {
+		if err := sendImage(ctx, server, *image, log); err != nil {
 			return err
 		}
 	}
-	result, err := runDeploy(ctx, server, app, *image, *catalogApp, stdout)
+	result, err := runDeploy(ctx, server, app, *image, *catalogApp, log)
 	if err != nil {
 		return err
 	}
@@ -151,7 +156,7 @@ func runRelease(ctx context.Context, server string, args []string, stdin io.Read
 	out, err := sshLog(ctx, server, hereLine(args...), stdin, stdout, first)
 	var code exitCode
 	if errors.As(err, &code) {
-		return daemon.Result{}, fmt.Errorf("%s failed on %s: the lines above say why", args[0], server)
+		return daemon.Result{}, fmt.Errorf("it did not work on %s: the lines above say why", server)
 	}
 	if err != nil {
 		return daemon.Result{}, err
@@ -258,11 +263,25 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 			return fmt.Errorf("install Docker on %s: %w", server, err)
 		}
 	}
-	if info.version == "" {
-		step(stdout, "installing %s %s", build.Name, build.Version)
-		return installMoin(ctx, server, info.arch)
+	if info.version != "" {
+		return nil
 	}
-	return nil
+	step(stdout, "installing %s %s", build.Name, build.Version)
+	if err := installMoin(ctx, server, info.arch); err != nil {
+		return err
+	}
+	step(stdout, "starting the daemon: backups, restore checks, reports")
+	return sshRun(ctx, server, hereLine("setup", serverName(server)), nil, io.Discard, os.Stderr)
+}
+
+// serverName is the name the server gets on its own, for its backups and
+// its watchers: prod for prod, the host for user@host.
+func serverName(server string) string {
+	_, host, found := strings.Cut(server, "@")
+	if found {
+		return host
+	}
+	return server
 }
 
 // warnOtherVersion says when the server runs another moin than this CLI.

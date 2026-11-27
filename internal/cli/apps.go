@@ -43,7 +43,11 @@ func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if number > 0 {
 			command = append(command, "--to", strconv.Itoa(number))
 		}
-		result, err := runRelease(ctx, server, command, nil, stdout, "rolling back "+app)
+		log := stdout
+		if flags.json() {
+			log = os.Stderr
+		}
+		result, err := runRelease(ctx, server, command, nil, log, "rolling back "+app)
 		if err != nil {
 			return err
 		}
