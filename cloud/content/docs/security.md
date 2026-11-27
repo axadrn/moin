@@ -13,7 +13,7 @@ moin keeps the doors shut. And no service holds a key to your server: only you d
 
 Whoever can SSH to it as root. Nobody else.
 
-- Not a watcher, not moin cloud, not us. They only receive reports.
+- Not a watcher, not moin cloud, not us. They only receive reports, and moin cloud copies.
 - Every SSH user who may run moin is as strong as root on that server. For a user who is not root, moin runs `sudo` by itself. That needs sudo without a password.
 - With `moin follow`, whoever can push to the branch it follows can deploy too. [Deploy from CI](/docs/deploy#deploy-from-ci)
 
