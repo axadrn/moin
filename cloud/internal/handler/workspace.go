@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/axadrn/moin/cloud/internal/copies"
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 	"github.com/axadrn/moin/cloud/internal/watchers"
 	"github.com/axadrn/moin/cloud/internal/workspace"
@@ -65,6 +66,9 @@ type cliWorkspace struct {
 	Billing  string      `json:"billing"`
 	NeedsYou []string    `json:"needs_you"`
 	Servers  []cliServer `json:"servers"`
+	// Storage is how many bytes the copies take, of StorageLimit.
+	Storage      int64 `json:"storage"`
+	StorageLimit int64 `json:"storage_limit"`
 }
 
 type cliServer struct {
@@ -97,7 +101,13 @@ func (c *Cloud) CLIWorkspace(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "the watcher's view", err)
 		return
 	}
-	answer := cliWorkspace{Mail: space.Mail, Status: space.Status, Plan: plan(space), Billing: c.billingURL(space), NeedsYou: view.NeedsYou, Servers: []cliServer{}}
+	storage, err := c.store.Storage(space.ID)
+	if err != nil {
+		renderError(w, "the storage of the copies", err)
+		return
+	}
+	answer := cliWorkspace{Mail: space.Mail, Status: space.Status, Plan: plan(space), Billing: c.billingURL(space), NeedsYou: view.NeedsYou, Servers: []cliServer{},
+		Storage: storage, StorageLimit: copies.Storage}
 	if answer.NeedsYou == nil {
 		answer.NeedsYou = []string{}
 	}

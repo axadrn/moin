@@ -21,7 +21,7 @@ moin cloud connect prod
 `moin cloud connect prod` gives prod a token. From then on prod reports to moin cloud. Connect every server the same way.
 
 ```bash
-moin cloud                     # your plan, billing, your servers, what needs you
+moin cloud                     # your plan, billing, servers, copies, what needs you
 moin cloud disconnect prod     # prod no longer reports
 ```
 

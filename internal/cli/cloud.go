@@ -18,6 +18,7 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/daemon"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -249,6 +250,10 @@ type cloudWorkspace struct {
 		Version string `json:"version,omitempty"`
 		Apps    int    `json:"apps"`
 	} `json:"servers"`
+	// Storage is how many bytes the copies in moin cloud take, of
+	// StorageLimit.
+	Storage      int64 `json:"storage"`
+	StorageLimit int64 `json:"storage_limit"`
 }
 
 // cloudStatus is `moin cloud`: the workspace, its plan, its servers.
@@ -274,6 +279,9 @@ func cloudStatus(ctx context.Context, args []string, stdout io.Writer) error {
 	fmt.Fprintln(stdout, style.Bold.Render(space.Mail)+"  "+style.Muted.Render(space.Plan))
 	if space.Billing != "" {
 		fmt.Fprintln(stdout, style.Muted.Render("Billing: "+space.Billing))
+	}
+	if space.Status == "paid" || space.Storage > 0 {
+		fmt.Fprintln(stdout, style.Muted.Render("Copies: "+human.Size(float64(space.Storage))+" of "+human.Size(float64(space.StorageLimit))))
 	}
 	if len(space.Servers) == 0 {
 		fmt.Fprintln(stdout, style.Muted.Render("No servers yet."))
