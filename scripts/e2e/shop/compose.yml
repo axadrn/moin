@@ -1,0 +1,18 @@
+# shop: a tiny Node app with Postgres. Every request but /count writes a row.
+services:
+  web:
+    build: .
+    expose: ["3000"]
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: e2e-only
+      PGDATABASE: postgres
+      GREETING: ${GREETING:-}
+    depends_on: [db]
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: e2e-only
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
