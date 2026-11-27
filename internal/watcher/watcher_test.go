@@ -1,6 +1,8 @@
 package watcher
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -153,14 +155,14 @@ func TestReceiveChecks(t *testing.T) {
 	}
 }
 
-func testWatcher(t *testing.T) *watcher {
+func testSite(t *testing.T) *site {
 	t.Helper()
 	config := Config{Password: "hunter2", Servers: map[string]string{"prod": "prod-token-0123456789", "web-1": "web-token-0123456789"}}
-	w, err := newWatcher(config, t.TempDir(), t0)
+	s, err := newSite(config, t.TempDir(), t0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return w
+	return s
 }
 
 func post(t *testing.T, h http.Handler, token, body string) int {
@@ -175,8 +177,8 @@ func post(t *testing.T, h http.Handler, token, body string) int {
 }
 
 func TestReceiveAuth(t *testing.T) {
-	w := testWatcher(t)
-	h := w.routes()
+	s := testSite(t)
+	h := s.routes()
 	body := `{"server":"prod","every_seconds":60,"apps":[{"name":"shop","running":true,"domains":["shop.example.com"]}]}`
 	if code := post(t, h, "", body); code != http.StatusUnauthorized {
 		t.Errorf("no token: %d", code)
@@ -193,14 +195,14 @@ func TestReceiveAuth(t *testing.T) {
 	if code := post(t, h, "prod-token-0123456789", body); code != http.StatusNoContent {
 		t.Errorf("good report: %d", code)
 	}
-	if w.state.Servers["prod"] == nil || w.state.Domains["shop.example.com"] == nil {
-		t.Errorf("state = %+v", w.state)
+	if state := s.watcher.state; state.Servers["prod"] == nil || state.Domains["shop.example.com"] == nil {
+		t.Errorf("state = %+v", state)
 	}
 }
 
 func TestPage(t *testing.T) {
-	w := testWatcher(t)
-	h := w.routes()
+	s := testSite(t)
+	h := s.routes()
 	post(t, h, "prod-token-0123456789", `{"server":"prod","version":"v1.0.0","every_seconds":60,"apps":[{"name":"shop","release":3,"running":true,"domains":["shop.example.com"],"databases":[{"name":"main","kind":"sqlite"}]}]}`)
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -239,22 +241,23 @@ func TestPage(t *testing.T) {
 func TestStateSaved(t *testing.T) {
 	dir := t.TempDir()
 	config := Config{Password: "x", Servers: map[string]string{"prod": "prod-token-0123456789"}}
-	w, err := newWatcher(config, dir, t0)
+	s, err := newSite(config, dir, t0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	post(t, w.routes(), "prod-token-0123456789", `{"server":"prod","apps":[{"name":"shop","running":true,"domains":["shop.example.com"]}]}`)
-	w.check(t.Context())
+	post(t, s.routes(), "prod-token-0123456789", `{"server":"prod","apps":[{"name":"shop","running":true,"domains":["shop.example.com"]}]}`)
+	s.watcher.Tick(t.Context())
+	s.save()
 	if _, err := os.Stat(filepath.Join(dir, "state.json")); err != nil {
 		t.Fatal(err)
 	}
-	again, err := newWatcher(config, dir, t0)
-	if err != nil || again.state.Servers["prod"] == nil {
-		t.Fatalf("after restart: %v, %+v", err, again.state)
+	again, err := newSite(config, dir, t0)
+	if err != nil || again.watcher.state.Servers["prod"] == nil {
+		t.Fatalf("after restart: %v, %+v", err, again.watcher.state)
 	}
-	gone, err := newWatcher(Config{Password: "x"}, dir, t0)
-	if err != nil || len(gone.state.Servers) != 0 || len(gone.state.Domains) != 0 {
-		t.Fatalf("after removal from config: %v, %+v", err, gone.state)
+	gone, err := newSite(Config{Password: "x"}, dir, t0)
+	if err != nil || len(gone.watcher.state.Servers) != 0 || len(gone.watcher.state.Domains) != 0 {
+		t.Fatalf("after removal from config: %v, %+v", err, gone.watcher.state)
 	}
 }
 
@@ -305,14 +308,19 @@ func TestRestartKeepsSilence(t *testing.T) {
 	if got := s.alerts(t0, t0.Add(4*time.Minute)); len(got) != 1 {
 		t.Fatalf("alerts = %v, want the silence", got)
 	}
-	if err := s.save(filepath.Join(dir, "state.json")); err != nil {
-		t.Fatal(err)
-	}
-	restart := t0.Add(time.Hour)
-	w, err := newWatcher(config, dir, restart)
+	saved, err := json.Marshal(s)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), saved, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	restart := t0.Add(time.Hour)
+	restarted, err := newSite(config, dir, restart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := restarted.watcher
 	for _, at := range []time.Duration{time.Minute, 4 * time.Minute} {
 		if got := w.state.alerts(restart, restart.Add(at)); len(got) != 0 {
 			t.Fatalf("after the restart: %v", got)
@@ -385,16 +393,17 @@ func TestUnsentAgain(t *testing.T) {
 	}))
 	defer hook.Close()
 	config := Config{Password: "x", Servers: map[string]string{"prod": "prod-token-0123456789"}, Alerts: []alert.Destination{{Kind: "webhook", URL: hook.URL}}}
-	w, err := newWatcher(config, t.TempDir(), time.Now().Add(-time.Hour))
+	s, err := newSite(config, t.TempDir(), time.Now().Add(-time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
+	w := s.watcher
 	w.state.receive("prod", testReport(), time.Now().Add(-10*time.Minute))
-	w.check(t.Context())
+	w.Tick(t.Context())
 	if took != 0 || len(w.state.Unsent) != 1 {
 		t.Fatalf("after a failure: took %d, unsent %d", took, len(w.state.Unsent))
 	}
-	w.check(t.Context())
+	w.Tick(t.Context())
 	if took != 1 || len(w.state.Unsent) != 0 {
 		t.Fatalf("after the retry: took %d, unsent %d", took, len(w.state.Unsent))
 	}
@@ -428,14 +437,107 @@ func TestCorruptState(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newWatcher(Config{}, dir, t0); err == nil || !strings.Contains(err.Error(), "Delete it to start fresh") {
+	if _, err := newSite(Config{}, dir, t0); err == nil || !strings.Contains(err.Error(), "Delete it to start fresh") {
 		t.Errorf("err = %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte(`{"servers":null,"domains":null}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	w, err := newWatcher(Config{}, dir, t0)
-	if err != nil || w.state.Servers == nil || w.state.Domains == nil {
+	s, err := newSite(Config{}, dir, t0)
+	if err != nil || s.watcher.state.Servers == nil || s.watcher.state.Domains == nil {
 		t.Errorf("null maps: %v", err)
+	}
+}
+
+// Receive takes a report only of a server the watcher watches, under its
+// own name.
+func TestReceive(t *testing.T) {
+	w, err := New([]string{"prod"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Receive("prod", report.Report{Server: "web-1"}); err == nil {
+		t.Error("took a report that names another server")
+	}
+	if err := w.Receive("web-1", report.Report{Server: "web-1"}); err == nil {
+		t.Error("took a report of a server it does not watch")
+	}
+	if err := w.Receive("prod", testReport(report.App{Name: "a b"})); err == nil {
+		t.Error("took an odd app name")
+	}
+	if err := w.Receive("prod", testReport(shop)); err != nil {
+		t.Fatal(err)
+	}
+	view := w.View()
+	if len(view.Servers) != 1 || view.Servers[0].Name != "prod" || len(view.Servers[0].Apps) != 1 || view.Servers[0].Apps[0].Name != "shop" {
+		t.Errorf("view = %+v", view)
+	}
+}
+
+// What Save hands out, New takes back; Save writes only what changed, and
+// tries again after a failed write.
+func TestSaveAndNew(t *testing.T) {
+	w, err := New([]string{"prod"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved []byte
+	writes := 0
+	write := func(data []byte) error { writes++; saved = data; return nil }
+	if err := w.Save(write); err != nil || writes != 0 {
+		t.Fatalf("saved nothing new: %d writes, %v", writes, err)
+	}
+	if err := w.Receive("prod", testReport(shop)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Save(func([]byte) error { return os.ErrPermission }); err == nil {
+		t.Fatal("a failed write is no error")
+	}
+	if err := w.Save(write); err != nil || writes != 1 {
+		t.Fatalf("after the failed write: %d writes, %v", writes, err)
+	}
+	if err := w.Save(write); err != nil || writes != 1 {
+		t.Fatalf("saved twice: %d writes, %v", writes, err)
+	}
+	again, err := New([]string{"prod"}, nil, saved)
+	if err != nil || again.state.Servers["prod"] == nil || again.state.Domains["shop.example.com"] == nil {
+		t.Fatalf("New from saved: %v, %+v", err, again.state)
+	}
+	if _, err := New(nil, nil, []byte("{")); err == nil {
+		t.Error("took a state that is not JSON")
+	}
+}
+
+// moin cloud sends its own kind of alert, like mail, through Send.
+func TestOwnSend(t *testing.T) {
+	mail := alert.Destination{Kind: "mail", URL: "mailto:ada@example.com"}
+	w, err := newAt([]string{"prod"}, []alert.Destination{mail}, nil, t0.Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sent []alert.Message
+	w.Send = func(_ context.Context, to alert.Destination, m alert.Message) error {
+		if to != mail {
+			t.Errorf("sent to %+v", to)
+		}
+		sent = append(sent, m)
+		return nil
+	}
+	w.state.receive("prod", testReport(), time.Now().Add(-10*time.Minute))
+	w.Tick(t.Context())
+	if len(sent) != 1 || sent[0].Title != "prod stopped reporting" || len(w.state.Unsent) != 0 {
+		t.Errorf("sent = %+v, unsent = %d", sent, len(w.state.Unsent))
+	}
+}
+
+// A visitor runs no more visits at once than it may.
+func TestVisitorAtOnce(t *testing.T) {
+	v := NewVisitor(2)
+	v.slots <- struct{}{}
+	v.slots <- struct{}{}
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if got := v.Visit(ctx, "shop.example.com"); got != "stopped" {
+		t.Errorf("a visit with no free slot = %q, want it to wait", got)
 	}
 }

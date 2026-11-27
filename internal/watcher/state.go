@@ -2,11 +2,8 @@ package watcher
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -29,7 +26,7 @@ const (
 	kept = 100
 )
 
-// state is all the watcher knows, in one JSON file.
+// state is all a watcher knows. It is saved as JSON.
 type state struct {
 	Servers map[string]*server `json:"servers"`
 	// Domains are the domains of running apps, by name.
@@ -104,18 +101,14 @@ func newState() *state {
 	return &state{Servers: map[string]*server{}, Domains: map[string]*domain{}}
 }
 
-// loadState reads the state file; a missing one is an empty state.
-func loadState(path string) (*state, error) {
+// parseState reads a state saved before; nothing saved is an empty state.
+func parseState(saved []byte) (*state, error) {
 	s := newState()
-	data, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	if len(saved) == 0 {
 		return s, nil
 	}
-	if err != nil {
+	if err := json.Unmarshal(saved, s); err != nil {
 		return nil, err
-	}
-	if err := json.Unmarshal(data, s); err != nil {
-		return nil, fmt.Errorf("%s: %w. Delete it to start fresh", path, err)
 	}
 	if s.Servers == nil {
 		s.Servers = map[string]*server{}
@@ -126,29 +119,16 @@ func loadState(path string) (*state, error) {
 	return s, nil
 }
 
-// save writes the state file whole, or not at all.
-func (s *state) save(path string) error {
-	data, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return err
-	}
-	temp := path + ".tmp"
-	if err := os.WriteFile(temp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(temp, path)
-}
-
-// forget drops what the config no longer has: servers with their
+// forget drops what the watcher no longer watches: servers with their
 // domains, and unsent alerts to a destination that is gone.
-func (s *state) forget(config Config, now time.Time) {
+func (s *state) forget(servers []string, alerts []alert.Destination, now time.Time) {
 	for name := range s.Servers {
-		if _, ok := config.Servers[name]; !ok {
+		if !slices.Contains(servers, name) {
 			delete(s.Servers, name)
 		}
 	}
 	s.syncDomains(now)
-	s.Unsent = slices.DeleteFunc(s.Unsent, func(u unsent) bool { return !slices.Contains(config.Alerts, u.To) })
+	s.Unsent = slices.DeleteFunc(s.Unsent, func(u unsent) bool { return !slices.Contains(alerts, u.To) })
 }
 
 // receive keeps a report of server name, received at now: its restore

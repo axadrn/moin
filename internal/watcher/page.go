@@ -3,218 +3,27 @@ package watcher
 import (
 	"crypto/subtle"
 	"html/template"
-	"maps"
 	"net/http"
-	"slices"
-	"strconv"
-	"time"
 
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/report"
 )
 
-// page is the one page: what needs you, every server and its apps, the
-// last proven restore, recent outages. It only reads: nothing on it
-// changes anything. It asks for the password of the config, any user name.
-func (w *watcher) page(rw http.ResponseWriter, r *http.Request) {
+// page is the one page of `moin watcher run`: the watcher's View. It
+// only reads: nothing on it changes anything. It asks for the password
+// of the config, any user name.
+func (s *site) page(rw http.ResponseWriter, r *http.Request) {
 	_, password, ok := r.BasicAuth()
-	if !ok || subtle.ConstantTimeCompare([]byte(password), []byte(w.config.Password)) != 1 {
+	if !ok || subtle.ConstantTimeCompare([]byte(password), []byte(s.config.Password)) != 1 {
 		rw.Header().Set("WWW-Authenticate", `Basic realm="`+build.Name+` watcher", charset="UTF-8"`)
 		http.Error(rw, "the watcher asks for its password", http.StatusUnauthorized)
 		return
 	}
-	w.mu.Lock()
-	view := w.view(time.Now())
-	w.mu.Unlock()
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rw.Header().Set("Cache-Control", "no-store")
 	rw.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'")
-	if err := pageTemplate.Execute(rw, view); err != nil {
+	if err := pageTemplate.Execute(rw, s.watcher.View()); err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-// pageView is everything the page shows, ready to print.
-type pageView struct {
-	Name     string
-	NeedsYou []string
-	Servers  []serverView
-	Outages  []outageView
-	Checks   []checkView
-}
-
-// serverView, appView and lineView each have a Problem: one sentence
-// for "Needs you" when it is red, empty when it is fine.
-type serverView struct {
-	Name, Version, State, Problem string
-	OK                            bool
-	Apps                          []appView
-}
-
-type appView struct {
-	Name, State, Problem string
-	OK                   bool
-	Domains, Databases   []lineView
-}
-
-// lineView is one domain or one database.
-type lineView struct {
-	Name, State, Problem string
-}
-
-type outageView struct {
-	What, From, Lasted, Reason string
-	Open                       bool
-}
-
-type checkView struct {
-	What, At, Result string
-	OK               bool
-}
-
-// view is what the page shows at now. The caller holds w.mu.
-func (w *watcher) view(now time.Time) pageView {
-	v := pageView{Name: build.Name}
-	for _, name := range slices.Sorted(maps.Keys(w.config.Servers)) {
-		server := w.serverView(name, now)
-		v.Servers = append(v.Servers, server)
-		v.NeedsYou = append(v.NeedsYou, problems(server)...)
-	}
-	for _, o := range slices.Backward(w.state.Outages) {
-		v.Outages = append(v.Outages, outageLine(o, now))
-	}
-	for _, c := range slices.Backward(w.state.Checks) {
-		v.Checks = append(v.Checks, checkLine(c))
-	}
-	return v
-}
-
-// serverView is one server with its apps, from its newest report.
-func (w *watcher) serverView(name string, now time.Time) serverView {
-	srv := w.state.Servers[name]
-	if srv == nil {
-		return serverView{Name: name, State: "no report yet",
-			Problem: name + " has not reported yet. On your laptop: " + build.Name + " watcher connect " + name + " <watcher url> <token>"}
-	}
-	server := serverView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received)}
-	if srv.Silent {
-		server.Problem = name + " stopped reporting " + ago(now, srv.Received) + ". Look: ssh " + name
-	}
-	server.OK = server.Problem == ""
-	for _, app := range srv.Report.Apps {
-		a := w.appView(name, app, now)
-		server.OK = server.OK && a.OK
-		server.Apps = append(server.Apps, a)
-	}
-	return server
-}
-
-// appView is one app: running or not, its domains as seen from outside,
-// its databases with the last copy and the last proven restore.
-func (w *watcher) appView(server string, app report.App, now time.Time) appView {
-	a := appView{Name: app.Name, State: "v" + strconv.Itoa(app.Release) + " running"}
-	if !app.Running {
-		a.State = "v" + strconv.Itoa(app.Release) + " stopped"
-		a.Problem = app.Name + " on " + server + " is stopped."
-	}
-	a.OK = a.Problem == ""
-	for _, name := range app.Domains {
-		line := w.domainLine(name, app.Running)
-		a.OK = a.OK && line.Problem == ""
-		a.Domains = append(a.Domains, line)
-	}
-	for _, db := range app.Databases {
-		line := databaseLine(server, app.Name, db, now)
-		a.OK = a.OK && line.Problem == ""
-		a.Databases = append(a.Databases, line)
-	}
-	return a
-}
-
-// domainLine says whether a domain answers from outside.
-func (w *watcher) domainLine(name string, running bool) lineView {
-	d := w.state.Domains[name]
-	switch {
-	case !running || d == nil:
-		return lineView{Name: name, State: "not visited"}
-	case d.Visited.IsZero():
-		return lineView{Name: name, State: "not visited yet"}
-	case d.Down:
-		return lineView{Name: name, State: "down: " + d.Reason, Problem: name + " is down: " + d.Reason + "."}
-	}
-	return lineView{Name: name, State: "up"}
-}
-
-// databaseLine says when the last copy was made and which copy a restore
-// last proved. A failed check or a backup error makes it red.
-func databaseLine(server, app string, db report.Database, now time.Time) lineView {
-	line := lineView{Name: db.Name + " (" + db.Kind + ")", State: "copy " + ago(now, db.LastCopy) + ", restore proven " + ago(now, db.CheckedCopy)}
-	where := db.Name + " of " + app + " on " + server
-	if db.LastCopy.IsZero() {
-		line.Problem = where + " has no copy yet. Set up backups: " + build.Name + " bucket set " + server
-	}
-	if !db.LastCheck.IsZero() && !db.CheckOK {
-		line.State = "restore check failed " + ago(now, db.LastCheck) + ", " + line.State
-		line.Problem = "The restore check of " + where + " failed " + ago(now, db.LastCheck) + "."
-	}
-	if db.Error != "" {
-		line.State += ". " + db.Error
-		line.Problem = where + ": " + db.Error
-	}
-	return line
-}
-
-// problems lists what is red on a server, one sentence each.
-func problems(server serverView) []string {
-	var out []string
-	if server.Problem != "" {
-		out = append(out, server.Problem)
-	}
-	for _, app := range server.Apps {
-		if app.Problem != "" {
-			out = append(out, app.Problem)
-		}
-		for _, line := range slices.Concat(app.Domains, app.Databases) {
-			if line.Problem != "" {
-				out = append(out, line.Problem)
-			}
-		}
-	}
-	return out
-}
-
-// outageLine is one outage, newest first on the page.
-func outageLine(o outage, now time.Time) outageView {
-	what := o.Server + " stopped reporting"
-	if o.Domain != "" {
-		what = o.Domain + " down (" + o.App + " on " + o.Server + ")"
-	}
-	line := outageView{What: what, From: clock(o.From), Reason: o.Reason, Open: o.To.IsZero()}
-	if line.Open {
-		line.Lasted = "still, " + spoken(now.Sub(o.From))
-	} else {
-		line.Lasted = spoken(o.To.Sub(o.From))
-	}
-	return line
-}
-
-// checkLine is one restore check, newest first on the page.
-func checkLine(c check) checkView {
-	line := checkView{What: c.Database + " of " + c.App + " on " + c.Server, At: clock(c.At), OK: c.OK}
-	if c.OK {
-		line.Result = "restored the copy of " + clock(c.Copy)
-	} else {
-		line.Result = "failed: " + c.Error
-	}
-	return line
-}
-
-// ago is how long ago t was, or "never".
-func ago(now, t time.Time) string {
-	if t.IsZero() {
-		return "never"
-	}
-	return spoken(now.Sub(t)) + " ago"
 }
 
 var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
