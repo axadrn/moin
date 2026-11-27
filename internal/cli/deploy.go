@@ -70,7 +70,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if flags.json() {
 		return printJSON(stdout, result)
 	}
-	printLive(stdout, result)
+	printLive(stdout, result, server, len(result.Databases) == 0 || hasBucket(ctx, server))
 	if result.Release == 1 {
 		return offerClose(ctx, server, stdin, stdout)
 	}
@@ -183,8 +183,17 @@ func runRelease(ctx context.Context, server string, args []string, stdin io.Read
 	return result, readAnswer(server, out, &result)
 }
 
-// printLive says the app is live, with its address and what to do next.
-func printLive(stdout io.Writer, result daemon.Result) {
+// hasBucket reports whether the server has a bucket for its copies. When
+// it does not answer, it says yes: no hint is better than a wrong one.
+func hasBucket(ctx context.Context, server string) bool {
+	var bucket *daemon.Bucket
+	err := sshJSON(ctx, server, []string{"bucket"}, nil, &bucket)
+	return err != nil || bucket != nil
+}
+
+// printLive says the app is live, with its address and what to do next:
+// with a database, its backups, or the bucket they need first.
+func printLive(stdout io.Writer, result daemon.Result, server string, bucket bool) {
 	if len(result.Addresses) == 0 {
 		done(stdout, "%s. %s runs v%d. It has no address yet: `%s domains add %s <domain>`", build.Name, result.App, result.Release, build.Name, result.App)
 		return
@@ -193,7 +202,11 @@ func printLive(stdout io.Writer, result daemon.Result) {
 	for _, address := range result.Addresses[1:] {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("also "+address))
 	}
-	if len(result.Databases) > 0 {
+	switch {
+	case len(result.Databases) == 0:
+	case !bucket:
+		hint(stdout, strings.Join(result.Databases, " and ")+" found. No backup yet:", build.Name+" bucket set "+server)
+	default:
 		hint(stdout, strings.Join(result.Databases, " and ")+" found. See its backups:", build.Name+" backups "+result.App)
 	}
 }
