@@ -15,6 +15,8 @@ type Status struct {
 	Watchers []string    `json:"watchers"`
 	// PublicSSH: port 22 is open to the internet.
 	PublicSSH bool `json:"public_ssh"`
+	// KnocksToday is how many connections the firewall dropped today.
+	KnocksToday int64 `json:"knocks_today"`
 }
 
 // AppStatus is one app: its live release, whether its containers run, and
@@ -34,6 +36,7 @@ func StatusHere(ctx context.Context, dir string) Status {
 		status.Watchers = watchers
 	}
 	status.PublicSSH = PublicSSHHere(ctx, dir)
+	status.KnocksToday = knocksToday(dir)
 	for _, app := range a.names() {
 		release := a.current(app)
 		if release == 0 {

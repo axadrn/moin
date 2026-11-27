@@ -15,6 +15,7 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/daemon"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
@@ -235,13 +236,16 @@ func overview(ctx context.Context, name string, args []string, stdout io.Writer)
 // printNeeds says under the table what needs you: a server nobody
 // watches, an app that does not run.
 func printNeeds(stdout io.Writer, rows []serverRow) {
-	var needs, open []string
+	var needs, open, knocked []string
 	for _, row := range rows {
 		if row.err != nil {
 			continue
 		}
 		if row.status.PublicSSH {
 			open = append(open, row.server)
+		}
+		if row.status.KnocksToday > 0 {
+			knocked = append(knocked, row.server+": "+human.Knocks(row.status.KnocksToday))
 		}
 		if len(row.status.Watchers) == 0 {
 			needs = append(needs, fmt.Sprintf("%s reports to no watcher: nobody notices when it is gone. `%s watcher connect %s <url> <token>`", row.server, build.Name, row.server))
@@ -252,8 +256,11 @@ func printNeeds(stdout io.Writer, rows []serverRow) {
 			}
 		}
 	}
-	if len(needs)+len(open) > 0 {
+	if len(needs)+len(open)+len(knocked) > 0 {
 		fmt.Fprintln(stdout)
+	}
+	for _, line := range knocked {
+		fmt.Fprintln(stdout, style.Muted.Render(line))
 	}
 	for _, server := range open {
 		fmt.Fprintln(stdout, style.Danger.Render(server+": port 22 open to the internet")+"  "+style.Muted.Render("Close it:")+" "+command(stdout, build.Name+" secure "+server))
@@ -323,14 +330,15 @@ type serverJSON struct {
 	Apps     []daemon.AppStatus `json:"apps"`
 	Watchers []string           `json:"watchers"`
 	// PublicSSH: port 22 is open to the internet.
-	PublicSSH bool `json:"public_ssh"`
+	PublicSSH   bool  `json:"public_ssh"`
+	KnocksToday int64 `json:"knocks_today"`
 }
 
 // overviewJSON is the table of `moin` for scripts.
 func overviewJSON(rows []serverRow) []serverJSON {
 	list := []serverJSON{}
 	for _, row := range rows {
-		entry := serverJSON{Server: row.server, Version: row.status.Version, Apps: row.status.Apps, Watchers: row.status.Watchers, PublicSSH: row.status.PublicSSH}
+		entry := serverJSON{Server: row.server, Version: row.status.Version, Apps: row.status.Apps, Watchers: row.status.Watchers, PublicSSH: row.status.PublicSSH, KnocksToday: row.status.KnocksToday}
 		if row.err != nil {
 			entry.Error = explain(row.err)
 		}

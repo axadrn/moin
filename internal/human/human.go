@@ -4,6 +4,7 @@ package human
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -62,4 +63,22 @@ func pair(big int, bigUnit string, small int, smallUnit string) string {
 		return fmt.Sprintf("%d%s", big, bigUnit)
 	}
 	return fmt.Sprintf("%d%s %d%s", big, bigUnit, small, smallUnit)
+}
+
+// Count is a whole number with a comma every three digits: "4,812".
+func Count(n int64) string {
+	digits := strconv.FormatInt(n, 10)
+	for i := len(digits) - 3; i > 0 && digits[i-1] != '-'; i -= 3 {
+		digits = digits[:i] + "," + digits[i:]
+	}
+	return digits
+}
+
+// Knocks is the knocks a firewall dropped today: "4,812 knocks today,
+// all dropped".
+func Knocks(today int64) string {
+	if today == 1 {
+		return "1 knock today, dropped"
+	}
+	return Count(today) + " knocks today, all dropped"
 }

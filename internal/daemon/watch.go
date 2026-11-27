@@ -145,6 +145,7 @@ func (w *watch) report(ctx context.Context, config Config, containers map[string
 		return
 	}
 	r := report.Report{Server: config.Name, Version: build.Version, EverySeconds: int(watchEvery.Seconds()), Apps: []report.App{}}
+	r.Knocks = knocksReport(filepath.Dir(w.apps.dir))
 	for _, app := range w.apps.names() {
 		if w.apps.current(app) == 0 {
 			continue

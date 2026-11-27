@@ -30,6 +30,19 @@ type Report struct {
 	Version      string `json:"version"`       // moin version on the server
 	EverySeconds int    `json:"every_seconds"` // how often this daemon reports; silence = 3 × this, from 1 minute to 1 hour
 	Apps         []App  `json:"apps"`
+	// Knocks are the connections the server's firewall dropped; nil
+	// while it counted none.
+	Knocks *Knocks `json:"knocks,omitempty"`
+}
+
+// Knocks are the knocks a server's firewall dropped: today and this
+// year by the server's clock, all since the first, and today's by the
+// name of the port, like "ssh" or "postgres".
+type Knocks struct {
+	Today       int64            `json:"today"`
+	Year        int64            `json:"year"`
+	Total       int64            `json:"total"`
+	TodayByName map[string]int64 `json:"today_by_name"`
 }
 
 // App is one app on the server.

@@ -82,7 +82,13 @@ func (m *model) listLines(rows int) []string {
 			lines = append(lines, name+"  "+style.Badge(style.StatusFailed, "unreachable")+"  "+style.Muted.Render(m.cli.Explain(server.err)))
 			continue
 		}
+		if server.status.KnocksToday > 0 {
+			name += "  " + style.Muted.Render(human.Knocks(server.status.KnocksToday))
+		}
 		lines = append(lines, name)
+		if server.status.PublicSSH {
+			lines = append(lines, "    "+style.Danger.Render("port 22 open to the internet"))
+		}
 		if len(server.status.Apps) == 0 {
 			lines = append(lines, "    "+style.Muted.Render("no apps"))
 		}
