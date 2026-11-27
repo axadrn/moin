@@ -17,17 +17,15 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestRenameDocker follows one app from before renames through the
-// update and a rename, with one set of containers: its volume, named by
-// compose after the old project, keeps its data and its name; the old
-// containers go when the new ones start; after the rename the containers
-// carry the new name, the data is still there and nothing of the old
-// name runs.
-func TestRenameDocker(t *testing.T) {
+// TestOldProjectDocker follows one app that runs as moin-<folder> through
+// a deploy: its volume, named by compose after the old project, keeps its
+// data and its name; the old containers go when the new ones start, which
+// carry the app's name.
+func TestOldProjectDocker(t *testing.T) {
 	ctx := context.Background()
 	suffix := make([]byte, 3)
 	_, _ = rand.Read(suffix)
-	folder, renamed := "rntest-"+hex.EncodeToString(suffix), "rntest-renamed-"+hex.EncodeToString(suffix)
+	folder := "rntest-" + hex.EncodeToString(suffix)
 	legacyVolume := project(folder) + "_data"
 	defer func(stable, window time.Duration) { stableFor, startWindow = stable, window }(stableFor, startWindow)
 	stableFor, startWindow = time.Second, 20*time.Second
@@ -44,7 +42,7 @@ func TestRenameDocker(t *testing.T) {
 		return strings.TrimSpace(string(out))
 	}
 	t.Cleanup(func() {
-		for _, name := range []string{project(folder), folder, renamed} {
+		for _, name := range []string{project(folder), folder} {
 			_ = exec.Command("docker", "compose", "-p", name, "down", "--volumes", "--remove-orphans").Run()
 		}
 		_ = exec.Command("docker", "volume", "rm", "-f", legacyVolume).Run()
@@ -61,15 +59,15 @@ func TestRenameDocker(t *testing.T) {
 
 	var mu sync.Mutex
 	var lines []string
-	var done []protocol.DeployDone
+	var done []deployDone
 	a := newApps(t.TempDir())
 	send := func(data any) {
 		mu.Lock()
 		defer mu.Unlock()
 		switch value := data.(type) {
-		case protocol.DeployLog:
+		case deployLog:
 			lines = append(lines, value.Line)
-		case protocol.DeployDone:
+		case deployDone:
 			done = append(done, value)
 		}
 	}
@@ -93,7 +91,7 @@ func TestRenameDocker(t *testing.T) {
 
 	// The first deploy after the update keeps the volume and its name and
 	// replaces the old containers.
-	deploy(protocol.DeployStart{DeployID: "d1", App: folder, Name: folder, Number: 1, SourceFile: source})
+	deploy(protocol.DeployStart{DeployID: "d1", App: folder, Number: 1, SourceFile: source})
 	if got := running(project(folder)); len(got) != 0 {
 		t.Fatalf("the old containers still exist: %v", got)
 	}
@@ -108,44 +106,25 @@ func TestRenameDocker(t *testing.T) {
 	}
 	docker("exec", folder+"-web-1", "sh", "-c", "echo after >> /data/kept")
 
-	// The rename: a restart under the new name.
-	deploy(protocol.DeployStart{DeployID: "d2", App: folder, Name: renamed, Number: 2})
-	if got := running(folder); len(got) != 0 {
-		t.Fatalf("containers of the old name are left: %v", got)
-	}
-	if got := running(renamed); len(got) != 1 || got[0] != renamed+"-web-1" {
-		t.Fatalf("containers = %v, want %s-web-1", got, renamed)
-	}
-	if got := read(renamed + "-web-1"); got != "before\nafter" {
-		t.Fatalf("data after the rename = %q", got)
-	}
-	if got := docker("inspect", "-f", `{{range .Mounts}}{{.Name}}{{end}}`, renamed+"-web-1"); got != legacyVolume {
-		t.Fatalf("mounted volume = %s, want %s", got, legacyVolume)
-	}
-	if got := docker("inspect", "-f", `{{index .Config.Labels "moin.app"}}`, renamed+"-web-1"); got != folder {
+	if got := docker("inspect", "-f", `{{index .Config.Labels "moin.app"}}`, folder+"-web-1"); got != folder {
 		t.Fatalf("app label = %q, want the folder", got)
 	}
-	if got := a.projectOf(folder); got != renamed {
+	if got := a.projectOf(folder); got != folder {
 		t.Fatalf("project = %s", got)
 	}
 
-	// Logs, stop and a rollback to v1 all reach the renamed containers.
-	logs, err := a.logs(ctx, protocol.LogsRequest{App: folder, Tail: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = logs
-	deploy(protocol.DeployStart{DeployID: "d3", App: folder, Name: renamed, Number: 3, FromNumber: 1})
-	if got := running(renamed); len(got) != 1 || got[0] != renamed+"-web-1" {
+	// A rollback to v1 and stop reach the same containers.
+	deploy(protocol.DeployStart{DeployID: "d2", App: folder, Number: 2, FromNumber: 1})
+	if got := running(folder); len(got) != 1 || got[0] != folder+"-web-1" {
 		t.Fatalf("containers after the rollback = %v", got)
 	}
-	if got := read(renamed + "-web-1"); got != "before\nafter" {
+	if got := read(folder + "-web-1"); got != "before\nafter" {
 		t.Fatalf("data after the rollback = %q", got)
 	}
 	if err := a.stop(ctx, folder); err != nil {
 		t.Fatal(err)
 	}
-	if got := docker("inspect", "-f", "{{.State.Running}}", renamed+"-web-1"); got != "false" {
+	if got := docker("inspect", "-f", "{{.State.Running}}", folder+"-web-1"); got != "false" {
 		t.Fatalf("running after stop = %s", got)
 	}
 }

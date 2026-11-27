@@ -67,7 +67,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 
 	var mu sync.Mutex
 	var sent [][]byte
-	var done []protocol.DeployDone
+	var done []deployDone
 	dir := t.TempDir()
 	a := newApps(dir)
 	send := func(data any) {
@@ -75,7 +75,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		sent = append(sent, body)
-		if value, ok := data.(protocol.DeployDone); ok {
+		if value, ok := data.(deployDone); ok {
 			done = append(done, value)
 		}
 	}
@@ -86,7 +86,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	domains := &protocol.Domains{Domains: []string{app + ".example.net"}}
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
-		start.App, start.Name, start.DeployID = app, app, "d"+start.DeployID
+		start.App, start.DeployID = app, "d"+start.DeployID
 		deployTo(ctx, a, start, send)
 		mu.Lock()
 		defer mu.Unlock()
@@ -253,17 +253,17 @@ func TestRemoveWithoutVariable(t *testing.T) {
 	// Not on the main service: that one reads app.env itself.
 	compose := "services:\n  web:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n  db:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n    environment:\n      NEED: ${NEED:?set NEED}\n"
 	source := sourceFile(t, map[string]string{"compose.yml": compose})
-	var done protocol.DeployDone
+	var done deployDone
 	a := newApps(t.TempDir())
 	send := func(data any) {
-		if value, ok := data.(protocol.DeployDone); ok {
+		if value, ok := data.(deployDone); ok {
 			done = value
 		}
 	}
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"NEED": "x"}}); err != nil {
 		t.Fatal(err)
 	}
-	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceFile: source}, send)
+	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Number: 1, SourceFile: source}, send)
 	if !done.OK {
 		t.Fatalf("deploy: %s", done.Error)
 	}

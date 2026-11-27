@@ -20,7 +20,7 @@ import (
 func composeRelease(t *testing.T, a *apps, config map[string]any, detected protocol.Detected, start protocol.DeployStart, running map[string]string) (string, error) {
 	t.Helper()
 	app := "my-app"
-	start.App, start.Name, start.Number = app, app, 2
+	start.App, start.Number = app, 2
 	release := &release{start: start, dir: a.releaseDir(app, 2), composeJSON: filepath.Join(a.releaseDir(app, 2), "compose.json"),
 		config: config, running: running, envFile: a.envFile(app), env: map[string]string{"DB_PASSWORD": "s3cret-value"}}
 	if err := os.MkdirAll(release.dir, 0o700); err != nil {

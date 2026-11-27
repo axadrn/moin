@@ -12,13 +12,28 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
+// deployLog is one line of a deploy's log, for the tests.
+type deployLog struct {
+	DeployID string
+	Line     string
+}
+
+// deployDone is how a deploy ended, for the tests.
+type deployDone struct {
+	DeployID    string
+	OK          bool
+	Error       string
+	Detected    protocol.Detected
+	ComposeFile string
+}
+
 // deployTo runs one deploy and hands every line of its log and how it
 // ended to send, for the tests to look at.
 func deployTo(ctx context.Context, a *apps, start protocol.DeployStart, send func(any)) {
 	logf := func(format string, args ...any) {
-		send(protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
+		send(deployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
 	}
-	done := protocol.DeployDone{DeployID: start.DeployID}
+	done := deployDone{DeployID: start.DeployID}
 	detected, err := a.runDeploy(ctx, &start, logf)
 	done.Detected = detected
 	if err != nil {

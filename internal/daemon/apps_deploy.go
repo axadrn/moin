@@ -390,7 +390,7 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 			return err
 		}
 	}
-	err := a.switchProject(ctx, start.App, nameOf(start), release.logf)
+	err := a.switchProject(ctx, start.App, start.App, release.logf)
 	if err != nil {
 		return err
 	}

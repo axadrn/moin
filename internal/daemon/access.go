@@ -167,7 +167,7 @@ func (a *apps) roomOf(release *release, config map[string]any) appRoom {
 		dataDir:     resolved(filepath.Join(a.appDir(app), "volumes")),
 		releasesDir: resolved(filepath.Join(a.appDir(app), "releases")),
 		volumes:     a.volumeNames(app),
-		project:     nameOf(release.start),
+		project:     release.start.App,
 		envFile:     a.envFile(app),
 	}
 	for _, folder := range release.server.Mounts {

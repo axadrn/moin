@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // TestPinNames: the volumes compose named after the project get their
@@ -71,7 +69,7 @@ func TestVolumeNames(t *testing.T) {
 }
 
 // TestProjectOf: an app runs as the project its file names, an app from
-// before renames as moin-<folder>; a deploy names it by its name now.
+// before as moin-<folder>.
 func TestProjectOf(t *testing.T) {
 	a := newApps(t.TempDir())
 	if got := a.projectOf("blog"); got != "moin-blog" {
@@ -85,12 +83,6 @@ func TestProjectOf(t *testing.T) {
 	}
 	if got := a.projectOf("blog"); got != "journal" {
 		t.Fatalf("project = %s", got)
-	}
-	if got := nameOf(protocol.DeployStart{App: "blog", Name: "diary"}); got != "diary" {
-		t.Fatalf("name = %s", got)
-	}
-	if got := nameOf(protocol.DeployStart{App: "blog"}); got != "blog" {
-		t.Fatalf("name of a deploy that names none = %s", got)
 	}
 	// A project another app runs as is refused.
 	if err := os.MkdirAll(a.appDir("notes"), 0o700); err != nil {

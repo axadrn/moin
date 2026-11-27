@@ -36,19 +36,19 @@ func TestImageWithSource(t *testing.T) {
 
 	var mu sync.Mutex
 	var lines []string
-	var done []protocol.DeployDone
+	var done []deployDone
 	a := newApps(t.TempDir())
 	send := func(data any) {
 		mu.Lock()
 		defer mu.Unlock()
 		switch value := data.(type) {
-		case protocol.DeployLog:
+		case deployLog:
 			lines = append(lines, value.Line)
-		case protocol.DeployDone:
+		case deployDone:
 			done = append(done, value)
 		}
 	}
-	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceFile: source, Image: "alpine:latest"}, send)
+	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Number: 1, SourceFile: source, Image: "alpine:latest"}, send)
 	mu.Lock()
 	last := done[len(done)-1]
 	log := strings.Join(lines, "\n")

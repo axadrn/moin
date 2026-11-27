@@ -16,12 +16,9 @@ import (
 // app.env on the server as it is then (EnvSet).
 type DeployStart struct {
 	DeployID string `json:"deploy_id"`
-	// App names the app on the server in every message: its folder, the
-	// name it was created with, which a rename never changes. Name is its
-	// name now, which its Compose project and containers carry, such as
-	// my-app-web-1; without one the daemon takes App.
+	// App names the app on the server: its folder, and the Compose project
+	// its containers carry, such as my-app-web-1.
 	App    string `json:"app"`
-	Name   string `json:"name,omitempty"`
 	Number int    `json:"number"`
 	// SourceFile is a gzipped tar of the source on the server itself, which
 	// the CLI sent over SSH.
@@ -60,28 +57,4 @@ func InstantHost(app, ip, provider string) string {
 		return ""
 	}
 	return app + "." + strings.ReplaceAll(address.String(), ".", "-") + "." + provider
-}
-
-// DeployLog is one line of build or start output.
-type DeployLog struct {
-	DeployID string `json:"deploy_id"`
-	Line     string `json:"line"`
-}
-
-// DeployDone reports how a deploy ended and what the daemon found.
-type DeployDone struct {
-	DeployID string   `json:"deploy_id"`
-	OK       bool     `json:"ok"`
-	Error    string   `json:"error,omitempty"`
-	Detected Detected `json:"detected"`
-	// Env names the env keys the app has after the deploy, which may have
-	// made the secrets of a catalog app: never a value.
-	Env *AppEnv `json:"env,omitempty"`
-	// ComposeFile is the compose file of a deploy that worked, YAML:
-	// everything the daemon runs for the app, written to run anywhere,
-	// without the instant address and with no value of the env. image,
-	// ports, expose, volumes, user, the env PORT and the paths of a build
-	// are as the deploy filled them in; every other ${NAME} stays as
-	// written. Daemons before it send none.
-	ComposeFile string `json:"compose_file,omitempty"`
 }
