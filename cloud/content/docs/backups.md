@@ -157,7 +157,7 @@ The first copy of each day is checked before it leaves the server. moin opens it
 
 So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while.
 
-A database copied less often than once a day: on the days between, moin restores its newest copy from your bucket.
+A database copied less often than once a day: on the days between, moin restores its newest copy from your bucket. The copy before a deploy and one from `moin backup` go up right away, without the check.
 
 If it fails:
 
