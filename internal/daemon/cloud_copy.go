@@ -13,7 +13,6 @@ import (
 	"net/netip"
 	neturl "net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -113,21 +112,6 @@ func (b *backups) toCloud(ctx context.Context, app string, database protocol.Dat
 		return failed
 	}
 	return errNoTaker
-}
-
-// tempCopy writes body into a new temp file in dir. The caller closes and
-// removes it.
-func tempCopy(dir string, body io.Reader) (*os.File, error) {
-	file, err := os.CreateTemp(dir, ".copy-*.age")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := io.Copy(file, body); err != nil {
-		file.Close()
-		os.Remove(file.Name())
-		return nil, err
-	}
-	return file, nil
 }
 
 // startCopy asks a watcher for an address to upload a copy to.
@@ -293,7 +277,7 @@ func CloudRestoreHere(ctx context.Context, dir string, r CloudRestore, out io.Wr
 		return Restored{}, err
 	}
 	fmt.Fprintf(out, "downloading the copy %s from %s cloud\n", r.Copy, build.Name)
-	file, err := downloadCopy(ctx, r.URL, filepath.Dir(a.dir))
+	file, err := a.downloadCopy(ctx, r.URL)
 	if err != nil {
 		return Restored{}, err
 	}
@@ -307,8 +291,10 @@ func CloudRestoreHere(ctx context.Context, dir string, r CloudRestore, out io.Wr
 	return Restored{Database: database.Path, To: r.Copy, Undo: undoPrefix + undo}, nil
 }
 
-// downloadCopy downloads a copy into a temp file in dir.
-func downloadCopy(ctx context.Context, address, dir string) (*os.File, error) {
+// downloadCopy downloads a copy into a temp file in the daemon's own
+// folder, where one a cut-off restore left goes after a day
+// (removeOldTemp). The caller closes and removes it.
+func (a *apps) downloadCopy(ctx context.Context, address string) (*os.File, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
 		return nil, err
@@ -321,7 +307,19 @@ func downloadCopy(ctx context.Context, address, dir string) (*os.File, error) {
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download the copy: HTTP %d. The address works for 5 minutes: run the restore again", response.StatusCode)
 	}
-	return tempCopy(dir, response.Body)
+	if err := os.MkdirAll(a.tempDir(), 0o700); err != nil {
+		return nil, err
+	}
+	file, err := os.CreateTemp(a.tempDir(), tempName("download-*.age"))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := io.Copy(file, response.Body); err != nil {
+		file.Close()
+		os.Remove(file.Name())
+		return nil, fmt.Errorf("download the copy: %w", err)
+	}
+	return file, nil
 }
 
 // restoreFile restores a database from an encrypted copy in file, as
