@@ -6,6 +6,7 @@ package githubstars
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -23,6 +24,8 @@ var (
 	count   int
 	checked time.Time
 	asking  bool
+	// failing says the last answer failed, so it is logged only once.
+	failing bool
 )
 
 // Count returns the stars GitHub last reported, 0 before the first answer or
@@ -38,14 +41,21 @@ func Count() int {
 	return count
 }
 
+// refresh asks GitHub. A failed answer keeps the count it had and is
+// logged once, until an answer comes again: GitHub allows 60 calls an
+// hour per address, and a dev server that restarts often uses them up.
 func refresh() {
 	stars, err := fetch()
 	mu.Lock()
 	defer mu.Unlock()
 	asking = false
 	checked = time.Now()
-	if err == nil {
-		count = stars
+	switch {
+	case err == nil:
+		count, failing = stars, false
+	case !failing:
+		failing = true
+		slog.Warn("github stars", "error", err)
 	}
 }
 
@@ -68,6 +78,15 @@ func fetch() (int, error) {
 	}
 	err = json.NewDecoder(response.Body).Decode(&repo)
 	return repo.Stars, err
+}
+
+// Stars are the stars as the site shows them, everywhere: the count the
+// way GitHub writes it, "" before GitHub answered or when it failed.
+func Stars() string {
+	if stars := Count(); stars > 0 {
+		return Short(stars)
+	}
+	return ""
 }
 
 // Short writes a count the way GitHub does: 950, 1.2k, 12k.

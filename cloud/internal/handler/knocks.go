@@ -74,14 +74,14 @@ var sampleTotals = counts.Totals{
 func (c *Cloud) SiteNumbers(development bool) func() pages.HomeNumbers {
 	return func() pages.HomeNumbers {
 		if development {
-			return pages.HomeNumbers{Stars: githubstars.Count(), Totals: sampleTotals, Sample: true}
+			return pages.HomeNumbers{Stars: githubstars.Stars(), Totals: sampleTotals, Sample: true}
 		}
 		totals, err := c.watchers.Counts().Totals(time.Now())
 		if err != nil {
 			slog.Warn("home: counts", "error", err)
 			totals = counts.Totals{}
 		}
-		return pages.HomeNumbers{Stars: githubstars.Count(), Totals: totals}
+		return pages.HomeNumbers{Stars: githubstars.Stars(), Totals: totals}
 	}
 }
 

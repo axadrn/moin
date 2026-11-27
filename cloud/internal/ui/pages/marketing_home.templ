@@ -67,7 +67,7 @@ templ HomeHero() {
 					<span>Deploy anything.</span>
 					<span class="moin-muted">Lose nothing.</span>
 				</h1>
-				<p class="moin-lead moin-center"><a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground moin-hero-open" data-quiet>Open source.</a> One command to your own server.<br/>Every backup proven, every day.</p>
+				<p class="moin-lead moin-center"><a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground moin-hero-open" data-quiet>Open source.</a>{ " " }<br class="moin-only-phone"/>One command to your own server.<br/>Every backup proven, every day.</p>
 			</div>
 			<div class="moin-stack moin-hero-start" data-gap="6">
 				@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
@@ -77,8 +77,8 @@ templ HomeHero() {
 					@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
 						<i class="moin-icon moin-icon-git-hub"></i>
 						GitHub
-						if stars := githubstars.Count(); stars > 0 {
-							<span class="moin-muted moin-digits">{ githubstars.Short(stars) }</span>
+						if stars := githubstars.Stars(); stars != "" {
+							<span class="moin-muted moin-digits">{ stars }</span>
 						}
 					}
 				</div>

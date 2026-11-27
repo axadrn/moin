@@ -3,18 +3,17 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/counts"
-	"github.com/axadrn/moin/cloud/internal/githubstars"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 	"strconv"
 )
 
-// HomeNumbers are the numbers of the landing page: the stars on GitHub,
-// 0 before GitHub answered, and what moin cloud counted. Sample marks
-// made-up numbers, which only development shows.
+// HomeNumbers are the numbers of the landing page: the stars on GitHub
+// (githubstars.Stars, "" while unknown), and what moin cloud counted.
+// Sample marks made-up numbers, which only development shows.
 type HomeNumbers struct {
-	Stars  int
+	Stars  string
 	Totals counts.Totals
 	Sample bool
 }
@@ -54,8 +53,8 @@ templ homeNumbers(n HomeNumbers) {
 		}
 		<div class="moin-grid" data-cols="2">
 			@numberCard("0 bytes", "Sent to us by the free software. Read the source.", layouts.GitHubURL)
-			if n.Stars > 0 {
-				@numberCard(githubstars.Short(n.Stars)+" stars", "On GitHub.", layouts.GitHubURL)
+			if n.Stars != "" {
+				@numberCard(n.Stars+" stars", "On GitHub.", layouts.GitHubURL)
 			}
 		</div>
 		if n.Totals.Servers > 0 {

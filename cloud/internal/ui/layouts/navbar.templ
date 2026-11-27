@@ -28,10 +28,6 @@ func navLinks(path string) []components.BarLink {
 	}
 }
 
-// starsShowAt is how many GitHub stars it takes before the navbar shows
-// the count.
-const starsShowAt = 1000
-
 // Navbar is the floating pill of the site: the wordmark, the places, the
 // search, GitHub and the one way in. On a phone it keeps the wordmark,
 // the search and Docs; the footer has the rest, X too. No menu: links
@@ -51,19 +47,17 @@ templ Navbar() {
 		@components.Button(components.ButtonProps{Href: "/search", Icon: true, Quiet: true, Attrs: templ.Attributes{"data-site-search-open": true, "aria-label": "Search", "aria-keyshortcuts": "Meta+K /"}}) {
 			<i class="moin-icon moin-icon-search"></i>
 		}
-		// The star count shows from starsShowAt on: a small one says
-		// "nobody uses this".
+		// The stars show once GitHub answered.
 		<span class="moin-only-phone">
 			@components.Button(components.ButtonProps{Href: "/docs", Quiet: true}) {
 				Docs
 			}
 		</span>
 		<span class="moin-hidden-phone">
-			{{ stars := githubstars.Count() }}
-			if stars >= starsShowAt {
+			if stars := githubstars.Stars(); stars != "" {
 				@components.Button(components.ButtonProps{Href: GitHubURL, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
 					<i class="moin-icon moin-icon-git-hub"></i>
-					{ githubstars.Short(stars) }
+					{ stars }
 				}
 			} else {
 				@components.Button(components.ButtonProps{Href: GitHubURL, Icon: true, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
