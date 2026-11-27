@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // TestCleanupDocker builds four tiny images and checks what cleanup takes:

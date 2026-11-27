@@ -77,7 +77,8 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	var sent [][]byte
 	var done []protocol.DeployDone
 	dir := t.TempDir()
-	a := newApps(dir, func(_ protocol.MessageType, _ string, data any) {
+	a := newApps(dir)
+	send := func(_ protocol.MessageType, _ string, data any) {
 		body, _ := json.Marshal(data)
 		mu.Lock()
 		defer mu.Unlock()
@@ -85,7 +86,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		if value, ok := data.(protocol.DeployDone); ok {
 			done = append(done, value)
 		}
-	})
+	}
 	a.proxyMode = func() string { return "tunnel" }
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"DB_PASSWORD": secret}}); err != nil {
 		t.Fatal(err)
@@ -102,7 +103,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
 		start.App, start.Name, start.DeployID = app, app, "d"+start.DeployID
-		a.deploy(ctx, start, nil)
+		deployTo(ctx, a, start, send)
 		mu.Lock()
 		defer mu.Unlock()
 		if last := done[len(done)-1]; !last.OK {
@@ -303,15 +304,16 @@ func TestRemoveWithoutVariable(t *testing.T) {
 	githubAPI = server.URL
 	defer server.Close()
 	var done protocol.DeployDone
-	a := newApps(t.TempDir(), func(_ protocol.MessageType, _ string, data any) {
+	a := newApps(t.TempDir())
+	send := func(_ protocol.MessageType, _ string, data any) {
 		if value, ok := data.(protocol.DeployDone); ok {
 			done = value
 		}
-	})
+	}
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"NEED": "x"}}); err != nil {
 		t.Fatal(err)
 	}
-	a.deploy(ctx, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/gone/tarball/abc123"}, nil)
+	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/gone/tarball/abc123"}, send)
 	if !done.OK {
 		t.Fatalf("deploy: %s", done.Error)
 	}

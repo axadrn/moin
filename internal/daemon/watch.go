@@ -144,7 +144,7 @@ func (w *watch) report(ctx context.Context, config Config, containers map[string
 		w.missed = 0
 		return
 	}
-	r := report.Report{Server: config.Name, Version: build.Version, At: time.Now().UTC(), Every: watchEvery, Apps: []report.App{}}
+	r := report.Report{Server: config.Name, Version: build.Version, EverySeconds: int(watchEvery.Seconds()), Apps: []report.App{}}
 	for _, app := range w.apps.names() {
 		if w.apps.current(app) == 0 {
 			continue

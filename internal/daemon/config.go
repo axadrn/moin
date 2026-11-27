@@ -1,8 +1,10 @@
 package daemon
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -170,7 +172,10 @@ func LoadConfig() (Config, error) {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Config{}, err
 	}
-	if err := yaml.Unmarshal(body, &config); err != nil {
+	// A key the config does not know is a typo, and an error.
+	decoder := yaml.NewDecoder(bytes.NewReader(body))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&config); err != nil && !errors.Is(err, io.EOF) {
 		return Config{}, fmt.Errorf("%s: %w", ConfigFile(), err)
 	}
 	if err := config.check(); err != nil {

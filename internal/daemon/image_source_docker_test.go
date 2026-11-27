@@ -43,7 +43,8 @@ func TestImageWithSource(t *testing.T) {
 	var mu sync.Mutex
 	var lines []string
 	var done []protocol.DeployDone
-	a := newApps(t.TempDir(), func(_ protocol.MessageType, _ string, data any) {
+	a := newApps(t.TempDir())
+	send := func(_ protocol.MessageType, _ string, data any) {
 		mu.Lock()
 		defer mu.Unlock()
 		switch value := data.(type) {
@@ -52,10 +53,10 @@ func TestImageWithSource(t *testing.T) {
 		case protocol.DeployDone:
 			done = append(done, value)
 		}
-	})
+	}
 	// The server keeps no registry login.
 	a.registryLogin = func(string) string { return "" }
-	a.deploy(ctx, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/blog/tarball/abc123", Image: "alpine:latest"}, nil)
+	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/blog/tarball/abc123", Image: "alpine:latest"}, send)
 	mu.Lock()
 	last := done[len(done)-1]
 	log := strings.Join(lines, "\n")

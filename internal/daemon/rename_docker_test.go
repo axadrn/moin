@@ -69,7 +69,8 @@ func TestRenameDocker(t *testing.T) {
 	var mu sync.Mutex
 	var lines []string
 	var done []protocol.DeployDone
-	a := newApps(t.TempDir(), func(messageType protocol.MessageType, _ string, data any) {
+	a := newApps(t.TempDir())
+	send := func(messageType protocol.MessageType, _ string, data any) {
 		mu.Lock()
 		defer mu.Unlock()
 		switch value := data.(type) {
@@ -78,10 +79,10 @@ func TestRenameDocker(t *testing.T) {
 		case protocol.DeployDone:
 			done = append(done, value)
 		}
-	})
+	}
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
-		a.deploy(ctx, start, nil)
+		deployTo(ctx, a, start, send)
 		mu.Lock()
 		defer mu.Unlock()
 		if last := done[len(done)-1]; !last.OK {

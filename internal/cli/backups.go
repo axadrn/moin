@@ -24,64 +24,52 @@ import (
 // server over SSH. What it sends, like a secret key, goes as JSON on
 // stdin, never on the command line; what comes back is JSON on stdout.
 
-// hereJSON runs `moin here args…` on server. input, when not nil, is sent
-// as JSON; the answer is read into result, when not nil.
-func hereJSON(ctx context.Context, server string, input, result any, args ...string) error {
-	var stdin io.Reader
-	if input != nil {
-		body, err := json.Marshal(input)
-		if err != nil {
-			return err
-		}
-		stdin = bytes.NewReader(body)
-	}
-	out, err := sshOutput(ctx, server, hereLine(args...), stdin)
-	if err != nil || result == nil {
+// sendJSON runs `moin here args…` on server with value as JSON on stdin,
+// for a command that answers nothing.
+func sendJSON(ctx context.Context, server string, value any, args ...string) error {
+	body, err := json.Marshal(value)
+	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(out, result); err != nil {
-		return fmt.Errorf("%s answered something moin cannot read. Update it with `%s update %s`", server, build.Name, server)
-	}
-	return nil
+	_, err = sshOutput(ctx, server, hereLine(args...), bytes.NewReader(body))
+	return err
 }
 
 // shownCopies is how many copies of a database `moin backups` lists.
 const shownCopies = 10
 
-// backups is `moin backups <server>`: the copies of the app's databases,
+// backups is `moin backups [app]`: the copies of the app's databases,
 // the last daily check and the copy it proved.
 func backups(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("backups", "backups <server> [--app <name>] [--json]").withApp().withJSON()
+	flags := newFlags("backups", "backups [app] [-s server] [--json]").withServer().withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	app, _, err := appArgs(flags, 0)
 	if err != nil {
 		return err
 	}
-	app, err := flags.app()
-	if err != nil {
-		return err
-	}
-	var databases []protocol.DatabaseBackup
-	if err := hereJSON(ctx, server, nil, &databases, "backups", app); err != nil {
-		return err
-	}
-	if flags.json() {
-		return printJSON(stdout, databases)
-	}
-	if len(databases) == 0 {
-		fmt.Fprintln(stdout, app+" has no database moin can copy: no SQLite file on a volume, no Postgres service.")
+	return onApp(ctx, flags, app, func(server string) error {
+		var databases []protocol.DatabaseBackup
+		if err := sshJSON(ctx, server, []string{"backups", app}, nil, &databases); err != nil {
+			return err
+		}
+		if flags.json() {
+			return printJSON(stdout, databases)
+		}
+		if len(databases) == 0 {
+			fmt.Fprintln(stdout, app+" has no database moin can copy: no SQLite file on a volume, no Postgres service.")
+			return nil
+		}
+		for _, database := range databases {
+			printBackup(stdout, app, database, time.Now())
+		}
 		return nil
-	}
-	for _, database := range databases {
-		printBackup(stdout, server, database, time.Now())
-	}
-	return nil
+	})
 }
 
 // printBackup shows how one database is backed up.
-func printBackup(stdout io.Writer, server string, database protocol.DatabaseBackup, now time.Time) {
+func printBackup(stdout io.Writer, app string, database protocol.DatabaseBackup, now time.Time) {
 	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
 	if database.Error != "" {
 		fmt.Fprintln(stdout, "  "+style.Danger.Render("✗")+" "+database.Error)
@@ -100,7 +88,7 @@ func printBackup(stdout io.Writer, server string, database protocol.DatabaseBack
 	}
 	if len(rows) > 0 {
 		table(stdout, []string{"COPY", "TAKEN", "SIZE"}, rows)
-		hint(stdout, "Go back to one with", build.Name+" restore "+server+" --to <copy>")
+		hint(stdout, "Go back to one with", build.Name+" restore "+app+" --to <copy>")
 	}
 	fmt.Fprintln(stdout)
 }
@@ -116,67 +104,63 @@ func checkLine(database protocol.DatabaseBackup, now time.Time) string {
 	return style.Success.Render("✓") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": the copy " + database.CheckedCopy + " restored and read fine"
 }
 
-// backUp is `moin backup <server>`: a copy of the app's databases now.
+// backUp is `moin backup [app]`: a copy of the app's databases now.
 func backUp(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("backup", "backup <server> [--app <name>] [--json]").withApp().withJSON()
+	flags := newFlags("backup", "backup [app] [-s server] [--json]").withServer().withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	app, _, err := appArgs(flags, 0)
 	if err != nil {
 		return err
 	}
-	app, err := flags.app()
-	if err != nil {
-		return err
-	}
-	var copied []daemon.Copied
-	if err := hereJSON(ctx, server, nil, &copied, "backup", app); err != nil {
-		return err
-	}
-	if flags.json() {
-		return printJSON(stdout, copied)
-	}
-	for _, copy := range copied {
-		done(stdout, "Copied %s of %s: %s", copy.Database, app, copy.Copy)
-	}
-	return nil
+	return onApp(ctx, flags, app, func(server string) error {
+		var copied []daemon.Copied
+		if err := sshJSON(ctx, server, []string{"backup", app}, nil, &copied); err != nil {
+			return err
+		}
+		if flags.json() {
+			return printJSON(stdout, copied)
+		}
+		for _, copy := range copied {
+			done(stdout, "Copied %s of %s: %s", copy.Database, app, copy.Copy)
+		}
+		return nil
+	})
 }
 
-// restore is `moin restore <server> --to <copy|time|undo-…>`: a database
-// goes back, and what it was before stays as an undo.
+// restore is `moin restore [app] --to <copy|time|undo-…>`: a database goes
+// back, and what it was before stays as an undo.
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("restore", "restore <server> --to <copy | 2026-11-27T14:07 | undo-…> [--database <name>] [--app <name>] [--yes] [--json]").withApp().withYes().withJSON()
-	to := flags.String("to", "", "a copy, a time in UTC, or an undo: see `"+build.Name+" backups <server>`")
+	flags := newFlags("restore", "restore [app] --to <copy | 2026-11-27T14:07 | undo-…> [--database <name>] [-s server] [--yes] [--json]").withServer().withYes().withJSON()
+	to := flags.String("to", "", "a copy, a time in UTC, or an undo: see `"+build.Name+" backups`")
 	database := flags.String("database", "", "the database, when the app has several")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
-	if err != nil {
-		return err
-	}
-	app, err := flags.app()
+	app, _, err := appArgs(flags, 0)
 	if err != nil {
 		return err
 	}
 	if *to == "" {
-		return fmt.Errorf("say what to go back to with --to. See the copies with `%s backups %s`", build.Name, server)
+		return fmt.Errorf("say what to go back to with --to. See the copies with `%s backups %s`", build.Name, app)
 	}
-	question := fmt.Sprintf("Put the data of %s on %s back to %s? The app stops for a moment.", app, server, *to)
+	question := fmt.Sprintf("Put the data of %s back to %s? The app stops for a moment.", app, *to)
 	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
 		return err
 	}
-	var restored daemon.Restored
-	if err := hereJSON(ctx, server, nil, &restored, "restore", app, *to, *database); err != nil {
-		return err
-	}
-	if flags.json() {
-		return printJSON(stdout, restored)
-	}
-	done(stdout, "%s of %s is back at %s", restored.Database, app, restored.To)
-	hint(stdout, "Undo it with", build.Name+" restore "+server+" --to "+restored.Undo)
-	return nil
+	return onApp(ctx, flags, app, func(server string) error {
+		var restored daemon.Restored
+		if err := sshJSON(ctx, server, []string{"restore", app, *to, *database}, nil, &restored); err != nil {
+			return err
+		}
+		if flags.json() {
+			return printJSON(stdout, restored)
+		}
+		done(stdout, "%s of %s is back at %s", restored.Database, app, restored.To)
+		hint(stdout, "Undo it with", build.Name+" restore "+app+" --to "+restored.Undo)
+		return nil
+	})
 }
 
 // bucket is `moin bucket <server>` and `moin bucket set <server> …`.
@@ -193,7 +177,7 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return err
 	}
 	var bucket *daemon.Bucket
-	if err := hereJSON(ctx, server, nil, &bucket, "bucket"); err != nil {
+	if err := sshJSON(ctx, server, []string{"bucket"}, nil, &bucket); err != nil {
 		return err
 	}
 	if flags.json() {
@@ -241,7 +225,7 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	if bucket.SecretKey == "" {
 		return errors.New("the secret key is empty: type it, or pipe it in")
 	}
-	if err := hereJSON(ctx, server, bucket, nil, "bucket", "set"); err != nil {
+	if err := sendJSON(ctx, server, bucket, "bucket", "set"); err != nil {
 		return err
 	}
 	done(stdout, "%s backs up to %s. The first copies come within a minute", server, bucket.Bucket)
@@ -272,7 +256,7 @@ func alerts(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	var names []string
-	if err := hereJSON(ctx, server, nil, &names, "alerts"); err != nil {
+	if err := sshJSON(ctx, server, []string{"alerts"}, nil, &names); err != nil {
 		return err
 	}
 	if flags.json() {
@@ -312,7 +296,7 @@ func addAlert(ctx context.Context, args []string, stdout io.Writer) error {
 	default:
 		return flags.wrong()
 	}
-	if err := hereJSON(ctx, server, destination, nil, "alerts", "add"); err != nil {
+	if err := sendJSON(ctx, server, destination, "alerts", "add"); err != nil {
 		return err
 	}
 	done(stdout, "A test alert went out. %s alerts %s from now on", server, destination.Kind)
@@ -328,7 +312,7 @@ func removeAlert(ctx context.Context, args []string, stdout io.Writer) error {
 	if flags.NArg() != 2 {
 		return flags.wrong()
 	}
-	if err := hereJSON(ctx, flags.Arg(0), nil, nil, "alerts", "rm", flags.Arg(1)); err != nil {
+	if err := sshRun(ctx, flags.Arg(0), hereLine("alerts", "rm", flags.Arg(1)), nil, io.Discard, os.Stderr); err != nil {
 		return err
 	}
 	done(stdout, "Removed alert %s from %s", flags.Arg(1), flags.Arg(0))
@@ -345,7 +329,7 @@ func testAlerts(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := hereJSON(ctx, server, nil, nil, "alerts", "test"); err != nil {
+	if err := sshRun(ctx, server, hereLine("alerts", "test"), nil, io.Discard, os.Stderr); err != nil {
 		return err
 	}
 	done(stdout, "A test alert went out from %s", server)
@@ -373,7 +357,7 @@ func watchers(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	var addresses []string
-	if err := hereJSON(ctx, server, nil, &addresses, "watchers"); err != nil {
+	if err := sshJSON(ctx, server, []string{"watchers"}, nil, &addresses); err != nil {
 		return err
 	}
 	if flags.json() {
@@ -402,7 +386,7 @@ func addWatcher(ctx context.Context, args []string, stdout io.Writer) error {
 		return flags.wrong()
 	}
 	watcher := daemon.Watcher{URL: flags.Arg(1), Token: flags.Arg(2)}
-	if err := hereJSON(ctx, flags.Arg(0), watcher, nil, "watchers", "add"); err != nil {
+	if err := sendJSON(ctx, flags.Arg(0), watcher, "watchers", "add"); err != nil {
 		return err
 	}
 	done(stdout, "%s reports to %s every minute", flags.Arg(0), watcher.URL)
@@ -418,7 +402,7 @@ func removeWatcher(ctx context.Context, args []string, stdout io.Writer) error {
 	if flags.NArg() != 2 {
 		return flags.wrong()
 	}
-	if err := hereJSON(ctx, flags.Arg(0), nil, nil, "watchers", "rm", flags.Arg(1)); err != nil {
+	if err := sshRun(ctx, flags.Arg(0), hereLine("watchers", "rm", flags.Arg(1)), nil, io.Discard, os.Stderr); err != nil {
 		return err
 	}
 	done(stdout, "%s no longer reports to %s", flags.Arg(0), flags.Arg(1))
@@ -437,13 +421,13 @@ func hereBackups(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	switch args[0] {
 	case "backups":
 		databases, err := daemon.BackupsHere(ctx, dir, rest[0])
-		return answerJSON(stdout, databases, err)
+		return respond(stdout, databases, err)
 	case "backup":
 		copied, err := daemon.BackupHere(ctx, dir, rest[0], os.Stderr)
-		return answerJSON(stdout, copied, err)
+		return respond(stdout, copied, err)
 	case "restore":
 		restored, err := daemon.RestoreHere(ctx, dir, rest[0], rest[2], rest[1], os.Stderr)
-		return answerJSON(stdout, restored, err)
+		return respond(stdout, restored, err)
 	case "bucket":
 		return hereBucket(ctx, rest[0], stdin, stdout)
 	case "alerts":
@@ -454,19 +438,11 @@ func hereBackups(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	return fmt.Errorf("unknown: %s here %s", build.Name, args[0])
 }
 
-// answerJSON writes value to stdout as JSON, unless err.
-func answerJSON(stdout io.Writer, value any, err error) error {
-	if err != nil {
-		return err
-	}
-	return json.NewEncoder(stdout).Encode(value)
-}
-
 // hereBucket is `moin here bucket` and `moin here bucket set`.
 func hereBucket(ctx context.Context, verb string, stdin io.Reader, stdout io.Writer) error {
 	if verb == "" {
 		bucket, err := daemon.BucketHere()
-		return answerJSON(stdout, bucket, err)
+		return respond(stdout, bucket, err)
 	}
 	var bucket daemon.Bucket
 	if err := json.NewDecoder(stdin).Decode(&bucket); err != nil {
@@ -491,7 +467,7 @@ func hereAlerts(ctx context.Context, verb, number string, stdin io.Reader, stdou
 		return daemon.TestAlertsHere(ctx)
 	}
 	names, err := daemon.AlertsHere()
-	return answerJSON(stdout, names, err)
+	return respond(stdout, names, err)
 }
 
 // hereWatchers is `moin here watchers`, and add and rm <url>.
@@ -507,5 +483,5 @@ func hereWatchers(verb, address string, stdin io.Reader, stdout io.Writer) error
 		return daemon.RemoveWatcherHere(address)
 	}
 	addresses, err := daemon.WatchersHere()
-	return answerJSON(stdout, addresses, err)
+	return respond(stdout, addresses, err)
 }

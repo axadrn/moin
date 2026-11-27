@@ -32,8 +32,8 @@ const undoPrefix = "undo-"
 // the copy it proved.
 func BackupsHere(ctx context.Context, dir, app string) ([]protocol.DatabaseBackup, error) {
 	a := newApps(dir)
-	if a.current(app) == 0 {
-		return nil, fmt.Errorf("no app %s on this server", app)
+	if err := a.mustHave(app); err != nil {
+		return nil, err
 	}
 	b := a.backups
 	statuses := []protocol.DatabaseBackup{}
@@ -52,6 +52,9 @@ type Copied struct {
 // BackupHere copies every database of app into the bucket now.
 func BackupHere(ctx context.Context, dir, app string, out io.Writer) ([]Copied, error) {
 	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return nil, err
+	}
 	b := a.backups
 	if !b.on() {
 		return nil, errNoBucket
@@ -89,6 +92,9 @@ type Restored struct {
 // "" for an app that has one.
 func RestoreHere(ctx context.Context, dir, app, name, to string, out io.Writer) (Restored, error) {
 	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return Restored{}, err
+	}
 	b := a.backups
 	database, err := b.one(app, name)
 	if err != nil {

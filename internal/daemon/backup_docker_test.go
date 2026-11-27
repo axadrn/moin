@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -37,10 +36,8 @@ type backupTest struct {
 	a        *apps
 	b        *backups
 	app      string
-	bucket   *protocol.Bucket
+	bucket   *Bucket
 	database protocol.Database
-	mu       sync.Mutex
-	sent     []protocol.Backups
 }
 
 func newBackupTest(t *testing.T, app string, compose map[string]any, database protocol.Database) *backupTest {
@@ -53,20 +50,12 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	t.Cleanup(cancel)
 	test := &backupTest{t: t, ctx: ctx, app: app, database: database}
 	test.a = newApps(t.TempDir())
-	test.b = newBackups(test.a, func(kind protocol.MessageType, _ string, data any) {
-		if backups, ok := data.(protocol.Backups); ok && kind == protocol.TypeBackupStatus {
-			test.mu.Lock()
-			test.sent = append(test.sent, backups)
-			test.mu.Unlock()
-		}
-	})
-	test.a.backups = test.b
+	test.b = test.a.backups
 	release := test.a.releaseDir(app, 1)
 	os.MkdirAll(release, 0o700)
 	saveJSON(filepath.Join(release, "compose.json"), compose)
 	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{database}})
 	os.WriteFile(filepath.Join(test.a.appDir(app), "current"), []byte("1"), 0o600)
-	os.WriteFile(filepath.Join(test.a.appDir(app), "app-id"), []byte(fmt.Sprintf("id-%d", time.Now().UnixNano())), 0o600)
 	composeJSON := test.a.composeJSON(app)
 	down := func() { exec.Command("docker", "compose", "-p", project(app), "-f", composeJSON, "down", "-v").Run() }
 	down()
@@ -74,10 +63,11 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	if out, err := exec.CommandContext(ctx, "docker", "compose", "-p", project(app), "-f", composeJSON, "up", "-d").CombinedOutput(); err != nil {
 		t.Fatalf("compose up: %v %s", err, out)
 	}
-	test.bucket = &protocol.Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: "moin-test", Workspace: "ws-" + app, AccessKey: "x", SecretKey: "y"}
+	// A folder of its own in the bucket for every run.
+	test.bucket = &Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: "moin-test", Path: fmt.Sprintf("run-%d", time.Now().UnixNano()), AccessKey: "x", SecretKey: "y"}
 	_, _ = s3Client(test.bucket).CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String("moin-test")})
-	test.b.configure(protocol.BackupConfig{Bucket: test.bucket, Schedules: map[string]protocol.Schedule{app: {Every: 15, Keep: 1}}})
-	t.Cleanup(func() { test.b.configure(protocol.BackupConfig{}) })
+	test.b.configure(Config{Name: "prod", Bucket: test.bucket, Backups: Backups{Apps: map[string]Schedule{app: {Every: "15m", Keep: "1d"}}}})
+	t.Cleanup(func() { test.b.configure(Config{}) })
 	return test
 }
 
@@ -141,21 +131,21 @@ func (test *backupTest) putBroken() {
 	}
 }
 
-// checks runs the daily check and says how it ended, and that the
-// hub heard of it.
+// check runs the daily check and says how it ended, and that it was
+// written down.
 func (test *backupTest) check() string {
 	test.t.Helper()
-	time.Sleep(100 * time.Millisecond) // the report of the last restore
-	test.mu.Lock()
-	test.sent = nil
-	test.mu.Unlock()
+	before := time.Now().Add(-time.Second)
 	test.b.checkAll(test.ctx)
-	test.mu.Lock()
-	defer test.mu.Unlock()
-	if len(test.sent) != 1 || test.sent[0].Databases[0].CheckedAt == nil {
-		test.t.Fatalf("the check was not reported: %+v", test.sent)
+	fresh := newBackups(test.a)
+	status := fresh.status(test.ctx, test.app, test.database, false)
+	if status.CheckedAt == nil || status.CheckedAt.Before(before) {
+		test.t.Fatalf("the check was not written down: %+v", status)
 	}
-	return test.sent[0].Databases[0].CheckError
+	if status.CheckError == "" && status.CheckedCopy != test.copies()[0].ID {
+		test.t.Fatalf("the check proved %q, not the newest copy", status.CheckedCopy)
+	}
+	return status.CheckError
 }
 
 func TestBackupSQLite(t *testing.T) {
@@ -273,11 +263,11 @@ func TestBackupSQLite(t *testing.T) {
 		t.Fatalf("two copies in one second: %s %s %v %v", one, two, err1, err2)
 	}
 	// No edit while a restore works on the app.
-	test.b.restoring[app]++
+	unlockRestore, _ := tryFileLock(test.b.restoreLock(app))
 	if _, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app}, SQL: `DELETE FROM notes`, Write: true}); err == nil || !strings.Contains(err.Error(), "a restore of") {
 		t.Fatalf("an edit during a restore: %v", err)
 	}
-	test.b.restoring[app]--
+	unlockRestore()
 	if state := test.restore(protocol.BackupRestore{Copy: third.ID}); state.State != protocol.RestoreDone || rows() != "a,b,c,d" {
 		t.Fatalf("back to the third copy: %+v", state)
 	}
@@ -287,7 +277,7 @@ func TestBackupSQLite(t *testing.T) {
 		t.Fatalf("the check failed: %s", why)
 	}
 	test.putBroken()
-	if why := test.check(); !strings.Contains(why, "the daily check failed") {
+	if why := test.check(); !strings.Contains(why, "did not restore") {
 		t.Fatalf("a broken copy passed the check: %q", why)
 	}
 
@@ -325,11 +315,11 @@ func TestBackupSQLite(t *testing.T) {
 	// copies: the newest real one counts (the broken copy above is a
 	// minute ahead).
 	test.b.mu.Lock()
-	test.b.state(app, test.database).lastCopy = time.Now().Add(time.Hour)
+	test.b.state(app, test.database).LastCopy = time.Now().Add(time.Hour)
 	test.b.mu.Unlock()
 	test.b.tick(test.ctx)
 	test.b.mu.Lock()
-	copied := test.b.state(app, test.database).lastCopy
+	copied := test.b.state(app, test.database).LastCopy
 	test.b.mu.Unlock()
 	if copied.After(time.Now()) {
 		t.Fatalf("the copies wait for one from the future: %v", copied)
@@ -429,7 +419,7 @@ func testBackupPostgres(t *testing.T, image string) {
 		t.Fatalf("the check failed: %s", why)
 	}
 	test.putBroken()
-	if why := test.check(); !strings.Contains(why, "the daily check failed") {
+	if why := test.check(); !strings.Contains(why, "did not restore") {
 		t.Fatalf("a broken copy passed the check: %q", why)
 	}
 
@@ -477,8 +467,8 @@ func testBackupPostgres(t *testing.T, image string) {
 	if copies := test.copies(); len(copies) != 1 {
 		t.Fatalf("the first copy of analytics: %+v", copies)
 	}
-	if listed := test.b.list(test.ctx, protocol.BackupRequest{App: app}); len(listed.Databases) != 3 || len(listed.Databases[1].Copies) != 1 || listed.Databases[1].Database != "postgres-db/analytics" {
-		t.Fatalf("the list: %+v", listed.Databases)
+	if listed, err := BackupsHere(test.ctx, filepath.Dir(test.a.dir), app); err != nil || len(listed) != 3 || listed[1].Database != "postgres-db/analytics" {
+		t.Fatalf("the list: %+v %v", listed, err)
 	}
 	firstVisit := test.copies()[0]
 	other(`INSERT INTO visits (page) VALUES ('/about');`)
