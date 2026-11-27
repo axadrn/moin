@@ -2,28 +2,24 @@
 
 Deploy anything. Lose nothing.
 
-One command puts your app on your server. Every backup is restored and checked, every day. No dashboard holds a key to your server.
+One command puts your app on your own server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
 
 ```bash
 curl -fsSL https://moin.run/cli.sh | sh
 cd shop
 moin deploy prod     # ✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
+moin                 # every server, every app, what needs you
+moin backups shop    # the copies, and the last restore check
 ```
 
-If `ssh prod` works, `moin deploy prod` works.
+If `ssh prod` works, `moin deploy prod` works. No account, no dashboard, no Docker on your laptop.
 
 ## Documentation
 
-Everything else is in the docs: [moin.run/docs](https://moin.run/docs). They are the source of truth.
+Everything else is in the docs: [moin.run/docs](https://moin.run/docs).
 
 News on X: [@usemoin](https://x.com/usemoin).
 
-## Build
-
-```bash
-go install github.com/axadrn/moin/cmd/moin@latest
-```
-
 ## License
 
-Open source: [what the license covers](https://moin.run/docs/faq#is-moin-open-source). See also [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).
+Open source, all of it: [what the license covers](https://moin.run/docs/faq#is-moin-open-source). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). The name and the logo: [TRADEMARKS.md](TRADEMARKS.md).
