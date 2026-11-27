@@ -234,7 +234,7 @@ func (w *watch) problems(config Config, containers map[string]appContainers, sta
 	}
 	for app, state := range containers {
 		if w.crashing(app, state.restarts) {
-			add("crash/"+app, app, app+" keeps crashing", fmt.Sprintf("Its containers restarted %d times. See why: %s logs %s --app %s", state.restarts, build.Name, config.Name, app))
+			add("crash/"+app, app, app+" keeps crashing", fmt.Sprintf("Its containers restarted %d times. See why: %s logs %s", state.restarts, build.Name, app))
 		}
 	}
 	if percent := diskPercent(w.apps.dir); w.diskFull(percent) {
