@@ -49,6 +49,15 @@ type Config struct {
 	StripePriceMonthly  string
 	StripePriceYearly   string
 	StripeAPIURL        string
+	// The bucket for the copies servers send: COPIES_ENDPOINT, like
+	// https://<account>.r2.cloudflarestorage.com, COPIES_BUCKET, and
+	// COPIES_ACCESS_KEY and COPIES_SECRET_KEY, a key that may read, write
+	// and delete objects in that bucket only. Without them no copy is
+	// taken.
+	CopiesEndpoint  string
+	CopiesBucket    string
+	CopiesAccessKey string
+	CopiesSecretKey string
 }
 
 // RenderConfig is what templates may know of the settings: nothing secret.
@@ -88,6 +97,10 @@ func Load() (*Config, error) {
 		StripePriceMonthly:  env("STRIPE_PRICE_ID_PRO_MONTHLY", ""),
 		StripePriceYearly:   env("STRIPE_PRICE_ID_PRO_YEARLY", ""),
 		StripeAPIURL:        env("STRIPE_API_URL", "https://api.stripe.com"),
+		CopiesEndpoint:      env("COPIES_ENDPOINT", ""),
+		CopiesBucket:        env("COPIES_BUCKET", ""),
+		CopiesAccessKey:     env("COPIES_ACCESS_KEY", ""),
+		CopiesSecretKey:     env("COPIES_SECRET_KEY", ""),
 	}
 	var errs []error
 	switch env("APP_ENV", "") {
@@ -119,6 +132,13 @@ func Load() (*Config, error) {
 	stripe := []string{cfg.StripeSecretKey, cfg.StripeWebhookSecret, cfg.StripeProduct, cfg.StripePriceMonthly, cfg.StripePriceYearly}
 	if slices.Contains(stripe, "") && slices.ContainsFunc(stripe, func(value string) bool { return value != "" }) {
 		errs = append(errs, errors.New("billing needs all of STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRODUCT_ID_PRO, STRIPE_PRICE_ID_PRO_MONTHLY and STRIPE_PRICE_ID_PRO_YEARLY, or none"))
+	}
+	bucket := []string{cfg.CopiesEndpoint, cfg.CopiesBucket, cfg.CopiesAccessKey, cfg.CopiesSecretKey}
+	if slices.Contains(bucket, "") && slices.ContainsFunc(bucket, func(value string) bool { return value != "" }) {
+		errs = append(errs, errors.New("copies need all of COPIES_ENDPOINT, COPIES_BUCKET, COPIES_ACCESS_KEY and COPIES_SECRET_KEY, or none"))
+	}
+	if cfg.CopiesEndpoint != "" && !absoluteURL(cfg.CopiesEndpoint) {
+		errs = append(errs, errors.New("COPIES_ENDPOINT must be an absolute HTTP or HTTPS URL"))
 	}
 	if knocks := env("KNOCKS_SERVER", ""); knocks != "" {
 		var found bool

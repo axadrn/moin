@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/copies"
 	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/db"
 	"github.com/axadrn/moin/cloud/internal/github"
@@ -61,6 +62,12 @@ func run() error {
 	} else if !cfg.Development {
 		slog.Warn("no STRIPE_SECRET_KEY: nobody can subscribe")
 	}
+	if cfg.CopiesBucket != "" {
+		bucket := copies.NewBucket(cfg.CopiesEndpoint, cfg.CopiesBucket, cfg.CopiesAccessKey, cfg.CopiesSecretKey)
+		cloud.Copies = copies.New(store, bucket, mail, cfg.AppURL)
+	} else if !cfg.Development {
+		slog.Warn("no COPIES_BUCKET: no server can send a copy")
+	}
 	site, err := routes.New(cfg, cloud)
 	if err != nil {
 		return err
@@ -78,6 +85,9 @@ func run() error {
 	watched := make(chan struct{})
 	go func() { watching.Run(ctx); close(watched) }()
 	go cleanUp(ctx, store)
+	if cloud.Copies != nil {
+		go cloud.Copies.Run(ctx)
+	}
 	failed := make(chan error, 1)
 	go func() { failed <- server.ListenAndServe() }()
 	select {

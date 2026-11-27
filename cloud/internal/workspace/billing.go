@@ -19,13 +19,15 @@ func (s *Store) ByStripeCustomer(customer string) (Workspace, error) {
 	return s.one(`SELECT `+columns+` FROM workspaces WHERE stripe_customer = ? ORDER BY created LIMIT 1`, customer)
 }
 
-// SetBilling keeps what Stripe says of a workspace's subscription.
+// SetBilling keeps what Stripe says of a workspace's subscription. The
+// first time it says ended is written down: the copies go 30 days later.
 func (s *Store) SetBilling(id string, b Billing) error {
 	var paidUntil any
 	if !b.PaidUntil.IsZero() {
 		paidUntil = b.PaidUntil.Unix()
 	}
-	_, err := s.db.Exec(`UPDATE workspaces SET status = ?, stripe_customer = ?, stripe_subscription = ?, paid_until = ? WHERE id = ?`,
-		b.Status, b.Customer, b.Subscription, paidUntil, id)
+	_, err := s.db.Exec(`UPDATE workspaces SET status = ?, stripe_customer = ?, stripe_subscription = ?, paid_until = ?,
+		ended = CASE WHEN ? = 'ended' THEN coalesce(ended, ?) END WHERE id = ?`,
+		b.Status, b.Customer, b.Subscription, paidUntil, b.Status, time.Now().Unix(), id)
 	return err
 }

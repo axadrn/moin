@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/axadrn/moin/cloud/internal/copies"
 	"github.com/axadrn/moin/cloud/internal/github"
 	"github.com/axadrn/moin/cloud/internal/mailer"
 	"github.com/axadrn/moin/cloud/internal/stripe"
@@ -31,6 +32,8 @@ type Cloud struct {
 	ipLimit   *limit
 	// Stripe sells moin cloud. Without it nobody can subscribe.
 	Stripe *stripe.Stripe
+	// Copies keeps the copies servers send. Without it none are taken.
+	Copies *copies.Copies
 }
 
 // NewCloud is moin cloud on the site at appURL.

@@ -86,6 +86,10 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("POST /api/cloud/servers", cloud.ConnectServer)
 	mux.HandleFunc("DELETE /api/cloud/servers/{name}", cloud.DisconnectServer)
 	mux.HandleFunc("POST "+report.Path, cloud.Report)
+	mux.HandleFunc("POST /api/copies", cloud.StartCopy)
+	mux.HandleFunc("POST /api/copies/{id}/done", cloud.CopyDone)
+	mux.HandleFunc("GET /api/cloud/copies", cloud.CLICopies)
+	mux.HandleFunc("POST /api/cloud/copies/{id}/download", cloud.CLIDownload)
 
 	mux.HandleFunc("/", handler.NotFound)
 
