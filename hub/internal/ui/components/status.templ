@@ -22,3 +22,8 @@ type DotProps struct {
 templ Dot(p DotProps) {
 	<i class="moin-dot" data-state={ string(p.State) } { p.Attrs... }></i>
 }
+
+// Chip is a short label next to a name, like "Launch price".
+templ Chip(text string) {
+	<span class="moin-chip">{ text }</span>
+}

@@ -10,22 +10,56 @@ import (
 )
 
 // ---------------------------------------------------------------- home
-// HomeCompare is the comparison on the home page: every tool, each
-// with how many facts moin wins, each a way to its page.
+// HomeCompare is the comparison on the home page: four facts, each tool
+// side by side, every answer linked to the page that says so. The row where
+// the others do more stays in: it makes the others believable.
 templ HomeCompare() {
 	<section id="compare" class="moin-band">
-		<h2 class="moin-statement">Next to the others.</h2>
-		<p class="moin-lead">None of them documents a daily check that a backup restores. { brand.Name } runs one. Where another tool does more, the page says so.</p>
-		<div class="moin-bento">
-			for _, competitor := range compare.Competitors {
-				@homeFeature(competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
-			}
+		<div class="moin-stack" data-gap="3">
+			<h2 class="moin-statement">Next to the others.</h2>
+			<p class="moin-lead">From each tool's own docs. Where another tool does more, it says so.</p>
 		</div>
-		<p class="moin-text moin-muted">
-			Fact by fact, from each tool's own docs.
-			<a href="/compare" class="moin-link moin-foreground">All comparisons</a>
+		<div class="moin-table-wrap">
+			<table class="moin-table">
+				<thead>
+					<tr>
+						<th scope="col"></th>
+						<th scope="col">{ brand.Name }</th>
+						for _, competitor := range compare.Competitors {
+							<th scope="col"><a href={ templ.SafeURL("/compare/" + competitor.Slug) } class="moin-link">{ competitor.Name }</a></th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range homeCompareRows() {
+						<tr>
+							<th scope="row">{ compare.Rows[row].Label }</th>
+							@compareCell(compare.Rows[row].Ours)
+							for _, competitor := range compare.Competitors {
+								@compareCell(competitor.Cells[row])
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<p class="moin-lead">
+			<a href="/compare" class="moin-link moin-foreground">Every fact, with its source</a>
 		</p>
 	</section>
+}
+
+// compareCell is one answer in the home table: its mark and its words,
+// linked to its source when it has one.
+templ compareCell(cell compare.Cell) {
+	<td data-mark={ string(cell.Mark) }>
+		<span aria-hidden="true">{ markSymbol(cell.Mark) }</span>
+		if cell.Source != "" {
+			<a href={ templ.SafeURL(cell.Source) } class="moin-link" rel="noopener">{ cell.Short }</a>
+		} else {
+			{ cell.Short }
+		}
+	</td>
 }
 
 // CompareIndex is /compare: every tool with its score, each a way to its
@@ -41,10 +75,18 @@ templ CompareIndex() {
 			<p class="moin-lead">Fact by fact, from each tool's own docs, each page with the day it was read. Where another tool does more, the page says so.</p>
 			<div class="moin-bento">
 				for _, competitor := range compare.Competitors {
-					@homeFeature(brand.Name+" vs "+competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
+					@compareCard(brand.Name+" vs "+competitor.Name, competitor.ScoreLine(), "/compare/"+competitor.Slug)
 				}
 			</div>
 		</main>
+	}
+}
+
+// compareCard is one tool on /compare: its name and score, a way to its page.
+templ compareCard(name, note, href string) {
+	@components.Card(components.CardProps{Href: href, Attrs: templ.Attributes{"data-gap": "1"}}) {
+		<span class="moin-strong">{ name }</span>
+		<span class="moin-small moin-muted">{ note }</span>
 	}
 }
 

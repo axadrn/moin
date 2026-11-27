@@ -1,6 +1,6 @@
 # moin
 
-> Your ./deploy.sh. But your data comes back. moin is one open source program. `moin deploy prod` logs in to your server over SSH, with your key, sends the committed source of your app and builds it there. It finds the app's SQLite and Postgres databases, copies them into your own S3-compatible bucket on a schedule, and every day restores the newest copy into a throwaway database and reads it. A watcher on another server notices when a server goes silent. There is no dashboard, no account and no service between you and your server: only who has SSH can command it. Every reading command takes --json, for scripts and AI agents.
+> Deploy anything. Lose nothing. moin is one open source program. `moin deploy prod` logs in to your server over SSH, with your key, sends the committed source of your app and builds it there. It finds the app's SQLite and Postgres databases, copies them into your own S3-compatible bucket on a schedule, and every day restores the newest copy into a throwaway database and reads it. A watcher on another server notices when a server goes silent. There is no dashboard, no account and no service between you and your server: only who has SSH can command it. Every reading command takes --json, for scripts and AI agents.
 
 Every docs page is also available as Markdown: add .md to its URL. The list of all pages is at /docs.md.
 

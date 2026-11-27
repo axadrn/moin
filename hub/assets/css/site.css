@@ -1769,3 +1769,51 @@
 .hub-harbor-rib-ink { fill: color-mix(in oklab, var(--background) 14%, transparent); }
 .hub-harbor-rail { fill: color-mix(in oklab, var(--foreground) 10%, transparent); }
 .hub-harbor-rail-ink { fill: color-mix(in oklab, var(--background) 12%, transparent); }
+
+/* The landing page: its terminal, the watcher's message, the two roads and
+   the table next to the others. */
+.moin-hero > :last-child:has(> .moin-code) { height: auto; padding-block-end: var(--space-8); }
+.moin-hero .moin-code > pre { max-height: none; font-size: 14px; padding: var(--space-6); }
+.moin-hero-start { width: min(100%, 34rem); margin-inline: auto; }
+.moin-pre { white-space: pre-line; }
+.moin-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.5rem;
+  padding-inline: 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.moin-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+.moin-roads { display: block; width: 100%; height: auto; color: var(--foreground); }
+.moin-roads-muted { fill: var(--muted-foreground); }
+.moin-roads-ink { fill: var(--foreground); }
+.moin-roads-ink-text { fill: var(--background); }
+.moin-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
+.moin-table { width: 100%; min-width: 44rem; border-collapse: collapse; font-size: 0.875rem; }
+.moin-table :is(th, td) { padding: var(--space-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.moin-table tr:last-child :is(th, td) { border-bottom: 0; }
+.moin-table thead th { font-weight: 600; }
+.moin-table tbody th { font-weight: 500; width: 14rem; }
+.moin-table td > span { margin-inline-end: 0.375rem; font-weight: 600; }
+.moin-table td[data-mark="yes"] > span { color: var(--live-text); }
+.moin-table td[data-mark="no"] > span { color: var(--failed-text); }
+.moin-table td[data-mark="part"] > span,
+.moin-table td[data-mark=""] > span,
+.moin-table td[data-mark="unknown"] > span { color: var(--muted-foreground); }
+.moin-table td { color: var(--muted-foreground); }
+.moin-table td:nth-child(2) { color: var(--foreground); }
+.moin-roads[data-tall] { max-width: 22rem; margin-inline: auto; }
+@media (min-width: 40rem) { .moin-roads[data-tall] { display: none; } }
+@media (max-width: 39.99rem) { .moin-roads:not([data-tall]) { display: none; } }

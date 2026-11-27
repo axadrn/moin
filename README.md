@@ -1,6 +1,6 @@
 # moin
 
-Your `./deploy.sh`. But your data comes back.
+Deploy anything. Lose nothing.
 
 One command puts your app on your server. Every backup is restored and checked, every day. No dashboard holds a key to your server.
 

@@ -1,22 +1,19 @@
 package pages
 
 import (
-	"strconv"
-
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// Home is the landing page: the promise and a deploy, the first commands,
-// the two one-way roads, the daily restore check, the watcher, the
-// catalog, moin cloud, how it compares, open source, the questions people
-// ask and the way in. Short: every part links to the docs for the rest.
+// Home is the landing page, in six parts: the promise and a real deploy,
+// how nothing gets lost, how nobody gets in, the others, the two prices,
+// and the way in. Every part shows a real thing moin prints or sends.
 // open is what the changelog says about how moin ships.
 templ Home(open HomeOpen) {
 	@layouts.Home(layouts.SEOProps{
-		Title:       "Your ./deploy.sh. But your data comes back.",
+		Title:       "Deploy anything. Lose nothing.",
 		Description: brand.Description,
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
@@ -24,15 +21,10 @@ templ Home(open HomeOpen) {
 		<main>
 			@HomeHero()
 			<div class="moin-page">
-				@HomeStart()
-				@HomeRoads()
-				@HomeChecked()
-				@HomeWatcher()
-				@HomeCatalog()
-				@HomeCloud()
+				@HomeLoseNothing()
+				@HomeNobodyGetsIn()
 				@HomeCompare()
-				@HomeOpenAndAgents(open)
-				@HomeQuestions()
+				@HomePricing(open)
 				@HomeEnd()
 			</div>
 		</main>
@@ -46,24 +38,34 @@ templ homePrimary() {
 	}
 }
 
+// homeInstall is the line that installs the CLI.
+func homeInstall(site string) string {
+	return "curl -fsSL " + site + "/cli.sh | sh"
+}
+
 // ---------------------------------------------------------------- hero
-// HomeHero is the whole first screen, up behind the floating navbar: the
-// promise and the two buttons on top, a real deploy below.
+// HomeHero is the first screen: the promise, the two commands, and a real
+// first deploy below them.
 templ HomeHero() {
 	<section class="moin-hero">
 		<div class="moin-page">
 			<div class="moin-stack" data-gap="6" data-center>
 				<h1 class="moin-display moin-stack" style="--gap:0">
-					<span>Your ./deploy.sh.</span>
-					<span class="moin-muted">But your data comes back.</span>
+					<span>Deploy anything.</span>
+					<span class="moin-muted">Lose nothing.</span>
 				</h1>
-				<p class="moin-lead moin-center" style="--measure:38ch">One command puts your app on your server. Every backup is restored and checked, every day. No dashboard holds a key to your server.</p>
+				<p class="moin-lead moin-center" style="--measure:44ch">
+					Like <code class="moin-mono">ssh prod</code> and <code class="moin-mono">./deploy.sh</code>, in one command. Every backup is restored and checked, every day. Only your SSH key commands your server.
+				</p>
 			</div>
-			<div class="moin-row" data-gap="2" data-center data-wrap>
-				@homePrimary()
-				@components.Button(components.ButtonProps{Href: "/docs/how-it-works"}) {
-					How it works
-				}
+			<div class="moin-stack moin-hero-start" data-gap="3">
+				@components.Command(components.CommandProps{Text: homeInstall(ctxkeys.RenderConfig(ctx).AppURL)})
+				<div class="moin-row" data-gap="2" data-center data-wrap>
+					@homePrimary()
+					@components.Button(components.ButtonProps{Href: "/docs/how-it-works"}) {
+						How it works
+					}
+				</div>
 			</div>
 		</div>
 		<div class="moin-page">
@@ -72,216 +74,237 @@ templ HomeHero() {
 	</section>
 }
 
-// homeDeploy is what the first deploy prints, as the CLI prints it.
-const homeDeploy = `$ moin deploy prod
+// homeDeploy is a first deploy, as the CLI prints it.
+const homeDeploy = `~/shop $ moin deploy prod
 shop · 3f2a9c1 → prod
-Set up moin on prod and deploy shop? [y/N] y
+? Set up moin on prod and deploy shop? [y/N] y
+→ installing Docker
+→ installing moin
+→ starting the daemon: backups, restore checks, reports
+→ sending the source
+→ building: Node, no Dockerfile needed
 ✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
-  Postgres found. No bucket yet: moin bucket set prod
-Close public SSH, only Tailscale from now on? [Y/n]`
+  postgres found. See its backups: moin backups shop`
 
-// ---------------------------------------------------------------- start
-// homeMoment is the one big thing of a section: what you get, as you see it.
-templ homeMoment(state, big, small string) {
-	@components.Card(components.CardProps{Attrs: templ.Attributes{"data-center": true, "style": "--pad:2rem"}}) {
-		<span class="moin-row moin-strong" data-gap="3">
-			@components.Dot(components.DotProps{State: components.StateLive})
-			{ state }
-		</span>
-		<p class="moin-statement">{ big }</p>
-		<p class="moin-small moin-muted">{ small }</p>
-	}
-}
-
-// HomeStart is how to begin: three commands, from a fresh server to live.
-templ HomeStart() {
-	<section id="how" class="moin-band">
-		<h2 class="moin-statement">Three commands. Live.</h2>
-		<p class="moin-lead">If <code class="moin-mono">ssh prod</code> works, <code class="moin-mono">moin deploy prod</code> works.</p>
-		<div class="moin-grid">
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					for index, step := range homeSteps(ctxkeys.RenderConfig(ctx).AppURL) {
-						@homeStep(strconv.Itoa(index+1), step[0], step[1])
-					}
-				}
-			}
-			@homeMoment("shop", "It's live.", "shop.203-0-113-7.sslip.io, with HTTPS.")
-		</div>
-		<p class="moin-lead">
-			Node. Bun. Python. Ruby. PHP. Go. Any Dockerfile. Any compose.yml. No Docker on your laptop.
-			<a href="/docs/getting-started" class="moin-link moin-foreground">Get started</a>
-		</p>
-	</section>
-}
-
-// homeSteps are the three steps of Get started: what you do, and how.
-func homeSteps(site string) [][2]string {
-	return [][2]string{
-		{"Install moin", "curl -fsSL " + site + "/cli.sh | sh"},
-		{"Go to your app", "cd shop"},
-		{"Deploy", "moin deploy prod"},
-	}
-}
-
-// homeStep is one step: its number, what you do, and how.
-templ homeStep(number, name, how string) {
-	@components.Item(components.ItemProps{}) {
-		<span class="moin-text moin-muted moin-digits">{ number }</span>
-		<div class="moin-row moin-fill" data-gap="1" data-phone="stack">
-			<span class="moin-fill moin-strong">{ name }</span>
-			<code class="moin-truncate moin-mono moin-text moin-muted">{ how }</code>
-		</div>
-	}
-}
-
-// ---------------------------------------------------------------- roads
-// HomeRoads is the shape of moin: commands go in over SSH, reports go
-// out to a watcher, and nothing comes back the other way.
-templ HomeRoads() {
-	<section id="roads" class="moin-band">
-		<h2 class="moin-statement">Two one-way roads.</h2>
-		<p class="moin-lead">Commands go in. Reports go out. Nothing comes back the other way.</p>
-		<div class="moin-grid" data-cols="2">
-			@homeRoad("Commands go in.", "From your laptop to your server. Over SSH, with your key. No service in between.")
-			@homeRoad("Reports go out.", "From your server to a watcher. The server acts on nothing a watcher says.")
-		</div>
-		@components.Card(components.CardProps{Ink: true, Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem"}}) {
-			<p class="moin-statement">Only who has SSH can command your server.</p>
-			<div class="moin-grid" data-cols="3">
-				@homeInk("Public SSH closes.", "After the first deploy. Then only over Tailscale.", "/docs/security#ssh-only-over-tailscale")
-				@homeInk("No updates by themselves.", "The server updates when you run moin update prod.", "/docs/security#updates")
-				@homeInk("A hacked watcher", "sees names and times. It can't touch a server.", "/docs/security#if-a-watcher-is-hacked")
-			</div>
-		}
-		<p class="moin-lead">
-			<a href="/docs/how-it-works" class="moin-link moin-foreground">How it works</a>
-		</p>
-	</section>
-}
-
-// homeRoad is one of the two roads: where it goes, and how.
-templ homeRoad(statement, line string) {
-	@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "3", "style": "--pad:2rem"}}) {
-		<p class="moin-statement">{ statement }</p>
-		<p class="moin-text moin-muted">{ line }</p>
-	}
-}
-
-// homeInk is one fact on the card that stands out.
-templ homeInk(name, note, href string) {
-	<a href={ templ.SafeURL(href) } class="moin-stack" data-gap="1">
-		<span class="moin-strong">{ name }</span>
-		<span class="moin-small moin-muted">{ note }</span>
-	</a>
-}
-
-// ---------------------------------------------------------------- checked
-// HomeChecked is why the backups can be trusted: each day the newest copy
-// comes back for real.
-templ HomeChecked() {
+// ---------------------------------------------------------------- lose nothing
+// HomeLoseNothing shows the promise as moin keeps it: a backup that came
+// back this morning, and a watcher that noticed a server go quiet.
+templ HomeLoseNothing() {
 	<section id="backups" class="moin-band">
-		<h2 class="moin-statement">Backups that come back.</h2>
-		<div class="moin-bento">
-			@components.Card(components.CardProps{Href: "/docs/backups", Attrs: templ.Attributes{"data-wide": true, "data-tall": true, "data-center": true, "style": "--pad:2rem"}}) {
-				<span class="moin-row moin-strong" data-gap="3">
-					@components.Dot(components.DotProps{State: components.StateLive})
-					shop
-				</span>
-				<p class="moin-statement">Checked today.</p>
-				<p class="moin-small moin-muted">Every day the newest copy is restored into a throwaway database and read. Then it tells you which copy it proved.</p>
-			}
-			@homeFeature("Found by themselves", "SQLite and Postgres. Nothing to set up.", "/docs/backups#what-moin-backs-up")
-			@homeFeature("Your own bucket", "Any S3-compatible bucket. Never through us.", "/docs/backups#the-bucket")
-			@homeFeature("Restore", "One command. Your app runs while it builds.", "/docs/backups#restore")
-			@homeFeature("Undo a restore", "The data from before stays. One step back.", "/docs/backups#undo-a-restore")
+		<div class="moin-stack" data-gap="3">
+			<h2 class="moin-statement">Lose nothing.</h2>
+			<p class="moin-lead">A backup you never restored is a hope. moin restores the newest copy every day, reads it, and tells you which copy it proved.</p>
 		</div>
+		<div class="moin-grid" data-cols="2">
+			<div class="moin-stack" data-gap="3">
+				@components.Code(components.CodeProps{ID: "home-backups", Text: homeBackups})
+				<p class="moin-small moin-muted">SQLite and Postgres, found by themselves. Into your own S3 bucket, on your schedule. A copy before every deploy. A restore can be undone.</p>
+			</div>
+			<div class="moin-stack" data-gap="3">
+				@homeAlert("prod stopped reporting", "No report since 2026-11-27 03:12 UTC. The server, its network or moin on it is down.\nApps on it: shop, blog.\nLook: ssh prod, or the console of your provider.")
+				<p class="moin-small moin-muted">A dead server can't tell you it's dead. A watcher on another machine can. Telegram, Slack, Discord or a webhook.</p>
+			</div>
+		</div>
+		<p class="moin-lead">
+			<a href="/docs/backups" class="moin-link moin-foreground">How backups work</a>
+		</p>
 	</section>
 }
 
-templ homeFeature(name, note, href string) {
-	@components.Card(components.CardProps{Href: href, Attrs: templ.Attributes{"data-gap": "1"}}) {
+// homeBackups is `moin backups shop`, as the CLI prints it.
+const homeBackups = `$ moin backups shop
+postgres
+  ✓ Restore check 4 hours ago: the copy 20261127T030000Z restored and read fine
+  COPY               TAKEN           SIZE
+  20261127T070000Z   12 minutes ago  41 MB
+  20261127T060000Z   1 hour ago      41 MB
+  20261127T030000Z   4 hours ago     40 MB
+  Go back to one with moin restore shop --to <copy>`
+
+// homeAlert is a message the watcher sends, as a chat app shows it.
+templ homeAlert(title, text string) {
+	<figure class="moin-chat" aria-label="An alert from the watcher">
+		<figcaption class="moin-row moin-small moin-muted" data-gap="2">
+			@components.Dot(components.DotProps{State: components.StateFailed})
+			moin watcher · Telegram
+		</figcaption>
+		<p class="moin-strong">{ title }</p>
+		<p class="moin-text moin-muted moin-pre">{ text }</p>
+	</figure>
+}
+
+// ---------------------------------------------------------------- nobody gets in
+// HomeNobodyGetsIn is the shape of moin: commands go in over SSH, reports
+// go out, and nothing comes back the other way.
+templ HomeNobodyGetsIn() {
+	<section id="security" class="moin-band">
+		<div class="moin-stack" data-gap="3">
+			<h2 class="moin-statement">Nobody gets in.</h2>
+			<p class="moin-lead">No dashboard holds a key to your server. Not ours either. Two one-way roads, and nothing comes back the other way.</p>
+		</div>
+		@components.Card(components.CardProps{Attrs: templ.Attributes{"style": "--pad:2rem"}}) {
+			@homeRoads()
+			@homeRoadsTall()
+		}
+		<div class="moin-grid" data-cols="3">
+			@homeFact("Public SSH closes.", "Right after the first deploy. From then on only over Tailscale.")
+			@homeFact("No updates by themselves.", "A server updates when you run moin update prod. Never before.")
+			@homeFact("A hacked watcher", "sees names and times. It can't touch a server.")
+		</div>
+		<p class="moin-lead">
+			<a href="/docs/security" class="moin-link moin-foreground">Security</a>
+		</p>
+	</section>
+}
+
+// homeFact is one short fact: a name, and a line under it.
+templ homeFact(name, note string) {
+	<div class="moin-stack" data-gap="1">
 		<span class="moin-strong">{ name }</span>
-		<span class="moin-small moin-muted">{ note }</span>
-	}
+		<span class="moin-text moin-muted">{ note }</span>
+	</div>
 }
 
-// ---------------------------------------------------------------- watcher
-// HomeWatcher is the one part that listens: it notices what the server
-// can't say itself.
-templ HomeWatcher() {
-	<section id="watcher" class="moin-band">
-		<h2 class="moin-statement">Someone notices.</h2>
-		<p class="moin-lead">A dead server can't tell you it's dead. A watcher can.</p>
-		<div class="moin-bento">
-			@homeFeature("Knows your apps", "Servers, apps, domains, backups. Nothing to set up.", "/docs/watcher")
-			@homeFeature("Alerts once", "Telegram. Slack. Discord. A webhook.", "/docs/watcher#alerts")
-			@homeFeature("On another server", "A small second one. Or two that watch each other.", "/docs/watcher#where-it-runs")
-			@homeFeature("Open source", "Run it yourself. Or let "+brand.Name+" cloud run it.", "/docs/watcher#run-one")
+// homeRoads draws the two one-way roads: laptop to server over SSH, server
+// to watcher and bucket, arrows one way only.
+templ homeRoads() {
+	<svg class="moin-roads" viewBox="0 0 960 220" role="img" aria-label="Your laptop sends commands to your server over SSH. The server sends reports to a watcher and copies to your bucket. Nothing goes back.">
+		<defs>
+			<marker id="road-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+				<path d="M0 0 10 5 0 10z" fill="currentColor"></path>
+			</marker>
+		</defs>
+		<g fill="none" stroke="currentColor" stroke-width="2">
+			<rect x="10" y="70" width="190" height="80" rx="20"></rect>
+			<rect x="385" y="70" width="190" height="80" rx="20" class="moin-roads-ink"></rect>
+			<rect x="760" y="10" width="190" height="80" rx="20"></rect>
+			<rect x="760" y="130" width="190" height="80" rx="20"></rect>
+			<path d="M200 110H377" marker-end="url(#road-arrow)"></path>
+			<path d="M575 95C670 95 680 50 752 50" marker-end="url(#road-arrow)"></path>
+			<path d="M575 125C670 125 680 170 752 170" marker-end="url(#road-arrow)"></path>
+		</g>
+		<g fill="currentColor" font-family="var(--font-sans)" text-anchor="middle">
+			<text x="105" y="106" font-size="20" font-weight="600">your laptop</text>
+			<text x="105" y="130" font-size="15" class="moin-roads-muted">moin deploy prod</text>
+			<text x="480" y="106" font-size="20" font-weight="600" class="moin-roads-ink-text">your server</text>
+			<text x="480" y="130" font-size="15" class="moin-roads-ink-text">apps, backups, checks</text>
+			<text x="855" y="46" font-size="20" font-weight="600">watcher</text>
+			<text x="855" y="70" font-size="15" class="moin-roads-muted">alerts you</text>
+			<text x="855" y="166" font-size="20" font-weight="600">your bucket</text>
+			<text x="855" y="190" font-size="15" class="moin-roads-muted">the copies</text>
+			<text x="290" y="96" font-size="15" class="moin-roads-muted">ssh, your key</text>
+			<text x="672" y="40" font-size="15" class="moin-roads-muted">reports</text>
+			<text x="672" y="200" font-size="15" class="moin-roads-muted">copies</text>
+		</g>
+	</svg>
+}
+
+// homeRoadsTall is homeRoads for a phone: the same roads, top to bottom.
+templ homeRoadsTall() {
+	<svg class="moin-roads" data-tall viewBox="0 0 360 430" role="img" aria-label="Your laptop sends commands to your server over SSH. The server sends reports to a watcher and copies to your bucket. Nothing goes back.">
+		<defs>
+			<marker id="road-arrow-tall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+				<path d="M0 0 10 5 0 10z" fill="currentColor"></path>
+			</marker>
+		</defs>
+		<g fill="none" stroke="currentColor" stroke-width="2">
+			<rect x="80" y="10" width="200" height="80" rx="20"></rect>
+			<rect x="80" y="175" width="200" height="80" rx="20" class="moin-roads-ink"></rect>
+			<rect x="5" y="340" width="160" height="80" rx="20"></rect>
+			<rect x="195" y="340" width="160" height="80" rx="20"></rect>
+			<path d="M180 90V167" marker-end="url(#road-arrow-tall)"></path>
+			<path d="M150 255C150 300 85 295 85 332" marker-end="url(#road-arrow-tall)"></path>
+			<path d="M210 255C210 300 275 295 275 332" marker-end="url(#road-arrow-tall)"></path>
+		</g>
+		<g fill="currentColor" font-family="var(--font-sans)" text-anchor="middle">
+			<text x="180" y="46" font-size="20" font-weight="600">your laptop</text>
+			<text x="180" y="70" font-size="15" class="moin-roads-muted">moin deploy prod</text>
+			<text x="250" y="134" font-size="15" class="moin-roads-muted">ssh, your key</text>
+			<text x="180" y="211" font-size="20" font-weight="600" class="moin-roads-ink-text">your server</text>
+			<text x="180" y="235" font-size="15" class="moin-roads-ink-text">apps, backups, checks</text>
+			<text x="85" y="376" font-size="20" font-weight="600">watcher</text>
+			<text x="85" y="400" font-size="15" class="moin-roads-muted">reports</text>
+			<text x="275" y="376" font-size="20" font-weight="600">your bucket</text>
+			<text x="275" y="400" font-size="15" class="moin-roads-muted">copies</text>
+		</g>
+	</svg>
+}
+
+// ---------------------------------------------------------------- pricing
+// HomePricing puts the free moin next to moin cloud: everything is open
+// source and free; the cloud takes two jobs off your hands.
+templ HomePricing(open HomeOpen) {
+	<section id="pricing" class="moin-band">
+		<div class="moin-stack" data-gap="3">
+			<h2 class="moin-statement">Free. Or free of worries.</h2>
+			<p class="moin-lead">All of moin is open source. moin cloud runs the two parts that must not live on your server.</p>
 		</div>
-	</section>
-}
-
-// ---------------------------------------------------------------- catalog
-// HomeCatalog is the other way to deploy: an open source app from the
-// catalog, with backups like any other.
-templ HomeCatalog() {
-	<section id="catalog" class="moin-band">
-		<h2 class="moin-statement">Or pick an app.</h2>
-		<p class="moin-lead">Umami. n8n. Open WebUI. Vaultwarden. Nextcloud. From the catalog, with backups and the daily check like any app.</p>
-		@components.Command(components.CommandProps{Text: "moin deploy prod --catalog umami"})
-		<p class="moin-lead">
-			<a href="/catalog" class="moin-link moin-foreground">The catalog</a>
-		</p>
-	</section>
-}
-
-// ---------------------------------------------------------------- cloud
-// HomeCloud is moin cloud: a watcher we run and a copy the server can't
-// delete. It is coming; there is no price until it is sold.
-templ HomeCloud() {
-	<section id="cloud" class="moin-band">
-		@components.Card(components.CardProps{Href: "/docs/cloud", Attrs: templ.Attributes{"data-gap": "3", "style": "--pad:2rem"}}) {
-			<p class="moin-statement">{ brand.Name } cloud. <span class="moin-muted">Coming.</span></p>
-			<p class="moin-text moin-muted">A watcher we run for you. And a copy of your backups that your server can add to, never delete. Your apps stay on your server.</p>
-		}
-	</section>
-}
-
-// ---------------------------------------------------------------- questions
-// HomeQuestions are the questions people ask first; the rest is in the
-// FAQ.
-templ HomeQuestions() {
-	<section id="questions" class="moin-band">
-		<h2 class="moin-statement">Good questions.</h2>
-		@components.Card(components.CardProps{}) {
-			@components.List() {
-				@homeQuestion("Is "+brand.Name+" open source?", "Yes. All of it. And free.")
-				@homeQuestion("Is there a dashboard?", "No. The CLI is the interface. A terminal UI is coming.")
-				@homeQuestion("Do I need Docker?", "Not on your laptop. "+brand.Name+" installs it on the server.")
-				@homeQuestion("Which servers?", "Any Linux server you can reach with SSH as root. Any provider.")
-				@homeQuestion("Can my team deploy?", "Everyone with a key on the server. moin keys add prod anna.pub.")
-				@homeQuestion("What if "+brand.Name+" cloud is down?", "Nothing changes on your server. Apps and backups keep running.")
+		<div class="moin-grid" data-cols="2">
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem"}}) {
+				<div class="moin-stack" data-gap="1">
+					<span class="moin-strong">{ brand.Name }</span>
+					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever, open source</span></span>
+					<span class="moin-small moin-muted">{ homeShips(open) }</span>
+				</div>
+				@homePrimary()
+				@homePlanRows(
+					"Deploy, rollback, logs, env, domains",
+					"Backups into your own bucket",
+					"A restore check every day",
+					"Alerts while your server lives",
+					"Run your own watcher on a second server",
+					"AI agents use the same CLI",
+				)
 			}
-		}
-		<p class="moin-lead">
-			<a href="/docs/faq" class="moin-link moin-foreground">All questions</a>
-		</p>
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem"}}) {
+				<div class="moin-stack" data-gap="1">
+					<span class="moin-row" data-gap="2">
+						<span class="moin-strong">{ brand.Name } cloud</span>
+						@components.Chip("Launch price")
+					</span>
+					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$7</span><span class="moin-small moin-muted">a month. Or $49 a year.</span></span>
+					<span class="moin-small moin-muted">It costs more later. Yours stays as long as you stay.</span>
+				</div>
+				@components.Button(components.ButtonProps{Href: "mailto:hello@moin.run?subject=moin%20cloud"}) {
+					Get in early
+				}
+				@homePlanRows(
+					"Everything in "+brand.Name,
+					"A watcher we run: you know when a server dies",
+					"A copy of every backup your server can add to, never delete",
+					"Encrypted on your server. We can't read it",
+					"No bucket to set up",
+					"Unlimited servers and apps",
+				)
+			}
+		</div>
+		<p class="moin-text moin-muted">{ brand.Name } cloud opens soon. Write to us and you get the launch price the day it does.</p>
 	</section>
 }
 
-templ homeQuestion(question, answer string) {
-	@components.Expand(components.ExpandProps{Name: question}) {
-		@components.Item(components.ItemProps{}) {
-			<span class="moin-fill moin-text moin-muted">{ answer }</span>
-		}
+// homeShips says how often moin ships, from the real changelog.
+func homeShips(open HomeOpen) string {
+	if open.Releases == 0 {
+		return "Every line on GitHub."
 	}
+	return "Every line on GitHub. " + homeVersions(open.Releases) + " since " + open.Since.Format("January 2, 2006") + "."
+}
+
+// homePlanRows are the lines of a plan, each with a check.
+templ homePlanRows(rows ...string) {
+	<ul class="moin-stack moin-text" data-gap="3">
+		for _, row := range rows {
+			<li class="moin-row" data-gap="3">
+				<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" class="moin-muted"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+				{ row }
+			</li>
+		}
+	</ul>
 }
 
 // ---------------------------------------------------------------- end
 // HomeEnd is the end of the page in one card: the name, where it comes
-// from, the promise and the way in. "Nothing goes missing" leads into
-// "your data comes back".
+// from, the promise and the way in.
 templ HomeEnd() {
 	<section id="start" class="moin-band">
 		@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "8", "style": "--pad:clamp(2rem,6vw,3.5rem)"}}) {
@@ -295,15 +318,15 @@ templ HomeEnd() {
 				I'm Axel. Born and raised in Hamburg, next to one of Europe's busiest ports. Millions of containers. Packed once. Shipped anywhere. Nothing goes missing. Your apps are containers too. So I built { brand.Name }, and named it after home.
 			</p>
 			<p class="moin-statement">
-				Your ./deploy.sh. <span class="moin-muted">But your data comes back.</span>
+				Deploy anything. <span class="moin-muted">Lose nothing.</span>
 			</p>
+			@components.Command(components.CommandProps{Text: homeInstall(ctxkeys.RenderConfig(ctx).AppURL)})
 			<div class="moin-row" data-gap="2" data-wrap>
 				@homePrimary()
 				@components.Button(components.ButtonProps{Href: "/docs"}) {
 					Read the docs
 				}
 			</div>
-			<p class="moin-small moin-muted">Free and open source.</p>
 			@homeGulls()
 			<div class="moin-bleed hub-harbor-in-card">
 				@homeHarbor()

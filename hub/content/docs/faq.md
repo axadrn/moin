@@ -7,7 +7,7 @@ order: 2
 
 ## What is moin?
 
-Your `./deploy.sh`, but your data comes back. One command puts your app on your server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
+Deploy anything. Lose nothing. Like `ssh prod` and `./deploy.sh`, in one command. One command puts your app on your server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
 
 ## Is there a dashboard?
 

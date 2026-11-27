@@ -5,7 +5,7 @@ import "github.com/axadrn/moin/internal/build"
 
 const (
 	Name    = build.Name
-	Tagline = "Your ./deploy.sh. But your data comes back."
+	Tagline = "Deploy anything. Lose nothing."
 	// Company runs moin cloud and holds the copyright.
 	Company = "Berry Good Ideas LLC"
 	// SupportEmail is where people write about moin.
