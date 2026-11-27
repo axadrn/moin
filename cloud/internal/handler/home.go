@@ -27,18 +27,6 @@ func Home(files fs.FS) http.HandlerFunc {
 	}
 }
 
-// Why is /why: every post from X that says the problem moin answers.
-func Why(files fs.FS) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		posts, err := tweets.Load(files)
-		if err != nil {
-			renderError(w, "why: tweets", err)
-			return
-		}
-		render(w, r, pages.Why(posts))
-	}
-}
-
 // NotFound answers every address the site does not have.
 func NotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)

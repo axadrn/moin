@@ -39,7 +39,6 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
 	mux.HandleFunc("GET /{$}", handler.Home(texts))
-	mux.HandleFunc("GET /why", handler.Why(texts))
 	mux.HandleFunc("GET /docs", handler.Docs(docs))
 	mux.HandleFunc("GET /docs.md", handler.Docs(docs))
 	mux.HandleFunc("GET /docs/", handler.Docs(docs))

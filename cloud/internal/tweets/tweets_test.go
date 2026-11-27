@@ -64,13 +64,10 @@ func TestPartsStopsAtTheRange(t *testing.T) {
 		t.Fatalf("got %q", parts)
 	}
 
-	// Truncated, with a mention in the middle and the photo link past the end.
-	parts = find(t, "2045455574620340332").Parts()
-	if len(parts) != 3 || parts[1].Href != "https://x.com/brian_lovin" {
-		t.Fatalf("got %q, want words, @brian_lovin, words", parts)
-	}
-	if !strings.HasSuffix(parts[2].Text, "way too big and usually") {
-		t.Errorf("last part %q, want it cut before the photo link", parts[2].Text)
+	// Truncated, with the photo link past the end.
+	parts = find(t, "1997293892090183772").Parts()
+	if len(parts) != 1 || !strings.HasSuffix(parts[0].Text, "a botnet was using my IP to") {
+		t.Fatalf("got %q, want it cut before the photo link", parts)
 	}
 }
 

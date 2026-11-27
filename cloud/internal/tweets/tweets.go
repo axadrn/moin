@@ -1,6 +1,6 @@
 // Package tweets reads the posts from X in content/tweets.json. Real
 // people say the problem: servers getting hacked, backups that did not
-// come back. The site shows them as they were posted.
+// come back. The landing page shows their words as they were posted.
 package tweets
 
 import (
@@ -17,24 +17,20 @@ import (
 // Tweet is one post, as X gave it. Text is raw: HTML entities like &gt;
 // and t.co links. Every At counts characters (runes), not bytes.
 type Tweet struct {
-	ID        string    `json:"id"`
-	URL       string    `json:"url"`
-	Name      string    `json:"name"`
-	Handle    string    `json:"handle"`
-	Avatar    string    `json:"avatar"`
-	Verified  bool      `json:"verified"`
-	Date      time.Time `json:"date"`
-	Likes     int       `json:"likes"`
-	Replies   int       `json:"replies"`
-	Topic     string    `json:"topic"`
-	Text      string    `json:"text"`
-	Range     [2]int    `json:"range"`
-	Truncated bool      `json:"truncated"`
-	Links     []Link    `json:"links"`
-	Mentions  []Mention `json:"mentions"`
-	Media     []Media   `json:"media"`
-	Photo     *Photo    `json:"photo"`
-	Card      *Card     `json:"card"`
+	ID       string    `json:"id"`
+	URL      string    `json:"url"`
+	Name     string    `json:"name"`
+	Handle   string    `json:"handle"`
+	Avatar   string    `json:"avatar"`
+	Verified bool      `json:"verified"`
+	Date     time.Time `json:"date"`
+	Likes    int       `json:"likes"`
+	Replies  int       `json:"replies"`
+	Text     string    `json:"text"`
+	Range    [2]int    `json:"range"`
+	Links    []Link    `json:"links"`
+	Mentions []Mention `json:"mentions"`
+	Media    []Media   `json:"media"`
 }
 
 // Link is a t.co link in the text: X shows Shown and goes to Href.
@@ -51,27 +47,11 @@ type Mention struct {
 	At     [2]int `json:"at"`
 }
 
-// Media is the t.co link of a photo. The photo shows under the text, so
-// the link goes.
+// Media is the t.co link of a photo. The site shows no photos, so the
+// link goes.
 type Media struct {
 	URL string `json:"url"`
 	At  [2]int `json:"at"`
-}
-
-// Photo is the picture of a post.
-type Photo struct {
-	URL    string `json:"url"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
-}
-
-// Card is the preview X shows for a link.
-type Card struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Domain      string `json:"domain"`
-	Href        string `json:"href"`
-	Image       string `json:"image"`
 }
 
 // Part is a piece of the text: words, or a link when Href is set.
@@ -173,22 +153,4 @@ func Count(n int) string {
 	default:
 		return strings.TrimSuffix(fmt.Sprintf("%.1f", float64(n)/1_000_000), ".0") + "M"
 	}
-}
-
-// Loudest are the n posts with the most likes.
-func Loudest(all []Tweet, n int) []Tweet {
-	sorted := slices.Clone(all)
-	slices.SortStableFunc(sorted, func(a, b Tweet) int { return cmp.Compare(b.Likes, a.Likes) })
-	return sorted[:min(n, len(sorted))]
-}
-
-// About are the posts on one topic: vps, hacked, backups or complexity.
-func About(all []Tweet, topic string) []Tweet {
-	var on []Tweet
-	for _, t := range all {
-		if t.Topic == topic {
-			on = append(on, t)
-		}
-	}
-	return on
 }

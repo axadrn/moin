@@ -3,111 +3,52 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/tweets"
-	"github.com/axadrn/moin/cloud/internal/ui/components"
-	"github.com/axadrn/moin/cloud/internal/ui/layouts"
-	"strconv"
 )
 
 // Posts from X say the problem; moin is the answer. Nobody in them talks
 // about moin, and the page never says they do.
 
-// whyClosing is the answer under the posts, on the home page and on /why.
-var whyClosing = "That's why " + brand.Name + " closes public SSH after the first deploy, and proves every backup, every day."
-
-// whyTopics are the groups of /why, in order: the topic and its heading.
-var whyTopics = []struct{ Topic, Title string }{
-	{"vps", "The move to a VPS"},
-	{"hacked", "Servers getting hacked"},
-	{"backups", "Backups that didn't come back"},
-	{"complexity", "Too much complexity"},
-}
+// homeAnswer is the answer under the posts.
+var homeAnswer = "That's why " + brand.Name + " closes public SSH after your first deploy, so you come in over Tailscale, and proves every backup, every day."
 
 // ---------------------------------------------------------------- home
-// HomeVoices is the section after the hero: the loudest posts, in two rows
-// drifting in opposite directions, then the answer.
+// HomeVoices is the section after the hero: the posts in one row that
+// moves slowly to the left, then the answer.
 templ HomeVoices(posts []tweets.Tweet) {
-	{{ loudest := tweets.Loudest(posts, 24) }}
 	<section class="moin-band" aria-label="Posts from X">
 		<div class="moin-page">
 			@homeHead("Everyone is moving to a VPS.", "Not everyone closes the door.")
 		</div>
-		<div class="moin-marquee">
-			@tweetRow(everyOther(loudest, 0), false)
-			@tweetRow(everyOther(loudest, 1), true)
+		// site.js moves the row and lets a hand drag it.
+		<div class="moin-marquee" data-marquee>
+			<div class="moin-marquee-row">
+				<div class="moin-marquee-track">
+					for _, post := range posts {
+						@tweetCard(post)
+					}
+				</div>
+				// The second copy makes the loop seamless; screen readers and
+				// the keyboard skip it.
+				<div class="moin-marquee-track" aria-hidden="true" inert>
+					for _, post := range posts {
+						@tweetCard(post)
+					}
+				</div>
+			</div>
 		</div>
-		<div class="moin-page moin-stack" data-gap="6" data-center>
-			<p class="moin-lead moin-center">{ whyClosing }</p>
-			@homeMore("/why", "Read all "+strconv.Itoa(len(posts)))
+		<div class="moin-page">
+			<p class="moin-text moin-muted moin-center">{ homeAnswer }</p>
 		</div>
 	</section>
 }
 
-// tweetRow is one row of the marquee. The second copy of the posts makes
-// the loop seamless; screen readers and the keyboard skip it.
-templ tweetRow(posts []tweets.Tweet, reverse bool) {
-	<div class="moin-marquee-lane">
-		<div class="moin-marquee-row" data-reverse?={ reverse } style={ "--drift:" + strconv.Itoa(len(posts)*8) + "s" }>
-			<div class="moin-marquee-track">
-				for _, post := range posts {
-					@tweetCard(post, true)
-				}
-			</div>
-			<div class="moin-marquee-track" aria-hidden="true" inert>
-				for _, post := range posts {
-					@tweetCard(post, true)
-				}
-			</div>
-		</div>
-	</div>
-}
-
-// everyOther is every second post, from the first or the second.
-func everyOther(posts []tweets.Tweet, from int) []tweets.Tweet {
-	var picked []tweets.Tweet
-	for i := from; i < len(posts); i += 2 {
-		picked = append(picked, posts[i])
-	}
-	return picked
-}
-
-// ---------------------------------------------------------------- /why
-// Why is every post, grouped by topic, then the answer.
-templ Why(posts []tweets.Tweet) {
-	@layouts.Home(layouts.SEOProps{
-		Title:       "Why " + brand.Name,
-		Description: "Real posts from X: servers getting hacked, backups that didn't come back, too much complexity. And what " + brand.Name + " does about it.",
-		Path:        "/why",
-	}) {
-		<main class="moin-page moin-content">
-			@components.Header(components.HeaderProps{Title: "Why " + brand.Name})
-			<p class="moin-lead">Everyone is moving to a VPS. Not everyone closes the door. Real posts from X, as they were posted.</p>
-			for _, group := range whyTopics {
-				if on := tweets.About(posts, group.Topic); len(on) > 0 {
-					<section class="moin-stack" data-gap="6">
-						<h2 class="moin-fact-name">{ group.Title }</h2>
-						<div class="moin-tweets">
-							for _, post := range on {
-								@tweetCard(post, false)
-							}
-						</div>
-					</section>
-				}
-			}
-			<div class="moin-stack moin-why-end" data-gap="6" data-center>
-				<p class="moin-statement moin-center">{ whyClosing }</p>
-				@homePrimary()
-			</div>
-		</main>
-	}
-}
-
 // ---------------------------------------------------------------- card
-// tweetCard is a post as X shows it. View on X stretches over the whole
-// card, so a click anywhere opens the post; the links inside sit on top.
-// compact is the marquee: one size for every card, the text cut to fit,
-// no photo, no preview, no Show more (the whole card opens the post).
-templ tweetCard(post tweets.Tweet, compact bool) {
-	<article class="moin-tweet" data-compact?={ compact }>
+// tweetCard is a post as X shows it, every card the same size: who wrote
+// it, the words cut to fit, what people did with it. The link to the post
+// stretches over the whole card and has no words, the X mark says it; the
+// links inside sit on top.
+templ tweetCard(post tweets.Tweet) {
+	<article class="moin-tweet">
 		<header class="moin-tweet-head">
 			<img class="moin-tweet-face" src={ post.Avatar } alt="" width="32" height="32" loading="lazy" decoding="async"/>
 			<div class="moin-tweet-who">
@@ -132,26 +73,10 @@ templ tweetCard(post tweets.Tweet, compact bool) {
 				}
 			}
 		</p>
-		if post.Truncated && !compact {
-			<a href={ templ.SafeURL(post.URL) } class="moin-tweet-inner moin-tweet-more" rel="noopener" target="_blank">Show more</a>
-		}
-		if compact {
-			// No photo or preview in the marquee: every card the same height.
-		} else if post.Photo != nil {
-			<img class="moin-tweet-photo" src={ post.Photo.URL } alt="" width={ strconv.Itoa(post.Photo.Width) } height={ strconv.Itoa(post.Photo.Height) } loading="lazy" decoding="async"/>
-		} else if post.Card != nil {
-			<a href={ templ.SafeURL(post.Card.Href) } class="moin-tweet-inner moin-tweet-preview" rel="noopener nofollow" target="_blank">
-				if post.Card.Image != "" {
-					<img src={ post.Card.Image } alt="" loading="lazy" decoding="async"/>
-				}
-				<span class="moin-small moin-muted">{ post.Card.Domain }</span>
-				<span class="moin-text">{ post.Card.Title }</span>
-			</a>
-		}
 		<footer class="moin-tweet-foot">
 			<span>{ tweetCount(post.Likes, "like", "likes") }</span>
 			<span>{ tweetCount(post.Replies, "reply", "replies") }</span>
-			<a href={ templ.SafeURL(post.URL) } class="moin-tweet-view" rel="noopener" target="_blank">View on X</a>
+			<a href={ templ.SafeURL(post.URL) } class="moin-tweet-view" rel="noopener" target="_blank" aria-label={ "The post of @" + post.Handle + " on X" }></a>
 		</footer>
 	</article>
 }

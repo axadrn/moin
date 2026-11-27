@@ -1928,23 +1928,31 @@
 .moin-hero > :last-child:has(> .moin-terminal) { height: auto; padding-block: var(--space-6) var(--space-8); }
 @media (min-width: 40rem) { .moin-hero > :last-child:has(> .moin-terminal) { padding-block-start: var(--space-8); } }
 
-/* A post from X, as X shows it: who wrote it, the words, a photo or a link
-   preview, and what people did with it. View on X stretches over the whole
-   card, so a click anywhere opens the post; the links inside sit on top. */
+/* A post from X, as X shows it: who wrote it, the words, what people did
+   with it. Every card has the same size, so the row is calm: the words are
+   cut to fit. The link to the post stretches over the whole card; the
+   links in the words sit on top. */
 .moin-tweet {
   position: relative;
+  box-sizing: border-box;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  width: 17.5rem;
+  height: 12.5rem;
+  overflow: hidden;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--card);
   color: var(--card-foreground);
   transition: background-color var(--fast) var(--ease);
 }
+@media (min-width: 40rem) { .moin-tweet { width: 21.25rem; } }
 .moin-tweet:hover { background-image: linear-gradient(var(--hover), var(--hover)); }
 .moin-tweet:has(.moin-tweet-view:focus-visible) { box-shadow: var(--focus); }
 .moin-tweet-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -1971,9 +1979,15 @@
 }
 .moin-tweet-check { flex: none; width: 0.875rem; height: 0.875rem; }
 .moin-tweet-meta { font-size: 0.8125rem; line-height: 1rem; color: var(--muted-foreground); }
+/* Five lines at most, then an ellipsis. */
 .moin-tweet-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  min-height: 0;
   font-size: 0.875rem;
-  line-height: 1.45;
+  line-height: 1.25rem;
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -1985,53 +1999,16 @@
   text-decoration: none;
 }
 .moin-tweet-inner:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
-.moin-tweet-more { align-self: flex-start; font-size: 0.8125rem; font-weight: 500; color: var(--foreground); }
-.moin-tweet-photo {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 22.5rem;
-  object-fit: cover;
-  border-radius: calc(var(--radius-lg) - var(--space-2));
-  border: 1px solid var(--border);
-  background: var(--muted);
-}
-/* A link preview: its picture, then the domain and the title. */
-.moin-tweet-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  padding-block-end: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius-lg) - var(--space-2));
-  color: var(--foreground);
-}
-.moin-tweet-preview > img {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1.91;
-  max-height: 22.5rem;
-  object-fit: cover;
-  margin-block-end: var(--space-2);
-  background: var(--muted);
-}
-.moin-tweet-preview > span { padding-inline: var(--space-3); }
-.moin-tweet-preview:hover { color: var(--foreground); background: var(--hover); text-decoration: none; }
 .moin-tweet-foot {
+  flex: none;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-4);
+  gap: var(--space-4);
   margin-block-start: auto;
   font-size: 0.75rem;
   line-height: 1rem;
   color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
 }
-.moin-tweet-foot > span { font-variant-numeric: tabular-nums; }
-.moin-tweet-view { margin-inline-start: auto; color: var(--muted-foreground); text-decoration: none; }
-.moin-tweet-view:hover { color: var(--foreground); }
 .moin-tweet-view:focus-visible { outline: none; }
 .moin-tweet-view::after {
   content: "";
@@ -2039,56 +2016,29 @@
   inset: 0;
   border-radius: inherit;
 }
-/* In the marquee: every card the same size, the header on top, the words
-   cut to fill the room, the footer at the bottom. */
-.moin-tweet[data-compact] { flex: none; gap: var(--space-2); width: 17.5rem; height: 11.25rem; }
-@media (min-width: 40rem) { .moin-tweet[data-compact] { width: 18.75rem; } }
-.moin-tweet[data-compact] .moin-tweet-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  overflow: hidden;
-}
 
-/* The marquee: rows of posts drifting sideways, the edges fading out. Each
-   row holds its posts twice and moves by one copy, so the loop has no seam.
-   The pointer or the keyboard stops it. Reduced motion: no drift, the row
-   scrolls sideways and the copy goes. */
+/* The marquee: a row of posts that site.js moves slowly to the left, and a
+   hand can drag or swipe. It holds its posts twice, so the loop has no
+   seam. The edges fade out. Reduced motion: it only scrolls, and the copy
+   goes. */
 .moin-marquee {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
   -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
 }
-.moin-marquee-lane { overflow: hidden; }
+.moin-marquee::-webkit-scrollbar { display: none; }
+.moin-marquee[data-dragging] { cursor: grabbing; }
+.moin-marquee img { -webkit-user-drag: none; }
 .moin-marquee-row { display: flex; width: max-content; }
 .moin-marquee-track {
   display: flex;
-  align-items: flex-start;
   gap: var(--space-3);
   padding-inline-end: var(--space-3);
 }
-@keyframes moin-drift { to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: no-preference) {
-  .moin-marquee-row { animation: moin-drift var(--drift, 120s) linear infinite; }
-  .moin-marquee-row[data-reverse] { animation-direction: reverse; }
-  .moin-marquee-row:hover,
-  .moin-marquee-row:focus-within { animation-play-state: paused; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .moin-marquee-lane { overflow-x: auto; scroll-snap-type: x mandatory; padding-inline: var(--gutter, 1rem); }
+  .moin-marquee { padding-inline: var(--gutter, 1rem); }
   .moin-marquee-track[aria-hidden] { display: none; }
-  .moin-marquee .moin-tweet { scroll-snap-align: center; }
 }
-
-/* /why: every post in calm columns, as many as fit, at most three. */
-.moin-tweets { columns: 3 17.5rem; column-gap: var(--space-3); }
-.moin-tweets > .moin-tweet {
-  display: inline-flex;
-  width: 100%;
-  vertical-align: top;
-  break-inside: avoid;
-  margin-block-end: var(--space-3);
-}
-.moin-why-end { padding-block: var(--space-8); }
