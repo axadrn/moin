@@ -1,6 +1,6 @@
 ---
 title: Terms of Service
-description: The plain-language rules for moin and moin cloud
+description: The plain-language rules for the moin website, the moin software and moin cloud
 lastUpdated: November 27, 2026
 ---
 
