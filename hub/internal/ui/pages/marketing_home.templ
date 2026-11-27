@@ -321,7 +321,7 @@ templ HomePricing() {
 				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth"}) {
 					{ homeStartLabel(ctx) }
 				}
-				@homePlanRows("Ready in minutes", "We run and update it", "Sign in with GitHub or a passkey", "Support by email")
+				@homePlanRows("Unlimited servers", "Unlimited apps", "Unlimited team", "Ready in minutes", "We run and update it", "Sign in with GitHub or a passkey", "Support by email")
 			}
 			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem", "data-plan": "self-hosted"}}) {
 				<div class="moin-stack" data-gap="1">
@@ -332,10 +332,10 @@ templ HomePricing() {
 				@components.Button(components.ButtonProps{Href: "/docs/self-hosting"}) {
 					Host it yourself
 				}
-				@homePlanRows("One command on one server", "Update with one command", "Your GitHub App, passkeys, email optional", "Help on GitHub")
+				@homePlanRows("Unlimited servers", "Unlimited apps", "Unlimited team", "One command on one server", "Update with one command", "Your GitHub App, passkeys, email optional", "Help on GitHub")
 			}
 		</div>
-		<p class="moin-lead" data-one-price>Unlimited servers. Unlimited apps. Unlimited team. Nothing to unlock.</p>
+		<p class="moin-lead" data-one-price>Nothing to unlock.</p>
 	</section>
 }
 
