@@ -1906,3 +1906,5 @@
 .moin-table { min-width: 40rem; }
 .moin-table td:nth-child(2), .moin-table thead th:nth-child(2) { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
 @media (min-width: 56rem) { .moin-grid[data-cols="3-2"] { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+/* A fact of zero trust: a title a step bigger than text. */
+.moin-fact-name { font-family: var(--font-heading); font-size: 1.25rem; font-weight: var(--weight-title); letter-spacing: var(--tracking-title); line-height: 1.3; }

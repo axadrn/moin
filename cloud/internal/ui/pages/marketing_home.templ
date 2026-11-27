@@ -167,10 +167,10 @@ templ homeMore(href, text string) {
 
 // homeFact is one short fact: a name, and a line under it.
 templ homeFact(name, note string) {
-	<div class="moin-stack" data-gap="1">
-		<span class="moin-strong">{ name }</span>
+	@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "1", "style": "--pad:2rem"}}) {
+		<span class="moin-fact-name">{ name }</span>
 		<span class="moin-text moin-muted">{ note }</span>
-	</div>
+	}
 }
 
 // homeRoads draws the two one-way roads: laptop to server over SSH, server
