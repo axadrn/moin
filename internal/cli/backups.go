@@ -140,7 +140,8 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 
 // restore is `moin restore [app]`: a database goes back to a copy, and
 // what it was before stays as an undo. On a terminal it shows the copies
-// and asks which one; a script names it with --to.
+// and asks which one; a script names it with --to. What it asks goes to
+// stderr, so stdout holds only the answer of --json.
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("restore", "restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>] [--database <name>] [-s server] [-y] [--json]").withServer().withYes().withJSON()
 	to := flags.String("to", "", "a copy, a time in UTC, or an undo: see `"+build.Name+" backups`")
@@ -154,17 +155,17 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	}
 	return onApp(ctx, flags, app, func(server string) error {
 		if *to == "" {
-			*database, *to, err = pickCopy(ctx, server, app, *database, stdin, stdout)
+			*database, *to, err = pickCopy(ctx, server, app, *database, stdin, os.Stderr)
 			if err != nil {
 				return err
 			}
 		}
 		question := fmt.Sprintf("Put the data of %s back to %s? The app stops for a moment.", app, *to)
-		if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+		if err := confirm(stdin, os.Stderr, flags.yes(), question); err != nil {
 			return err
 		}
 		var restored daemon.Restored
-		if err := sshJSON(ctx, server, []string{"restore", app, *to, *database}, nil, &restored); err != nil {
+		if err := sshJSON(ctx, server, []string{"restore", app, "--to", *to, "--database", *database}, nil, &restored); err != nil {
 			return err
 		}
 		if flags.json() {
@@ -302,7 +303,7 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 		return err
 	}
 	done(stdout, "%s backs up to %s. The first copies come within a minute", server, bucket.Bucket)
-	hint(stdout, "See them with", build.Name+" backups")
+	hint(stdout, "See them with", build.Name+" backups <app>")
 	return nil
 }
 
@@ -344,7 +345,7 @@ func alerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	case "add":
 		return addAlert(ctx, args[1:], stdin, stdout)
 	case "rm":
-		return removeAlert(ctx, args[1:], stdout)
+		return removeAlert(ctx, args[1:], stdin, stdout)
 	case "test":
 		return testAlerts(ctx, args[1:], stdout)
 	}
@@ -420,18 +421,22 @@ func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 }
 
 // removeAlert is `moin alerts rm <server> <n>`, n as `moin alerts` lists it.
-func removeAlert(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("alerts rm", "alerts rm <server> <n>")
+func removeAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("alerts rm", "alerts rm <server> <n> [-y]").withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 2 {
 		return flags.wrong()
 	}
-	if err := sshRun(ctx, flags.Arg(0), hereLine("alerts", "rm", flags.Arg(1)), nil, io.Discard, os.Stderr); err != nil {
+	server, number := flags.Arg(0), flags.Arg(1)
+	if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove alert %s from %s?", number, server)); err != nil {
 		return err
 	}
-	done(stdout, "Removed alert %s from %s", flags.Arg(1), flags.Arg(0))
+	if err := sshRun(ctx, server, hereLine("alerts", "rm", number), nil, io.Discard, os.Stderr); err != nil {
+		return err
+	}
+	done(stdout, "Removed alert %s from %s", number, server)
 	return nil
 }
 
@@ -452,107 +457,42 @@ func testAlerts(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
-// watchers is `moin watcher connect <server> <url> <token>` and `moin
-// watcher disconnect <server> <url>`: where the server reports to.
-func watchers(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("watcher", "watcher connect <server> <url> <token>, or watcher disconnect <server> <url>")
+// watcherConnect is `moin watcher connect <server> <url> <token>`: the
+// server reports to the watcher at url from now on.
+func watcherConnect(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("watcher connect", "watcher connect <server> <url> <token>")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	verb, server, address := flags.Arg(0), flags.Arg(1), flags.Arg(2)
-	switch {
-	case verb == "connect" && flags.NArg() == 4:
-		watcher := daemon.Watcher{URL: address, Token: flags.Arg(3)}
-		if err := sendJSON(ctx, server, watcher, "watchers", "add"); err != nil {
-			return err
-		}
-		done(stdout, "%s reports to %s every minute", server, address)
-		return nil
-	case verb == "disconnect" && flags.NArg() == 3:
-		if err := sshRun(ctx, server, hereLine("watchers", "rm", address), nil, io.Discard, os.Stderr); err != nil {
-			return err
-		}
-		done(stdout, "%s no longer reports to %s", server, address)
-		return nil
+	if flags.NArg() != 3 {
+		return flags.wrong()
 	}
-	return flags.wrong()
+	server, watcher := flags.Arg(0), daemon.Watcher{URL: flags.Arg(1), Token: flags.Arg(2)}
+	if err := sendJSON(ctx, server, watcher, "watchers", "connect"); err != nil {
+		return err
+	}
+	done(stdout, "%s reports to %s every minute", server, watcher.URL)
+	return nil
 }
 
-// hereBackups is the server's side of the commands above: `moin here
-// setup|backups|backup|restore|bucket|alerts|watchers …`. It reads what the CLI
-// sent as JSON from stdin, writes its answer as JSON to stdout and what it
-// says to people to stderr.
-func hereBackups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	dir := daemon.StateDir()
-	// rest are the words after the first, always three, so a missing one
-	// is "" and not a crash.
-	rest := append(append([]string{}, args[1:]...), "", "", "")
-	switch args[0] {
-	case "setup":
-		return daemon.SetUpHere(ctx, rest[0])
-	case "backups":
-		databases, err := daemon.BackupsHere(ctx, dir, rest[0])
-		return respond(stdout, databases, err)
-	case "backup":
-		copied, err := daemon.BackupHere(ctx, dir, rest[0], os.Stderr)
-		return respond(stdout, copied, err)
-	case "restore":
-		restored, err := daemon.RestoreHere(ctx, dir, rest[0], rest[2], rest[1], os.Stderr)
-		return respond(stdout, restored, err)
-	case "bucket":
-		return hereBucket(ctx, rest[0], stdin, stdout)
-	case "alerts":
-		return hereAlerts(ctx, rest[0], rest[1], stdin, stdout)
-	case "watchers":
-		return hereWatchers(rest[0], rest[1], stdin, stdout)
+// watcherDisconnect is `moin watcher disconnect <server> <url>`: the
+// server stops reporting there.
+func watcherDisconnect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("watcher disconnect", "watcher disconnect <server> <url> [-y]").withYes()
+	if err := flags.parse(args); err != nil {
+		return err
 	}
-	return fmt.Errorf("unknown: %s here %s", build.Name, args[0])
-}
-
-// hereBucket is `moin here bucket` and `moin here bucket set`.
-func hereBucket(ctx context.Context, verb string, stdin io.Reader, stdout io.Writer) error {
-	if verb == "" {
-		bucket, err := daemon.BucketHere()
-		return respond(stdout, bucket, err)
+	if flags.NArg() != 2 {
+		return flags.wrong()
 	}
-	var bucket daemon.Bucket
-	if err := json.NewDecoder(stdin).Decode(&bucket); err != nil {
-		return fmt.Errorf("read the bucket: %w", err)
+	server, address := flags.Arg(0), flags.Arg(1)
+	question := fmt.Sprintf("Stop the reports of %s to %s? That watcher will say the server is silent.", server, address)
+	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+		return err
 	}
-	return daemon.SetBucketHere(ctx, bucket)
-}
-
-// hereAlerts is `moin here alerts`, and add, rm <n> and test.
-func hereAlerts(ctx context.Context, verb, number string, stdin io.Reader, stdout io.Writer) error {
-	switch verb {
-	case "add":
-		var destination alert.Destination
-		if err := json.NewDecoder(stdin).Decode(&destination); err != nil {
-			return fmt.Errorf("read the alert: %w", err)
-		}
-		return daemon.AddAlertHere(ctx, destination)
-	case "rm":
-		n, _ := strconv.Atoi(number)
-		return daemon.RemoveAlertHere(n)
-	case "test":
-		return daemon.SendTestAlertHere(ctx)
+	if err := sshRun(ctx, server, hereLine("watchers", "disconnect", address), nil, io.Discard, os.Stderr); err != nil {
+		return err
 	}
-	names, err := daemon.AlertsHere()
-	return respond(stdout, names, err)
-}
-
-// hereWatchers is `moin here watchers`, and add and rm <url>.
-func hereWatchers(verb, address string, stdin io.Reader, stdout io.Writer) error {
-	switch verb {
-	case "add":
-		var watcher daemon.Watcher
-		if err := json.NewDecoder(stdin).Decode(&watcher); err != nil {
-			return fmt.Errorf("read the watcher: %w", err)
-		}
-		return daemon.AddWatcherHere(watcher)
-	case "rm":
-		return daemon.RemoveWatcherHere(address)
-	}
-	addresses, err := daemon.WatchersHere()
-	return respond(stdout, addresses, err)
+	done(stdout, "%s no longer reports to %s", server, address)
+	return nil
 }

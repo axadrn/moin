@@ -2,12 +2,16 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 
+	"github.com/axadrn/moin/internal/alert"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/daemon"
 )
 
@@ -62,8 +66,30 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		return hereKeys(ctx, args, stdin, stdout)
 	case "update":
 		return daemon.UpdateHere(ctx, oneArg(args), nil)
-	case "setup", "backups", "backup", "restore", "bucket", "alerts", "watchers":
-		return hereBackups(ctx, append([]string{verb}, args...), stdin, stdout)
+	case "setup":
+		return daemon.SetUpHere(ctx, oneArg(args))
+	case "backups":
+		value, err := daemon.BackupsHere(ctx, dir, oneArg(args))
+		return respond(stdout, value, err)
+	case "backup":
+		value, err := daemon.BackupHere(ctx, dir, oneArg(args), log)
+		return respond(stdout, value, err)
+	case "restore":
+		flags := newFlags("here restore", "here restore <app> --to <copy|time|undo-…> [--database <name>]")
+		to := flags.String("to", "", "what to go back to")
+		database := flags.String("database", "", "the database")
+		app, err := hereApp(flags, args)
+		if err != nil {
+			return err
+		}
+		value, err := daemon.RestoreHere(ctx, dir, app, *to, *database, log)
+		return respond(stdout, value, err)
+	case "bucket":
+		return hereBucket(ctx, args, stdin, stdout)
+	case "alerts":
+		return hereAlerts(ctx, args, stdin, stdout)
+	case "watchers":
+		return hereWatchers(args, stdin, stdout)
 	}
 	return fmt.Errorf("moin on this server does not know `here %s`: put the CLI's version here with `moin update <server>`", verb)
 }
@@ -203,4 +229,65 @@ func exitCodeOf(err error) int {
 		return exit.ExitCode()
 	}
 	return 0
+}
+
+// hereBucket is `moin here bucket`, which answers the bucket without its
+// secret key, and `moin here bucket set`, which reads one from stdin.
+func hereBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) == 0 {
+		bucket, err := daemon.BucketHere()
+		return respond(stdout, bucket, err)
+	}
+	if len(args) != 1 || args[0] != "set" {
+		return errors.New("usage: here bucket [set]")
+	}
+	var bucket daemon.Bucket
+	if err := json.NewDecoder(stdin).Decode(&bucket); err != nil {
+		return fmt.Errorf("read the bucket: %w", err)
+	}
+	return daemon.SetBucketHere(ctx, bucket)
+}
+
+// hereAlerts is `moin here alerts`, and `alerts add` with the destination
+// on stdin, `alerts rm <n>` and `alerts test`.
+func hereAlerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	switch {
+	case len(args) == 0:
+		names, err := daemon.AlertsHere()
+		return respond(stdout, names, err)
+	case len(args) == 1 && args[0] == "add":
+		var destination alert.Destination
+		if err := json.NewDecoder(stdin).Decode(&destination); err != nil {
+			return fmt.Errorf("read the alert: %w", err)
+		}
+		return daemon.AddAlertHere(ctx, destination)
+	case len(args) == 2 && args[0] == "rm":
+		number, err := strconv.Atoi(args[1])
+		if err != nil {
+			return fmt.Errorf("%q is not the number of an alert: see them with `%s alerts <server>`", args[1], build.Name)
+		}
+		return daemon.RemoveAlertHere(number)
+	case len(args) == 1 && args[0] == "test":
+		return daemon.SendTestAlertHere(ctx)
+	}
+	return errors.New("usage: here alerts [add | rm <n> | test]")
+}
+
+// hereWatchers is `moin here watchers`, and `watchers connect` with the
+// watcher on stdin and `watchers disconnect <url>`.
+func hereWatchers(args []string, stdin io.Reader, stdout io.Writer) error {
+	switch {
+	case len(args) == 0:
+		addresses, err := daemon.WatchersHere()
+		return respond(stdout, addresses, err)
+	case len(args) == 1 && args[0] == "connect":
+		var watcher daemon.Watcher
+		if err := json.NewDecoder(stdin).Decode(&watcher); err != nil {
+			return fmt.Errorf("read the watcher: %w", err)
+		}
+		return daemon.ConnectWatcherHere(watcher)
+	case len(args) == 2 && args[0] == "disconnect":
+		return daemon.DisconnectWatcherHere(args[1])
+	}
+	return errors.New("usage: here watchers [connect | disconnect <url>]")
 }

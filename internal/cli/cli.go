@@ -221,8 +221,11 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "alerts":
 		return alerts(ctx, rest, stdin, stdout)
 	case "watcher":
-		if len(rest) > 0 && (rest[0] == "connect" || rest[0] == "disconnect") {
-			return watchers(ctx, rest, stdout)
+		if len(rest) > 0 && rest[0] == "connect" {
+			return watcherConnect(ctx, rest[1:], stdout)
+		}
+		if len(rest) > 0 && rest[0] == "disconnect" {
+			return watcherDisconnect(ctx, rest[1:], stdin, stdout)
 		}
 		return watcherCommand(ctx, rest, stdout)
 	case "here":

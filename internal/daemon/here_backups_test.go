@@ -68,12 +68,12 @@ func TestAlertsHere(t *testing.T) {
 func TestWatchersHere(t *testing.T) {
 	useConfig(t, "name: prod\n")
 	for _, wrong := range []Watcher{{URL: "watcher.example.com", Token: "t"}, {URL: "https://watcher.example.com"}} {
-		if err := AddWatcherHere(wrong); err == nil {
+		if err := ConnectWatcherHere(wrong); err == nil {
 			t.Errorf("took %+v", wrong)
 		}
 	}
 	for _, token := range []string{"old", "new"} {
-		if err := AddWatcherHere(Watcher{URL: "https://watcher.example.com", Token: token}); err != nil {
+		if err := ConnectWatcherHere(Watcher{URL: "https://watcher.example.com", Token: token}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -81,10 +81,10 @@ func TestWatchersHere(t *testing.T) {
 	if len(config.Watchers) != 1 || config.Watchers[0].Token != "new" {
 		t.Fatalf("watchers = %+v", config.Watchers)
 	}
-	if err := RemoveWatcherHere("https://other.example.com"); err == nil {
+	if err := DisconnectWatcherHere("https://other.example.com"); err == nil {
 		t.Fatal("removed a watcher that is not there")
 	}
-	if err := RemoveWatcherHere("https://watcher.example.com"); err != nil {
+	if err := DisconnectWatcherHere("https://watcher.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	if addresses, _ := WatchersHere(); len(addresses) != 0 {

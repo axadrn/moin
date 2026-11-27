@@ -90,7 +90,7 @@ type Restored struct {
 // newest copy at or before a time like 2026-11-27T14:07 (UTC), or to
 // undo-<id>, the state before an earlier restore. name is the database,
 // "" for an app that has one.
-func RestoreHere(ctx context.Context, dir, app, name, to string, out io.Writer) (Restored, error) {
+func RestoreHere(ctx context.Context, dir, app, to, name string, out io.Writer) (Restored, error) {
 	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return Restored{}, err
@@ -146,7 +146,7 @@ func (b *backups) copyFor(ctx context.Context, app string, database protocol.Dat
 		}
 	}
 	if err != nil {
-		return "", fmt.Errorf("%q is not a copy, a time like 2026-11-27T14:07 (UTC) or an undo. See them with `%s backups <server>`", to, build.Name)
+		return "", fmt.Errorf("%q is not a copy, a time like 2026-11-27T14:07 (UTC) or an undo. See them with `%s backups <app>`", to, build.Name)
 	}
 	copies, err := b.copies(ctx, app, database)
 	if err != nil {
@@ -277,15 +277,15 @@ func WatchersHere() ([]string, error) {
 	return addresses, nil
 }
 
-// AddWatcherHere has the server report to one more watcher, or gives a
+// ConnectWatcherHere has the server report to one more watcher, or gives a
 // watcher it has a new token.
-func AddWatcherHere(watcher Watcher) error {
+func ConnectWatcherHere(watcher Watcher) error {
 	link, err := url.Parse(watcher.URL)
 	if err != nil || link.Host == "" || link.Scheme != "https" && link.Scheme != "http" {
 		return fmt.Errorf("%q is not the address of a watcher, like https://watcher.example.com", watcher.URL)
 	}
 	if watcher.Token == "" {
-		return errors.New("a watcher needs its token for this server: get it with `" + build.Name + " watcher add <server-name>` on the watcher")
+		return errors.New("a watcher needs its token for this server: get it with `" + build.Name + " watcher token <server>` on the watcher")
 	}
 	config, err := LoadConfig()
 	if err != nil {
@@ -296,8 +296,8 @@ func AddWatcherHere(watcher Watcher) error {
 	return SaveConfig(config)
 }
 
-// RemoveWatcherHere stops the reports to the watcher at address.
-func RemoveWatcherHere(address string) error {
+// DisconnectWatcherHere stops the reports to the watcher at address.
+func DisconnectWatcherHere(address string) error {
 	config, err := LoadConfig()
 	if err != nil {
 		return err
