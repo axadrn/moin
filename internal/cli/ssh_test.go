@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/daemon"
 )
 
@@ -150,15 +151,23 @@ func TestEditUntilValidGivesUp(t *testing.T) {
 	}
 }
 
-// TestQuietJSONNeverAsks: many servers at once run ssh in batch mode, so
-// none of them asks for a password on the terminal.
-func TestQuietJSONNeverAsks(t *testing.T) {
+// fakeSSH puts an ssh in PATH that notes its arguments, one line per
+// run, in the file it returns, and answers out.
+func fakeSSH(t *testing.T, out string) string {
 	dir := t.TempDir()
-	fake := "#!/bin/sh\necho \"$@\" > " + dir + "/args\necho '{\"total\": 3}'\n"
+	runs := filepath.Join(dir, "runs")
+	fake := "#!/bin/sh\necho \"$@\" >> " + runs + "\nprintf '%s' '" + out + "'\n"
 	if err := os.WriteFile(filepath.Join(dir, "ssh"), []byte(fake), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
+	return runs
+}
+
+// TestQuietJSONNeverAsks: many servers at once run ssh in batch mode, so
+// none of them asks for a password on the terminal.
+func TestQuietJSONNeverAsks(t *testing.T) {
+	runs := fakeSSH(t, `{"total": 3}`)
 	var answer struct {
 		Total int `json:"total"`
 	}
@@ -168,11 +177,25 @@ func TestQuietJSONNeverAsks(t *testing.T) {
 	if answer.Total != 3 {
 		t.Errorf("total = %d, want 3", answer.Total)
 	}
-	args, err := os.ReadFile(filepath.Join(dir, "args"))
+	args, err := os.ReadFile(runs)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(string(args), "-o BatchMode=yes ") {
 		t.Errorf("ssh ran with %q, want BatchMode first", args)
+	}
+}
+
+// TestUpdateStopsOnAnOldDaemon: the daemon of beta.37 knows no `moin
+// here`, so update says how to remove it and runs nothing more.
+func TestUpdateStopsOnAnOldDaemon(t *testing.T) {
+	runs := fakeSSH(t, "x86_64\ndocker\n"+build.Name+" v1.0.0-beta.37\n")
+	err := updateServer(context.Background(), "prod", io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "daemon uninstall") {
+		t.Fatalf("err = %v, want the uninstall hint", err)
+	}
+	args, _ := os.ReadFile(runs)
+	if n := strings.Count(string(args), "\n"); n != 1 {
+		t.Errorf("ssh ran %d times, want only the look", n)
 	}
 }

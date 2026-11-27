@@ -286,7 +286,7 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 		return err
 	}
 	if oldDaemon(info.version) {
-		return fmt.Errorf("%s still runs the daemon of %s %s, which takes no deploys over SSH. Remove it first, the apps keep running: ssh -t %s %s daemon uninstall. The Upgrade steps of beta.38 in the changelog say what follows", server, build.Name, info.version, server, build.Name)
+		return oldDaemonError(server, info.version)
 	}
 	if info.docker && info.version != "" {
 		warnOtherVersion(stdout, server, info.version)
@@ -325,6 +325,12 @@ const lastOldVersion = "v1.0.0-beta.37"
 // oldDaemon reports whether version is that release or one before it.
 func oldDaemon(version string) bool {
 	return build.IsRelease(version) && !build.NewerVersion(version, lastOldVersion)
+}
+
+// oldDaemonError says how to remove the daemon of an old release, which
+// takes no commands over SSH.
+func oldDaemonError(server, version string) error {
+	return fmt.Errorf("%s still runs the daemon of %s %s, which takes no commands over SSH. Remove it first, the apps keep running: ssh -t %s %s daemon uninstall. The Upgrade steps of beta.38 in the changelog say what follows", server, build.Name, version, server, build.Name)
 }
 
 // serverName is the name the server gets on its own, for its backups and

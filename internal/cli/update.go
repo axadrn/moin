@@ -201,6 +201,9 @@ func updateServer(ctx context.Context, server string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if oldDaemon(info.version) {
+		return oldDaemonError(server, info.version)
+	}
 	if info.version == "" {
 		return fmt.Errorf("%s is not on %s yet. Set it up with `%s deploy %s`", build.Name, server, build.Name, server)
 	}
