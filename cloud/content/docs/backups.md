@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite and Postgres, copied on a schedule into your bucket. Every day one copy is restored and read. Restore, and undo a restore."
+description: "SQLite and Postgres, copied on a schedule into your bucket, encrypted. Every day one copy is restored and read. Restore, undo a restore, and restore with only your key when a server is gone."
 group: "Servers and data"
 order: 1
 ---
@@ -30,6 +30,8 @@ moin asks for the endpoint, the bucket's name, the access key and the secret key
 ✓ prod backs up to backups. The first copies come within a minute
 ```
 
+Right after, moin shows your backup key, once, and asks you to paste it back. [Your backup key](#your-backup-key)
+
 - In a script, pass `--endpoint`, `--bucket` and `--access-key`, and the secret key on stdin:
 
   ```bash
@@ -40,7 +42,41 @@ moin asks for the endpoint, the bucket's name, the access key and the secret key
 - The key lives on the server, in `/etc/moin/config.yml`, readable only by root. [Server config](/docs/config#bucket)
 - `moin bucket prod` shows what is set, never the secret.
 
-Until there is a bucket, moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.`
+Until there is a bucket, moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.` And `moin` shows each app with a database in red: `shop: no backup yet.`
+
+## Encryption
+
+Every copy is encrypted on the server before it leaves, with [age](https://age-encryption.org). Your bucket only ever holds encrypted copies.
+
+Each copy opens with either of two keys:
+
+- **The server's key.** The server makes it before its first copy, in `/etc/moin/backup.key`, root only. The daily check and a restore open the copies with it.
+- **Your backup key.** It is made on your laptop and shown to you once. The server only gets its public half, `age1…`. With it, the server can write copies for you, but never read one.
+
+When the server is gone, its key is gone with it. Then only your key opens its copies. So keep it in your password manager.
+
+## Your backup key
+
+`moin bucket set` makes it for a server that has none yet:
+
+```text
+Your backup key for prod. It is shown once.
+Every copy is encrypted before it leaves the server. When the server is gone,
+only this key reads the copies. Keep it in your password manager.
+
+  AGE-SECRET-KEY-1…
+
+? Paste your backup key, to confirm that you have it:
+✓ Your key opens the copies of prod: it read the copy 20261127T140000Z-118204 of /data/shop.db from the bucket to the end
+```
+
+To confirm it, moin takes a fresh copy of the server's smallest database. It fetches that copy as it lies in the bucket, and opens and reads it on your laptop, with the key you pasted. Only then does the server note that you have the key.
+
+- Until you confirm it, `moin` shows the server in red: `prod: your backup key is not confirmed.` Confirm it later with `moin bucket confirm prod`.
+- `moin bucket prod` says whether every copy is encrypted for a key you confirmed, and shows its public half.
+- `moin bucket key prod` makes a new key. The copies made so far only open with the old one, so it asks first.
+- One key for several servers: `moin bucket key web-1 --public age1…` with the public half of the key you have. `moin bucket prod` shows it.
+- Your key goes to the server only for a restore with `--key`, on stdin, never on a command line. The server uses it for that restore and writes it nowhere.
 
 ## See your backups
 
@@ -61,11 +97,11 @@ COPY                      TAKEN    SIZE
 
 A SQLite database is named by its path in the container. A Postgres database by its service, like `postgres-db`.
 
-It lists the newest 10 copies. `--json` lists them all.
+It lists the newest 10 copies. `--json` lists them all. A copy from before every copy was encrypted says `not encrypted` next to its size, until it expires.
 
 ## How often
 
-A copy every hour, each kept for 7 days. The newest copy always stays. Set another schedule for the server, or for one app, in its [config](/docs/config#backups):
+A copy every hour, each kept for 7 days. The three newest copies always stay, and so does the copy the last check restored. Set another schedule for the server, or for one app, in its [config](/docs/config#backups):
 
 ```yaml
 backups:
@@ -80,8 +116,8 @@ backups:
 ## How a copy is made
 
 ```text
-SQLite:   VACUUM INTO a temp file ─▶ gzip ─▶ your bucket
-Postgres: pg_dump ─▶ straight into your bucket
+SQLite:   VACUUM INTO a temp file ─▶ gzip ─▶ age ─▶ your bucket
+Postgres: pg_dump ─▶ age ─▶ straight into your bucket
 ```
 
 Both make a clean copy while your app keeps running.
@@ -95,11 +131,20 @@ A copy on the spot, before something risky:
 moin backup shop
 ```
 
+Every deploy takes one too, just before the new release touches the data. If that copy fails, the deploy stops, so the way back is never missing. `moin deploy --no-copy` deploys all the same. A rollback goes on without it.
+
 ## The daily check
 
-Every day moin takes the newest copy and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it.
+Every day moin takes the newest copy, opens it with the server's key, and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it.
 
-So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while. If it fails, you get an alert, `<app>: a backup of <database> did not restore`, and `moin backups shop` shows it with a ✗.
+So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while.
+
+If it fails:
+
+- You get an alert: `<app>: a backup of <database> did not restore`.
+- `moin backups shop` shows it with a ✗, and the last copy that did restore.
+- `moin` shows it in red: `shop: today's backup did not restore. Last proven copy: Nov 26 14:00 UTC.`
+- The check runs again an hour later, not a day.
 
 ## Restore
 
@@ -133,16 +178,39 @@ Every restore keeps the data from right before it. `moin backups shop` lists it 
 
 An undo stays as long as the copies do: 7 days, unless the [config](/docs/config#backups) says otherwise.
 
+## When the server is gone
+
+Your copies are in your bucket, and your backup key opens them. Set up a new server, here `new`, and deploy the app there:
+
+```bash
+cd shop
+moin deploy new
+moin bucket set new
+moin backups shop -s new --from prod
+moin restore shop -s new --from prod --key
+```
+
+- `moin bucket set new` takes the same bucket. Give it your old key with `moin bucket key new --public age1…`, or take a new one.
+- `--from prod` reads the copies the server `prod` left in the bucket, under its name.
+- `--key` asks for your backup key. The new server's own key can't open the old copies.
+- In a script, name the copy with `--to <copy>`, pipe the key in, and add `-y`.
+
+With [moin cloud](/docs/cloud#a-copy-your-server-cant-delete), `moin cloud restore shop -s new` works the same, from the copy your server could not delete.
+
 ## Your copies without moin
 
-The copies of a database are in `<path>/<server>/<app>/<database>/copies/` in your bucket. A SQLite copy is gzipped: `gunzip` it and open it with `sqlite3`. A Postgres copy is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. You need no moin for either.
+The copies of a database are in `<path>/<server>/<app>/<database>/copies/` in your bucket. Each is an [age](https://age-encryption.org) file. Put your backup key in a file, `key.txt`, and open a copy with the `age` tool:
 
-## Encryption
+```bash
+age -d -i key.txt 20261127T140000Z-118204.db.gz.age | gunzip > shop.db
+age -d -i key.txt 20261127T140000Z-118204.dump.age > shop.dump
+```
 
-Coming. Each copy will be encrypted on the server before it leaves.
+A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. You need no moin for either.
 
 ## If it breaks
 
 - **The server dies during a restore.** The switch is one step, so the database is whole either way. When the daemon starts again, it finishes or rolls back, and tells you.
 - **The disk is too full.** moin checks for room before a copy, a check or a restore, and says so instead of starting.
-- **The server is gone.** Your copies are in your bucket. Set up a new server, deploy, and restore.
+- **The server is gone.** Your copies are in your bucket, and your backup key opens them. [When the server is gone](#when-the-server-is-gone)
+- **The backup key is lost, and the server is gone.** Then nobody can open the copies, not even us. Keep the key in your password manager.
