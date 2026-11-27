@@ -40,7 +40,7 @@ A release has a version, like `v1.0.0-beta.38`, and its notes in the [changelog]
 1. The notes go into the changelog, then the tag.
 2. The Deploy workflow tests and builds the `moin` binaries.
 3. It waits until a maintainer approves the run in GitHub.
-4. It signs `SHA256SUMS` with `RELEASE_SIGNING_KEY`, a secret of the GitHub environment `release`. Only a `v*` tag reaches it, and only after that approval.
+4. It signs `SHA256SUMS` with `RELEASE_SIGNING_KEY`, a secret of the GitHub environment `release`, twice: `SHA256SUMS.sig` for `moin update`, `SHA256SUMS.sshsig` for `ssh-keygen` in `cli.sh`. Only a `v*` tag reaches the key, and only after that approval.
 5. It makes the GitHub release as a draft, adds every file, and only then publishes it.
 
 So nobody sees a new version before its signed release is complete.
@@ -49,7 +49,7 @@ So nobody sees a new version before its signed release is complete.
 
 Nothing updates by itself. Not the CLI, not a server, not a watcher.
 
-- `moin update` updates the CLI on your laptop.
+- `moin update` updates the CLI on your laptop, from the GitHub release, after it checked the signature.
 - `moin update prod` puts that same version on the server, over SSH. The server downloads it, checks its signature, and restarts the daemon. Your apps keep running.
 - Once a day the CLI says when a new version is out.
 
