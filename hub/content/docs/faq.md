@@ -59,11 +59,11 @@ Never. `moin update prod` updates it, when you run it. [Updates](/docs/security#
 
 ## Is moin open source?
 
-Yes, all of it: AGPL-3.0, at [github.com/axadrn/moin](https://github.com/axadrn/moin). Free.
+Yes, all of it: Apache-2.0, at [github.com/axadrn/moin](https://github.com/axadrn/moin). Free.
 
-## Why AGPL, and can I contribute?
+## Can I contribute?
 
-AGPL keeps moin open: whoever runs a changed moin as a service shares the changes. Open an issue first, then a pull request. The pull request template holds one line about the license. Leave it in. [CONTRIBUTING.md](https://github.com/axadrn/moin/blob/main/CONTRIBUTING.md).
+Yes. Open an issue first, then a pull request. Your contribution comes in under the same license, Apache-2.0. [CONTRIBUTING.md](https://github.com/axadrn/moin/blob/main/CONTRIBUTING.md).
 
 ## Why the name?
 

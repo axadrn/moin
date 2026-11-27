@@ -47,9 +47,8 @@ What happens after the merge, deploys, releases and versions:
 
 ## License
 
-Your contribution comes in under the Apache License 2.0, so the project can
-keep choosing its license later. You keep the copyright. The pull request
-template says so in one line. Leave it in.
+moin is Apache-2.0. Your contribution comes in under the same license. You
+keep the copyright.
 
 ## Never commit
 
