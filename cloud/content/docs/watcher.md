@@ -17,6 +17,7 @@ Whatever the daemons report. Nothing to set up.
 - their apps, and the release that runs
 - the domains of each app
 - the backups, and the last restore check
+- the knocks of the day: connection attempts the firewall dropped
 
 It has one small page that shows it all: what is fine, what needs you, the outages. Nothing on it changes a server.
 
@@ -26,7 +27,7 @@ Two kinds of alerts, from two places. Each problem alerts once when it starts, a
 
 | Who alerts | What |
 | --- | --- |
-| the daemon, on your server, while it lives | a backup that fails, a copy that did not restore, an app that keeps crashing, a disk that is 90% full, no watcher reachable |
+| the daemon, on your server, while it lives | a backup that fails, a copy that did not restore, a restore check that is late, a bucket that takes no backups, an app that keeps crashing, a disk that is 90% full, a mistake in the config, Tailscale that does not run or a key that expires soon, a deploy of a followed branch that fails, no watcher reachable |
 | the watcher, from outside | a server that stopped reporting, a domain that is down from outside |
 
 The watcher's alerts read like this:
@@ -193,6 +194,8 @@ The watcher is the only part of moin that listens. Two ways to reach it:
 
 Each server reports with its own token. A report with a token the watcher does not know gets `401`. A report is all it takes in: the answer is a status code, and the daemon acts on nothing in it.
 
+One exception, for moin cloud: after a copy, the daemon asks each watcher whether it takes the copy. Your own watcher answers `404`, so nothing happens. moin cloud, for a paying workspace, answers with one address to upload that copy to. The daemon uses it only over https, only to a public address, for one PUT, and follows no redirect. [moin cloud](/docs/cloud#a-copy-your-server-cant-delete)
+
 ## The page
 
 Open the watcher's URL in a browser. It asks for a password: any user name, and `password:` from its config.
@@ -211,7 +214,7 @@ moin watcher disconnect prod https://watcher.example.com
 
 ## If it is hacked
 
-Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers. Run two watchers, and one hacked watcher can't silence you.
+Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
 
 ## If it breaks
 
