@@ -19,10 +19,10 @@ func compareIndexDescription() string {
 }
 
 // homeCompareRows are the facts the home page shows, by their place in
-// compare.Rows: who commands the server, the daily check, who notices a
-// dead server, and several servers, where others do more.
+// compare.Rows: who commands the server, what is open to the internet,
+// the daily check, and who notices a dead server.
 func homeCompareRows() []int {
-	return []int{0, 3, 5, 8}
+	return []int{0, 1, 3, 5}
 }
 
 // markSymbol is how a mark reads in the home table.

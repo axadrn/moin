@@ -15,10 +15,7 @@ import (
 // the others do more stays in: it makes the others believable.
 templ HomeCompare() {
 	<section id="compare" class="moin-band">
-		<div class="moin-stack" data-gap="3">
-			<h2 class="moin-statement">Next to the others.</h2>
-			<p class="moin-lead">From each tool's own docs. Where another tool does more, it says so.</p>
-		</div>
+		@homeHead("Next to the others.", "Fact by fact, from their own docs.")
 		<div class="moin-table-wrap">
 			<table class="moin-table">
 				<thead>
@@ -43,9 +40,8 @@ templ HomeCompare() {
 				</tbody>
 			</table>
 		</div>
-		<p class="moin-lead">
-			<a href="/compare" class="moin-link moin-foreground">Every fact, with its source</a>
-		</p>
+		<p class="moin-small moin-muted moin-center">uncloud and Kamal run an app on several servers, without downtime. { brand.Name } runs it on one.</p>
+		@homeMore("/compare", "Every fact, with its source")
 	</section>
 }
 
@@ -53,11 +49,10 @@ templ HomeCompare() {
 // linked to its source when it has one.
 templ compareCell(cell compare.Cell) {
 	<td data-mark={ string(cell.Mark) }>
-		<span aria-hidden="true">{ markSymbol(cell.Mark) }</span>
 		if cell.Source != "" {
-			<a href={ templ.SafeURL(cell.Source) } class="moin-link" rel="noopener">{ cell.Short }</a>
+			<a href={ templ.SafeURL(cell.Source) } title={ cell.Short } rel="noopener">{ markSymbol(cell.Mark) }</a>
 		} else {
-			{ cell.Short }
+			<span title={ cell.Short }>{ markSymbol(cell.Mark) }</span>
 		}
 	</td>
 }

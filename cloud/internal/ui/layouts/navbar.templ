@@ -23,6 +23,7 @@ func navLinks(path string) []components.BarLink {
 	return []components.BarLink{
 		{Label: "Docs", Href: "/docs", Current: strings.HasPrefix(path, "/docs")},
 		{Label: "Catalog", Href: "/catalog", Current: strings.HasPrefix(path, "/catalog")},
+		{Label: "Pricing", Href: "/#pricing"},
 		{Label: "Blog", Href: "/blog", Current: strings.HasPrefix(path, "/blog")},
 	}
 }

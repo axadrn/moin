@@ -30,3 +30,36 @@ templ Command(p CommandProps) {
 		</button>
 	</div>
 }
+
+// TerminalLine is one line of a terminal: what it is, and its text.
+// Kind is "prompt" (what you type), "step" (→), "done" (✓), "failed"
+// (✗), "ask" (a question), "hint" (a next command) or "" for output.
+type TerminalLine struct {
+	Kind string
+	Text string
+}
+
+// TerminalProps is a Terminal. Play shows the lines one after the other,
+// once, when the page opens.
+type TerminalProps struct {
+	Title string
+	Lines []TerminalLine
+	Play  bool
+}
+
+// Terminal shows real CLI output in a terminal window, for the landing
+// page.
+templ Terminal(p TerminalProps) {
+	<figure class="moin-terminal" data-play?={ p.Play } aria-label={ p.Title }>
+		<div class="moin-terminal-bar" aria-hidden="true">
+			<i></i><i></i><i></i>
+			<span>{ p.Title }</span>
+		</div>
+		<div class="moin-terminal-body">
+			for i, line := range p.Lines {
+				<div class="moin-terminal-line" data-kind={ line.Kind } style={ terminalDelay(i) }>{ line.Text }</div>
+			}
+			<div class="moin-terminal-line moin-terminal-cursor" data-kind="prompt" style={ terminalDelay(len(p.Lines)) }>$ </div>
+		</div>
+	</figure>
+}

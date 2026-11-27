@@ -1817,3 +1817,92 @@
 .moin-roads[data-tall] { max-width: 22rem; margin-inline: auto; }
 @media (min-width: 40rem) { .moin-roads[data-tall] { display: none; } }
 @media (max-width: 39.99rem) { .moin-roads:not([data-tall]) { display: none; } }
+
+/* A terminal window with real CLI output: a bar with three dots and its
+   title, then the lines. Playing, the lines come one after the other. */
+.moin-terminal {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--terminal);
+  color: var(--terminal-foreground);
+  box-shadow: var(--shadow-float);
+}
+.moin-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.125rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--terminal-foreground) 10%, transparent);
+}
+.moin-terminal-bar > i {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--terminal-foreground) 22%, transparent);
+}
+.moin-terminal-bar > span {
+  flex: 1;
+  margin-inline-end: 3.25rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: color-mix(in oklab, var(--terminal-foreground) 55%, transparent);
+}
+.moin-terminal-body {
+  padding: 1.25rem 1.5rem 1.5rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: clamp(12px, 1.3vw, 14px);
+  line-height: 1.6;
+  font-variant-ligatures: none;
+}
+.moin-terminal-line { white-space: pre; color: color-mix(in oklab, var(--terminal-foreground) 62%, transparent); }
+.moin-terminal-line[data-kind="prompt"] { color: var(--terminal-foreground); font-weight: 600; }
+.moin-terminal-line[data-kind="done"] { color: var(--terminal-foreground); font-weight: 600; }
+.moin-terminal-line[data-kind="done"]::first-letter { color: var(--live); }
+.moin-terminal-line[data-kind="failed"]::first-letter { color: var(--failed); }
+.moin-terminal-line[data-kind="ask"] { color: var(--terminal-foreground); }
+.moin-terminal-line[data-kind="hint"] { color: color-mix(in oklab, var(--terminal-foreground) 80%, transparent); }
+.moin-terminal-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  vertical-align: -0.2em;
+  background: var(--terminal-foreground);
+  animation: moin-blink 1.1s steps(1) infinite;
+}
+@keyframes moin-blink { 50% { opacity: 0; } }
+@keyframes moin-line-in { from { opacity: 0; transform: translateY(0.25rem); } }
+@media (prefers-reduced-motion: no-preference) {
+  .moin-terminal[data-play] .moin-terminal-line {
+    animation: moin-line-in 0.28s var(--ease) both;
+    animation-delay: calc(0.35s + var(--line) * 0.22s);
+  }
+  .moin-terminal[data-play] .moin-terminal-cursor { animation: moin-line-in 0.28s var(--ease) both; animation-delay: calc(0.35s + var(--line) * 0.22s); }
+}
+@media (prefers-reduced-motion: reduce) { .moin-terminal-cursor::after { animation: none; } }
+
+/* The landing page sections: more room, the head in the middle, short
+   lines, cards side by side as tall as each other. */
+.moin-band { --band: 8rem; gap: var(--space-10, 2.5rem); }
+@media (min-width: 40rem) { .moin-band { --band: 11rem; } }
+.moin-band-head { align-items: center; text-align: center; }
+.moin-band-head > .moin-lead { max-width: 60ch; text-wrap: balance; }
+.moin-stack[data-fill] > :first-child { flex: 1; }
+.moin-chat { justify-content: center; }
+.moin-card-end { margin-block-start: auto; display: flex; }
+.moin-card-end > * { flex: 1; }
+.moin-table td { text-align: center; font-size: 1rem; }
+.moin-table thead th:not(:first-child) { text-align: center; }
+.moin-table td > :is(a, span) { font-weight: 600; text-decoration: none; }
+.moin-table td[data-mark="yes"] > * { color: var(--live-text); }
+.moin-table td[data-mark="no"] > * { color: var(--failed-text); }
+.moin-table td[data-mark="part"] > *,
+.moin-table td[data-mark=""] > *,
+.moin-table td[data-mark="unknown"] > * { color: var(--muted-foreground); }
+.moin-table tbody th { width: auto; white-space: nowrap; }
+.moin-table { min-width: 40rem; }
+.moin-table td:nth-child(2), .moin-table thead th:nth-child(2) { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
+@media (min-width: 56rem) { .moin-grid[data-cols="3-2"] { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
