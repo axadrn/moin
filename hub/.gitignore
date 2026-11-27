@@ -1,56 +1,27 @@
 # Binaries
 /bin/
-/tmp/
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
+/site
 *.test
-
-# Output of the go coverage tool
 *.out
 
-# Go workspace file
-go.work
-
-# Environment variables
+# Settings
 .env
 .env.tpl
-.env.local
-.env.*.local
-
-# Database
-/data/
-*.db
-*.db-shm
-*.db-wal
-
-# User uploads
-/uploads/
 
 # Generated files
 *_templ.go
 
-# IDE
+# The moin binaries the image serves at /download
+/downloads/
+
+# Local leftovers: tmp/, and data/ from when the hub had a database
+/tmp/
+/data/
+
+# Editors and OS
 .idea/
 .vscode/
 *.swp
-*.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Logs
 *.log
-
-# Air tmp
-/tmp/
-
-
-# Daemon binaries served at /download
-/downloads/

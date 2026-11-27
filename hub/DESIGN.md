@@ -1,7 +1,7 @@
 # moin design
 
-One product in four places: the landing page, the hub, the TUI and
-the CLI. They share these rules. Change a token here and in the code at once.
+One product in two places: the website and the CLI. They share these
+rules. Change a token here and in the code at once.
 
 ## Character
 
@@ -24,7 +24,7 @@ in iOS and macOS), not a website and not a dashboard template.
 - **Alive.** Live dots pulse softly, running states blink, changes swap in
   place without layout jumps. Reduced motion turns it off.
 - **Phone first.** Every page works with a thumb: 44 px targets, no
-  sideways scrolling, a list that drills down where the desktop shows tabs.
+  sideways scrolling.
 - Real product, real output. The landing page keeps its floating pill
   navbar.
 - **The harbor.** moin is Hamburg, and shipping containers are app
@@ -49,7 +49,7 @@ uppercase mono "eyebrow" labels over every section, stretched type, stock
 phrases ("supercharge", "unleash", "seamless", "effortless",
 "revolutionize", "next-generation"), fake testimonials, made-up numbers.
 
-## Tokens (ui/theme.css)
+## Tokens (assets/css/site.css)
 
 | Token | Use |
 | --- | --- |
@@ -71,11 +71,10 @@ image are the same shapes. The story behind the name is Why moin in the FAQ.
 
 ## Geometry
 
-One system, in one place: moin UI (`ui/` at the repo root, the Go side in
-`internal/ui/components`). A page gives a component its content, never a
-height, radius, padding or color. To change the look, change moin UI, not a
-page. `/ui` shows every component, light and dark: check it there once
-instead of on every page.
+One system, in one place: `assets/css/site.css`, and its Go side in
+`internal/ui/components`. A page gives a component its content, never a
+height, radius, padding or color. To change the look, change the
+component, not a page.
 
 | Part | Value |
 | --- | --- |
@@ -84,7 +83,7 @@ instead of on every page.
 | Inside a group: rows, boxes, a log | the group's radius minus the gap to it, so the curves run parallel |
 | Page | `moin-page`: one width, 16 px gutters on phones, 24 px from a tablet up |
 
-Overlays (the palette, a select's list, the keys, the confirm dialog) float:
+Overlays (the search palette) float:
 one step lighter than what they cover (`--popover`: white in light, #2c2c2e
 in dark), a shadow, no border.
 
@@ -99,172 +98,8 @@ product frame) keep their own shapes.
 ## Navigation
 
 Every page is a full page load; there is no hx-boost and no client router.
-
-- **A link changes the page.** Tabs, rows, the bar and the palette are plain
-  `<a href>` links to the page's own URL. `@view-transition { navigation:
-  auto; }` holds the old page until the new one paints, so nothing flashes.
-- **htmx only acts on the page:** save, delete, a switch, a search, a part
-  that reloads itself. Never to switch pages.
-- **One tab bar per page at most** (`components.Tabs`). A second level is a
-  list that drills down to its own page ("‹ my-app" back), never a second tab
-  bar. Filters that only narrow (a time range) are a `components.Select`.
-- **Tabs only on an app's top level.** App, Deploys, Domains, Logs, Data
-  and Settings have the app's head and its tabs. Anything one level deeper
-  is a page of its own, the same on a phone and the desktop: one back
-  link that names the page one level up, its own title, no app head, no
-  tabs, no trail ("Data › postgres-db"). A database is "‹ Data" /
-  "postgres-db", its table "‹ postgres-db" / "comments", the metrics
-  "‹ blog" / "Metrics", the uptime "‹ Domains" / "Uptime".
-- **On a phone** an app's sections are a list on its first page, each row
-  with its value ("Deploys · v12 live ›"); on the desktop they are the tab
-  bar. The same links either way.
-- **The bar** is the wordmark (home), the workspace name, the search and
-  your picture. The workspace and your picture both open Settings, a page,
-  not a menu.
-- **The palette** (`⌘K`, `ctrl+k`, `/` or the search in the bar) opens in
-  the middle of the screen, a native `<dialog>`. It finds apps, servers,
-  places and actions, and shows each one's key. The same palette is in the
-  TUI. There is no which-key menu.
-- **Live parts** use `components.Live`, the only way a page opens a stream
-  (hx-sse). It closes when the page is left, and a page back from the
-  back-forward cache loads fresh (`hub.js`). A part that reloads itself
-  has `hx-get` and `hx-trigger="<event> from:body"` and renders its content
-  with the page; it is never empty until an event fills it.
-- **Scripts** live in `ui/moin.js` when moin UI needs them and in
-  `assets/js/hub.js` when only the hub does. Both listen on `document`, so HTML that htmx swaps in works at once. No page script.
-
-## Pages
-
-Rules every page follows:
-
-- **For dummies.** Someone who opens a page for the first time sees what it
-  is, what state things are in and the one thing to do next.
-- **One question per page.** Its answer is the first thing on it, big: an
-  app's head says "Live · v12 · 2m ago" or "v13 failed" in the page
-  title size, with the one primary action next to it.
-- **Five sizes, no others.** No `text-[…px]`, no other `text-*` size on a
-  page:
-
-  | Name | Classes | Use |
-  | --- | --- | --- |
-  | page title | `moin-title` | the `h1`, once per page |
-  | number | `moin-number` | a value that is the point |
-  | section title | `moin-heading` | card titles |
-  | body | `moin-text` | everything else (muted with `moin-muted`) |
-  | small | `moin-small moin-muted` | meta next to a value: times, counts |
-
-- **Families.** Geist for everything; Geist Mono (`moin-mono`)
-  only for code, commands, IDs, keys, commits, paths and log lines.
-- **Components.** Everything a page is built from is one function with one
-  Props struct in `internal/ui/components`, printing exactly its example in
-  `ui/examples`. Nothing comes from a UI library: a page that needs something
-  new adds it to moin UI, with its docs and example.
-- **One list, a few kinds of row.** Every group of rows is a `components.List`.
-  A list is only rows; the `components.Card` it sits in is the surface. A page
-  never draws a row of its own. Only what does something lights up,
-  and the lines next to a lit row give way so the light fills the gap:
-
-  | Row | `components.Item` | Looks |
-  | --- | --- | --- |
-  | opens something | `Href`; another site `External`; more in place `components.Expand` | lights up, ends in a chevron (↗ and a new tab for another site) |
-  | does something | `Button` | lights up, names its action, no chevron |
-  | is picked | `Pick`, a radio of a form | the picked one is lit like under the mouse and ends in a check; no ring, no border |
-  | only tells | no `Href`, or `Value` | still: no light, the lines stay |
-  | holds a control | `For`, `Form` | still: the switch, select or field is what you press |
-
-  Two lit rows never touch: the light is round and sits 3 px inside the
-  row, so the open row and the one under the mouse keep room between them.
-  Lines start where the text starts, after a leading icon or avatar
-  (`data-lead`).
-  `/ui/item` shows each kind.
-- **Icons only in the catalog.** A catalog app shows its logo
-  (`components.AppIcon`) where you browse and pick; your own apps go by their
-  names everywhere else.
-- **One look for picking.** The palette and every `components.Select` list share one
-  look: the option the mouse or the arrows are on is lit, only
-  that one.
-- **No explaining.** No description line under a title, no help icon next
-  to it. A card about an empty thing says what is missing in one sentence
-  and shows the one button or command that fills it.
-- **Danger at the end.** Stop, remove and disconnect sit at the bottom of
-  Settings, as red text buttons that ask first.
-- **Text.** Muted for secondary facts, `moin-digits` for numbers and
-  times. Times are relative ("3h ago") with the full stamp as `title`.
-- **Times, sizes and durations** read the same on every surface and come
-  from one place, `internal/human`: "just now", "4m ago", "3h ago",
-  "12d ago", then the date; "512 B", "1.5 KB", "38 GB" (1024 to a KB);
-  "850ms", "16s", "2m 5s", "3h 10m", "3d 4h".
-
-## Feedback
-
-Every answer to a click or a form takes one of these shapes, the same on
-every page. Nothing on the page moves to make room for it. There are no
-toasts.
-
-- **If it worked:** the button that did it shows a check for a moment in
-  place of its label, at the same size. No words: what changed on the page
-  is the rest of the answer.
-- **If a field is wrong** (empty, too long, taken, not a domain): the field
-  turns red and takes the focus, what was typed stays, and the line under
-  it says why in one short sentence (`components.Field`). A field in one row with
-  its button has that line too.
-- **If it failed and no field is to blame** (daemon offline, not allowed):
-  a red line in the page under the row, form or head that sent it, until
-  the next try. Never floating over other content. The page stays as it
-  was.
-- **If a control saves itself** (a switch, a cell): its new state is the
-  answer. If saving fails, it goes back and says why under it.
-- **If something was copied:** the copy icon turns into a check for a
-  moment.
-- **If a state lasts** while the page is open (trial ended, read-only
-  workspace, server offline): a line in the page, rendered with the page.
-- **If a request runs:** the button that sent it is disabled until the
-  answer (`hx-disable`) and keeps its size; a running deploy or restore
-  shows the running status. No spinner that moves anything.
-- **Saving never restarts an app.** Changes that need a restart wait; the
-  app's head says "2 changes waiting" next to Restart.
-
-Messages read like the CLI: short and concrete, never "Success", "Error" or
-"successfully".
-
-## Asking first
-
-Three tiers, the same on every surface. The API never asks: the caller
-decides, and for tier 1 sends the name.
-
-1. **Big and cannot be undone** (delete the workspace or the account,
-   remove an app, a server or the bucket, restore over live data): the
-   name must be typed out. Web: the confirm dialog shows the name with a
-   copy button and the button works only once it matches. CLI: "Type
-   blog to confirm:", scripts pass `--confirm blog`. TUI: type the name,
-   then `enter`; paste works. MCP: destructive, and the tool takes
-   `confirm`, the name. Deleting the account asks for DELETE.
-   Tier 1 is checked by the service, never only in the browser or a
-   client: the method takes `confirm` and refuses with
-   `ErrConfirmMismatch` (`confirm_mismatch`, 422) unless it is the name,
-   spaces around it trimmed (`internal/service/confirm.go`). The web
-   dialog sends what was typed as `X-Moin-Confirm`, URI-encoded; the API
-   takes `?confirm=`; the CLI asks or takes `--confirm <name>`, as `--yes`
-   is not enough; MCP takes `confirm`.
-2. **Reversible or small** (stop an app, roll back, revoke a token or an
-   invitation, remove a domain, an env var, a registry login, a key, a
-   member or the password, unlink a repo, a new or no deploy hook, change
-   how a server is reached): one question. Web: the confirm dialog. CLI:
-   `[y/N]`, `--yes` skips it. TUI: `y`. MCP: destructive.
-3. **Harmless** (deploy, redeploy, restart, start, back up, add or set
-   something): no question.
-
-Web: put the question in `hx-confirm` ("Remove blog? Its data stays."):
-up to the first "? " is the title, the rest the description. The dialog
-(`components.ConfirmDialog`, in the base layout) repeats the label of the
-clicked button, or `data-confirm-action`. Add `data-confirm-name` for
-tier 1. Never `window.confirm` and no question dialog of a page's own;
-only the account keeps its dialog, as the server checks the DELETE. The
-confirm dialog, the palette and the list of `components.Select` are the only
-overlays: no menus, popovers or
-sheets. CLI:
-`confirm` and `typeName` in `internal/cli/args.go`; TUI: `confirmFirst`
-and `confirmName`; service: `confirmed`.
+A link changes the page. htmx only answers the search palette. Scripts
+live in `assets/js/site.js` and listen on `document`; no page script.
 
 ## Status
 
@@ -274,19 +109,9 @@ Every status shows as a colored dot or symbol plus a word, everywhere:
 | --- | --- | --- |
 | live | ● | online, live, the live deploy |
 | running | ◐ (animated where possible) | running, deploying |
-| waiting | ○ in the running color | a server whose daemon never connected |
 | done | ✓ muted | a deploy that succeeded but is no longer live |
 | failed | ✗ | failed, offline |
 | idle | ○ | new, unknown |
-
-## Activity
-
-Every change in a workspace goes through one helper, `record` in `internal/service/activity.go`, with a `service.Actor`: the member, how it came in (`Source`: web, cli, tui, api, mcp, hook, github or system, the connection or CI token by name, the client IP and user agent) and what it touched. moin itself acts as `service.System(workspaceID)`.
-
-- **What we log:** the exact time in UTC, who, how, the app and server, and the settings before and after: names, on and off, domains, branches, roles, counts, durations, versions, release numbers, exit codes and error messages.
-- **What we never log:** env var values, secrets, tokens, passwords, SQL text, row contents or cell values, file contents and app log lines. A SQL write keeps the kind of statement, its tables and the row count; a row edit the table, row and column names.
-- **Showing it:** seconds and the time zone everywhere (UTC on the web, local in the CLI and TUI, RFC 3339 in the API and MCP). IP and user agent only for admins and owners.
-- `TestActivityNeverHoldsSecrets` guards the rule. A new action gets a sentence in `ActivityEvent.Summary`.
 
 ## Terminal (moin/internal/style)
 
@@ -301,43 +126,29 @@ to run in bold.
 
 ## Words
 
-One thing, one word, on every surface and in every layer: the web, the
-CLI, the TUI, the API, MCP, the docs, and the code under them (handlers,
-services, tables, columns). Where the code says something else, it is
-renamed, with a migration when a table or column changes. moin is in
-beta: a rename is a clean break, no alias and no redirect; the release
-notes say it under Changed.
+One thing, one word, on every surface and in every layer: the site, the
+CLI, the docs, and the code under them. moin is in beta: a rename is a
+clean break, no alias and no redirect; the release notes say it under
+Changed.
 
 | Word | Means | Not |
 | --- | --- | --- |
-| hub | the moin web app and API every server reports to; "moin hub", or your own when you self-host | control plane, dashboard, panel, backend, console |
-| daemon | the moin process on a server (`moin daemon`, service `moin-daemon`); it only dials out | agent, node agent, connector |
-| server | a machine with the daemon; named `web-1`, `web-2` … unless you name it | node, host, machine (in copy) |
+| server | a machine you reach with `ssh`; its name is your SSH alias, like `prod` | node, host, machine (in copy) |
+| daemon | the moin process on a server (`moin daemon`): backups, checks, follows, reports | agent, node agent, connector |
 | app | what you deploy | project, service (a service is one container of an app's compose file) |
 | deploy | one version of an app, v12; also the verb | release (in copy), build, rollout |
-| restart | start the live deploy again, applying the changes that wait | apply, reload |
 | domain | a name the app answers on, the instant address included | address, route, routing (in copy) |
-| password | the one password of an app; its domains and its instant address ask for it | protection, protect |
-| backup | a copy of an app's database in your bucket, on the schedule you pick | snapshot, dump, history, point in time |
+| backup | a copy of an app's database in your bucket, on a schedule | snapshot, dump, history, point in time |
 | restore | going back to a copy; it can be undone as long as the copies are kept | rollback (that is for deploys), recover |
-| check | only the daily test that the newest copy restores | drill, verification, restore check; never for uptime |
-| uptime | whether a domain answers, visited every minute | uptime check, health check (that is for deploys) |
+| check | only the daily test that the newest copy restores | drill, verification, restore check |
 | bucket | the S3-compatible bucket you bring, for backups | storage, S3 (alone), object storage (in copy) |
-| workspace | the space apps, servers and the team belong to | organization, account, team (for the space) |
-| team | the people in a workspace | members (in copy), users |
-| AI agent | an AI that uses moin through MCP, such as Claude or Cursor | agent (alone) |
-| catalog | the place with the apps you install in one click; its items are apps ("catalog app" where it is unclear) | apps (for the place), templates, marketplace |
-| changelog | what changed in each version of moin | what's new, release notes (in the app) |
-| activity | who did what, when | audit log, history |
+| watcher | what receives the reports of the daemons and alerts when a server goes silent (`moin watcher`) | monitor, dashboard, hub, control plane |
+| moin cloud | the watcher and the write-only copy that moin runs for you | hub, hosted hub, SaaS |
+| catalog | the open source apps you deploy with one command; its items are apps | apps (for the place), templates, marketplace |
+| changelog | what changed in each version of moin | what's new, release notes |
 
-Every thing has a name you give it and an ID that never changes (the
-UUID without dashes, 32 characters). A link is made of names. After a
-rename, links inside moin follow; an old bookmark shows "not found".
-Workspaces, apps, servers and buckets can all be renamed. On a server, an app's
-containers carry its current name (`my-app-web-1`) and its volumes a
-fixed one (`moin-<id>-<volume>`), so a rename never loses data. Examples
-everywhere: the app `my-app` (a second one `blog`), the workspace `acme`,
-the server `web-1`, the domain `my-app.example.com`.
+Examples everywhere: the server `prod` (a second one `web-1`), the app
+`shop` (a second one `blog`), the domain `shop.example.com`.
 
 ## Copy
 

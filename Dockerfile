@@ -1,31 +1,26 @@
-# The hub image. Build from the repo root:
+# The image of the site at moin.run. Build from the repo root:
 #   docker build --build-arg VERSION=v0.1.0 .
 # The build runs on the builder's own CPU and cross-compiles for the
-# target, so the arm64 box is built at full speed, not emulated.
+# target, so the arm64 image is built at full speed, not emulated.
 FROM --platform=$BUILDPLATFORM golang:1.26 AS build
 WORKDIR /app
 
-# Copy Go dependency files first so Docker can cache module downloads.
+# Go dependency files first, so Docker caches the module download.
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the rest of the project.
 COPY . .
-
-# Install build-time dependencies.
-RUN apt-get update && apt-get install -y wget ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/hub
 
-# Generate Go files from .templ files.
+# Go files from the .templ files.
 RUN go tool templ generate
 
-# The moin binary that install.sh, cli.sh and CI download from /download,
-# built from the same commit as the hub, with SHA256SUMS for checking a
-# download by hand. For a tag, the Deploy workflow signs these files and
-# puts them on the GitHub release, where daemons update from. It is the
-# same in both boxes, so it comes before anything of the target and is
-# built once.
+# The moin binaries that cli.sh downloads from /download, built from the
+# same commit, with SHA256SUMS for checking a download by hand. For a tag,
+# the Deploy workflow signs these files and puts them on the GitHub
+# release. They are the same in every image, so they come before anything
+# of the target and are built once.
 ARG VERSION=dev
 RUN mkdir -p downloads && \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
@@ -36,35 +31,18 @@ RUN mkdir -p downloads && \
     done && \
     (cd downloads && sha256sum moin-* > SHA256SUMS)
 
-# The server, a static binary for the CPU of the box being built. It knows
-# its version, the one daemons update to.
+# The site, a static binary for the CPU of the image being built.
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
       -ldflags "-X github.com/axadrn/moin/internal/build.Version=$VERSION" \
-      -o main ./cmd/server
+      -o site ./cmd/server
 
-# Deploy-Stage
 FROM alpine:3.24
 WORKDIR /app
-
-# Install ca-certificates and sqlite for backups/debugging
-RUN apk add --no-cache ca-certificates sqlite
-
-# Set environment variable for runtime
+RUN apk add --no-cache ca-certificates
 ENV APP_ENV=production
-ENV GO_ENV=production
-
-# Copy the binary and downloads
-COPY --from=build /app/hub/main .
+COPY --from=build /app/hub/site .
 COPY --from=build /app/hub/downloads ./downloads
-
-# Expose the port
 EXPOSE 8090
-
-# Healthy within seconds of a start, since update.sh waits for it. A start
-# that restores the database from the bucket or migrates long has five
-# minutes before a failed check counts.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5m --start-interval=2s --retries=3 CMD wget -qO- http://127.0.0.1:8090/healthz >/dev/null || exit 1
-
-# Command to run
-CMD ["./main"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 CMD wget -qO- http://127.0.0.1:8090/healthz >/dev/null || exit 1
+CMD ["./site"]

@@ -11,21 +11,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.20.18
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
-	github.com/benbjohnson/litestream v0.5.17
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/coder/websocket v1.8.15
-	github.com/getsentry/sentry-go v0.36.1
-	github.com/go-webauthn/webauthn v0.18.2
 	github.com/google/uuid v1.6.0
-	github.com/jmoiron/sqlx v1.4.0
-	github.com/joho/godotenv v1.5.1
-	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.24
-	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/pressly/goose/v3 v3.26.0
-	github.com/samber/slog-multi v1.5.0
-	github.com/samber/slog-sentry/v2 v2.9.3
-	github.com/stripe/stripe-go/v85 v85.1.0
 	github.com/yuin/goldmark v1.8.6
 	go.abhg.dev/goldmark/frontmatter v0.2.0
 	golang.org/x/crypto v0.57.0
