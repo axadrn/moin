@@ -38,6 +38,7 @@ templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers) {
 				if numbers != nil {
 					@homeNumbers(*numbers)
 				}
+				@HomeStory()
 				@HomeEnd()
 			</div>
 		</main>
@@ -48,6 +49,14 @@ templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers) {
 templ homePrimary() {
 	@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs/getting-started"}) {
 		Get started
+	}
+}
+
+// homeStar is the quiet button next to it, to the source.
+templ homeStar() {
+	@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
+		<i class="moin-icon moin-icon-git-hub"></i>
+		Star on GitHub
 	}
 }
 
@@ -74,10 +83,7 @@ templ HomeHero() {
 				@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
 				<div class="moin-row" data-gap="2" data-center data-wrap>
 					@homePrimary()
-					@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
-						<i class="moin-icon moin-icon-git-hub"></i>
-						Star on GitHub
-					}
+					@homeStar()
 				</div>
 			</div>
 		</div>
@@ -321,34 +327,51 @@ templ homePlanRows(rows ...string) {
 }
 
 // ---------------------------------------------------------------- end
-// HomeEnd is the end of the page in one card: the name, where it comes
-// from, the promise and the way in.
-templ HomeEnd() {
-	<section id="start" class="moin-band">
-		@components.Card(components.CardProps{}) {
-			<div class="moin-huge">
-				@components.Wordmark(components.WordmarkProps{Size: "1em"})
-			</div>
-			<p class="moin-lead" data-large>
-				<span class="moin-mono">/mɔɪn/</span> · Hamburg for hello. Any hour, one word.
-			</p>
-			<p class="moin-lead" data-large>
-				I'm Axel. Born and raised in Hamburg, next to one of Europe's busiest ports. Millions of containers. Packed once. Shipped anywhere. Nothing goes missing. Your apps are containers too. So I built { brand.Name }, and named it after home.
-			</p>
-			<p class="moin-statement">
-				Deploy anything. <span class="moin-muted">Lose nothing.</span>
-			</p>
-			@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
-			<div class="moin-row" data-gap="2" data-wrap>
-				@homePrimary()
-				@components.Button(components.ButtonProps{Href: "/docs"}) {
-					Read the docs
-				}
+// HomeStory is the name and where it comes from, in the one card with
+// more room, over the wall of containers. To read, nothing to press.
+templ HomeStory() {
+	<section class="moin-band">
+		@components.Card(components.CardProps{Roomy: true}) {
+			<div class="moin-stack moin-center" data-gap="8" data-center>
+				<div class="moin-stack" data-center>
+					<div class="moin-huge">
+						@components.Wordmark(components.WordmarkProps{Size: "1em"})
+					</div>
+					<p class="moin-lead" data-large>
+						<span class="moin-mono">/mɔɪn/</span> · Hamburg for hello.
+						<br class="moin-only-phone"/>
+						{ " " }Any hour, one word.
+					</p>
+				</div>
+				<p class="moin-lead moin-foreground" data-large>
+					I'm Axel. Born and raised in Hamburg, next to one of Europe's busiest ports. Millions of containers. Packed once. Shipped anywhere. Nothing goes missing. Your apps are containers too. So I built { brand.Name }, and named it after home.
+				</p>
 			</div>
 			@homeGulls()
 			<div class="moin-bleed hub-harbor-in-card">
 				@homeHarbor()
 			</div>
 		}
+	</section>
+}
+
+// HomeEnd is the end of the page, the way in: the promise, the line that
+// installs the CLI and the two buttons of the first screen.
+templ HomeEnd() {
+	<section id="start" class="moin-band">
+		<div class="moin-stack moin-band-head">
+			<h2 class="moin-statement">
+				Deploy anything.
+				<br class="moin-only-phone"/>
+				{ " " }<span class="moin-muted">Lose nothing.</span>
+			</h2>
+		</div>
+		<div class="moin-stack" data-center>
+			@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
+			<div class="moin-row" data-gap="2" data-center data-wrap>
+				@homePrimary()
+				@homeStar()
+			</div>
+		</div>
 	</section>
 }

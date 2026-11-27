@@ -4,19 +4,21 @@ package components
 type CardProps struct {
 	Title string
 	// Href makes the whole card a link. Ink is the one card that stands out.
+	// Roomy is the one card that closes a page, with more room around it.
 	Href  string
 	Ink   bool
+	Roomy bool
 	Attrs templ.Attributes
 }
 
 // Card is a block with one topic.
 templ Card(p CardProps) {
 	if p.Href != "" {
-		<a href={ templ.SafeURL(p.Href) } class="moin-card" data-ink?={ p.Ink } { p.Attrs... }>
+		<a href={ templ.SafeURL(p.Href) } class="moin-card" data-ink?={ p.Ink } data-roomy?={ p.Roomy } { p.Attrs... }>
 			{ children... }
 		</a>
 	} else {
-		<section class="moin-card" data-ink?={ p.Ink } { p.Attrs... }>
+		<section class="moin-card" data-ink?={ p.Ink } data-roomy?={ p.Roomy } { p.Attrs... }>
 			if p.Title != "" {
 				<div class="moin-card-head">
 					<h2 class="moin-heading">{ p.Title }</h2>

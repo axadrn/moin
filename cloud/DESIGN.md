@@ -34,7 +34,9 @@ in iOS and macOS), not a website and not a dashboard template.
   draw the scene, the user's app in ink; color stays status
   and long flat shadows give depth. `moin` appears only in the logo, never
   on a ship or a container. Light enough to read on both grounds, simple
-  shapes, still. The home page's last card, the way in, ends on a wall of containers:
+  shapes, still. The home page's story card (the name and where it comes
+  from, to read, in the one roomy card; the way in follows it without a
+  card) ends on a wall of containers:
   `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`: 20-foot
   containers from the side, staggered, only your-app and two others pulled
   out, the whole wall resting on the card's bottom edge.

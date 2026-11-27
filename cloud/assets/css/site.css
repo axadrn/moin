@@ -1092,6 +1092,12 @@
   .moin-card[data-gap="6"] { gap: var(--space-6); }
   .moin-card[data-gap="8"] { gap: var(--space-8); }
   .moin-card[data-flush] { padding-inline: 0; }
+  /* The one card that closes a page: more room around what it says, and
+     shorter lines. */
+  .moin-card[data-roomy] { --pad: calc(2rem * var(--density)); --measure: 60ch; }
+  @media (min-width: 40rem) {
+    .moin-card[data-roomy] { --pad: calc(4rem * var(--density)); }
+  }
   .moin-card-head {
     display: flex;
     flex-wrap: wrap;
@@ -1737,11 +1743,11 @@
   overflow: hidden;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
-/* Gulls over the wall, on its right, just above it. */
+/* Gulls over the wall, on its right, in the air between the words and it. */
 .hub-gulls {
   align-self: flex-end;
   width: clamp(5rem, 12vw, 8rem);
-  margin: 0 8% calc(-1 * var(--space-4)) 0;
+  margin: var(--space-4) 8% 0 0;
   fill: none;
   stroke: var(--muted-foreground);
   stroke-width: 1.6;
