@@ -1,4 +1,4 @@
--- The tables of the old hub that the import reads, as its migrations 001 to
+-- The tables of the old service that the import reads, as its migrations 001 to
 -- 064 left them (commit 27a885a7, hub/internal/db/migrations). Only for the
 -- test: it builds an old database with fake rows from this.
 

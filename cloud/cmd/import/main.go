@@ -1,4 +1,4 @@
-// Command import brings the paying customers of the old hub into moin
+// Command import brings the paying customers of the old service into moin
 // cloud, once:
 //
 //	go run ./cloud/cmd/import <old.db> <new.db>
@@ -36,7 +36,7 @@ type result struct {
 	imported, sameMail, unclaimed int
 }
 
-// seconds is SQL that turns a time of the old hub into Unix seconds. It
+// seconds is SQL that turns a time of the old service into Unix seconds. It
 // wrote text like 2026-11-03 10:00:00, in UTC.
 func seconds(column string) string {
 	return "CASE WHEN " + column + " IS NULL THEN NULL WHEN typeof(" + column + ") = 'integer' THEN " + column +

@@ -41,7 +41,7 @@ type Config struct {
 	// Stripe sells moin cloud: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 	// the product STRIPE_PRODUCT_ID_PRO, and its two prices
 	// STRIPE_PRICE_ID_PRO_MONTHLY and STRIPE_PRICE_ID_PRO_YEARLY. The
-	// names are the old hub's, so its settings keep working. Without them
+	// names are the old service's, so its settings keep working. Without them
 	// nobody can subscribe.
 	StripeSecretKey     string
 	StripeWebhookSecret string

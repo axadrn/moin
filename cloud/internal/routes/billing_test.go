@@ -210,7 +210,7 @@ func TestWebhookSignature(t *testing.T) {
 	}
 }
 
-// A customer of the old hub is found by their customer in Stripe, on a
+// A customer of the old service is found by their customer in Stripe, on a
 // price moin no longer sells. Another product of the account counts not.
 func TestWebhookOldCustomer(t *testing.T) {
 	server, _, _, fake, store, database := billingSite(t)
@@ -220,7 +220,7 @@ func TestWebhookOldCustomer(t *testing.T) {
 		t.Fatal(err)
 	}
 	end := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
-	// The old hub's subscription carries no workspace id this site knows.
+	// The old service's subscription carries no workspace id this site knows.
 	fake.subscription("sub_old", "cus_old", "active", "price_2025_monthly", "prod_cloud", "", end)
 	fake.subscription("sub_shop", "cus_old", "active", "price_shirt", "prod_shirt", "", end)
 	if status := sendEvent(t, server, webhookSecret, "customer.subscription.updated", map[string]any{"id": "sub_shop"}); status != http.StatusNoContent {

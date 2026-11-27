@@ -22,7 +22,7 @@ type BlogPost struct {
 }
 
 // BlogPosts reads blog/ in files, newest first. A file without a title, a
-// description or a date stops the hub, so no post goes out half done.
+// description or a date stops the site, so no post goes out half done.
 func BlogPosts(files fs.FS) ([]BlogPost, error) {
 	names, err := fs.Glob(files, "blog/*.md")
 	if err != nil {

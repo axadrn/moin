@@ -9,7 +9,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// oldDatabase is a database of the old hub with fake rows:
+// oldDatabase is a database of the old service with fake rows:
 //
 //   - paid: a subscription in Stripe, owned by Ada.
 //   - backer: no subscription, but its owner has an offer.

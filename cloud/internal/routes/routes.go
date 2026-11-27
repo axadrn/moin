@@ -75,7 +75,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("POST /cloud/delete", cloud.DeleteAccount)
 	mux.HandleFunc("POST /cloud/subscribe", cloud.Subscribe)
 	mux.HandleFunc("GET /cloud/billing", cloud.Billing)
-	// Stripe's webhook keeps the old hub's address, so its endpoint in
+	// Stripe's webhook keeps the old service's address, so its endpoint in
 	// the Stripe dashboard keeps working.
 	mux.HandleFunc("POST /webhooks/payment", cloud.StripeWebhook)
 	mux.HandleFunc("GET /cli", cloud.CLIPage)
