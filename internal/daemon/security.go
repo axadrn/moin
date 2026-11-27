@@ -55,12 +55,14 @@ type serverFile struct {
 
 // loadServerFile reads server.json from dir. ok is false when there is
 // none.
-func loadServerFile(dir string) (file serverFile, ok bool) {
+func loadServerFile(dir string) (serverFile, bool) {
+	var file serverFile
 	body, err := os.ReadFile(filepath.Join(dir, serverConfigFile))
 	if err != nil {
-		return serverFile{}, false
+		return file, false
 	}
-	return file, json.Unmarshal(body, &file) == nil
+	err = json.Unmarshal(body, &file)
+	return file, err == nil
 }
 
 // security is what is closed on this server, and the apps it closes
@@ -114,10 +116,9 @@ type Security struct {
 // now says what is closed now: what server.json asks for and whether the
 // rules are really loaded.
 func (s *security) now(ctx context.Context) Security {
-	loaded := tableLoaded(ctx)
 	now := Security{
-		PublicSSH: listening(22) && !(s.file.SSHOnTailscale && loaded),
-		Firewall:  s.file.Firewall && loaded,
+		PublicSSH: publicSSH(ctx, s.file),
+		Firewall:  s.file.Firewall && tableLoaded(ctx),
 		Tunnel:    s.file.TunnelToken != "",
 		OpenPorts: []string{},
 		Published: publishedPorts(ctx),
@@ -132,12 +133,14 @@ func (s *security) now(ctx context.Context) Security {
 // PublicSSHHere says whether port 22 of this server is open to the
 // internet, for the red line in `moin`.
 func PublicSSHHere(ctx context.Context, dir string) bool {
-	return newSecurity(dir, nil).now(ctx).PublicSSH
+	file, _ := loadServerFile(dir)
+	return publicSSH(ctx, file)
 }
 
-// SecurityHere says what is closed on this server.
-func SecurityHere(ctx context.Context, dir string) Security {
-	return newSecurity(dir, nil).now(ctx)
+// publicSSH says whether port 22 is open to the internet: sshd listens,
+// and file does not close it, or its rules are not loaded.
+func publicSSH(ctx context.Context, file serverFile) bool {
+	return listening(22) && !(file.SSHOnTailscale && tableLoaded(ctx))
 }
 
 // Secure is what the CLI changes. CloseSSH shuts public port 22,
@@ -220,7 +223,7 @@ func ConfirmHere(ctx context.Context, dir string) (Security, error) {
 			return Security{}, fmt.Errorf("stop the guard: %s", lastLine(string(output)))
 		}
 	}
-	return SecurityHere(ctx, dir), nil
+	return newSecurity(dir, nil).now(ctx), nil
 }
 
 // UnlockHere opens public port 22 again, and starts sshd if it is off.
@@ -230,7 +233,7 @@ func UnlockHere(ctx context.Context, dir string) error {
 	if os.Geteuid() != 0 {
 		return errors.New("run it as root: sudo " + installedPath + " unlock")
 	}
-	s := newSecurity(dir, newApps(dir))
+	s := newSecurity(dir, nil)
 	s.file.SSHOnTailscale = false
 	saved := s.save()
 	if saved != nil {

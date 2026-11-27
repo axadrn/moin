@@ -123,7 +123,7 @@ func firewallRules(file serverFile) string {
 	// tailnet or from the containers themselves, and the web.
 	rules.WriteString("\tchain forward {\n")
 	rule("type filter hook forward priority filter - 1; policy accept;")
-	rule("ct status dnat iifname " + fmt.Sprintf("%q", tailnetInterface) + " accept")
+	rule(fmt.Sprintf("ct status dnat iifname %q accept", tailnetInterface))
 	rule(`ct status dnat iifname "docker0" accept`)
 	rule(`ct status dnat iifname "br-*" accept`)
 	if file.TunnelToken == "" {
