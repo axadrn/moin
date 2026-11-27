@@ -20,23 +20,12 @@ type DeployStart struct {
 	// name it was created with, which a rename never changes. Name is its
 	// name now, which its Compose project and containers carry, such as
 	// my-app-web-1; without one the daemon takes App.
-	App  string `json:"app"`
-	Name string `json:"name,omitempty"`
-	// AppID is an ID of the app that outlives its name, when it has one.
-	AppID  string `json:"app_id,omitempty"`
+	App    string `json:"app"`
+	Name   string `json:"name,omitempty"`
 	Number int    `json:"number"`
-	// SourceURL is a GitHub tarball of one commit; the daemon downloads
-	// nothing else. SourceAuthorization is sent with the download, a GitHub
-	// token; SourceStripTop drops the one folder GitHub wraps a repo in.
-	SourceURL           string `json:"source_url,omitempty"`
-	SourceAuthorization string `json:"source_authorization,omitempty"`
-	SourceStripTop      bool   `json:"source_strip_top,omitempty"`
 	// SourceFile is a gzipped tar of the source on the server itself, which
-	// the CLI sent over SSH. It never travels in a message.
+	// the CLI sent over SSH.
 	SourceFile string `json:"-"`
-	// SourceNumber builds the source the server kept of release n again,
-	// for a redeploy; nothing is downloaded.
-	SourceNumber int `json:"source_number,omitempty"`
 	// Catalog deploys the catalog app of this name, such as umami: the
 	// daemon takes its compose file from the catalog built into it.
 	Catalog    string   `json:"catalog,omitempty"`
@@ -50,13 +39,8 @@ type DeployStart struct {
 
 // Domains is how visitors reach the app, as `moin domains` set them on
 // the server, the only place they are set.
-// DeployStart carries it under the JSON key routing, which daemons of
-// protocol version 1 read.
 type Domains struct {
-	Domains   []string `json:"domains,omitempty"`
-	Canonical string   `json:"canonical,omitempty"`
-	// Services are the domains of the app's other services, by service.
-	Services map[string][]string `json:"services,omitempty"`
+	Domains []string `json:"domains,omitempty"`
 	// Instant is the provider of the app's instant address, such as
 	// sslip.io, "" for none; InstantIP the server's public IPv4 it names.
 	Instant   string `json:"instant,omitempty"`

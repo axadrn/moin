@@ -94,7 +94,7 @@ type release struct {
 
 // hasSource reports whether a deploy brings source code to build.
 func hasSource(start protocol.DeployStart) bool {
-	return start.SourceURL != "" || start.SourceFile != "" || start.SourceNumber > 0 || start.Catalog != ""
+	return start.SourceFile != "" || start.Catalog != ""
 }
 
 // runDeploy runs the steps of one deploy in order: make the release, take
@@ -104,8 +104,8 @@ func hasSource(start protocol.DeployStart) bool {
 // once, like one from your laptop and one of a branch the server follows,
 // never take the same number, and neither wipes the other's release.
 func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
-	if !protocol.ValidAppName(deploy.App) || deploy.Number < 0 || deploy.AppID != "" && !appIDPattern.MatchString(deploy.AppID) {
-		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
+	if !protocol.ValidAppName(deploy.App) || deploy.Number < 0 {
+		return protocol.Detected{}, errors.New("invalid app name or deploy number")
 	}
 	defer a.lock(deploy.App)()
 	if deploy.Number == 0 {
@@ -139,21 +139,12 @@ func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf
 	return release.detected, nil
 }
 
-// newRelease keeps the app's ID and makes an empty folder for the release,
-// with its kind for prune.
+// newRelease makes an empty folder for the release, with its kind for
+// prune.
 func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any)) (*release, error) {
 	server, err := LoadConfig()
 	if err != nil {
 		return nil, err
-	}
-	if start.AppID != "" {
-		err := os.MkdirAll(a.appDir(start.App), 0o700)
-		if err == nil {
-			err = os.WriteFile(filepath.Join(a.appDir(start.App), "app-id"), []byte(start.AppID), 0o600)
-		}
-		if err != nil {
-			return nil, err
-		}
 	}
 	dir := a.releaseDir(start.App, start.Number)
 	_ = os.RemoveAll(dir)
@@ -237,14 +228,13 @@ func (a *apps) fetch(ctx context.Context, release *release) error {
 	return a.reuseRunningRelease(ctx, release)
 }
 
-// fetchSource downloads the source, or copies the one of an older release,
-// and reads its compose file.
+// fetchSource takes the source from the catalog or unpacks the one the
+// CLI sent, and reads its compose file.
 func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	start := release.start
 	src := filepath.Join(release.dir, "src")
 	var err error
-	switch {
-	case start.Catalog != "":
+	if start.Catalog != "" {
 		release.logf("taking %s from the catalog", start.Catalog)
 		err = catalogSource(start.Catalog, src)
 		if err == nil {
@@ -254,17 +244,8 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 		if err == nil {
 			release.env, err = a.env(start.App)
 		}
-	case start.SourceURL != "":
-		release.logf("downloading the source")
-		err = download(ctx, start, src)
-	case start.SourceFile != "":
+	} else {
 		err = unpackFile(start.SourceFile, src)
-	default:
-		release.logf("building the source of v%d again", start.SourceNumber)
-		err = a.copySource(ctx, start.App, start.SourceNumber, src)
-		if err == nil {
-			err = a.dropGenerated(start.App, start.SourceNumber, src)
-		}
 	}
 	if err != nil {
 		return err
@@ -403,7 +384,7 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 	previous := a.current(start.App)
 	// A restart brings nothing new: it needs no copy, and compose would
 	// leave the containers as they are, so they are made again.
-	restart := start.SourceURL == "" && start.SourceFile == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
+	restart := start.SourceFile == "" && start.Image == "" && start.FromNumber == 0
 	if previous > 0 && !restart && !start.NoCopy {
 		if err := a.copyDataBefore(ctx, release); err != nil {
 			return err
@@ -613,37 +594,6 @@ func (a *apps) rebuildMissing(ctx context.Context, release *release) error {
 		}
 		release.logf("image %s of service %s is gone from the server: building it again from the kept source", image, name)
 		delete(release.running, name)
-	}
-	return nil
-}
-
-// dropGenerated takes the compose.yml moin wrote for a repo without one out
-// of the source it copied from release number, so resolve writes it again
-// and finds the repo as the first deploy did: how it builds, and for
-// Railpack a new plan next to src, with the env names as they are now.
-func (a *apps) dropGenerated(app string, number int, src string) error {
-	var detected protocol.Detected
-	body, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "detected.json"))
-	_ = json.Unmarshal(body, &detected)
-	if detected.Kind == "" || detected.Kind == "compose" {
-		return nil
-	}
-	err := os.Remove(filepath.Join(src, "compose.yml"))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	return err
-}
-
-// copySource copies the source a release kept into a new release.
-func (a *apps) copySource(ctx context.Context, app string, number int, target string) error {
-	source := filepath.Join(a.releaseDir(app, number), "src")
-	if _, err := os.Stat(source); err != nil {
-		return fmt.Errorf("the source of v%d is no longer on the server: deploy again with moin deploy", number)
-	}
-	output, err := exec.CommandContext(ctx, "cp", "-a", source, target).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("copy the source of v%d: %s", number, strings.TrimSpace(string(output)))
 	}
 	return nil
 }

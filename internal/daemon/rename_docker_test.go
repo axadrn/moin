@@ -6,8 +6,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,17 +28,12 @@ func TestRenameDocker(t *testing.T) {
 	suffix := make([]byte, 3)
 	_, _ = rand.Read(suffix)
 	folder, renamed := "rntest-"+hex.EncodeToString(suffix), "rntest-renamed-"+hex.EncodeToString(suffix)
-	appID := "0f8e2c4a-1b3d-4e5f-8a9b-" + hex.EncodeToString(suffix) + "000000"
 	legacyVolume := project(folder) + "_data"
 	defer func(stable, window time.Duration) { stableFor, startWindow = stable, window }(stableFor, startWindow)
 	stableFor, startWindow = time.Second, 20*time.Second
 
 	compose := "services:\n  web:\n    image: alpine:latest\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    volumes:\n      - data:/data\nvolumes:\n  data: {}\n"
-	source := tarball(t, map[string]string{"compose.yml": compose})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
-	defer func(old string) { githubAPI = old }(githubAPI)
-	githubAPI = server.URL
-	defer server.Close()
+	source := sourceFile(t, map[string]string{"compose.yml": compose})
 
 	docker := func(args ...string) string {
 		t.Helper()
@@ -100,7 +93,7 @@ func TestRenameDocker(t *testing.T) {
 
 	// The first deploy after the update keeps the volume and its name and
 	// replaces the old containers.
-	deploy(protocol.DeployStart{DeployID: "d1", App: folder, Name: folder, AppID: appID, Number: 1, SourceURL: server.URL + "/repos/me/blog/tarball/abc123"})
+	deploy(protocol.DeployStart{DeployID: "d1", App: folder, Name: folder, Number: 1, SourceFile: source})
 	if got := running(project(folder)); len(got) != 0 {
 		t.Fatalf("the old containers still exist: %v", got)
 	}
@@ -116,7 +109,7 @@ func TestRenameDocker(t *testing.T) {
 	docker("exec", folder+"-web-1", "sh", "-c", "echo after >> /data/kept")
 
 	// The rename: a restart under the new name.
-	deploy(protocol.DeployStart{DeployID: "d2", App: folder, Name: renamed, AppID: appID, Number: 2})
+	deploy(protocol.DeployStart{DeployID: "d2", App: folder, Name: renamed, Number: 2})
 	if got := running(folder); len(got) != 0 {
 		t.Fatalf("containers of the old name are left: %v", got)
 	}
@@ -142,7 +135,7 @@ func TestRenameDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = logs
-	deploy(protocol.DeployStart{DeployID: "d3", App: folder, Name: renamed, AppID: appID, Number: 3, FromNumber: 1})
+	deploy(protocol.DeployStart{DeployID: "d3", App: folder, Name: renamed, Number: 3, FromNumber: 1})
 	if got := running(renamed); len(got) != 1 || got[0] != renamed+"-web-1" {
 		t.Fatalf("containers after the rollback = %v", got)
 	}

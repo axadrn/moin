@@ -33,7 +33,7 @@ func checkResolved(t *testing.T, compose string, env map[string]string) (string,
 	if err != nil {
 		return "", err
 	}
-	pinNames(config, "web", "web", func(volume string) string { return a.volumeName(ctx, "web", "", volume) })
+	pinNames(config, "web", "web", func(volume string) string { return a.volumeName("web", volume) })
 	box := appRoom{
 		dataDir:     resolved(filepath.Join(a.appDir("web"), "volumes")),
 		releasesDir: resolved(filepath.Join(a.appDir("web"), "releases")),

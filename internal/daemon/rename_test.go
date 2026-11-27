@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/protocol"
@@ -56,23 +55,17 @@ func TestPinNames(t *testing.T) {
 	}
 }
 
-// TestVolumeNames: a new app's volume is named after its ID, once, and
-// keeps that name; an app from before renames keeps the name compose
-// gave it (TestRenameDocker).
+// TestVolumeNames: a volume is named once, as compose names it for the
+// app's first project, and keeps that name.
 func TestVolumeNames(t *testing.T) {
 	a := newApps(t.TempDir())
-	app, id := "volume-test-"+strings.ToLower(filepath.Base(t.TempDir())), "0f8e2c4a-1b3d-4e5f-8a9b-0c1d2e3f4a5b"
-	if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
+	if err := os.MkdirAll(a.appDir("shop"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
-	if got := a.volumeName(ctx, app, id, "data"); got != "moin-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b-data" {
+	if got := a.volumeName("shop", "data"); got != "moin-shop_data" {
 		t.Fatalf("volume = %s", got)
 	}
-	if got := a.volumeName(ctx, app, "", "data"); got != "moin-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b-data" {
-		t.Fatalf("the second time volume = %s, want the one kept", got)
-	}
-	if got := a.volumeNames(app); len(got) != 1 || got[0] != "moin-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b-data" {
+	if got := a.volumeNames("shop"); len(got) != 1 || got[0] != "moin-shop_data" {
 		t.Fatalf("volume names = %v", got)
 	}
 }

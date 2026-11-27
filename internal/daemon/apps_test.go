@@ -39,7 +39,7 @@ func tarball(t *testing.T, files map[string]string) []byte {
 func TestUnpackRefusesPathsOutsideTheSource(t *testing.T) {
 	for _, name := range []string{"../evil", "a/../../evil", "/etc/evil"} {
 		dir := t.TempDir()
-		err := unpack(bytes.NewReader(tarball(t, map[string]string{name: "x"})), filepath.Join(dir, "src"), false)
+		err := unpack(bytes.NewReader(tarball(t, map[string]string{name: "x"})), filepath.Join(dir, "src"))
 		if name == "/etc/evil" {
 			// An absolute name lands inside the source directory.
 			if _, statErr := os.Stat(filepath.Join(dir, "src", "etc", "evil")); err != nil || statErr != nil {
@@ -286,16 +286,16 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" {
+	if detected.Domains[0] != "blog.example.com" {
 		t.Fatalf("detected = %+v", detected)
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port})
+	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: "blog.example.com", port: detected.Port})
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
@@ -308,9 +308,6 @@ func TestRouterLabels(t *testing.T) {
 	}
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
 		t.Fatal("the main service is not on the proxy network")
-	}
-	if _, err := route("blog", protocol.Detected{}, &protocol.Domains{Domains: []string{"blog.example.com"}, Canonical: "www.blog.example.com"}); err == nil {
-		t.Fatal("a canonical domain that is not one of the domains must fail")
 	}
 	if _, err := route("blog", protocol.Detected{}, &protocol.Domains{Domains: []string{"not a domain"}}); err == nil {
 		t.Fatal("a bad domain must fail")

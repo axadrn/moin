@@ -1,32 +1,11 @@
 package daemon
 
 import (
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/protocol"
 )
-
-// TestRouteServices: domains per service come from the settings; an entry for
-// the main service is not another service; a domain on two services fails.
-func TestRouteServices(t *testing.T) {
-	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Services: map[string][]string{"web": {"x.example.net"}, "api": {"API.shop.example.net"}, "admin": {}}}
-	detected, err := route("shop", protocol.Detected{Service: "web"}, domains)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(detected.Domains, []string{"shop.example.net"}) || len(detected.ServiceDomains) != 1 || !slices.Equal(detected.ServiceDomains["api"], []string{"api.shop.example.net"}) {
-		t.Errorf("domains %v, services %v", detected.Domains, detected.ServiceDomains)
-	}
-	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"x.example.com"}, Services: map[string][]string{"api": {"x.example.com"}}}); err == nil {
-		t.Error("a domain on two services passed")
-	}
-	// The settings are not changed by route.
-	if domains.Services["api"][0] != "API.shop.example.net" {
-		t.Errorf("route changed the domains it was given: %v", domains.Services)
-	}
-}
 
 // TestRouteInstant: the settings' provider names the instant address; off, an
 // unknown provider or no public IPv4 give none.

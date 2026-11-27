@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,8 +39,6 @@ const (
 	// first start.
 	waitTimeout = 120 * time.Second
 )
-
-var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
 // apps runs the deploys, logs and removals of the apps on this server.
 type apps struct {

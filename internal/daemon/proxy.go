@@ -23,39 +23,21 @@ const proxyImage = "traefik:v3.6"
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
 // route settles the domains of a deploy from the app's settings on the
-// server, the only place they are set. Domains are the main service's; ServiceDomains those
-// of the others; Instant its instant address.
+// server, the only place they are set. Domains are the main service's;
+// Instant its instant address.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {
 		domains = &protocol.Domains{}
 	}
 	detected.Domains = slices.Clone(domains.Domains)
-	detected.ServiceDomains = otherServiceDomains(detected.Service, domains)
-	detected.Canonical = domains.Canonical
-	err := cleanDomains(detected)
-	if err != nil {
+	// No command sets domains of other services or a canonical one: none
+	// carries over from a release that had them.
+	detected.ServiceDomains, detected.Canonical = nil, ""
+	if err := cleanDomains(detected); err != nil {
 		return detected, err
-	}
-	if detected.Canonical != "" && !slices.Contains(detected.Domains, detected.Canonical) {
-		return detected, fmt.Errorf("canonical domain %s is not one of the domains", detected.Canonical)
 	}
 	detected.Instant = protocol.InstantHost(app, domains.InstantIP, domains.Instant)
 	return detected, nil
-}
-
-// otherServiceDomains are the domains of the services other than the main
-// one, nil when there are none.
-func otherServiceDomains(mainName string, domains *protocol.Domains) map[string][]string {
-	byService := map[string][]string{}
-	for service, list := range domains.Services {
-		if service != mainName && len(list) > 0 {
-			byService[service] = slices.Clone(list)
-		}
-	}
-	if len(byService) == 0 {
-		return nil
-	}
-	return byService
 }
 
 // cleanDomains checks every domain of a deploy and writes it in lower case.

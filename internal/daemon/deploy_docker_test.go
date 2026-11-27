@@ -5,6 +5,9 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
 
 	"github.com/axadrn/moin/protocol"
 )
@@ -31,4 +34,15 @@ func deployTo(ctx context.Context, a *apps, start protocol.DeployStart, send fun
 		}
 	}
 	send(done)
+}
+
+// sourceFile writes files as the gzipped tar the CLI sends over SSH, and
+// names it for a deploy.
+func sourceFile(t *testing.T, files map[string]string) string {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "source.tar.gz")
+	if err := os.WriteFile(file, tarball(t, files), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return file
 }

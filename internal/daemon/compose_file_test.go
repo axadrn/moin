@@ -95,17 +95,13 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 		"volumes":  map[string]any{"pg": map[string]any{"name": "moin-my-app_pg"}},
 		"networks": map[string]any{"default": map[string]any{"name": "moin-my-app_default"}},
 	}
-	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}, Canonical: "example.com"}
+	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}}
 	text := mustCompose(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, protocol.DeployStart{Domains: domains}, nil)
 
 	for _, leak := range []string{dir, "s3cret-value", "external"} {
 		if strings.Contains(text, leak) {
 			t.Errorf("the compose file holds %q:\n%s", leak, text)
 		}
-	}
-	// compose reads $$ as $: the redirect keeps it, as compose.json does.
-	if !strings.Contains(text, "replacement: https://example.com$${3}") {
-		t.Errorf("the canonical redirect lost its $$:\n%s", text)
 	}
 	if !strings.Contains(text, "postgres://app:${DB_PASSWORD}@db/app") || !strings.HasPrefix(text, "name: my-app\nservices:\n") {
 		t.Errorf("the compose file lost ${DB_PASSWORD} or its order:\n%s", text)

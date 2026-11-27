@@ -60,9 +60,8 @@ func (a *apps) switchProject(ctx context.Context, app, name string, logf func(st
 }
 
 // volumeName is the fixed name of a named volume of the app, chosen once
-// and kept in volumes.json: the name compose gave it before renames when
-// that volume exists, else moin-<app ID>-<volume>.
-func (a *apps) volumeName(ctx context.Context, app, appID, volume string) string {
+// and kept in volumes.json: the name compose gave it before renames.
+func (a *apps) volumeName(app, volume string) string {
 	file := filepath.Join(a.appDir(app), "volumes.json")
 	names := map[string]string{}
 	body, _ := os.ReadFile(file)
@@ -71,9 +70,6 @@ func (a *apps) volumeName(ctx context.Context, app, appID, volume string) string
 		return name
 	}
 	name := project(app) + "_" + volume
-	if _, err := a.output(ctx, "docker", "volume", "inspect", name); err != nil && appIDPattern.MatchString(appID) {
-		name = ourName + "-" + strings.ReplaceAll(appID, "-", "") + "-" + volume
-	}
 	names[volume] = name
 	saveJSON(file, names)
 	return name
@@ -148,7 +144,7 @@ func (a *apps) pinFile(ctx context.Context, start protocol.DeployStart, composeJ
 	if err := json.Unmarshal(body, &config); err != nil {
 		return err
 	}
-	pinNames(config, start.App, nameOf(start), func(volume string) string { return a.volumeName(ctx, start.App, start.AppID, volume) })
+	pinNames(config, start.App, nameOf(start), func(volume string) string { return a.volumeName(start.App, volume) })
 	body, err = json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err

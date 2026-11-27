@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,15 +59,11 @@ func TestNoEnvValueLeaks(t *testing.T) {
     command: ["sleep", "3600"]
     env_file: [worker.env]
 `
-	source := tarball(t, map[string]string{
+	source := sourceFile(t, map[string]string{
 		"compose.yml": compose,
 		"worker.env":  "WORKER_PASSWORD=${DB_PASSWORD}\n",
 		".env":        "REPO_VAR=from-the-repo\n",
 	})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
-	defer func(old string) { githubAPI = old }(githubAPI)
-	githubAPI = server.URL
-	defer server.Close()
 
 	var mu sync.Mutex
 	var sent [][]byte
@@ -127,7 +122,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		}
 	}
 
-	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceURL: server.URL + "/repos/me/leak/tarball/abc123", Domains: domains})
+	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceFile: source, Domains: domains})
 	seesValues(secret)
 	answers(t, app)
 	// A restart with a new value: Docker fills in the new value.
@@ -178,7 +173,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	}
 	deploy(protocol.DeployStart{DeployID: "5", Number: 5})
 	seesValues(changed)
-	deploy(protocol.DeployStart{DeployID: "6", Number: 6, SourceURL: server.URL + "/repos/me/leak/tarball/abc123"})
+	deploy(protocol.DeployStart{DeployID: "6", Number: 6, SourceFile: source})
 	seesValues(changed)
 
 	mu.Lock()
@@ -257,11 +252,7 @@ func TestRemoveWithoutVariable(t *testing.T) {
 	})
 	// Not on the main service: that one reads app.env itself.
 	compose := "services:\n  web:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n  db:\n    image: busybox:latest\n    command: [\"sleep\", \"3600\"]\n    environment:\n      NEED: ${NEED:?set NEED}\n"
-	source := tarball(t, map[string]string{"compose.yml": compose})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(source) }))
-	defer func(old string) { githubAPI = old }(githubAPI)
-	githubAPI = server.URL
-	defer server.Close()
+	source := sourceFile(t, map[string]string{"compose.yml": compose})
 	var done protocol.DeployDone
 	a := newApps(t.TempDir())
 	send := func(data any) {
@@ -272,7 +263,7 @@ func TestRemoveWithoutVariable(t *testing.T) {
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"NEED": "x"}}); err != nil {
 		t.Fatal(err)
 	}
-	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceURL: server.URL + "/repos/me/gone/tarball/abc123"}, send)
+	deployTo(ctx, a, protocol.DeployStart{DeployID: "d1", App: app, Name: app, Number: 1, SourceFile: source}, send)
 	if !done.OK {
 		t.Fatalf("deploy: %s", done.Error)
 	}
