@@ -153,7 +153,7 @@ Daemon
 
 Watcher
   watcher            Watch servers from outside, the only part that listens: watcher [--listen :8080] [--config /etc/moin/watcher.yml] [--dir /var/lib/moin/watcher]
-  watcher add        A new token for a server to report with: watcher add prod
+  watcher add        A new token for a server, and the line that points it here: watcher add prod [--url https://watcher.example.com]
 
   version            Show the version of moin and the hub, and a newer release
   update <app>       Update an app from the catalog; restore can go back to before it: update umami [--version 3.4.1]

@@ -34,7 +34,7 @@ type Config struct {
 	Alerts   []alert.Destination `yaml:"alerts"`
 }
 
-var serverName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
+var serverName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@._-]{0,126}$`)
 
 // LoadConfig reads and checks the config at path.
 func LoadConfig(path string) (Config, error) {
@@ -70,7 +70,7 @@ func LoadConfig(path string) (Config, error) {
 // CheckName says whether name can name a server.
 func CheckName(name string) error {
 	if !serverName.MatchString(name) {
-		return fmt.Errorf("%q is not a server name: letters, digits, dots, dashes and underscores", name)
+		return fmt.Errorf("%q is not a server name: letters, digits, dots, dashes, underscores and @", name)
 	}
 	return nil
 }

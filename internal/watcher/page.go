@@ -3,16 +3,19 @@ package watcher
 import (
 	"crypto/subtle"
 	"html/template"
+	"maps"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/report"
 )
 
-// page is the one page: every server, its apps, the last proven restore,
-// recent outages. It reads; nothing on it changes anything. It asks for
-// the password of the config, any user name.
+// page is the one page: what needs you, every server and its apps, the
+// last proven restore, recent outages. It only reads: nothing on it
+// changes anything. It asks for the password of the config, any user name.
 func (w *watcher) page(rw http.ResponseWriter, r *http.Request) {
 	_, password, ok := r.BasicAuth()
 	if !ok || subtle.ConstantTimeCompare([]byte(password), []byte(w.config.Password)) != 1 {
@@ -31,36 +34,32 @@ func (w *watcher) page(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// pageView is everything the page shows, ready to print.
 type pageView struct {
-	Name    string
-	Servers []serverView
-	Outages []outageView
-	Checks  []checkView
+	Name     string
+	NeedsYou []string
+	Servers  []serverView
+	Outages  []outageView
+	Checks   []checkView
 }
 
+// serverView, appView and lineView each have a Problem: one sentence
+// for "Needs you" when it is red, empty when it is fine.
 type serverView struct {
-	Name, Version, Seen, State string
-	OK                         bool
-	Apps                       []appView
+	Name, Version, State, Problem string
+	OK                            bool
+	Apps                          []appView
 }
 
 type appView struct {
-	Name    string
-	Release int
-	OK      bool
-	State   string
-	Domains []domainView
-	DBs     []dbView
+	Name, State, Problem string
+	OK                   bool
+	Domains, Databases   []lineView
 }
 
-type domainView struct {
-	Name, State string
-	OK          bool
-}
-
-type dbView struct {
-	Name, Kind, Copy, Proven, Error string
-	OK                              bool
+// lineView is one domain or one database.
+type lineView struct {
+	Name, State, Problem string
 }
 
 type outageView struct {
@@ -69,69 +68,139 @@ type outageView struct {
 }
 
 type checkView struct {
-	What, At, Copy, Error string
-	OK                    bool
+	What, At, Result string
+	OK               bool
 }
 
 // view is what the page shows at now. The caller holds w.mu.
 func (w *watcher) view(now time.Time) pageView {
 	v := pageView{Name: build.Name}
-	for _, name := range sortedKeys(w.config.Servers) {
-		srv := w.state.Servers[name]
-		if srv == nil {
-			v.Servers = append(v.Servers, serverView{Name: name, State: "no report yet"})
-			continue
-		}
-		sv := serverView{Name: name, Version: srv.Report.Version, Seen: ago(now, srv.Received), OK: !srv.Silent, State: "reports"}
-		if srv.Silent {
-			sv.State = "silent"
-		}
-		for _, app := range srv.Report.Apps {
-			av := appView{Name: app.Name, Release: app.Release, OK: app.Running, State: "running"}
-			if !app.Running {
-				av.State = "stopped"
-			}
-			for _, d := range app.Domains {
-				dv := domainView{Name: d, OK: true, State: "up"}
-				if state := w.state.Domains[d]; state == nil || !app.Running {
-					dv.State = "not visited"
-				} else if state.Down {
-					dv.OK, dv.State = false, "down: "+state.Reason
-				}
-				av.OK = av.OK && dv.OK
-				av.Domains = append(av.Domains, dv)
-			}
-			for _, db := range app.Databases {
-				dv := dbView{Name: db.Name, Kind: db.Kind, Copy: ago(now, db.LastCopy), Proven: ago(now, db.CheckedCopy), Error: db.Error}
-				dv.OK = db.Error == "" && (db.LastCheck.IsZero() || db.CheckOK)
-				av.OK = av.OK && dv.OK
-				av.DBs = append(av.DBs, dv)
-			}
-			sv.OK = sv.OK && av.OK
-			sv.Apps = append(sv.Apps, av)
-		}
-		v.Servers = append(v.Servers, sv)
+	for _, name := range slices.Sorted(maps.Keys(w.config.Servers)) {
+		server := w.serverView(name, now)
+		v.Servers = append(v.Servers, server)
+		v.NeedsYou = append(v.NeedsYou, problems(server)...)
 	}
 	for _, o := range slices.Backward(w.state.Outages) {
-		what := o.Server + " stopped reporting"
-		if o.Domain != "" {
-			what = o.Domain + " down (" + o.Server + " · " + o.App + ")"
-		}
-		ov := outageView{What: what, From: clock(o.From), Reason: o.Reason, Open: o.To.IsZero()}
-		if ov.Open {
-			ov.Lasted = "still on, " + spoken(now.Sub(o.From))
-		} else {
-			ov.Lasted = spoken(o.To.Sub(o.From))
-		}
-		v.Outages = append(v.Outages, ov)
+		v.Outages = append(v.Outages, outageLine(o, now))
 	}
 	for _, c := range slices.Backward(w.state.Checks) {
-		v.Checks = append(v.Checks, checkView{
-			What: c.Server + " · " + c.App + " · " + c.Database, At: clock(c.At),
-			Copy: clock(c.Copy), Error: c.Error, OK: c.OK,
-		})
+		v.Checks = append(v.Checks, checkLine(c))
 	}
 	return v
+}
+
+// serverView is one server with its apps, from its newest report.
+func (w *watcher) serverView(name string, now time.Time) serverView {
+	srv := w.state.Servers[name]
+	if srv == nil {
+		return serverView{Name: name, State: "no report yet", OK: true}
+	}
+	server := serverView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received)}
+	if srv.Silent {
+		server.Problem = name + " stopped reporting " + ago(now, srv.Received) + ". Look: ssh " + name
+	}
+	server.OK = server.Problem == ""
+	for _, app := range srv.Report.Apps {
+		a := w.appView(name, app, now)
+		server.OK = server.OK && a.OK
+		server.Apps = append(server.Apps, a)
+	}
+	return server
+}
+
+// appView is one app: running or not, its domains as seen from outside,
+// its databases with the last copy and the last proven restore.
+func (w *watcher) appView(server string, app report.App, now time.Time) appView {
+	a := appView{Name: app.Name, State: "v" + strconv.Itoa(app.Release) + " running"}
+	if !app.Running {
+		a.State = "v" + strconv.Itoa(app.Release) + " stopped"
+		a.Problem = app.Name + " on " + server + " is stopped."
+	}
+	a.OK = a.Problem == ""
+	for _, name := range app.Domains {
+		line := w.domainLine(name, app.Running)
+		a.OK = a.OK && line.Problem == ""
+		a.Domains = append(a.Domains, line)
+	}
+	for _, db := range app.Databases {
+		line := databaseLine(server, app.Name, db, now)
+		a.OK = a.OK && line.Problem == ""
+		a.Databases = append(a.Databases, line)
+	}
+	return a
+}
+
+// domainLine says whether a domain answers from outside.
+func (w *watcher) domainLine(name string, running bool) lineView {
+	d := w.state.Domains[name]
+	switch {
+	case !running || d == nil:
+		return lineView{Name: name, State: "not visited"}
+	case d.Down:
+		return lineView{Name: name, State: "down: " + d.Reason, Problem: name + " is down: " + d.Reason + "."}
+	}
+	return lineView{Name: name, State: "up"}
+}
+
+// databaseLine says when the last copy was made and which copy a restore
+// last proved. A failed check or a backup error makes it red.
+func databaseLine(server, app string, db report.Database, now time.Time) lineView {
+	line := lineView{Name: db.Name + " (" + db.Kind + ")", State: "copy " + ago(now, db.LastCopy) + ", restore proven " + ago(now, db.CheckedCopy)}
+	where := db.Name + " of " + app + " on " + server
+	if !db.LastCheck.IsZero() && !db.CheckOK {
+		line.State = "restore check failed " + ago(now, db.LastCheck) + ", " + line.State
+		line.Problem = "The restore check of " + where + " failed " + ago(now, db.LastCheck) + "."
+	}
+	if db.Error != "" {
+		line.State += ". " + db.Error
+		line.Problem = where + ": " + db.Error
+	}
+	return line
+}
+
+// problems lists what is red on a server, one sentence each.
+func problems(server serverView) []string {
+	var out []string
+	if server.Problem != "" {
+		out = append(out, server.Problem)
+	}
+	for _, app := range server.Apps {
+		if app.Problem != "" {
+			out = append(out, app.Problem)
+		}
+		for _, line := range slices.Concat(app.Domains, app.Databases) {
+			if line.Problem != "" {
+				out = append(out, line.Problem)
+			}
+		}
+	}
+	return out
+}
+
+// outageLine is one outage, newest first on the page.
+func outageLine(o outage, now time.Time) outageView {
+	what := o.Server + " stopped reporting"
+	if o.Domain != "" {
+		what = o.Domain + " down (" + o.App + " on " + o.Server + ")"
+	}
+	line := outageView{What: what, From: clock(o.From), Reason: o.Reason, Open: o.To.IsZero()}
+	if line.Open {
+		line.Lasted = "still, " + spoken(now.Sub(o.From))
+	} else {
+		line.Lasted = spoken(o.To.Sub(o.From))
+	}
+	return line
+}
+
+// checkLine is one restore check, newest first on the page.
+func checkLine(c check) checkView {
+	line := checkView{What: c.Database + " of " + c.App + " on " + c.Server, At: clock(c.At), OK: c.OK}
+	if c.OK {
+		line.Result = "restored the copy of " + clock(c.Copy)
+	} else {
+		line.Result = "failed: " + c.Error
+	}
+	return line
 }
 
 // ago is how long ago t was, or "never".
@@ -153,34 +222,33 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 :root { color-scheme: light dark; --fg: #111; --bg: #fff; --muted: #777; --line: #e5e5e5; --bad: #c00; --good: #080; }
 @media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #111; --muted: #888; --line: #2a2a2a; --bad: #f55; --good: #5c5; } }
 body { margin: 0 auto; max-width: 56rem; padding: 2rem 1rem; font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; color: var(--fg); background: var(--bg); }
-h1 { font-size: 1.25rem; margin: 0 0 2rem; }
+h1 { font-size: 1.25rem; margin: 0 0 1rem; }
 h2 { font-size: 1rem; margin: 2.5rem 0 .5rem; }
 table { width: 100%; border-collapse: collapse; }
 td, th { text-align: left; padding: .4rem .5rem .4rem 0; border-top: 1px solid var(--line); vertical-align: top; }
 th { font-weight: 600; color: var(--muted); font-size: .85rem; }
-.server { margin-bottom: 2rem; }
-.server h2 { margin-top: 0; }
+ul { padding-left: 1.2rem; margin: .25rem 0; }
 .muted { color: var(--muted); }
 .dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .4rem; background: var(--good); }
-.bad .dot, .dot.bad { background: var(--bad); }
+.dot.bad { background: var(--bad); }
 .bad { color: var(--bad); }
 .wrap { overflow-x: auto; }
 </style>
 </head>
 <body>
 <h1>{{.Name}} watcher</h1>
+{{if .NeedsYou}}<div class="bad"><strong>Needs you</strong><ul>{{range .NeedsYou}}<li>{{.}}</li>{{end}}</ul></div>
+{{else}}<p><span class="dot"></span>Everything is fine.</p>{{end}}
 {{range .Servers}}
-<section class="server">
-<h2><span class="dot{{if not .OK}} bad{{end}}"></span>{{.Name}} <span class="muted">{{.State}}{{if .Seen}}, last report {{.Seen}}{{end}}{{if .Version}}, {{.Version}}{{end}}</span></h2>
+<h2><span class="dot{{if not .OK}} bad{{end}}"></span>{{.Name}} <span class="muted">{{.State}}{{if .Version}}, {{.Version}}{{end}}</span></h2>
 {{if .Apps}}<div class="wrap"><table>
-<tr><th>App</th><th>Domains</th><th>Databases: last copy, last proven restore</th></tr>
+<tr><th>App</th><th>Domains, from outside</th><th>Databases</th></tr>
 {{range .Apps}}<tr>
-<td><span class="dot{{if not .OK}} bad{{end}}"></span>{{.Name}} <span class="muted">v{{.Release}} {{.State}}</span></td>
-<td>{{range .Domains}}<div{{if not .OK}} class="bad"{{end}}>{{.Name}} <span class="muted">{{.State}}</span></div>{{else}}<span class="muted">none</span>{{end}}</td>
-<td>{{range .DBs}}<div{{if not .OK}} class="bad"{{end}}>{{.Name}} <span class="muted">{{.Kind}}, copy {{.Copy}}, proven {{.Proven}}</span>{{if .Error}}<br>{{.Error}}{{end}}</div>{{else}}<span class="muted">none</span>{{end}}</td>
+<td><span class="dot{{if not .OK}} bad{{end}}"></span>{{.Name}} <span class="muted">{{.State}}</span></td>
+<td>{{range .Domains}}<div{{if .Problem}} class="bad"{{end}}>{{.Name}} <span class="muted">{{.State}}</span></div>{{else}}<span class="muted">none</span>{{end}}</td>
+<td>{{range .Databases}}<div{{if .Problem}} class="bad"{{end}}>{{.Name}} <span class="muted">{{.State}}</span></div>{{else}}<span class="muted">none</span>{{end}}</td>
 </tr>{{end}}
 </table></div>{{else}}<p class="muted">No apps.</p>{{end}}
-</section>
 {{else}}
 <p class="muted">No servers yet. Add one with <code>{{.Name}} watcher add &lt;server&gt;</code>.</p>
 {{end}}
@@ -191,8 +259,8 @@ th { font-weight: 600; color: var(--muted); font-size: .85rem; }
 </table></div>{{else}}<p class="muted">None.</p>{{end}}
 <h2>Restore checks</h2>
 {{if .Checks}}<div class="wrap"><table>
-<tr><th>Database</th><th>Ran</th><th>Copy</th><th>Result</th></tr>
-{{range .Checks}}<tr{{if not .OK}} class="bad"{{end}}><td>{{.What}}</td><td>{{.At}}</td><td>{{if .OK}}{{.Copy}}{{end}}</td><td>{{if .OK}}restored{{else}}failed: {{.Error}}{{end}}</td></tr>{{end}}
+<tr><th>Database</th><th>Ran</th><th>Result</th></tr>
+{{range .Checks}}<tr{{if not .OK}} class="bad"{{end}}><td>{{.What}}</td><td>{{.At}}</td><td>{{.Result}}</td></tr>{{end}}
 </table></div>{{else}}<p class="muted">None yet.</p>{{end}}
 </body>
 </html>

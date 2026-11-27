@@ -3,17 +3,22 @@ package watcher
 import (
 	"context"
 	"crypto/subtle"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/axadrn/moin/internal/alert"
@@ -48,6 +53,8 @@ type watcher struct {
 	dirty bool
 }
 
+// newWatcher loads what the watcher knew from dir, minus the servers the
+// config no longer has.
 func newWatcher(config Config, dir string, now time.Time) (*watcher, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
@@ -97,6 +104,7 @@ func Run(ctx context.Context, listen, configPath, dir string) error {
 	return nil
 }
 
+// routes are the only two: reports in, the page out.
 func (w *watcher) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST "+report.Path, w.receive)
@@ -131,8 +139,8 @@ func (w *watcher) receive(rw http.ResponseWriter, r *http.Request) {
 // serverOf is the server whose token the Authorization header carries.
 // Every token is compared, in constant time.
 func (w *watcher) serverOf(header string) (string, bool) {
-	token, ok := cutBearer(header)
-	if !ok {
+	token, ok := strings.CutPrefix(header, "Bearer ")
+	if !ok || token == "" {
 		return "", false
 	}
 	found := ""
@@ -142,14 +150,6 @@ func (w *watcher) serverOf(header string) (string, bool) {
 		}
 	}
 	return found, found != ""
-}
-
-func cutBearer(header string) (string, bool) {
-	const prefix = "Bearer "
-	if len(header) <= len(prefix) || header[:len(prefix)] != prefix {
-		return "", false
-	}
-	return header[len(prefix):], true
 }
 
 // loop looks for silent servers every few seconds and visits every
@@ -199,18 +199,12 @@ func (w *watcher) check(ctx context.Context) {
 // visitAll visits every domain at once and counts what each visit said.
 func (w *watcher) visitAll(ctx context.Context) {
 	w.mu.Lock()
-	names := sortedKeys(w.state.Domains)
+	names := slices.Sorted(maps.Keys(w.state.Domains))
 	w.mu.Unlock()
-	type result struct {
-		up     bool
-		reason string
-	}
-	results := make([]result, len(names))
+	failures := make([]string, len(names))
 	var wait sync.WaitGroup
 	for i, name := range names {
-		wait.Go(func() {
-			results[i].up, results[i].reason = w.visit(ctx, name)
-		})
+		wait.Go(func() { failures[i] = w.visit(ctx, name) })
 	}
 	wait.Wait()
 	if ctx.Err() != nil {
@@ -221,45 +215,52 @@ func (w *watcher) visitAll(ctx context.Context) {
 	defer w.mu.Unlock()
 	for i, name := range names {
 		if d := w.state.Domains[name]; d != nil {
-			d.visited(results[i].up, results[i].reason, now)
+			d.visited(failures[i] == "", failures[i], now)
 		}
 	}
 	w.dirty = true
 }
 
-// visit GETs a domain like a visitor: any answer below 500 is up; a 5xx,
-// a timeout, a refused connection or a bad certificate is down.
-func (w *watcher) visit(ctx context.Context, domain string) (bool, string) {
+// visit GETs a domain like a visitor and says why it failed, or "" when it
+// is up: any answer below 500 is up; a 5xx, a timeout, a refused
+// connection or a bad certificate is down.
+func (w *watcher) visit(ctx context.Context, domain string) string {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+"/", nil)
 	if err != nil {
-		return false, "not a domain"
+		return "not a domain"
 	}
 	request.Header.Set("User-Agent", build.Name+"-watcher/"+build.Version)
 	response, err := w.client.Do(request)
 	if err != nil {
-		return false, visitFailure(err)
+		return visitFailure(err)
 	}
 	defer response.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
 	if response.StatusCode >= 500 {
-		return false, "HTTP " + strconv.Itoa(response.StatusCode)
+		return "HTTP " + strconv.Itoa(response.StatusCode)
 	}
-	return true, ""
+	return ""
 }
 
-// visitFailure says in a few words why a visit failed.
+// visitFailure says in a few words why a visit got no answer.
 func visitFailure(err error) string {
 	var dnsErr *net.DNSError
+	var certErr *tls.CertificateVerificationError
 	var netErr net.Error
 	var urlErr *url.Error
 	switch {
 	case errors.As(err, &dnsErr):
 		return "DNS has no address for " + dnsErr.Name
+	case errors.As(err, &certErr):
+		return "the HTTPS certificate is not valid"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "connection refused"
+	case errors.Is(err, syscall.ECONNRESET):
+		return "connection reset"
 	case errors.As(err, &netErr) && netErr.Timeout():
 		return "no answer within " + visitTimeout.String()
-	}
-	if errors.As(err, &urlErr) {
-		err = urlErr.Err
+	case errors.As(err, &urlErr):
+		return urlErr.Err.Error()
 	}
 	return err.Error()
 }

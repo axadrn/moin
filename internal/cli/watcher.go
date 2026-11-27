@@ -30,10 +30,11 @@ func watcherCommand(ctx context.Context, args []string, stdout io.Writer) error 
 	return watcher.Run(ctx, *listen, *config, *dir)
 }
 
-// watcherAdd prints a new token for a server: one line for the watcher's
-// config, and what the server's config needs to report to it.
+// watcherAdd prints a new token for a server: the line for the watcher's
+// config, and the command that points the server at this watcher.
 func watcherAdd(args []string, stdout io.Writer) error {
-	flags := newFlags("watcher add", "watcher add <server> [--config "+watcher.DefaultConfig+"]")
+	flags := newFlags("watcher add", "watcher add <server> [--url https://watcher.example.com] [--config "+watcher.DefaultConfig+"]")
+	address := flags.String("url", "https://<this watcher>", "the address daemons reach this watcher at")
 	path := flags.String("config", watcher.DefaultConfig, "the config file")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -53,15 +54,13 @@ func watcherAdd(args []string, stdout io.Writer) error {
 		return fmt.Errorf("%s is in %s already. Remove its line first for a new token", name, *path)
 	}
 	token := watcher.NewToken()
-	fmt.Fprintf(stdout, `Put this line under servers: in %s, then restart the watcher:
+	fmt.Fprintf(stdout, `1. Put this line under servers: in %s, then restart the watcher:
 
   %s: %s
 
-On %s, add this watcher to /etc/%s/config.yml:
+2. On your laptop, point %s at this watcher:
 
-watchers:
-  - url: https://<this watcher>
-    token: %s
-`, *path, name, token, name, build.Name, token)
+  %s watchers add %s %s %s
+`, *path, name, token, name, build.Name, name, *address, token)
 	return nil
 }

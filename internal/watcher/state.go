@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/axadrn/moin/internal/alert"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/report"
 )
 
@@ -85,6 +87,7 @@ type check struct {
 	Error    string    `json:"error,omitempty"`
 }
 
+// newState is a watcher that knows nothing yet.
 func newState() *state {
 	return &state{Servers: map[string]*server{}, Domains: map[string]*domain{}}
 }
@@ -101,12 +104,6 @@ func loadState(path string) (*state, error) {
 	}
 	if err := json.Unmarshal(data, s); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if s.Servers == nil {
-		s.Servers = map[string]*server{}
-	}
-	if s.Domains == nil {
-		s.Domains = map[string]*domain{}
 	}
 	return s, nil
 }
@@ -150,7 +147,7 @@ func (s *state) receive(name string, r report.Report, now time.Time) {
 			s.Checks = append(s.Checks, check{Server: name, App: app.Name, Database: db.Name, At: db.LastCheck, OK: db.CheckOK, Copy: db.CheckedCopy, Error: db.Error})
 		}
 	}
-	s.Checks = newest(s.Checks)
+	s.Checks = s.Checks[max(0, len(s.Checks)-kept):]
 	before.Report, before.Received = r, now
 	s.syncDomains(now)
 }
@@ -215,6 +212,7 @@ func silent(received, started, now time.Time, every time.Duration) bool {
 	return now.Sub(later(received, started)) > silentAfter*every
 }
 
+// later is the later of two times.
 func later(a, b time.Time) time.Time {
 	if a.After(b) {
 		return a
@@ -243,44 +241,69 @@ func (d *domain) visited(up bool, reason string, at time.Time) {
 
 // alerts turns what changed since the last call into alerts, once per
 // event: a server that went silent or came back, a domain that went down
-// or came up. A domain of a silent server does not alert: the silence
-// says more, and when the server is back and the domain still down, it
-// alerts then.
+// or came up.
 func (s *state) alerts(started, now time.Time) []alert.Message {
 	var out []alert.Message
-	for _, name := range sortedKeys(s.Servers) {
-		srv := s.Servers[name]
-		quiet := silent(srv.Received, started, now, srv.Report.Every)
-		switch {
-		case quiet && !srv.Silent:
-			srv.Silent = true
-			s.Outages = newest(append(s.Outages, outage{Server: name, From: srv.Received}))
-			out = append(out, alert.Message{Server: name, Title: name + " stopped reporting",
-				Text: "No report since " + clock(srv.Received) + ". The server, its network or moin on it is down." + appsOf(srv.Report)})
-		case !quiet && srv.Silent:
-			srv.Silent = false
-			from := s.end(name, "", now)
-			out = append(out, alert.Message{Server: name, Title: name + " reports again", OK: true,
-				Text: "It was silent for " + spoken(now.Sub(from)) + "."})
+	for _, name := range slices.Sorted(maps.Keys(s.Servers)) {
+		if m, ok := s.serverAlert(name, started, now); ok {
+			out = append(out, m)
 		}
 	}
-	for _, name := range sortedKeys(s.Domains) {
-		d := s.Domains[name]
-		srv := s.Servers[d.Server]
-		switch {
-		case d.Down && !d.Alerted && srv != nil && !srv.Silent:
-			d.Alerted = true
-			s.Outages = newest(append(s.Outages, outage{Server: d.Server, App: d.App, Domain: name, From: d.Since, Reason: d.Reason}))
-			out = append(out, alert.Message{Server: d.Server, App: d.App, Title: name + " is down",
-				Text: "Down from outside since " + clock(d.Since) + ": " + d.Reason + "."})
-		case !d.Down && d.Alerted:
-			d.Alerted = false
-			from := s.end(d.Server, name, now)
-			out = append(out, alert.Message{Server: d.Server, App: d.App, Title: name + " is up again", OK: true,
-				Text: "It was down for " + spoken(now.Sub(from)) + "."})
+	for _, name := range slices.Sorted(maps.Keys(s.Domains)) {
+		if m, ok := s.domainAlert(name, now); ok {
+			out = append(out, m)
 		}
 	}
 	return out
+}
+
+// serverAlert is the alert of a server that just went silent or just came
+// back, if it did.
+func (s *state) serverAlert(name string, started, now time.Time) (alert.Message, bool) {
+	srv := s.Servers[name]
+	quiet := silent(srv.Received, started, now, srv.Report.Every)
+	if quiet && !srv.Silent {
+		srv.Silent = true
+		s.Outages = append(s.Outages, outage{Server: name, From: srv.Received})
+		s.Outages = s.Outages[max(0, len(s.Outages)-kept):]
+		return alert.Message{
+			Server: name,
+			Title:  name + " stopped reporting",
+			Text: "No report since " + clock(srv.Received) + ". The server, its network or moin on it is down." + appsOf(srv.Report) +
+				"\nLook: ssh " + name + ", or the console of your provider.",
+		}, true
+	}
+	if !quiet && srv.Silent {
+		srv.Silent = false
+		from := s.end(name, "", now)
+		return alert.Message{Server: name, Title: name + " reports again", OK: true, Text: "It was silent for " + spoken(now.Sub(from)) + "."}, true
+	}
+	return alert.Message{}, false
+}
+
+// domainAlert is the alert of a domain that just went down or came up, if
+// it did. A domain of a silent server does not alert: the silence says
+// more. When the server is back and the domain still down, it alerts then.
+func (s *state) domainAlert(name string, now time.Time) (alert.Message, bool) {
+	d := s.Domains[name]
+	srv := s.Servers[d.Server]
+	if d.Down && !d.Alerted && srv != nil && !srv.Silent {
+		d.Alerted = true
+		s.Outages = append(s.Outages, outage{Server: d.Server, App: d.App, Domain: name, From: d.Since, Reason: d.Reason})
+		s.Outages = s.Outages[max(0, len(s.Outages)-kept):]
+		return alert.Message{
+			Server: d.Server, App: d.App,
+			Title: name + " is down",
+			Text: "No good answer from outside since " + clock(d.Since) + ": " + d.Reason + ".\n" +
+				d.Server + " still reports, so look at the app: " + build.Name + " logs " + d.Server + " --app " + d.App,
+		}, true
+	}
+	if !d.Down && d.Alerted {
+		d.Alerted = false
+		from := s.end(d.Server, name, now)
+		return alert.Message{Server: d.Server, App: d.App, Title: name + " is up again", OK: true, Text: "It was down for " + spoken(now.Sub(from)) + "."}, true
+	}
+	return alert.Message{}, false
 }
 
 // end ends the open outage of a server or one of its domains, and says
@@ -294,23 +317,6 @@ func (s *state) end(server, domain string, now time.Time) time.Time {
 		}
 	}
 	return now
-}
-
-// newest keeps the last kept entries.
-func newest[T any](list []T) []T {
-	if len(list) > kept {
-		return slices.Clone(list[len(list)-kept:])
-	}
-	return list
-}
-
-func sortedKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // appsOf names the apps of a report, for the silence alert.
