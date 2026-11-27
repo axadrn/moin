@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -22,8 +23,9 @@ import (
 // Every minute the daemon looks at its server, tells the watchers what it
 // sees (a report) and alerts what is wrong: a backup that fails, a copy
 // that did not restore, an app that keeps crashing, a disk that is almost
-// full, and watchers it cannot reach. Each problem alerts once when it
-// starts and once when it is over.
+// full, a bucket that is away, a mistake in the config, and watchers it
+// cannot reach. Each problem alerts once when it starts and once when it
+// is over.
 
 const (
 	watchEvery = time.Minute
@@ -38,6 +40,9 @@ const (
 	// watcherMisses is how many reports in a row no watcher took before
 	// that is a problem.
 	watcherMisses = 5
+	// checkLate is how old the newest daily check may get before that is
+	// a problem of its own: something keeps the checks from running.
+	checkLate = 2 * day
 )
 
 // watch is the daemon's look at its server, once a minute.
@@ -51,19 +56,51 @@ type watch struct {
 	restarts map[string][]int
 	// missed counts the reports in a row that no watcher took.
 	missed int
+	// saved is what is written down now, so only a change is written.
+	saved []byte
 }
 
-// newWatch reads the problems an earlier daemon left open.
+// watchState is what a watch writes down: the open problems, and what it
+// counts to tell that one goes on. A daemon that starts again alerts
+// nothing twice and calls nothing over that is not.
+type watchState struct {
+	Open     map[string]alert.Message `json:"open"`
+	Restarts map[string][]int         `json:"restarts"`
+	Missed   int                      `json:"missed"`
+}
+
+// newWatch reads what an earlier daemon wrote down.
 func newWatch(a *apps) *watch {
-	w := &watch{apps: a, open: map[string]alert.Message{}, restarts: map[string][]int{}}
-	body, _ := os.ReadFile(w.openFile())
-	_ = json.Unmarshal(body, &w.open)
+	w := &watch{apps: a}
+	state := watchState{}
+	body, _ := os.ReadFile(w.stateFile())
+	_ = json.Unmarshal(body, &state)
+	w.open, w.restarts, w.missed = state.Open, state.Restarts, state.Missed
+	if w.open == nil {
+		w.open = map[string]alert.Message{}
+	}
+	if w.restarts == nil {
+		w.restarts = map[string][]int{}
+	}
 	return w
 }
 
-// openFile is where the open problems are written down.
-func (w *watch) openFile() string {
+// stateFile is where the watch writes down what it knows.
+func (w *watch) stateFile() string {
 	return filepath.Join(filepath.Dir(w.apps.dir), "alerts.json")
+}
+
+// save writes down what the watch knows, when it changed.
+func (w *watch) save() {
+	body, _ := json.Marshal(watchState{Open: w.open, Restarts: w.restarts, Missed: w.missed})
+	if bytes.Equal(body, w.saved) {
+		return
+	}
+	if err := writeWhole(w.stateFile(), body); err != nil {
+		slog.Error("write down the open alerts", "error", err)
+		return
+	}
+	w.saved = body
 }
 
 // loop looks at the server every minute until ctx ends.
@@ -80,18 +117,22 @@ func (w *watch) loop(ctx context.Context) {
 	}
 }
 
-// look is one round: end what stopped deploys left, report, alert.
+// look is one round: end what stopped deploys left, report, alert. A
+// config with a mistake is a problem of its own, and the last good one
+// keeps everything working.
 func (w *watch) look(ctx context.Context) {
-	config, err := LoadConfig()
-	if err != nil {
-		slog.Error("the config has a mistake: nothing is reported", "error", err)
-		return
-	}
+	config, mistake := w.apps.backups.configNow()
 	w.apps.recoverDeploys(ctx)
 	containers := w.apps.containers(ctx)
 	statuses := w.apps.backups.statuses(ctx)
 	w.report(ctx, config, containers, statuses)
-	w.alert(ctx, config, w.problems(config, containers, statuses))
+	problems := w.problems(config, containers, statuses)
+	if mistake != nil {
+		slog.Error("the config has a mistake: the last good one keeps working", "error", mistake)
+		problems["config"] = alert.Message{Server: config.Name, Title: "the config has a mistake", Text: mistake.Error() + ". Nothing changed: the last good config keeps working."}
+	}
+	w.alert(ctx, config, problems)
+	w.save()
 }
 
 // appContainers is what the containers of one app do now.
@@ -224,12 +265,20 @@ func (w *watch) problems(config Config, containers map[string]appContainers, sta
 	}
 	for app, databases := range statuses {
 		for _, status := range databases {
+			switch {
 			// A server without a bucket is no news: the deploy said so.
-			if status.Error != "" && config.Bucket != nil {
+			case status.Error == "" || config.Bucket == nil:
+			// A bucket that is away is one problem, not one for each database.
+			case status.BucketDown:
+				add("bucket", "", "the bucket takes no backups", status.Error)
+			default:
 				add("backup/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the backup of %s fails", app, status.Database), status.Error)
 			}
 			if status.CheckError != "" {
 				add("check/"+app+"/"+status.Database, app, fmt.Sprintf("%s: a backup of %s did not restore", app, status.Database), status.CheckError)
+			}
+			if status.CheckedAt != nil && config.Bucket != nil && time.Since(*status.CheckedAt) > checkLate {
+				add("check-late/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the restore check of %s is late", app, status.Database), "The last one ran "+status.CheckedAt.UTC().Format("Jan 2 15:04 UTC")+". One should run every day.")
 			}
 		}
 	}
@@ -285,7 +334,6 @@ func diskPercent(dir string) int {
 // alert sends what is new among the problems and what is over, once each.
 // A problem no destination took alerts again in the next round.
 func (w *watch) alert(ctx context.Context, config Config, problems map[string]alert.Message) {
-	changed := false
 	for key, message := range problems {
 		if _, open := w.open[key]; open {
 			continue
@@ -293,7 +341,6 @@ func (w *watch) alert(ctx context.Context, config Config, problems map[string]al
 		slog.Warn("alert", "title", message.Title, "text", message.Text)
 		if sendAlert(ctx, config, message) {
 			w.open[key] = message
-			changed = true
 		}
 	}
 	for key, message := range w.open {
@@ -304,12 +351,6 @@ func (w *watch) alert(ctx context.Context, config Config, problems map[string]al
 		slog.Info("alert", "title", message.Title)
 		if sendAlert(ctx, config, message) {
 			delete(w.open, key)
-			changed = true
-		}
-	}
-	if changed {
-		if err := writeState(w.openFile(), w.open); err != nil {
-			slog.Error("write down the open alerts", "error", err)
 		}
 	}
 }

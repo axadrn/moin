@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/catalog"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -395,17 +396,19 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 func (a *apps) startRelease(ctx context.Context, release *release) error {
 	start := release.start
 	previous := a.current(start.App)
-	if previous > 0 {
-		a.copyDataBefore(ctx, release)
+	// A restart brings nothing new: it needs no copy, and compose would
+	// leave the containers as they are, so they are made again.
+	restart := start.SourceURL == "" && start.SourceFile == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
+	if previous > 0 && !restart && !start.NoCopy {
+		if err := a.copyDataBefore(ctx, release); err != nil {
+			return err
+		}
 	}
 	err := a.switchProject(ctx, start.App, nameOf(start), release.logf)
 	if err != nil {
 		return err
 	}
 	release.logf("starting")
-	// A restart brings nothing new, so compose would leave the containers
-	// as they are: recreate them.
-	restart := start.SourceURL == "" && start.SourceFile == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
 	err = a.start(ctx, start.App, release.composeJSON, release.detected, restart, release.logf)
 	if err != nil {
 		return a.startPreviousAgain(ctx, release, previous, err)
@@ -414,13 +417,21 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 }
 
 // copyDataBefore makes a copy of each database just before the new release
-// touches the data.
-func (a *apps) copyDataBefore(ctx context.Context, release *release) {
-	before := a.backups.copyBefore(ctx, release.start.App, "", release.logf)
-	if before == nil {
-		return
+// touches the data. Without that copy there is no deploy: the way back
+// would be missing. --no-copy deploys all the same. A rollback is the way
+// back itself and waits for no bucket: it goes on without the copy.
+func (a *apps) copyDataBefore(ctx context.Context, release *release) error {
+	start := release.start
+	copies, err := a.backups.copyBefore(ctx, start.App)
+	switch {
+	case err != nil && start.FromNumber > 0:
+		release.logf("the copy before this rollback failed: %s. It goes on without it", err)
+	case err != nil:
+		return fmt.Errorf("the copy before this deploy failed: %w. Deploy anyway: %s deploy … --no-copy", err, build.Name)
+	case len(copies) > 0:
+		release.logf("copied the data before v%d: %s", start.Number, strings.Join(copies, ", "))
 	}
-	release.logf("copied the data before v%d: %s", release.start.Number, protocol.BeforeCopyID(*before))
+	return nil
 }
 
 // startPreviousAgain starts the release that ran before, after the new one

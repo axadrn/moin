@@ -13,7 +13,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// Where install.sh puts the daemon.
+// Where moin lives on a server.
 var (
 	unitFile      = "/etc/systemd/system/" + build.Name + "-daemon.service"
 	installedPath = "/usr/local/bin/" + build.Name
@@ -22,7 +22,8 @@ var (
 // Uninstall removes the daemon from this server: its systemd service, its
 // binary and its state in dir. The apps keep running with their data, the
 // proxy, the tunnel and the firewall, unless withApps: then it takes all of
-// them down too, data included. It returns what stays on the server.
+// them down too, data included, and the config with the keys of the
+// bucket and the server's backup key. It returns what stays on the server.
 func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string, ...any)) ([]string, error) {
 	units := map[string]string{build.Name + "-daemon": unitFile}
 	var installed []string
@@ -82,6 +83,16 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 		if err != nil {
 			return nil, err
 		}
+		// The config holds the keys of the bucket. The copies in the bucket
+		// stay, and your own backup key still opens them.
+		logf("removing the config with the keys of the bucket, and the server's backup key, in %s", filepath.Dir(ConfigFile()))
+		for _, file := range []string{ConfigFile(), serverKeyFile()} {
+			if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+		}
+		// The folder goes when nothing else is in it.
+		_ = os.Remove(filepath.Dir(ConfigFile()))
 	} else {
 		entries, _ := os.ReadDir(dir)
 		for _, entry := range entries {
@@ -119,7 +130,7 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 		}
 	}
 	if _, err := os.Stat(ConfigFile()); err == nil {
-		kept = append(kept, "the config in "+ConfigFile())
+		kept = append(kept, "the config in "+ConfigFile()+", which holds the keys of the bucket, and the server's backup key next to it")
 	}
 	if hasDocker {
 		kept = append(kept, "Docker")

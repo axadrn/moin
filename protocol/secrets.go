@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// Secrets live only on the server. The hub forwards a value once, keeps
-// its name and when it changed, and forgets it:
+// Secrets live only on the server, where the CLI puts them over SSH:
 //
 //	<state>/apps/<app>/app.env  the env values of an app, 0600 (EnvSet)
 //	<state>/server.json         the secrets of the server itself, 0600 (SecretSet)
@@ -23,7 +22,7 @@ type EnvSet struct {
 
 // AppEnv names the env keys an app has on the server, from its app.env,
 // and when that file last changed: never a value. The server is the truth
-// for them; the hub shows what it reports.
+// for them; the CLI shows what it says.
 type AppEnv struct {
 	Keys      []string  `json:"keys"`
 	ChangedAt time.Time `json:"changed_at"`
@@ -32,8 +31,6 @@ type AppEnv struct {
 // SecretSet keeps the secret Value under Name in the server's server.json;
 // an empty Value removes it. Names say what a secret is for:
 //
-//	BucketSecret(id)      the secret key of a bucket
-//	RegistrySecret(host)  a registry login, as <username>:<password>
 //	SecretTailscale       the auth key that joins the server to a tailnet
 //	SecretTunnel          the token of the server's Cloudflare Tunnel
 type SecretSet struct {
@@ -47,12 +44,9 @@ const (
 	SecretTunnel    = "tunnel"
 )
 
-// RegistrySecret names the login for the registry host, such as ghcr.io.
-func RegistrySecret(host string) string { return "registry/" + host }
-
-// SecretOf splits a secret's name into its kind, bucket or registry, and
-// what it is for: the bucket's ID or the registry's host. A name without
-// a part, like tailscale, is its own kind.
+// SecretOf splits a secret's name into its kind, like registry, and what
+// it is for, like the registry's host. A name without a part, like
+// tailscale, is its own kind.
 func SecretOf(name string) (kind, of string) {
 	kind, of, _ = strings.Cut(name, "/")
 	return kind, of

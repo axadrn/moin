@@ -39,7 +39,7 @@ func Run(ctx context.Context, dir string) error {
 	// What a command that stopped left behind ends first: a restore's
 	// switch is one step, so the database is whole.
 	a.backups.recover(ctx)
-	a.backups.sweepTemp()
+	a.removeOldTemp()
 	a.recoverDeploys(ctx)
 	go a.backups.loop(ctx)
 	go a.cleanups(ctx)

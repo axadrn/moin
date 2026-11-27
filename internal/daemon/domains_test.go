@@ -8,7 +8,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// TestRouteServices: domains per service come from the hub; an entry for
+// TestRouteServices: domains per service come from the settings; an entry for
 // the main service is not another service; a domain on two services fails.
 func TestRouteServices(t *testing.T) {
 	domains := &protocol.Domains{Domains: []string{"shop.example.net"}, Services: map[string][]string{"web": {"x.example.net"}, "api": {"API.shop.example.net"}, "admin": {}}}
@@ -22,13 +22,13 @@ func TestRouteServices(t *testing.T) {
 	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"x.example.com"}, Services: map[string][]string{"api": {"x.example.com"}}}); err == nil {
 		t.Error("a domain on two services passed")
 	}
-	// The hub's settings are not changed by route.
+	// The settings are not changed by route.
 	if domains.Services["api"][0] != "API.shop.example.net" {
 		t.Errorf("route changed the domains it was given: %v", domains.Services)
 	}
 }
 
-// TestRouteInstant: the hub's provider names the instant address; off, an
+// TestRouteInstant: the settings' provider names the instant address; off, an
 // unknown provider or no public IPv4 give none.
 func TestRouteInstant(t *testing.T) {
 	for _, test := range []struct{ provider, ip, want string }{

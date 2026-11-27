@@ -30,7 +30,7 @@ func (a *apps) projectOf(app string) string {
 }
 
 // nameOf is the name a deploy gives the app's project: its name now, or
-// its folder from a hub that sends none.
+// its folder for a deploy that names none.
 func nameOf(start protocol.DeployStart) string {
 	if protocol.ValidAppName(start.Name) {
 		return start.Name

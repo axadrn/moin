@@ -22,8 +22,8 @@ const proxyImage = "traefik:v3.6"
 
 var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 
-// route settles the domains of a deploy from the hub's settings, the only
-// place they are set. Domains are the main service's; ServiceDomains those
+// route settles the domains of a deploy from the app's settings on the
+// server, the only place they are set. Domains are the main service's; ServiceDomains those
 // of the others; Instant its instant address.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {

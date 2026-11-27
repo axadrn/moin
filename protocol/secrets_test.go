@@ -24,8 +24,8 @@ func TestNoSecretInDeploysAndConfigs(t *testing.T) {
 
 func TestSecretNames(t *testing.T) {
 	for name, want := range map[string][2]string{
-		RegistrySecret("ghcr.io"): {"registry", "ghcr.io"},
-		SecretTailscale:           {"tailscale", ""},
+		"registry/ghcr.io": {"registry", "ghcr.io"},
+		SecretTailscale:    {"tailscale", ""},
 	} {
 		if kind, of := SecretOf(name); kind != want[0] || of != want[1] {
 			t.Errorf("SecretOf(%q) = %q, %q", name, kind, of)

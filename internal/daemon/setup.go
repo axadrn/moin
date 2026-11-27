@@ -62,7 +62,7 @@ func nameServer(name string) error {
 		return err
 	}
 	if !serverName.MatchString(name) {
-		return fmt.Errorf("%q cannot name a server: letters, digits, dots and dashes", name)
+		return fmt.Errorf("%q cannot name a server: letters, digits, dots, dashes and underscores", name)
 	}
 	config.Name = name
 	return SaveConfig(config)

@@ -79,9 +79,8 @@ func (a *apps) runExec(ctx context.Context, start protocol.ExecStart, output fun
 	return done, nil
 }
 
-// maskedCommand is argv as one line for the activity, with the app's env
-// values masked, such as a password typed into the command. The hub never
-// sees the values, so it cannot mask them. Short values would mask
+// maskedCommand is argv as one line for the log, with the app's env
+// values masked, such as a password typed into the command. Short values would mask
 // ordinary words, so only values of six characters or more count. When the
 // env file cannot be read, only the program is left.
 func (a *apps) maskedCommand(app string, argv []string) string {

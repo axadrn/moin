@@ -13,11 +13,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"filippo.io/age"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/axadrn/moin/protocol"
@@ -38,6 +38,8 @@ type backupTest struct {
 	app      string
 	bucket   *Bucket
 	database protocol.Database
+	// yours is your backup key: every copy is encrypted for it too.
+	yours *age.X25519Identity
 }
 
 func newBackupTest(t *testing.T, app string, compose map[string]any, database protocol.Database) *backupTest {
@@ -49,6 +51,8 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	t.Cleanup(cancel)
 	test := &backupTest{t: t, ctx: ctx, app: app, database: database}
+	// The server's backup key lives next to the config.
+	t.Setenv("MOIN_CONFIG", filepath.Join(t.TempDir(), "config.yml"))
 	test.a = newApps(t.TempDir())
 	test.b = test.a.backups
 	release := test.a.releaseDir(app, 1)
@@ -66,7 +70,9 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	// A folder of its own in the bucket for every run.
 	test.bucket = &Bucket{Endpoint: endpoint, Region: "us-east-1", Bucket: "moin-test", Path: fmt.Sprintf("run-%d", time.Now().UnixNano()), AccessKey: "x", SecretKey: "y"}
 	_, _ = s3Client(test.bucket).CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String("moin-test")})
-	test.b.configure(Config{Name: "prod", Bucket: test.bucket, Backups: Backups{Apps: map[string]Schedule{app: {Every: "15m", Keep: "1d"}}}})
+	yours, _ := age.GenerateX25519Identity()
+	test.yours = yours
+	test.b.configure(Config{Name: "prod", Bucket: test.bucket, BackupKey: &BackupKey{Public: yours.Recipient().String()}, Backups: Backups{Apps: map[string]Schedule{app: {Every: "15m", Keep: "1d"}}}})
 	t.Cleanup(func() { test.b.configure(Config{}) })
 	return test
 }
@@ -92,23 +98,27 @@ func (test *backupTest) copies() []protocol.Copy {
 }
 
 // restore runs a restore and returns how it ended.
-func (test *backupTest) restore(request protocol.BackupRestore) protocol.RestoreState {
+func (test *backupTest) restore(request protocol.BackupRestore) restoreMark {
 	test.t.Helper()
 	request.ID, request.App, request.Database = fmt.Sprintf("r%d", time.Now().UnixNano()), test.app, test.database.Path
-	_ = test.b.restore(test.ctx, request)
-	return test.stateOf(request.ID)
+	undo, _ := test.b.restore(test.ctx, request, io.Discard)
+	mark := test.stateOf(request.ID)
+	if mark.Undo != undo {
+		test.t.Fatalf("the restore named the undo %q, its mark %q", undo, mark.Undo)
+	}
+	return mark
 }
 
 // stateOf is how the restore id ended.
-func (test *backupTest) stateOf(id string) protocol.RestoreState {
+func (test *backupTest) stateOf(id string) restoreMark {
 	test.t.Helper()
-	for _, state := range test.b.restoreStates(test.app) {
-		if state.ID == id {
-			return state
+	for _, mark := range test.b.marks() {
+		if mark.ID == id {
+			return mark
 		}
 	}
 	test.t.Fatalf("no state of the restore %s", id)
-	return protocol.RestoreState{}
+	return restoreMark{}
 }
 
 // running says every service of the app runs.
@@ -117,15 +127,21 @@ func (test *backupTest) running() bool {
 	return len(strings.Fields(string(out))) > 0 && !strings.Contains(string(out), "exited")
 }
 
-// putBroken puts a copy that is not a database in the bucket, newest.
+// putBroken puts a copy that is not a database in the bucket, newest,
+// encrypted as every copy is.
 func (test *backupTest) putBroken() {
 	test.t.Helper()
 	_, folder, _ := test.b.where(test.app, test.database)
-	key := folder + "/" + protocol.CopyFile(protocol.NewCopyID(time.Now().Add(time.Minute)), test.database.Postgres())
+	key := folder + "/" + protocol.CopyFile(protocol.NewCopyID(time.Now().Add(time.Minute)), test.database.Postgres(), false)
 	var body bytes.Buffer
-	zipped := gzip.NewWriter(&body)
+	encrypted, err := test.b.encrypt(&body)
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	zipped := gzip.NewWriter(encrypted)
 	zipped.Write([]byte("this is not a database at all, but it is long enough to look like one"))
 	zipped.Close()
+	encrypted.Close()
 	if _, err := s3Client(test.bucket).PutObject(test.ctx, &s3.PutObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(key), Body: bytes.NewReader(body.Bytes())}); err != nil {
 		test.t.Fatal(err)
 	}
@@ -136,12 +152,14 @@ func (test *backupTest) putBroken() {
 func (test *backupTest) check() string {
 	test.t.Helper()
 	before := time.Now().Add(-time.Second)
-	test.b.checkAll(test.ctx)
+	test.b.check(test.ctx, test.app, test.database)
+	test.b.saveStates()
 	fresh := newBackups(test.a)
 	status := fresh.status(test.ctx, test.app, test.database, false)
 	if status.CheckedAt == nil || status.CheckedAt.Before(before) {
 		test.t.Fatalf("the check was not written down: %+v", status)
 	}
+	fresh.load = test.b.load
 	if status.CheckError == "" && status.CheckedCopy != test.copies()[0].ID {
 		test.t.Fatalf("the check proved %q, not the newest copy", status.CheckedCopy)
 	}
@@ -188,9 +206,16 @@ func TestBackupSQLite(t *testing.T) {
 	// next one only when its time came.
 	write(`INSERT INTO notes (body) VALUES ('a'), ('b')`)
 	test.b.tick(test.ctx)
-	if copies := test.copies(); len(copies) != 1 {
+	if copies := test.copies(); len(copies) != 1 || copies[0].Plain {
 		t.Fatalf("the first copy: %+v", copies)
 	}
+	// The same tick proved it: a new database waits no day for its check.
+	if status := test.b.status(test.ctx, app, test.database, false); status.CheckedCopy != test.copies()[0].ID || status.CheckError != "" {
+		t.Fatalf("the first check: %+v", status)
+	}
+	// In the bucket it is an age file, which only a key opens: the
+	// server's, and yours without the server.
+	test.encryptedForBoth(test.copies()[0])
 	test.b.tick(test.ctx)
 	if copies := test.copies(); len(copies) != 1 {
 		t.Fatalf("a copy before its time: %+v", copies)
@@ -202,11 +227,14 @@ func TestBackupSQLite(t *testing.T) {
 	write(`INSERT INTO notes (body) VALUES ('c')`)
 	second := test.copyNow()
 
-	// Retention: a copy older than the app keeps goes, but never the
-	// newest one.
+	// Retention: a copy older than the app keeps goes, a plain one from
+	// before copies were encrypted too, but never the newest ones.
 	_, folder, _ := test.b.where(app, test.database)
 	old := time.Now().Add(-3 * day).UTC().Format(protocol.CopyIDLayout)
-	s3Client(test.bucket).PutObject(test.ctx, &s3.PutObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(folder + "/" + protocol.CopyFile(old, false)), Body: strings.NewReader("old")})
+	s3Client(test.bucket).PutObject(test.ctx, &s3.PutObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(folder + "/" + protocol.CopyFile(old, false, true)), Body: strings.NewReader("old")})
+	if listed := test.copies(); listed[len(listed)-1].ID != old || !listed[len(listed)-1].Plain {
+		t.Fatalf("a plain copy from before is not listed: %+v", listed)
+	}
 	write(`INSERT INTO notes (body) VALUES ('d')`)
 	third := test.copyNow()
 	for _, copy := range test.copies() {
@@ -262,12 +290,21 @@ func TestBackupSQLite(t *testing.T) {
 	if err1 != nil || err2 != nil || one == two {
 		t.Fatalf("two copies in one second: %s %s %v %v", one, two, err1, err2)
 	}
-	// No edit while a restore works on the app.
+	// No copy while a restore works on the app.
 	unlockRestore, _ := tryFileLock(test.b.restoreLock(app))
-	if _, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app}, SQL: `DELETE FROM notes`, Write: true}); err == nil || !strings.Contains(err.Error(), "a restore of") {
-		t.Fatalf("an edit during a restore: %v", err)
+	if _, err := test.b.copyNow(test.ctx, app, test.database); err == nil || !strings.Contains(err.Error(), "a restore of") {
+		t.Fatalf("a copy during a restore: %v", err)
 	}
 	unlockRestore()
+	// A copy or an undo that is not there is refused before anything is
+	// written down.
+	marks := len(test.b.marks())
+	for _, request := range []protocol.BackupRestore{{Copy: "20200101T000000Z-123456"}, {Undo: "20200101T000000Z-123456"}} {
+		request.ID, request.App = "nothing", app
+		if _, err := test.b.restore(test.ctx, request, io.Discard); err == nil || !strings.Contains(err.Error(), "has no") || len(test.b.marks()) != marks {
+			t.Fatalf("a restore to what is not there: %v", err)
+		}
+	}
 	if state := test.restore(protocol.BackupRestore{Copy: third.ID}); state.State != protocol.RestoreDone || rows() != "a,b,c,d" {
 		t.Fatalf("back to the third copy: %+v", state)
 	}
@@ -282,10 +319,7 @@ func TestBackupSQLite(t *testing.T) {
 	}
 
 	// Download: the copy in the bucket opens with the SQLite driver.
-	from, body, err := test.b.readCopy(test.ctx, app, test.database, third.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	from := mustCopy(t, test, third.ID)
 	if from.size == 0 {
 		t.Fatal("the copy carries no note of its size")
 	}
@@ -297,19 +331,16 @@ func TestBackupSQLite(t *testing.T) {
 	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		t.Fatal(err)
 	}
-	body.Close()
 	opened, _ := sql.Open("sqlite", "file:"+downloaded+"?mode=ro")
 	defer opened.Close()
 	var n int
 	if err := opened.QueryRow(`SELECT count(*) FROM notes`).Scan(&n); err != nil || n != 4 {
 		t.Fatalf("the download: %d rows, %v", n, err)
 	}
-	// An edit through moin takes a copy just before it: "Before your
-	// edit" is that copy.
-	time.Sleep(1100 * time.Millisecond)
-	result, err := test.a.query(test.ctx, protocol.DBQuery{DBRequest: protocol.DBRequest{App: app, Database: "/data/app.db"}, SQL: `INSERT INTO notes (body) VALUES ('g')`, Write: true})
-	if err != nil || result.Before == nil || !slices.ContainsFunc(test.copies(), func(copy protocol.Copy) bool { return copy.At.Equal(*result.Before) }) {
-		t.Fatalf("the copy before an edit: %+v %v", result.Before, err)
+	// A deploy takes a copy just before it, and names it.
+	count := len(test.copies())
+	if ids, err := test.b.copyBefore(test.ctx, app); err != nil || len(ids) != 1 || len(test.copies()) != count+1 {
+		t.Fatalf("the copy before a deploy: %v %v", ids, err)
 	}
 	// A copy from the future, after the clock jumped, does not stop the
 	// copies: the newest real one counts (the broken copy above is a
@@ -424,16 +455,12 @@ func testBackupPostgres(t *testing.T, image string) {
 	}
 
 	// Download: the copy in the bucket lists with pg_restore.
-	from, body, err := test.b.readCopy(test.ctx, app, database, second.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	from := mustCopy(t, test, second.ID)
 	if from.size == 0 {
 		t.Fatal("the copy carries no note of its size")
 	}
 	var list bytes.Buffer
-	err = target.exec(test.ctx, from.copy, &list, "pg_restore", "--list")
-	body.Close()
+	err := target.exec(test.ctx, from.copy, &list, "pg_restore", "--list")
 	if err != nil || !strings.Contains(list.String(), "TABLE public notes") {
 		t.Fatalf("pg_restore --list: %v %s", err, list.String())
 	}
@@ -463,11 +490,13 @@ func testBackupPostgres(t *testing.T, image string) {
 	shop := test.database
 	test.database = protocol.Database{Path: "postgres-db/analytics", Kind: protocol.DatabasePostgres, Service: "db", Name: "analytics"}
 	defer func() { test.database = shop }()
+	// The next look at the databases finds the new one.
+	test.b.foundAt = time.Time{}
 	test.b.tick(test.ctx)
 	if copies := test.copies(); len(copies) != 1 {
 		t.Fatalf("the first copy of analytics: %+v", copies)
 	}
-	if listed, err := BackupsHere(test.ctx, filepath.Dir(test.a.dir), app); err != nil || len(listed) != 3 || listed[1].Database != "postgres-db/analytics" {
+	if listed, err := test.listed(); err != nil || len(listed) != 3 || listed[1].Database != "postgres-db/analytics" {
 		t.Fatalf("the list: %+v %v", listed, err)
 	}
 	firstVisit := test.copies()[0]
@@ -493,15 +522,68 @@ func testBackupPostgres(t *testing.T, image string) {
 	}
 }
 
-// mustCopy opens a copy of the test's database in the bucket.
+// mustCopy opens a copy of the test's database in the bucket, decrypted
+// with the server's key.
 func mustCopy(t *testing.T, test *backupTest, id string) source {
 	t.Helper()
-	from, body, err := test.b.readCopy(test.ctx, test.app, test.database, id)
+	copy := protocol.Copy{ID: id}
+	body, size, err := test.b.readCopy(test.ctx, test.app, test.database, copy)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { body.Close() })
-	return from
+	plain, err := test.b.decrypt(copy, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return source{copy: plain, size: size}
+}
+
+// listed is what `moin backups` shows of the app, as the test's config
+// has it.
+func (test *backupTest) listed() ([]protocol.DatabaseBackup, error) {
+	statuses := []protocol.DatabaseBackup{}
+	for _, database := range test.b.databases(test.ctx, test.app) {
+		statuses = append(statuses, test.b.status(test.ctx, test.app, database, true))
+	}
+	return statuses, nil
+}
+
+// encryptedForBoth checks a copy as it lies in the bucket: not readable
+// as it is, and opened by the server's key and by yours, each alone, and
+// by no other key.
+func (test *backupTest) encryptedForBoth(copy protocol.Copy) {
+	test.t.Helper()
+	read := func() []byte {
+		body, _, err := test.b.readCopy(test.ctx, test.app, test.database, copy)
+		if err != nil {
+			test.t.Fatal(err)
+		}
+		defer body.Close()
+		all, _ := io.ReadAll(body)
+		return all
+	}
+	raw := read()
+	if !bytes.HasPrefix(raw, []byte("age-encryption.org/v1")) || bytes.Contains(raw, []byte("SQLite format 3")) || bytes.Contains(raw, []byte("PGDMP")) {
+		test.t.Fatalf("the copy in the bucket is not an age file: %q", raw[:min(len(raw), 40)])
+	}
+	server, err := serverKey()
+	if err != nil {
+		test.t.Fatal(err)
+	}
+	stranger, _ := age.GenerateX25519Identity()
+	for name, key := range map[string]age.Identity{"the server's key": server, "your key": test.yours} {
+		plain, err := DecryptCopy(bytes.NewReader(raw), key)
+		if err != nil {
+			test.t.Fatalf("%s does not open the copy: %v", name, err)
+		}
+		if n, err := io.Copy(io.Discard, plain); err != nil || n == 0 {
+			test.t.Fatalf("%s reads %d bytes of the copy: %v", name, n, err)
+		}
+	}
+	if _, err := DecryptCopy(bytes.NewReader(raw), stranger); !errors.Is(err, errWrongKey) {
+		test.t.Fatalf("a stranger's key: %v", err)
+	}
 }
 
 // killed writes down a restore as running and hands back a mark for a
@@ -517,7 +599,7 @@ func (test *backupTest) killed() restoreMark {
 
 // killedDuringSQLiteRestore leaves what a daemon stopped just before or
 // just after the switch leaves, and starts the daemon again.
-func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) protocol.RestoreState {
+func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) restoreMark {
 	test.t.Helper()
 	live, built := test.database.HostPath, test.database.HostPath+".moin-restore"
 	from := mustCopy(test.t, test, copy)
@@ -554,7 +636,7 @@ func (test *backupTest) killedDuringSQLiteRestore(copy string, switched bool) pr
 
 // killedDuringPostgresRestore leaves what a daemon stopped just before
 // or just after the switch leaves, and starts the daemon again.
-func (test *backupTest) killedDuringPostgresRestore(copy string, switched bool) protocol.RestoreState {
+func (test *backupTest) killedDuringPostgresRestore(copy string, switched bool) restoreMark {
 	test.t.Helper()
 	target, err := test.b.apps.postgres(test.ctx, test.app, test.database)
 	if err != nil {

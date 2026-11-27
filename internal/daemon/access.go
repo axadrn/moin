@@ -12,10 +12,10 @@ import (
 
 // An app runs in its own room on the server: its containers, its data
 // folders, its named volumes and its networks. A compose file may only use
-// the settings below, so whoever controls the hub cannot deploy a container
-// that reaches into the server. Anything not listed is refused, also a
-// setting Docker adds later, unless the server's rules have
-// server-access: on, which only root on the server can write.
+// the settings below, so whoever can push to a repo the server follows
+// cannot deploy a container that reaches into the server. Anything not
+// listed is refused, also a setting Docker adds later, unless the server's
+// config has server_access: true, which only root on the server can write.
 
 // serviceKeys are the settings a service may use. Those marked "checked"
 // have their value checked in checkService.
@@ -138,7 +138,7 @@ type appRoom struct {
 const beyondTheApp = "this reaches beyond the app, so the server refuses it"
 
 // checkCompose refuses a release whose compose file reaches beyond its
-// app, unless the server's rules allow it with server-access: on. It reads
+// app, unless the server's config allows it with server_access: true. It reads
 // the compose file as it will run, after moin filled it in, so it holds for
 // every deploy: new source, an image, new env or a rollback. Its places,
 // the settings that say where a service runs, are filled in already

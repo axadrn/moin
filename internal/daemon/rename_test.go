@@ -97,7 +97,7 @@ func TestProjectOf(t *testing.T) {
 		t.Fatalf("name = %s", got)
 	}
 	if got := nameOf(protocol.DeployStart{App: "blog"}); got != "blog" {
-		t.Fatalf("name from an older hub = %s", got)
+		t.Fatalf("name of a deploy that names none = %s", got)
 	}
 	// A project another app runs as is refused.
 	if err := os.MkdirAll(a.appDir("notes"), 0o700); err != nil {

@@ -13,10 +13,18 @@ type Status struct {
 	Version  string      `json:"version"`
 	Apps     []AppStatus `json:"apps"`
 	Watchers []string    `json:"watchers"`
+	// Needs is what on this server needs you now.
+	Needs []Need `json:"needs,omitempty"`
 	// PublicSSH: port 22 is open to the internet.
 	PublicSSH bool `json:"public_ssh"`
 	// KnocksToday is how many connections the firewall dropped today.
 	KnocksToday int64 `json:"knocks_today"`
+}
+
+// Need is one thing that needs you, and the command that settles it.
+type Need struct {
+	Text    string `json:"text"`
+	Command string `json:"command"`
 }
 
 // AppStatus is one app: its live release, whether its containers run, and
@@ -37,6 +45,9 @@ func StatusHere(ctx context.Context, dir string) Status {
 	}
 	status.PublicSSH = PublicSSHHere(ctx, dir)
 	status.KnocksToday = knocksToday(dir)
+	if config, err := LoadConfig(); err == nil {
+		status.Needs = backupKeyNeeds(config)
+	}
 	for _, app := range a.names() {
 		release := a.current(app)
 		if release == 0 {
@@ -51,6 +62,21 @@ func StatusHere(ctx context.Context, dir string) Status {
 		})
 	}
 	return status
+}
+
+// backupKeyNeeds says what your backup key needs: a server with a bucket
+// whose copies only the server itself could open is one fire away from
+// copies nobody can read.
+func backupKeyNeeds(config Config) []Need {
+	switch {
+	case config.Bucket == nil:
+		return nil
+	case config.BackupKey == nil:
+		return []Need{{Text: config.Name + ": no backup key of yours. When the server is gone, nobody can read its copies.", Command: build.Name + " bucket key " + config.Name}}
+	case !config.BackupKey.Confirmed:
+		return []Need{{Text: config.Name + ": your backup key is not confirmed. Without it nobody can read the copies when the server is gone.", Command: build.Name + " bucket confirm " + config.Name}}
+	}
+	return nil
 }
 
 // running reports whether at least one container of the app runs.

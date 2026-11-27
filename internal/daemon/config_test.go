@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/internal/alert"
+	"github.com/axadrn/moin/protocol"
 )
 
 // useConfig points the config file at a temp file with body.
@@ -97,6 +99,90 @@ func TestConfigMistakes(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: err = %v, want %q", body, err, want)
 		}
+	}
+}
+
+// A typo in the config stops nothing: the last good config keeps working,
+// and the mistake is known.
+func TestAMistakeKeepsTheLastGoodConfig(t *testing.T) {
+	good := "name: prod\nbucket:\n  bucket: b\n  access_key: k\n  secret_key: s\nbackups:\n  keep: 30d\n"
+	file := useConfig(t, good)
+	b := newBackups(newApps(t.TempDir()))
+	if !b.on() {
+		t.Fatal("no bucket")
+	}
+	os.WriteFile(file, []byte(strings.Replace(good, "keep:", "kep:", 1)), 0o600)
+	config, mistake := b.configNow()
+	if mistake == nil || !strings.Contains(mistake.Error(), "kep") {
+		t.Fatalf("the mistake: %v", mistake)
+	}
+	if _, keep := config.schedule("shop"); config.Bucket == nil || keep != 30*day || !b.on() {
+		t.Fatalf("the last good config is gone: %+v", config)
+	}
+	if _, _, err := b.where("shop", protocol.Database{Path: "/data/app.db"}); err != nil {
+		t.Fatalf("copies stop: %v", err)
+	}
+	os.WriteFile(file, []byte(good), 0o600)
+	if _, mistake := b.configNow(); mistake != nil {
+		t.Fatalf("after the fix: %v", mistake)
+	}
+	// A command that never read a good config says the mistake, not "no bucket".
+	os.WriteFile(file, []byte("bucket: [\n"), 0o600)
+	fresh := newBackups(newApps(t.TempDir()))
+	if _, _, err := fresh.where("shop", protocol.Database{Path: "/data/app.db"}); err == nil || errors.Is(err, errNoBucket) {
+		t.Fatalf("a config that never read: %v", err)
+	}
+}
+
+// A schedule that copies too often or keeps too short is a mistake, not
+// silently another schedule.
+func TestScheduleLimits(t *testing.T) {
+	for body, want := range map[string]string{
+		"backups:\n  every: 1m\n":                        "every 1m is too often",
+		"backups:\n  keep: 12h\n":                        "keep 12h is too short, the least is 1d",
+		"backups:\n  apps:\n    shop:\n      keep: 5m\n": "backups of shop: keep 5m is too short",
+	} {
+		useConfig(t, body)
+		if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v", body, err)
+		}
+	}
+	useConfig(t, "backups:\n  every: 5m\n  keep: 1d\n")
+	if _, err := LoadConfig(); err != nil {
+		t.Errorf("the least of both: %v", err)
+	}
+}
+
+// What a command changes in the config leaves your comments where they
+// are, and never writes the hostname down as the server's name.
+func TestSaveConfigKeepsCommentsAndNoHostname(t *testing.T) {
+	file := useConfig(t, `# The config of our server.
+
+# Where the backups go.
+bucket:
+  bucket: b # ours
+  access_key: k
+  secret_key: s
+backups:
+  # The shop changes all day.
+  apps:
+    shop:
+      every: 15m # often
+`)
+	if err := ConnectWatcherHere(Watcher{URL: "https://watcher.example.com", Token: "t"}); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(file)
+	for _, kept := range []string{"# The config of our server.", "# Where the backups go.", "bucket: b # ours", "# The shop changes all day.", "every: 15m # often", "url: https://watcher.example.com"} {
+		if !strings.Contains(string(body), kept) {
+			t.Errorf("%q is gone:\n%s", kept, body)
+		}
+	}
+	if strings.Contains(string(body), "name:") {
+		t.Errorf("the hostname was written down as the name:\n%s", body)
+	}
+	if config, err := LoadConfig(); err != nil || config.Name == "" || config.Backups.Apps["shop"].Every != "15m" {
+		t.Fatalf("read back: %+v %v", config, err)
 	}
 }
 

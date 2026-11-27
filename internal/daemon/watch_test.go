@@ -75,6 +75,7 @@ func TestAlertOnceAndWhenOver(t *testing.T) {
 	hook.fail = false
 	w.alert(context.Background(), config, problem)
 	w.alert(context.Background(), config, problem)
+	w.save()
 	if got := hook.titles(); got != "the disk is 95% full" {
 		t.Fatalf("alerts = %q", got)
 	}
@@ -115,6 +116,55 @@ func TestProblems(t *testing.T) {
 	problems = w.problems(Config{Name: "prod"}, nil, map[string][]protocol.DatabaseBackup{"shop": {{Database: "/data/app.db", Error: errNoBucket.Error()}}})
 	if _, ok := problems["backup/shop//data/app.db"]; ok {
 		t.Error("a server without a bucket alerts")
+	}
+}
+
+// A bucket that is away is one problem for the server, however many
+// databases it has, and a check nobody ran for two days is one too.
+func TestBucketAndLateCheckProblems(t *testing.T) {
+	w := newWatch(newApps(t.TempDir()))
+	config := Config{Name: "prod", Bucket: &Bucket{Bucket: "b"}}
+	longAgo, today := time.Now().Add(-3*day), time.Now().Add(-time.Hour)
+	statuses := map[string][]protocol.DatabaseBackup{
+		"shop": {{Database: "/data/app.db", Error: "copy /data/app.db: the bucket: connection refused", BucketDown: true}, {Database: "postgres-db", Error: "copy postgres-db: the bucket: connection refused", BucketDown: true, CheckedAt: &longAgo}},
+		"blog": {{Database: "/data/blog.db", Error: "copy /data/blog.db: the bucket: connection refused", BucketDown: true, CheckedAt: &today}},
+	}
+	problems := w.problems(config, nil, statuses)
+	if len(problems) != 2 || problems["bucket"].Title != "the bucket takes no backups" || !strings.Contains(problems["bucket"].Text, "connection refused") {
+		t.Fatalf("problems = %v", problems)
+	}
+	if late := problems["check-late/shop/postgres-db"]; !strings.Contains(late.Title, "the restore check of postgres-db is late") {
+		t.Fatalf("problems = %v", problems)
+	}
+}
+
+// What the watch counts is written down: a daemon that starts again
+// still knows the app that keeps crashing and the watchers it misses, and
+// calls neither over.
+func TestWatchCountsOutliveARestart(t *testing.T) {
+	dir := t.TempDir()
+	w := newWatch(newApps(dir))
+	for _, restarts := range []int{0, 1, 2, 3} {
+		w.crashing("shop", restarts)
+	}
+	w.missed = watcherMisses
+	w.open["crash/shop"] = alert.Message{Title: "shop keeps crashing"}
+	w.save()
+	again := newWatch(newApps(dir))
+	problems := again.problems(Config{Name: "prod"}, map[string]appContainers{"shop": {running: true, restarts: 4}}, nil)
+	if _, ok := problems["crash/shop"]; !ok {
+		t.Errorf("the crashing app is over after a restart: %v", problems)
+	}
+	if _, ok := problems["watchers"]; !ok {
+		t.Errorf("the missed watchers are over after a restart: %v", problems)
+	}
+	// Nothing changed, nothing is written.
+	saved := again.saved
+	again.save()
+	info, _ := os.Stat(again.stateFile())
+	again.save()
+	if after, _ := os.Stat(again.stateFile()); saved != nil || !after.ModTime().Equal(info.ModTime()) {
+		t.Error("the state is written again without a change")
 	}
 }
 

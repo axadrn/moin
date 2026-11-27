@@ -20,7 +20,7 @@ func TestInstantHost(t *testing.T) {
 	}
 }
 
-// TestWantSSH: a config from a hub before SSH still says who SSH answers.
+// TestWantSSH: a config from before SSH still says who SSH answers.
 func TestWantSSH(t *testing.T) {
 	for _, test := range []struct {
 		config ServerConfig

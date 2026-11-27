@@ -4,7 +4,6 @@ import (
 	"net/netip"
 	"slices"
 	"strings"
-	"time"
 )
 
 // DeployStart is one deploy. Number counts per app. A rollback carries
@@ -21,19 +20,15 @@ type DeployStart struct {
 	// App names the app on the server in every message: its folder, the
 	// name it was created with, which a rename never changes. Name is its
 	// name now, which its Compose project and containers carry, such as
-	// my-app-web-1; a hub from before renames sends none, and the daemon
-	// takes App.
+	// my-app-web-1; without one the daemon takes App.
 	App  string `json:"app"`
 	Name string `json:"name,omitempty"`
-	// AppID is the app's ID in the hub. Its backups live under
-	// it, so an app removed and created again with the same name starts
-	// with an empty backup folder.
+	// AppID is an ID of the app that outlives its name, when it has one.
 	AppID  string `json:"app_id,omitempty"`
 	Number int    `json:"number"`
 	// SourceURL is a GitHub tarball of one commit; the daemon downloads
 	// nothing else. SourceAuthorization is sent with the download, a GitHub
 	// token; SourceStripTop drops the one folder GitHub wraps a repo in.
-	// The hub never holds the source itself.
 	SourceURL           string `json:"source_url,omitempty"`
 	SourceAuthorization string `json:"source_authorization,omitempty"`
 	SourceStripTop      bool   `json:"source_strip_top,omitempty"`
@@ -44,12 +39,14 @@ type DeployStart struct {
 	// for a redeploy; nothing is downloaded.
 	SourceNumber int `json:"source_number,omitempty"`
 	// Catalog deploys the catalog app of this name, such as umami: the
-	// daemon takes its compose file from the catalog built into it, never
-	// from the hub. Daemons before v1.0.0-beta.35 do not know it.
+	// daemon takes its compose file from the catalog built into it.
 	Catalog    string   `json:"catalog,omitempty"`
 	FromNumber int      `json:"from_number,omitempty"`
 	Image      string   `json:"image,omitempty"`
 	Domains    *Domains `json:"routing,omitempty"`
+	// NoCopy deploys without the copy of the databases just before the new
+	// release starts: the way on when that copy fails.
+	NoCopy bool `json:"no_copy,omitempty"`
 }
 
 // Domains is how visitors reach the app, as set in web, CLI, TUI or MCP:
@@ -107,10 +104,6 @@ type DeployDone struct {
 	OK       bool     `json:"ok"`
 	Error    string   `json:"error,omitempty"`
 	Detected Detected `json:"detected"`
-	// Before is when the daemon took the copies just before the new
-	// release started over an older one, the time in their IDs: the hub
-	// names them "Before v12".
-	Before *time.Time `json:"before,omitempty"`
 	// Env names the env keys the app has after the deploy, which may have
 	// made the secrets of a catalog app: never a value.
 	Env *AppEnv `json:"env,omitempty"`

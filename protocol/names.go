@@ -29,11 +29,6 @@ func NewCopyID(at time.Time) string {
 	return at.UTC().Format(CopyIDLayout) + "-" + fmt.Sprintf("%06d", 1+rand.IntN(999999))
 }
 
-// BeforeCopyID is the ID of the copies taken at at just before a deploy
-// or an edit, the hub finds them by: the digits 000000, which no other
-// copy has.
-func BeforeCopyID(at time.Time) string { return at.UTC().Format(CopyIDLayout) + "-000000" }
-
 // CopyTime is the time in a copy's ID.
 func CopyTime(id string) (time.Time, bool) {
 	if !copyID.MatchString(id) {

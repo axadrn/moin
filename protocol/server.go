@@ -23,8 +23,7 @@ func ValidSSH(ssh string) bool {
 // user's tailnet when SSH is SSHTailscale. SSH says who SSH answers: SSHTailscale only through Tailscale, SSHEveryone, or SSHOff
 // with sshd stopped. Firewall drops every other inbound connection.
 //
-// SSHOnTailscale is SSH == SSHTailscale for daemons before SSH: the hub sends
-// both, and a daemon without SSH reads SSHOnTailscale.
+// SSHOnTailscale is SSH == SSHTailscale, from before SSH.
 type ServerConfig struct {
 	SSH            string `json:"ssh,omitempty"`
 	SSHOnTailscale bool   `json:"ssh_on_tailscale,omitempty"`

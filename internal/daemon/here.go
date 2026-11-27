@@ -33,6 +33,8 @@ type Deploy struct {
 	Source  io.Reader
 	Image   string
 	Catalog string
+	// NoCopy deploys without the copy of the databases just before it.
+	NoCopy bool
 }
 
 // Result is what a deploy ends with: the release that runs and its
@@ -62,6 +64,7 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 	}
 	a := hereApps(dir)
 	start := a.newStart(d.App)
+	start.NoCopy = d.NoCopy
 	switch {
 	case d.Catalog != "":
 		if _, ok := catalog.Compose(d.Catalog); !ok {
