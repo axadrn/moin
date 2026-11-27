@@ -33,9 +33,10 @@ const (
 	Keep = 14 * 24 * time.Hour
 	// Grace is how long the copies stay after a subscription ended.
 	Grace = 30 * 24 * time.Hour
-	// every is how often one database may send a copy: one an hour,
-	// with a few minutes to spare for a clock that runs a bit fast.
-	every = 55 * time.Minute
+	// every is how far apart the copies of one database are made, by the
+	// time the server took them: one an hour, with ten minutes to spare
+	// for a dump or a check that took long.
+	every = 50 * time.Minute
 	// perHour is how many copies a whole workspace may send in an hour.
 	perHour = 100
 )
@@ -44,7 +45,7 @@ var (
 	ErrUnknownToken = errors.New("unknown token")
 	ErrNotPaid      = errors.New("copies come with a paid plan of " + build.Name + " cloud")
 	ErrFull         = fmt.Errorf("the storage for copies is full, %d GB: old copies go after 14 days, then new ones fit", Storage>>30)
-	ErrTooOften     = errors.New("a copy came a moment ago: one an hour per database")
+	ErrTooOften     = errors.New("another copy of this database was made within 50 minutes: one an hour per database")
 	ErrNotUploaded  = errors.New("the copy is not in the bucket: upload it first")
 	ErrNotFound     = errors.New("no such copy")
 	ErrNotACopy     = errors.New("not a copy")
@@ -91,15 +92,15 @@ func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, er
 	if err := r.check(now); err != nil {
 		return Upload{}, err
 	}
-	recent, err := c.store.CopiesSince(space.ID, server, r.App, r.Database, now.Add(-every))
+	near, err := c.store.CopiesMadeBetween(space.ID, server, r.App, r.Database, r.MadeAt.Add(-every), r.MadeAt.Add(every))
 	if err != nil {
 		return Upload{}, err
 	}
-	all, err := c.store.CopiesSince(space.ID, "", "", "", now.Add(-time.Hour))
+	all, err := c.store.CopiesSince(space.ID, now.Add(-time.Hour))
 	if err != nil {
 		return Upload{}, err
 	}
-	if recent > 0 || all >= perHour {
+	if near > 0 || all >= perHour {
 		return Upload{}, ErrTooOften
 	}
 	used, err := c.store.Storage(space.ID)

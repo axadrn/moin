@@ -79,13 +79,21 @@ func (s *Store) Storage(workspaceID string) (int64, error) {
 	return used, err
 }
 
-// CopiesSince counts the copies a workspace started since a time: of one
-// database, or of all when server is "".
-func (s *Store) CopiesSince(workspaceID, server, app, database string, since time.Time) (int, error) {
+// CopiesSince counts the copies a workspace started since a time.
+func (s *Store) CopiesSince(workspaceID string, since time.Time) (int, error) {
 	var n int
-	err := s.db.QueryRow(`SELECT count(*) FROM copies WHERE workspace_id = ? AND created > ?
-		AND (? = '' OR (server = ? AND app = ? AND database = ?))`,
-		workspaceID, since.Unix(), server, server, app, database).Scan(&n)
+	err := s.db.QueryRow(`SELECT count(*) FROM copies WHERE workspace_id = ? AND created > ?`,
+		workspaceID, since.Unix()).Scan(&n)
+	return n, err
+}
+
+// CopiesMadeBetween counts the copies of one database made after from
+// and before to.
+func (s *Store) CopiesMadeBetween(workspaceID, server, app, database string, from, to time.Time) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT count(*) FROM copies WHERE workspace_id = ? AND server = ? AND app = ? AND database = ?
+		AND made_at > ? AND made_at < ?`,
+		workspaceID, server, app, database, from.Unix(), to.Unix()).Scan(&n)
 	return n, err
 }
 

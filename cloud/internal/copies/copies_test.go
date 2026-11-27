@@ -108,6 +108,11 @@ func TestCopyUploadAndDownload(t *testing.T) {
 	if _, err := test.copies.Start(test.ctx, test.token, request); !errors.Is(err, ErrNotPaid) {
 		t.Fatalf("a trial: %v", err)
 	}
+	// The daemon asks with an empty request whether copies are taken:
+	// the plan is answered before the request is looked at.
+	if _, err := test.copies.Start(test.ctx, test.token, Request{}); !errors.Is(err, ErrNotPaid) {
+		t.Fatalf("an empty request on a trial: %v", err)
+	}
 	if _, err := test.copies.Start(test.ctx, "wrong", request); !errors.Is(err, ErrUnknownToken) {
 		t.Fatalf("a wrong token: %v", err)
 	}
@@ -160,9 +165,19 @@ func TestCopyUploadAndDownload(t *testing.T) {
 		t.Fatalf("list = %+v, %v", list, err)
 	}
 
-	// One copy an hour per database.
-	if _, err := test.copies.Start(test.ctx, test.token, request); !errors.Is(err, ErrTooOften) {
-		t.Errorf("a second copy at once: %v", err)
+	// One copy an hour per database, by the time it was made: not when
+	// it is asked for, as a long dump or check asks late.
+	for _, at := range []time.Duration{0, -49 * time.Minute, 49 * time.Minute} {
+		again := request
+		again.MadeAt = request.MadeAt.Add(at)
+		if _, err := test.copies.Start(test.ctx, test.token, again); !errors.Is(err, ErrTooOften) {
+			t.Errorf("a copy made %s after the last: %v", at, err)
+		}
+	}
+	next := request
+	next.MadeAt = request.MadeAt.Add(51 * time.Minute)
+	if _, err := test.copies.Start(test.ctx, test.token, next); err != nil {
+		t.Errorf("a copy made 51 minutes after the last: %v", err)
 	}
 	// A full storage refuses, and mails once a day.
 	big := Request{App: "shop", Database: "postgres-db", MadeAt: request.MadeAt, Size: Storage}

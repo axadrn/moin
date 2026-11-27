@@ -71,6 +71,8 @@ func TestCopyRoundTrip(t *testing.T) {
 
 	postJSON(t, http.DefaultClient, server.URL+"/api/copies", "wrong", start, http.StatusUnauthorized, nil)
 	postJSON(t, http.DefaultClient, server.URL+"/api/copies", token, start, http.StatusPaymentRequired, nil)
+	// The daemon asks with an empty body whether copies are taken.
+	postJSON(t, http.DefaultClient, server.URL+"/api/copies", token, map[string]any{}, http.StatusPaymentRequired, nil)
 	if err := store.SetBilling(space.ID, workspace.Billing{Status: "paid"}); err != nil {
 		t.Fatal(err)
 	}
