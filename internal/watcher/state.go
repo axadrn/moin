@@ -305,7 +305,7 @@ func (s *state) domainAlert(name string, now time.Time) (alert.Message, bool) {
 			Server: d.Server, App: d.App,
 			Title: name + " is down",
 			Text: "No good answer from outside since " + clock(d.Since) + ": " + d.Reason + ".\n" +
-				d.Server + " still reports, so look at the app: " + build.Name + " logs " + d.Server + " --app " + d.App,
+				d.Server + " still reports, so look at the app: " + build.Name + " logs " + d.App,
 		}, true
 	}
 	if !d.Down && d.Alerted {
