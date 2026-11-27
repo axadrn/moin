@@ -2,7 +2,6 @@ package handler
 
 import (
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/counts"
@@ -84,13 +83,5 @@ func (c *Cloud) SiteNumbers(development bool) func() pages.HomeNumbers {
 			totals = counts.Totals{}
 		}
 		return pages.HomeNumbers{Stars: githubrepo.Stars(), Downloads: githubrepo.Now().Downloads, Totals: totals}
-	}
-}
-
-// KnocksPage is /knocks: the count of the site's own server on one
-// screen, to share.
-func KnocksPage(knocks func() *pages.HomeKnocks) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		render(w, r, pages.Knocks(knocks(), time.Now()))
 	}
 }

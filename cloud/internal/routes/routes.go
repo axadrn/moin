@@ -38,10 +38,9 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /robots.txt", seo.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
-	siteKnocks := cloud.SiteKnocks(cfg.KnocksWorkspace, cfg.KnocksServer, cfg.Development)
-	mux.HandleFunc("GET /{$}", handler.Home(texts, siteKnocks, cloud.SiteNumbers(cfg.Development)))
-	mux.HandleFunc("GET /knocks", handler.KnocksPage(siteKnocks))
-	mux.HandleFunc("GET /free-year", handler.FreeYear)
+	mux.HandleFunc("GET /{$}", handler.Home(texts,
+		cloud.SiteKnocks(cfg.KnocksWorkspace, cfg.KnocksServer, cfg.Development),
+		cloud.SiteNumbers(cfg.Development)))
 	mux.HandleFunc("GET /docs", handler.Docs(docs))
 	mux.HandleFunc("GET /docs.md", handler.Docs(docs))
 	mux.HandleFunc("GET /docs/", handler.Docs(docs))
