@@ -244,10 +244,6 @@ func BackupKeyHere() (*BackupKey, error) {
 // SetBackupKeyHere makes public the public half of your backup key: every
 // copy from now on is encrypted for it. A new key is not confirmed.
 func SetBackupKeyHere(public string) error {
-	// A key no copy can be encrypted for would stop every copy.
-	if _, err := age.ParseX25519Recipient(public); err != nil {
-		return errors.New("this is not the public half of a backup key: one starts with age1")
-	}
 	config, err := readConfig()
 	if err != nil {
 		return err
