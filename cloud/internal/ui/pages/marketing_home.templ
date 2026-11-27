@@ -136,11 +136,11 @@ templ HomeLoseNothing() {
 var homeBackups = []components.TerminalLine{
 	{Kind: "prompt", Text: "$ moin backups shop"},
 	{Kind: "prompt", Text: "postgres"},
-	{Kind: "done", Text: "✓ Restore check 4 hours ago: the copy 20261127T030000Z restored and read fine"},
-	{Text: "COPY               TAKEN           SIZE"},
-	{Text: "20261127T070000Z   12 minutes ago  41 MB"},
-	{Text: "20261127T060000Z   1 hour ago      41 MB"},
-	{Text: "20261127T030000Z   4 hours ago     40 MB"},
+	{Kind: "done", Text: "✓ Restore check 4h ago: the copy 20261127T030000Z-482913 restored and read fine"},
+	{Text: "COPY                      TAKEN    SIZE"},
+	{Text: "20261127T070000Z-118204   12m ago  41 MB"},
+	{Text: "20261127T060000Z-730551   1h ago   41 MB"},
+	{Text: "20261127T030000Z-482913   4h ago   40 MB"},
 	{Kind: "hint", Text: "Go back to one with moin restore shop --to <copy>"},
 }
 
