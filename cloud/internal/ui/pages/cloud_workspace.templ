@@ -15,6 +15,10 @@ type CloudWorkspaceProps struct {
 	Plan string
 	// TrialOver is a trial that ran out, unpaid: alerts are off.
 	TrialOver bool
+	// Subscribe shows the offer: the workspace doesn't pay, and the site
+	// can sell. Billing links Stripe's portal, once Stripe knows you.
+	Subscribe bool
+	Billing   bool
 	View      watcher.View
 }
 
@@ -22,6 +26,11 @@ type CloudWorkspaceProps struct {
 templ CloudWorkspace(p CloudWorkspaceProps) {
 	@cloudPage(brand.Name + " cloud") {
 		@components.Header(components.HeaderProps{Title: brand.Name + " cloud"}) {
+			if p.Billing {
+				@components.Button(components.ButtonProps{Href: "/cloud/billing", Quiet: true}) {
+					Billing
+				}
+			}
 			@components.Button(components.ButtonProps{Href: "/cloud/settings", Quiet: true}) {
 				Settings
 			}
@@ -35,6 +44,19 @@ templ CloudWorkspace(p CloudWorkspaceProps) {
 		if p.TrialOver {
 			@components.Card(components.CardProps{Title: "Your trial is over. Alerts are off."}) {
 				<p class="moin-text moin-muted">Your servers still report, and this page still shows them. Nobody gets a mail when one goes silent.</p>
+			}
+		}
+		if p.Subscribe {
+			@components.Card(components.CardProps{Title: "Subscribe"}) {
+				<p class="moin-text moin-muted">$7 a month, or $49 a year, for the whole workspace. Alerts for every server, and a copy of every backup your server can't delete. For businesses only.</p>
+				<form method="post" action="/cloud/subscribe" class="moin-row" data-gap="3" data-wrap>
+					@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary, Attrs: templ.Attributes{"name": "interval", "value": "yearly"}}) {
+						$49 a year
+					}
+					@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"name": "interval", "value": "monthly"}}) {
+						$7 a month
+					}
+				</form>
 			}
 		}
 		if len(p.View.Servers) == 0 {

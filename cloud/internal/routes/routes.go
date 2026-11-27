@@ -62,8 +62,8 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /cli.sh", cloud.CountInstall(handler.CLIScript(cfg.AppURL)))
 	mux.Handle("GET /download/", http.StripPrefix("/download/", http.FileServer(http.Dir("downloads"))))
 
-	// moin cloud: sign-in, the workspace, `moin cloud` in the CLI, and
-	// the reports of servers.
+	// moin cloud: sign-in, the workspace, billing, `moin cloud` in the
+	// CLI, and the reports of servers.
 	mux.HandleFunc("GET /login", cloud.Login)
 	mux.HandleFunc("POST /login", cloud.SendLink)
 	mux.HandleFunc("GET /login/link", cloud.LinkPage)
@@ -74,6 +74,11 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /cloud", cloud.WorkspacePage)
 	mux.HandleFunc("GET /cloud/settings", cloud.Settings)
 	mux.HandleFunc("POST /cloud/delete", cloud.DeleteAccount)
+	mux.HandleFunc("POST /cloud/subscribe", cloud.Subscribe)
+	mux.HandleFunc("GET /cloud/billing", cloud.Billing)
+	// Stripe's webhook keeps the old hub's address, so its endpoint in
+	// the Stripe dashboard keeps working.
+	mux.HandleFunc("POST /webhooks/payment", cloud.StripeWebhook)
 	mux.HandleFunc("GET /cli", cloud.CLIPage)
 	mux.HandleFunc("POST /cli", cloud.AllowCLI)
 	mux.HandleFunc("POST /api/cli/login", cloud.StartCLILogin)

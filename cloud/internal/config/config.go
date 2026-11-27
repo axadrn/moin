@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -41,6 +42,17 @@ type Config struct {
 	// 3f9c/web-1. Without it the landing page shows none.
 	KnocksWorkspace string
 	KnocksServer    string
+	// Stripe sells moin cloud: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+	// the product STRIPE_PRODUCT_ID_PRO, and its two prices
+	// STRIPE_PRICE_ID_PRO_MONTHLY and STRIPE_PRICE_ID_PRO_YEARLY. The
+	// names are the old hub's, so its settings keep working. Without them
+	// nobody can subscribe.
+	StripeSecretKey     string
+	StripeWebhookSecret string
+	StripeProduct       string
+	StripePriceMonthly  string
+	StripePriceYearly   string
+	StripeAPIURL        string
 }
 
 // RenderConfig is what templates may know of the settings: nothing secret.
@@ -69,6 +81,12 @@ func Load() (*Config, error) {
 		GitHubClientSecret:  env("GITHUB_APP_CLIENT_SECRET", ""),
 		GitHubURL:           env("GITHUB_URL", "https://github.com"),
 		GitHubAPIURL:        env("GITHUB_API_URL", "https://api.github.com"),
+		StripeSecretKey:     env("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET", ""),
+		StripeProduct:       env("STRIPE_PRODUCT_ID_PRO", ""),
+		StripePriceMonthly:  env("STRIPE_PRICE_ID_PRO_MONTHLY", ""),
+		StripePriceYearly:   env("STRIPE_PRICE_ID_PRO_YEARLY", ""),
+		StripeAPIURL:        env("STRIPE_API_URL", "https://api.stripe.com"),
 	}
 	var errs []error
 	switch env("APP_ENV", "") {
@@ -96,6 +114,10 @@ func Load() (*Config, error) {
 	}
 	if (cfg.GitHubClientID == "") != (cfg.GitHubClientSecret == "") {
 		errs = append(errs, errors.New("GitHub sign-in needs both GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET, or neither"))
+	}
+	stripe := []string{cfg.StripeSecretKey, cfg.StripeWebhookSecret, cfg.StripeProduct, cfg.StripePriceMonthly, cfg.StripePriceYearly}
+	if slices.Contains(stripe, "") && slices.ContainsFunc(stripe, func(value string) bool { return value != "" }) {
+		errs = append(errs, errors.New("billing needs all of STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRODUCT_ID_PRO, STRIPE_PRICE_ID_PRO_MONTHLY and STRIPE_PRICE_ID_PRO_YEARLY, or none"))
 	}
 	if knocks := env("KNOCKS_SERVER", ""); knocks != "" {
 		var found bool

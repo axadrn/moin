@@ -19,8 +19,8 @@ func (c *Cloud) Settings(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteAccount deletes the workspace when the typed mail is its mail:
-// its servers' tokens, its sessions and its logins. Copies under the lock
-// expire by themselves.
+// it cancels the subscription, then deletes its servers' tokens, its
+// sessions and its logins. Copies under the lock expire by themselves.
 func (c *Cloud) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	space, ok := c.signedIn(r)
 	if !ok || !c.sameOrigin(r) {
@@ -33,11 +33,12 @@ func (c *Cloud) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		render(w, r, pages.CloudSettings(pages.CloudSettingsProps{Mail: space.Mail, Problem: "Type " + space.Mail + " to delete the account."}))
 		return
 	}
-	// Billing comes with its own step; until then a running subscription
-	// is not deleted here by accident.
-	if space.StripeSubscription != "" {
-		w.WriteHeader(http.StatusConflict)
-		render(w, r, pages.CloudSettings(pages.CloudSettingsProps{Mail: space.Mail, Problem: "This account has a subscription. Write to us to cancel it and delete the account."}))
+	// A running subscription ends first, so nobody pays for an account
+	// that is gone.
+	if err := c.cancelSubscription(r.Context(), space); err != nil {
+		slog.Error("subscription not cancelled, account kept", "workspace", space.ID, "error", err)
+		w.WriteHeader(http.StatusBadGateway)
+		render(w, r, pages.CloudSettings(pages.CloudSettingsProps{Mail: space.Mail, Problem: "Your subscription did not cancel, so the account is still here. Try again in a minute."}))
 		return
 	}
 	if err := c.store.DeleteWorkspace(space.ID); err != nil {

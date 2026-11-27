@@ -11,6 +11,7 @@ import (
 
 	"github.com/axadrn/moin/cloud/internal/github"
 	"github.com/axadrn/moin/cloud/internal/mailer"
+	"github.com/axadrn/moin/cloud/internal/stripe"
 	"github.com/axadrn/moin/cloud/internal/watchers"
 	"github.com/axadrn/moin/cloud/internal/workspace"
 )
@@ -28,6 +29,8 @@ type Cloud struct {
 	// limits count the sign-in mails per address and per IP.
 	mailLimit *limit
 	ipLimit   *limit
+	// Stripe sells moin cloud. Without it nobody can subscribe.
+	Stripe *stripe.Stripe
 }
 
 // NewCloud is moin cloud on the site at appURL.

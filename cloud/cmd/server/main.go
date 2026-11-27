@@ -20,6 +20,7 @@ import (
 	"github.com/axadrn/moin/cloud/internal/handler"
 	"github.com/axadrn/moin/cloud/internal/mailer"
 	"github.com/axadrn/moin/cloud/internal/routes"
+	"github.com/axadrn/moin/cloud/internal/stripe"
 	"github.com/axadrn/moin/cloud/internal/watchers"
 	"github.com/axadrn/moin/cloud/internal/workspace"
 )
@@ -52,6 +53,14 @@ func run() error {
 	}
 	signIn := github.New(cfg.GitHubClientID, cfg.GitHubClientSecret, cfg.GitHubURL, cfg.GitHubAPIURL)
 	cloud := handler.NewCloud(store, watching, mail, signIn, cfg.AppURL, !cfg.Development)
+	if cfg.StripeSecretKey != "" {
+		cloud.Stripe = stripe.New(stripe.Settings{
+			SecretKey: cfg.StripeSecretKey, WebhookSecret: cfg.StripeWebhookSecret, API: cfg.StripeAPIURL,
+			Product: cfg.StripeProduct, Monthly: cfg.StripePriceMonthly, Yearly: cfg.StripePriceYearly,
+		})
+	} else if !cfg.Development {
+		slog.Warn("no STRIPE_SECRET_KEY: nobody can subscribe")
+	}
 	site, err := routes.New(cfg, cloud)
 	if err != nil {
 		return err

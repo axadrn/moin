@@ -30,7 +30,11 @@ func (c *Cloud) WorkspacePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	render(w, r, pages.CloudWorkspace(pages.CloudWorkspaceProps{Mail: space.Mail, Plan: plan(space), TrialOver: space.TrialOver(time.Now()), View: view}))
+	render(w, r, pages.CloudWorkspace(pages.CloudWorkspaceProps{
+		Mail: space.Mail, Plan: plan(space), TrialOver: space.TrialOver(time.Now()),
+		Subscribe: c.Stripe != nil && space.Status != "paid", Billing: c.Stripe != nil && space.StripeCustomer != "",
+		View: view,
+	}))
 }
 
 // plan says in a few words what a workspace pays and until when.
@@ -52,13 +56,15 @@ func plan(space workspace.Workspace) string {
 
 // cliWorkspace is what `moin cloud` shows.
 type cliWorkspace struct {
-	Mail      string      `json:"mail"`
-	Status    string      `json:"status"`
-	Plan      string      `json:"plan"`
-	TrialEnds *time.Time  `json:"trial_ends,omitempty"`
-	PaidUntil *time.Time  `json:"paid_until,omitempty"`
-	NeedsYou  []string    `json:"needs_you"`
-	Servers   []cliServer `json:"servers"`
+	Mail      string     `json:"mail"`
+	Status    string     `json:"status"`
+	Plan      string     `json:"plan"`
+	TrialEnds *time.Time `json:"trial_ends,omitempty"`
+	PaidUntil *time.Time `json:"paid_until,omitempty"`
+	// Billing is where to subscribe, or Stripe's portal once it knows you.
+	Billing  string      `json:"billing"`
+	NeedsYou []string    `json:"needs_you"`
+	Servers  []cliServer `json:"servers"`
 }
 
 type cliServer struct {
@@ -91,7 +97,7 @@ func (c *Cloud) CLIWorkspace(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "the watcher's view", err)
 		return
 	}
-	answer := cliWorkspace{Mail: space.Mail, Status: space.Status, Plan: plan(space), NeedsYou: view.NeedsYou, Servers: []cliServer{}}
+	answer := cliWorkspace{Mail: space.Mail, Status: space.Status, Plan: plan(space), Billing: c.billingURL(space), NeedsYou: view.NeedsYou, Servers: []cliServer{}}
 	if answer.NeedsYou == nil {
 		answer.NeedsYou = []string{}
 	}

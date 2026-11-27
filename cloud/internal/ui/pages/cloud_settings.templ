@@ -21,7 +21,7 @@ templ CloudSettings(p CloudSettingsProps) {
 			<p class="moin-small moin-muted">Your email is your account. Sign in with it by GitHub or a link by mail.</p>
 		}
 		@components.Card(components.CardProps{Title: "Delete account"}) {
-			<p class="moin-text moin-muted">This deletes the workspace, the tokens of its servers and every session. Your servers keep running; their reports get no answer. Copies of backups stay under their 14-day lock and expire by themselves.</p>
+			<p class="moin-text moin-muted">This cancels your subscription, then deletes the workspace, the tokens of its servers and every session. Your servers keep running; their reports get no answer. Copies of backups stay under their 14-day lock and expire by themselves.</p>
 			<form method="post" action="/cloud/delete" class="moin-stack" data-gap="3">
 				<label for="mail" class="moin-small">Type { p.Mail } to confirm</label>
 				@components.Input(components.InputProps{ID: "mail", Name: "mail", Type: "email", Attrs: templ.Attributes{"required": true, "autocomplete": "off"}})
