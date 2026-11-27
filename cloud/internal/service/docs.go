@@ -12,7 +12,7 @@ import (
 // docsGroups are the topics of the docs home, in their order. A page names
 // its topic in its front matter (group); a page without one, or with
 // another, goes under "More" at the end.
-var docsGroups = []string{"Start", "Apps", "Servers and data", "Reference"}
+var docsGroups = []string{"Start", "Basics", "Apps", "Servers and data", "Reference"}
 
 // DocsService reads the pages under docs/: once, or on every request in
 // development (live), so an edit shows on reload.
