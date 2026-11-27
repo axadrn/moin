@@ -142,7 +142,8 @@ func runEditor(ctx context.Context, file string, stdin io.Reader, stdout io.Writ
 		editor = []string{"vi"}
 	}
 	cmd := exec.CommandContext(ctx, editor[0], append(editor[1:], file)...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, os.Stderr
+	// The editor draws on the terminal itself, not through the color writer.
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, raw(stdout), os.Stderr
 	if err := cmd.Run(); err != nil {
 		return errors.New("the editor did not end well, so nothing changed: " + err.Error())
 	}
