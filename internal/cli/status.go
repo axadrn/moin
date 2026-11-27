@@ -295,18 +295,12 @@ func askServers(ctx context.Context, servers []string) []serverRow {
 // quietStatus is serverStatus without a password prompt and without what
 // ssh says on stderr, which would mix into the table.
 func quietStatus(ctx context.Context, server string) (daemon.Status, error) {
-	cmd := sshCommand(ctx, server, asRoot(hereLine("apps")), false)
-	// BatchMode: a server that would ask for a password fails instead.
-	cmd.Args = slices.Insert(cmd.Args, 1, "-o", "BatchMode=yes")
-	out, err := cmd.Output()
+	var status daemon.Status
+	err := quietJSON(ctx, server, []string{"apps"}, &status)
 	if ctx.Err() != nil {
 		return daemon.Status{}, errors.New("no answer in time")
 	}
-	if err != nil {
-		return daemon.Status{}, sshError(server, err)
-	}
-	var status daemon.Status
-	return status, readAnswer(server, out, &status)
+	return status, err
 }
 
 // printApps writes the table of servers and their apps.

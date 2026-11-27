@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -146,5 +147,32 @@ func TestEditUntilValidGivesUp(t *testing.T) {
 	t.Setenv("EDITOR", editor)
 	if _, err := editUntilValid(t.Context(), "shop", []byte("A=\"1\"\n"), strings.NewReader(""), io.Discard); err == nil {
 		t.Error("the same mistake twice: want an error")
+	}
+}
+
+// TestQuietJSONNeverAsks: many servers at once run ssh in batch mode, so
+// none of them asks for a password on the terminal.
+func TestQuietJSONNeverAsks(t *testing.T) {
+	dir := t.TempDir()
+	fake := "#!/bin/sh\necho \"$@\" > " + dir + "/args\necho '{\"total\": 3}'\n"
+	if err := os.WriteFile(filepath.Join(dir, "ssh"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	var answer struct {
+		Total int `json:"total"`
+	}
+	if err := quietJSON(context.Background(), "prod", []string{"knocks"}, &answer); err != nil {
+		t.Fatal(err)
+	}
+	if answer.Total != 3 {
+		t.Errorf("total = %d, want 3", answer.Total)
+	}
+	args, err := os.ReadFile(filepath.Join(dir, "args"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(args), "-o BatchMode=yes ") {
+		t.Errorf("ssh ran with %q, want BatchMode first", args)
 	}
 }

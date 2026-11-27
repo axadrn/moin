@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -142,6 +143,20 @@ func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) 
 // answers into value.
 func sshJSON(ctx context.Context, server string, args []string, stdin io.Reader, value any) error {
 	return sshAnswer(ctx, server, args, stdin, os.Stderr, value)
+}
+
+// quietJSON is sshJSON for many servers at once: without a password
+// prompt and without what ssh says on stderr. Many prompts at once would
+// fight over the terminal, and the noise would mix into the table.
+func quietJSON(ctx context.Context, server string, args []string, value any) error {
+	cmd := sshCommand(ctx, server, asRoot(hereLine(args...)), false)
+	// BatchMode: a server that would ask for a password fails instead.
+	cmd.Args = slices.Insert(cmd.Args, 1, "-o", "BatchMode=yes")
+	out, err := cmd.Output()
+	if err != nil {
+		return sshError(server, err)
+	}
+	return readAnswer(server, out, value)
 }
 
 // sshAnswer is sshJSON with what ssh and moin say going to stderr, so the

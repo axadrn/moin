@@ -46,7 +46,15 @@ func knocks(ctx context.Context, args []string, stdout io.Writer) error {
 		wait.Go(func() {
 			var counted daemon.Knocks
 			results[i].Server = server
-			if err := sshJSON(ctx, server, []string{"knocks"}, nil, &counted); err != nil {
+			// Many servers: no prompts that fight over the terminal. One
+			// named server may still ask for a password.
+			var err error
+			if flags.NArg() == 0 {
+				err = quietJSON(ctx, server, []string{"knocks"}, &counted)
+			} else {
+				err = sshJSON(ctx, server, []string{"knocks"}, nil, &counted)
+			}
+			if err != nil {
 				results[i].Error = explain(err)
 				return
 			}
