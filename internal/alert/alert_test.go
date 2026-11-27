@@ -90,9 +90,25 @@ func TestSendFailureHidesSecret(t *testing.T) {
 }
 
 func TestSendRefusesBadDestination(t *testing.T) {
-	for _, d := range []Destination{{Kind: "mail"}, {Kind: "telegram"}, {Kind: "webhook", URL: "ftp://example.com"}} {
+	for _, d := range []Destination{
+		{Kind: "mail"}, {Kind: "telegram"}, {Kind: "webhook", URL: "ftp://example.com"},
+		{Kind: "slack", URL: "http://hooks.example.com/x"}, {Kind: "webhook", URL: "http://10.0.0.5/hook"}, {Kind: "discord"},
+	} {
 		if err := Send(context.Background(), d, down); err == nil {
 			t.Errorf("Send(%v) = nil, want an error", d)
+		}
+	}
+}
+
+func TestCheck(t *testing.T) {
+	for _, d := range []Destination{
+		{Kind: "telegram", Token: "123:abc", ChatID: "-42"},
+		{Kind: "webhook", URL: "https://example.com/hook"},
+		{Kind: "webhook", URL: "http://127.0.0.1:9000/hook"},
+		{Kind: "slack", URL: "http://localhost/hook"},
+	} {
+		if err := Check(d); err != nil {
+			t.Errorf("Check(%v) = %v", d, err)
 		}
 	}
 }

@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -45,14 +47,47 @@ var client = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 }
 
-// Send sends m to d. The error never holds the token or URL of d: both
-// are secrets.
-func Send(ctx context.Context, d Destination, m Message) error {
+// Check says whether d can work: a known kind with what that kind needs.
+func Check(d Destination) error {
 	switch d.Kind {
 	case "telegram":
 		if d.Token == "" || d.ChatID == "" {
-			return errors.New("telegram needs a token and a chat_id")
+			return errors.New("a telegram alert needs a token and a chat_id")
 		}
+		return nil
+	case "slack", "discord", "webhook":
+		return checkURL(d.URL)
+	}
+	return fmt.Errorf("unknown alert kind %q: use telegram, slack, discord or webhook", d.Kind)
+}
+
+// checkURL wants https, or http to this machine only: an alert says what
+// is down where, and a URL may hold a token.
+func checkURL(address string) error {
+	parsed, err := url.Parse(address)
+	if err != nil || parsed.Host == "" {
+		return errors.New("the alert url is not a valid URL")
+	}
+	if parsed.Scheme == "https" || parsed.Scheme == "http" && isLoopback(parsed.Hostname()) {
+		return nil
+	}
+	return errors.New("the alert url must start with https:// (http:// only to this machine)")
+}
+
+// isLoopback says whether host is this machine.
+func isLoopback(host string) bool {
+	ip := net.ParseIP(host)
+	return host == "localhost" || ip != nil && ip.IsLoopback()
+}
+
+// Send sends m to d. The error never holds the token or URL of d: both
+// are secrets.
+func Send(ctx context.Context, d Destination, m Message) error {
+	if err := Check(d); err != nil {
+		return err
+	}
+	switch d.Kind {
+	case "telegram":
 		body := map[string]any{"chat_id": d.ChatID, "text": telegramText(m), "parse_mode": "HTML", "disable_web_page_preview": true}
 		return post(ctx, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token)
 	case "slack":
@@ -60,18 +95,13 @@ func Send(ctx context.Context, d Destination, m Message) error {
 	case "discord":
 		body := map[string]any{"content": discordText(m), "allowed_mentions": map[string]any{"parse": []string{}}}
 		return post(ctx, d.URL, body, d.URL)
-	case "webhook":
-		return post(ctx, d.URL, m, d.URL)
 	}
-	return fmt.Errorf("unknown alert kind %q: use telegram, slack, discord or webhook", d.Kind)
+	return post(ctx, d.URL, m, d.URL)
 }
 
-// post sends body as JSON to address and wants a 2xx back. secrets never
-// show in the error.
+// post sends body as JSON to address and wants a 2xx back. The secret
+// never shows in the error.
 func post(ctx context.Context, address string, body any, secret string) error {
-	if !strings.HasPrefix(address, "https://") && !strings.HasPrefix(address, "http://") {
-		return errors.New("the alert url must start with https://")
-	}
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
