@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -159,9 +158,8 @@ func TestFirewallWithoutNftSaysWhatToInstall(t *testing.T) {
 	}
 }
 
-// TestServerSecrets: the daemon keeps every secret in server.json, 0600,
-// reports only their names, and reads the tunnel token and Tailscale key a
-// server.json from before kept.
+// TestServerSecrets: the daemon keeps the tunnel token, the Tailscale key
+// and the registry logins in server.json, 0600.
 func TestServerSecrets(t *testing.T) {
 	dir := t.TempDir()
 	old := `{"tunnel_token":"tunnel-token-1234","tailscale_key":"tskey-auth-1","ssh":"tailscale","firewall":true}`
@@ -172,10 +170,8 @@ func TestServerSecrets(t *testing.T) {
 	if s.proxyMode() != "tunnel" || !s.current().known() || s.current().SSH != protocol.SSHTailscale {
 		t.Fatalf("server.json from before = %+v", s.current())
 	}
-	for name, value := range map[string]string{protocol.BucketSecret("b1"): "bucket-secret", protocol.RegistrySecret("ghcr.io"): "me:registry-token"} {
-		if err := s.setSecret(name, value); err != nil {
-			t.Fatal(err)
-		}
+	if err := s.setSecret(protocol.RegistrySecret("ghcr.io"), "me:registry-token"); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.setSecret(protocol.SecretTunnel, ""); err != nil {
 		t.Fatal(err)
@@ -183,44 +179,20 @@ func TestServerSecrets(t *testing.T) {
 	if err := s.setSecret("cloudflare", "x"); err == nil {
 		t.Fatal("an unknown secret was kept")
 	}
-	if s.bucketKey("b1") != "bucket-secret" || s.registryLogin("ghcr.io") != "me:registry-token" || s.proxyMode() != "direct" {
+	if s.registryLogin("ghcr.io") != "me:registry-token" || s.proxyMode() != "direct" {
 		t.Fatalf("file = %+v", s.current())
 	}
 	info, err := os.Stat(filepath.Join(dir, serverConfigFile))
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("server.json: %v, %v", info, err)
 	}
-	hello := Hello(dir)
-	want := []string{"bucket/b1", "registry/ghcr.io", "tailscale"}
-	if !slices.Equal(hello.Secrets, want) {
-		t.Fatalf("hello secrets = %q, want %q", hello.Secrets, want)
-	}
-	body, _ := json.Marshal(hello)
-	if strings.Contains(string(body), "bucket-secret") || strings.Contains(string(body), "registry-token") {
-		t.Fatalf("hello carries a value: %s", body)
-	}
-	// A config from the hub keeps the secrets.
+	// A new config keeps the secrets.
 	fakeCommand(t, "docker", "exit 1\n")
 	fakeCommand(t, "nft", "exit 1\n")
 	fakeCommand(t, "tailscale", "exit 1\n")
 	s.apply(context.Background(), protocol.ServerConfig{SSH: protocol.SSHEveryone})
 	again := newSecurity(dir, &apps{})
-	if again.bucketKey("b1") != "bucket-secret" || again.current().TailscaleKey != "tskey-auth-1" || again.current().SSH != protocol.SSHEveryone {
+	if again.registryLogin("ghcr.io") != "me:registry-token" || again.current().TailscaleKey != "tskey-auth-1" || again.current().SSH != protocol.SSHEveryone {
 		t.Fatalf("after a config = %+v", again.current())
-	}
-}
-
-// TestSecretSetObeysNetworkLocked: with network: locked the hub cannot
-// hand the server a tunnel token or a Tailscale key; other secrets go.
-func TestSecretSetObeysNetworkLocked(t *testing.T) {
-	r := &runner{security: newSecurity(t.TempDir(), &apps{}), pending: map[string]protocol.DeployDone{}}
-	locked := &protocol.Rules{NetworkLocked: true}
-	for _, name := range []string{protocol.SecretTunnel, protocol.SecretTailscale, protocol.RegistrySecret("ghcr.io")} {
-		message, _ := protocol.NewMessage(protocol.TypeSecretSet, protocol.SecretSet{Name: name, Value: "me:v"})
-		message.RequestID = "r1"
-		r.secretSet(message, locked)
-	}
-	if got := r.security.current().secretNames(); !slices.Equal(got, []string{"registry/ghcr.io"}) {
-		t.Fatalf("kept with network: locked = %q", got)
 	}
 }

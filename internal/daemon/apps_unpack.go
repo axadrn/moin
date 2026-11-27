@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,4 +119,23 @@ func writeFile(path string, content io.Reader, mode fs.FileMode) error {
 func within(dir, path string) bool {
 	relative, err := filepath.Rel(dir, path)
 	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative)
+}
+
+// githubAPI is the one place a source download comes from; tests replace it.
+var githubAPI = "https://api.github.com"
+
+// sourceName names the GitHub repo a source download comes from, as
+// github.com/<owner>/<repo>. A source is only ever the tarball of a commit,
+// over https from api.github.com: anything else is refused.
+func sourceName(raw string) (string, error) {
+	link, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("the source address %q is not a URL", raw)
+	}
+	from := link.Scheme + "://" + link.Host
+	parts := strings.Split(strings.Trim(link.Path, "/"), "/")
+	if from == githubAPI && len(parts) == 5 && parts[0] == "repos" && parts[3] == "tarball" {
+		return "github.com/" + parts[1] + "/" + parts[2], nil
+	}
+	return "", fmt.Errorf("a source comes only from a GitHub repo, over https from api.github.com, not from %s", from)
 }

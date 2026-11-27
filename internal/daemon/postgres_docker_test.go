@@ -29,7 +29,7 @@ func TestPostgresDocker(t *testing.T) {
 	container := strings.TrimSpace(string(out))
 	defer exec.Command("docker", "rm", "-f", container).Run()
 
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	database := protocol.Database{Path: protocol.PostgresKey("db"), Kind: protocol.DatabasePostgres, Service: "db"}
 	target, err := a.postgres(ctx, "pgtest", database)
 	if err != nil {

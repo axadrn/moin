@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -43,11 +44,10 @@ const (
 
 var appIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
-// apps runs the deploys, logs and removals the hub asks for.
+// apps runs the deploys, logs and removals of the apps on this server.
 type apps struct {
-	dir  string
-	send func(protocol.MessageType, string, any)
-	// backups follows the databases a deploy adds or removes.
+	dir string
+	// backups copies the databases before a deploy changes them.
 	backups *backups
 	// proxyMode is "direct" or "tunnel", from the server config.
 	proxyMode func() string
@@ -59,16 +59,20 @@ type apps struct {
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex
-	// befores is the moment just before each running deploy started its
-	// new release over an older one, by deploy ID, for deploy.done.
-	befores map[string]time.Time
 }
 
-func newApps(dir string, send func(protocol.MessageType, string, any)) *apps {
-	return &apps{dir: filepath.Join(dir, "apps"), send: send, locks: map[string]*sync.Mutex{}, befores: map[string]time.Time{}}
+func newApps(dir string) *apps {
+	a := &apps{dir: filepath.Join(dir, "apps"), locks: map[string]*sync.Mutex{}}
+	a.backups = newBackups(a)
+	return a
 }
 
-// lock serializes everything that touches one app.
+func (a *apps) lockFile(app string) string {
+	return filepath.Join(filepath.Dir(a.dir), "locks", app+".lock")
+}
+
+// lock serializes everything that touches one app: in this process, and
+// with a file lock across the daemon and every command over SSH.
 func (a *apps) lock(app string) func() {
 	a.mu.Lock()
 	lock := a.locks[app]
@@ -78,7 +82,15 @@ func (a *apps) lock(app string) func() {
 	}
 	a.mu.Unlock()
 	lock.Lock()
-	return lock.Unlock
+	unlockFile, err := fileLock(a.lockFile(app))
+	if err != nil {
+		slog.Warn("lock the app across commands", "app", app, "error", err)
+		return lock.Unlock
+	}
+	return func() {
+		unlockFile()
+		lock.Unlock()
+	}
 }
 
 func (a *apps) appDir(app string) string { return filepath.Join(a.dir, app) }
@@ -91,59 +103,10 @@ func (a *apps) releaseDir(app string, number int) string {
 	return filepath.Join(a.appDir(app), "releases", strconv.Itoa(number))
 }
 
-// appID is the app's ID in the hub, which every deploy brings,
-// or "" before the first deploy that brought one.
-func (a *apps) appID(app string) string {
-	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "app-id"))
-	id := strings.TrimSpace(string(body))
-	if !appIDPattern.MatchString(id) {
-		return ""
-	}
-	return id
-}
-
-// keepIDs stores the IDs the hub sends for apps that have none
-// yet, the ones deployed before deploys brought it. A stored ID stays. It
-// reports whether it stored one.
-func (a *apps) keepIDs(ids map[string]string) (kept bool) {
-	for app, id := range ids {
-		if !protocol.ValidAppName(app) || !appIDPattern.MatchString(id) || a.appID(app) != "" {
-			continue
-		}
-		if _, err := os.Stat(a.appDir(app)); err != nil {
-			continue
-		}
-		if os.WriteFile(filepath.Join(a.appDir(app), "app-id"), []byte(id), 0o600) == nil {
-			kept = true
-		}
-	}
-	return kept
-}
-
 func (a *apps) current(app string) int {
 	body, _ := os.ReadFile(filepath.Join(a.appDir(app), "current"))
 	number, _ := strconv.Atoi(strings.TrimSpace(string(body)))
 	return number
-}
-
-// sendLogs answers a logs request (LogsRequest) unless the rules say
-// logs: off.
-func (r *runner) sendLogs(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
-	var request protocol.LogsRequest
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	if rules != nil && rules.LogsOff {
-		r.fail(message, refused(r.rulesFile, "logs: off"))
-		return
-	}
-	result, err := r.apps.logs(ctx, request)
-	if err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeLogsResult, message.RequestID, result)
 }
 
 // logs returns the last lines of every container of the app.
@@ -163,20 +126,6 @@ func (a *apps) logs(ctx context.Context, request protocol.LogsRequest) (protocol
 	return protocol.LogsResult{Lines: lines}, nil
 }
 
-// removeApp answers app.remove (AppRemove).
-func (r *runner) removeApp(ctx context.Context, message protocol.Message) {
-	var request protocol.AppRemove
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	if err := r.apps.remove(ctx, request.App); err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeOK, message.RequestID, nil)
-}
-
 // remove stops the app and deletes its containers, images and releases. The
 // volumes stay, so the data survives. Its backups stop; what is in the
 // bucket stays there.
@@ -194,26 +143,11 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	}
 	_ = os.RemoveAll(filepath.Join(a.appDir(app), "releases"))
 	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
-	_ = os.Remove(filepath.Join(a.appDir(app), "app-id"))
 	// Its containers are gone; volumes.json stays with the volumes.
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
 	// Its env goes with it: nothing runs that reads it.
 	_ = os.Remove(a.envFile(app))
 	return nil
-}
-
-// stopApp answers app.stop (AppStop).
-func (r *runner) stopApp(ctx context.Context, message protocol.Message) {
-	var request protocol.AppStop
-	if err := message.Decode(&request); err != nil {
-		r.fail(message, err)
-		return
-	}
-	if err := r.apps.stop(ctx, request.App); err != nil {
-		r.fail(message, err)
-		return
-	}
-	r.send(protocol.TypeOK, message.RequestID, nil)
 }
 
 // stop stops the containers of the app's current release. Their restart

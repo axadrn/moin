@@ -16,7 +16,7 @@ import (
 // compose is the command's. compose reads the env files that fill the
 // compose file, the release's .env and then the app's env.
 func TestExecArgs(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	release := a.releaseDir("shop", 3)
 	if err := os.MkdirAll(release, 0o700); err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestCopyCapped(t *testing.T) {
 // TestExecRefused: names that could escape compose, an empty command and
 // an app without a release never reach docker.
 func TestExecRefused(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	for _, start := range []protocol.ExecStart{
 		{App: "shop", Service: "web; rm -rf /", Argv: []string{"ls"}},
 		{App: "../shop", Service: "web", Argv: []string{"ls"}},
@@ -94,7 +94,7 @@ func TestExecRefused(t *testing.T) {
 // compose file that are not env values stay. An env file moin cannot read
 // leaves only the program.
 func TestMaskedCommand(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	_, err := a.setEnv(protocol.EnvSet{App: "web", Set: map[string]string{"DB_PASSWORD": "abcdef123", "PRICE": "$5-dollars", "SHORT": "abcde", "INNER": "abcdef"}})
 	if err != nil {
 		t.Fatal(err)
@@ -111,16 +111,5 @@ func TestMaskedCommand(t *testing.T) {
 	}
 	if got := a.maskedCommand("web", []string{"psql", "-c", "abcdef123"}); got != "psql …" {
 		t.Errorf("with a broken env file = %q", got)
-	}
-}
-
-// TestExecRule: exec: off is a rule like logs: off.
-func TestExecRule(t *testing.T) {
-	rules, err := parseRules("exec: off\n", "/etc/moin/rules")
-	if err != nil || !rules.ExecOff || strings.Join(rules.Lines(), ",") != "exec: off" {
-		t.Errorf("exec: off = %+v, %v", rules, err)
-	}
-	if _, err := parseRules("exec: maybe\n", "/etc/moin/rules"); err == nil {
-		t.Error("exec: maybe passed")
 	}
 }

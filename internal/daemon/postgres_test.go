@@ -45,7 +45,7 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 	if err := os.WriteFile(composeJSON, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	found, noBackup, err := a.scanDatabases(context.Background(), composeJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -220,7 +220,7 @@ func TestPgError(t *testing.T) {
 // of its service from the live release.
 func TestServiceImage(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	a := newApps(dir)
 	release := a.releaseDir("shop", 3)
 	if err := os.MkdirAll(release, 0o755); err != nil {
 		t.Fatal(err)
@@ -252,7 +252,7 @@ func TestFindNewDatabases(t *testing.T) {
 	if err := os.MkdirAll(pg, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	release := a.releaseDir("shop", 1)
 	if err := os.MkdirAll(release, 0o700); err != nil {
 		t.Fatal(err)

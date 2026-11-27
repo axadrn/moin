@@ -19,64 +19,10 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// deployStart runs a deploy the rules allow (DeployStart). The answer is
-// deploy.done, never TypeError.
-func (r *runner) deployStart(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
-	var start protocol.DeployStart
-	if err := message.Decode(&start); err != nil {
-		slog.Error("bad deploy.start", "error", err)
-		return
-	}
-	if err := checkDeploy(rules, r.rulesFile, start); err != nil {
-		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: err.Error()})
-		return
-	}
-	if !r.beginWork() {
-		r.send(protocol.TypeDeployDone, "", protocol.DeployDone{DeployID: start.DeployID, Error: errUpdating.Error()})
-		return
-	}
-	defer r.endWork()
-	r.apps.deploy(ctx, start, rules)
-}
-
-// deploy runs one deploy and always ends with deploy.done.
-func (a *apps) deploy(ctx context.Context, start protocol.DeployStart, rules *protocol.Rules) {
-	logf := func(format string, args ...any) {
-		a.send(protocol.TypeDeployLog, "", protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
-	}
-	done := protocol.DeployDone{DeployID: start.DeployID}
-	detected, err := a.runDeploy(ctx, start, rules, logf)
-	done.Detected = detected
-	a.mu.Lock()
-	if before, ok := a.befores[start.DeployID]; ok {
-		done.Before = &before
-		delete(a.befores, start.DeployID)
-	}
-	a.mu.Unlock()
-	if err != nil {
-		done.Error = err.Error()
-		logf("deploy failed: %s", err)
-		a.markFailed(start.App, start.Number)
-	} else {
-		done.OK = true
-		logf("v%d is live", start.Number)
-		var fileErr error
-		done.ComposeFile, fileErr = a.composeFile(start.App, start.Number)
-		if fileErr != nil {
-			logf("the compose file of v%d could not be made: %s", start.Number, fileErr)
-		}
-	}
-	// Last, so the keys are as fresh as they can be.
-	if protocol.ValidAppName(start.App) {
-		env := a.envKeys(start.App)
-		done.Env = &env
-	}
-	a.send(protocol.TypeDeployDone, "", done)
-}
-
 // deployNote is the file "deploying" in an app's folder, there from the
-// start of a deploy to its end. A daemon that finds one when it starts
-// died during that deploy.
+// start of a deploy to its end. One that is there while nobody holds the
+// app's lock is of a deploy whose command stopped, like one whose SSH
+// connection broke.
 type deployNote struct {
 	ID     string `json:"id"`
 	Number int    `json:"number"`
@@ -84,51 +30,49 @@ type deployNote struct {
 
 func (a *apps) noteFile(app string) string { return filepath.Join(a.appDir(app), "deploying") }
 
-// recoverDeploys ends the deploys a stopped daemon left running. The
-// daemon runs it when it starts.
+// recoverDeploys ends the deploys a stopped command left running. The
+// daemon runs it when it starts and every minute.
 func (a *apps) recoverDeploys(ctx context.Context) {
 	notes, _ := filepath.Glob(a.noteFile("*"))
 	for _, file := range notes {
+		app := filepath.Base(filepath.Dir(file))
+		unlock, ok := tryFileLock(a.lockFile(app))
+		if !ok {
+			// The deploy still runs.
+			continue
+		}
 		var note deployNote
 		if body, err := os.ReadFile(file); err == nil && json.Unmarshal(body, &note) == nil {
-			a.send(protocol.TypeDeployDone, "", a.endDeploy(ctx, filepath.Base(filepath.Dir(file)), note))
+			a.endDeploy(ctx, app, note)
 		}
 		os.Remove(file)
+		unlock()
 	}
 }
 
-// endDeploy says how a deploy the daemon died in ended. If it got as far
-// as being the current version, it worked. If not, the current version
+// endDeploy ends a deploy whose command stopped. If it got as far as
+// being the current version, it worked. If not, the current version
 // starts again, as after any failed deploy.
-func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) protocol.DeployDone {
-	done := protocol.DeployDone{DeployID: note.ID}
+func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) {
 	current := a.current(app)
 	if current == note.Number {
-		done.OK = true
-		done.Detected, _ = a.live(app)
-		var err error
-		done.ComposeFile, err = a.composeFile(app, note.Number)
-		if err != nil {
-			slog.Warn("the compose file could not be made", "app", app, "number", note.Number, "error", err)
-		}
-		return done
+		return
 	}
 	a.markFailed(app, note.Number)
-	done.Error = "the daemon stopped during this deploy"
+	slog.Warn("a deploy stopped before it was live", "app", app, "number", note.Number)
 	if current > 0 && a.compose(ctx, app, a.composeJSON(app), func(string, ...any) {}, "up", "-d", "--remove-orphans") == nil {
-		done.Error += fmt.Sprintf("; v%d is running again", current)
+		slog.Info("the release before it is running again", "app", app, "number", current)
 	}
-	return done
 }
 
 // release is one deploy on its way to running. Every step of the deploy
 // reads from it and writes down what it found.
 type release struct {
-	// start is what the hub asked for. A deploy without source takes the
+	// start is what was asked for. A deploy without source takes the
 	// image of the running release into start.Image.
 	start protocol.DeployStart
-	// rules are the rules of the server when the deploy started.
-	rules *protocol.Rules
+	// server is the config of the server when the deploy started.
+	server Config
 	// dir is the folder of this release.
 	dir string
 	// composeJSON is the compose.json moin runs for this release.
@@ -156,7 +100,7 @@ func hasSource(start protocol.DeployStart) bool {
 // runDeploy runs the steps of one deploy in order: make the release, take
 // the compose file of an older release or fetch and build a new one, start
 // it, then follow its databases and clean up.
-func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, rules *protocol.Rules, logf func(string, ...any)) (protocol.Detected, error) {
+func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
 	if !protocol.ValidAppName(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
 		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
 	}
@@ -166,7 +110,7 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, rules 
 		return protocol.Detected{}, fmt.Errorf("write the deploy down: %w", err)
 	}
 	defer os.Remove(note)
-	release, err := a.newRelease(start, rules, logf)
+	release, err := a.newRelease(start, logf)
 	if err != nil {
 		return protocol.Detected{}, err
 	}
@@ -190,7 +134,11 @@ func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, rules 
 
 // newRelease keeps the app's ID and makes an empty folder for the release,
 // with its kind for prune.
-func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, logf func(string, ...any)) (*release, error) {
+func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any)) (*release, error) {
+	server, err := LoadConfig()
+	if err != nil {
+		return nil, err
+	}
 	if start.AppID != "" {
 		err := os.MkdirAll(a.appDir(start.App), 0o700)
 		if err == nil {
@@ -202,7 +150,7 @@ func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, log
 	}
 	dir := a.releaseDir(start.App, start.Number)
 	_ = os.RemoveAll(dir)
-	err := os.MkdirAll(dir, 0o700)
+	err = os.MkdirAll(dir, 0o700)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +170,7 @@ func (a *apps) newRelease(start protocol.DeployStart, rules *protocol.Rules, log
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, rules: rules, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
+	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
 }
 
 // rollBack runs an older release again: its compose file and images, with
@@ -258,8 +206,9 @@ func (a *apps) rollBack(ctx context.Context, release *release) error {
 // the running release into release.start.
 func (a *apps) prepareRelease(ctx context.Context, release *release) error {
 	// Asked before fetch: an image fetch takes from the running release is
-	// already on the server and needs no pull.
-	pull := release.start.Image != ""
+	// already on the server and needs no pull, and so is one the CLI sent
+	// with --image.
+	pull := release.start.Image != "" && !strings.HasPrefix(release.start.Image, project(release.start.App)+":")
 	err := a.fetch(ctx, release)
 	if err != nil {
 		return err
@@ -465,16 +414,13 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 }
 
 // copyDataBefore makes a copy of each database just before the new release
-// touches the data: the hub names it "Before v12".
+// touches the data.
 func (a *apps) copyDataBefore(ctx context.Context, release *release) {
 	before := a.backups.copyBefore(ctx, release.start.App, "", release.logf)
 	if before == nil {
 		return
 	}
-	release.logf("copied the data before v%d", release.start.Number)
-	a.mu.Lock()
-	a.befores[release.start.DeployID] = *before
-	a.mu.Unlock()
+	release.logf("copied the data before v%d: %s", release.start.Number, protocol.BeforeCopyID(*before))
 }
 
 // startPreviousAgain starts the release that ran before, after the new one
@@ -499,8 +445,8 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 	return fmt.Errorf("%w; v%d is running again", startErr, previous)
 }
 
-// afterStart notes the databases the running release has, has backups
-// follow them, and drops old releases and images.
+// afterStart notes the databases the running release has, which the
+// daemon copies from its next minute on, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, release *release) {
 	databases, noBackup, err := a.scanDatabases(ctx, release.composeJSON)
 	if err == nil {
@@ -512,9 +458,6 @@ func (a *apps) afterStart(ctx context.Context, release *release) {
 		}
 	}
 	logDatabases(release.detected, release.logf)
-	if a.backups != nil {
-		go a.backups.tick(context.Background())
-	}
 	a.prune(ctx, release.start.App)
 	a.cleanup(ctx)
 }

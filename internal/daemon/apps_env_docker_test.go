@@ -17,7 +17,7 @@ import (
 // Run with: go test -tags docker -run RepairCatalogEnvFromDocker ./internal/daemon/
 func TestRepairCatalogEnvFromDocker(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	const app = "repair-test"
 	if err := os.CopyFS(a.appDir(app), os.DirFS("testdata/beta34/apps/feeds")); err != nil {
 		t.Fatal(err)

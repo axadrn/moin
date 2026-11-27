@@ -26,7 +26,7 @@ func TestResolveKeepsVariables(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	a := newApps(dir)
 	if _, err := a.setEnv(protocol.EnvSet{App: "vars", Set: map[string]string{"DB_PASSWORD": "s3cret'\"$x"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestResolveKeepsVariables(t *testing.T) {
 // Dockerfile in its compose file, not a compose repo.
 func TestRedeployKeepsHowItBuilds(t *testing.T) {
 	ctx := context.Background()
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	app := "goapp"
 	if err := a.ensureEnv(app); err != nil {
 		t.Fatal(err)

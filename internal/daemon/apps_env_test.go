@@ -16,7 +16,7 @@ import (
 // TestMakeSecrets: a catalog deploy makes a value for each secret its
 // compose file needs that the app lacks, and keeps the ones it has.
 func TestMakeSecrets(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	if _, err := a.setEnv(protocol.EnvSet{App: "flux", Set: map[string]string{"VERSION": "2.2.0", "ADMIN_PASSWORD": "kept"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestMakeSecrets(t *testing.T) {
 // starts and before a deploy, and a catalog app keeps its secrets.
 func TestMoveOldEnv(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	compose, _ := catalog.Compose("miniflux")
 	old := map[string]string{"VERSION": "2.2.0", "ODD": "a$b \"c\" d\\e\nf"}
 	for _, name := range catalog.Secrets(compose) {
@@ -141,7 +141,7 @@ func TestMoveOldEnvFromBeta34(t *testing.T) {
 	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	a.moveOldEnvs(t.Context())
 	want := map[string]map[string]string{
 		// Deployed without env, then env set and restarted.
@@ -191,7 +191,7 @@ func TestMoveOldEnvSaysWhy(t *testing.T) {
 	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	if err := os.Remove(filepath.Join(a.releaseDir("echo", 2), "compose.json")); err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestMoveOldEnvOfAPrunedCatalogApp(t *testing.T) {
 	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	for _, app := range []string{"feeds", "blog"} {
 		if err := os.RemoveAll(a.releaseDir(app, 1)); err != nil {
 			t.Fatal(err)
@@ -262,7 +262,7 @@ func TestRepairCatalogEnv(t *testing.T) {
 	if err := os.CopyFS(dir, os.DirFS("testdata/beta34")); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	beta35 := map[string]map[string]string{
 		"feeds": {"VERSION": "2.3.4", "DB_PASSWORD": "set-since"},
 		"blog":  {"TOKEN": "token-value"},

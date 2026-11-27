@@ -70,7 +70,7 @@ func webBuild(src string) map[string]any {
 // the proxy, so its domains and HTTPS run elsewhere too.
 func TestComposeFileRunsAnywhere(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	a.proxyMode = func() string { return "direct" }
 	src := filepath.Join(a.releaseDir("my-app", 1), "src")
 	config := map[string]any{
@@ -162,7 +162,7 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 // TestComposeFileWithoutDomains has no proxy, and the Dockerfile moin
 // wrote into the compose file of a Go repo stays in it.
 func TestComposeFileWithoutDomains(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": src, "dockerfile_inline": goDockerfile(src, []byte("go 1.26\n"))}}}}
 	text := mustCompose(t, a, config, protocol.Detected{Kind: "go", Service: "web", Port: 8080}, protocol.DeployStart{}, nil)
@@ -174,7 +174,7 @@ func TestComposeFileWithoutDomains(t *testing.T) {
 // TestComposeFileOfRailpack keeps the image moin built: the plan of a
 // Railpack build is not in the repo. Its secrets go with the build.
 func TestComposeFileOfRailpack(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	config := map[string]any{"services": map[string]any{"web": map[string]any{
 		"build": map[string]any{"context": src, "dockerfile": "../" + railpackPlan, "args": map[string]any{"BUILDKIT_SYNTAX": railpackFrontend}},
@@ -189,7 +189,7 @@ func TestComposeFileOfRailpack(t *testing.T) {
 // the running release, so compose.json names moin's image, not the build.
 // The compose file builds from "." again, from base.json.
 func TestComposeFileAfterARestart(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 1), "src")
 	text := mustCompose(t, a, webBuild(src), protocol.Detected{Kind: "dockerfile", Service: "web", Port: 8080}, protocol.DeployStart{}, map[string]string{"web": "moin-my-app-web:1"})
 	compose, _ := os.ReadFile(filepath.Join(a.releaseDir("my-app", 2), "compose.json"))
@@ -204,7 +204,7 @@ func TestComposeFileAfterARestart(t *testing.T) {
 // TestComposeFileOfAnImageDeploy keeps the image CI built for a service the
 // repo builds, pinned as it was deployed.
 func TestComposeFileOfAnImageDeploy(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	image := "ghcr.io/me/my-app@sha256:" + strings.Repeat("a", 64)
 	text := mustCompose(t, a, webBuild(src), protocol.Detected{Kind: "dockerfile", Service: "web", Port: 8080}, protocol.DeployStart{Image: image}, nil)
@@ -217,7 +217,7 @@ func TestComposeFileOfAnImageDeploy(t *testing.T) {
 // proxy as moin-traefik; with both names taken, the file is not made, and
 // no service is replaced.
 func TestComposeFileProxyName(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	domains := protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"example.com"}}}
 	config := webBuild(src)
@@ -246,7 +246,7 @@ func TestComposeFileProxyName(t *testing.T) {
 // server, so its routers stay with moin. The domains keep theirs, and an
 // app reached only there gets no proxy.
 func TestComposeFileLeavesTheInstantAddress(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080}
 	instant := protocol.Domains{Instant: "sslip.io", InstantIP: "203.0.113.7"}
@@ -268,7 +268,7 @@ func TestComposeFileLeavesTheInstantAddress(t *testing.T) {
 // TestComposeFileOnATunnelServer says in its first line that the proxy
 // takes ports 80 and 443 here, which a tunnel server opens none of.
 func TestComposeFileOnATunnelServer(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	a.proxyMode = func() string { return "tunnel" }
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	text := mustCompose(t, a, webBuild(src), protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"example.com"}}}, nil)
@@ -317,7 +317,7 @@ func beta34Server(t *testing.T) *apps {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	a.moveOldEnvs(t.Context())
 	return a
 }
@@ -331,7 +331,7 @@ func TestComposeFileOfABeta34Restart(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(a.appDir("feeds"), "volumes", "data", "postgres"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	release, err := a.newRelease(protocol.DeployStart{App: "feeds", Name: "feeds", Number: 3}, nil, func(string, ...any) {})
+	release, err := a.newRelease(protocol.DeployStart{App: "feeds", Name: "feeds", Number: 3}, func(string, ...any) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func TestComposeFileHoldsNoSecret(t *testing.T) {
 		{"hash", "postgres://u:${DB_PASSWORD}@db/x?h=$$2y$$05$$" + strings.Repeat("h", 53), true, "the hash of the app's password"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			a := newApps(t.TempDir(), nil)
+			a := newApps(t.TempDir())
 			env := map[string]string{"DB_PASSWORD": "s3cret$value", "VERSION": "2026.10.3", "DOMAIN": "my-app.example.com", "DEBUG": "true"}
 			if _, err := a.setEnv(protocol.EnvSet{App: "my-app", Set: env}); err != nil {
 				t.Fatal(err)

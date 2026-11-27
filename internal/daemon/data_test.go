@@ -14,7 +14,7 @@ import (
 
 func TestTablesAndQueries(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	a := newApps(dir)
 	file := filepath.Join(dir, "app.db")
 	db, err := sql.Open("sqlite", file)
 	if err != nil {
@@ -94,7 +94,7 @@ func TestTablesAndQueries(t *testing.T) {
 // can attach or write another file: the daemon runs as root.
 func TestSQLReachesOnlyItsDatabase(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	a := newApps(dir)
 	file := filepath.Join(dir, "app.db")
 	db, err := sql.Open("sqlite", file)
 	if err != nil {

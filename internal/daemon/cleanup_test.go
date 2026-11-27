@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // TestUnusedImages: only an image moin named, that no release on disk
@@ -29,7 +27,7 @@ func TestUnusedImages(t *testing.T) {
 // TestRememberImages: the images file grows with the images of the
 // releases, so the names survive prune.
 func TestRememberImages(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	release := a.releaseDir("shop", 1)
 	if err := os.MkdirAll(release, 0o755); err != nil {
 		t.Fatal(err)

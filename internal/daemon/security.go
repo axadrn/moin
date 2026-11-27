@@ -41,9 +41,7 @@ type serverFile struct {
 	TunnelToken string `json:"tunnel_token,omitempty"`
 	// TailscaleKey joins the server to a tailnet.
 	TailscaleKey string `json:"tailscale_key,omitempty"`
-	// Buckets are the secret keys of buckets by their ID in the hub;
-	// Registries the registry logins by host, as <username>:<password>.
-	Buckets    map[string]string `json:"buckets,omitempty"`
+	// Registries are the registry logins by host, as <username>:<password>.
 	Registries map[string]string `json:"registries,omitempty"`
 }
 
@@ -56,25 +54,6 @@ func loadServerFile(dir string) (file serverFile, ok bool) {
 	return file, json.Unmarshal(body, &file) == nil
 }
 
-// secretNames are the names of the secrets in the file, for Hello.
-func (f serverFile) secretNames() []string {
-	names := []string{}
-	if f.TunnelToken != "" {
-		names = append(names, protocol.SecretTunnel)
-	}
-	if f.TailscaleKey != "" {
-		names = append(names, protocol.SecretTailscale)
-	}
-	for id := range f.Buckets {
-		names = append(names, protocol.BucketSecret(id))
-	}
-	for host := range f.Registries {
-		names = append(names, protocol.RegistrySecret(host))
-	}
-	slices.Sort(names)
-	return names
-}
-
 // security applies the server config and keeps it: after each start and
 // every protocol.SecurityEvery it puts back what drifted.
 type security struct {
@@ -85,8 +64,6 @@ type security struct {
 
 	mu   sync.Mutex
 	file serverFile
-	// fixed is what checks put back that the hub has not heard of yet.
-	fixed []string
 }
 
 func newSecurity(dir string, a *apps) *security {
@@ -117,14 +94,6 @@ func (s *security) proxyMode() string {
 	return "direct"
 }
 
-// bucketKey is the secret key the server keeps for the bucket with the
-// hub's ID id, "" for none.
-func (s *security) bucketKey(id string) string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.file.Buckets[id]
-}
-
 // registryLogin is the server's login for a registry host, as
 // <username>:<password>, "" for none.
 func (s *security) registryLogin(host string) string {
@@ -145,8 +114,6 @@ func (s *security) setSecret(name, value string) error {
 		s.file.TunnelToken = value
 	case name == protocol.SecretTailscale:
 		s.file.TailscaleKey = value
-	case kind == "bucket" && of != "":
-		s.file.Buckets = setOrRemove(s.file.Buckets, of, value)
 	case kind == "registry" && of != "":
 		s.file.Registries = setOrRemove(s.file.Registries, of, value)
 	default:
@@ -165,63 +132,6 @@ func setOrRemove(values map[string]string, key, value string) map[string]string 
 	}
 	values[key] = value
 	return values
-}
-
-// secretSet answers secret.set (SecretSet). The rule network: locked
-// refuses the tunnel token and the Tailscale key, like the config they
-// belong to.
-func (r *runner) secretSet(message protocol.Message, rules *protocol.Rules) {
-	answer(r, message, protocol.TypeOK, func(request protocol.SecretSet) (any, error) {
-		network := request.Name == protocol.SecretTunnel || request.Name == protocol.SecretTailscale
-		if network && rules != nil && rules.NetworkLocked {
-			return nil, refused(r.rulesFile, "network: locked")
-		}
-		return nil, r.security.setSecret(request.Name, request.Value)
-	})
-}
-
-// serverConfig answers server.config (ServerConfig) unless the rules say
-// network: locked.
-func (r *runner) serverConfig(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
-	var config protocol.ServerConfig
-	if err := message.Decode(&config); err != nil {
-		r.fail(message, err)
-		return
-	}
-	if rules != nil && rules.NetworkLocked {
-		r.fail(message, refused(r.rulesFile, "network: locked"))
-		return
-	}
-	r.send(protocol.TypeServerConfigResult, message.RequestID, r.security.apply(ctx, config))
-}
-
-// keepSecurity checks the server's security after each start and every
-// protocol.SecurityEvery, puts back what drifted, and tells the hub what
-// is. A session that starts gets the last report at once (reportSecurity).
-func (r *runner) keepSecurity(ctx context.Context) {
-	ticker := time.NewTicker(protocol.SecurityEvery)
-	defer ticker.Stop()
-	for {
-		r.reportSecurity(r.security.keep(ctx))
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-// reportSecurity sends a report while a session is up; the fixes in it
-// then count as told.
-func (r *runner) reportSecurity(report protocol.ServerConfigResult) {
-	r.mu.Lock()
-	connected := r.conn != nil
-	r.mu.Unlock()
-	if !connected {
-		return
-	}
-	r.send(protocol.TypeServerSecurity, "", report)
-	r.security.told(len(report.Fixed))
 }
 
 // apply sets up what the hub asks for. SSH that was off starts again when
@@ -266,18 +176,8 @@ func (s *security) keep(ctx context.Context) protocol.ServerConfigResult {
 	before := look(ctx, s.apps)
 	result := s.set(ctx, file)
 	fixed := drifted(file.ServerConfig, before, look(ctx, s.apps))
-	s.mu.Lock()
-	s.fixed = append(s.fixed, fixed...)
-	result.Fixed = slices.Clone(s.fixed)
-	s.mu.Unlock()
+	result.Fixed = fixed
 	return result
-}
-
-// told forgets the first n fixes: the hub has them.
-func (s *security) told(n int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.fixed = s.fixed[min(n, len(s.fixed)):]
 }
 
 // seen is what a look at the server finds.

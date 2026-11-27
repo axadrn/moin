@@ -43,7 +43,7 @@ func TestSQLiteRecover(t *testing.T) {
 		if switched {
 			os.Rename(live+".moin-restore", live)
 		}
-		e := &sqliteEngine{b: newBackups(newApps(dir, nil), nil), database: protocol.Database{HostPath: live}}
+		e := &sqliteEngine{b: newBackups(newApps(dir)), database: protocol.Database{HostPath: live}}
 		got, err := e.Recover(context.Background(), restoreMark{Undo: id})
 		if err != nil || got != switched {
 			t.Fatalf("switched %v: Recover says %v, %v", switched, got, err)
@@ -56,7 +56,7 @@ func TestSQLiteRecover(t *testing.T) {
 	dir := t.TempDir()
 	live := filepath.Join(dir, "app.db")
 	os.WriteFile(undoFile(live, id), []byte("before"), 0o600)
-	e := &sqliteEngine{b: newBackups(newApps(dir, nil), nil), database: protocol.Database{HostPath: live}}
+	e := &sqliteEngine{b: newBackups(newApps(dir)), database: protocol.Database{HostPath: live}}
 	if got, err := e.Recover(context.Background(), restoreMark{Undo: id}); err != nil || got {
 		t.Fatalf("no live file: %v %v", got, err)
 	}
@@ -74,8 +74,8 @@ func TestBeforeCopyIDs(t *testing.T) {
 			t.Fatal("a scheduled copy has the ID of a copy before a change")
 		}
 	}
-	b := newBackups(newApps(t.TempDir(), nil), nil)
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Workspace: "ws"}})
+	b := newBackups(newApps(t.TempDir()))
+	b.configure(Config{Name: "prod", Bucket: &Bucket{Bucket: "b"}})
 	first := b.copyBefore(context.Background(), "shop", "", func(string, ...any) {})
 	b.before["shop"] = time.Now().UTC().Truncate(time.Second)
 	started := time.Now()
@@ -101,33 +101,16 @@ func TestCopyIDs(t *testing.T) {
 	}
 }
 
-// An app without settings, or with broken ones, is copied hourly and
-// keeps its copies a week.
-func TestScheduleDefaults(t *testing.T) {
-	b := newBackups(newApps(t.TempDir(), nil), nil)
-	b.configure(protocol.BackupConfig{Bucket: nil, Schedules: map[string]protocol.Schedule{"shop": {Every: 15, Keep: 3}, "broken": {}}})
-	if got := b.schedule("shop"); got != (protocol.Schedule{Every: 15, Keep: 3}) {
-		t.Errorf("shop: %+v", got)
-	}
-	for _, app := range []string{"broken", "other"} {
-		if got := b.schedule(app); got != protocol.DefaultSchedule {
-			t.Errorf("%s: %+v", app, got)
-		}
-	}
-}
-
-// A bucket that never answers ends the listing in time, with an error
-// the hub can put in words.
+// A bucket that never answers ends the listing in time.
 func TestABucketThatNeverAnswers(t *testing.T) {
 	release := make(chan struct{})
 	bucket := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-release }))
 	defer bucket.Close()
 	defer close(release)
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	os.MkdirAll(a.appDir("shop"), 0o700)
-	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
-	b := newBackups(a, nil)
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Endpoint: bucket.URL, AccessKey: "k", SecretKey: "s"}})
+	b := newBackups(a)
+	b.configure(Config{Name: "prod", Bucket: &Bucket{Bucket: "b", Endpoint: bucket.URL, AccessKey: "k", SecretKey: "s"}})
 
 	began := time.Now()
 	_, err := b.copies(context.Background(), "shop", protocol.Database{Path: "/data/app.db"})
@@ -139,23 +122,19 @@ func TestABucketThatNeverAnswers(t *testing.T) {
 	}
 }
 
-// Every copy of a database has its place in the bucket, which the hub
-// finds the same way for a download.
+// Every copy of a database has its place in the bucket, under the
+// server's name.
 func TestCopyKey(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	os.MkdirAll(a.appDir("shop"), 0o700)
-	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
-	b := newBackups(a, nil)
+	b := newBackups(a)
 	if _, _, err := b.where("shop", protocol.Database{Path: "/data/app.db"}); err == nil {
 		t.Fatal("a folder without a bucket")
 	}
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Path: "moin", Workspace: "ws"}})
+	b.configure(Config{Name: "prod", Bucket: &Bucket{Bucket: "b", Path: "moin"}})
 	_, folder, err := b.where("shop", protocol.Database{Path: "/data/app.db"})
-	if err != nil || folder != "moin/ws/shop/id-1/data~app.db" {
+	if err != nil || folder != "moin/prod/shop/data~app.db" {
 		t.Fatalf("folder %q %v", folder, err)
-	}
-	if _, _, err := b.where("blog", protocol.Database{Path: "/data/app.db"}); err == nil {
-		t.Fatal("an app without an ID has a folder")
 	}
 }
 
@@ -175,9 +154,9 @@ func TestMoinNames(t *testing.T) {
 
 // Two paths that only differ by / and - never share a folder.
 func TestDatabaseFolder(t *testing.T) {
-	bucket := protocol.Bucket{Workspace: "ws"}
-	if protocol.DatabaseFolder(bucket, "a", "1", "/data/app.db") == protocol.DatabaseFolder(bucket, "a", "1", "/data-app.db") ||
-		protocol.DatabaseFolder(bucket, "a", "1", "postgres-db/analytics") == protocol.DatabaseFolder(bucket, "a", "1", "postgres-db-analytics") {
+	config := Config{Name: "prod", Bucket: &Bucket{}}
+	if databaseKey(config, "a", "/data/app.db") == databaseKey(config, "a", "/data-app.db") ||
+		databaseKey(config, "a", "postgres-db/analytics") == databaseKey(config, "a", "postgres-db-analytics") {
 		t.Error("two databases share a folder")
 	}
 }
@@ -192,14 +171,15 @@ func TestRoom(t *testing.T) {
 	}
 }
 
-// Copies that stopped coming are an error the hub hears, and a stray
+// Copies that stopped coming are an error, and a stray
 // temp copy of a stopped daemon goes at the next start.
 func TestLateAndSweep(t *testing.T) {
 	dir := t.TempDir()
-	b := newBackups(newApps(dir, nil), nil)
+	b := newBackups(newApps(dir))
+	b.configure(Config{Name: "prod", Bucket: &Bucket{Bucket: "b"}})
 	database := protocol.Database{Path: "/data/app.db", HostPath: filepath.Join(dir, "app.db")}
 	b.mu.Lock()
-	b.state("shop", database).lastCopy = time.Now().Add(-3 * time.Hour)
+	b.state("shop", database).LastCopy = time.Now().Add(-3 * time.Hour)
 	b.mu.Unlock()
 	if status := b.status(context.Background(), "shop", database, false); !strings.Contains(status.Error, "the copies are late") {
 		t.Fatalf("late: %+v", status)
@@ -218,15 +198,14 @@ func TestLateAndSweep(t *testing.T) {
 
 // A copy before a deploy that fails says so in the deploy log.
 func TestCopyBeforeSaysWhenItFails(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	file, _ := sqliteDatabase(t)
 	release := a.releaseDir("shop", 1)
 	os.MkdirAll(release, 0o700)
 	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
 	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
-	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
-	b := newBackups(a, nil)
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws", AccessKey: "x", SecretKey: "y"}})
+	b := newBackups(a)
+	b.configure(Config{Name: "prod", Bucket: &Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", AccessKey: "x", SecretKey: "y"}})
 	var logged []string
 	if at := b.copyBefore(context.Background(), "shop", "", func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }); at != nil || len(logged) != 1 || !strings.Contains(logged[0], "before the change failed") {
 		t.Fatalf("copy before: %v %v", at, logged)
@@ -245,27 +224,16 @@ func sqliteDatabase(t *testing.T) (string, *sql.DB) {
 	return file, db
 }
 
-// Nothing of an app the hub sent no schedule for is deleted: the
-// default would be a guess.
-func TestNoPruneWithoutSchedule(t *testing.T) {
-	b := newBackups(newApps(t.TempDir(), nil), nil)
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Endpoint: "http://127.0.0.1:1", Bucket: "b", Workspace: "ws"}, Schedules: map[string]protocol.Schedule{}})
-	old := protocol.Copy{ID: "20200101T000000Z", At: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
-	if err := b.prune(context.Background(), "shop", protocol.Database{Path: "/data/app.db"}, []protocol.Copy{{At: time.Now()}, old}); err != nil {
-		t.Fatalf("prune touched the bucket: %v", err)
-	}
-}
-
 // An edit takes the app's lock, as a deploy and a restore do: it waits
 // for one that holds it.
 func TestEditsTakeTheAppLock(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	file, _ := sqliteDatabase(t)
 	release := a.releaseDir("shop", 1)
 	os.MkdirAll(release, 0o700)
 	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
 	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
-	a.backups = newBackups(a, nil)
+	a.backups = newBackups(a)
 	unlock := a.lock("shop")
 	done := make(chan error, 1)
 	go func() {
@@ -283,29 +251,16 @@ func TestEditsTakeTheAppLock(t *testing.T) {
 	}
 }
 
-// An app the hub cannot open the bucket of is paused: nothing of it is
-// copied or deleted, and it says why.
-func TestPausedApp(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
-	os.MkdirAll(a.appDir("shop"), 0o700)
-	os.WriteFile(filepath.Join(a.appDir("shop"), "app-id"), []byte("id-1"), 0o600)
-	b := newBackups(a, nil)
-	b.configure(protocol.BackupConfig{Bucket: &protocol.Bucket{Bucket: "b", Workspace: "ws"}, Paused: map[string]string{"shop": "the bucket of shop cannot be opened"}})
-	if _, _, err := b.where("shop", protocol.Database{Path: "/data/app.db"}); err == nil || !strings.Contains(err.Error(), "cannot be opened") {
-		t.Fatalf("a paused app: %v", err)
-	}
-}
-
 // A restore that waits for the app's lock already keeps edits out: none
 // slips in between.
 func TestEditsRefusedWhileARestoreWaits(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	file, _ := sqliteDatabase(t)
 	release := a.releaseDir("shop", 1)
 	os.MkdirAll(release, 0o700)
 	saveJSON(filepath.Join(release, "detected.json"), protocol.Detected{Databases: []protocol.Database{{Path: "/data/app.db", HostPath: file}}})
 	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
-	a.backups = newBackups(a, nil)
+	a.backups = newBackups(a)
 	unlock := a.lock("shop")
 	done := make(chan error, 1)
 	go func() {

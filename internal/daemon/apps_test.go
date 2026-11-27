@@ -342,8 +342,9 @@ func TestStartKeepsTheCrashInTheDeployLog(t *testing.T) {
 	}
 }
 
-// A daemon that died during a deploy tells the hub how it ended when it
-// starts, and only starts the app if the new version never became current.
+// A deploy whose command stopped is ended by the daemon, which only starts
+// the app if the new version never became current. One that still runs
+// holds the app's lock and is left alone.
 func TestDeployTheDaemonDiedIn(t *testing.T) {
 	calls := filepath.Join(t.TempDir(), "calls")
 	fakeCommand(t, "docker", "echo \"$*\" >> "+calls+"\n")
@@ -351,18 +352,15 @@ func TestDeployTheDaemonDiedIn(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		current     int
-		wantOK      bool
-		wantError   string
 		wantStarted string
 	}{
-		{"the new version never became current", 12, false, "the daemon stopped during this deploy; v12 is running again", "releases/12/compose.json --progress plain up -d --remove-orphans"},
-		{"the new version is already current", 13, true, "", ""},
-		{"the very first deploy", 0, false, "the daemon stopped during this deploy", ""},
+		{"the new version never became current", 12, "releases/12/compose.json --progress plain up -d --remove-orphans"},
+		{"the new version is already current", 13, ""},
+		{"the very first deploy", 0, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			os.Remove(calls)
-			var sent []protocol.DeployDone
-			a := &apps{dir: t.TempDir(), send: func(_ protocol.MessageType, _ string, data any) { sent = append(sent, data.(protocol.DeployDone)) }}
+			a := newApps(t.TempDir())
 			if err := writeState(a.noteFile("blog"), deployNote{ID: "d1", Number: 13}); err != nil {
 				t.Fatal(err)
 			}
@@ -371,10 +369,13 @@ func TestDeployTheDaemonDiedIn(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			unlock := a.lock("blog")
 			a.recoverDeploys(context.Background())
-			if len(sent) != 1 || sent[0].DeployID != "d1" || sent[0].OK != test.wantOK || sent[0].Error != test.wantError {
-				t.Fatalf("told the hub %+v", sent)
+			if !exists(a.noteFile("blog")) {
+				t.Fatal("a deploy that still runs was ended")
 			}
+			unlock()
+			a.recoverDeploys(context.Background())
 			if exists(a.noteFile("blog")) {
 				t.Error("the note is still there")
 			}
@@ -553,7 +554,7 @@ func TestTakePlaces(t *testing.T) {
 // release they took the compose file from. prune keeps that release while
 // a kept one names its source, also past the last builds it keeps.
 func TestPruneKeepsNamedSources(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	app := "prune-sources"
 	source := filepath.Join(a.releaseDir(app, 1), "src")
 	for number := 1; number <= protocol.KeepReleases+2; number++ {

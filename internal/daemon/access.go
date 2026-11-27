@@ -145,7 +145,7 @@ const beyondTheApp = "this reaches beyond the app, so the server refuses it"
 // (takePlaces); a ${VAR} Docker would fill in in another setting it checks
 // fails the check, as it could become anything.
 func (a *apps) checkCompose(release *release) error {
-	if release.rules != nil && release.rules.ServerAccess {
+	if release.server.ServerAccess {
 		return nil
 	}
 	config, err := readJSON(release.composeJSON)
@@ -154,7 +154,7 @@ func (a *apps) checkCompose(release *release) error {
 	}
 	room := a.roomOf(release, config)
 	if reason := room.check(config); reason != "" {
-		return fmt.Errorf("%s: %s. Allow it with server-access: on in %s", reason, beyondTheApp, RulesFile())
+		return fmt.Errorf("%s: %s. Allow it with server_access: true in %s", reason, beyondTheApp, ConfigFile())
 	}
 	return nil
 }
@@ -170,10 +170,8 @@ func (a *apps) roomOf(release *release, config map[string]any) appRoom {
 		project:     nameOf(release.start),
 		envFile:     a.envFile(app),
 	}
-	if release.rules != nil {
-		for _, folder := range release.rules.Mounts {
-			room.mounts = append(room.mounts, resolved(folder))
-		}
+	for _, folder := range release.server.Mounts {
+		room.mounts = append(room.mounts, resolved(folder))
 	}
 	if current := a.current(app); current > 0 && current != release.start.Number {
 		running, _ := readJSON(filepath.Join(a.releaseDir(app, current), "compose.json"))
@@ -384,7 +382,7 @@ func (r appRoom) checkMount(mount map[string]any) string {
 		return ""
 	}
 	if !r.inData(target) && !r.inMounts(target) {
-		return "mounts " + source + ", which is not a folder of the app. Allow a folder of the server with mounts: <folder> in " + RulesFile()
+		return "mounts " + source + ", which is not a folder of the app. Allow a folder of the server with mounts: <folder> in " + ConfigFile()
 	}
 	for _, folder := range r.writable {
 		if target != folder && within(folder, target) {

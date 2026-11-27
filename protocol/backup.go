@@ -127,7 +127,9 @@ type DatabaseBackup struct {
 	Undos      []Copy     `json:"undos,omitempty"`
 	CheckedAt  *time.Time `json:"verified_at,omitempty"`
 	CheckError string     `json:"drill_error,omitempty"`
-	Error      string     `json:"error,omitempty"`
+	// CheckedCopy is the copy the last check that worked restored.
+	CheckedCopy string `json:"checked_copy,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 // Copy is one copy of a database in the bucket, or one state before a

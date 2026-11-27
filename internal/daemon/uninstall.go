@@ -24,8 +24,7 @@ var (
 // proxy, the tunnel and the firewall, unless withApps: then it takes all of
 // them down too, data included. It returns what stays on the server.
 func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string, ...any)) ([]string, error) {
-	// legacyUnit is there when the server never moved from the agent.
-	units := map[string]string{build.Name + "-daemon": unitFile, legacyUnit: legacyUnitFile}
+	units := map[string]string{build.Name + "-daemon": unitFile}
 	var installed []string
 	for unit, file := range units {
 		if _, err := os.Stat(file); err == nil {
@@ -47,7 +46,7 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 	}
 	var err error
 
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	appNames := a.names()
 	_, err = exec.LookPath("docker")
 	hasDocker := err == nil
@@ -119,8 +118,8 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 			kept = append(kept, "the proxy container "+proxyName+", and the tunnel and firewall when they were on")
 		}
 	}
-	if _, err := os.Stat(RulesFile()); err == nil {
-		kept = append(kept, "your rules in "+RulesFile())
+	if _, err := os.Stat(ConfigFile()); err == nil {
+		kept = append(kept, "the config in "+ConfigFile())
 	}
 	if hasDocker {
 		kept = append(kept, "Docker")

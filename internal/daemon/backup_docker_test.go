@@ -52,7 +52,7 @@ func newBackupTest(t *testing.T, app string, compose map[string]any, database pr
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	t.Cleanup(cancel)
 	test := &backupTest{t: t, ctx: ctx, app: app, database: database}
-	test.a = newApps(t.TempDir(), nil)
+	test.a = newApps(t.TempDir())
 	test.b = newBackups(test.a, func(kind protocol.MessageType, _ string, data any) {
 		if backups, ok := data.(protocol.Backups); ok && kind == protocol.TypeBackupStatus {
 			test.mu.Lock()

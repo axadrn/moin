@@ -1,265 +1,511 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
-	"strings"
+	"strconv"
 	"time"
 
+	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/daemon"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/protocol"
 )
 
-// backups lists the backups of an app with the moments to go back to, or
-// sets how often and how long with --every and --keep.
-func backups(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("backups", "backups [app] [--every 15m|1h|1d] [--keep 1d|3d|7d|30d]").withApp()
-	every := flags.String("every", "", "how often moin copies the databases: 15m, 1h or 1d")
-	keep := flags.String("keep", "", "how long each copy stays: 1d, 3d, 7d or 30d")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() > 1 {
-		return flags.wrong()
-	}
-	name, err := flags.app(flags.Arg(0))
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	list, err := api.Backups(ctx, name)
-	if err != nil {
-		return err
-	}
-	if *every == "" && *keep == "" {
-		printBackups(stdout, name, list, time.Now())
-		return nil
-	}
-	schedule := list.BackupSchedule
-	if *every != "" {
-		minutes, ok := protocol.EveryMinutes(*every)
-		if !ok {
-			return fmt.Errorf("--every is 15m, 1h or 1d")
-		}
-		schedule.EveryMinutes = minutes
-	}
-	if *keep != "" {
-		days, ok := protocol.KeepDays(*keep)
-		if !ok {
-			return fmt.Errorf("--keep is 1d, 3d, 7d or 30d")
-		}
-		schedule.KeepDays = days
-	}
-	schedule, err = api.SetBackupSchedule(ctx, name, schedule)
-	if err != nil {
-		return err
-	}
-	done(stdout, "%s is copied %s, each copy kept %s.", name, everyText(schedule.EveryMinutes), keepText(schedule.KeepDays))
-	return nil
-}
+// Backups, and the parts of a server's config the CLI changes: the bucket,
+// the alerts and the watchers. Each command runs `moin here …` on the
+// server over SSH. What it sends, like a secret key, goes as JSON on
+// stdin, never on the command line; what comes back is JSON on stdout.
 
-func everyText(minutes int) string {
-	switch minutes {
-	case 60:
-		return "hourly"
-	case 1440:
-		return "daily"
-	}
-	return fmt.Sprintf("every %d minutes", minutes)
-}
-
-func keepText(days int) string {
-	if days == 1 {
-		return "1 day"
-	}
-	return fmt.Sprintf("%d days", days)
-}
-
-func onOff(on bool) string {
-	if on {
-		return "on"
-	}
-	return "off"
-}
-
-// backUp is moin backup: download a copy.
-func backUp(ctx context.Context, args []string, stdout io.Writer) error {
-	if len(args) == 0 || args[0] != "download" {
-		return fmt.Errorf("usage: `%s backup download [app] [--db <path>] [--to <moment>] [--link]`. moin copies every database on its schedule: %s backups lists the copies", build.Name, build.Name)
-	}
-	flags := newFlags("backup download", "backup download [app] [--db <path>] [--to <moment>] [--link]").withApp()
-	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	to := flags.String("to", "", "a copy from "+build.Name+" backups, like before-v12; the newest without it")
-	link := flags.Bool("link", false, "print the link to the copy in your bucket instead of saving it here")
-	if err := flags.parse(args[1:]); err != nil {
-		return err
-	}
-	if flags.NArg() > 1 {
-		return flags.wrong()
-	}
-	name, err := flags.app(flags.Arg(0))
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	download, err := api.Download(ctx, name, *database, strings.TrimSpace(*to))
-	if err != nil {
-		return err
-	}
-	if *link {
-		fmt.Fprintln(stdout, download.Link)
-		hint(stdout, "The link works for 15 minutes:", build.Name+" backup download "+name+" --link")
-		return nil
-	}
-	file := copyName(name, download.Link)
-	out, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("save the copy: %w", err)
-	}
-	err = api.FetchCopy(ctx, download.Link, out)
-	if closeErr := out.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		os.Remove(file)
-		return err
-	}
-	done(stdout, "Saved %s (%s), the copy of %s from %s.", file, human.Size(float64(download.Size)), download.Database, download.At.UTC().Format("Jan 2 15:04 UTC"))
-	return nil
-}
-
-// copyName is the file a copy saves to: the app, the database and the
-// copy's name in the bucket, like my-app-data-app.db-20261107T140000Z.db.gz.
-func copyName(app, link string) string {
-	parsed, err := url.Parse(link)
-	if err != nil {
-		return app + "-copy"
-	}
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) < 3 {
-		return app + "-copy"
-	}
-	return app + "-" + parts[len(parts)-3] + "-" + parts[len(parts)-1]
-}
-
-// restore puts a database back to a moment.
-func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("restore", `restore [app] --to <moment> [--db <path>] [--confirm <app>]`).withApp().withConfirm()
-	database := flags.String("db", "", "database path in the container; needed when the app has several")
-	to := flags.String("to", "", `a moment from `+build.Name+` backups, like before-v12, or a time in UTC, like 14:01 or "2026-11-07 14:01"`)
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() > 1 {
-		return flags.wrong()
-	}
-	if strings.TrimSpace(*to) == "" {
-		return fmt.Errorf("name the moment to go back to: %s restore <app> --to before-v12. %s backups lists them", build.Name, build.Name)
-	}
-	name, err := flags.app(flags.Arg(0))
-	if err != nil {
-		return err
-	}
-	moment, at := restoreTarget(*to, time.Now())
-	what := "the moment " + moment
-	if at != nil {
-		what = at.Format("2006-01-02 15:04") + " UTC"
-	}
-	// The hub checks the name typed out too.
-	typed, err := typeName(stdin, stdout, flags.confirmed(), fmt.Sprintf("Put the database of %s back to %s? It replaces what is there now; %s keeps the data of now beside it, so you can undo this.", name, what, build.Name), name)
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	step(stdout, "restoring %s: building it beside the live database, then one switch", name)
-	err = api.Restore(ctx, name, *database, moment, at, typed)
-	if err != nil {
-		return err
-	}
-	done(stdout, "Restored. %s runs again. Undo it with %s restore %s --to the newest undo- moment of %s backups.", name, build.Name, name, build.Name)
-	return nil
-}
-
-// restoreTarget reads where a restore goes: a time, to the minute, or
-// else a moment's ID or label.
-func restoreTarget(to string, now time.Time) (moment string, at *time.Time) {
-	parsed, err := parseTime(to, now)
-	if err != nil {
-		return strings.TrimSpace(to), nil
-	}
-	parsed = parsed.Truncate(time.Minute)
-	return "", &parsed
-}
-
-// parseTime reads a time in UTC: RFC 3339, or a date and time, or a time
-// of today.
-func parseTime(text string, now time.Time) (time.Time, error) {
-	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02T15:04", "15:04:05", "15:04"} {
-		parsed, err := time.Parse(layout, strings.TrimSpace(text))
+// hereJSON runs `moin here args…` on server. input, when not nil, is sent
+// as JSON; the answer is read into result, when not nil.
+func hereJSON(ctx context.Context, server string, input, result any, args ...string) error {
+	var stdin io.Reader
+	if input != nil {
+		body, err := json.Marshal(input)
 		if err != nil {
-			continue
+			return err
 		}
-		// A time without a day is today in UTC, as in the TUI.
-		if parsed.Year() == 0 {
-			now = now.UTC()
-			parsed = time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
-		}
-		return parsed.UTC(), nil
+		stdin = bytes.NewReader(body)
 	}
-	return time.Time{}, errors.New("not a time")
+	out, err := sshOutput(ctx, server, hereLine(args...), stdin)
+	if err != nil || result == nil {
+		return err
+	}
+	if err := json.Unmarshal(out, result); err != nil {
+		return fmt.Errorf("%s answered something moin cannot read. Update it with `%s update %s`", server, build.Name, server)
+	}
+	return nil
 }
 
-func printBackups(w io.Writer, app string, list client.AppBackups, now time.Time) {
-	for index, database := range list.Databases {
-		if index > 0 {
-			fmt.Fprintln(w)
-		}
-		fmt.Fprintln(w, style.Bold.Render(database.Database))
-		checked := "not checked yet"
-		if database.CheckedAt != nil {
-			checked = "checked " + human.Ago(*database.CheckedAt, now)
-		}
-		switch {
-		case database.Problem != "":
-			fmt.Fprintln(w, "  "+style.Danger.Render(style.SymbolFailed+" "+database.Problem))
-		case database.CopiedAt == nil:
-			fmt.Fprintln(w, "  "+style.Muted.Render("starting: no copy yet"))
-		default:
-			fmt.Fprintln(w, "  "+style.Success.Render(style.SymbolDone+" last copy "+human.Ago(*database.CopiedAt, now)+" · "+checked))
-		}
-		if len(database.Moments) == 0 {
-			if database.Problem == "" {
-				fmt.Fprintln(w, style.Muted.Render("  nothing to go back to yet"))
-			}
-			continue
-		}
-		rows := [][]string{}
-		for _, moment := range database.Moments {
-			rows = append(rows, []string{moment.ID, moment.Label, moment.At.UTC().Format("Jan 2 15:04") + " UTC"})
-		}
-		table(w, []string{"MOMENT", "GO BACK TO", "AT"}, rows)
+// shownCopies is how many copies of a database `moin backups` lists.
+const shownCopies = 10
+
+// backups is `moin backups <server>`: the copies of the app's databases,
+// the last daily check and the copy it proved.
+func backups(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("backups", "backups <server> [--app <name>] [--json]").withApp().withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
 	}
-	fmt.Fprintln(w)
-	if list.Bucket != "" {
-		fmt.Fprintln(w, style.Muted.Render("bucket: "+list.Bucket+", copied "+everyText(list.EveryMinutes)+", kept "+keepText(list.KeepDays)))
+	server, err := flags.server()
+	if err != nil {
+		return err
 	}
-	hint(w, "Go back:", build.Name+" restore "+app+" --to <moment>, or a time like 14:01 UTC")
-	hint(w, "How often:", build.Name+" backups "+app+" --every 15m|1h|1d --keep 1d|3d|7d|30d")
-	hint(w, "A copy:", build.Name+" backup download "+app)
+	app, err := flags.app()
+	if err != nil {
+		return err
+	}
+	var databases []protocol.DatabaseBackup
+	if err := hereJSON(ctx, server, nil, &databases, "backups", app); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, databases)
+	}
+	if len(databases) == 0 {
+		fmt.Fprintln(stdout, app+" has no database moin can copy: no SQLite file on a volume, no Postgres service.")
+		return nil
+	}
+	for _, database := range databases {
+		printBackup(stdout, server, database, time.Now())
+	}
+	return nil
+}
+
+// printBackup shows how one database is backed up.
+func printBackup(stdout io.Writer, server string, database protocol.DatabaseBackup, now time.Time) {
+	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
+	if database.Error != "" {
+		fmt.Fprintln(stdout, "  "+style.Danger.Render("✗")+" "+database.Error)
+	}
+	fmt.Fprintln(stdout, "  "+checkLine(database, now))
+	rows := [][]string{}
+	for index, copy := range database.Copies {
+		if index == shownCopies {
+			rows = append(rows, []string{style.Muted.Render(fmt.Sprintf("and %d older, see --json", len(database.Copies)-shownCopies)), "", ""})
+			break
+		}
+		rows = append(rows, []string{copy.ID, human.Ago(copy.At, now), human.Size(float64(copy.Size))})
+	}
+	for _, undo := range database.Undos {
+		rows = append(rows, []string{"undo-" + undo.ID, human.Ago(undo.At, now), "before a restore"})
+	}
+	if len(rows) > 0 {
+		table(stdout, []string{"COPY", "TAKEN", "SIZE"}, rows)
+		hint(stdout, "Go back to one with", build.Name+" restore "+server+" --to <copy>")
+	}
+	fmt.Fprintln(stdout)
+}
+
+// checkLine says how the last daily check of a database went.
+func checkLine(database protocol.DatabaseBackup, now time.Time) string {
+	switch {
+	case database.CheckedAt == nil:
+		return style.Muted.Render("No restore check yet. The newest copy is restored and read once a day.")
+	case database.CheckError != "":
+		return style.Danger.Render("✗") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError
+	}
+	return style.Success.Render("✓") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": the copy " + database.CheckedCopy + " restored and read fine"
+}
+
+// backUp is `moin backup <server>`: a copy of the app's databases now.
+func backUp(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("backup", "backup <server> [--app <name>] [--json]").withApp().withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	app, err := flags.app()
+	if err != nil {
+		return err
+	}
+	var copied []daemon.Copied
+	if err := hereJSON(ctx, server, nil, &copied, "backup", app); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, copied)
+	}
+	for _, copy := range copied {
+		done(stdout, "Copied %s of %s: %s", copy.Database, app, copy.Copy)
+	}
+	return nil
+}
+
+// restore is `moin restore <server> --to <copy|time|undo-…>`: a database
+// goes back, and what it was before stays as an undo.
+func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("restore", "restore <server> --to <copy | 2026-11-27T14:07 | undo-…> [--database <name>] [--app <name>] [--yes] [--json]").withApp().withYes().withJSON()
+	to := flags.String("to", "", "a copy, a time in UTC, or an undo: see `"+build.Name+" backups <server>`")
+	database := flags.String("database", "", "the database, when the app has several")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	app, err := flags.app()
+	if err != nil {
+		return err
+	}
+	if *to == "" {
+		return fmt.Errorf("say what to go back to with --to. See the copies with `%s backups %s`", build.Name, server)
+	}
+	question := fmt.Sprintf("Put the data of %s on %s back to %s? The app stops for a moment.", app, server, *to)
+	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+		return err
+	}
+	var restored daemon.Restored
+	if err := hereJSON(ctx, server, nil, &restored, "restore", app, *to, *database); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, restored)
+	}
+	done(stdout, "%s of %s is back at %s", restored.Database, app, restored.To)
+	hint(stdout, "Undo it with", build.Name+" restore "+server+" --to "+restored.Undo)
+	return nil
+}
+
+// bucket is `moin bucket <server>` and `moin bucket set <server> …`.
+func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) > 0 && args[0] == "set" {
+		return setBucket(ctx, args[1:], stdin, stdout)
+	}
+	flags := newFlags("bucket", "bucket <server> [--json]").withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	var bucket *daemon.Bucket
+	if err := hereJSON(ctx, server, nil, &bucket, "bucket"); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, bucket)
+	}
+	if bucket == nil {
+		fmt.Fprintln(stdout, server+" has no bucket yet, so nothing is backed up.")
+		hint(stdout, "Set one with", build.Name+" bucket set "+server+" --endpoint <url> --bucket <name> --access-key <key>")
+		return nil
+	}
+	table(stdout, []string{"BUCKET", "ENDPOINT", "REGION", "PATH", "ACCESS KEY"}, [][]string{{bucket.Bucket, bucket.Endpoint, bucket.Region, bucket.Path, bucket.AccessKey}})
+	return nil
+}
+
+// setBucket is `moin bucket set <server> …`. It asks for the secret key,
+// and the server keeps the bucket only when a test file went in and out.
+func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("bucket set", "bucket set <server> --bucket <name> --access-key <key> [--endpoint <url>] [--region <region>] [--path <folder>]")
+	var bucket daemon.Bucket
+	flags.StringVar(&bucket.Endpoint, "endpoint", "", "the S3 endpoint, like https://s3.example.com; none for AWS")
+	flags.StringVar(&bucket.Region, "region", "", "the region; default us-east-1")
+	flags.StringVar(&bucket.Bucket, "bucket", "", "the bucket's name")
+	flags.StringVar(&bucket.Path, "path", "", "a folder in the bucket for moin")
+	flags.StringVar(&bucket.AccessKey, "access-key", "", "the access key ID")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	if bucket.Bucket == "" || bucket.AccessKey == "" {
+		return flags.wrong()
+	}
+	if isTerminal(stdin) {
+		fmt.Fprint(stdout, "Secret key: ")
+	}
+	bucket.SecretKey, err = readSecret(stdin)
+	if isTerminal(stdin) {
+		fmt.Fprintln(stdout)
+	}
+	if err != nil {
+		return err
+	}
+	if bucket.SecretKey == "" {
+		return errors.New("the secret key is empty: type it, or pipe it in")
+	}
+	if err := hereJSON(ctx, server, bucket, nil, "bucket", "set"); err != nil {
+		return err
+	}
+	done(stdout, "%s backs up to %s. The first copies come within a minute", server, bucket.Bucket)
+	hint(stdout, "See them with", build.Name+" backups "+server)
+	return nil
+}
+
+// alerts is `moin alerts <server>` and `moin alerts add|rm|test <server> …`.
+func alerts(ctx context.Context, args []string, stdout io.Writer) error {
+	verb := ""
+	if len(args) > 0 {
+		verb = args[0]
+	}
+	switch verb {
+	case "add":
+		return addAlert(ctx, args[1:], stdout)
+	case "rm":
+		return removeAlert(ctx, args[1:], stdout)
+	case "test":
+		return testAlerts(ctx, args[1:], stdout)
+	}
+	flags := newFlags("alerts", "alerts <server> [--json]").withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	var names []string
+	if err := hereJSON(ctx, server, nil, &names, "alerts"); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, names)
+	}
+	if len(names) == 0 {
+		fmt.Fprintln(stdout, server+" alerts nobody yet: what goes wrong only shows in its log.")
+		hint(stdout, "Add one with", build.Name+" alerts add "+server+" telegram <bot-token> <chat-id>")
+		return nil
+	}
+	rows := [][]string{}
+	for index, name := range names {
+		rows = append(rows, []string{strconv.Itoa(index + 1), name})
+	}
+	table(stdout, []string{"#", "ALERTS GO TO"}, rows)
+	return nil
+}
+
+// addAlert is `moin alerts add <server> telegram <token> <chat-id>`, or
+// slack, discord or webhook with a URL. The server sends a test alert
+// first and keeps the destination only when that went out.
+func addAlert(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("alerts add", "alerts add <server> telegram <bot-token> <chat-id> | slack|discord|webhook <url>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() < 3 {
+		return flags.wrong()
+	}
+	server := flags.Arg(0)
+	destination := alert.Destination{Kind: flags.Arg(1)}
+	switch {
+	case destination.Kind == "telegram" && flags.NArg() == 4:
+		destination.Token, destination.ChatID = flags.Arg(2), flags.Arg(3)
+	case destination.Kind != "telegram" && flags.NArg() == 3:
+		destination.URL = flags.Arg(2)
+	default:
+		return flags.wrong()
+	}
+	if err := hereJSON(ctx, server, destination, nil, "alerts", "add"); err != nil {
+		return err
+	}
+	done(stdout, "A test alert went out. %s alerts %s from now on", server, destination.Kind)
+	return nil
+}
+
+// removeAlert is `moin alerts rm <server> <n>`, n as `moin alerts` lists it.
+func removeAlert(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("alerts rm", "alerts rm <server> <n>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 2 {
+		return flags.wrong()
+	}
+	if err := hereJSON(ctx, flags.Arg(0), nil, nil, "alerts", "rm", flags.Arg(1)); err != nil {
+		return err
+	}
+	done(stdout, "Removed alert %s from %s", flags.Arg(1), flags.Arg(0))
+	return nil
+}
+
+// testAlerts is `moin alerts test <server>`: a test alert to everyone.
+func testAlerts(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("alerts test", "alerts test <server>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	if err := hereJSON(ctx, server, nil, nil, "alerts", "test"); err != nil {
+		return err
+	}
+	done(stdout, "A test alert went out from %s", server)
+	return nil
+}
+
+// watchers is `moin watchers <server>` and `moin watchers add|rm <server> …`.
+func watchers(ctx context.Context, args []string, stdout io.Writer) error {
+	verb := ""
+	if len(args) > 0 {
+		verb = args[0]
+	}
+	switch verb {
+	case "add":
+		return addWatcher(ctx, args[1:], stdout)
+	case "rm":
+		return removeWatcher(ctx, args[1:], stdout)
+	}
+	flags := newFlags("watchers", "watchers <server> [--json]").withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	var addresses []string
+	if err := hereJSON(ctx, server, nil, &addresses, "watchers"); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, addresses)
+	}
+	if len(addresses) == 0 {
+		fmt.Fprintln(stdout, server+" reports to no watcher: nobody notices when it goes away.")
+		hint(stdout, "Run one on another machine with", build.Name+" watcher")
+		return nil
+	}
+	rows := [][]string{}
+	for _, address := range addresses {
+		rows = append(rows, []string{address})
+	}
+	table(stdout, []string{"REPORTS TO"}, rows)
+	return nil
+}
+
+// addWatcher is `moin watchers add <server> <url> <token>`.
+func addWatcher(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("watchers add", "watchers add <server> <url> <token>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 3 {
+		return flags.wrong()
+	}
+	watcher := daemon.Watcher{URL: flags.Arg(1), Token: flags.Arg(2)}
+	if err := hereJSON(ctx, flags.Arg(0), watcher, nil, "watchers", "add"); err != nil {
+		return err
+	}
+	done(stdout, "%s reports to %s every minute", flags.Arg(0), watcher.URL)
+	return nil
+}
+
+// removeWatcher is `moin watchers rm <server> <url>`.
+func removeWatcher(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("watchers rm", "watchers rm <server> <url>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 2 {
+		return flags.wrong()
+	}
+	if err := hereJSON(ctx, flags.Arg(0), nil, nil, "watchers", "rm", flags.Arg(1)); err != nil {
+		return err
+	}
+	done(stdout, "%s no longer reports to %s", flags.Arg(0), flags.Arg(1))
+	return nil
+}
+
+// hereBackups is the server's side of the commands above: `moin here
+// backups|backup|restore|bucket|alerts|watchers …`. It reads what the CLI
+// sent as JSON from stdin, writes its answer as JSON to stdout and what it
+// says to people to stderr.
+func hereBackups(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	dir := daemon.StateDir()
+	// rest are the words after the first, always three, so a missing one
+	// is "" and not a crash.
+	rest := append(append([]string{}, args[1:]...), "", "", "")
+	switch args[0] {
+	case "backups":
+		databases, err := daemon.BackupsHere(ctx, dir, rest[0])
+		return answerJSON(stdout, databases, err)
+	case "backup":
+		copied, err := daemon.BackupHere(ctx, dir, rest[0], os.Stderr)
+		return answerJSON(stdout, copied, err)
+	case "restore":
+		restored, err := daemon.RestoreHere(ctx, dir, rest[0], rest[2], rest[1], os.Stderr)
+		return answerJSON(stdout, restored, err)
+	case "bucket":
+		return hereBucket(ctx, rest[0], stdin, stdout)
+	case "alerts":
+		return hereAlerts(ctx, rest[0], rest[1], stdin, stdout)
+	case "watchers":
+		return hereWatchers(rest[0], rest[1], stdin, stdout)
+	}
+	return fmt.Errorf("unknown: %s here %s", build.Name, args[0])
+}
+
+// answerJSON writes value to stdout as JSON, unless err.
+func answerJSON(stdout io.Writer, value any, err error) error {
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(value)
+}
+
+// hereBucket is `moin here bucket` and `moin here bucket set`.
+func hereBucket(ctx context.Context, verb string, stdin io.Reader, stdout io.Writer) error {
+	if verb == "" {
+		bucket, err := daemon.BucketHere()
+		return answerJSON(stdout, bucket, err)
+	}
+	var bucket daemon.Bucket
+	if err := json.NewDecoder(stdin).Decode(&bucket); err != nil {
+		return fmt.Errorf("read the bucket: %w", err)
+	}
+	return daemon.SetBucketHere(ctx, bucket)
+}
+
+// hereAlerts is `moin here alerts`, and add, rm <n> and test.
+func hereAlerts(ctx context.Context, verb, number string, stdin io.Reader, stdout io.Writer) error {
+	switch verb {
+	case "add":
+		var destination alert.Destination
+		if err := json.NewDecoder(stdin).Decode(&destination); err != nil {
+			return fmt.Errorf("read the alert: %w", err)
+		}
+		return daemon.AddAlertHere(ctx, destination)
+	case "rm":
+		n, _ := strconv.Atoi(number)
+		return daemon.RemoveAlertHere(n)
+	case "test":
+		return daemon.TestAlertsHere(ctx)
+	}
+	names, err := daemon.AlertsHere()
+	return answerJSON(stdout, names, err)
+}
+
+// hereWatchers is `moin here watchers`, and add and rm <url>.
+func hereWatchers(verb, address string, stdin io.Reader, stdout io.Writer) error {
+	switch verb {
+	case "add":
+		var watcher daemon.Watcher
+		if err := json.NewDecoder(stdin).Decode(&watcher); err != nil {
+			return fmt.Errorf("read the watcher: %w", err)
+		}
+		return daemon.AddWatcherHere(watcher)
+	case "rm":
+		return daemon.RemoveWatcherHere(address)
+	}
+	addresses, err := daemon.WatchersHere()
+	return answerJSON(stdout, addresses, err)
 }

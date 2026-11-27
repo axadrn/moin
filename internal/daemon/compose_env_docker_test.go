@@ -15,7 +15,7 @@ import (
 // becomes docker's own environment. Docker reads DOCKER_CONFIG itself, and
 // one pointing at the source would run a program from there, as root.
 func TestEnvNeverReachesDocker(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.appDir("web"), "releases", "1", "src")
 	plugins := filepath.Join(src, ".docker", "cli-plugins")
 	if err := os.MkdirAll(plugins, 0o755); err != nil {

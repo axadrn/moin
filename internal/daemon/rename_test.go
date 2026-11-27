@@ -60,7 +60,7 @@ func TestPinNames(t *testing.T) {
 // keeps that name; an app from before renames keeps the name compose
 // gave it (TestRenameDocker).
 func TestVolumeNames(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	app, id := "volume-test-"+strings.ToLower(filepath.Base(t.TempDir())), "0f8e2c4a-1b3d-4e5f-8a9b-0c1d2e3f4a5b"
 	if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestVolumeNames(t *testing.T) {
 // TestProjectOf: an app runs as the project its file names, an app from
 // before renames as moin-<folder>; a deploy names it by its name now.
 func TestProjectOf(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	if got := a.projectOf("blog"); got != "moin-blog" {
 		t.Fatalf("project = %s", got)
 	}

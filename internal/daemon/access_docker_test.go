@@ -18,7 +18,7 @@ import (
 func checkResolved(t *testing.T, compose string, env map[string]string) (string, error) {
 	t.Helper()
 	ctx := context.Background()
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.appDir("web"), "releases", "1", "src")
 	if err := os.MkdirAll(src, 0o755); err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func TestOnlyWhatRuns(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(src, "compose.yml"), []byte(compose), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	config, _, err := a.readComposeConfig(context.Background(), "web", src)
 	if err != nil {
 		t.Fatal(err)
