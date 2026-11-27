@@ -1922,3 +1922,8 @@
 }
 .moin-source { color: var(--muted-foreground); text-decoration: none; }
 .moin-source:hover { color: var(--foreground); text-decoration: underline; }
+/* The hero breathes the same all the way down: words, command, buttons,
+   then the terminal with as much room above it. */
+.moin-hero > :first-child { gap: var(--space-10, 2.5rem); }
+.moin-hero > :last-child:has(> .moin-terminal) { height: auto; padding-block: var(--space-6) var(--space-8); }
+@media (min-width: 40rem) { .moin-hero > :last-child:has(> .moin-terminal) { padding-block-start: var(--space-8); } }
