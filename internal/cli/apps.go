@@ -170,7 +170,7 @@ func restartApp(ctx context.Context, server, app string, log io.Writer) (daemon.
 // logs is `moin logs [app] [-f]`: the last lines of the app's containers,
 // and with -f what they write from then on.
 func logs(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("logs", "logs [app] [-f] [--tail 200] [-s server]").withServer()
+	flags := newFlags("logs", "logs [app] [-f] [--tail 200] [-s server] [--json]").withServer().withJSON()
 	tail := flags.Int("tail", 200, "how many lines from the end")
 	follow := new(bool)
 	flags.BoolVar(follow, "f", false, "keep printing new lines until Ctrl-C")
@@ -178,11 +178,21 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	if err := flags.parse(args); err != nil {
 		return err
 	}
+	if flags.json() && *follow {
+		return errors.New("--json prints the lines there are, so it takes no -f")
+	}
 	app, _, err := appArgs(flags, 0)
 	if err != nil {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
+		if flags.json() {
+			var out strings.Builder
+			if err := appLogs(ctx, server, app, *tail, false, &out, os.Stderr); err != nil {
+				return err
+			}
+			return printJSON(stdout, logLines(out.String()))
+		}
 		err := appLogs(ctx, server, app, *tail, *follow, stdout, os.Stderr)
 		if ctx.Err() != nil {
 			// Ctrl-C ends -f: that is how it is meant to stop.
@@ -200,6 +210,34 @@ func appLogs(ctx context.Context, server, app string, tail int, follow bool, std
 		command = append(command, "--follow")
 	}
 	return sshRun(ctx, server, hereLine(command...), nil, stdout, stderr)
+}
+
+// logLine is one line of `moin logs --json`.
+type logLine struct {
+	Time      string `json:"time"`
+	Container string `json:"container"`
+	Line      string `json:"line"`
+}
+
+// logLines reads what docker compose logs --timestamps prints, a line like
+// "web-1  | 2026-11-27T16:39:08.672243096Z hello". A line without the
+// container or the time keeps them empty.
+func logLines(text string) []logLine {
+	lines := []logLine{}
+	for raw := range strings.Lines(text) {
+		var line logLine
+		rest := strings.TrimRight(raw, "\r\n")
+		if container, after, ok := strings.Cut(rest, " | "); ok {
+			line.Container, rest = strings.TrimSpace(container), after
+		}
+		stamp, after, _ := strings.Cut(rest, " ")
+		if _, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
+			line.Time, rest = stamp, after
+		}
+		line.Line = rest
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 // execArgs splits `exec [app] [flags] -- <command…>` at the first "--":
