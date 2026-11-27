@@ -87,10 +87,10 @@ func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, er
 	if space.Status != "paid" {
 		return Upload{}, ErrNotPaid
 	}
-	if err := r.check(); err != nil {
+	now := time.Now()
+	if err := r.check(now); err != nil {
 		return Upload{}, err
 	}
-	now := time.Now()
 	recent, err := c.store.CopiesSince(space.ID, server, r.App, r.Database, now.Add(-every))
 	if err != nil {
 		return Upload{}, err
@@ -122,8 +122,10 @@ func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, er
 	return Upload{ID: copy.ID, URL: address}, nil
 }
 
-// check refuses a request that is no copy of a database.
-func (r Request) check() error {
+// check refuses a request that is no copy of a database. A copy made
+// more than an hour after now is from a wrong clock or a lie: it would
+// pass as the newest.
+func (r Request) check(now time.Time) error {
 	switch {
 	case !protocol.ValidAppName(r.App):
 		return fmt.Errorf("%w: %q is not an app", ErrNotACopy, r.App)
@@ -131,6 +133,8 @@ func (r Request) check() error {
 		return fmt.Errorf("%w: %q is not a database", ErrNotACopy, r.Database)
 	case r.MadeAt.IsZero():
 		return fmt.Errorf("%w: it needs the time it was made", ErrNotACopy)
+	case r.MadeAt.After(now.Add(time.Hour)):
+		return fmt.Errorf("%w: it was made at %s, in the future", ErrNotACopy, r.MadeAt.UTC().Format(time.RFC3339))
 	case r.Size <= 0 || r.Size > Storage:
 		return fmt.Errorf("%w: %d bytes do not fit", ErrNotACopy, r.Size)
 	}

@@ -112,7 +112,7 @@ func TestCopyUploadAndDownload(t *testing.T) {
 		t.Fatalf("a wrong token: %v", err)
 	}
 	test.pay("paid")
-	for _, bad := range []Request{{App: "Shop!", Database: "x", MadeAt: request.MadeAt, Size: 1}, {App: "shop", MadeAt: request.MadeAt, Size: 1}, {App: "shop", Database: "x", Size: 1}, {App: "shop", Database: "x", MadeAt: request.MadeAt}} {
+	for _, bad := range []Request{{App: "Shop!", Database: "x", MadeAt: request.MadeAt, Size: 1}, {App: "shop", MadeAt: request.MadeAt, Size: 1}, {App: "shop", Database: "x", Size: 1}, {App: "shop", Database: "x", MadeAt: request.MadeAt}, {App: "shop", Database: "x", MadeAt: time.Now().Add(2 * time.Hour), Size: 1}} {
 		if _, err := test.copies.Start(test.ctx, test.token, bad); !errors.Is(err, ErrNotACopy) {
 			t.Errorf("%+v: %v", bad, err)
 		}
