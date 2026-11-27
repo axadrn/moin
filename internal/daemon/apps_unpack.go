@@ -48,6 +48,16 @@ func download(ctx context.Context, start protocol.DeployStart, dir string) error
 	return unpack(bytes.NewReader(body), dir, start.SourceStripTop)
 }
 
+// unpackFile extracts the gzipped tar at path into dir.
+func unpackFile(path, dir string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return unpack(file, dir, false)
+}
+
 // unpack extracts a gzipped tar of regular files and directories into dir.
 // Links and paths that leave dir are refused. stripTop drops the first
 // folder of every path, which GitHub wraps a repo in.

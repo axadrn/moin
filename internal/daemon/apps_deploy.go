@@ -150,7 +150,7 @@ type release struct {
 
 // hasSource reports whether a deploy brings source code to build.
 func hasSource(start protocol.DeployStart) bool {
-	return start.SourceURL != "" || start.SourceNumber > 0 || start.Catalog != ""
+	return start.SourceURL != "" || start.SourceFile != "" || start.SourceNumber > 0 || start.Catalog != ""
 }
 
 // runDeploy runs the steps of one deploy in order: make the release, take
@@ -302,6 +302,8 @@ func (a *apps) fetchSource(ctx context.Context, release *release) error {
 	case start.SourceURL != "":
 		release.logf("downloading the source")
 		err = download(ctx, start, src)
+	case start.SourceFile != "":
+		err = unpackFile(start.SourceFile, src)
 	default:
 		release.logf("building the source of v%d again", start.SourceNumber)
 		err = a.copySource(ctx, start.App, start.SourceNumber, src)
@@ -454,7 +456,7 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 	release.logf("starting")
 	// A restart brings nothing new, so compose would leave the containers
 	// as they are: recreate them.
-	restart := start.SourceURL == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
+	restart := start.SourceURL == "" && start.SourceFile == "" && start.SourceNumber == 0 && start.Image == "" && start.FromNumber == 0
 	err = a.start(ctx, start.App, release.composeJSON, release.detected, restart, release.logf)
 	if err != nil {
 		return a.startPreviousAgain(ctx, release, previous, err)

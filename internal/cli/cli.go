@@ -259,7 +259,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "apps":
 		return apps(ctx, rest, stdin, stdout)
 	case "deploy":
-		return deploy(ctx, rest, stdin, stdout)
+		return sshDeploy(ctx, rest, stdin, stdout)
+	case "here":
+		return here(ctx, rest, stdin, stdout)
 	case "deploys":
 		return deploys(ctx, rest, stdout)
 	case "rollback":
@@ -267,7 +269,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "redeploy":
 		return redeploy(ctx, rest, stdout)
 	case "logs":
-		return logs(ctx, rest, stdout)
+		return sshLogs(ctx, rest, stdout)
 	case "compose":
 		return compose(ctx, rest, stdout)
 	case "db":

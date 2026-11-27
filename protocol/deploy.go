@@ -37,6 +37,9 @@ type DeployStart struct {
 	SourceURL           string `json:"source_url,omitempty"`
 	SourceAuthorization string `json:"source_authorization,omitempty"`
 	SourceStripTop      bool   `json:"source_strip_top,omitempty"`
+	// SourceFile is a gzipped tar of the source on the server itself, which
+	// the CLI sent over SSH. It never travels in a message.
+	SourceFile string `json:"-"`
 	// SourceNumber builds the source the server kept of release n again,
 	// for a redeploy; nothing is downloaded.
 	SourceNumber int `json:"source_number,omitempty"`
