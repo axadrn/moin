@@ -10,7 +10,7 @@ November 27, 2026
 **In short:** moin without a hub. One command deploys over your own SSH, public SSH closes after it, and every backup is encrypted and checked every day.
 
 ### Why
-The hub was the one place every server trusted. Whoever took it over could reach every server behind it. Now commands go one way: from your laptop to your server, over SSH, with your key. Reports go one way: from your server to a watcher. Nothing in between holds a key. The story: [Why we deleted the hub](/blog/why-we-deleted-the-hub).
+The hub was the one place every server trusted. Whoever took it over could reach every server behind it. Now commands go one way: from your laptop to your server, over SSH, with your key. Reports go one way: from your server to a watcher. Nothing in between holds a key. The story: [Why I deleted the hub](/blog/why-i-deleted-the-hub).
 
 ### New
 - **Deploy over SSH**: `moin deploy prod` sends the committed code of this folder to your server, and the server builds it. If `ssh prod` works, it works. (#171)

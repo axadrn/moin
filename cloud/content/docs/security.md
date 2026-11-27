@@ -67,7 +67,7 @@ From then on, `moin deploy` goes over Tailscale. To the rest of the internet, po
 
 ## Tailnet Lock
 
-We strongly recommend it. With [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock), a new device joins your tailnet only when one of your own devices signs it. Not even Tailscale can add one.
+Turn it on. With [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock), a new device joins your tailnet only when one of your own devices signs it. Not even Tailscale can add one.
 
 Without it, whoever controls your Tailscale account could add a device to your tailnet, and reach your server's SSH.
 

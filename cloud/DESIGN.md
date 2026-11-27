@@ -156,3 +156,9 @@ Examples everywhere: the server `prod` (a second one `web-1`), the app
 Short, concrete, active. Say what happens: "Deploy v4 of blog is live", not
 "Your deployment has been successfully completed". Show the command people
 type next.
+
+Who speaks:
+
+- Blog: Axel writes it, as "I", with his name as the author.
+- Site and docs: the product and the reader. "moin does …", "your server". No "I", no "we".
+- "We" only where the company promises or answers for something: moin cloud, privacy, terms, prices, "we can't read your backups".
