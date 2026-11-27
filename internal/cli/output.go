@@ -25,6 +25,16 @@ func terminal(w io.Writer) io.Writer {
 	return colorprofile.NewWriter(w, os.Environ())
 }
 
+// raw is w without terminal's writer, which takes out or changes colors a
+// terminal cannot show. Bytes from a server, like a copy, the output of
+// exec or an app's logs, go out through it as they are.
+func raw(w io.Writer) io.Writer {
+	if colors, ok := w.(*colorprofile.Writer); ok {
+		return colors.Forward
+	}
+	return w
+}
+
 // isTTY reports whether w is a terminal, so spinners and symbols make sense.
 func isTTY(w io.Writer) bool {
 	writer, ok := w.(*colorprofile.Writer)

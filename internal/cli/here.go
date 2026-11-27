@@ -27,6 +27,8 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	// When you press Ctrl-C on your laptop, ssh goes and so do stdout and
 	// stderr. A deploy goes on to its end instead of dying on a write.
 	signal.Ignore(syscall.SIGPIPE)
+	// What goes to stdout is data, JSON or bytes: it leaves as it is.
+	stdout = raw(stdout)
 	// The server's log of this command goes to its journal, not to you.
 	daemon.LogToJournal()
 	dir := daemon.StateDir()

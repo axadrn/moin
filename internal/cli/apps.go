@@ -193,7 +193,7 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 			}
 			return printJSON(stdout, logLines(out.String()))
 		}
-		err := appLogs(ctx, server, app, *tail, *follow, stdout, os.Stderr)
+		err := appLogs(ctx, server, app, *tail, *follow, raw(stdout), os.Stderr)
 		if ctx.Err() != nil {
 			// Ctrl-C ends -f: that is how it is meant to stop.
 			return nil
@@ -278,7 +278,7 @@ func execCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	line = append(append(line, "--"), command...)
 	return onApp(ctx, flags, app, func(server string) error {
 		cmd := sshCommand(ctx, server, asRoot(hereLine(line...)), tty)
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, os.Stderr
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, raw(stdout), os.Stderr
 		// Every exit code is the command's own, also 97, 98 or 255: read
 		// as moin's, a command could run twice.
 		err := cmd.Run()
