@@ -1,14 +1,11 @@
 // Package style is the look of moin in the terminal: the brand and status
-// colors of the web UI (hub/DESIGN.md), symbols and text styles. The
-// TUI and the CLI both use it, so a status looks the same everywhere.
+// colors, symbols and text styles, so a status looks the same everywhere.
 package style
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/axadrn/moin/internal/client"
 )
 
 // Colors carry status only; the brand is monochrome, like the web UI. The
@@ -113,42 +110,6 @@ func Of(status Status) lipgloss.Style {
 // Badge renders a status as its colored symbol and text, like "● live v3".
 func Badge(status Status, text string) string {
 	return Of(status).Render(Symbol(status) + " " + text)
-}
-
-// Server is the status badge of a server: ● online, ○ waiting, ✗ offline.
-func Server(server client.Server) string {
-	word := server.Status()
-	return Badge(StatusOf(word), word)
-}
-
-// App is the status badge of an app: ● live v3, ◐ deploying v4,
-// ✗ failed v4 · v3 live, ○ new.
-func App(app client.App) string {
-	switch {
-	case app.LatestNumber == 0:
-		return Badge(StatusIdle, "new")
-	case app.LatestStatus == "running":
-		return Badge(StatusRunning, fmt.Sprintf("deploying v%d", app.LatestNumber))
-	case app.Stopped:
-		return Badge(StatusIdle, fmt.Sprintf("stopped v%d", app.LiveNumber))
-	case app.LatestStatus == "failed" && app.LiveNumber > 0:
-		return Badge(StatusFailed, fmt.Sprintf("failed v%d", app.LatestNumber)) + Muted.Render(fmt.Sprintf(" · v%d live", app.LiveNumber))
-	case app.LatestStatus == "failed":
-		return Badge(StatusFailed, fmt.Sprintf("failed v%d", app.LatestNumber))
-	}
-	return Badge(StatusLive, fmt.Sprintf("live v%d", app.LiveNumber))
-}
-
-// Deploy is the status badge of one deploy of an app: the live one is
-// ● live, older good ones ✓ succeeded.
-func Deploy(deploy client.Deploy, liveNumber int) string {
-	switch {
-	case deploy.Status == "succeeded" && deploy.Number == liveNumber:
-		return Badge(StatusLive, "live")
-	case deploy.Status == "succeeded":
-		return Badge(StatusDone, "succeeded")
-	}
-	return Badge(StatusOf(deploy.Status), deploy.Status)
 }
 
 // steps are how the daemon's own deploy log lines start (logf in

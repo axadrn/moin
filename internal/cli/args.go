@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/style"
+	"github.com/axadrn/moin/protocol"
 	"golang.org/x/term"
 )
 
@@ -20,14 +20,15 @@ import (
 // line.
 type flagSet struct {
 	*flag.FlagSet
-	usage       string
-	appFlag     *string
-	yesFlag     *bool
-	confirmFlag *string
+	usage      string
+	appFlag    *string
+	serverFlag *string
+	yesFlag    *bool
+	jsonFlag   *bool
 }
 
 // newFlags makes the flags of a command. usage is the command line without
-// the binary name, like "logs [--tail 200] [app]".
+// the binary name, like "logs <server> [--tail 200]".
 func newFlags(name, usage string) *flagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -46,15 +47,14 @@ func (f *flagSet) withYes() *flagSet {
 	return f
 }
 
-// withConfirm adds --confirm, the name typed out, for what is big and
-// cannot be undone: scripts pass it, as --yes is not enough there.
-func (f *flagSet) withConfirm() *flagSet {
-	f.confirmFlag = f.String("confirm", "", "the name, typed out, to do it without asking")
+// withJSON adds --json, for scripts and AI tools.
+func (f *flagSet) withJSON() *flagSet {
+	f.jsonFlag = f.Bool("json", false, "print JSON")
 	return f
 }
 
 // parse reads flags before, between and after the arguments, so
-// `rollback v3 --app my-app` works like `rollback --app my-app v3`. After
+// `logs prod -f` works like `logs -f prod`. After
 // "--" everything is an argument.
 func (f *flagSet) parse(args []string) error {
 	return f.check(parseAnywhere(f.FlagSet, args), args)
@@ -93,51 +93,28 @@ func (f *flagSet) wrong() error {
 // yes reports whether --yes was given.
 func (f *flagSet) yes() bool { return f.yesFlag != nil && *f.yesFlag }
 
-// confirmed is what --confirm gave, empty without it.
-func (f *flagSet) confirmed() string {
-	if f.confirmFlag == nil {
-		return ""
+// json reports whether --json was given.
+func (f *flagSet) json() bool { return f.jsonFlag != nil && *f.jsonFlag }
+
+// server is the one argument, the server, when the command takes nothing
+// else.
+func (f *flagSet) server() (string, error) {
+	if f.NArg() != 1 {
+		return "", f.wrong()
 	}
-	return *f.confirmFlag
+	return f.Arg(0), nil
 }
 
-// app picks the app the command works on: --app, then the argument, then
-// the app that follows the GitHub repo of this folder, then the folder's
-// name. A not found error names it and where it came from.
-func (f *flagSet) app(argument string) (string, error) {
-	flagValue := ""
-	if f.appFlag != nil {
-		flagValue = *f.appFlag
+// app is the app of deploy: --app, or the name of this folder.
+func (f *flagSet) app() (string, error) {
+	if f.appFlag == nil || *f.appFlag == "" {
+		return folderApp()
 	}
-	if flagValue != "" && argument != "" && flagValue != argument {
-		return "", fmt.Errorf("two apps: --app %s and %s. Name it once", flagValue, argument)
+	if !protocol.ValidAppName(*f.appFlag) {
+		return "", fmt.Errorf("%q is not an app name: lowercase letters, digits and dashes", *f.appFlag)
 	}
-	from := "--app"
-	if flagValue == "" {
-		flagValue, from = argument, "the argument"
-	}
-	name, source := client.PickApp(flagValue, ".")
-	if flagValue == "" {
-		from = source
-		followed, repo, err := repoApp()
-		if err != nil {
-			return "", err
-		}
-		if followed != "" {
-			name, from = followed, "the app that follows "+repo
-		}
-	}
-	if name == "" {
-		return "", errors.New("cannot tell the app: pass it with --app")
-	}
-	picked = pickedApp{name: name, from: from}
-	return name, nil
+	return *f.appFlag, nil
 }
-
-// pickedApp is the app the running command works on, for error messages.
-type pickedApp struct{ name, from string }
-
-var picked pickedApp
 
 // helpError carries the help of a command: Run prints it and exits with 0.
 type helpError struct{ flags *flagSet }
@@ -169,7 +146,7 @@ func (h helpError) print(w io.Writer) {
 }
 
 // parseAnywhere parses flags before and after the arguments, so
-// `db rows users --limit 5` works like `db rows --limit 5 users`. After
+// `logs prod --tail 5` works like `logs --tail 5 prod`. After
 // "--" everything is an argument.
 func parseAnywhere(flags *flag.FlagSet, args []string) error {
 	positional := []string{}
@@ -198,50 +175,6 @@ func isTerminal(r io.Reader) bool {
 	return ok && term.IsTerminal(int(file.Fd()))
 }
 
-// typeName asks before something big that cannot be undone and returns
-// the name typed out, which the hub checks again. given, from
-// --confirm, answers it for scripts; without a terminal and without it,
-// it refuses, so a script never removes something by accident.
-func typeName(stdin io.Reader, stdout io.Writer, given, question, name string) (string, error) {
-	if given != "" {
-		return given, nil
-	}
-	if !isTerminal(stdin) {
-		return "", fmt.Errorf("%s Answer it on a terminal, or add --confirm %s", question, name)
-	}
-	if err := askName(stdin, stdout, question, name); err != nil {
-		return "", err
-	}
-	return name, nil
-}
-
-// confirmName asks before something big that cannot be undone: the answer
-// must be name, typed out. --yes skips it for scripts.
-func confirmName(stdin io.Reader, stdout io.Writer, yes bool, question, name string) error {
-	if yes {
-		return nil
-	}
-	if !isTerminal(stdin) {
-		return fmt.Errorf("%s Answer it on a terminal, or add --yes", question)
-	}
-	return askName(stdin, stdout, question, name)
-}
-
-// askName asks on the terminal for name, typed out.
-func askName(stdin io.Reader, stdout io.Writer, question, name string) error {
-	fmt.Fprintln(stdout, style.Warning.Render("?")+" "+question)
-	fmt.Fprint(stdout, "  Type "+style.Bold.Render(name)+" to confirm: ")
-	answer, err := readLine(stdin)
-	if err != nil {
-		return err
-	}
-	if answer == name {
-		return nil
-	}
-	fmt.Fprintln(stdout, style.Muted.Render("That is not "+name+". Nothing changed."))
-	return errReported
-}
-
 // confirm asks before a destructive step. --yes skips the question; without
 // a terminal and without --yes it refuses, so a script never removes
 // something by accident.
@@ -263,4 +196,14 @@ func confirm(stdin io.Reader, stdout io.Writer, yes bool, question string) error
 	}
 	fmt.Fprintln(stdout, style.Muted.Render("Nothing changed."))
 	return errReported
+}
+
+// readSecret reads one line without echo from a terminal, or plainly from
+// a pipe.
+func readSecret(stdin io.Reader) (string, error) {
+	if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		secret, err := term.ReadPassword(int(file.Fd()))
+		return strings.TrimSpace(string(secret)), err
+	}
+	return readLine(stdin)
 }

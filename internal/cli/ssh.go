@@ -1,188 +1,146 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/daemon"
-	"github.com/axadrn/moin/internal/style"
-	"github.com/axadrn/moin/protocol"
 )
 
 // The CLI reaches a server the way `ssh <server>` does: the server is a
-// name from your ssh config, or user@host. moin runs on the server as
-// `moin here …` and does the work there. No hub in between.
+// name from your ssh config, or user@host, with your keys and agent. moin
+// runs there as `moin here …`, as root, and does the work. Its data comes
+// back on stdout, what it says to people on stderr.
 
+// remoteBinary is where moin lives on a server.
 const remoteBinary = "/usr/local/bin/" + build.Name
 
-// sshDeploy is `moin deploy <server>`: it sends the committed source of
-// this folder to the server, which builds and starts it.
-func sshDeploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy <server> [--app name] [--yes]").withApp().withYes()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() != 1 {
-		return flags.wrong()
-	}
-	server := flags.Arg(0)
-	app, err := folderApp(*flags.appFlag)
-	if err != nil {
-		return err
-	}
-	commit, err := gitOutput(ctx, "rev-parse", "--short", "HEAD")
-	if err != nil {
-		return errors.New("deploy sends the committed source: run it in a git repository with a commit")
-	}
-	if dirty, _ := gitOutput(ctx, "status", "--porcelain"); dirty != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("Changes that are not committed stay here: moin sends "+commit+"."))
-	}
-	fmt.Fprintf(stdout, "%s · %s → %s\n", app, commit, server)
+// noSudo is the exit code of a command for root that the SSH user may not
+// run with sudo.
+const noSudo = 97
 
-	installed, err := sshOutput(ctx, server, "command -v "+build.Name+" docker || true")
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(installed, remoteBinary) || !strings.Contains(installed, "docker") {
-		if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Set up %s on %s and deploy %s?", build.Name, server, app)); err != nil {
-			return err
-		}
-	}
-	if !strings.Contains(installed, "docker") {
-		fmt.Fprintln(stdout, style.Muted.Render("Installing Docker…"))
-		if err := sshRun(ctx, server, "curl -fsSL https://get.docker.com | sh", nil, io.Discard); err != nil {
-			return fmt.Errorf("install Docker on %s: %w", server, err)
-		}
-	}
-	if err := sendBinary(ctx, server); err != nil {
-		return err
-	}
+// sshTimeout is how many seconds ssh waits for a server to answer.
+const sshTimeout = "10"
 
-	archive := exec.CommandContext(ctx, "git", "archive", "--format=tar.gz", "HEAD")
-	source, err := archive.StdoutPipe()
+// hereLine is the shell line that runs `moin here args…` on a server.
+func hereLine(args ...string) string {
+	return shellJoin(append([]string{remoteBinary, "here"}, args...))
+}
+
+// asRoot runs line as root: as it is for root, with sudo -n for anyone
+// else, and exits with noSudo when sudo would ask for a password.
+func asRoot(line string) string {
+	return `if [ "$(id -u)" = 0 ]; then ` + line + `; else sudo -n true 2>/dev/null || exit ` + strconv.Itoa(noSudo) + `; sudo -n ` + line + `; fi`
+}
+
+// shellJoin quotes each word for the remote shell, so nothing in it is
+// read twice: a command for exec reaches the container word for word.
+func shellJoin(words []string) string {
+	quoted := make([]string, len(words))
+	for i, word := range words {
+		quoted[i] = "'" + strings.ReplaceAll(word, "'", `'\''`) + "'"
+	}
+	return strings.Join(quoted, " ")
+}
+
+// sshCommand is ssh to server running line. tty asks for a terminal on the
+// server, for exec on a terminal.
+func sshCommand(ctx context.Context, server, line string, tty bool) *exec.Cmd {
+	args := []string{"-o", "ConnectTimeout=" + sshTimeout}
+	if tty {
+		args = append(args, "-t")
+	}
+	args = append(args, server, line)
+	return exec.CommandContext(ctx, "ssh", args...)
+}
+
+// sshRun runs line on server as root with stdin, stdout and stderr passed
+// through.
+func sshRun(ctx context.Context, server, line string, stdin io.Reader, stdout, stderr io.Writer) error {
+	cmd := sshCommand(ctx, server, asRoot(line), false)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, stderr
+	return sshError(server, cmd.Run())
+}
+
+// sshOutput runs line on server as root and returns what it printed.
+func sshOutput(ctx context.Context, server, line string, stdin io.Reader) ([]byte, error) {
+	var out bytes.Buffer
+	err := sshRun(ctx, server, line, stdin, &out, os.Stderr)
+	return out.Bytes(), err
+}
+
+// sshLog runs line on server as root and shows what it says on stderr as a
+// deploy log: steps with →, tool output dimmed, a spinner on a terminal.
+// It returns what the server printed on stdout.
+func sshLog(ctx context.Context, server, line string, stdin io.Reader, stdout io.Writer, first string) ([]byte, error) {
+	reader, writer := io.Pipe()
+	shown := make(chan struct{})
+	progress := newProgress(stdout, first)
+	go func() {
+		defer close(shown)
+		scanner := bufio.NewScanner(reader)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			progress.line(scanner.Text())
+		}
+	}()
+	var out bytes.Buffer
+	err := sshRun(ctx, server, line, stdin, &out, writer)
+	writer.Close()
+	<-shown
+	progress.end()
+	return out.Bytes(), err
+}
+
+// sshError says what went wrong in words: ssh exits with 255 when it
+// cannot reach the server, asRoot with noSudo. Any other code is moin's
+// on the server, which said why on stderr already.
+func sshError(server string, err error) error {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		return err
+	}
+	switch exit.ExitCode() {
+	case 255:
+		return fmt.Errorf("cannot reach %s over SSH. Check that `ssh %s` works", server, server)
+	case noSudo:
+		return fmt.Errorf("moin runs as root on %s, and your user there may not use sudo without a password. Log in as root, or allow sudo for it", server)
+	case noAppCode:
+		return errNoApp
+	}
+	return exitCode(exit.ExitCode())
+}
+
+// exitCode is an error that is already on the screen and ends moin with
+// its code, like the exit code of a command run with exec.
+type exitCode int
+
+func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
+
+// sshJSON runs `moin here args…` on server as root and reads the JSON it
+// answers into value.
+func sshJSON(ctx context.Context, server string, args []string, stdin io.Reader, value any) error {
+	out, err := sshOutput(ctx, server, hereLine(args...), stdin)
 	if err != nil {
 		return err
 	}
-	if err := archive.Start(); err != nil {
-		return err
-	}
-	runErr := sshRun(ctx, server, build.Name+" here deploy "+app, source, stdout)
-	if err := archive.Wait(); err != nil && runErr == nil {
-		return fmt.Errorf("git archive: %w", err)
-	}
-	if runErr != nil {
-		return errors.New("the deploy failed: the lines above say why")
+	return readAnswer(server, out, value)
+}
+
+// readAnswer reads what a server answered. A server with another version
+// of moin may answer something else.
+func readAnswer(server string, out []byte, value any) error {
+	if err := json.Unmarshal(out, value); err != nil {
+		return fmt.Errorf("%s answered something moin cannot read. Put this version there with `%s update %s`", server, build.Name, server)
 	}
 	return nil
-}
-
-// sshLogs is `moin logs <server> [app]`.
-func sshLogs(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("logs", "logs <server> [--app name] [--tail 200]").withApp()
-	tail := flags.Int("tail", 200, "how many lines")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() != 1 {
-		return flags.wrong()
-	}
-	app, err := folderApp(*flags.appFlag)
-	if err != nil {
-		return err
-	}
-	return sshRun(ctx, flags.Arg(0), build.Name+" here logs "+app+" "+strconv.Itoa(*tail), nil, stdout)
-}
-
-// here is `moin here …`, what the CLI runs on a server over SSH.
-func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) < 2 || !protocol.ValidAppName(args[1]) {
-		return errors.New("moin here runs on a server, for the CLI on your laptop")
-	}
-	switch args[0] {
-	case "deploy":
-		return daemon.DeployHere(ctx, daemon.StateDir()+"/apps", args[1], stdin, stdout)
-	case "logs":
-		tail := 200
-		if len(args) > 2 {
-			tail, _ = strconv.Atoi(args[2])
-		}
-		return daemon.LogsHere(ctx, daemon.StateDir()+"/apps", args[1], tail, stdout)
-	}
-	return fmt.Errorf("unknown: moin here %s", args[0])
-}
-
-// sendBinary puts this very binary on the server when the server has
-// another one. A release takes the signed binary of its version instead.
-func sendBinary(ctx context.Context, server string) error {
-	arch, err := sshOutput(ctx, server, "uname -sm")
-	if err != nil {
-		return err
-	}
-	want := map[string]string{"x86_64": "amd64", "aarch64": "arm64"}[strings.Fields(arch + " _")[1]]
-	if runtime.GOOS != "linux" || want != runtime.GOARCH {
-		return fmt.Errorf("%s is %s: this build of moin is %s/%s and can't run there yet", server, strings.TrimSpace(arch), runtime.GOOS, runtime.GOARCH)
-	}
-	self, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	body, err := os.ReadFile(self)
-	if err != nil {
-		return err
-	}
-	sum := sha256.Sum256(body)
-	there, _ := sshOutput(ctx, server, "sha256sum "+remoteBinary+" 2>/dev/null || true")
-	if strings.HasPrefix(there, hex.EncodeToString(sum[:])) {
-		return nil
-	}
-	return sshRun(ctx, server, "cat > "+remoteBinary+".new && chmod 755 "+remoteBinary+".new && mv "+remoteBinary+".new "+remoteBinary, bytes.NewReader(body), io.Discard)
-}
-
-// folderApp is the app's name: --app, or this folder's name.
-func folderApp(flag string) (string, error) {
-	name := flag
-	if name == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		name = strings.ToLower(filepath.Base(dir))
-	}
-	if !protocol.ValidAppName(name) {
-		return "", fmt.Errorf("%q is not a valid app name: pass --app with lowercase letters, digits and dashes", name)
-	}
-	return name, nil
-}
-
-// sshRun runs command on server through the ssh of this computer, with
-// its config, keys and agent.
-func sshRun(ctx context.Context, server, command string, stdin io.Reader, stdout io.Writer) error {
-	cmd := exec.CommandContext(ctx, "ssh", server, command)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, os.Stderr
-	return cmd.Run()
-}
-
-func sshOutput(ctx context.Context, server, command string) (string, error) {
-	var out bytes.Buffer
-	if err := sshRun(ctx, server, command, nil, &out); err != nil {
-		return "", fmt.Errorf("ssh %s: %w", server, err)
-	}
-	return out.String(), nil
-}
-
-func gitOutput(ctx context.Context, args ...string) (string, error) {
-	out, err := exec.CommandContext(ctx, "git", args...).Output()
-	return strings.TrimSpace(string(out)), err
 }

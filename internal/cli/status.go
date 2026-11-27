@@ -2,67 +2,227 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
-	"github.com/axadrn/moin/internal/client"
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/daemon"
 	"github.com/axadrn/moin/internal/style"
 )
 
-// status says whether everything is OK in the workspace. It exits 1 when
-// something needs you, so a script or CI can check it.
-func status(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("status", "status")
+// statusTimeout is how long `moin` waits for all servers together.
+const statusTimeout = 15 * time.Second
+
+// configDir is moin's folder on your laptop, ~/.config/moin.
+func configDir() (string, error) {
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return filepath.Join(dir, build.Name), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config", build.Name), nil
+}
+
+// serversFile lists the servers you deployed to, one name per line.
+func serversFile() (string, error) {
+	dir, err := configDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "servers"), nil
+}
+
+// loadServers reads the servers file, none when it is not there.
+func loadServers() ([]string, error) {
+	file, err := serversFile()
+	if err != nil {
+		return nil, err
+	}
+	body, err := os.ReadFile(file)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	return parseServers(string(body)), err
+}
+
+// parseServers reads one server per line. Blank lines and # comments are
+// skipped, a name twice counts once.
+func parseServers(text string) []string {
+	var servers []string
+	for line := range strings.Lines(text) {
+		name := strings.TrimSpace(line)
+		if name != "" && !strings.HasPrefix(name, "#") && !slices.Contains(servers, name) {
+			servers = append(servers, name)
+		}
+	}
+	return servers
+}
+
+// addServer puts server in the servers file, once.
+func addServer(server string) error {
+	servers, err := loadServers()
+	if err != nil || slices.Contains(servers, server) {
+		return err
+	}
+	file, err := serversFile()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(file, []byte(strings.Join(append(servers, server), "\n")+"\n"), 0o600)
+}
+
+// add is `moin add <server>`: a server for the list of `moin`, as on a new
+// laptop.
+func add(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("add", "add <server>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	status, err := serverStatus(ctx, server)
+	if err != nil {
+		return err
+	}
+	rememberApps([]serverRow{{server: server, status: status}})
+	if err := addServer(server); err != nil {
+		return err
+	}
+	done(stdout, "Added %s. `%s` shows it now", server, build.Name)
+	return nil
+}
+
+// serverStatus asks one server what runs there.
+func serverStatus(ctx context.Context, server string) (daemon.Status, error) {
+	var status daemon.Status
+	err := sshJSON(ctx, server, []string{"apps"}, nil, &status)
+	return status, err
+}
+
+// serverRow is one server in the table of `moin`: what it said, or why it
+// did not answer.
+type serverRow struct {
+	server string
+	status daemon.Status
+	err    error
+}
+
+// overview is `moin` alone: every server of the list and its apps, asked
+// in parallel, each with one SSH call.
+func overview(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("", "[--json]").withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 0 {
 		return flags.wrong()
 	}
-	api, err := apiClient()
+	servers, err := loadServers()
 	if err != nil {
 		return err
 	}
-	answer, err := api.Status(ctx)
-	if err != nil {
-		return err
+	if len(servers) == 0 && !flags.json() {
+		fmt.Fprintln(stdout, build.Name+": your app on your server. Backups checked every day.")
+		fmt.Fprintln(stdout)
+		hint(stdout, "Deploy this folder to a server you can ssh to:", build.Name+" deploy <server>")
+		hint(stdout, "All commands:", build.Name+" help")
+		return nil
 	}
-	printStatus(stdout, answer)
-	if !answer.OK {
-		return errReported
+	rows := askServers(ctx, servers)
+	rememberApps(rows)
+	if flags.json() {
+		return printJSON(stdout, overviewJSON(rows))
 	}
+	printApps(stdout, rows)
 	return nil
 }
 
-// printStatus writes what needs you first, then what could be newer, then
-// the counts.
-func printStatus(w io.Writer, status client.Status) {
-	counts := fmt.Sprintf("%d of %d apps live · %d of %d servers online · %d of %d backups checked today",
-		status.Counts.AppsLive, status.Counts.Apps, status.Counts.ServersOnline, status.Counts.Servers, status.Counts.BackupsChecked, status.Counts.Databases)
-	if status.OK {
-		fmt.Fprintln(w, style.Success.Render(style.SymbolDone)+" All good.")
-		fmt.Fprintln(w, "  "+style.Muted.Render(counts))
-	} else {
-		need := "1 thing needs you"
-		if len(status.Issues) != 1 {
-			need = fmt.Sprintf("%d things need you", len(status.Issues))
-		}
-		fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" "+need+":")
-		for _, issue := range status.Issues {
-			mark := style.Danger.Render(style.SymbolFailed)
-			if issue.Kind == "daemon.behind" {
-				mark = style.Warning.Render(style.SymbolRunning)
-			}
-			fmt.Fprintf(w, "  %s %s %s\n", mark, issue.Target, style.Muted.Render(issue.Detail))
-		}
-		fmt.Fprintln(w, "  "+style.Muted.Render(counts))
+// askServers asks every server at once and waits for all, at most
+// statusTimeout. A server that does not answer comes back with its error.
+func askServers(ctx context.Context, servers []string) []serverRow {
+	ctx, cancel := context.WithTimeout(ctx, statusTimeout)
+	defer cancel()
+	rows := make([]serverRow, len(servers))
+	var wait sync.WaitGroup
+	for i, server := range servers {
+		wait.Go(func() {
+			status, err := quietStatus(ctx, server)
+			rows[i] = serverRow{server: server, status: status, err: err}
+		})
 	}
-	if len(status.Updates) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Updates:")
-		for _, update := range status.Updates {
-			fmt.Fprintf(w, "  %s %s %s → %s\n", update.App, style.Muted.Render(update.Name), update.Version, update.Latest)
-		}
-		hint(w, "Update one with", "moin update <app>")
+	wait.Wait()
+	return rows
+}
+
+// quietStatus is serverStatus without a password prompt and without what
+// ssh says on stderr, which would mix into the table.
+func quietStatus(ctx context.Context, server string) (daemon.Status, error) {
+	cmd := sshCommand(ctx, server, asRoot(hereLine("apps")), false)
+	cmd.Args = slices.Insert(cmd.Args, 1, "-o", "BatchMode=yes")
+	out, err := cmd.Output()
+	if ctx.Err() != nil {
+		return daemon.Status{}, errors.New("no answer in time")
 	}
+	if err != nil {
+		return daemon.Status{}, sshError(server, err)
+	}
+	var status daemon.Status
+	return status, readAnswer(server, out, &status)
+}
+
+// printApps writes the table of servers and their apps.
+func printApps(stdout io.Writer, rows []serverRow) {
+	lines := [][]string{}
+	for _, row := range rows {
+		if row.err != nil {
+			lines = append(lines, []string{style.Bold.Render(row.server), "", "", badge(stdout, style.Badge(style.StatusFailed, "unreachable"), "unreachable"), style.Muted.Render(explain(row.err))})
+			continue
+		}
+		if len(row.status.Apps) == 0 {
+			lines = append(lines, []string{style.Bold.Render(row.server), style.Muted.Render("no apps"), "", "", ""})
+		}
+		for _, app := range row.status.Apps {
+			lines = append(lines, []string{style.Bold.Render(row.server), app.Name, "v" + strconv.Itoa(app.Release), appState(stdout, app.Running), strings.Join(app.Addresses, " ")})
+		}
+	}
+	table(stdout, []string{"SERVER", "APP", "RELEASE", "STATE", "ADDRESS"}, lines)
+}
+
+// serverJSON is one server in `moin --json`.
+type serverJSON struct {
+	Server  string             `json:"server"`
+	Version string             `json:"version,omitempty"`
+	Error   string             `json:"error,omitempty"`
+	Apps    []daemon.AppStatus `json:"apps"`
+}
+
+// overviewJSON is the table of `moin` for scripts.
+func overviewJSON(rows []serverRow) []serverJSON {
+	list := []serverJSON{}
+	for _, row := range rows {
+		entry := serverJSON{Server: row.server, Version: row.status.Version, Apps: row.status.Apps}
+		if row.err != nil {
+			entry.Error = explain(row.err)
+		}
+		if entry.Apps == nil {
+			entry.Apps = []daemon.AppStatus{}
+		}
+		list = append(list, entry)
+	}
+	return list
 }

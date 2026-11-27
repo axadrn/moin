@@ -1,54 +1,51 @@
 package cli
 
 import (
-	"strings"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 )
 
-func TestVersionSaysANewerReleaseIsOut(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/version": `{"version":"v0.2.0","self_hosted":true,"latest":"v0.3.0","update_available":true,"notes_url":"https://github.com/axadrn/moin/releases/tag/v0.3.0","summary":"Faster deploys.","read_first":"Read this first. Some updates need a step from you before you update."}`,
-	}}
-	code, stdout, stderr := runCLI(t, api, "version")
-	if code != 0 || stderr != "" {
-		t.Fatalf("code %d, stderr %q", code, stderr)
-	}
-	for _, want := range []string{"hub v0.2.0", "moin v0.3.0 is out. Faster deploys.", "releases/tag/v0.3.0", "Read this first.", "sh /opt/moin/update.sh"} {
-		if !strings.Contains(stdout, want) {
-			t.Errorf("stdout %q misses %q", stdout, want)
+// TestUpdateCheckOncePerDay asks GitHub once, keeps the answer for a day,
+// and asks again after it.
+func TestUpdateCheckOncePerDay(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	asked := 0
+	github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked++
+		http.Redirect(w, r, "/axadrn/moin/releases/tag/v1.2.3", http.StatusFound)
+	}))
+	defer github.Close()
+	releasesURL = github.URL + "/axadrn/moin/releases/latest"
+
+	now := time.Now()
+	for _, at := range []time.Time{now, now.Add(time.Hour), now.Add(23 * time.Hour)} {
+		if got := latestRelease(t.Context(), at); got != "v1.2.3" {
+			t.Fatalf("latest = %q", got)
 		}
 	}
-}
-
-func TestVersionShowsTheHubBackupToItsAdmins(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/version": `{"version":"v0.3.0","self_hosted":false,"hub_backup":{"state":"late","bucket":"acme-hub","last_copy":"2026-01-02T03:04:05Z"}}`,
-	}}
-	code, stdout, _ := runCLI(t, api, "version")
-	if code != 0 || !strings.Contains(stdout, "hub backup ✗ late · bucket acme-hub · last copy") {
-		t.Fatalf("code %d, stdout %q", code, stdout)
+	if asked != 1 {
+		t.Fatalf("asked GitHub %d times in a day, want once", asked)
+	}
+	latestRelease(t.Context(), now.Add(25*time.Hour))
+	if asked != 2 {
+		t.Fatalf("asked GitHub %d times after a day, want twice", asked)
 	}
 }
 
-// update without an app says how a self-hosted hub updates.
-func TestUpdateWithoutAppSaysHowTheHubUpdates(t *testing.T) {
-	code, _, stderr := runCLI(t, &fakeAPI{}, "update")
-	if code == 0 || !strings.Contains(stderr, "update <app>") || !strings.Contains(stderr, "sh /opt/moin/update.sh") {
-		t.Fatalf("code %d, stderr %q", code, stderr)
+// TestUpdateCheckOffline keeps the last answer when GitHub does not
+// answer, and waits a day before it asks again.
+func TestUpdateCheckOffline(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	file, _ := checkFile()
+	now := time.Now()
+	writeCheck(file, updateCheck{Checked: now.Add(-48 * time.Hour), Latest: "v1.0.0"})
+	releasesURL = "http://127.0.0.1:1/releases/latest"
+	if got := latestRelease(t.Context(), now); got != "v1.0.0" {
+		t.Errorf("offline latest = %q, want the last answer", got)
 	}
-}
-
-func TestDaemonAutoUpdate(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/daemon-updates": `{"auto":true}`,
-		"PUT /api/v1/daemon-updates": `{"auto":false}`,
-	}}
-	code, stdout, _ := runCLI(t, api, "servers", "auto-update")
-	if code != 0 || !strings.Contains(stdout, "by themselves: on") {
-		t.Fatalf("code %d, stdout %q", code, stdout)
-	}
-	code, _, _ = runCLI(t, api, "servers", "auto-update", "off")
-	if code != 0 || !api.seen(`PUT /api/v1/daemon-updates {"auto":false}`) {
-		t.Fatalf("code %d, requests %v", code, api.requests)
+	if checkDue(readCheck(file), now.Add(time.Hour)) {
+		t.Error("a failed check is due again within the hour, want a day")
 	}
 }
