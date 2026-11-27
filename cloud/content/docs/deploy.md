@@ -37,6 +37,7 @@ The next time, `moin deploy` is enough: it deploys to the server the app runs on
 - With a `Dockerfile` or a `compose.yml`, the server builds from those.
 - Without either, moin builds the app with [Railpack](https://railpack.com). Node, Bun, Python, Ruby, PHP and Go work like that.
 - The server builds. Your laptop needs no Docker, and you need no registry.
+- An app that ran before gets a copy of its databases just before the new release starts. If that copy fails, the deploy stops and says why. `moin deploy --no-copy` deploys all the same. [Backups](/docs/backups#how-a-copy-is-made)
 
 ## What moin reads from compose.yml
 
@@ -84,7 +85,7 @@ moin follow shop --branch main
 - With `gh` logged in, moin adds it to the GitHub repo by itself. Else it prints the key, and you add it as a deploy key with write access off.
 - Every minute the server asks the repo for the newest commit of the branch. A new one is cloned and deployed like a deploy from your laptop.
 - In the folder of the app, the branch and the repo come from git. Else name them: `--branch main --repo git@github.com:you/shop.git`.
-- The repo goes over SSH. An `https://` address becomes its SSH address.
+- The repo goes over SSH, and only over SSH. An `https://` address becomes its SSH address. git on the server may use no other way, so a repo address can't run a command or read a file there.
 - Each commit is tried once. A deploy that fails alerts once, and the next good one says it is over.
 - `moin follow shop --off` stops it and removes the key from the server. Remove it from the repo too.
 
@@ -167,6 +168,8 @@ moin logs shop --tail 1000
 ```
 
 The last 200 lines of the app. `-f` follows them as they come, until Ctrl-C.
+
+`moin logs shop --json` prints them as a list, each with its time, its container and the line. It takes no `-f`.
 
 ## Run a command
 
