@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite and Postgres, copied on a schedule into your bucket, encrypted. Every day one copy is restored and read. Restore, undo a restore, and restore with only your key when a server is gone."
+description: "SQLite and Postgres, encrypted and copied into your bucket on a schedule. Every day one copy is restored and read. Restore it, even with the server gone."
 group: "Servers and data"
 order: 1
 ---
