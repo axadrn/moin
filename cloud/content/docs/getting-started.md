@@ -14,6 +14,8 @@ You need two things:
 
 That is all. No account. No Docker on your laptop.
 
+Never rented a server? Start with the [Basics](/docs/basics/servers), or follow [from zero to live](/docs/basics/from-zero-to-live).
+
 ## 1. Install moin
 
 On your Mac or Linux laptop:
