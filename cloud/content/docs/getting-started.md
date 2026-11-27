@@ -48,7 +48,7 @@ shop · 3f2a9c1 → prod
 → starting
 → v1 is live
 ✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
-  Postgres found. See its backups: moin backups shop
+  Postgres found. No backup yet: moin bucket set prod
 ```
 
 Your app is live, with HTTPS. On a fresh server this takes about two minutes. Most of it is installing Docker. What Docker and the build print shows dimmed, between the steps.
