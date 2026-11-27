@@ -192,6 +192,9 @@ func TestSubscribe(t *testing.T) {
 	if len(mails.sent) != sent+1 || !strings.Contains(mails.last(t).Subject, "ended") {
 		t.Errorf("one mail about the end, got %d: %+v", len(mails.sent)-sent, mails.last(t))
 	}
+	if page := body(t, browser, server.URL+"/cloud"); !strings.Contains(page, "Alerts are off.") || strings.Contains(page, "trial") {
+		t.Errorf("an ended subscription is no trial: %s", page)
+	}
 }
 
 // An event Stripe didn't sign changes nothing.

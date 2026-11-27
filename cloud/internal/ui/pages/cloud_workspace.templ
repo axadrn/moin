@@ -13,8 +13,8 @@ import (
 type CloudWorkspaceProps struct {
 	Mail string
 	Plan string
-	// TrialOver is a trial that ran out, unpaid: alerts are off.
-	TrialOver bool
+	// AlertsOff is a trial that ran out, or a subscription that ended.
+	AlertsOff bool
 	// Subscribe shows the offer: the workspace doesn't pay, and the site
 	// can sell. Billing links Stripe's portal, once Stripe knows you.
 	Subscribe bool
@@ -41,8 +41,8 @@ templ CloudWorkspace(p CloudWorkspaceProps) {
 			</form>
 		}
 		<p class="moin-text moin-muted">{ p.Mail }. { p.Plan }.</p>
-		if p.TrialOver {
-			@components.Card(components.CardProps{Title: "Your trial is over. Alerts are off."}) {
+		if p.AlertsOff {
+			@components.Card(components.CardProps{Title: "Alerts are off."}) {
 				<p class="moin-text moin-muted">Your servers still report, and this page still shows them. Nobody gets a mail when one goes silent.</p>
 			}
 		}

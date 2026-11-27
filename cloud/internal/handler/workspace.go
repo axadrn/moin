@@ -31,7 +31,7 @@ func (c *Cloud) WorkspacePage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	render(w, r, pages.CloudWorkspace(pages.CloudWorkspaceProps{
-		Mail: space.Mail, Plan: plan(space), TrialOver: space.TrialOver(time.Now()),
+		Mail: space.Mail, Plan: plan(space), AlertsOff: space.TrialOver(time.Now()),
 		Subscribe: c.Stripe != nil && space.Status != "paid", Billing: c.Stripe != nil && space.StripeCustomer != "",
 		View: view,
 	}))
