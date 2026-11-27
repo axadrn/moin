@@ -82,7 +82,7 @@ func (w *Watcher) serverView(name string, now time.Time) ServerView {
 	srv := w.state.Servers[name]
 	if srv == nil {
 		return ServerView{Name: name, State: "no report yet",
-			Problem: name + " has not reported yet. On your laptop: " + build.Name + " watcher connect " + name + " <watcher url> <token>"}
+			Problem: name + " has not reported yet. On your laptop: " + w.Connect(name)}
 	}
 	server := ServerView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received)}
 	if srv.Silent {

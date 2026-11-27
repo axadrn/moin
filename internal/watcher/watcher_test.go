@@ -541,3 +541,26 @@ func TestVisitorAtOnce(t *testing.T) {
 		t.Errorf("a visit with no free slot = %q, want it to wait", got)
 	}
 }
+
+// SetServers watches a new server and forgets one that is gone.
+func TestSetServers(t *testing.T) {
+	w, err := New([]string{"prod"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Receive("prod", testReport(shop)); err != nil {
+		t.Fatal(err)
+	}
+	w.Connect = func(server string) string { return "moin cloud connect " + server }
+	w.SetServers([]string{"web-1"})
+	if len(w.state.Servers) != 0 || len(w.state.Domains) != 0 {
+		t.Errorf("prod is still known: %+v", w.state)
+	}
+	view := w.View()
+	if len(view.NeedsYou) != 1 || !strings.Contains(view.NeedsYou[0], "moin cloud connect web-1") {
+		t.Errorf("needs you = %v", view.NeedsYou)
+	}
+	if err := w.Receive("prod", testReport(shop)); err == nil {
+		t.Error("took a report of a server it no longer watches")
+	}
+}

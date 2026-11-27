@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/axadrn/moin/internal/alert"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/report"
 )
 
@@ -35,6 +36,10 @@ type Watcher struct {
 	// Send sends one alert to one destination. New sets it to alert.Send;
 	// moin cloud puts its own in front, which also sends mail.
 	Send func(context.Context, alert.Destination, alert.Message) error
+	// Connect is the command that connects a server to this watcher, for
+	// the page of a server that has not reported yet. moin cloud says
+	// its own.
+	Connect func(server string) string
 
 	// servers are the names of the servers it watches, sorted.
 	servers []string
@@ -63,7 +68,22 @@ func newAt(servers []string, alerts []alert.Destination, saved []byte, now time.
 		return nil, fmt.Errorf("the saved state is not what a watcher saves: %w", err)
 	}
 	s.forget(servers, alerts, now)
-	return &Watcher{Send: alert.Send, servers: slices.Sorted(slices.Values(servers)), alerts: slices.Clone(alerts), started: now, state: s}, nil
+	return &Watcher{Send: alert.Send, Connect: connectLine, servers: slices.Sorted(slices.Values(servers)), alerts: slices.Clone(alerts), started: now, state: s}, nil
+}
+
+// connectLine is how a server is connected to a watcher you run.
+func connectLine(server string) string {
+	return build.Name + " watcher connect " + server + " <watcher url> <token>"
+}
+
+// SetServers changes the servers the watcher watches. What it knew of a
+// server no longer in the list is forgotten.
+func (w *Watcher) SetServers(servers []string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.servers = slices.Sorted(slices.Values(servers))
+	w.state.forget(w.servers, w.alerts, time.Now())
+	w.dirty = true
 }
 
 // Receive keeps the report of a server. It refuses a report that names
@@ -72,14 +92,14 @@ func (w *Watcher) Receive(server string, r report.Report) error {
 	if r.Server != server {
 		return fmt.Errorf("this token is for server %s", server)
 	}
-	if !slices.Contains(w.servers, server) {
-		return fmt.Errorf("this watcher does not watch %s", server)
-	}
 	if err := checkReport(&r); err != nil {
 		return err
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if !slices.Contains(w.servers, server) {
+		return fmt.Errorf("this watcher does not watch %s", server)
+	}
 	w.state.receive(server, r, time.Now())
 	w.dirty = true
 	return nil
