@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"filippo.io/age"
-	"github.com/charmbracelet/colorprofile"
 
 	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/internal/build"
@@ -175,15 +174,16 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
+	prompts := terminal(os.Stderr)
 	return onApp(ctx, flags, app, func(server string) error {
 		if *to == "" {
-			*database, *to, err = pickCopy(ctx, server, app, *database, *from, stdin, os.Stderr)
+			*database, *to, err = pickCopy(ctx, server, app, *database, *from, stdin, prompts)
 			if err != nil {
 				return err
 			}
 		}
 		question := fmt.Sprintf("Put the data of %s back to %s? The app stops for a moment.", app, *to)
-		if err := confirm(stdin, os.Stderr, flags.yes(), question); err != nil {
+		if err := confirm(stdin, prompts, flags.yes(), question); err != nil {
 			return err
 		}
 		line := []string{"restore", app, "--to", *to, "--database", *database, "--from", *from}
@@ -191,7 +191,7 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		// server opens the copy with it and writes it nowhere.
 		var key io.Reader
 		if *withKey {
-			secret, err := askBackupKey(stdin, os.Stderr, "Your backup key:")
+			secret, err := askBackupKey(stdin, prompts, "Your backup key:")
 			if err != nil {
 				return err
 			}
@@ -544,11 +544,7 @@ func hereBucketKey(ctx context.Context, args []string, stdin io.Reader, stdout i
 		if err != nil {
 			return err
 		}
-		// The copy is bytes, not text: it goes past the writer that takes
-		// colors out of what a terminal cannot show, which would change it.
-		if colors, ok := stdout.(*colorprofile.Writer); ok {
-			stdout = colors.Forward
-		}
+		// stdout is raw here (see here): the copy leaves byte for byte.
 		return daemon.SendCopyHere(ctx, daemon.StateDir(), daemon.KeyCopy{App: app, Database: *database, Copy: *copy}, stdout)
 	}
 	return errors.New("usage: here bucket key [set|confirm|copy|send]")

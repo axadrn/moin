@@ -102,17 +102,19 @@ func cloudRestore(ctx context.Context, args []string, stdin io.Reader, stdout io
 	if err != nil {
 		return err
 	}
+	// What it asks goes to stderr, so stdout holds only the answer of --json.
+	prompts := terminal(os.Stderr)
 	return onApp(ctx, flags, app, func(server string) error {
-		chosen, err := pickCloudCopy(ctx, session, app, *database, *to, stdin, os.Stderr)
+		chosen, err := pickCloudCopy(ctx, session, app, *database, *to, stdin, prompts)
 		if err != nil {
 			return err
 		}
 		question := fmt.Sprintf("Put %s of %s on %s back to the copy %s from %s, taken %s? The app stops for a moment.",
 			chosen.Database, app, server, chosen.ID, chosen.Server, chosen.MadeAt.UTC().Format("Jan 2 15:04 UTC"))
-		if err := confirm(stdin, os.Stderr, flags.yes(), question); err != nil {
+		if err := confirm(stdin, prompts, flags.yes(), question); err != nil {
 			return err
 		}
-		key, err := askBackupKey(stdin, os.Stderr, "Your backup key:")
+		key, err := askBackupKey(stdin, prompts, "Your backup key:")
 		if err != nil {
 			return err
 		}
