@@ -1,0 +1,34 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// FreeYear is /free-year: what earns a free year of moin cloud, and how
+// to claim it.
+templ FreeYear() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "A free year of " + brand.Name + " cloud",
+		Description: "One year of " + brand.Name + " cloud, free, while " + brand.Name + " is in beta. For a real deploy on X, a confirmed bug or a merged pull request.",
+		Path:        "/free-year",
+	}) {
+		<main class="moin-page moin-content">
+			@components.Header(components.HeaderProps{Title: "A free year of " + brand.Name + " cloud"})
+			<p class="moin-lead">One year of { brand.Name } cloud, free. Normally $49. As long as { brand.Name } is in beta. No raffle, no limit.</p>
+			<article class="moin-narrow moin-prose">
+				<h2>How to get it</h2>
+				<p>Do one of these:</p>
+				<ul>
+					<li>Show your real { brand.Name } deploy on X: a post with a screenshot or a video of your own app, deployed with { brand.Name }.</li>
+					<li>Report a bug we confirm, as an issue on <a href={ templ.SafeURL(layouts.GitHubURL + "/issues") }>GitHub</a>.</li>
+					<li>Get a pull request merged.</li>
+				</ul>
+				<p>Never for likes, reposts or follows.</p>
+				<h2>How to claim it</h2>
+				<p>Write to <a href={ templ.SafeURL("mailto:" + brand.SupportEmail) }>{ brand.SupportEmail }</a> with the link. You get a code for a free year at checkout.</p>
+			</article>
+		</main>
+	}
+}

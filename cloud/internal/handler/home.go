@@ -22,6 +22,11 @@ func Home(files fs.FS, knocks func() *pages.HomeKnocks, numbers func() pages.Hom
 	}
 }
 
+// FreeYear is /free-year: what earns a free year of moin cloud.
+func FreeYear(w http.ResponseWriter, r *http.Request) {
+	render(w, r, pages.FreeYear())
+}
+
 // NotFound answers every address the site does not have.
 func NotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)

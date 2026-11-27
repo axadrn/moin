@@ -41,6 +41,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	siteKnocks := cloud.SiteKnocks(cfg.KnocksWorkspace, cfg.KnocksServer, cfg.Development)
 	mux.HandleFunc("GET /{$}", handler.Home(texts, siteKnocks, cloud.SiteNumbers(cfg.Development)))
 	mux.HandleFunc("GET /knocks", handler.KnocksPage(siteKnocks))
+	mux.HandleFunc("GET /free-year", handler.FreeYear)
 	mux.HandleFunc("GET /docs", handler.Docs(docs))
 	mux.HandleFunc("GET /docs.md", handler.Docs(docs))
 	mux.HandleFunc("GET /docs/", handler.Docs(docs))
