@@ -98,7 +98,8 @@ jobs:
       # The binaries the box built, in /app/downloads, and SHA256SUMS
       # signed with the release key. SHA256SUMS also names the box by its
       # digest, so the signature covers the exact image too. moin update
-      # sends these to a server and checks the signature first.
+      # sends these to a server and checks the signature first. The same
+      # key signs it the way ssh-keygen checks, for cli.sh.
       - name: Sign the binaries and the image
         env:
           IMAGE: ${{ needs.box.outputs.image }}
@@ -110,14 +111,15 @@ jobs:
             exit 1
           fi
           public=$(printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkey -pubout -outform DER | tail -c 32 | base64)
-          if ! grep -q "\"$public\", // RELEASE_SIGNING_KEY$" internal/daemon/update.go; then
-            echo "RELEASE_SIGNING_KEY is not the signing key in internal/daemon/update.go (the spare stays offline)" >&2
+          if ! grep -q "\"$public\", // RELEASE_SIGNING_KEY$" internal/build/release.go; then
+            echo "RELEASE_SIGNING_KEY is not the signing key in internal/build/release.go (the spare stays offline)" >&2
             exit 1
           fi
           docker create --name box "ghcr.io/axadrn/moin@$DIGEST" >/dev/null
           docker cp box:/app/downloads downloads
           printf '%s  %s\n' "${DIGEST#sha256:}" "$IMAGE" >> downloads/SHA256SUMS
           printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkeyutl -sign -rawin -inkey /dev/stdin -in downloads/SHA256SUMS -out downloads/SHA256SUMS.sig
+          printf '%s\n' "$RELEASE_SIGNING_KEY" | sh scripts/sshsig.sh downloads/SHA256SUMS > downloads/SHA256SUMS.sshsig
       # The notes are the tag's section of the changelog, without its date.
       - name: Release
         env:

@@ -29,14 +29,6 @@ const (
 // their signature come from here.
 var releaseURL = "https://github.com/axadrn/" + build.Name + "/releases/download/"
 
-// ReleaseKeys are the public Ed25519 keys whose signature a release must
-// carry, base64: the key that signs every release and a spare kept offline.
-// cli.sh on the site checks downloads with them too.
-var ReleaseKeys = []string{
-	"dkwXdu3Ecl8Rs4tfXxIrvipOfRa5R61tfWEdKISw3LA=", // RELEASE_SIGNING_KEY
-	"K2CVHFrtBYK1IT7s++2/R/LZNxO6+jGPc68EZiUDKhQ=", // RELEASE_SIGNING_KEY_SPARE, offline
-}
-
 // getRelease starts the download of a file of a release.
 func getRelease(ctx context.Context, url string) (io.ReadCloser, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -73,7 +65,7 @@ func downloadRelease(ctx context.Context, url string, limit int64) ([]byte, erro
 
 // signedByARelease reports whether one of the release keys signed sums.
 func signedByARelease(sums, signature []byte) bool {
-	for _, encoded := range ReleaseKeys {
+	for _, encoded := range build.ReleaseKeys {
 		key, err := base64.StdEncoding.DecodeString(encoded)
 		if err == nil && len(key) == ed25519.PublicKeySize && ed25519.Verify(key, sums, signature) {
 			return true
