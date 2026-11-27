@@ -156,6 +156,26 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// Needed are the settings moin.run itself needs: mail to people, GitHub
+// sign-in, billing and copies. A site on a laptop runs without them.
+var Needed = []string{
+	"EMAIL_FROM", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN",
+	"GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET",
+	"STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRODUCT_ID_PRO", "STRIPE_PRICE_ID_PRO_MONTHLY", "STRIPE_PRICE_ID_PRO_YEARLY",
+	"COPIES_ENDPOINT", "COPIES_BUCKET", "COPIES_ACCESS_KEY", "COPIES_SECRET_KEY",
+}
+
+// Missing are the Needed settings that are empty.
+func Missing() []string {
+	var missing []string
+	for _, key := range Needed {
+		if env(key, "") == "" {
+			missing = append(missing, key)
+		}
+	}
+	return missing
+}
+
 func env(key, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value

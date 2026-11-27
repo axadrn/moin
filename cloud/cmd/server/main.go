@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,10 +28,30 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "preflight" {
+		if err := preflight(); err != nil {
+			slog.Error("preflight failed, the running site stays", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		slog.Error("site stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+// preflight checks the settings of moin.run before update.sh switches to
+// this version: all of them read well, and none moin.run needs is empty.
+func preflight() error {
+	if _, err := config.Load(); err != nil {
+		return err
+	}
+	if missing := config.Missing(); len(missing) > 0 {
+		return fmt.Errorf("moin.run needs these settings in .env: %s", strings.Join(missing, ", "))
+	}
+	slog.Info("preflight passed")
+	return nil
 }
 
 func run() error {
