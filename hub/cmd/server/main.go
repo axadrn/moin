@@ -38,7 +38,7 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 	}
-	slog.Info("site starting", "port", cfg.Port, "env", cfg.AppEnv, "url", cfg.AppURL)
+	slog.Info("site starting", "port", cfg.Port, "development", cfg.Development, "url", cfg.AppURL)
 
 	// It runs until SIGTERM or ctrl+c, then lets open requests finish.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -45,7 +45,7 @@ func TestRoadmapIsCardsFromTheDocsPage(t *testing.T) {
 }
 
 func TestDocsRoadmapMovedButItsMarkdownStays(t *testing.T) {
-	handler := NewDocsHandler(service.NewDocsService(roadmapContent(t), false))
+	handler := service.NewDocsService(roadmapContent(t), false)
 	if response := serveDocs(t, handler, "/docs/roadmap"); response.Code != http.StatusMovedPermanently || response.Header().Get("Location") != "/roadmap" {
 		t.Errorf("/docs/roadmap: %d to %q", response.Code, response.Header().Get("Location"))
 	}

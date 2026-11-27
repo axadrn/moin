@@ -2,7 +2,6 @@ package markdown
 
 import (
 	"bytes"
-	"io"
 
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/yuin/goldmark"
@@ -93,23 +92,6 @@ func (p *Parser) ParseWithFrontmatter(source []byte) (content []byte, meta map[s
 	return buf.Bytes(), meta, nil
 }
 
-func (p *Parser) ConvertReader(r io.Reader, w io.Writer) error {
-	data, err := readAll(r)
-	if err != nil {
-		return err
-	}
-	return p.md.Convert(data, w)
-}
-
-func readAll(r io.Reader) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(r)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 func (p *Parser) ExtractFrontmatter(source []byte) map[string]any {
 	context := parser.NewContext()
 	p.md.Parser().Parse(text.NewReader(source), parser.WithContext(context))
@@ -125,10 +107,6 @@ func (p *Parser) ExtractFrontmatter(source []byte) map[string]any {
 		return make(map[string]any)
 	}
 	return meta
-}
-
-func (p *Parser) Renderer() renderer.Renderer {
-	return p.md.Renderer()
 }
 
 func (p *Parser) ExtractHeadings(source []byte) []model.DocHeading {

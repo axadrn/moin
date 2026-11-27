@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"encoding/xml"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
@@ -27,27 +25,8 @@ func Changelog(files fs.FS) http.HandlerFunc {
 	}
 }
 
-// ChangelogFeed is the changelog as RSS, one item per release, so a reader
-// or a Slack feed hears about each one.
+// ChangelogFeed is the changelog as RSS, one item per release.
 func ChangelogFeed(files fs.FS, appURL, name string) http.HandlerFunc {
-	type item struct {
-		Title       string `xml:"title"`
-		Link        string `xml:"link"`
-		GUID        string `xml:"guid"`
-		PubDate     string `xml:"pubDate"`
-		Description string `xml:"description"`
-	}
-	type channel struct {
-		Title       string `xml:"title"`
-		Link        string `xml:"link"`
-		Description string `xml:"description"`
-		Items       []item `xml:"item"`
-	}
-	type rss struct {
-		XMLName xml.Name `xml:"rss"`
-		Version string   `xml:"version,attr"`
-		Channel channel  `xml:"channel"`
-	}
 	base := strings.TrimRight(appURL, "/")
 	return func(w http.ResponseWriter, r *http.Request) {
 		releases, err := service.ChangelogReleases(files)
@@ -56,23 +35,16 @@ func ChangelogFeed(files fs.FS, appURL, name string) http.HandlerFunc {
 			http.Error(w, "no changelog", http.StatusNotFound)
 			return
 		}
-		feed := rss{Version: "2.0", Channel: channel{Title: name + " changelog", Link: base + "/changelog", Description: "What shipped in " + name + ", newest first."}}
+		var items []feedItem
 		for _, release := range releases {
-			date := release.Date
-			if date.IsZero() {
-				date = time.Now()
-			}
-			feed.Channel.Items = append(feed.Channel.Items, item{
+			items = append(items, feedItem{
 				Title:       release.Version,
 				Link:        base + "/changelog#" + release.Anchor(),
 				GUID:        base + "/changelog#" + release.Version,
-				PubDate:     date.UTC().Format(time.RFC1123Z),
+				PubDate:     feedDate(release.Date),
 				Description: release.InShort,
 			})
 		}
-		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=600")
-		_, _ = w.Write([]byte(xml.Header))
-		_ = xml.NewEncoder(w).Encode(feed)
+		writeFeed(w, name+" changelog", base+"/changelog", "What shipped in "+name+", newest first.", items)
 	}
 }

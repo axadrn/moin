@@ -1,18 +1,20 @@
+// Package model holds the docs pages as the site reads them.
 package model
 
+// DocPage is one file under content/docs.
 type DocPage struct {
 	Title string
-	Slug  string
-	Path  string
-	Order int
-	// Group is the topic the page sits under on the docs home.
+	// Slug is the path under docs/ without .md, like getting-started.
+	Slug string
+	// Group is the topic the page sits under on the docs home, Order its
+	// place there.
 	Group       string
+	Order       int
 	Description string
+	// Content is the Markdown, HTMLContent the page.
 	Content     string
 	HTMLContent string
 	Headings    []DocHeading
-	Children    []*DocPage
-	Parent      *DocPage
 }
 
 type DocHeading struct {
@@ -26,20 +28,4 @@ type DocHeading struct {
 type DocGroup struct {
 	Title string
 	Pages []*DocPage
-}
-
-// UIBlock is a whole page of moin UI to copy.
-type UIBlock struct {
-	Slug  string
-	Title string
-	// Description is the block's own line, from its meta description.
-	Description string
-	// Code is the file, with the links as they are after copying the folder.
-	Code string
-}
-
-// UIBlockGroup is a topic of the blocks.
-type UIBlockGroup struct {
-	Title  string
-	Blocks []UIBlock
 }

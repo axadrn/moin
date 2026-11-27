@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/markdown"
 )
 
@@ -23,8 +24,8 @@ type LegalPage struct {
 var legalSlug = regexp.MustCompile(`^[a-z-]+$`)
 
 // ReadLegalPage reads one legal page. {{support_email}} in it becomes
-// supportEmail.
-func ReadLegalPage(files fs.FS, slug, supportEmail string) (*LegalPage, error) {
+// brand.SupportEmail.
+func ReadLegalPage(files fs.FS, slug string) (*LegalPage, error) {
 	if !legalSlug.MatchString(slug) {
 		return nil, fmt.Errorf("no legal page %q", slug)
 	}
@@ -32,7 +33,7 @@ func ReadLegalPage(files fs.FS, slug, supportEmail string) (*LegalPage, error) {
 	if err != nil {
 		return nil, err
 	}
-	source = []byte(strings.ReplaceAll(string(source), "{{support_email}}", supportEmail))
+	source = []byte(strings.ReplaceAll(string(source), "{{support_email}}", brand.SupportEmail))
 	html, meta, err := markdown.NewParser().ParseWithFrontmatter(source)
 	if err != nil {
 		return nil, err

@@ -7,71 +7,38 @@ import (
 	"time"
 )
 
-// responseWriter wraps http.ResponseWriter to capture status code
-type responseWriter struct {
+// statusWriter remembers the status of a response.
+type statusWriter struct {
 	http.ResponseWriter
-	statusCode int
-	written    bool
+	status int
 }
 
-// Keep streaming and other optional HTTP capabilities visible through logging.
-func (rw *responseWriter) Unwrap() http.ResponseWriter {
-	return rw.ResponseWriter
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	if !rw.written {
-		rw.statusCode = code
-		rw.written = true
-		rw.ResponseWriter.WriteHeader(code)
+func (w *statusWriter) WriteHeader(status int) {
+	if w.status == 0 {
+		w.status = status
 	}
+	w.ResponseWriter.WriteHeader(status)
 }
 
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	if !rw.written {
-		rw.WriteHeader(http.StatusOK)
+func (w *statusWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
 	}
-	return rw.ResponseWriter.Write(b)
+	return w.ResponseWriter.Write(b)
 }
 
-// Static asset paths are never logged (they would bury real requests).
-var skipLoggingPaths = []string{
-	"/assets/",
-	"/favicon.ico",
-}
-
-// RequestLogging returns middleware that logs each HTTP request (method, path,
-// status, duration). Static assets are always skipped. When enabled is false
-// it is a no-op pass-through (e.g. when a reverse proxy already logs requests).
-func RequestLogging(enabled bool) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		if !enabled {
-			return next
+// RequestLogging logs each request: method, path, status and how long it
+// took. Files under /assets/ and the favicon are left out, they would bury
+// the pages.
+func RequestLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/assets/") || r.URL.Path == "/favicon.ico" {
+			next.ServeHTTP(w, r)
+			return
 		}
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			for _, prefix := range skipLoggingPaths {
-				if strings.HasPrefix(r.URL.Path, prefix) {
-					next.ServeHTTP(w, r)
-					return
-				}
-			}
-
-			start := time.Now()
-
-			rw := &responseWriter{
-				ResponseWriter: w,
-				statusCode:     http.StatusOK,
-				written:        false,
-			}
-
-			next.ServeHTTP(rw, r)
-
-			slog.Info("http request",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"status", rw.statusCode,
-				"duration_ms", time.Since(start).Milliseconds(),
-			)
-		})
-	}
+		start := time.Now()
+		written := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(written, r)
+		slog.Info("http request", "method", r.Method, "path", r.URL.Path, "status", written.status, "duration_ms", time.Since(start).Milliseconds())
+	})
 }

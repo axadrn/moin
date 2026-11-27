@@ -1,21 +1,20 @@
 package service
 
 import (
-	"slices"
+	"strings"
 	"testing"
+	"time"
 )
 
-// The sitemap lists the legal pages, the catalog and the blog.
-func TestSitemapListsThePublicPages(t *testing.T) {
-	sitemap := NewSitemapService(nil, "https://example.com/")
-	sitemap.AddCatalog([]string{"umami"})
-	var locs []string
-	for _, url := range sitemap.staticURLs() {
-		locs = append(locs, url.Loc)
+// Each page is its absolute address, with its date where it has one.
+func TestSitemap(t *testing.T) {
+	out, err := Sitemap("https://example.com", []SitemapPage{{Path: "/"}, {Path: "/changelog", Changed: time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)}})
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, page := range []string{"https://example.com/legal/terms", "https://example.com/catalog/umami", "https://example.com/changelog"} {
-		if !slices.Contains(locs, page) {
-			t.Errorf("sitemap misses %s: %v", page, locs)
+	for _, want := range []string{"<loc>https://example.com/</loc>", "<loc>https://example.com/changelog</loc>", "<lastmod>2026-11-03</lastmod>"} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("sitemap misses %s:\n%s", want, out)
 		}
 	}
 }

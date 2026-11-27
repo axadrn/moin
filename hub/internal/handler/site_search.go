@@ -27,11 +27,12 @@ func NewSiteSearchHandler(docs *service.DocsService, entries []catalog.Entry) *S
 // with the search, for a browser without JavaScript.
 func (h *SiteSearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
-	if _, err := h.docs.DocsTree(); err != nil {
+	groups, err := h.docs.Groups()
+	if err != nil {
 		renderError(w, "search unavailable", err)
 		return
 	}
-	hits := pages.FindSite(h.docs.Groups(), h.catalog, query, siteHits)
+	hits := pages.FindSite(groups, h.catalog, query, siteHits)
 	w.Header().Add("Vary", "HX-Request")
 	if isAction(r) {
 		render(w, r, pages.SiteSearchOptions(query, hits))

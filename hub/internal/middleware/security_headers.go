@@ -1,67 +1,48 @@
 package middleware
 
 import (
+	"crypto/rand"
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/a-h/templ"
+	"github.com/axadrn/moin/hub/internal/config"
 )
 
-type SecurityHeadersConfig struct {
-	RobotsNoIndex bool
-	UmamiHost     string
-	PlausibleHost string
-}
-
-// SecurityHeaders adds the security headers to all responses. The nonce
-// from NonceMiddleware lets the inline scripts of a page run.
-func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		nonce := GetNonce(r.Context())
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=()")
-		if cfg.RobotsNoIndex {
-			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
-		}
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy(cfg, nonce))
-		next.ServeHTTP(w, r)
-	})
+// SecurityHeaders adds the security headers to every response. Each
+// request gets a new nonce: the inline scripts of its page carry it
+// (templ.GetNonce), and only scripts with it run.
+func SecurityHeaders(cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nonce := rand.Text()
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=()")
+			w.Header().Set("Content-Security-Policy", contentSecurityPolicy(cfg, nonce))
+			next.ServeHTTP(w, r.WithContext(templ.WithNonce(r.Context(), nonce)))
+		})
+	}
 }
 
 // contentSecurityPolicy says what a page may load and run. Scripts need the
-// nonce or one of the listed hosts, and nothing may frame the page.
-func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
-	umamiHost, umamiConnect := umamiSources(cfg)
-	plausibleHost := plausibleSource(cfg)
+// nonce, and nothing may frame the page. The Umami server may send its
+// script and take the page views.
+func contentSecurityPolicy(cfg *config.Config, nonce string) string {
+	umami := ""
+	if cfg.UmamiHost != "" {
+		umami = " https://" + cfg.UmamiHost
+	}
 	return strings.Join([]string{
 		"default-src 'self'",
-		"script-src 'self' 'nonce-" + nonce + "' https://" + umamiHost + " https://" + plausibleHost + " https://www.googletagmanager.com",
+		"script-src 'self' 'nonce-" + nonce + "'" + umami,
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: https:",
-		"media-src 'self' " + brand.Media,
 		"font-src 'self' data:",
-		"connect-src 'self' " + umamiConnect + " https://" + plausibleHost + " https://*.google-analytics.com https://analytics.google.com",
+		"connect-src 'self'" + umami,
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
 		"form-action 'self'",
 	}, "; ")
-}
-
-// umamiSources is the host that serves Umami's script and the hosts it
-// sends events to: several for the cloud, one when self-hosted.
-func umamiSources(cfg SecurityHeadersConfig) (string, string) {
-	if cfg.UmamiHost != "" && cfg.UmamiHost != "cloud.umami.is" {
-		return cfg.UmamiHost, "https://" + cfg.UmamiHost
-	}
-	return "cloud.umami.is", "https://cloud.umami.is https://analytics.umami.is https://gateway.umami.is https://eu.umami.is https://api-gateway-eu.umami.dev https://api-gateway.umami.dev"
-}
-
-// plausibleSource is the Plausible host: plausible.io unless self-hosted.
-func plausibleSource(cfg SecurityHeadersConfig) string {
-	if cfg.PlausibleHost != "" {
-		return cfg.PlausibleHost
-	}
-	return "plausible.io"
 }

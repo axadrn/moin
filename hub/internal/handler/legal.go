@@ -9,9 +9,9 @@ import (
 )
 
 // Legal shows the terms or the privacy policy at /legal/{page}.
-func Legal(files fs.FS, supportEmail string) http.HandlerFunc {
+func Legal(files fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		page, err := service.ReadLegalPage(files, r.PathValue("page"), supportEmail)
+		page, err := service.ReadLegalPage(files, r.PathValue("page"))
 		if err != nil {
 			NotFound(w, r)
 			return

@@ -16,7 +16,7 @@ import (
 )
 
 func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
-	response := serveDocs(t, newDocsTestHandler(t), "/docs")
+	response := serveDocs(t, newDocsTestService(t), "/docs")
 	body := response.Body.String()
 	if response.Code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 		t.Fatalf("status = %d, body is no page", response.Code)
@@ -36,7 +36,7 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 }
 
 func TestSiteSearchFindsDocsAndCatalog(t *testing.T) {
-	docs := newDocsTestHandler(t).docsService
+	docs := newDocsTestService(t)
 	search := NewSiteSearchHandler(docs, []catalog.Entry{{Slug: "ntfy", Name: "ntfy", Category: "Communication", Pitch: "Push notifications."}})
 	serve := func(path string, htmx bool) string {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
@@ -66,7 +66,7 @@ func TestSiteSearchFindsDocsAndCatalog(t *testing.T) {
 }
 
 func TestDocsPageEndsWithTheNextPage(t *testing.T) {
-	body := serveDocs(t, newDocsTestHandler(t), "/docs/getting-started").Body.String()
+	body := serveDocs(t, newDocsTestService(t), "/docs/getting-started").Body.String()
 	for _, want := range []string{"First step", `href="/docs/guides/domains"`, "Next: </span>Domains", `href="/docs"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page misses %q", want)
@@ -74,18 +74,13 @@ func TestDocsPageEndsWithTheNextPage(t *testing.T) {
 	}
 }
 
-func TestDocsRedirectsWhatIsNoPage(t *testing.T) {
-	handler := newDocsTestHandler(t)
-	for path, target := range map[string]string{
-		"/docs/guides": "/docs",
-	} {
-		response := serveDocs(t, handler, path)
-		if location := response.Header().Get("Location"); location != target {
-			t.Errorf("%s goes to %q, want %q", path, location, target)
-		}
+func TestDocsHaveOneAddressPerPage(t *testing.T) {
+	handler := newDocsTestService(t)
+	if response := serveDocs(t, handler, "/docs/getting-started/?q=1"); response.Header().Get("Location") != "/docs/getting-started?q=1" {
+		t.Errorf("/docs/getting-started/ goes to %q", response.Header().Get("Location"))
 	}
-	// A page that was renamed is gone: no old path leads to the new one.
-	for _, path := range []string{"/docs/missing", "/docs/introduction"} {
+	// A folder or a page that was renamed is no page.
+	for _, path := range []string{"/docs/guides", "/docs/missing", "/docs/introduction"} {
 		if code := serveDocs(t, handler, path).Code; code != http.StatusNotFound {
 			t.Errorf("%s answers %d", path, code)
 		}
@@ -93,7 +88,7 @@ func TestDocsRedirectsWhatIsNoPage(t *testing.T) {
 }
 
 func TestDocsServesMarkdownSource(t *testing.T) {
-	handler := newDocsTestHandler(t)
+	handler := newDocsTestService(t)
 	page := serveDocs(t, handler, "/docs/getting-started.md")
 	if page.Code != http.StatusOK || page.Header().Get("Content-Type") != "text/markdown; charset=utf-8" {
 		t.Fatalf("status = %d, Content-Type = %q", page.Code, page.Header().Get("Content-Type"))
@@ -107,7 +102,7 @@ func TestDocsServesMarkdownSource(t *testing.T) {
 	}
 }
 
-func newDocsTestHandler(t *testing.T) *DocsHandler {
+func newDocsTestService(t *testing.T) *service.DocsService {
 	t.Helper()
 	contentPath := t.TempDir()
 	docsPath := filepath.Join(contentPath, "docs")
@@ -123,20 +118,19 @@ func newDocsTestHandler(t *testing.T) *DocsHandler {
 			t.Fatalf("write docs page: %v", err)
 		}
 	}
-	return NewDocsHandler(service.NewDocsService(os.DirFS(contentPath), false))
+	return service.NewDocsService(os.DirFS(contentPath), false)
 }
 
-func serveDocs(t *testing.T, handler *DocsHandler, path string) *httptest.ResponseRecorder {
+func serveDocs(t *testing.T, docs *service.DocsService, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodGet, path, nil)
 	ctx := ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{
 		AppURL:       "https://example.com",
-		SupportEmail: "support@example.com",
 	})
 	ctx = ctxkeys.WithURLPath(ctx, request.URL.Path)
 	request = request.WithContext(ctx)
 	recorder := httptest.NewRecorder()
 
-	handler.ShowDocs(recorder, request)
+	Docs(docs)(recorder, request)
 	return recorder
 }

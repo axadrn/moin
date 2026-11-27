@@ -4,14 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/hub/internal/config"
 )
 
-// The home page plays its video from the media bucket; without media-src
-// the browser blocks it and shows an empty player.
-func TestPolicyLetsPagesPlayMedia(t *testing.T) {
-	policy := contentSecurityPolicy(SecurityHeadersConfig{}, "nonce")
-	if !strings.Contains(policy, "media-src 'self' "+brand.Media) {
-		t.Fatalf("media-src misses %s: %s", brand.Media, policy)
+// Only scripts with the nonce of the page run, and nothing frames it.
+func TestPolicyRunsOnlyThePagesScripts(t *testing.T) {
+	policy := contentSecurityPolicy(&config.Config{RenderConfig: config.RenderConfig{UmamiHost: "umami.example.com"}}, "abc")
+	for _, want := range []string{"script-src 'self' 'nonce-abc' https://umami.example.com", "connect-src 'self' https://umami.example.com", "frame-ancestors 'none'"} {
+		if !strings.Contains(policy, want) {
+			t.Errorf("policy misses %q: %s", want, policy)
+		}
 	}
 }

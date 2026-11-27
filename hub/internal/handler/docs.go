@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/hub/internal/model"
@@ -10,96 +11,65 @@ import (
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
-type DocsHandler struct {
-	docsService *service.DocsService
-}
-
-func NewDocsHandler(docsService *service.DocsService) *DocsHandler {
-	handler := &DocsHandler{
-		docsService: docsService,
-	}
-	// Docs might be added later: a page that is missing says so.
-	_ = handler.docsService.BuildDocsTree()
-	return handler
-}
-
-// ShowDocs is the docs: /docs the topics with every page, /docs/<slug> one
+// Docs is the docs: /docs the topics with every page, /docs/<slug> one
 // page, and either with .md its Markdown. Every link is a full page load.
-func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
-	if redirectTrailingSlash(w, r) {
-		return
-	}
-	markdown := strings.HasSuffix(r.URL.Path, ".md")
-	slug := strings.Trim(strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, ".md"), "/docs"), "/")
-
-	// The roadmap has a page of its own; its Markdown stays here.
-	if slug == "roadmap" && !markdown {
-		http.Redirect(w, r, "/roadmap", http.StatusMovedPermanently)
-		return
-	}
-
-	if _, err := h.docsService.DocsTree(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		render(w, r, pages.StatusPage("Docs unavailable", "The docs could not be loaded. Try again.", "500 internal server error"))
-		return
-	}
-	groups := h.docsService.Groups()
-
-	if slug == "" {
-		if markdown {
-			writeMarkdown(w, docsIndexMarkdown(groups))
+func Docs(docs *service.DocsService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// /docs/page/ goes to /docs/page, so every page has one address.
+		if path := r.URL.Path; len(path) > 1 && strings.HasSuffix(path, "/") {
+			target := strings.TrimRight(path, "/")
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return
 		}
-		render(w, r, pages.DocsHome(groups))
-		return
-	}
-	page, err := h.docsService.DocPage(slug)
-	if err != nil {
-		if markdown {
+		markdown := strings.HasSuffix(r.URL.Path, ".md")
+		slug := strings.Trim(strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, ".md"), "/docs"), "/")
+		// The roadmap has a page of its own; its Markdown stays here.
+		if slug == "roadmap" && !markdown {
+			http.Redirect(w, r, "/roadmap", http.StatusMovedPermanently)
+			return
+		}
+		groups, err := docs.Groups()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			render(w, r, pages.StatusPage("Docs unavailable", "The docs could not be loaded. Try again.", "500 internal server error"))
+			return
+		}
+		if slug == "" {
+			if markdown {
+				writeMarkdown(w, docsIndexMarkdown(groups))
+				return
+			}
+			render(w, r, pages.DocsHome(groups))
+			return
+		}
+		all, _ := docs.Pages()
+		at := slices.IndexFunc(all, func(page *model.DocPage) bool { return page.Slug == slug })
+		switch {
+		case at < 0 && markdown:
 			http.Error(w, "Docs page not found", http.StatusNotFound)
-			return
+		case at < 0:
+			NotFound(w, r)
+		case markdown:
+			writeMarkdown(w, all[at].Content)
+		default:
+			var next *model.DocPage
+			if at+1 < len(all) {
+				next = all[at+1]
+			}
+			render(w, r, pages.Docs(all[at], groups, next))
 		}
-		w.WriteHeader(http.StatusNotFound)
-		render(w, r, pages.NotFound())
-		return
 	}
-	// A folder (guides, reference) is no page: its pages are on the home.
-	if len(page.Children) > 0 {
-		http.Redirect(w, r, "/docs", http.StatusFound)
-		return
-	}
-	if markdown {
-		writeMarkdown(w, page.Content)
-		return
-	}
-	_, next := h.docsService.PrevNextPages(page)
-	render(w, r, pages.Docs(page, groups, next))
 }
 
-// writeMarkdown answers with a page as Markdown, for AI agents. It is a copy
+// writeMarkdown answers with a page as Markdown, for AI tools. It is a copy
 // of the HTML page, so it stays out of search.
 func writeMarkdown(w http.ResponseWriter, content string) {
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.Header().Set("X-Robots-Tag", "noindex")
 	_, _ = w.Write([]byte(content))
-}
-
-// redirectTrailingSlash sends /docs/page/ to /docs/page, so every page has
-// one address.
-func redirectTrailingSlash(w http.ResponseWriter, r *http.Request) bool {
-	path := r.URL.Path
-	if len(path) < 2 || !strings.HasSuffix(path, "/") {
-		return false
-	}
-	target := strings.TrimRight(path, "/")
-	if target == "" {
-		target = "/"
-	}
-	if r.URL.RawQuery != "" {
-		target += "?" + r.URL.RawQuery
-	}
-	http.Redirect(w, r, target, http.StatusMovedPermanently)
-	return true
 }
 
 // docsIndexMarkdown is /docs.md: every page under its topic, linked to its

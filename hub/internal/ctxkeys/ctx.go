@@ -10,24 +10,24 @@ import (
 type contextKey string
 
 const (
-	URLPathKey      contextKey = "url_path"
-	RenderConfigKey contextKey = "render_config"
+	urlPathKey      contextKey = "url_path"
+	renderConfigKey contextKey = "render_config"
 )
 
 func URLPath(ctx context.Context) string {
-	path, _ := ctx.Value(URLPathKey).(string)
+	path, _ := ctx.Value(urlPathKey).(string)
 	return path
 }
 
 func WithURLPath(ctx context.Context, path string) context.Context {
-	return context.WithValue(ctx, URLPathKey, path)
+	return context.WithValue(ctx, urlPathKey, path)
 }
 
 func RenderConfig(ctx context.Context) config.RenderConfig {
-	cfg, _ := ctx.Value(RenderConfigKey).(config.RenderConfig)
+	cfg, _ := ctx.Value(renderConfigKey).(config.RenderConfig)
 	return cfg
 }
 
 func WithRenderConfig(ctx context.Context, cfg config.RenderConfig) context.Context {
-	return context.WithValue(ctx, RenderConfigKey, cfg)
+	return context.WithValue(ctx, renderConfigKey, cfg)
 }

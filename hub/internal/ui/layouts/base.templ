@@ -64,7 +64,7 @@ templ seo(props SEOProps) {
 	// Author
 	<meta name="author" content={ appName }/>
 	// Robots Tags
-	if props.NoIndex || cfg.RobotsNoIndex {
+	if props.NoIndex {
 		<meta name="robots" content="noindex, nofollow"/>
 	} else {
 		<meta name="robots" content="index, follow"/>

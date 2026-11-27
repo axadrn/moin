@@ -22,26 +22,25 @@ import (
 // request goes through.
 func New(cfg *config.Config) (http.Handler, error) {
 	// content/ is read from disk in development, so an edit shows on reload.
-	texts := content.FS(cfg.IsDevelopment())
+	texts := content.FS(cfg.Development)
 	entries, err := catalog.Load(catalogfiles.Files)
 	if err != nil {
 		return nil, err
 	}
-	docs := service.NewDocsService(texts, cfg.IsDevelopment())
-	seo := handler.NewSEOHandler(docs, entries, cfg.AppURL, texts, cfg.RobotsNoIndex)
+	docs := service.NewDocsService(texts, cfg.Development)
+	seo := handler.NewSEOHandler(docs, entries, cfg.AppURL, texts)
 	catalogPages := handler.NewCatalogHandler(entries, cfg.AppURL)
-	docsPages := handler.NewDocsHandler(docs)
 
 	mux := http.NewServeMux()
-	assetRoutes(mux, cfg.IsDevelopment())
+	assetRoutes(mux, cfg.Development)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	mux.HandleFunc("GET /robots.txt", seo.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
 	mux.HandleFunc("GET /{$}", handler.Home(texts))
-	mux.HandleFunc("GET /docs", docsPages.ShowDocs)
-	mux.HandleFunc("GET /docs.md", docsPages.ShowDocs)
-	mux.HandleFunc("GET /docs/", docsPages.ShowDocs)
+	mux.HandleFunc("GET /docs", handler.Docs(docs))
+	mux.HandleFunc("GET /docs.md", handler.Docs(docs))
+	mux.HandleFunc("GET /docs/", handler.Docs(docs))
 	mux.HandleFunc("GET /search", handler.NewSiteSearchHandler(docs, entries).Search)
 	mux.HandleFunc("GET /roadmap", handler.Roadmap(texts))
 	mux.HandleFunc("GET /changelog", handler.Changelog(texts))
@@ -54,28 +53,19 @@ func New(cfg *config.Config) (http.Handler, error) {
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
 	mux.HandleFunc("GET /compare", handler.CompareIndex)
 	mux.HandleFunc("GET /compare/{name}", handler.Compare)
-	mux.HandleFunc("GET /legal/{page}", handler.Legal(texts, cfg.SupportEmail))
+	mux.HandleFunc("GET /legal/{page}", handler.Legal(texts))
 	// The script that installs moin, and the binaries it downloads: the
 	// image builds them into downloads/.
 	mux.HandleFunc("GET /cli.sh", handler.CLIScript(cfg.AppURL))
 	mux.Handle("GET /download/", http.StripPrefix("/download/", http.FileServer(http.Dir("downloads"))))
 	mux.HandleFunc("/", handler.NotFound)
 
-	securityHeaders := func(next http.Handler) http.Handler {
-		return middleware.SecurityHeaders(middleware.SecurityHeadersConfig{
-			RobotsNoIndex: cfg.RobotsNoIndex,
-			UmamiHost:     cfg.UmamiHost,
-			PlausibleHost: cfg.PlausibleHost,
-		}, next)
-	}
 	return middleware.Chain(
 		mux,
-		middleware.RenderConfig(cfg.Render()),
-		middleware.NonceMiddleware,
-		securityHeaders,
-		middleware.RequestLogging(cfg.LogHTTP),
+		middleware.RequestLogging,
 		middleware.OldDomain(cfg.OldURLs, cfg.AppURL),
-		middleware.WithURLPath,
+		middleware.SecurityHeaders(cfg),
+		middleware.RenderContext(cfg.RenderConfig),
 	), nil
 }
 
@@ -88,27 +78,25 @@ func assetRoutes(mux *http.ServeMux, development bool) {
 	if development {
 		files = os.DirFS("assets")
 	}
-	serve := middleware.Gzip(http.FileServerFS(files))
-	mux.Handle("GET /assets/", http.StripPrefix("/assets/", noCacheInDevelopment(development, serve)))
+	serve := http.FileServerFS(files)
 	versioned := "/assets/" + build.Version + "/"
-	mux.Handle("GET "+versioned, http.StripPrefix(versioned, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !development {
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		}
-		noCacheInDevelopment(development, serve).ServeHTTP(w, r)
-	})))
+	mux.Handle("GET /assets/", cached(development, "", http.StripPrefix("/assets/", serve)))
+	mux.Handle("GET "+versioned, cached(development, "public, max-age=31536000, immutable", http.StripPrefix(versioned, serve)))
 	// Browsers, link previews and analytics ask for /favicon.ico at the root.
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, files, "img/favicon.ico")
 	})
 }
 
-// noCacheInDevelopment makes the browser ask again on every reload, so an
-// edit shows.
-func noCacheInDevelopment(development bool, next http.Handler) http.Handler {
+// cached sets Cache-Control to control, or to no-store in development, so
+// an edit shows on reload.
+func cached(development bool, control string, next http.Handler) http.Handler {
+	if development {
+		control = "no-store"
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if development {
-			w.Header().Set("Cache-Control", "no-store")
+		if control != "" {
+			w.Header().Set("Cache-Control", control)
 		}
 		next.ServeHTTP(w, r)
 	})

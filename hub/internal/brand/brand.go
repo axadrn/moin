@@ -5,19 +5,12 @@ import "github.com/axadrn/moin/internal/build"
 
 const (
 	Name    = build.Name
-	Tagline = "Deploy anything. Lose nothing."
-	// Promise is the line under the tagline, the same on the home page,
-	// the sign-in page, the docs, the README and the CLI.
-	Promise = "Your apps on your servers. Backups on your schedule. Checked every day."
-	// Company runs the hosted service and holds the copyright.
+	Tagline = "Your ./deploy.sh. But your data comes back."
+	// Company runs moin cloud and holds the copyright.
 	Company = "Berry Good Ideas LLC"
-	// SupportEmail is where people write about moin, on every install;
-	// SUPPORT_EMAIL overrides it.
+	// SupportEmail is where people write about moin.
 	SupportEmail = "hello@moin.run"
-	// Media is where the site's videos live: a public bucket of their own,
-	// so a page may load them (Content-Security-Policy, media-src).
-	Media = "https://media.moin.run"
-	// Description is Promise with a few words for search engines, at most
-	// 160 characters: the description of the home page.
-	Description = Promise + " Open source. SQLite and Postgres. Web, CLI, terminal UI and MCP."
+	// Description is what search engines show for the home page, at most
+	// 160 characters.
+	Description = Tagline + " Open source. SQLite and Postgres. Over SSH, no dashboard."
 )

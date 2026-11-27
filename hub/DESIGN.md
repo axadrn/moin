@@ -38,10 +38,9 @@ in iOS and macOS), not a website and not a dashboard template.
   `homeHarbor` in `internal/ui/pages/marketing_harbor.templ`: 20-foot
   containers from the side, staggered, only your-app and two others pulled
   out, the whole wall resting on the card's bottom edge.
-- **The overview video.** Under the headline, in the first screen, the
-  landing page plays the overview film (`homeVideo` in `internal/ui/pages/marketing_home.templ`):
-  real moin only, recorded on throwaway servers. It plays without sound
-  and loops; its controls turn the sound on.
+- **The transcript.** Under the headline, in the first screen, the
+  landing page shows a real deploy as terminal output (`components.Code`):
+  real moin only, no made-up numbers.
 
 Never: an accent color, gradients, glows or blurred blobs, glassmorphism,
 emoji, sparkles, rocket icons, three generic icon cards in a row, small
