@@ -12,6 +12,9 @@ import (
 	"strings"
 	"syscall"
 
+	// The SQLite driver, for database/sql.
+	_ "modernc.org/sqlite"
+
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/protocol"
 )
@@ -335,6 +338,18 @@ func sweepTemp(root *os.Root, live string) {
 				_ = root.RemoveAll(name)
 			}
 		}
+	}
+}
+
+// matchOwnerOf gives the database name in root and its -wal and -shm files
+// the owner in info.
+func matchOwnerOf(root *os.Root, name string, info os.FileInfo) {
+	owner, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return
+	}
+	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
+		_ = root.Lchown(name+suffix, int(owner.Uid), int(owner.Gid))
 	}
 }
 

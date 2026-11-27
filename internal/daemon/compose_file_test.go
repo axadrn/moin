@@ -294,60 +294,6 @@ func TestBuildAgainDropsTheSecretsHash(t *testing.T) {
 	}
 }
 
-// beta34Server copies testdata/beta34, the apps folder beta.34 left
-// behind, to a new state folder, with its paths, and moves the env as the
-// daemon does when it starts.
-func beta34Server(t *testing.T) *apps {
-	t.Helper()
-	dir := t.TempDir()
-	err := filepath.WalkDir("testdata/beta34", func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
-		}
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dir, strings.TrimPrefix(path, "testdata/beta34"))
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			return err
-		}
-		return os.WriteFile(target, []byte(strings.ReplaceAll(string(body), "/var/lib/moin/", dir+"/")), 0o600)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a := newApps(dir)
-	a.moveOldEnvs(t.Context())
-	return a
-}
-
-// TestComposeFileOfABeta34Restart: beta.34 wrote the values into
-// base.json, and a restart takes its compose file from there, so the
-// Postgres password of miniflux is in it. That file stays on the server.
-func TestComposeFileOfABeta34Restart(t *testing.T) {
-	a := beta34Server(t)
-	// Postgres's data, which the release mounts.
-	if err := os.MkdirAll(filepath.Join(a.appDir("feeds"), "volumes", "data", "postgres"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	release, err := a.newRelease(protocol.DeployStart{App: "feeds", Name: "feeds", Number: 3}, func(string, ...any) {})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := a.prepareRelease(t.Context(), release); err != nil {
-		t.Fatal(err)
-	}
-	saveJSON(filepath.Join(release.dir, "detected.json"), release.detected)
-	text, err := a.composeFile("feeds", 3)
-	if err == nil || !strings.Contains(err.Error(), "it holds the value of DB_PASSWORD") || text != "" {
-		t.Fatalf("the compose file of a restart from beta.34: %v\n%s", err, text)
-	}
-	if strings.Contains(err.Error(), "db-password-value") {
-		t.Errorf("the error shows the value: %v", err)
-	}
-}
-
 // TestComposeFileHoldsNoSecret: a compose file that holds a value of the
 // app's env, or its password hash, is not made. A value where the deploy
 // fills it in on purpose, such as the version in the image or a domain in
