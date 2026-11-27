@@ -225,6 +225,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return bucket(ctx, rest, stdin, stdout)
 	case "alerts":
 		return alerts(ctx, rest, stdin, stdout)
+	case "cloud":
+		return cloud(ctx, rest, stdin, stdout)
 	case "watcher":
 		return watcherCommand(ctx, rest, stdin, stdout)
 	case "here":
