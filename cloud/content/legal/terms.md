@@ -57,7 +57,7 @@ If you see abuse or content that infringes your rights and it involves moin, wri
 
 moin cloud is for businesses only: you subscribe as a business, not as a consumer, and confirm it before you subscribe. moin cloud is a subscription per workspace, monthly or yearly, at the price shown at checkout.
 
-A new workspace gets a free trial of the watcher, without a payment method. The trial starts with the first report of a connected server and lasts 30 days. The copies of your backups come with a subscription. After the trial, you need a subscription to keep the watcher.
+A new workspace gets a free trial of the watcher, without a payment method. The trial starts with the first report of a connected server and lasts 30 days. Copies of your backups come only with a subscription. After the trial, alerts are off until you subscribe.
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: its checkout shows the price, tax and terms of the purchase, and Stripe handles invoices, receipts and refunds required by law. A subscription renews automatically until you cancel it. You can cancel at any time in the billing portal; your plan stays active until the end of the period you paid for. Payments already made are not refunded, except where the law requires it or these terms say so.
 
@@ -99,7 +99,9 @@ You alone are responsible for your data and for your backup key. We are not resp
 
 **AS FAR AS THE LAW ALLOWS, WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, REVENUE, DATA, GOODWILL OR DOWNTIME, HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, EVEN IF WE WERE TOLD THEY MIGHT HAPPEN.**
 
-**OUR TOTAL LIABILITY FOR ALL CLAIMS ABOUT MOIN AND MOIN CLOUD IS LIMITED TO WHAT YOU PAID FOR MOIN CLOUD IN THE 12 MONTHS BEFORE THE EVENT THAT CAUSED THE CLAIM. IF YOU PAID NOTHING, INCLUDING WHEN YOU USE ONLY THE FREE SOFTWARE, IT IS ZERO.**
+**OUR TOTAL LIABILITY FOR ALL CLAIMS ABOUT MOIN AND MOIN CLOUD IS LIMITED TO WHAT YOU PAID FOR MOIN CLOUD IN THE 12 MONTHS BEFORE THE EVENT THAT CAUSED THE CLAIM. IF YOU PAID NOTHING, IT IS ZERO.**
+
+**YOU USE THE FREE OPEN SOURCE SOFTWARE, INCLUDING THE CLI, THE DAEMON AND THE WATCHER, AT YOUR OWN RISK. AS FAR AS THE LAW ALLOWS, WE ARE NOT LIABLE FOR IT AT ALL.**
 
 For the use of moin, your contracting party is Berry Good Ideas LLC alone; for the purchase of moin cloud, Stripe is the seller of record (see Plans and payment). The owners, members, managers, employees and contributors of Berry Good Ideas LLC are not personally liable to you, privately or in business, for anything about moin.
 
@@ -113,7 +115,7 @@ You defend and hold us harmless from claims by others, and the costs that come w
 
 You can stop using moin at any time. Your apps keep running on your servers; moin on them stays until you remove it.
 
-To leave moin cloud, cancel your subscription in the billing portal and disconnect your servers with `moin cloud disconnect <server>`. A disconnected server no longer reports and sends no copies. To delete your account, write to us. Copies younger than 14 days stay locked until they are 14 days old, then they are deleted.
+To leave moin cloud, cancel your subscription in the billing portal and disconnect your servers with `moin cloud disconnect <server>`. A disconnected server no longer reports and sends no copies. You can delete your account at any time in moin cloud's Settings. Copies younger than 14 days stay locked until they are 14 days old, then they expire by themselves.
 
 If we ever end moin cloud, we tell you by mail in good time, keep your copies long enough for you to restore them, and refund the unused part of any prepaid period.
 

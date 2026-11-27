@@ -122,9 +122,9 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 - **Server logs**: a short time, for security and troubleshooting.
 - **Sign-in links**: 15 minutes, and they work once.
 - **Sessions**: 30 days in a browser, a year for the CLI, or until you sign out.
-- **Account**: while it exists. To delete it, write to us. Deleting it deletes your workspace, its servers, their reports and the history.
+- **Account**: while it exists. You delete it in moin cloud's Settings. Deleting it deletes your workspace, its servers, their reports and the history.
 - **Reports**: only the newest one of each server. Disconnecting a server deletes its report.
-- **Copies of backups**: 14 days each. After a subscription ends, they are deleted after the time the [Terms](/legal/terms) state. A copy younger than 14 days stays locked until it is 14 days old, also when you delete your account.
+- **Copies of backups**: 14 days each. After a subscription ends, they are deleted after the time the [Terms](/legal/terms) state. A copy younger than 14 days stays locked until it is 14 days old, also when you delete your account, then it expires by itself.
 - **Mails**: as long as we need them to help you, then deleted. Ask and we delete them sooner.
 - **Payment records**: Stripe keeps them as long as tax law requires.
 
