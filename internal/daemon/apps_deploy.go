@@ -341,7 +341,7 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 
 // needsProxy reports whether the app has an address the proxy must serve.
 func needsProxy(detected protocol.Detected) bool {
-	return len(detected.Domains) > 0 || len(detected.ServiceDomains) > 0 || detected.Instant != ""
+	return len(detected.Domains) > 0 || detected.Instant != ""
 }
 
 // build pulls the image built elsewhere, then builds the services that

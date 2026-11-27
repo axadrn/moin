@@ -7,20 +7,16 @@ type Detected struct {
 	// brought, and for railpack that moin built it with Railpack. Builder
 	// says what Railpack found, like "Node 24.22.1, start: npm start".
 	// Image is the image of the main service when it came from CI.
-	// Domains are the domains the main service answers on, Canonical the one
-	// the others redirect to.
-	Kind      string   `json:"kind"`
-	Builder   string   `json:"builder,omitempty"`
-	Image     string   `json:"image,omitempty"`
-	Domains   []string `json:"domains,omitempty"`
-	Canonical string   `json:"canonical,omitempty"`
-	// ServiceDomains are the domains of the other services, by service;
-	// Instant is the main service's instant address, "" when it has none.
-	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
-	Instant        string              `json:"instant,omitempty"`
-	Service        string              `json:"service"`
-	Port           int                 `json:"port"`
-	Databases      []Database          `json:"databases"`
+	// Domains are the domains the main service answers on; Instant its
+	// instant address, "" when it has none.
+	Kind      string     `json:"kind"`
+	Builder   string     `json:"builder,omitempty"`
+	Image     string     `json:"image,omitempty"`
+	Domains   []string   `json:"domains,omitempty"`
+	Instant   string     `json:"instant,omitempty"`
+	Service   string     `json:"service"`
+	Port      int        `json:"port"`
+	Databases []Database `json:"databases"`
 	// NoBackup is what looks like a database but moin cannot back up.
 	NoBackup []Database `json:"no_backup,omitempty"`
 }

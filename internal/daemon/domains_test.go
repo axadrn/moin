@@ -42,7 +42,7 @@ func TestDomainsByService(t *testing.T) {
 			t.Errorf("%s = %v, want %s", key, labels[key], want)
 		}
 	}
-	// No canonical domain, so no router has a middleware.
+	// No router has a middleware.
 	for key := range labels {
 		if strings.Contains(key, "middlewares") {
 			t.Errorf("%s = %v", key, labels[key])
@@ -54,12 +54,6 @@ func TestDomainsByService(t *testing.T) {
 	labels = only["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-idea.rule"] != nil || labels["traefik.http.routers.moin-idea-instant.rule"] != "Host(`idea.203-0-113-7.sslip.io`)" {
 		t.Errorf("instant only: %v", labels)
-	}
-	api := map[string]any{}
-	addRouters(config, api, routes{app: "shop", router: serviceRouter("shop", "api"), domains: []string{"api.shop.example.net"}, port: 9000})
-	labels = api["labels"].(map[string]any)
-	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.example.net`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" {
-		t.Errorf("api labels: %v", labels)
 	}
 	if config["networks"].(map[string]any)["default"].(map[string]any)["name"] != "moin-shop_default" {
 		t.Errorf("networks: %v", config["networks"])

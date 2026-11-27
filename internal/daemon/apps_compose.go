@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -494,36 +493,19 @@ func addEnv(service map[string]any, file string, env map[string]string) {
 	service["env_file"] = append(files, file)
 }
 
-// routeService puts a service on the proxy when it has an address: the
-// main service with the app's domains, another one with its own.
+// routeService puts the main service on the proxy when it has an address.
 func routeService(release *release, config map[string]any, name string, service map[string]any) {
-	app := release.start.App
 	detected := release.detected
-	if name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != "") {
-		addRouters(config, service, routes{
-			app:       app,
-			router:    project(app),
-			domains:   detected.Domains,
-			canonical: detected.Canonical,
-			port:      detected.Port,
-			instant:   detected.Instant,
-		})
+	if name != detected.Service || (len(detected.Domains) == 0 && detected.Instant == "") {
 		return
 	}
-	serviceDomains := detected.ServiceDomains[name]
-	if len(serviceDomains) == 0 {
-		return
-	}
-	canonical := ""
-	if slices.Contains(serviceDomains, detected.Canonical) {
-		canonical = detected.Canonical
-	}
+	app := release.start.App
 	addRouters(config, service, routes{
-		app:       app,
-		router:    serviceRouter(app, name),
-		domains:   serviceDomains,
-		canonical: canonical,
-		port:      servicePort("", service),
+		app:     app,
+		router:  project(app),
+		domains: detected.Domains,
+		port:    detected.Port,
+		instant: detected.Instant,
 	})
 }
 

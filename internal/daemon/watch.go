@@ -223,9 +223,6 @@ func (w *watch) reportApp(app string, containers appContainers, statuses []proto
 	if detected.Instant != "" {
 		domains = append(domains, detected.Instant)
 	}
-	for _, service := range sortedServices(detected.ServiceDomains) {
-		domains = append(domains, detected.ServiceDomains[service]...)
-	}
 	a := report.App{Name: app, Release: w.apps.current(app), Running: containers.running, Domains: domains, Databases: []report.Database{}}
 	for _, status := range statuses {
 		a.Databases = append(a.Databases, reportDatabase(status))
@@ -249,16 +246,6 @@ func reportDatabase(status protocol.DatabaseBackup) report.Database {
 	d.CheckedCopy, _ = protocol.CopyTime(status.CheckedCopy)
 	d.Error = cmp.Or(d.Error, status.CheckError, status.CloudError)
 	return d
-}
-
-// sortedServices are the keys of a map of lists, sorted.
-func sortedServices(values map[string][]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // problems are what is wrong on the server now, by a key that stays the

@@ -295,16 +295,10 @@ func TestRouterLabels(t *testing.T) {
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: "blog.example.com", port: detected.Port})
+	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, port: detected.Port})
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
-	}
-	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical" {
-		t.Fatalf("middlewares = %v", labels["traefik.http.routers.moin-blog.middlewares"])
-	}
-	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.example\.com)(:[0-9]+)?(.*)` {
-		t.Fatalf("regex = %v", labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"])
 	}
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
 		t.Fatal("the main service is not on the proxy network")
