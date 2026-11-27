@@ -51,8 +51,8 @@ Then check what you changed, and only that:
   site in a browser, or the changed command in the CLI against a throwaway
   server.
 - Every release: `scripts/e2e/run.sh`, the whole product on two throwaway
-  servers in one command, about 10 minutes. A change to the layout every page of the site uses: Chromium and WebKit, at
-  phone and desktop width.
+  servers in one command, about 10 minutes. A change to the layout every
+  page of the site uses: Chromium and WebKit, at phone and desktop width.
 
 Whole environments and end-to-end tests run on throwaway servers
 (`scripts/test-servers.sh`), not on the dev machine. Remove what you started.
