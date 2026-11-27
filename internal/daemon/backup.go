@@ -124,6 +124,9 @@ type state struct {
 	CheckedAt    time.Time `json:"checked_at,omitzero"`
 	CheckError   string    `json:"check_error,omitempty"`
 	CheckedCopy  string    `json:"checked_copy,omitempty"`
+	// CloudTried is when a server without a bucket last made a copy that
+	// no watcher took.
+	CloudTried time.Time `json:"cloud_tried,omitzero"`
 }
 
 func newBackups(a *apps) *backups {
@@ -282,26 +285,105 @@ func (r *remember) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// copy streams a copy of a database into the bucket as id, encrypted on
-// the way (encrypt).
+// copy takes a copy of a database into the bucket as id.
 func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
-	bucket, folder, err := b.where(app, database)
+	return b.copyTo(ctx, app, database, id, false)
+}
+
+// errNoTaker is a copy nobody took: the server has no bucket, and no
+// watcher it reports to takes copies.
+var errNoTaker = errors.New("no bucket, and no watcher that takes copies")
+
+// copyTo takes a copy of a database as id. It is written to a file on
+// the server first, encrypted (encrypt), so its size is known. From there
+// it goes into the bucket, when the server has one, and with cloud to the
+// watchers that take copies (toCloud). A server without a bucket has its
+// copy when one watcher took it.
+func (b *backups) copyTo(ctx context.Context, app string, database protocol.Database, id string, cloud bool) (string, error) {
+	config, mistake := b.configNow()
+	cloud = cloud && len(config.Watchers) > 0
+	if config.Bucket == nil && !cloud {
+		// A config that never read well may have a bucket nobody knows of.
+		return "", cmp.Or(mistake, errNoBucket)
+	}
+	file, size, err := b.copyToFile(ctx, app, database)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("copy %s: %w", database.Path, err)
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	if config.Bucket != nil {
+		if err := b.upload(ctx, app, database, id, file, size); err != nil {
+			return "", fmt.Errorf("copy %s: %w", database.Path, err)
+		}
+	}
+	if cloud {
+		// With a bucket the copy is safe there: what fails here is logged.
+		if err := b.toCloud(ctx, app, database, id, file); err != nil && config.Bucket == nil {
+			return "", fmt.Errorf("copy %s: %w", database.Path, err)
+		}
 	}
 	at, _ := protocol.CopyTime(id)
+	b.mu.Lock()
+	if s := b.state(app, database); at.After(s.LastCopy) {
+		s.LastCopy = at
+	}
+	b.mu.Unlock()
+	return id, nil
+}
+
+// copyToFile writes an encrypted copy of a database into a new file in
+// the daemon's own folder, and says how many bytes the database takes.
+// The caller closes and removes the file.
+func (b *backups) copyToFile(ctx context.Context, app string, database protocol.Database) (*os.File, int64, error) {
 	engine := b.engine(app, database)
 	size, err := engine.Size(ctx)
 	if err != nil {
-		return "", fmt.Errorf("copy %s: %w", database.Path, err)
+		return nil, 0, err
+	}
+	if err := os.MkdirAll(b.apps.tempDir(), 0o700); err != nil {
+		return nil, 0, err
+	}
+	file, err := os.CreateTemp(b.apps.tempDir(), tempName("copy-*.age"))
+	if err != nil {
+		return nil, 0, err
 	}
 	ctx, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
 	reader, writer := io.Pipe()
 	go func() { writer.CloseWithError(b.copyEncrypted(ctx, engine, writer)) }()
-	// What the reading fails with is the database's own failure.
-	fromDatabase := &remember{reader: reader}
-	body, stopWatching := stopWhenStuck(fromDatabase, firstDataLimit(size), stallLimit, stop)
+	body, stopWatching := stopWhenStuck(reader, firstDataLimit(size), stallLimit, stop)
+	defer stopWatching()
+	_, err = io.Copy(file, body)
+	// The file is written, or not: this frees a writer that still waits.
+	reader.CloseWithError(errors.New("the copy ended"))
+	if stuck := context.Cause(ctx); stuck != nil {
+		err = stuck
+	}
+	if err == nil {
+		err = file.Sync()
+	}
+	if err != nil {
+		file.Close()
+		os.Remove(file.Name())
+		return nil, 0, err
+	}
+	return file, size, nil
+}
+
+// upload puts the copy in file into the bucket as id, with a note of how
+// many bytes its database takes. It stops when no data moves.
+func (b *backups) upload(ctx context.Context, app string, database protocol.Database, id string, file *os.File, size int64) error {
+	bucket, folder, err := b.where(app, database)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	body, stopWatching := stopWhenStuck(file, stallLimit, stallLimit, stop)
 	defer stopWatching()
 	// Parts of 32 MB, two at a time: up to 320 GB in 64 MB of memory.
 	uploader := manager.NewUploader(s3Client(bucket), func(u *manager.Uploader) { u.PartSize, u.Concurrency = 32<<20, 2 })
@@ -311,26 +393,13 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 		Body:     body,
 		Metadata: map[string]string{sizeNote: strconv.FormatInt(size, 10)},
 	})
-	// The upload is over: this frees a writer that still waits.
-	reader.CloseWithError(errors.New("the upload ended"))
-	switch stuck := context.Cause(ctx); {
-	case err == nil:
-	case stuck != nil:
-		err = stuck
-	case fromDatabase.failed != nil:
-		err = fromDatabase.failed
-	default:
-		err = bucketError{err}
+	if stuck := context.Cause(ctx); err != nil && stuck != nil {
+		return stuck
 	}
 	if err != nil {
-		return "", fmt.Errorf("copy %s: %w", database.Path, err)
+		return bucketError{err}
 	}
-	b.mu.Lock()
-	if s := b.state(app, database); at.After(s.LastCopy) {
-		s.LastCopy = at
-	}
-	b.mu.Unlock()
-	return id, nil
+	return nil
 }
 
 // copyEncrypted writes an encrypted copy of the engine's database to w.
@@ -502,7 +571,8 @@ func (b *backups) tick(ctx context.Context) {
 		return
 	}
 	defer b.ticking.Unlock()
-	if !b.on() {
+	// Without a bucket there is still the copy a watcher may take.
+	if !b.on() && len(b.config().Watchers) == 0 {
 		return
 	}
 	for app, databases := range b.running(ctx) {
@@ -528,17 +598,30 @@ func (b *backups) copyIfDue(ctx context.Context, app string, database protocol.D
 		return
 	}
 	b.mu.Lock()
-	copied := b.state(app, database).LastCopy
+	copied, tried := b.state(app, database).LastCopy, b.state(app, database).CloudTried
 	b.mu.Unlock()
 	due, _ := b.config().schedule(app)
 	// A copy from the future, after the clock jumped, is no reason to wait.
 	if time.Since(copied) < due && !copied.After(time.Now()) {
 		return
 	}
+	// A copy no watcher took cost a whole copy on the disk: the next try
+	// waits (cloudAgain).
+	if !b.on() && time.Since(tried) < min(due, cloudAgain) && !tried.After(time.Now()) {
+		return
+	}
 	err := b.copyDue(ctx, app, database, due)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	s := b.state(app, database)
+	if !b.on() && err != nil {
+		s.CloudTried = time.Now().UTC()
+	}
+	// No watcher takes copies: nothing failed, the server has no bucket.
+	if errors.Is(err, errNoTaker) {
+		s.CopyError, s.BucketDown, s.FailingSince = "", false, time.Time{}
+		return
+	}
 	if err == nil {
 		s.CopyError, s.BucketDown, s.FailingSince = "", false, time.Time{}
 		return
@@ -551,6 +634,10 @@ func (b *backups) copyIfDue(ctx context.Context, app string, database protocol.D
 	s.CopyError, s.BucketDown = err.Error(), errors.As(err, &down)
 }
 
+// cloudAgain is how long a server without a bucket waits after a copy no
+// watcher took, before it makes the next one.
+const cloudAgain = time.Hour
+
 // checkAgain is how long after a check that failed the next one runs: a
 // bucket that was away, or a newer copy, may prove the backup again.
 const checkAgain = time.Hour
@@ -558,6 +645,11 @@ const checkAgain = time.Hour
 // checkIfDue runs the daily check of one database: a day after the last
 // one, or checkAgain after one that failed.
 func (b *backups) checkIfDue(ctx context.Context, app string, database protocol.Database) {
+	// The check reads the copy from the bucket: the daemon can add copies
+	// to a watcher and never read one.
+	if !b.on() {
+		return
+	}
 	b.mu.Lock()
 	s := *b.state(app, database)
 	b.mu.Unlock()
@@ -575,8 +667,13 @@ func (b *backups) searchDatabases(ctx context.Context) {
 }
 
 // copyDue takes a copy when the newest in the bucket is older than due,
-// and deletes the old ones.
+// and deletes the old ones. A server without a bucket takes one for the
+// watchers that take copies; how long those keep it is their job.
 func (b *backups) copyDue(ctx context.Context, app string, database protocol.Database, due time.Duration) error {
+	if !b.on() {
+		_, err := b.copyTo(ctx, app, database, protocol.NewCopyID(time.Now()), true)
+		return err
+	}
 	copies, err := b.copies(ctx, app, database)
 	if err != nil {
 		return fmt.Errorf("copy %s: %w", database.Path, err)
@@ -592,11 +689,10 @@ func (b *backups) copyDue(ctx context.Context, app string, database protocol.Dat
 		return nil
 	}
 	at := time.Now().UTC().Truncate(time.Second)
-	id, err := b.copy(ctx, app, database, protocol.NewCopyID(at))
+	id, err := b.copyTo(ctx, app, database, protocol.NewCopyID(at), true)
 	if err != nil {
 		return err
 	}
-	b.toCloud(ctx, app, database, id)
 	return b.prune(ctx, app, database, append([]protocol.Copy{{ID: id, At: at}}, copies...))
 }
 
@@ -629,7 +725,8 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		status.CheckedAt, status.CheckError, status.CheckedCopy = &s.CheckedAt, s.CheckError, s.CheckedCopy
 	}
 	switch {
-	case !b.on():
+	// A server without a bucket may still have its copies at a watcher.
+	case !b.on() && s.LastCopy.IsZero() && s.CopyError == "":
 		status.Error = errNoBucket.Error()
 	case s.CopyError != "" && time.Since(s.FailingSince) > failGrace:
 		status.Error, status.BucketDown = s.CopyError, s.BucketDown

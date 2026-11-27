@@ -19,17 +19,16 @@ import (
 	"time"
 
 	"filippo.io/age"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/report"
 	"github.com/axadrn/moin/protocol"
 )
 
-// A copy a hacked server can't delete. After each copy in your bucket the
-// daemon sends the same copy, encrypted as it is, to every watcher that
-// takes copies: moin cloud, for a paid workspace.
+// A copy a hacked server can't delete. The daemon sends each copy it
+// takes on its schedule, encrypted as it is, to every watcher that takes
+// copies: moin cloud, for a paid workspace. A bucket of your own is not
+// needed for it.
 //
 //	daemon ── POST <watcher>/api/copies ──▶ an ID and one address to upload to
 //	daemon ── PUT the .age file ──────────▶ that address, 15 minutes long
@@ -60,70 +59,40 @@ type copyUpload struct {
 // yourself, or moin cloud for a workspace that does not pay.
 var errTakesNoCopies = errors.New("takes no copies")
 
-// toCloud sends the copy id of a database, as it lies in the bucket, to
-// every watcher that takes it. What fails is logged: the copy in your
-// bucket is there either way.
-func (b *backups) toCloud(ctx context.Context, app string, database protocol.Database, id string) {
-	watchers := b.config().Watchers
-	if len(watchers) == 0 {
-		return
-	}
-	bucket, folder, err := b.where(app, database)
+// toCloud sends the copy id of a database, encrypted as it is in file, to
+// every watcher that takes it. One that took it is enough: only when none
+// did, it says why, errNoTaker when none takes copies.
+func (b *backups) toCloud(ctx context.Context, app string, database protocol.Database, id string, file *os.File) error {
+	info, err := file.Stat()
 	if err != nil {
-		return
-	}
-	key := copyKey(folder, protocol.Copy{ID: id}, database)
-	head, err := s3Client(bucket).HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
-	if err != nil {
-		slog.Warn("cloud copy: the copy is not in the bucket", "app", app, "copy", id, "error", shortS3(err))
-		return
+		return err
 	}
 	at, _ := protocol.CopyTime(id)
-	start := copyStart{App: app, Database: database.Path, MadeAt: at, Size: aws.ToInt64(head.ContentLength)}
-	uploads := map[string]copyUpload{}
-	for _, watcher := range watchers {
+	start := copyStart{App: app, Database: database.Path, MadeAt: at, Size: info.Size()}
+	sent, failed := false, error(nil)
+	for _, watcher := range b.config().Watchers {
 		upload, err := startCopy(ctx, watcher, start)
 		if errors.Is(err, errTakesNoCopies) {
 			continue
 		}
+		if err == nil {
+			err = sendCopy(ctx, watcher, upload, file, start.Size)
+		}
 		if err != nil {
-			slog.Warn("cloud copy: the watcher took no copy", "app", app, "copy", id, "error", err)
+			slog.Warn("cloud copy: the watcher got no copy", "app", app, "copy", id, "error", err)
+			failed = err
 			continue
 		}
-		uploads[watcher.URL] = upload
-	}
-	if len(uploads) == 0 {
-		return
-	}
-	file, err := b.fetchCopy(ctx, bucket, key)
-	if err != nil {
-		slog.Warn("cloud copy: read the copy from the bucket", "app", app, "copy", id, "error", err)
-		return
-	}
-	defer os.Remove(file.Name())
-	defer file.Close()
-	for _, watcher := range watchers {
-		upload, ok := uploads[watcher.URL]
-		if !ok {
-			continue
-		}
-		if err := sendCopy(ctx, watcher, upload, file, start.Size); err != nil {
-			slog.Warn("cloud copy: the upload failed", "app", app, "copy", id, "error", err)
-			continue
-		}
+		sent = true
 		slog.Info("cloud copy: sent", "app", app, "database", database.Path, "copy", id, "size", start.Size)
 	}
-}
-
-// fetchCopy downloads a copy from the bucket into a temp file next to the
-// apps, encrypted as it is. The caller closes and removes it.
-func (b *backups) fetchCopy(ctx context.Context, bucket *Bucket, key *string) (*os.File, error) {
-	object, err := s3Client(bucket).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket.Bucket), Key: key})
-	if err != nil {
-		return nil, bucketError{err}
+	switch {
+	case sent:
+		return nil
+	case failed != nil:
+		return failed
 	}
-	defer object.Body.Close()
-	return tempCopy(filepath.Dir(b.apps.dir), object.Body)
+	return errNoTaker
 }
 
 // tempCopy writes body into a new temp file in dir. The caller closes and

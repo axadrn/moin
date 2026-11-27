@@ -246,8 +246,8 @@ func shopWithSQLite(t *testing.T) (*backups, protocol.Database) {
 	return a.backups, database
 }
 
-// fakeBucket is a bucket in memory that lists, hands out and deletes what
-// a test put in. cut makes that many reads of an object break half way.
+// fakeBucket is a bucket in memory that takes, lists, hands out and
+// deletes copies. cut makes that many reads of an object break half way.
 type fakeBucket struct {
 	mu      sync.Mutex
 	objects map[string][]byte
@@ -280,6 +280,8 @@ func (f *fakeBucket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		panic(http.ErrAbortHandler)
 	case r.Method == http.MethodGet:
 		w.Write(f.objects[key])
+	case r.Method == http.MethodPut:
+		f.objects[key], _ = io.ReadAll(r.Body)
 	case r.Method == http.MethodDelete:
 		f.deleted = append(f.deleted, path.Base(key))
 		delete(f.objects, key)

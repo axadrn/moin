@@ -269,7 +269,7 @@ func (w *watch) problems(config Config, containers map[string]appContainers, sta
 		for _, status := range databases {
 			switch {
 			// A server without a bucket is no news: the deploy said so.
-			case status.Error == "" || config.Bucket == nil:
+			case status.Error == "" || status.Error == errNoBucket.Error():
 			// A bucket that is away is one problem, not one for each database.
 			case status.BucketDown:
 				add("bucket", "", "the bucket takes no backups", status.Error)
