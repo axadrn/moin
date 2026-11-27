@@ -24,7 +24,8 @@ const (
 	// domain goes down or comes back: a restart or a short hiccup changes
 	// nothing.
 	inARow = 3
-	// kept is how many outages and restore checks the history keeps.
+	// kept is how many outages, restore checks and unsent alerts the
+	// state keeps.
 	kept = 100
 )
 
@@ -36,12 +37,21 @@ type state struct {
 	// Outages and Checks are the history, oldest first.
 	Outages []outage `json:"outages"`
 	Checks  []check  `json:"checks"`
+	// Unsent are alerts a destination did not take yet; each check tries
+	// them again.
+	Unsent []unsent `json:"unsent"`
+}
+
+// unsent is one alert for one destination.
+type unsent struct {
+	To      alert.Destination `json:"to"`
+	Message alert.Message     `json:"message"`
 }
 
 // server is the newest report of a server and when it came.
 type server struct {
 	Report   report.Report `json:"report"`
-	Received time.Time     `json:"received"`
+	Received time.Time     `json:"received,omitzero"`
 	// Silent is true from the alert that the server stopped reporting to
 	// the one that it is back.
 	Silent bool `json:"silent"`
@@ -56,13 +66,15 @@ type domain struct {
 	// Against counts the visits in a row that say the opposite of Down,
 	// and Turning is when the first of them ran.
 	Against int       `json:"against"`
-	Turning time.Time `json:"turning"`
+	Turning time.Time `json:"turning,omitzero"`
 	// Since is when Down last changed.
-	Since time.Time `json:"since"`
+	Since time.Time `json:"since,omitzero"`
 	// Reason is why the last failed visit failed.
 	Reason string `json:"reason"`
 	// Alerted is true from the down alert to the up alert.
 	Alerted bool `json:"alerted"`
+	// Visited is when the last visit ran; zero before the first.
+	Visited time.Time `json:"visited,omitzero"`
 }
 
 // outage is a server that stopped reporting (Domain is "") or a domain
@@ -72,7 +84,7 @@ type outage struct {
 	App    string    `json:"app,omitempty"`
 	Domain string    `json:"domain,omitempty"`
 	From   time.Time `json:"from"`
-	To     time.Time `json:"to"`
+	To     time.Time `json:"to,omitzero"`
 	Reason string    `json:"reason,omitempty"`
 }
 
@@ -83,7 +95,7 @@ type check struct {
 	Database string    `json:"database"`
 	At       time.Time `json:"at"`
 	OK       bool      `json:"ok"`
-	Copy     time.Time `json:"copy"`
+	Copy     time.Time `json:"copy,omitzero"`
 	Error    string    `json:"error,omitempty"`
 }
 
@@ -103,7 +115,13 @@ func loadState(path string) (*state, error) {
 		return nil, err
 	}
 	if err := json.Unmarshal(data, s); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return nil, fmt.Errorf("%s: %w. Delete it to start fresh", path, err)
+	}
+	if s.Servers == nil {
+		s.Servers = map[string]*server{}
+	}
+	if s.Domains == nil {
+		s.Domains = map[string]*domain{}
 	}
 	return s, nil
 }
@@ -121,14 +139,16 @@ func (s *state) save(path string) error {
 	return os.Rename(temp, path)
 }
 
-// forget drops the servers the config no longer has, and their domains.
-func (s *state) forget(config Config) {
+// forget drops what the config no longer has: servers with their
+// domains, and unsent alerts to a destination that is gone.
+func (s *state) forget(config Config, now time.Time) {
 	for name := range s.Servers {
 		if _, ok := config.Servers[name]; !ok {
 			delete(s.Servers, name)
 		}
 	}
-	s.syncDomains(time.Now())
+	s.syncDomains(now)
+	s.Unsent = slices.DeleteFunc(s.Unsent, func(u unsent) bool { return !slices.Contains(config.Alerts, u.To) })
 }
 
 // receive keeps a report of server name, received at now: its restore
@@ -169,15 +189,19 @@ func lastCheck(r report.Report, app, database string) time.Time {
 
 // syncDomains visits the domains of the running apps of every server, and
 // forgets the others. A forgotten domain that was down ends its outage
-// without an alert: it is gone, not up.
+// without an alert: it is gone, not up. When two servers report one
+// domain, the one that had it keeps it, else the first by name.
 func (s *state) syncDomains(now time.Time) {
 	want := map[string]*domain{}
-	for name, srv := range s.Servers {
-		for _, app := range srv.Report.Apps {
+	for _, name := range slices.Sorted(maps.Keys(s.Servers)) {
+		for _, app := range s.Servers[name].Report.Apps {
 			if !app.Running {
 				continue
 			}
 			for _, d := range app.Domains {
+				if _, taken := want[d]; taken && !s.owns(d, name, app.Name) {
+					continue
+				}
 				want[d] = &domain{Server: name, App: app.Name}
 			}
 		}
@@ -199,16 +223,21 @@ func (s *state) syncDomains(now time.Time) {
 	}
 }
 
+// owns says whether a domain is visited for this server and app now.
+func (s *state) owns(domain, server, app string) bool {
+	d := s.Domains[domain]
+	return d != nil && d.Server == server && d.App == app
+}
+
 // silent says whether a server that last reported at received, every
-// every, is silent at now. Time before the watcher started does not count,
-// so a watcher that was off does not call every server silent.
-func silent(received, started, now time.Time, every time.Duration) bool {
+// everySeconds, is silent at now. The interval counts from 1 minute to
+// 1 hour. Time before the watcher started does not count, so a watcher
+// that was off does not call every server silent.
+func silent(received, started, now time.Time, everySeconds int) bool {
 	if received.IsZero() {
 		return false
 	}
-	if every <= 0 {
-		every = time.Minute
-	}
+	every := min(max(time.Duration(everySeconds)*time.Second, time.Minute), time.Hour)
 	return now.Sub(later(received, started)) > silentAfter*every
 }
 
@@ -223,6 +252,7 @@ func later(a, b time.Time) time.Time {
 // visited counts one visit of d at at: inARow visits in a row that say the
 // opposite turn it.
 func (d *domain) visited(up bool, reason string, at time.Time) {
+	d.Visited = at
 	if !up {
 		d.Reason = reason
 	}
@@ -261,11 +291,10 @@ func (s *state) alerts(started, now time.Time) []alert.Message {
 // back, if it did.
 func (s *state) serverAlert(name string, started, now time.Time) (alert.Message, bool) {
 	srv := s.Servers[name]
-	quiet := silent(srv.Received, started, now, srv.Report.Every)
+	quiet := silent(srv.Received, started, now, srv.Report.EverySeconds)
 	if quiet && !srv.Silent {
 		srv.Silent = true
-		s.Outages = append(s.Outages, outage{Server: name, From: srv.Received})
-		s.Outages = s.Outages[max(0, len(s.Outages)-kept):]
+		s.addOutage(outage{Server: name, From: srv.Received})
 		return alert.Message{
 			Server: name,
 			Title:  name + " stopped reporting",
@@ -273,7 +302,9 @@ func (s *state) serverAlert(name string, started, now time.Time) (alert.Message,
 				"\nLook: ssh " + name + ", or the console of your provider.",
 		}, true
 	}
-	if !quiet && srv.Silent {
+	// Back only with a report since the start: a watcher that restarts
+	// does not call a silent server back.
+	if !quiet && srv.Silent && srv.Received.After(started) {
 		srv.Silent = false
 		from := s.end(name, "", now)
 		return alert.Message{Server: name, Title: name + " reports again", OK: true, Text: "It was silent for " + spoken(now.Sub(from)) + "."}, true
@@ -289,8 +320,7 @@ func (s *state) domainAlert(name string, now time.Time) (alert.Message, bool) {
 	srv := s.Servers[d.Server]
 	if d.Down && !d.Alerted && srv != nil && !srv.Silent {
 		d.Alerted = true
-		s.Outages = append(s.Outages, outage{Server: d.Server, App: d.App, Domain: name, From: d.Since, Reason: d.Reason})
-		s.Outages = s.Outages[max(0, len(s.Outages)-kept):]
+		s.addOutage(outage{Server: d.Server, App: d.App, Domain: name, From: d.Since, Reason: d.Reason})
 		return alert.Message{
 			Server: d.Server, App: d.App,
 			Title: name + " is down",
@@ -306,6 +336,19 @@ func (s *state) domainAlert(name string, now time.Time) (alert.Message, bool) {
 	return alert.Message{}, false
 }
 
+// addOutage adds an outage to the history. Past kept, the oldest outage
+// that ended goes; an open one always stays.
+func (s *state) addOutage(o outage) {
+	s.Outages = append(s.Outages, o)
+	for len(s.Outages) > kept {
+		i := slices.IndexFunc(s.Outages, func(o outage) bool { return !o.To.IsZero() })
+		if i < 0 {
+			return
+		}
+		s.Outages = slices.Delete(s.Outages, i, i+1)
+	}
+}
+
 // end ends the open outage of a server or one of its domains, and says
 // when it began.
 func (s *state) end(server, domain string, now time.Time) time.Time {
@@ -319,18 +362,25 @@ func (s *state) end(server, domain string, now time.Time) time.Time {
 	return now
 }
 
-// appsOf names the apps of a report, for the silence alert.
+// appsOf names the first apps of a report, for the silence alert. A
+// short list keeps the alert inside what every chat takes.
 func appsOf(r report.Report) string {
-	var names []string
-	for _, app := range r.Apps {
-		names = append(names, app.Name)
-	}
-	if len(names) == 0 {
+	const shown = 10
+	if len(r.Apps) == 0 {
 		return ""
 	}
-	return "\nApps on it: " + strings.Join(names, ", ") + "."
+	var names []string
+	for _, app := range r.Apps[:min(len(r.Apps), shown)] {
+		names = append(names, app.Name)
+	}
+	more := ""
+	if len(r.Apps) > shown {
+		more = fmt.Sprintf(" and %d more", len(r.Apps)-shown)
+	}
+	return "\nApps on it: " + strings.Join(names, ", ") + more + "."
 }
 
+// clock is a moment as the alerts and the page print it.
 func clock(t time.Time) string { return t.UTC().Format("2006-01-02 15:04 UTC") }
 
 // spoken is a duration as a person says it: 40 seconds, 12 minutes, 3 hours.
@@ -346,6 +396,7 @@ func spoken(d time.Duration) string {
 	return plural(int(d.Hours()/24), "day")
 }
 
+// plural is n and the word, with an s unless n is 1.
 func plural(n int, word string) string {
 	if n == 1 {
 		return "1 " + word

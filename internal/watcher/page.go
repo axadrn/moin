@@ -28,7 +28,7 @@ func (w *watcher) page(rw http.ResponseWriter, r *http.Request) {
 	w.mu.Unlock()
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rw.Header().Set("Cache-Control", "no-store")
-	rw.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	rw.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'")
 	if err := pageTemplate.Execute(rw, view); err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
@@ -93,7 +93,8 @@ func (w *watcher) view(now time.Time) pageView {
 func (w *watcher) serverView(name string, now time.Time) serverView {
 	srv := w.state.Servers[name]
 	if srv == nil {
-		return serverView{Name: name, State: "no report yet", OK: true}
+		return serverView{Name: name, State: "no report yet",
+			Problem: name + " has not reported yet. On your laptop: " + build.Name + " watcher connect " + name + " <watcher url> <token>"}
 	}
 	server := serverView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received)}
 	if srv.Silent {
@@ -136,6 +137,8 @@ func (w *watcher) domainLine(name string, running bool) lineView {
 	switch {
 	case !running || d == nil:
 		return lineView{Name: name, State: "not visited"}
+	case d.Visited.IsZero():
+		return lineView{Name: name, State: "not visited yet"}
 	case d.Down:
 		return lineView{Name: name, State: "down: " + d.Reason, Problem: name + " is down: " + d.Reason + "."}
 	}
@@ -147,6 +150,9 @@ func (w *watcher) domainLine(name string, running bool) lineView {
 func databaseLine(server, app string, db report.Database, now time.Time) lineView {
 	line := lineView{Name: db.Name + " (" + db.Kind + ")", State: "copy " + ago(now, db.LastCopy) + ", restore proven " + ago(now, db.CheckedCopy)}
 	where := db.Name + " of " + app + " on " + server
+	if db.LastCopy.IsZero() {
+		line.Problem = where + " has no copy yet. Set up backups: " + build.Name + " bucket set " + server
+	}
 	if !db.LastCheck.IsZero() && !db.CheckOK {
 		line.State = "restore check failed " + ago(now, db.LastCheck) + ", " + line.State
 		line.Problem = "The restore check of " + where + " failed " + ago(now, db.LastCheck) + "."
@@ -250,7 +256,7 @@ ul { padding-left: 1.2rem; margin: .25rem 0; }
 </tr>{{end}}
 </table></div>{{else}}<p class="muted">No apps.</p>{{end}}
 {{else}}
-<p class="muted">No servers yet. Add one with <code>{{.Name}} watcher add &lt;server&gt;</code>.</p>
+<p class="muted">No servers yet. Add one with <code>{{.Name}} watcher token &lt;server&gt; --url &lt;url&gt;</code>.</p>
 {{end}}
 <h2>Outages</h2>
 {{if .Outages}}<div class="wrap"><table>

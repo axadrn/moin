@@ -7,6 +7,7 @@ package watcher
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -34,12 +35,23 @@ type Config struct {
 	Alerts   []alert.Destination `yaml:"alerts"`
 }
 
+// minPassword is the shortest password the page takes.
+const minPassword = 16
+
 // serverName is what a server may be called: a name or user@host.
 var serverName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@._-]{0,126}$`)
 
-// LoadConfig reads and checks the config at path.
+// LoadConfig reads and checks the config at path. Only its owner may
+// read it: it holds the tokens.
 func LoadConfig(path string) (Config, error) {
 	var config Config
+	info, err := os.Stat(path)
+	if err != nil {
+		return config, err
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return config, fmt.Errorf("%s holds tokens, only its owner may read it: chmod 600 %s", path, path)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return config, err
@@ -49,28 +61,39 @@ func LoadConfig(path string) (Config, error) {
 	if err := decoder.Decode(&config); err != nil {
 		return config, fmt.Errorf("%s: %w", path, err)
 	}
-	if config.Password == "" {
-		return config, fmt.Errorf("%s: set a password, the page asks for it", path)
+	if err := config.check(); err != nil {
+		return config, fmt.Errorf("%s: %w", path, err)
+	}
+	return config, nil
+}
+
+// check says what is missing or wrong in a config.
+func (c Config) check() error {
+	if len(c.Password) < minPassword {
+		return fmt.Errorf("the password needs at least %d characters, the page asks for it", minPassword)
+	}
+	if len(c.Alerts) == 0 {
+		return errors.New("add at least one alert, or nobody hears what the watcher sees")
+	}
+	for _, d := range c.Alerts {
+		if err := alert.Check(d); err != nil {
+			return err
+		}
 	}
 	seen := map[string]string{}
-	for name, token := range config.Servers {
+	for name, token := range c.Servers {
 		if err := CheckName(name); err != nil {
-			return config, fmt.Errorf("%s: %w", path, err)
+			return err
 		}
 		if len(token) < 16 {
-			return config, fmt.Errorf("%s: the token of %s is too short; make one with `%s watcher add %s`", path, name, build.Name, name)
+			return fmt.Errorf("the token of %s is too short; make one with `%s watcher token %s`", name, build.Name, name)
 		}
 		if other, ok := seen[token]; ok {
-			return config, fmt.Errorf("%s: %s and %s have the same token", path, other, name)
+			return fmt.Errorf("%s and %s have the same token", other, name)
 		}
 		seen[token] = name
 	}
-	for _, d := range config.Alerts {
-		if d.Kind != "telegram" && d.Kind != "slack" && d.Kind != "discord" && d.Kind != "webhook" {
-			return config, fmt.Errorf("%s: unknown alert kind %q: use telegram, slack, discord or webhook", path, d.Kind)
-		}
-	}
-	return config, nil
+	return nil
 }
 
 // CheckName says whether name can name a server.

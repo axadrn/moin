@@ -6,20 +6,25 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"maps"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/internal/build"
@@ -35,6 +40,12 @@ const (
 	visitTimeout = 10 * time.Second
 	// reportLimit is the largest report it reads.
 	reportLimit = 1 << 20
+	// The most a report may hold: apps, and domains and databases per app.
+	maxApps      = 100
+	maxDomains   = 50
+	maxDatabases = 20
+	// maxError is how much of a backup error the watcher keeps.
+	maxError = 200
 )
 
 // DefaultDir is where the watcher keeps what it knows.
@@ -64,15 +75,50 @@ func newWatcher(config Config, dir string, now time.Time) (*watcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.forget(config)
-	return &watcher{
-		config: config, path: path, started: now, state: s,
-		client: &http.Client{
-			Timeout:       visitTimeout,
-			Transport:     &http.Transport{DisableKeepAlives: true, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: visitTimeout},
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	s.forget(config, now)
+	return &watcher{config: config, path: path, started: now, state: s, client: visitClient()}, nil
+}
+
+// visitClient visits like a new visitor each time: a new connection, no
+// redirects followed (a redirect is an answer), and only public addresses,
+// so a report cannot make the watcher knock on its own network.
+func visitClient() *http.Client {
+	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: refusePrivate}
+	return &http.Client{
+		Timeout: visitTimeout,
+		Transport: &http.Transport{
+			DialContext:           dialer.DialContext,
+			DisableKeepAlives:     true,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: visitTimeout,
 		},
-	}, nil
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+}
+
+// errPrivate is a visit to an address that is not on the public internet.
+var errPrivate = errors.New("the domain points at a private address")
+
+// sharedNetwork is 100.64.0.0/10: carrier networks and Tailscale.
+var sharedNetwork = netip.MustParsePrefix("100.64.0.0/10")
+
+// refusePrivate stops a connection to loopback, private, link-local,
+// shared or unspecified addresses. It runs after DNS, so a name that
+// points inside cannot slip past it.
+func refusePrivate(network, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
+		return err
+	}
+	ip = ip.Unmap()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() || sharedNetwork.Contains(ip) {
+		return errPrivate
+	}
+	return nil
 }
 
 // Run serves reports and the page on listen, and alerts, until ctx ends.
@@ -89,7 +135,14 @@ func Run(ctx context.Context, listen, configPath, dir string) error {
 	if err != nil {
 		return err
 	}
-	server := &http.Server{Handler: w.routes(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second}
+	server := &http.Server{
+		Handler:           w.routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10,
+	}
 	go w.loop(ctx)
 	go func() {
 		<-ctx.Done()
@@ -121,7 +174,7 @@ func (w *watcher) receive(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var got report.Report
-	if err := json.NewDecoder(io.LimitReader(r.Body, reportLimit)).Decode(&got); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(rw, r.Body, reportLimit)).Decode(&got); err != nil {
 		http.Error(rw, "not a report", http.StatusBadRequest)
 		return
 	}
@@ -129,11 +182,60 @@ func (w *watcher) receive(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "this token is for server "+name, http.StatusBadRequest)
 		return
 	}
+	if err := checkReport(&got); err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.mu.Lock()
 	w.state.receive(name, got, time.Now())
 	w.dirty = true
 	w.mu.Unlock()
 	rw.WriteHeader(http.StatusNoContent)
+}
+
+// hostname is a plain domain name: no port, path, user or IP address.
+var hostname = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// checkReport refuses a report that is too big or names things oddly, and
+// cuts long backup errors. The watcher visits the domains of a report, so
+// each must be a plain public name.
+func checkReport(r *report.Report) error {
+	if len(r.Apps) > maxApps {
+		return fmt.Errorf("more than %d apps", maxApps)
+	}
+	for i := range r.Apps {
+		app := &r.Apps[i]
+		if !serverName.MatchString(app.Name) {
+			return fmt.Errorf("%q is not an app name", app.Name)
+		}
+		if len(app.Domains) > maxDomains || len(app.Databases) > maxDatabases {
+			return fmt.Errorf("%s has more than %d domains or %d databases", app.Name, maxDomains, maxDatabases)
+		}
+		for _, d := range app.Domains {
+			if len(d) > 253 || !hostname.MatchString(d) || net.ParseIP(d) != nil {
+				return fmt.Errorf("%q of %s is not a plain domain name", d, app.Name)
+			}
+		}
+		for j := range app.Databases {
+			db := &app.Databases[j]
+			if db.Name == "" || len(db.Name) > 200 || !utf8.ValidString(db.Name) || strings.ContainsFunc(db.Name, unicode.IsControl) {
+				return fmt.Errorf("%q of %s is not a database name", db.Name, app.Name)
+			}
+			db.Error = clip(db.Error, maxError)
+		}
+	}
+	return nil
+}
+
+// clip cuts text to at most n bytes, on a whole character.
+func clip(text string, n int) string {
+	if len(text) <= n {
+		return text
+	}
+	for n > 0 && !utf8.RuneStart(text[n]) {
+		n--
+	}
+	return text[:n] + "…"
 }
 
 // serverOf is the server whose token the Authorization header carries.
@@ -162,6 +264,7 @@ func (w *watcher) loop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			w.save()
 			return
 		case <-checks.C:
 			w.check(ctx)
@@ -172,28 +275,62 @@ func (w *watcher) loop(ctx context.Context) {
 	}
 }
 
-// check saves the state when it changed and sends the alerts of what
-// changed, once each.
+// check finds what changed, sends its alerts once each, tries again the
+// alerts a destination did not take, and saves the state.
 func (w *watcher) check(ctx context.Context) {
 	w.mu.Lock()
-	messages := w.state.alerts(w.started, time.Now())
-	if w.dirty || len(messages) > 0 {
-		if err := w.state.save(w.path); err != nil {
-			slog.Error("save state", "error", err)
-		}
-		w.dirty = false
-	}
-	w.mu.Unlock()
-	for _, m := range messages {
+	for _, m := range w.state.alerts(w.started, time.Now()) {
 		slog.Info("alert", "server", m.Server, "app", m.App, "title", m.Title)
 		for _, d := range w.config.Alerts {
-			sending, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
-			if err := alert.Send(sending, d, m); err != nil {
-				slog.Error("alert not sent", "kind", d.Kind, "title", m.Title, "error", err)
-			}
-			cancel()
+			w.state.Unsent = append(w.state.Unsent, unsent{To: d, Message: m})
 		}
 	}
+	todo := w.state.Unsent
+	w.state.Unsent = nil
+	w.mu.Unlock()
+
+	failed := w.send(ctx, todo)
+
+	w.mu.Lock()
+	w.state.Unsent = append(failed, w.state.Unsent...)
+	w.state.Unsent = w.state.Unsent[max(0, len(w.state.Unsent)-kept):]
+	w.dirty = w.dirty || len(todo) > 0
+	w.mu.Unlock()
+	w.save()
+}
+
+// send sends each alert and returns the ones that did not go out. After
+// one failure a destination gets nothing more this round, so a dead one
+// does not hold up the others.
+func (w *watcher) send(ctx context.Context, todo []unsent) []unsent {
+	var failed []unsent
+	down := map[alert.Destination]bool{}
+	for _, u := range todo {
+		if down[u.To] {
+			failed = append(failed, u)
+			continue
+		}
+		if err := alert.Send(ctx, u.To, u.Message); err != nil {
+			slog.Error("alert not sent, trying again soon", "kind", u.To.Kind, "title", u.Message.Title, "error", err)
+			down[u.To] = true
+			failed = append(failed, u)
+		}
+	}
+	return failed
+}
+
+// save writes the state when it changed.
+func (w *watcher) save() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.dirty {
+		return
+	}
+	if err := w.state.save(w.path); err != nil {
+		slog.Error("save state", "error", err)
+		return
+	}
+	w.dirty = false
 }
 
 // visitAll visits every domain at once and counts what each visit said.
@@ -249,6 +386,8 @@ func visitFailure(err error) string {
 	var netErr net.Error
 	var urlErr *url.Error
 	switch {
+	case errors.Is(err, errPrivate):
+		return errPrivate.Error()
 	case errors.As(err, &dnsErr):
 		return "DNS has no address for " + dnsErr.Name
 	case errors.As(err, &certErr):
@@ -260,7 +399,7 @@ func visitFailure(err error) string {
 	case errors.As(err, &netErr) && netErr.Timeout():
 		return "no answer within " + visitTimeout.String()
 	case errors.As(err, &urlErr):
-		return urlErr.Err.Error()
+		return clip(urlErr.Err.Error(), maxError)
 	}
-	return err.Error()
+	return clip(err.Error(), maxError)
 }
