@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/db"
 	"github.com/axadrn/moin/cloud/internal/github"
 	"github.com/axadrn/moin/cloud/internal/handler"
@@ -45,7 +46,7 @@ func run() error {
 	if _, logs := mail.(mailer.Log); logs && !cfg.Development {
 		slog.Warn("no CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN: mails go to the log, not to people")
 	}
-	watching := watchers.New(store, mail, cfg.AppURL)
+	watching := watchers.New(store, counts.New(database), mail, cfg.AppURL)
 	if err := watching.Load(); err != nil {
 		return err
 	}

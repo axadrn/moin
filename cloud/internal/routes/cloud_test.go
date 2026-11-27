@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/db"
 	"github.com/axadrn/moin/cloud/internal/github"
 	"github.com/axadrn/moin/cloud/internal/handler"
@@ -59,7 +60,7 @@ func testCloud(t *testing.T, appURL string, mails *outbox) *handler.Cloud {
 	if mails != nil {
 		send = mails
 	}
-	return handler.NewCloud(store, watchers.New(store, send, appURL), send, github.New("", "", "", ""), appURL, false)
+	return handler.NewCloud(store, watchers.New(store, counts.New(database), send, appURL), send, github.New("", "", "", ""), appURL, false)
 }
 
 // testSite is the site with moin cloud, served on a test server, and a

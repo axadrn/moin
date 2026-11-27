@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/db"
 	"github.com/axadrn/moin/cloud/internal/mailer"
 	"github.com/axadrn/moin/cloud/internal/workspace"
@@ -30,7 +31,7 @@ func TestReceiveAndMail(t *testing.T) {
 	defer database.Close()
 	store := workspace.NewStore(database)
 	mails := &outbox{}
-	ws := New(store, mails, "https://cloud.example.com/")
+	ws := New(store, counts.New(database), mails, "https://cloud.example.com/")
 	space, _ := store.SignIn("ada@example.com")
 	token, _ := store.ConnectServer(space.ID, "prod")
 
@@ -74,7 +75,7 @@ func TestTrialOver(t *testing.T) {
 	defer database.Close()
 	store := workspace.NewStore(database)
 	mails := &outbox{}
-	ws := New(store, mails, "https://cloud.example.com")
+	ws := New(store, counts.New(database), mails, "https://cloud.example.com")
 	space, _ := store.SignIn("ada@example.com")
 	if err := store.StartTrial(space.ID, time.Now().Add(4*24*time.Hour)); err != nil {
 		t.Fatal(err)

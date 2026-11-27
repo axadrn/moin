@@ -53,6 +53,12 @@ CREATE TABLE servers (
     name TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     created INTEGER NOT NULL,
+    -- What its last report said, for the counts: when it came, how many
+    -- apps it had, each app's release as JSON, and the knocks in all.
+    last_report INTEGER,
+    apps INTEGER NOT NULL DEFAULT 0,
+    releases TEXT NOT NULL DEFAULT '{}',
+    knocks INTEGER,
     UNIQUE (workspace_id, name)
 );
 
@@ -68,3 +74,12 @@ CREATE TABLE copies (
     state TEXT NOT NULL
 );
 CREATE INDEX copies_server ON copies(server_id, app, database, made_at);
+
+-- Sums over everyone, by day (UTC), for the landing page: deploys, knocks,
+-- installs. Nothing in it names a customer.
+CREATE TABLE counts (
+    day TEXT NOT NULL,
+    name TEXT NOT NULL,
+    n INTEGER NOT NULL,
+    PRIMARY KEY (day, name)
+);

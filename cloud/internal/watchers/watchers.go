@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/mailer"
 	"github.com/axadrn/moin/cloud/internal/workspace"
 	"github.com/axadrn/moin/internal/alert"
@@ -43,6 +44,7 @@ const mailKind = "mail"
 // Watchers are the watchers of every workspace with a server.
 type Watchers struct {
 	store   *workspace.Store
+	counts  *counts.Counts
 	mailer  mailer.Mailer
 	visitor *watcher.Visitor
 	appURL  string
@@ -52,11 +54,12 @@ type Watchers struct {
 	byWorkspace map[string]*watcher.Watcher
 }
 
-// New are the watchers of the workspaces in store. Alerts go out through
-// mailer, with a link to appURL.
-func New(store *workspace.Store, mailer mailer.Mailer, appURL string) *Watchers {
+// New are the watchers of the workspaces in store. Each report adds to
+// counts. Alerts go out through mailer, with a link to appURL.
+func New(store *workspace.Store, counts *counts.Counts, mailer mailer.Mailer, appURL string) *Watchers {
 	return &Watchers{
 		store:       store,
+		counts:      counts,
 		mailer:      mailer,
 		visitor:     watcher.NewVisitor(visitsAtOnce),
 		appURL:      strings.TrimRight(appURL, "/"),
@@ -154,6 +157,9 @@ func (ws *Watchers) Receive(token string, r report.Report) error {
 	}
 	if err := w.Receive(name, r); err != nil {
 		return err
+	}
+	if err := ws.counts.Report(id, name, r, time.Now()); err != nil {
+		slog.Error("count a report", "error", err)
 	}
 	return ws.store.StartTrial(id, time.Now().Add(trial))
 }
