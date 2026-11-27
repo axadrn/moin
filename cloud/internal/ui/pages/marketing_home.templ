@@ -107,9 +107,9 @@ var homeDeploy = []components.TerminalLine{
 	{Kind: "step", Text: "→ installing moin"},
 	{Kind: "step", Text: "→ starting the daemon: backups, restore checks, reports"},
 	{Kind: "step", Text: "→ sending the source"},
-	{Kind: "step", Text: "→ building: Node, no Dockerfile needed"},
+	{Kind: "step", Text: "→ building"},
 	{Kind: "done", Text: "✓ moin. shop is live: https://shop.203-0-113-7.sslip.io"},
-	{Kind: "hint", Text: "  postgres found. See its backups: moin backups shop"},
+	{Kind: "hint", Text: "  Postgres found. See its backups: moin backups shop"},
 }
 
 // ---------------------------------------------------------------- lose nothing
@@ -136,7 +136,7 @@ templ HomeLoseNothing() {
 var homeBackups = []components.TerminalLine{
 	{Kind: "prompt", Text: "$ moin backups shop"},
 	{Kind: "prompt", Text: "postgres"},
-	{Kind: "done", Text: "✓ Restore check 4 hours ago: 20261127T030000Z restored and read fine"},
+	{Kind: "done", Text: "✓ Restore check 4 hours ago: the copy 20261127T030000Z restored and read fine"},
 	{Text: "COPY               TAKEN           SIZE"},
 	{Text: "20261127T070000Z   12 minutes ago  41 MB"},
 	{Text: "20261127T060000Z   1 hour ago      41 MB"},
