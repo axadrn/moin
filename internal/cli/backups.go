@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"filippo.io/age"
+	"github.com/charmbracelet/colorprofile"
 
 	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/internal/build"
@@ -500,7 +501,10 @@ func openCopy(encrypted io.Reader, postgres bool, key age.Identity) error {
 		}
 	}
 	first := make([]byte, len(start))
-	if _, err := io.ReadFull(plain, first); err != nil || string(first) != start {
+	if _, err := io.ReadFull(plain, first); err != nil {
+		return fmt.Errorf("it ends before a database starts: %w", err)
+	}
+	if string(first) != start {
 		return errors.New("what it holds is not a database")
 	}
 	_, err = io.Copy(io.Discard, plain)
@@ -539,6 +543,11 @@ func hereBucketKey(ctx context.Context, args []string, stdin io.Reader, stdout i
 		app, err := hereApp(flags, args[1:])
 		if err != nil {
 			return err
+		}
+		// The copy is bytes, not text: it goes past the writer that takes
+		// colors out of what a terminal cannot show, which would change it.
+		if colors, ok := stdout.(*colorprofile.Writer); ok {
+			stdout = colors.Forward
 		}
 		return daemon.SendCopyHere(ctx, daemon.StateDir(), daemon.KeyCopy{App: app, Database: *database, Copy: *copy}, stdout)
 	}
