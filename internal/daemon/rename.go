@@ -15,9 +15,7 @@ import (
 // changes. Its Compose project is its name now, so docker ps shows
 // my-app-web-1; the project file in the folder says which one runs. Its
 // named volumes have fixed names, kept in volumes.json, so a rename never
-// loses data: moin-<app ID>-<volume>, or for an app from before renames
-// the name compose gave it, moin-<folder>_<volume>. Its networks follow
-// the project.
+// loses data: moin-<folder>_<volume>. Its networks follow the project.
 
 // projectOf is the Compose project the app runs as: the project file, or
 // for an app from before renames moin-<folder>.
