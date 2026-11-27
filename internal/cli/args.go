@@ -37,7 +37,7 @@ func newFlags(name, usage string) *flagSet {
 
 // withApp adds --app.
 func (f *flagSet) withApp() *flagSet {
-	f.appFlag = f.String("app", "", "app name; default the directory name")
+	f.appFlag = f.String("app", "", "the app's name; default this folder's name")
 	return f
 }
 
@@ -129,11 +129,19 @@ func (h helpError) print(w io.Writer) {
 	fmt.Fprintln(w, style.Bold.Render("Usage")+"  "+h.flags.usage)
 	rows := [][]string{}
 	h.flags.VisitAll(func(each *flag.Flag) {
+		if len(each.Name) == 1 {
+			// -s, -f and -y show on the line of their long name.
+			return
+		}
 		text := each.Usage
 		if each.DefValue != "" && each.DefValue != "false" && each.DefValue != "0" {
 			text += " (default " + each.DefValue + ")"
 		}
-		rows = append(rows, []string{"  --" + each.Name, style.Muted.Render(text)})
+		name := "  --" + each.Name
+		if short := h.flags.Lookup(each.Name[:1]); short != nil && short.Usage == each.Usage {
+			name = "  -" + short.Name + ", --" + each.Name
+		}
+		rows = append(rows, []string{name, style.Muted.Render(text)})
 	})
 	if len(rows) == 0 {
 		return

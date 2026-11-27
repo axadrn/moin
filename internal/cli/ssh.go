@@ -60,7 +60,8 @@ func sshCommand(ctx context.Context, server, line string, tty bool) *exec.Cmd {
 	if tty {
 		args = append(args, "-t")
 	}
-	args = append(args, server, line)
+	// After --, a server name never reads as an option of ssh.
+	args = append(args, "--", server, line)
 	return exec.CommandContext(ctx, "ssh", args...)
 }
 

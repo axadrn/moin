@@ -278,6 +278,7 @@ func askServers(ctx context.Context, servers []string) []serverRow {
 // ssh says on stderr, which would mix into the table.
 func quietStatus(ctx context.Context, server string) (daemon.Status, error) {
 	cmd := sshCommand(ctx, server, asRoot(hereLine("apps")), false)
+	// BatchMode: a server that would ask for a password fails instead.
 	cmd.Args = slices.Insert(cmd.Args, 1, "-o", "BatchMode=yes")
 	out, err := cmd.Output()
 	if ctx.Err() != nil {

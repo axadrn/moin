@@ -45,7 +45,7 @@ func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		log := stdout
 		if flags.json() {
-			log = os.Stderr
+			log = terminal(os.Stderr)
 		}
 		result, err := runRelease(ctx, server, command, nil, log, "rolling back "+app)
 		if err != nil {

@@ -40,7 +40,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	// With --json, stdout is for the JSON alone: the log goes to stderr.
 	log := stdout
 	if flags.json() {
-		log = os.Stderr
+		log = terminal(os.Stderr)
 	}
 	from, err := deploySource(ctx, *image, *catalogApp, log)
 	if err != nil {
