@@ -209,6 +209,7 @@ On your server, and only there. Root only.
 | --- | --- |
 | `/var/lib/moin/apps/<app>/app.env` | the env vars of one app |
 | `/etc/moin/config.yml` | the bucket key, the alert tokens, the watcher tokens |
+| `/etc/moin/backup.key` | the server's own backup key, which opens its copies |
 | `/var/lib/moin/server.json` | the Cloudflare Tunnel token, and what is closed |
 | `/var/lib/moin/follow/<app>/key` | the read-only deploy key of an app that follows a branch |
 
