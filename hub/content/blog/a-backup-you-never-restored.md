@@ -75,6 +75,6 @@ A restore test from March says nothing about today. Schemas change, disks fill u
 
 ## How moin does it
 
-[moin](/) does all of this for every SQLite and Postgres database of your apps. It copies them into your own bucket on the schedule you pick, hourly unless you change it. Every day it restores the newest copy into a throwaway database and checks it. When a check fails, it tells you.
+[moin](/) does all of this for every SQLite and Postgres database of your apps. It copies them into your own bucket on a schedule. Every day it restores the newest copy into a throwaway database and reads it. When a check fails, it tells you.
 
-[Backups in the docs](/docs/guides/backups) has the details.
+[Backups in the docs](/docs/backups) has the details.

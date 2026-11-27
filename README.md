@@ -1,21 +1,20 @@
-<p align="center">
-  <img src="hub/assets/img/og.png" alt="moin. Deploy anything. Lose nothing." width="100%">
-</p>
+# moin
 
-Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule. Checked every day. Open source, for SQLite and Postgres, with web, CLI, terminal UI and MCP.
+Your `./deploy.sh`. But your data comes back.
+
+One command puts your app on your server. Every backup is restored and checked, every day. No dashboard holds a key to your server.
 
 ```bash
-moin login              # log in through the browser
-moin servers add web-1  # prints the one-line install for your server
-moin deploy             # ✓ moin. your app is live
-moin                    # the live terminal UI
+curl -fsSL https://moin.run/cli.sh | sh
+cd shop
+moin deploy prod     # ✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
 ```
 
-The daemon on your server only dials out. Nothing listens for moin.
+If `ssh prod` works, `moin deploy prod` works.
 
 ## Documentation
 
-Everything else is in the docs: [moin.run/docs](https://moin.run/docs), or `/docs` on your own hub. They are the source of truth.
+Everything else is in the docs: [moin.run/docs](https://moin.run/docs). They are the source of truth.
 
 News on X: [@usemoin](https://x.com/usemoin).
 
@@ -25,8 +24,6 @@ News on X: [@usemoin](https://x.com/usemoin).
 go install github.com/axadrn/moin/cmd/moin@latest
 ```
 
-The hub is in [`hub`](hub).
-
 ## License
 
-Open source: [what the licenses cover](https://moin.run/docs/faq#is-moin-open-source). See also [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).
+Open source: [what the license covers](https://moin.run/docs/faq#is-moin-open-source). See also [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).

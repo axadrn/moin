@@ -2,9 +2,7 @@ package pages
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/axadrn/moin/hub/internal/access"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/model"
 	"github.com/axadrn/moin/hub/internal/service"
@@ -19,9 +17,9 @@ func jsonLD(data any) string {
 	return `<script type="application/ld+json">` + string(body) + `</script>`
 }
 
-// homeJSONLD says what the home page is about: the product, free to host
-// yourself and, on a hub with billing, its hosted prices, and who makes it.
-func homeJSONLD(appURL string, billing bool) string {
+// homeJSONLD says what the home page is about: the product, free and open
+// source, and who makes it.
+func homeJSONLD(appURL string) string {
 	return jsonLD([]map[string]any{
 		{
 			"@context":            "https://schema.org",
@@ -29,9 +27,9 @@ func homeJSONLD(appURL string, billing bool) string {
 			"name":                brand.Name,
 			"description":         brand.Description,
 			"applicationCategory": "DeveloperApplication",
-			"operatingSystem":     "Linux",
+			"operatingSystem":     "Linux, macOS",
 			"url":                 appURL,
-			"offers":              homeOffers(billing),
+			"offers":              map[string]any{"@type": "Offer", "price": "0.00", "priceCurrency": "USD"},
 		},
 		{
 			"@context": "https://schema.org",
@@ -43,26 +41,6 @@ func homeJSONLD(appURL string, billing bool) string {
 			"sameAs":   []string{layouts.GitHubURL, layouts.XURL},
 		},
 	})
-}
-
-// homeOffers are the prices the home page shows: self-hosted for free and,
-// with billing, the hosted plan by the month and by the year.
-func homeOffers(billing bool) []map[string]any {
-	offers := []map[string]any{offer("Self-hosted", 0)}
-	if !billing {
-		return offers
-	}
-	for _, plan := range access.Product.Plans {
-		if plan.Purchasable {
-			offers = append(offers, offer("Hosted, a month per workspace", plan.MonthlyPrice), offer("Hosted, a year per workspace", plan.YearlyPrice))
-		}
-	}
-	return offers
-}
-
-// offer is one price in US cents.
-func offer(name string, cents int) map[string]any {
-	return map[string]any{"@type": "Offer", "name": name, "price": fmt.Sprintf("%d.%02d", cents/100, cents%100), "priceCurrency": "USD"}
 }
 
 // blogJSONLD says what a post is, who wrote it and when.
@@ -81,8 +59,8 @@ func blogJSONLD(post service.BlogPost, appURL string) string {
 }
 
 // docsJSONLD is the way from the docs to a page, for the crumbs under a
-// search result. A folder such as Guides is no page of its own, so the way
-// is the docs, then the page.
+// search result. A folder is no page of its own, so the way is the docs,
+// then the page.
 func docsJSONLD(page *model.DocPage, appURL string) string {
 	return jsonLD(map[string]any{
 		"@context": "https://schema.org",

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
@@ -26,9 +27,10 @@ func NewHomeOpen(releases []service.Release) HomeOpen {
 	return HomeOpen{Releases: len(releases), Since: releases[len(releases)-1].Date, Latest: releases[0]}
 }
 
-// HomeOpenAndNext is the trust a young product can show without logos: the
-// code is open, and it ships often, counted from the real changelog.
-templ HomeOpenAndNext(open HomeOpen) {
+// HomeOpenAndAgents is the trust a young product can show without logos:
+// the code is open and it ships often, counted from the real changelog.
+// Next to it: AI agents use the same CLI you do.
+templ HomeOpenAndAgents(open HomeOpen) {
 	<section class="moin-band">
 		<div class="moin-grid" data-cols="2">
 			if open.Releases > 0 {
@@ -41,7 +43,10 @@ templ HomeOpenAndNext(open HomeOpen) {
 					}
 				}
 			}
-			@HomeNext()
+			@components.Card(components.CardProps{Href: "/docs/cli#ai-agents", Attrs: templ.Attributes{"id": "agents", "data-gap": "3", "style": "--pad:2rem"}}) {
+				<h2 class="moin-statement">AI agents use the CLI.</h2>
+				<p class="moin-text moin-muted">Claude Code. Codex. Cursor. They use { brand.Name } like you do. Every reading command takes --json. Every command that deletes needs --yes. So each step shows in the agent's transcript.</p>
+			}
 		</div>
 	</section>
 }

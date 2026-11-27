@@ -79,6 +79,6 @@ Or don't publish at all. Containers in one compose file reach each other by name
 
 ## How moin does it
 
-[moin](/) was built this way. Its daemon on your server dials out to the hub. The hub never connects in, and it holds no SSH key to your servers. Deploys, backups and logs all go over the line the daemon opened. Visitors come in over 80 and 443, or a Cloudflare Tunnel.
+[moin](/) does these steps for you. After the first deploy it closes public SSH, so you reach the server only over Tailscale. `moin secure prod` adds the Cloudflare Tunnel and the firewall. moin itself needs no open port: it comes in over your SSH, and reports go out.
 
-[How moin works](/docs/concepts/how-moin-works) has the whole picture.
+[Security](/docs/security) has the whole picture.

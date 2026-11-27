@@ -1,83 +1,65 @@
 ---
 title: "FAQ"
-description: "Common questions about moin. Short answers: pricing, the license, security, backups and self-hosting."
+description: "Short answers: what moin is, what it needs, where your data is, who can reach your server, and the license."
 group: "Reference"
-order: 6
+order: 2
 ---
 
-The questions people ask most.
+## What is moin?
 
-## Does my server need open ports?
+Your `./deploy.sh`, but your data comes back. One command puts your app on your server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
 
-Not for moin. The daemon dials out. Visitors reach your apps on ports 80 and 443, and with a [Cloudflare Tunnel](/docs/guides/security#web) not even those are open.
+## Is there a dashboard?
+
+No. The CLI is the interface, with `--json` for scripts and AI agents. A terminal UI is coming. A watcher has one small page that only shows.
+
+## Do I need an account?
+
+No. moin cloud is the one part with an account. [moin cloud](/docs/cloud)
+
+## Do I need Docker?
+
+Not on your laptop. moin installs Docker on the server. Only `moin deploy --image` needs Docker on your laptop, to send the image you built there.
+
+## Which servers work?
+
+Any Linux server you can reach with SSH as root. Any provider.
 
 ## Does moin build on its own servers?
 
-No. Builds run on your server. [How moin works](/docs/concepts/how-moin-works).
-
-## How is moin different from Coolify, Kamal or Heroku?
-
-moin holds no SSH key to your servers. moin never stores your code, and your backups stay in your own bucket. Every day moin checks that a copy restores. [Why moin](/docs/why-moin).
+No. Your server builds your app. Your source goes from your laptop to it over SSH, and nowhere else.
 
 ## Do I need a domain?
 
-Not to start. Every app answers at its [instant address](/docs/guides/domains#instant-address), with HTTPS and a password.
-
-## Can I install apps like n8n or Umami?
-
-Yes: 47 open source apps from the [catalog](/docs/guides/catalog), in one click.
-
-## What happens when a deploy fails?
-
-The previous deploy starts again. The failed one says why. `moin deploys v4` shows its log. The same happens when the server restarts during a deploy, as soon as it is back.
+Not to start. Every app answers at an address that needs no DNS, like `https://shop.203-0-113-7.sslip.io`, with HTTPS.
 
 ## Where is my data?
 
-On your server: bind mounts under `/var/lib/moin/apps/<app>/volumes`, named volumes in Docker. Removing an app keeps both.
+On your server, under `/var/lib/moin/apps/<app>/volumes`, and in Docker's named volumes. The copies are in your bucket.
 
 ## Does moin back up my files?
 
-No. moin backs up databases, not files. [Backups](/docs/guides/backups#what-moin-backs-up).
+No. moin backs up databases: SQLite and Postgres. [Backups](/docs/backups)
 
-## Can moin see my data?
+## Can my team deploy?
 
-Only what you open, passed through to you and never stored. `data: off` and `logs: off` in `/etc/moin/rules` close even that. [Rules](/docs/guides/security#rules).
+Everyone with an SSH key on the server can. `moin keys add prod anna.pub`. [The team](/docs/security#the-team)
 
-## Where are my env vars?
+## Can an AI agent use it?
 
-On your server, in a file only root can read. The hub passes each value on once and keeps only its name. [Where your secrets live](/docs/guides/security#where-your-secrets-live).
+Yes, through the CLI, like you do. [AI agents](/docs/cli#ai-agents)
 
-## What is a workspace?
+## How is moin different from Coolify, Kamal or uncloud?
 
-Your team in moin: its servers, apps, bucket, settings and people. You can be in several. [Team](/docs/guides/team).
+Coolify and Dokploy are dashboards that hold a key to your server. Kamal and uncloud run over SSH like moin, and do several servers. moin restores and checks your backups every day, and a watcher notices when a server is gone. [Every fact, with its source](/compare)
 
-## Do I pay per workspace?
+## Does my server update by itself?
 
-Yes: $7 a month per workspace, or $49 a year. Unlimited servers, apps and team. The free trial comes once, with your first. Hosting moin yourself is free.
-
-This is the launch price. It may go up later. Your price stays as long as your subscription runs.
-
-The tenth server costs the same as the first. On hosted plans, Coolify Cloud is $5 for 2 servers plus $3 per extra server, so it reaches $29 at 10 servers and $59 at 20. Dokploy Cloud Startup is from $15 with 3 servers plus $4.50 per extra server.
-
-The whole team is included, with no per-seat fee, and so is everything else: backups with a daily check, uptime, the data browser and AI agents. No higher tier unlocks more.
-
-## How does the hosted trial work?
-
-Your first workspace gets 30 days with everything. The 30 days start when you connect your first server, not when you sign up. No card. Then it is read-only until you subscribe. Your apps and their backups keep running.
-
-The hosted plans are for businesses. Before **Subscribe** you tick one box: you subscribe as a business, not as a consumer. No tax ID, no company name. Self-hosted, moin asks nothing of the kind.
-
-## Can an AI agent do everything?
-
-Almost. Every action on servers, apps, data, backups, domains and invitations is an [MCP tool](/docs/guides/mcp). Your account, roles and deleting a workspace stay on the web.
-
-## Can my team work on it too?
-
-Yes, at no extra cost. [Invite them](/docs/guides/team#invite-someone).
+Never. `moin update prod` updates it, when you run it. [Updates](/docs/security#updates)
 
 ## Is moin open source?
 
-Yes, all of it: AGPL-3.0, and [moin UI](/ui) under MIT, at [github.com/axadrn/moin](https://github.com/axadrn/moin). [Host it yourself](/docs/self-hosting), free.
+Yes, all of it: AGPL-3.0, at [github.com/axadrn/moin](https://github.com/axadrn/moin). Free.
 
 ## Why AGPL, and can I contribute?
 
