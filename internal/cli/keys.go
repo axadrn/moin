@@ -82,7 +82,7 @@ func isPublicKey(body []byte) bool {
 // removeKey removes a key by its name, the comment at its end, or its
 // fingerprint. The server refuses the key this session logged in with.
 func removeKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("keys rm", "keys rm <server> <name or fingerprint> [--yes]").withYes()
+	flags := newFlags("keys rm", "keys rm <server> <name or fingerprint> [-y]").withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}

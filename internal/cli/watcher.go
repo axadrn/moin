@@ -30,7 +30,7 @@ func watcherCommand(ctx context.Context, args []string, stdin io.Reader, stdout 
 	case "disconnect":
 		return watcherDisconnect(ctx, args, stdin, stdout)
 	}
-	return fmt.Errorf("usage: `%s watcher run`, `%s watcher token <server> --url <url>`, `%s watcher connect <server> <url> <token>` or `%s watcher disconnect <server> <url>`", build.Name, build.Name, build.Name, build.Name)
+	return fmt.Errorf("usage: `%s watcher run`, `%s watcher token <server>`, `%s watcher connect <server> <url> <token>` or `%s watcher disconnect <server> <url>`", build.Name, build.Name, build.Name, build.Name)
 }
 
 // watcherRun runs the watcher until it is stopped.

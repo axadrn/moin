@@ -36,8 +36,17 @@ type updateCheck struct {
 // version is `moin version`. The first line is the version alone, which
 // a server's update checks.
 func version(args []string, stdout io.Writer) error {
-	if err := noArguments("version", args); err != nil {
+	flags := newFlags("version", "version [--json]").withJSON()
+	if err := flags.parse(args); err != nil {
 		return err
+	}
+	if flags.NArg() > 0 {
+		return flags.wrong()
+	}
+	if flags.json() {
+		return printJSON(stdout, struct {
+			Version string `json:"version"`
+		}{build.Version})
 	}
 	fmt.Fprintln(stdout, build.Name, build.Version)
 	return nil

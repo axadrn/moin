@@ -32,7 +32,7 @@ Apps
   restart                  Start the app again, with its env and domains as they are now: restart [app]
   stop                     Stop the app until you start it: stop [app]
   start                    Start a stopped app: start [app]
-  logs                     The app's logs: logs [app] [-f] [--tail 200]
+  logs                     The app's logs: logs [app] [-f] [--tail 200] [--json]
   exec                     Run a command in the app's container: exec [app] -- psql
   env                      The names of the app's env vars, never a value: env [app] [--json]
   env edit                 Change them in $EDITOR; the app restarts with them: env edit [app]
@@ -84,7 +84,7 @@ On the server
   unlock                   Open port 22 to the internet again, from your provider's web console
   daemon uninstall         Remove moin from this server; the apps keep running: daemon uninstall [--apps] [-y]
 
-  version                  Show the version
+  version                  Show the version [--json]
   help                     Show this help
 
 A server is a name from your ssh config, like prod, or user@host: if
@@ -294,7 +294,7 @@ func daemonCommand(ctx context.Context, args []string, stdin io.Reader, stdout i
 
 // uninstallDaemon removes moin from this server and says what stays.
 func uninstallDaemon(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("daemon uninstall", "daemon uninstall [--apps] [--yes]").withYes()
+	flags := newFlags("daemon uninstall", "daemon uninstall [--apps] [-y]").withYes()
 	withApps := flags.Bool("apps", false, "remove the apps with their data, the proxy, the tunnel and the firewall too")
 	if err := flags.parse(args); err != nil {
 		return err
