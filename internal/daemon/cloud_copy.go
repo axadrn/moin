@@ -186,8 +186,12 @@ func sendCopy(ctx context.Context, watcher Watcher, upload copyUpload, file *os.
 	return nil
 }
 
-// watcherClient asks a watcher about copies.
-var watcherClient = &http.Client{Timeout: 30 * time.Second}
+// watcherClient asks a watcher about copies. It follows no redirect: a
+// redirect is an answer, and the daemon acts on none but the address.
+var watcherClient = &http.Client{
+	Timeout:       30 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
 
 // callWatcher posts body as JSON to path of a watcher, with the server's
 // token, and returns the answer, short, and its status. It goes only over
