@@ -5,11 +5,17 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 )
 
 // openBrowser opens url in the default browser without waiting for it.
 // Over SSH or without a display there is none; then you open it by hand.
+// Only https: the address comes from a server, and anything else, like
+// another scheme or a path, would open some other program.
 func openBrowser(url string) error {
+	if !strings.HasPrefix(url, "https://") {
+		return errors.New("not a web address")
+	}
 	if os.Getenv("SSH_CONNECTION") != "" {
 		return errors.New("over ssh")
 	}
