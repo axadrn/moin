@@ -185,11 +185,22 @@ func confirm(stdin io.Reader, stdout io.Writer, yes bool, question string) error
 }
 
 // readSecret reads one line without echo from a terminal, or plainly from
-// a pipe.
+// a pipe. Ctrl-C stops the wait and turns the echo back on.
 func readSecret(stdin io.Reader) (string, error) {
 	if !isTerminal(stdin) {
 		return readLine(stdin)
 	}
-	secret, err := term.ReadPassword(int(stdin.(*os.File).Fd()))
-	return strings.TrimSpace(string(secret)), err
+	fd := int(stdin.(*os.File).Fd())
+	echo, err := term.GetState(fd)
+	if err != nil {
+		return "", err
+	}
+	secret, err := untilStopped(func() (string, error) {
+		secret, err := term.ReadPassword(fd)
+		return strings.TrimSpace(string(secret)), err
+	})
+	if errors.Is(err, errStopped) {
+		_ = term.Restore(fd, echo)
+	}
+	return secret, err
 }

@@ -141,7 +141,7 @@ func usageEntry(line string) (name, description string, ok bool) {
 // Run runs one command and returns the exit code.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// SIGHUP too: a closed terminal still lets env edit remove its file.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	ctx, stop := signal.NotifyContext(context.Background(), stopSignals...)
 	defer stop()
 
 	stdout, stderr = terminal(stdout), terminal(stderr)
@@ -158,6 +158,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case errors.As(err, &help):
 		help.print(stdout)
 		return 0
+	case errors.Is(err, errStopped):
+		// The cursor waits behind the question.
+		fmt.Fprintln(stderr)
 	case ctx.Err() != nil && !onServer:
 		// Ctrl-C ends the ssh session, not the work on the server.
 		fmt.Fprintln(stderr)
@@ -273,13 +276,44 @@ func noArguments(command string, args []string) error {
 	return nil
 }
 
-// readLine reads one line and trims it.
+// stopSignals stop a run: Ctrl-C, a kill, a closed terminal.
+var stopSignals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP}
+
+// errStopped is Ctrl-C while a question waits for its answer.
+var errStopped = errors.New("stopped")
+
+// readLine reads one line and trims it. Ctrl-C stops the wait.
 func readLine(stdin io.Reader) (string, error) {
-	line, err := bufio.NewReader(stdin).ReadString('\n')
-	if err != nil && !errors.Is(err, io.EOF) {
-		return "", err
+	return untilStopped(func() (string, error) {
+		line, err := bufio.NewReader(stdin).ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return "", err
+		}
+		return strings.TrimSpace(line), nil
+	})
+}
+
+// untilStopped waits for read, or for Ctrl-C, which says errStopped. A
+// read from a terminal does not end on Ctrl-C by itself. The read left
+// waiting ends with the run.
+func untilStopped(read func() (string, error)) (string, error) {
+	stopped, stop := signal.NotifyContext(context.Background(), stopSignals...)
+	defer stop()
+	type answer struct {
+		text string
+		err  error
 	}
-	return strings.TrimSpace(line), nil
+	answered := make(chan answer, 1)
+	go func() {
+		text, err := read()
+		answered <- answer{text, err}
+	}()
+	select {
+	case got := <-answered:
+		return got.text, got.err
+	case <-stopped.Done():
+		return "", errStopped
+	}
 }
 
 // daemonCommand is `moin daemon` on a server, and `moin daemon uninstall`.
