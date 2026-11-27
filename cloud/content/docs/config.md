@@ -1,6 +1,6 @@
 ---
 title: "Server config"
-description: "/etc/moin/config.yml, key by key: the server's name, its watchers, alerts, bucket, backup schedule, mounts and server access."
+description: "/etc/moin/config.yml, key by key: the server's name, its watchers, alerts, bucket, backup key, backup schedule, mounts and server access."
 group: "Reference"
 order: 2
 ---
@@ -13,8 +13,10 @@ You rarely write it by hand. The commands write it for you:
 | --- | --- |
 | the first `moin deploy` | `name` |
 | `moin watcher connect`, `moin watcher disconnect` | `watchers` |
+| `moin cloud connect`, `moin cloud disconnect` | `watchers`: moin cloud is one |
 | `moin alerts add`, `moin alerts rm` | `alerts` |
 | `moin bucket set` | `bucket` |
+| `moin bucket key`, `moin bucket confirm` | `backup_key` |
 
 The backup schedule, `mounts` and `server_access` you set by hand: `ssh prod`, then edit the file as root.
 
@@ -54,6 +56,13 @@ bucket:
   access_key: <access key>           # needed
   secret_key: <secret key>           # needed
 
+# The public half of your backup key: every copy is encrypted for it.
+# `moin bucket key prod` writes it, `moin bucket confirm prod` sets
+# confirmed once your key opened a copy.
+backup_key:
+  public: age1…
+  confirmed: true
+
 # How often each database is copied, and how long a copy is kept.
 backups:
   every: 1h        # default 1h, at least 5m
@@ -75,17 +84,17 @@ server_access: false
 ## The rules
 
 - **Every key is optional.** A server without the file has no watcher, no alert and no bucket. Its name is then its hostname.
-- **A key moin does not know is an error.** So a typo never goes unnoticed. The daemon logs the mistake and does nothing until it is fixed. Commands say it too.
+- **A key moin does not know is an error.** So a typo never goes unnoticed. The daemon alerts `the config has a mistake`, and the last good config keeps working until it is fixed. Commands say it too.
 - **A change counts within a minute.** The daemon reads the file every minute. No restart.
-- **A command rewrites the whole file.** Comments you wrote go away when `moin bucket set` or another command changes it.
-- **Root only.** It holds the bucket's secret key and the alert tokens. `moin bucket prod` shows the bucket, never the secret.
+- **A command keeps your comments.** When `moin bucket set` or another command changes the file, the comments you wrote stay.
+- **Root only.** It holds the bucket's secret key, the alert tokens and the watcher tokens. `moin bucket prod` shows the bucket, never the secret.
 
 ## backups
 
 A time is a number and a unit: `m` minutes, `h` hours, `d` days. Like `15m`, `1h`, `7d`.
 
 - `every`: how often a copy is taken. Default `1h`. Less than `5m` is an error.
-- `keep`: how long a copy stays in the bucket, counted from the newest copy. Default `7d`. Less than `1d` counts as `1d`. The newest copy always stays.
+- `keep`: how long a copy stays in the bucket, counted from the newest copy. Default `7d`. Less than `1d` is an error. The three newest copies always stay, and so does the copy the last check restored.
 - `apps`: a schedule for one app. What it leaves out comes from the server's.
 
 The undo a restore leaves behind is kept just as long as the copies.
@@ -96,6 +105,13 @@ The undo a restore leaves behind is kept just as long as the copies.
 - `region`: the bucket's region. Default `us-east-1`. Cloudflare R2 takes `auto`.
 - `bucket`, `access_key`, `secret_key`: needed, all three.
 - `path`: a folder in the bucket. Then copies go to `<path>/<server>/<app>/<database>/copies/`.
+
+## backup_key
+
+- `public`: the public half of your backup key, `age1…`. Every copy is encrypted for it, and for the server's own key in `/etc/moin/backup.key`.
+- `confirmed`: you showed that you have the private half, by opening a copy with it. Until then `moin` shows the server in red.
+
+The private half is never on the server. [Your backup key](/docs/backups#your-backup-key)
 
 ## mounts and server_access
 
@@ -109,6 +125,8 @@ An app may mount its own folders, like `./data`, and its own named volumes. Noth
 | Path | What |
 | --- | --- |
 | `/etc/moin/config.yml` | this file. `MOIN_CONFIG` points moin at another one |
+| `/etc/moin/backup.key` | the server's own backup key, next to this file. Root only |
+| `/var/lib/moin/server.json` | what is closed, and the Cloudflare Tunnel token. Root only |
 | `/var/lib/moin/` | the apps, their deploys and what the daemon knows |
 | `/usr/local/bin/moin` | the program |
 | `moin-daemon` | the systemd service of `moin daemon` |
