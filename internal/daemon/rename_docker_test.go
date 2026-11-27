@@ -70,7 +70,7 @@ func TestRenameDocker(t *testing.T) {
 	var lines []string
 	var done []protocol.DeployDone
 	a := newApps(t.TempDir())
-	send := func(messageType protocol.MessageType, _ string, data any) {
+	send := func(data any) {
 		mu.Lock()
 		defer mu.Unlock()
 		switch value := data.(type) {

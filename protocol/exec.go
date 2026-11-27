@@ -9,12 +9,6 @@ type ExecStart struct {
 	Timeout int      `json:"timeout"`
 }
 
-// ExecOutput is a piece of what the command wrote, stdout and stderr as
-// they came.
-type ExecOutput struct {
-	Data string `json:"data"`
-}
-
 // ExecDone ends a run: the exit code, or the error that kept the command
 // from running. Truncated says the output passed ExecMaxOutput and the rest
 // was dropped; TimedOut that the daemon stopped it. Command is the command

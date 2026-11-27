@@ -834,7 +834,7 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 	}
 	switch {
 	case !switched:
-		err = errors.New("the daemon stopped during the restore; the data is as it was before")
+		err = errors.New("the restore was cut off before the switch; the data is as it was before")
 	case startErr != nil:
 		err = fmt.Errorf("the restored data is in place, but start the app: %w", startErr)
 	}

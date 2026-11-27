@@ -47,9 +47,6 @@ const (
 	SecretTunnel    = "tunnel"
 )
 
-// BucketSecret names the secret key of the bucket with the hub's ID id.
-func BucketSecret(id string) string { return "bucket/" + id }
-
 // RegistrySecret names the login for the registry host, such as ghcr.io.
 func RegistrySecret(host string) string { return "registry/" + host }
 
@@ -59,30 +56,4 @@ func RegistrySecret(host string) string { return "registry/" + host }
 func SecretOf(name string) (kind, of string) {
 	kind, of, _ = strings.Cut(name, "/")
 	return kind, of
-}
-
-// BucketSet has the daemon write a test file to Bucket with SecretKey, or
-// with the key it keeps when SecretKey is empty, and keep the key under
-// BucketSecret(Bucket.ID) when the write works.
-type BucketSet struct {
-	Bucket    Bucket `json:"bucket"`
-	SecretKey string `json:"secret_key,omitempty"`
-}
-
-// BackupLink asks for a link to download the copy Copy of the database
-// Database of App, signed by the daemon with the bucket's key, valid
-// BackupLinkLife. Name starts the file's name, the app's name in moin.
-type BackupLink struct {
-	App      string `json:"app"`
-	Database string `json:"database"`
-	Copy     string `json:"copy"`
-	Name     string `json:"name"`
-}
-
-// BackupLinkLife is how long a download link works.
-const BackupLinkLife = 15 * time.Minute
-
-// BackupLinkResult is the signed link.
-type BackupLinkResult struct {
-	Link string `json:"link"`
 }

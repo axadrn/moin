@@ -164,9 +164,22 @@ func (c Config) check() error {
 	return nil
 }
 
-// LoadConfig reads the config file. Without one the server has its
-// hostname as name, and no bucket, watcher or alert.
+// LoadConfig reads the config file. Without one, or without a name in
+// it, the server has its hostname as name.
 func LoadConfig() (Config, error) {
+	config, err := readConfig()
+	if err != nil {
+		return Config{}, err
+	}
+	if config.Name == "" {
+		config.Name, _ = os.Hostname()
+	}
+	return config, nil
+}
+
+// readConfig reads the config file as it is written. A server without one
+// has no bucket, watcher or alert.
+func readConfig() (Config, error) {
 	var config Config
 	body, err := os.ReadFile(ConfigFile())
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -180,9 +193,6 @@ func LoadConfig() (Config, error) {
 	}
 	if err := config.check(); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", ConfigFile(), err)
-	}
-	if config.Name == "" {
-		config.Name, _ = os.Hostname()
 	}
 	return config, nil
 }

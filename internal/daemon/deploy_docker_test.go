@@ -11,9 +11,9 @@ import (
 
 // deployTo runs one deploy and hands every line of its log and how it
 // ended to send, for the tests to look at.
-func deployTo(ctx context.Context, a *apps, start protocol.DeployStart, send func(protocol.MessageType, string, any)) {
+func deployTo(ctx context.Context, a *apps, start protocol.DeployStart, send func(any)) {
 	logf := func(format string, args ...any) {
-		send(protocol.TypeDeployLog, "", protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
+		send(protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
 	}
 	done := protocol.DeployDone{DeployID: start.DeployID}
 	detected, err := a.runDeploy(ctx, start, logf)
@@ -30,5 +30,5 @@ func deployTo(ctx context.Context, a *apps, start protocol.DeployStart, send fun
 			logf("the compose file of v%d could not be made: %s", start.Number, fileErr)
 		}
 	}
-	send(protocol.TypeDeployDone, "", done)
+	send(done)
 }

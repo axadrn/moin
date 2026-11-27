@@ -78,7 +78,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	var done []protocol.DeployDone
 	dir := t.TempDir()
 	a := newApps(dir)
-	send := func(_ protocol.MessageType, _ string, data any) {
+	send := func(data any) {
 		body, _ := json.Marshal(data)
 		mu.Lock()
 		defer mu.Unlock()
@@ -305,7 +305,7 @@ func TestRemoveWithoutVariable(t *testing.T) {
 	defer server.Close()
 	var done protocol.DeployDone
 	a := newApps(t.TempDir())
-	send := func(_ protocol.MessageType, _ string, data any) {
+	send := func(data any) {
 		if value, ok := data.(protocol.DeployDone); ok {
 			done = value
 		}

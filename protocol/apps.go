@@ -10,13 +10,3 @@ type LogsRequest struct {
 type LogsResult struct {
 	Lines []string `json:"lines"`
 }
-
-// AppRemove names the app to remove.
-type AppRemove struct {
-	App string `json:"app"`
-}
-
-// AppStop names the app to stop.
-type AppStop struct {
-	App string `json:"app"`
-}

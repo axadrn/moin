@@ -55,7 +55,7 @@ func loadServerFile(dir string) (file serverFile, ok bool) {
 }
 
 // security applies the server config and keeps it: after each start and
-// every protocol.SecurityEvery it puts back what drifted.
+// every securityEvery it puts back what drifted.
 type security struct {
 	dir  string
 	apps *apps
