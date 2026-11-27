@@ -8,44 +8,23 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/daemon"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
-// apps is `moin apps [server]`: the apps on one server, or on all.
+// apps is `moin apps`: every app on every server, the table of `moin`.
 func apps(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("apps", "apps [server] [--json]").withJSON()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() == 0 {
-		return overview(ctx, args, stdout)
-	}
-	server, err := flags.server()
-	if err != nil {
-		return err
-	}
-	status, err := serverStatus(ctx, server)
-	if err != nil {
-		return err
-	}
-	rememberApps([]serverRow{{server: server, status: status}})
-	if flags.json() {
-		return printJSON(stdout, status.Apps)
-	}
-	if len(status.Apps) == 0 {
-		fmt.Fprintln(stdout, "No apps on "+server+" yet.")
-		hint(stdout, "Deploy one from its folder with", build.Name+" deploy "+server)
-		return nil
-	}
-	printApps(stdout, []serverRow{{server: server, status: status}})
-	return nil
+	return overview(ctx, "apps", args, stdout)
 }
 
-// rollback is `moin rollback [app] [--to v3]`: an older release runs
-// again, with the env and domains as they are now.
-func rollback(ctx context.Context, args []string, stdout io.Writer) error {
+// rollback is `moin rollback [app]`: an older release runs again, with
+// the env and domains as they are now. On a terminal you pick it; --to v3
+// names it; without either it is the release before.
+func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("rollback", "rollback [app] [--to v3] [-s server] [--json]").withServer().withJSON()
 	to := flags.String("to", "", "the release to go back to, like v3; default the one before the live one")
 	if err := flags.parse(args); err != nil {
@@ -55,15 +34,15 @@ func rollback(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	command := []string{"rollback", app}
-	if *to != "" {
-		number, err := releaseNumber(*to)
+	return onApp(ctx, flags, app, func(server string) error {
+		number, err := rollbackTarget(ctx, server, app, *to, stdin, stdout)
 		if err != nil {
 			return err
 		}
-		command = append(command, "--to", strconv.Itoa(number))
-	}
-	return onApp(ctx, flags, app, func(server string) error {
+		command := []string{"rollback", app}
+		if number > 0 {
+			command = append(command, "--to", strconv.Itoa(number))
+		}
 		result, err := runRelease(ctx, server, command, nil, stdout, "rolling back "+app)
 		if err != nil {
 			return err
@@ -74,6 +53,53 @@ func rollback(ctx context.Context, args []string, stdout io.Writer) error {
 		done(stdout, "%s runs v%d again, as v%d", app, result.From, result.Release)
 		return nil
 	})
+}
+
+// rollbackTarget is the release to go back to: --to, else the one you
+// pick on a terminal, else 0, the one before, which the server finds.
+func rollbackTarget(ctx context.Context, server, app, to string, stdin io.Reader, stdout io.Writer) (int, error) {
+	if to != "" {
+		return releaseNumber(to)
+	}
+	if !isTerminal(stdin) {
+		return 0, nil
+	}
+	var releases []daemon.Release
+	if err := sshJSON(ctx, server, []string{"releases", app}, nil, &releases); err != nil {
+		return 0, err
+	}
+	return pickRelease(stdin, stdout, app, releases, time.Now())
+}
+
+// pickRelease shows the releases and asks which one. Enter takes the one
+// before the live one.
+func pickRelease(stdin io.Reader, stdout io.Writer, app string, releases []daemon.Release, now time.Time) (int, error) {
+	suggested := 0
+	rows := [][]string{}
+	for _, release := range releases {
+		note := ""
+		switch {
+		case release.Live:
+			note = style.Success.Render("live")
+		case release.Before:
+			note = style.Muted.Render("the one before")
+			suggested = release.Number
+		}
+		rows = append(rows, []string{"v" + strconv.Itoa(release.Number), human.Ago(release.At, now), note})
+	}
+	if suggested == 0 {
+		return 0, fmt.Errorf("%s has no older release to go back to", app)
+	}
+	table(stdout, []string{"RELEASE", "DEPLOYED", ""}, rows)
+	fmt.Fprint(stdout, style.Warning.Render("?")+" Go back to which release? "+style.Muted.Render("[v"+strconv.Itoa(suggested)+"]")+" ")
+	answer, err := readLine(stdin)
+	if err != nil {
+		return 0, err
+	}
+	if answer == "" {
+		return suggested, nil
+	}
+	return releaseNumber(answer)
 }
 
 // releaseNumber reads a release like v3 or 3.
@@ -119,7 +145,9 @@ func restart(ctx context.Context, command string, args []string, stdout io.Write
 func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("logs", "logs [app] [-f] [--tail 200] [-s server]").withServer()
 	tail := flags.Int("tail", 200, "how many lines from the end")
-	follow := flags.Bool("f", false, "follow: keep printing new lines until Ctrl-C")
+	follow := new(bool)
+	flags.BoolVar(follow, "f", false, "keep printing new lines until Ctrl-C")
+	flags.BoolVar(follow, "follow", false, "keep printing new lines until Ctrl-C")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -129,7 +157,7 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	command := []string{"logs", app, "--tail", strconv.Itoa(*tail)}
 	if *follow {
-		command = append(command, "-f")
+		command = append(command, "--follow")
 	}
 	return onApp(ctx, flags, app, func(server string) error {
 		err := sshRun(ctx, server, hereLine(command...), nil, stdout, os.Stderr)

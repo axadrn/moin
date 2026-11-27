@@ -41,9 +41,12 @@ func (f *flagSet) withApp() *flagSet {
 	return f
 }
 
-// withYes adds --yes, which skips the question before a destructive step.
+// withYes adds --yes and -y, which skip the question before a destructive
+// step.
 func (f *flagSet) withYes() *flagSet {
-	f.yesFlag = f.Bool("yes", false, "do it without asking")
+	f.yesFlag = new(bool)
+	f.BoolVar(f.yesFlag, "y", false, "do it without asking")
+	f.BoolVar(f.yesFlag, "yes", false, "do it without asking")
 	return f
 }
 

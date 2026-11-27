@@ -35,15 +35,18 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		value, err := daemon.RollbackHere(ctx, dir, app, *to, log)
 		return respond(stdout, value, err)
+	case "releases":
+		value, err := daemon.ReleasesHere(dir, oneArg(args))
+		return respond(stdout, value, err)
 	case "restart", "start":
 		value, err := daemon.ApplyHere(ctx, dir, oneArg(args), log)
 		return respond(stdout, value, err)
 	case "stop":
 		return daemon.StopHere(ctx, dir, oneArg(args))
 	case "logs":
-		flags := newFlags("here logs", "here logs <app> [--tail 200] [-f]")
+		flags := newFlags("here logs", "here logs <app> [--tail 200] [--follow]")
 		tail := flags.Int("tail", 200, "lines")
-		follow := flags.Bool("f", false, "follow")
+		follow := flags.Bool("follow", false, "follow")
 		app, err := hereApp(flags, args)
 		if err != nil {
 			return err
@@ -59,7 +62,7 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		return hereKeys(ctx, args, stdin, stdout)
 	case "update":
 		return daemon.UpdateHere(ctx, oneArg(args), nil)
-	case "backups", "backup", "restore", "bucket", "alerts", "watchers":
+	case "setup", "backups", "backup", "restore", "bucket", "alerts", "watchers":
 		return hereBackups(ctx, append([]string{verb}, args...), stdin, stdout)
 	}
 	return fmt.Errorf("moin on this server does not know `here %s`: put the CLI's version here with `moin update <server>`", verb)

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 )
 
 // RollbackHere runs an older release of the app again: release number, or
@@ -34,6 +35,42 @@ func RollbackHere(ctx context.Context, dir, app string, number int, out io.Write
 	start := a.newStart(app)
 	start.FromNumber = number
 	return a.deployHere(ctx, start, out)
+}
+
+// Release is a release of an app that can run again, for the picker of
+// `moin rollback`.
+type Release struct {
+	Number int       `json:"number"`
+	At     time.Time `json:"at"`
+	// Live is the release that runs now, Before the one a rollback
+	// without --to goes back to.
+	Live   bool `json:"live,omitempty"`
+	Before bool `json:"before,omitempty"`
+}
+
+// ReleasesHere lists the releases of app that can run again, newest
+// first.
+func ReleasesHere(dir, app string) ([]Release, error) {
+	a := hereApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return nil, err
+	}
+	current := a.current(app)
+	before := a.previousRelease(app, current)
+	numbers := a.releases(app)
+	slices.Reverse(numbers)
+	list := []Release{}
+	for _, number := range numbers {
+		if !a.canRunAgain(app, number) {
+			continue
+		}
+		release := Release{Number: number, Live: number == current, Before: number == before}
+		if info, err := os.Stat(filepath.Join(a.releaseDir(app, number), "compose.json")); err == nil {
+			release.At = info.ModTime()
+		}
+		list = append(list, release)
+	}
+	return list, nil
 }
 
 // previousRelease is the newest release below current whose images differ

@@ -22,57 +22,58 @@ import (
 const usage = `moin: your app on your server. Backups checked every day.
 
 Usage
-  moin                 Every server you deployed to, its apps and what needs you [--json]
-  moin <command>       Run one command
+  moin                     Every server you deployed to, every app, what needs you [--json]
+  moin <command>           Run one command
 
 Apps
-  deploy               Deploy this folder; the first time name the server: deploy prod [--image shop:dev | --catalog umami] [--app shop]
-  apps                 The apps on one server, or on all: apps [server] [--json]
-  rollback             Go back to the release before, or another: rollback [app] [--to v3]
-  restart              Start the app again, with its env and domains as they are now: restart [app]
-  stop                 Stop the app until you start it: stop [app]
-  start                Start a stopped app: start [app]
-  logs                 The app's logs: logs [app] [-f] [--tail 200]
-  exec                 Run a command in the app's container: exec [app] -- psql
-  env                  The names of the app's env vars, never a value: env [app] [--json]
-  env edit             Change them in $EDITOR; the app restarts with them: env edit [app]
-  domains              The app's domains: domains [app] [--json]
-  domains add          Add one; the certificate follows by itself: domains add [app] shop.example.com
-  domains rm           Remove one: domains rm [app] shop.example.com
-  catalog              Open source apps to deploy with --catalog [--json]
+  deploy                   Deploy this folder: deploy prod the first time, then deploy [--image shop:dev] [--catalog umami] [--app shop]
+  apps                     Every app on every server [--json]
+  rollback                 Go back to an older release, picked on a terminal: rollback [app] [--to v3]
+  restart                  Start the app again, with its env and domains as they are now: restart [app]
+  stop                     Stop the app until you start it: stop [app]
+  start                    Start a stopped app: start [app]
+  logs                     The app's logs: logs [app] [-f] [--tail 200]
+  exec                     Run a command in the app's container: exec [app] -- psql
+  env                      The names of the app's env vars, never a value: env [app] [--json]
+  env edit                 Change them in $EDITOR; the app restarts with them: env edit [app]
+  domains                  The app's domains: domains [app] [--json]
+  domains add              Add one; the certificate follows by itself: domains add [app] shop.example.com
+  domains rm               Remove one: domains rm [app] shop.example.com
+  catalog                  Open source apps to deploy with deploy --catalog [--json]
 
 Backups
-  backups              The copies of the app's databases and the last restore check: backups [app] [--json]
-  backup               A copy now: backup [app]
-  restore              Go back to a copy; can be undone: restore [app] --to <copy | 2026-11-27T14:07 | undo-…>
+  backups                  The copies of the app's databases and the last restore check: backups [app] [--json]
+  backup                   A copy now: backup [app]
+  restore                  Go back to a copy, picked on a terminal; can be undone: restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>]
 
 Servers
-  add                  Add a server you deployed to before, as on a new laptop: add prod
-  keys                 The team: the SSH keys that may log in as root: keys prod [--json]
-  keys add             Let one more key in: keys add prod anna.pub
-  keys rm              Take a key out; never the one you are logged in with: keys rm prod anna@laptop
-  bucket               Where the backups go: bucket prod [--json]
-  bucket set           Set it; asks for the secret key: bucket set prod --endpoint … --bucket … --access-key …
-  alerts               Where alerts go: alerts prod [--json]
-  alerts add           Add one: alerts add prod telegram|slack|discord|webhook …
-  alerts rm            Remove one: alerts rm prod 2
-  alerts test          Send a test alert: alerts test prod
-  watchers             The watchers this server reports to: watchers prod [--json]
-  watchers add         Add one: watchers add prod https://watcher.example.com <token>
-  watchers rm          Remove one: watchers rm prod https://watcher.example.com
-  update               Update this CLI to the newest release: update
-  update <server>      Put this CLI's version of moin on a server: update prod
+  servers                  Your servers and their watchers [--json]
+  servers add              Add one you deployed to before, as on a new laptop: servers add prod
+  servers rm               Forget one; nothing changes on it: servers rm prod
+  keys                     The team: the SSH keys that may log in as root: keys prod [--json]
+  keys add                 Let one more key in: keys add prod anna.pub
+  keys rm                  Take a key out; never the one you are logged in with: keys rm prod anna@laptop
+  bucket                   Where the backups go: bucket prod [--json]
+  bucket set               Set it; asks for each value: bucket set prod
+  alerts                   Where alerts go: alerts prod [--json]
+  alerts add               Add one: alerts add prod telegram --token … --chat-id …, or slack|discord|webhook --url …
+  alerts rm                Remove one: alerts rm prod 2
+  alerts test              Send a test alert: alerts test prod
+  update                   Update this CLI to the newest release
+  update <server>          Put this CLI's version of moin on a server: update prod
 
 Watcher
-  watcher              Watch servers from outside, the only part that listens: watcher [--listen :8080] [--config /etc/moin/watcher.yml] [--dir /var/lib/moin/watcher]
-  watcher add          A new token for a server, and the line that points it here: watcher add prod --url https://watcher.example.com
+  watcher run              Run a watcher, on another machine than your servers
+  watcher token            On the watcher: the line that connects a server: watcher token prod
+  watcher connect          On your laptop: the server reports there: watcher connect prod <url> <token>
+  watcher disconnect       It no longer does: watcher disconnect prod <url>
 
 On the server
-  daemon               Run the timers: backups, restore checks, reports
-  daemon uninstall     Remove moin from this server; the apps keep running: daemon uninstall [--apps] [--yes]
+  daemon                   Run the timers: backups, restore checks, reports
+  daemon uninstall         Remove moin from this server; the apps keep running: daemon uninstall [--apps] [-y]
 
-  version              Show the version
-  help                 Show this help
+  version                  Show the version
+  help                     Show this help
 
 A server is a name from your ssh config, like prod, or user@host: if
 ssh prod works, moin works. Name the app, or leave it out in its folder;
@@ -173,7 +174,7 @@ func checksUpdates(args []string) bool {
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "--json") {
-		return overview(ctx, args, stdout)
+		return overview(ctx, "", args, stdout)
 	}
 	command, rest := args[0], args[1:]
 	switch command {
@@ -184,14 +185,14 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return version(rest, stdout)
 	case "update":
 		return update(ctx, rest, stdout)
-	case "add":
-		return add(ctx, rest, stdout)
+	case "servers":
+		return servers(ctx, rest, stdout)
 	case "deploy":
 		return deploy(ctx, rest, stdin, stdout)
 	case "apps":
 		return apps(ctx, rest, stdout)
 	case "rollback":
-		return rollback(ctx, rest, stdout)
+		return rollback(ctx, rest, stdin, stdout)
 	case "restart", "start", "stop":
 		return restart(ctx, command, rest, stdout)
 	case "logs":
@@ -219,6 +220,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "watchers":
 		return watchers(ctx, rest, stdout)
 	case "watcher":
+		if len(rest) > 0 && (rest[0] == "connect" || rest[0] == "disconnect") {
+			return watchers(ctx, rest, stdout)
+		}
 		return watcherCommand(ctx, rest, stdout)
 	case "here":
 		return here(ctx, rest, stdin, stdout)

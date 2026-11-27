@@ -10,8 +10,9 @@ import (
 // Status is what runs on this server, for `moin` and `moin apps` on your
 // laptop.
 type Status struct {
-	Version string      `json:"version"`
-	Apps    []AppStatus `json:"apps"`
+	Version  string      `json:"version"`
+	Apps     []AppStatus `json:"apps"`
+	Watchers []string    `json:"watchers"`
 }
 
 // AppStatus is one app: its live release, whether its containers run, and
@@ -26,7 +27,10 @@ type AppStatus struct {
 // StatusHere looks at every app on this server.
 func StatusHere(ctx context.Context, dir string) Status {
 	a := hereApps(dir)
-	status := Status{Version: build.Version, Apps: []AppStatus{}}
+	status := Status{Version: build.Version, Apps: []AppStatus{}, Watchers: []string{}}
+	if watchers, err := WatchersHere(); err == nil && watchers != nil {
+		status.Watchers = watchers
+	}
 	for _, app := range a.names() {
 		release := a.current(app)
 		if release == 0 {

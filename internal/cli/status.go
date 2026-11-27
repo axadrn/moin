@@ -74,6 +74,11 @@ func addServer(server string) error {
 	if err != nil || slices.Contains(servers, server) {
 		return err
 	}
+	return saveServers(append(servers, server))
+}
+
+// saveServers writes the servers file.
+func saveServers(servers []string) error {
 	file, err := serversFile()
 	if err != nil {
 		return err
@@ -81,13 +86,59 @@ func addServer(server string) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(file, []byte(strings.Join(append(servers, server), "\n")+"\n"), 0o600)
+	return os.WriteFile(file, []byte(strings.Join(servers, "\n")+"\n"), 0o600)
 }
 
-// add is `moin add <server>`: a server for the list of `moin`, as on a new
-// laptop.
-func add(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("add", "add <server>")
+// servers is `moin servers`, the servers you deployed to with their
+// watchers, and `servers add|rm <server>`.
+func servers(ctx context.Context, args []string, stdout io.Writer) error {
+	if len(args) > 0 && args[0] == "add" {
+		return addServerCommand(ctx, args[1:], stdout)
+	}
+	if len(args) > 0 && args[0] == "rm" {
+		return removeServerCommand(args[1:], stdout)
+	}
+	flags := newFlags("servers", "servers [--json], or servers add|rm <server>").withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return flags.wrong()
+	}
+	list, err := loadServers()
+	if err != nil {
+		return err
+	}
+	rows := askServers(ctx, list)
+	rememberApps(rows)
+	if flags.json() {
+		return printJSON(stdout, overviewJSON(rows))
+	}
+	if len(rows) == 0 {
+		fmt.Fprintln(stdout, "No servers yet.")
+		hint(stdout, "Your first deploy adds one:", build.Name+" deploy <server>")
+		return nil
+	}
+	lines := [][]string{}
+	for _, row := range rows {
+		if row.err != nil {
+			lines = append(lines, []string{style.Bold.Render(row.server), badge(stdout, style.Badge(style.StatusFailed, "unreachable"), "unreachable"), "", style.Muted.Render(explain(row.err))})
+			continue
+		}
+		watchers := style.Warning.Render("none: nobody notices when it is gone")
+		if len(row.status.Watchers) > 0 {
+			watchers = strings.Join(row.status.Watchers, " ")
+		}
+		lines = append(lines, []string{style.Bold.Render(row.server), build.Name + " " + row.status.Version, strconv.Itoa(len(row.status.Apps)), watchers})
+	}
+	table(stdout, []string{"SERVER", "RUNS", "APPS", "WATCHERS"}, lines)
+	return nil
+}
+
+// addServerCommand is `moin servers add <server>`, as on a new laptop. It
+// asks the server first, so a typo is not added.
+func addServerCommand(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("servers add", "servers add <server>")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -103,7 +154,35 @@ func add(ctx context.Context, args []string, stdout io.Writer) error {
 	if err := addServer(server); err != nil {
 		return err
 	}
-	done(stdout, "Added %s. `%s` shows it now", server, build.Name)
+	done(stdout, "Added %s, with %d apps. `%s` shows it now", server, len(status.Apps), build.Name)
+	return nil
+}
+
+// removeServerCommand is `moin servers rm <server>`: moin forgets the
+// server. Nothing changes on it.
+func removeServerCommand(args []string, stdout io.Writer) error {
+	flags := newFlags("servers rm", "servers rm <server>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	list, err := loadServers()
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(list, server) {
+		return fmt.Errorf("%s is not in your list: see it with `%s servers`", server, build.Name)
+	}
+	if err := saveServers(slices.DeleteFunc(list, func(s string) bool { return s == server })); err != nil {
+		return err
+	}
+	apps := loadApps()
+	updateApps(apps, server, nil)
+	_ = saveApps(apps)
+	done(stdout, "moin forgot %s. Nothing changed on the server", server)
 	return nil
 }
 
@@ -122,10 +201,10 @@ type serverRow struct {
 	err    error
 }
 
-// overview is `moin` alone: every server of the list and its apps, asked
-// in parallel, each with one SSH call.
-func overview(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("", "[--json]").withJSON()
+// overview is `moin` alone and `moin apps`: every server of the list and
+// its apps, asked in parallel, each with one SSH call.
+func overview(ctx context.Context, name string, args []string, stdout io.Writer) error {
+	flags := newFlags(name, strings.TrimSpace(name+" [--json]")).withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}

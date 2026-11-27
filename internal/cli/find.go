@@ -108,7 +108,7 @@ func twoServers(app string, servers []string) error {
 
 // noServer says no server of yours runs app.
 func noServer(app string) error {
-	return fmt.Errorf("none of your servers runs %s. Deploy it with `%s deploy <server>`, or add the server it runs on with `%s add <server>`", app, build.Name, build.Name)
+	return fmt.Errorf("none of your servers runs %s. Deploy it with `%s deploy <server>`, or add the server it runs on with `%s servers add <server>`", app, build.Name, build.Name)
 }
 
 // appsFile keeps which servers run which app.

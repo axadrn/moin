@@ -1,8 +1,13 @@
 package cli
 
 import (
+	"io"
 	"os/exec"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/axadrn/moin/internal/daemon"
 )
 
 // TestShellJoin: every word reaches the server as it is, quotes and all.
@@ -50,5 +55,20 @@ func TestCatalog(t *testing.T) {
 		if entry.Title == "" || entry.Pitch == "" {
 			t.Errorf("%s has no name or pitch in its app.md", entry.Name)
 		}
+	}
+}
+
+// TestPickRelease: Enter takes the one before the live one, a typed one
+// wins.
+func TestPickRelease(t *testing.T) {
+	releases := []daemon.Release{{Number: 5, Live: true}, {Number: 4}, {Number: 3, Before: true}}
+	for answer, want := range map[string]int{"\n": 3, "v4\n": 4, "4\n": 4} {
+		got, err := pickRelease(strings.NewReader(answer), io.Discard, "shop", releases, time.Now())
+		if err != nil || got != want {
+			t.Errorf("answer %q: v%d, %v; want v%d", answer, got, err, want)
+		}
+	}
+	if _, err := pickRelease(strings.NewReader("\n"), io.Discard, "shop", releases[:1], time.Now()); err == nil {
+		t.Error("only the live release: want an error")
 	}
 }
