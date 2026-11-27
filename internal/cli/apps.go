@@ -39,15 +39,11 @@ func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		if err != nil {
 			return err
 		}
-		command := []string{"rollback", app}
-		if number > 0 {
-			command = append(command, "--to", strconv.Itoa(number))
-		}
 		log := stdout
 		if flags.json() {
 			log = terminal(os.Stderr)
 		}
-		result, err := runRelease(ctx, server, command, nil, log, "rolling back "+app)
+		result, err := rollBack(ctx, server, app, number, log)
 		if err != nil {
 			return err
 		}
@@ -68,11 +64,28 @@ func rollbackTarget(ctx context.Context, server, app, to string, stdin io.Reader
 	if !isTerminal(stdin) {
 		return 0, nil
 	}
-	var releases []daemon.Release
-	if err := sshJSON(ctx, server, []string{"releases", app}, nil, &releases); err != nil {
+	releases, err := appReleases(ctx, server, app, os.Stderr)
+	if err != nil {
 		return 0, err
 	}
 	return pickRelease(stdin, stdout, app, releases, time.Now())
+}
+
+// appReleases are the releases of app that can run again, newest first.
+func appReleases(ctx context.Context, server, app string, stderr io.Writer) ([]daemon.Release, error) {
+	var releases []daemon.Release
+	err := sshAnswer(ctx, server, []string{"releases", app}, nil, stderr, &releases)
+	return releases, err
+}
+
+// rollBack runs an older release of app again: number, or the one before
+// the live one when it is 0.
+func rollBack(ctx context.Context, server, app string, number int, log io.Writer) (daemon.Result, error) {
+	command := []string{"rollback", app}
+	if number > 0 {
+		command = append(command, "--to", strconv.Itoa(number))
+	}
+	return runRelease(ctx, server, command, nil, log, "rolling back "+app)
 }
 
 // pickRelease shows the releases and asks which one. Enter takes the one
@@ -135,13 +148,19 @@ func restart(ctx context.Context, command string, args []string, stdout io.Write
 			done(stdout, "%s is stopped. It stays stopped after a reboot, until `%s start %s`", app, build.Name, app)
 			return nil
 		}
-		result, err := runRelease(ctx, server, []string{"restart", app}, nil, stdout, "starting "+app)
+		result, err := restartApp(ctx, server, app, stdout)
 		if err != nil {
 			return err
 		}
 		done(stdout, "%s runs v%d", app, result.Release)
 		return nil
 	})
+}
+
+// restartApp runs the live release of app again, with its env and domains
+// as they are now. The steps go to log.
+func restartApp(ctx context.Context, server, app string, log io.Writer) (daemon.Result, error) {
+	return runRelease(ctx, server, []string{"restart", app}, nil, log, "starting "+app)
 }
 
 // logs is `moin logs [app] [-f]`: the last lines of the app's containers,
@@ -159,18 +178,24 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	command := []string{"logs", app, "--tail", strconv.Itoa(*tail)}
-	if *follow {
-		command = append(command, "--follow")
-	}
 	return onApp(ctx, flags, app, func(server string) error {
-		err := sshRun(ctx, server, hereLine(command...), nil, stdout, os.Stderr)
+		err := appLogs(ctx, server, app, *tail, *follow, stdout, os.Stderr)
 		if ctx.Err() != nil {
 			// Ctrl-C ends -f: that is how it is meant to stop.
 			return nil
 		}
 		return err
 	})
+}
+
+// appLogs writes the last tail lines of the app's containers to stdout,
+// and with follow what they write from then on, until ctx ends.
+func appLogs(ctx context.Context, server, app string, tail int, follow bool, stdout, stderr io.Writer) error {
+	command := []string{"logs", app, "--tail", strconv.Itoa(tail)}
+	if follow {
+		command = append(command, "--follow")
+	}
+	return sshRun(ctx, server, hereLine(command...), nil, stdout, stderr)
 }
 
 // execArgs splits `exec [app] [flags] -- <command…>` at the first "--":

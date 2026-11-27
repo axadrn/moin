@@ -141,11 +141,17 @@ func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) 
 // sshJSON runs `moin here args…` on server as root and reads the JSON it
 // answers into value.
 func sshJSON(ctx context.Context, server string, args []string, stdin io.Reader, value any) error {
-	out, err := sshOutput(ctx, server, hereLine(args...), stdin)
-	if err != nil {
+	return sshAnswer(ctx, server, args, stdin, os.Stderr, value)
+}
+
+// sshAnswer is sshJSON with what ssh and moin say going to stderr, so the
+// terminal UI can keep it off its screen.
+func sshAnswer(ctx context.Context, server string, args []string, stdin io.Reader, stderr io.Writer, value any) error {
+	var out bytes.Buffer
+	if err := sshRun(ctx, server, hereLine(args...), stdin, &out, stderr); err != nil {
 		return err
 	}
-	return readAnswer(server, out, value)
+	return readAnswer(server, out.Bytes(), value)
 }
 
 // readAnswer reads what a server answered. A server with another version

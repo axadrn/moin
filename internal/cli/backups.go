@@ -51,8 +51,8 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
-		var databases []protocol.DatabaseBackup
-		if err := sshJSON(ctx, server, []string{"backups", app}, nil, &databases); err != nil {
+		databases, err := appBackups(ctx, server, app, os.Stderr)
+		if err != nil {
 			return err
 		}
 		if flags.json() {
@@ -67,6 +67,14 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	})
+}
+
+// appBackups is how the databases of app are backed up: the copies, the
+// undos and the last check of each.
+func appBackups(ctx context.Context, server, app string, stderr io.Writer) ([]protocol.DatabaseBackup, error) {
+	var databases []protocol.DatabaseBackup
+	err := sshAnswer(ctx, server, []string{"backups", app}, nil, stderr, &databases)
+	return databases, err
 }
 
 // printBackup shows how one database is backed up.
@@ -175,8 +183,8 @@ func pickCopy(ctx context.Context, server, app, name string, stdin io.Reader, st
 	if !isTerminal(stdin) {
 		return "", "", fmt.Errorf("say what to go back to with --to. See the copies with `%s backups %s`", build.Name, app)
 	}
-	var databases []protocol.DatabaseBackup
-	if err := sshJSON(ctx, server, []string{"backups", app}, nil, &databases); err != nil {
+	databases, err := appBackups(ctx, server, app, os.Stderr)
+	if err != nil {
 		return "", "", err
 	}
 	chosen, err := pickDatabase(app, name, databases, stdin, stdout)
