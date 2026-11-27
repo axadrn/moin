@@ -29,7 +29,7 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Alerts from the server**: A failed backup, a failed check, a crashing app or a full disk, to Telegram, Slack, Discord or a webhook. `moin alerts add prod telegram --token … --chat-id …`.
 - **Your own watcher**: `moin watcher run`, on another machine. It alerts when a server goes silent, or a domain is down from outside.
 - **moin cloud**: A watcher we run for you, with alerts by mail. `moin cloud login`, then `moin cloud connect prod`. 30 days free from the first report, then $7 a month or $49 a year. (#174)
-- **A copy nobody can delete**: moin cloud keeps a copy of every scheduled backup. Your server can add one, never delete one.
+- **A copy nobody can delete**: On a paid plan, moin cloud keeps a copy of every scheduled backup for 14 days. Your server can add one, never delete one.
 
 ### Changed
 - **Nobody else can command your server**: Only who has SSH to it as root. Not a watcher, not moin cloud, not us.
