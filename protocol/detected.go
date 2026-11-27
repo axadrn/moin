@@ -1,7 +1,5 @@
 package protocol
 
-import "strings"
-
 // Detected is what the daemon learned about an app from its repo and its
 // running containers.
 type Detected struct {
@@ -25,16 +23,6 @@ type Detected struct {
 	Databases      []Database          `json:"databases"`
 	// NoBackup is what looks like a database but moin cannot back up.
 	NoBackup []Database `json:"no_backup,omitempty"`
-}
-
-// Built says for people how moin built the app: the language Railpack found,
-// like "Node 24.22.1 (Railpack)", or the kind.
-func (d Detected) Built() string {
-	if d.Kind == "railpack" && d.Builder != "" {
-		language, _, _ := strings.Cut(d.Builder, ", start:")
-		return language + " (Railpack)"
-	}
-	return d.Kind
 }
 
 // Database is a database of an app: a SQLite file the daemon found on one
