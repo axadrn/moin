@@ -176,6 +176,9 @@ func checksUpdates(args []string) bool {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) == 0 && isTTY(stdout) && isTerminal(stdin) {
+		return openTUI(ctx, stdout)
+	}
 	if len(args) == 0 || strings.HasPrefix(args[0], "--json") {
 		return overview(ctx, "", args, stdout)
 	}
