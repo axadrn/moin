@@ -194,7 +194,7 @@ A watcher only listens. If someone takes it over:
 
 Then they are root on it, as you are. They can read its apps, its data and its env vars. They can also use its bucket key, and that key can delete copies.
 
-That is why moin cloud will keep a second copy the server can only add to, never delete. Coming. [moin cloud](/docs/cloud)
+That is why moin cloud keeps a second copy the server can only add to, never delete. [moin cloud](/docs/cloud#a-copy-your-server-cant-delete)
 
 ## Where your secrets live
 

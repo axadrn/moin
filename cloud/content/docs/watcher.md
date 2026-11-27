@@ -50,7 +50,7 @@ Never on the server it watches. When that server dies, the watcher dies with it,
 
 - **A small second server.** The cheapest one your provider has is enough.
 - **Two servers that watch each other.** Best at two different providers.
-- **moin cloud.** We run one for you. Coming. [moin cloud](/docs/cloud)
+- **moin cloud.** We run one for you. [moin cloud](/docs/cloud)
 
 A server can report to several watchers.
 
