@@ -313,3 +313,18 @@ func TestTheListScrollsToTheSelection(t *testing.T) {
 		t.Errorf("the screen has %d lines, want %d", lines, m.height)
 	}
 }
+
+func TestWhatNeedsYouIsUnderItsServer(t *testing.T) {
+	m := newModel(t.Context(), CLI{Servers: []string{"prod"}})
+	m.Update(statusMsg{server: "prod", status: daemon.Status{
+		PublicSSH: true,
+		Needs:     []daemon.Need{{Text: "shop: postgres has no backup yet.", Command: "moin bucket set prod"}},
+		Apps:      []daemon.AppStatus{{Name: "shop", Release: 1, Running: true}},
+	}})
+	view := m.View().Content
+	for _, want := range []string{"port 22 open to the internet", "moin secure prod", "shop: postgres has no backup yet.", "moin bucket set prod"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the screen does not show %q:\n%s", want, view)
+		}
+	}
+}

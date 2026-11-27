@@ -87,7 +87,10 @@ func (m *model) listLines(rows int) []string {
 		}
 		lines = append(lines, name)
 		if server.status.PublicSSH {
-			lines = append(lines, "    "+style.Danger.Render("port 22 open to the internet"))
+			lines = append(lines, "    "+style.Danger.Render("port 22 open to the internet")+"  "+style.Accent.Render(build.Name+" secure "+server.name))
+		}
+		for _, need := range server.status.Needs {
+			lines = append(lines, "    "+style.Danger.Render(need.Text)+"  "+style.Accent.Render(need.Command))
 		}
 		if len(server.status.Apps) == 0 {
 			lines = append(lines, "    "+style.Muted.Render("no apps"))
