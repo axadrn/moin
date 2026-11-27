@@ -182,8 +182,7 @@ func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any))
 }
 
 // rollBack runs an older release again: its compose file and images, with
-// the env, the domains and the password as they are now. An app has one
-// password, so a rollback never brings an old one back.
+// the env and the domains as they are now.
 func (a *apps) rollBack(ctx context.Context, release *release) error {
 	from := release.start.FromNumber
 	release.logf("rolling back to v%d", from)

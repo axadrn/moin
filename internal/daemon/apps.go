@@ -22,7 +22,6 @@ import (
 //	releases/<n>/src           the source of deploy n
 //	releases/<n>/compose.json  the compose project moin runs, 0600
 //	releases/<n>/.env          a copy of the source's .env, when it has one
-//	releases/<n>/htpasswd      the app's password, when it has one, 0600
 //	releases/<n>/kind          build, apply or failed, for prune
 //	current                    the number of the running release
 //	volumes/                   bind mounts that are not part of the repo

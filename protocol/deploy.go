@@ -49,16 +49,13 @@ type DeployStart struct {
 	NoCopy bool `json:"no_copy,omitempty"`
 }
 
-// Domains is how visitors reach the app, as set in web, CLI, TUI or MCP:
-// the only place they are set. Password is an htpasswd line ("user:bcrypt
-// hash") when the app's password is on: the app's domains, those of its
-// other services and its instant address ask for it.
+// Domains is how visitors reach the app, as `moin domains` set them on
+// the server, the only place they are set.
 // DeployStart carries it under the JSON key routing, which daemons of
 // protocol version 1 read.
 type Domains struct {
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`
-	Password  string   `json:"password,omitempty"`
 	// Services are the domains of the app's other services, by service.
 	Services map[string][]string `json:"services,omitempty"`
 	// Instant is the provider of the app's instant address, such as

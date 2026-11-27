@@ -65,8 +65,7 @@ func webBuild(src string) map[string]any {
 }
 
 // TestComposeFileRunsAnywhere: the compose file of an app with a build, a
-// database, data, a config folder from the repo, domains and a password
-// names no path of the server, keeps ${NAME} without its value, and brings
+// database, data, a config folder from the repo and domains names no path of the server, keeps ${NAME} without its value, and brings
 // the proxy, so its domains and HTTPS run elsewhere too.
 func TestComposeFileRunsAnywhere(t *testing.T) {
 	dir := t.TempDir()
@@ -96,11 +95,10 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 		"volumes":  map[string]any{"pg": map[string]any{"name": "moin-my-app_pg"}},
 		"networks": map[string]any{"default": map[string]any{"name": "moin-my-app_default"}},
 	}
-	hash := "ada:$2a$04$abcdefghijklmnopqrstuuJ0c7bQzZ1zCq3Yd0c6bVq1n8m9E2Qe"
-	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}, Canonical: "example.com", Password: hash}
+	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}, Canonical: "example.com"}
 	text := mustCompose(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, protocol.DeployStart{Domains: domains}, nil)
 
-	for _, leak := range []string{dir, "s3cret-value", "abcdefghijklmnopqrstuuJ0c7bQzZ1zCq3Yd0c6bVq1n8m9E2Qe", "external"} {
+	for _, leak := range []string{dir, "s3cret-value", "external"} {
 		if strings.Contains(text, leak) {
 			t.Errorf("the compose file holds %q:\n%s", leak, text)
 		}
@@ -144,14 +142,11 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 			t.Errorf("web lacks %s: %s", want, mounts)
 		}
 	}
-	if got := web.Labels["traefik.http.middlewares.moin-my-app-auth.basicauth.usersfile"]; got != proxyUsers {
-		t.Errorf("the password is read from %q", got)
-	}
 	if file.Services["db"].Image != "postgres:17" {
 		t.Errorf("db runs %q", file.Services["db"].Image)
 	}
 	proxy := file.Services[proxyService]
-	if proxy.Image != proxyImage || len(proxy.Ports) != 2 || !strings.Contains(text, "./htpasswd:/htpasswd:ro") || !strings.Contains(text, "certificatesresolvers.le.acme") {
+	if proxy.Image != proxyImage || len(proxy.Ports) != 2 || !strings.Contains(text, "certificatesresolvers.le.acme") {
 		t.Errorf("the proxy is not as moin runs it: %+v", proxy)
 	}
 	if file.Networks[proxyNetwork]["name"] != proxyNetwork {
@@ -295,20 +290,17 @@ func TestBuildAgainDropsTheSecretsHash(t *testing.T) {
 }
 
 // TestComposeFileHoldsNoSecret: a compose file that holds a value of the
-// app's env, or its password hash, is not made. A value where the deploy
+// app's env is not made. A value where the deploy
 // fills it in on purpose, such as the version in the image or a domain in
 // the proxy's labels, is fine, and so is a short one.
 func TestComposeFileHoldsNoSecret(t *testing.T) {
-	hash := "$2y$05$" + strings.Repeat("h", 53)
 	for _, test := range []struct {
 		name, url string
-		password  bool
 		held      string
 	}{
-		{"names", "postgres://u:${DB_PASSWORD}@db/x", true, ""},
-		{"value", "postgres://u:s3cret$value@db/x", false, "the value of DB_PASSWORD"},
-		{"value as compose writes it", "postgres://u:s3cret$$value@db/x", false, "the value of DB_PASSWORD"},
-		{"hash", "postgres://u:${DB_PASSWORD}@db/x?h=$$2y$$05$$" + strings.Repeat("h", 53), true, "the hash of the app's password"},
+		{"names", "postgres://u:${DB_PASSWORD}@db/x", ""},
+		{"value", "postgres://u:s3cret$value@db/x", "the value of DB_PASSWORD"},
+		{"value as compose writes it", "postgres://u:s3cret$$value@db/x", "the value of DB_PASSWORD"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			a := newApps(t.TempDir())
@@ -321,9 +313,6 @@ func TestComposeFileHoldsNoSecret(t *testing.T) {
 				"environment": map[string]any{"DATABASE_URL": test.url, "LOG": "true"},
 			}}}
 			start := protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"my-app.example.com"}}}
-			if test.password {
-				start.Domains.Password = "ada:" + hash
-			}
 			text, err := composeRelease(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, start, nil)
 			if test.held == "" {
 				if err != nil || !strings.Contains(text, "${DB_PASSWORD}") {

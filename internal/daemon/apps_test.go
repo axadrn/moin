@@ -286,25 +286,22 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com", Password: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" || !detected.Password {
+	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" {
 		t.Fatalf("detected = %+v", detected)
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port, usersFile: proxyUsersFile("blog", 2)})
+	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port})
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
 	}
-	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical,moin-blog-auth" {
+	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical" {
 		t.Fatalf("middlewares = %v", labels["traefik.http.routers.moin-blog.middlewares"])
-	}
-	if labels["traefik.http.middlewares.moin-blog-auth.basicauth.usersfile"] != "/apps/blog/releases/2/htpasswd" {
-		t.Fatalf("auth = %v", labels["traefik.http.middlewares.moin-blog-auth.basicauth.usersfile"])
 	}
 	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.example\.com)(:[0-9]+)?(.*)` {
 		t.Fatalf("regex = %v", labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"])
@@ -447,8 +444,8 @@ func TestStartWaitsForTheHealthcheck(t *testing.T) {
 }
 
 // TestComposeJSONKeepsNames: the compose.json of a release names each env
-// value as ${NAME} and holds no password hash: those live in app.env and
-// in the release's htpasswd. The places are as the deploy filled them in,
+// value as ${NAME}: the values live in app.env. The places are as the
+// deploy filled them in,
 // and labels a compose file wrote as a list keep their values.
 func TestComposeJSONKeepsNames(t *testing.T) {
 	config := map[string]any{"services": map[string]any{"web": map[string]any{
@@ -467,14 +464,14 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 	mapLists(config)
 	takePlaces(config, filled)
 	dir := t.TempDir()
-	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}, Password: "ada:$2y$05$hash"}}
+	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}}}
 	release := &release{start: start, dir: dir, config: config, composeJSON: filepath.Join(dir, "compose.json"), envFile: "/state/apps/shop/app.env", env: map[string]string{"DB_PASSWORD": "s3cret"}}
 	release.detected, _ = route("shop", protocol.Detected{Service: "web", Port: 8080}, start.Domains)
 	if err := finish(release); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(release.composeJSON)
-	for _, leak := range []string{"s3cret", "t0ken", "$2y$05$hash"} {
+	for _, leak := range []string{"s3cret", "t0ken"} {
 		if strings.Contains(string(body), leak) {
 			t.Errorf("compose.json holds %q:\n%s", leak, body)
 		}
@@ -501,13 +498,8 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 	if web.Build["context"] != "/src/app" || web.Image != "moin-shop-web:2" || web.Volumes[0].Source != "/src/data" || web.Volumes[0].Type != "bind" {
 		t.Errorf("places: %+v", web)
 	}
-	if web.Labels["traefik.http.middlewares.moin-shop-auth.basicauth.usersfile"] != "/apps/shop/releases/2/htpasswd" {
+	if web.Labels["traefik.http.routers.moin-shop.rule"] != "Host(`shop.example.net`)" {
 		t.Errorf("labels: %v", web.Labels)
-	}
-	hash, _ := os.ReadFile(filepath.Join(dir, "htpasswd"))
-	info, err := os.Stat(filepath.Join(dir, "htpasswd"))
-	if string(hash) != "ada:$2y$05$hash\n" || err != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("htpasswd = %q, %v", hash, err)
 	}
 }
 

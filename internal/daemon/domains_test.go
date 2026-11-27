@@ -46,49 +46,40 @@ func TestRouteInstant(t *testing.T) {
 }
 
 // TestDomainsByService: the main service routes its domains and, on a router
-// of its own, the instant address; both ask for the app's one password.
-// Another service gets its own router and port, and the same password.
-// Without a password no router asks for one.
+// of its own, the instant address. Another service gets its own router
+// and port.
 func TestDomainsByService(t *testing.T) {
 	config := map[string]any{}
 	web := map[string]any{}
-	addRouters(config, web, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.net"}, port: 3000, instant: "shop.203-0-113-7.sslip.io", usersFile: proxyUsersFile("shop", 3)})
+	addRouters(config, web, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.net"}, port: 3000, instant: "shop.203-0-113-7.sslip.io"})
 	labels := web["labels"].(map[string]any)
 	for key, want := range map[string]string{
-		"traefik.http.routers.moin-shop.rule":                         "Host(`shop.example.net`)",
-		"traefik.http.routers.moin-shop.middlewares":                  "moin-shop-auth",
-		"traefik.http.routers.moin-shop-tunnel.middlewares":           "moin-shop-auth",
-		"traefik.http.routers.moin-shop-instant.rule":                 "Host(`shop.203-0-113-7.sslip.io`)",
-		"traefik.http.routers.moin-shop-instant.service":              "moin-shop",
-		"traefik.http.routers.moin-shop-instant.middlewares":          "moin-shop-auth",
-		"traefik.http.middlewares.moin-shop-auth.basicauth.usersfile": "/apps/shop/releases/3/htpasswd",
-		"traefik.http.services.moin-shop.loadbalancer.server.port":    "3000",
+		"traefik.http.routers.moin-shop.rule":                      "Host(`shop.example.net`)",
+		"traefik.http.routers.moin-shop-instant.rule":              "Host(`shop.203-0-113-7.sslip.io`)",
+		"traefik.http.routers.moin-shop-instant.service":           "moin-shop",
+		"traefik.http.services.moin-shop.loadbalancer.server.port": "3000",
 	} {
 		if labels[key] != want {
 			t.Errorf("%s = %v, want %s", key, labels[key], want)
 		}
 	}
-	// Off: no router asks for a password.
-	open := map[string]any{}
-	addRouters(config, open, routes{app: "shop", router: project("shop"), domains: []string{"shop.example.net"}, port: 3000, instant: "shop.203-0-113-7.sslip.io"})
-	labels = open["labels"].(map[string]any)
+	// No canonical domain, so no router has a middleware.
 	for key := range labels {
 		if strings.Contains(key, "middlewares") {
-			t.Errorf("off, yet %s = %v", key, labels[key])
+			t.Errorf("%s = %v", key, labels[key])
 		}
 	}
-	// An app with only its instant address has no router for domains, and
-	// its password still guards the instant address.
+	// An app with only its instant address has no router for domains.
 	only := map[string]any{}
-	addRouters(config, only, routes{app: "idea", router: project("idea"), port: 8080, instant: "idea.203-0-113-7.sslip.io", usersFile: proxyUsersFile("idea", 1)})
+	addRouters(config, only, routes{app: "idea", router: project("idea"), port: 8080, instant: "idea.203-0-113-7.sslip.io"})
 	labels = only["labels"].(map[string]any)
-	if labels["traefik.http.routers.moin-idea.rule"] != nil || labels["traefik.http.routers.moin-idea-instant.rule"] != "Host(`idea.203-0-113-7.sslip.io`)" || labels["traefik.http.routers.moin-idea-instant.middlewares"] != "moin-idea-auth" || labels["traefik.http.middlewares.moin-idea-auth.basicauth.usersfile"] != "/apps/idea/releases/1/htpasswd" {
+	if labels["traefik.http.routers.moin-idea.rule"] != nil || labels["traefik.http.routers.moin-idea-instant.rule"] != "Host(`idea.203-0-113-7.sslip.io`)" {
 		t.Errorf("instant only: %v", labels)
 	}
 	api := map[string]any{}
-	addRouters(config, api, routes{app: "shop", router: serviceRouter("shop", "api"), domains: []string{"api.shop.example.net"}, port: 9000, usersFile: proxyUsersFile("shop", 3)})
+	addRouters(config, api, routes{app: "shop", router: serviceRouter("shop", "api"), domains: []string{"api.shop.example.net"}, port: 9000})
 	labels = api["labels"].(map[string]any)
-	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.example.net`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" || labels["traefik.http.routers.moin-shop-svc-api.middlewares"] != "moin-shop-svc-api-auth" {
+	if labels["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.shop.example.net`)" || labels["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "9000" {
 		t.Errorf("api labels: %v", labels)
 	}
 	if config["networks"].(map[string]any)["default"].(map[string]any)["name"] != "moin-shop_default" {

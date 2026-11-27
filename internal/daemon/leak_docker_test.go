@@ -18,18 +18,15 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/axadrn/moin/protocol"
 )
 
 // TestNoEnvValueLeaks deploys an app that uses a secret of its env in
 // every way a compose file can: in environment, inside a URL, through an
-// env_file of its source, and with the app's password on. The containers
-// see the secret, and the proxy asks for the app's one password, through a
-// restart with a new password and rollbacks with it on and off. Yet no file of the daemon but app.env
-// and the htpasswd files holds the secret or a password hash, and neither
-// does any message the daemon sends, the compose file of each deploy too.
+// env_file of its source. The containers see the secret and the proxy
+// reaches the app, through a restart and rollbacks. Yet no file of the
+// daemon but app.env holds the secret, and neither does any message the
+// daemon sends, the compose file of each deploy too.
 // A release from before beta.35, with the value in its base.json, keeps
 // its compose file on the server.
 func TestNoEnvValueLeaks(t *testing.T) {
@@ -91,15 +88,7 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"DB_PASSWORD": secret}}); err != nil {
 		t.Fatal(err)
 	}
-	hashes := []string{}
-	withPassword := func(password string) *protocol.Domains {
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
-		if err != nil {
-			t.Fatal(err)
-		}
-		hashes = append(hashes, string(hash))
-		return &protocol.Domains{Domains: []string{app + ".example.net"}, Password: "ada:" + string(hash)}
-	}
+	domains := &protocol.Domains{Domains: []string{app + ".example.net"}}
 	deploy := func(start protocol.DeployStart) {
 		t.Helper()
 		start.App, start.Name, start.DeployID = app, app, "d"+start.DeployID
@@ -138,36 +127,27 @@ func TestNoEnvValueLeaks(t *testing.T) {
 		}
 	}
 
-	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceURL: server.URL + "/repos/me/leak/tarball/abc123", Domains: withPassword("first-password")})
+	deploy(protocol.DeployStart{DeployID: "1", Number: 1, SourceURL: server.URL + "/repos/me/leak/tarball/abc123", Domains: domains})
 	seesValues(secret)
-	asks(t, app, "first-password")
-	// A restart with a new value and a new password: Docker fills in the
-	// new value, and the proxy asks for the new password.
+	answers(t, app)
+	// A restart with a new value: Docker fills in the new value.
 	if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{"DB_PASSWORD": changed}}); err != nil {
 		t.Fatal(err)
 	}
-	deploy(protocol.DeployStart{DeployID: "2", Number: 2, Domains: withPassword("second-password")})
+	deploy(protocol.DeployStart{DeployID: "2", Number: 2, Domains: domains})
 	seesValues(changed)
-	asks(t, app, "second-password")
-	// A rollback to v1 runs v1 again, with the env and the password as they
-	// are now: an app has one password.
-	deploy(protocol.DeployStart{DeployID: "3", Number: 3, FromNumber: 1, Domains: withPassword("third-password")})
+	answers(t, app)
+	// A rollback runs an old release again, with the env as it is now.
+	deploy(protocol.DeployStart{DeployID: "3", Number: 3, FromNumber: 1, Domains: domains})
 	seesValues(changed)
-	asks(t, app, "third-password")
-	// With the password off, a rollback asks for none.
-	deploy(protocol.DeployStart{DeployID: "4", Number: 4, FromNumber: 2, Domains: &protocol.Domains{Domains: []string{app + ".example.net"}}})
+	answers(t, app)
+	deploy(protocol.DeployStart{DeployID: "4", Number: 4, FromNumber: 2, Domains: domains})
 	seesValues(changed)
-	asks(t, app, "")
+	answers(t, app)
 
-	// compose writes a $ of a value as $$, so a hash in a compose file reads
-	// $$2a$$04$$...: what follows its last $, the salt and the digest, is
-	// searched too.
 	leaks := []string{secret, changed}
-	for _, hash := range hashes {
-		leaks = append(leaks, hash, hash[strings.LastIndex(hash, "$")+1:])
-	}
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || entry.Name() == "app.env" || entry.Name() == "htpasswd" {
+		if err != nil || entry.IsDir() || entry.Name() == "app.env" {
 			return err
 		}
 		body, err := os.ReadFile(path)
@@ -212,14 +192,14 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	done = append(done[:4], done[5])
 	// Every deploy sends its compose file, with ${DB_PASSWORD} as written.
 	// The scan of the messages below covers it, and docker compose reads
-	// it as it is, next to a .env, the repo's env file and a password.
+	// it as it is, next to a .env and the repo's env file.
 	for _, value := range done {
 		if !strings.Contains(value.ComposeFile, "${DB_PASSWORD}") {
 			t.Errorf("deploy %s sent the compose file:\n%s", value.DeployID, value.ComposeFile)
 		}
 	}
 	elsewhere := t.TempDir()
-	for name, body := range map[string]string{"compose.yml": done[2].ComposeFile, ".env": "DB_PASSWORD=x\nREPO_VAR=y\n", "worker.env": "WORKER_PASSWORD=${DB_PASSWORD}\n", "htpasswd": "ada:x\n"} {
+	for name, body := range map[string]string{"compose.yml": done[2].ComposeFile, ".env": "DB_PASSWORD=x\nREPO_VAR=y\n", "worker.env": "WORKER_PASSWORD=${DB_PASSWORD}\n"} {
 		if err := os.WriteFile(filepath.Join(elsewhere, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -229,7 +209,6 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	}
 	for _, body := range sent {
 		for _, leak := range leaks {
-			// JSON writes $ as it is; a hash has no characters it escapes.
 			if bytes.Contains(body, []byte(leak)) {
 				t.Errorf("a message holds %q: %s", leak, body)
 			}
@@ -237,49 +216,29 @@ func TestNoEnvValueLeaks(t *testing.T) {
 	}
 }
 
-// asks checks that the proxy asks for the app's password on its tunnel
-// entrypoint, and lets the right one in. Without a password, it lets
-// everyone in.
-func asks(t *testing.T, app, password string) {
+// answers checks that the proxy reaches the app on its tunnel entrypoint.
+func answers(t *testing.T, app string) {
 	t.Helper()
 	out, err := exec.Command("docker", "inspect", "-f", "{{(index .NetworkSettings.Networks \""+proxyNetwork+"\").IPAddress}}", proxyName).Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	url := "http://" + strings.TrimSpace(string(out)) + ":" + tunnelPort + "/"
-	status := func(user, password string) int {
-		request, _ := http.NewRequest(http.MethodGet, url, nil)
-		request.Host = app + ".example.net"
-		if user != "" {
-			request.SetBasicAuth(user, password)
-		}
-		response, err := http.DefaultClient.Do(request)
-		if err != nil {
-			return 0
-		}
-		response.Body.Close()
-		return response.StatusCode
-	}
+	request, _ := http.NewRequest(http.MethodGet, "http://"+strings.TrimSpace(string(out))+":"+tunnelPort+"/", nil)
+	request.Host = app + ".example.net"
 	// The proxy takes a moment to see the new containers.
 	deadline := time.Now().Add(30 * time.Second)
-	user := "ada"
-	if password == "" {
-		user = ""
-	}
-	for status(user, password) != http.StatusOK {
+	for {
+		response, err := http.DefaultClient.Do(request)
+		if err == nil {
+			response.Body.Close()
+			if response.StatusCode == http.StatusOK {
+				return
+			}
+		}
 		if time.Now().After(deadline) {
-			t.Fatalf("the proxy does not let %q in", password)
+			t.Fatalf("the proxy does not reach %s", app)
 		}
 		time.Sleep(500 * time.Millisecond)
-	}
-	if password == "" {
-		return
-	}
-	if got := status("", ""); got != http.StatusUnauthorized {
-		t.Fatalf("without the password: %d", got)
-	}
-	if got := status("ada", "wrong"); got != http.StatusUnauthorized {
-		t.Fatalf("with a wrong password: %d", got)
 	}
 }
 

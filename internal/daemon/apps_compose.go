@@ -416,19 +416,13 @@ func imagesOfRelease(dir string) map[string]string {
 // finish writes compose.json for a release: built services get an image tag
 // per deploy, or keep their running image when there is no source; the main
 // service runs start.Image when set; the app's services read the env file;
-// the main service gets the router labels, and the app's password goes in
-// the release's htpasswd; every service restarts unless stopped.
+// the main service gets the router labels; every service restarts unless
+// stopped.
 // release.config stays as it is.
 func finish(release *release) error {
 	config, err := copyConfig(release.config)
 	if err != nil {
 		return err
-	}
-	if line := passwordLine(release.start.Domains); line != "" {
-		err = writeWhole(filepath.Join(release.dir, "htpasswd"), []byte(line+"\n"))
-		if err != nil {
-			return err
-		}
 	}
 	detected := release.detected
 	env := release.env
@@ -505,10 +499,6 @@ func addEnv(service map[string]any, file string, env map[string]string) {
 func routeService(release *release, config map[string]any, name string, service map[string]any) {
 	app := release.start.App
 	detected := release.detected
-	usersFile := ""
-	if passwordLine(release.start.Domains) != "" {
-		usersFile = proxyUsersFile(app, release.start.Number)
-	}
 	if name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != "") {
 		addRouters(config, service, routes{
 			app:       app,
@@ -516,7 +506,6 @@ func routeService(release *release, config map[string]any, name string, service 
 			domains:   detected.Domains,
 			canonical: detected.Canonical,
 			port:      detected.Port,
-			usersFile: usersFile,
 			instant:   detected.Instant,
 		})
 		return
@@ -535,7 +524,6 @@ func routeService(release *release, config map[string]any, name string, service 
 		domains:   serviceDomains,
 		canonical: canonical,
 		port:      servicePort("", service),
-		usersFile: usersFile,
 	})
 }
 

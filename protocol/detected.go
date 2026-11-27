@@ -10,13 +10,12 @@ type Detected struct {
 	// says what Railpack found, like "Node 24.22.1, start: npm start".
 	// Image is the image of the main service when it came from CI.
 	// Domains are the domains the main service answers on, Canonical the one
-	// the others redirect to, Password whether the app's password guards it.
+	// the others redirect to.
 	Kind      string   `json:"kind"`
 	Builder   string   `json:"builder,omitempty"`
 	Image     string   `json:"image,omitempty"`
 	Domains   []string `json:"domains,omitempty"`
 	Canonical string   `json:"canonical,omitempty"`
-	Password  bool     `json:"password,omitempty"`
 	// ServiceDomains are the domains of the other services, by service;
 	// Instant is the main service's instant address, "" when it has none.
 	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
