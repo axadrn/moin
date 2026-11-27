@@ -151,6 +151,9 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
 	// Its env goes with it: nothing runs that reads it.
 	_ = os.Remove(a.envFile(app))
+	// And the branch it follows, with its deploy key: no push brings the
+	// app back.
+	_ = os.RemoveAll(followDir(filepath.Dir(a.dir), app))
 	return nil
 }
 

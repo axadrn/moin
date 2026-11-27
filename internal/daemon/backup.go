@@ -1018,12 +1018,18 @@ func (b *backups) recoverRestore(ctx context.Context, mark restoreMark) {
 
 // removeOldTemp removes what copies and checks that were cut off left in
 // the daemon's own folder, once it is a day old: nothing takes that long.
+// The daemon runs it when it starts, before it follows any branch, so the
+// clones a stopped daemon left in follow/<app>/deploy-… go too.
 func (a *apps) removeOldTemp() {
 	entries, _ := os.ReadDir(a.tempDir())
 	for _, entry := range entries {
 		if info, err := entry.Info(); err == nil && time.Since(info.ModTime()) > day {
 			_ = os.RemoveAll(filepath.Join(a.tempDir(), entry.Name()))
 		}
+	}
+	clones, _ := filepath.Glob(filepath.Join(followDir(filepath.Dir(a.dir), "*"), "deploy-*"))
+	for _, clone := range clones {
+		_ = os.RemoveAll(clone)
 	}
 }
 

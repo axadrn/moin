@@ -185,9 +185,49 @@ func TestRemoveOldTemp(t *testing.T) {
 		os.WriteFile(filepath.Join(dir, "copy.db"), []byte("x"), 0o600)
 	}
 	os.Chtimes(old, time.Now().Add(-2*day), time.Now().Add(-2*day))
+	// What a deploy of a followed branch left when the daemon stopped
+	// goes too; the follow and its key stay.
+	clone := filepath.Join(followDir(filepath.Dir(a.dir), "shop"), "deploy-123", "src")
+	os.MkdirAll(clone, 0o700)
+	saveFollow(filepath.Dir(a.dir), Follow{App: "shop", Repo: "git@example.com:ada/shop.git", Branch: "main"})
 	a.removeOldTemp()
 	if exists(old) || !exists(fresh) {
 		t.Fatalf("old %v, fresh %v", exists(old), exists(fresh))
+	}
+	if exists(filepath.Dir(clone)) || !exists(filepath.Join(followDir(filepath.Dir(a.dir), "shop"), "follow.json")) {
+		t.Fatalf("the clone %v, the follow %v", exists(filepath.Dir(clone)), exists(filepath.Join(followDir(filepath.Dir(a.dir), "shop"), "follow.json")))
+	}
+}
+
+// Two deploys of one app at once, like one from your laptop and one of a
+// branch the server follows, never take the same release number: the
+// number is picked under the app's lock, so neither wipes the other's
+// release.
+func TestTwoDeploysTakeTwoNumbers(t *testing.T) {
+	journal(t)
+	t.Setenv("MOIN_CONFIG", filepath.Join(t.TempDir(), "config.yml"))
+	a := newApps(t.TempDir())
+	// Both start before either has the lock.
+	fromLaptop, fromBranch := a.newStart("shop"), a.newStart("shop")
+	if fromLaptop.Number != 0 || fromBranch.Number != 0 {
+		t.Fatalf("a number before the lock: %d %d", fromLaptop.Number, fromBranch.Number)
+	}
+	fromLaptop.SourceFile, fromBranch.SourceFile = filepath.Join(t.TempDir(), "none.tar.gz"), filepath.Join(t.TempDir(), "none.tar.gz")
+	unlock := a.lock("shop")
+	var wait sync.WaitGroup
+	for _, start := range []protocol.DeployStart{fromLaptop, fromBranch} {
+		wait.Go(func() {
+			// Neither has a source to build: each fails after it made its release.
+			if _, err := a.deployHere(context.Background(), start, io.Discard); err == nil {
+				t.Error("a deploy without a source worked")
+			}
+		})
+	}
+	time.Sleep(100 * time.Millisecond)
+	unlock()
+	wait.Wait()
+	if got := a.releases("shop"); !slices.Equal(got, []int{1, 2}) {
+		t.Fatalf("releases %v, want 1 and 2", got)
 	}
 }
 

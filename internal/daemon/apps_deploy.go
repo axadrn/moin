@@ -100,12 +100,19 @@ func hasSource(start protocol.DeployStart) bool {
 
 // runDeploy runs the steps of one deploy in order: make the release, take
 // the compose file of an older release or fetch and build a new one, start
-// it, then follow its databases and clean up.
-func (a *apps) runDeploy(ctx context.Context, start protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
-	if !protocol.ValidAppName(start.App) || start.Number < 1 || start.AppID != "" && !appIDPattern.MatchString(start.AppID) {
+// it, then follow its databases and clean up. A deploy without a number
+// gets the next one here, once it holds the app's lock: two deploys at
+// once, like one from your laptop and one of a branch the server follows,
+// never take the same number, and neither wipes the other's release.
+func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
+	if !protocol.ValidAppName(deploy.App) || deploy.Number < 0 || deploy.AppID != "" && !appIDPattern.MatchString(deploy.AppID) {
 		return protocol.Detected{}, errors.New("invalid app name, app ID or deploy number")
 	}
-	defer a.lock(start.App)()
+	defer a.lock(deploy.App)()
+	if deploy.Number == 0 {
+		deploy.Number = a.nextNumber(deploy.App)
+	}
+	start := *deploy
 	note := a.noteFile(start.App)
 	if err := writeState(note, deployNote{ID: start.DeployID, Number: start.Number}); err != nil {
 		return protocol.Detected{}, fmt.Errorf("write the deploy down: %w", err)

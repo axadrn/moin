@@ -153,12 +153,12 @@ func ExecHere(ctx context.Context, dir, app, service string, tty bool, argv []st
 	return runTo(ctx, stdout, stderr, stdin, "docker", args...)
 }
 
-// newStart is a deploy of app with the next number and its domains.
+// newStart is a deploy of app with its domains. It gets its number when
+// it has the app's lock (runDeploy).
 func (a *apps) newStart(app string) protocol.DeployStart {
 	return protocol.DeployStart{
 		DeployID: newDeployID(),
 		App:      app,
-		Number:   a.nextNumber(app),
 		Domains:  &protocol.Domains{Domains: a.domains(app), Instant: "sslip.io", InstantIP: firstIPv4()},
 	}
 }
@@ -166,7 +166,7 @@ func (a *apps) newStart(app string) protocol.DeployStart {
 // deployHere runs one deploy and says what runs after it.
 func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out io.Writer) (Result, error) {
 	logf := func(format string, args ...any) { fmt.Fprintf(out, format+"\n", args...) }
-	detected, err := a.runDeploy(ctx, start, logf)
+	detected, err := a.runDeploy(ctx, &start, logf)
 	if err != nil {
 		a.markFailed(start.App, start.Number)
 		return Result{}, err

@@ -16,7 +16,7 @@ func deployTo(ctx context.Context, a *apps, start protocol.DeployStart, send fun
 		send(protocol.DeployLog{DeployID: start.DeployID, Line: fmt.Sprintf(format, args...)})
 	}
 	done := protocol.DeployDone{DeployID: start.DeployID}
-	detected, err := a.runDeploy(ctx, start, logf)
+	detected, err := a.runDeploy(ctx, &start, logf)
 	done.Detected = detected
 	if err != nil {
 		done.Error = err.Error()
