@@ -33,6 +33,16 @@ func TestGoArch(t *testing.T) {
 	}
 }
 
+// TestOldDaemon: beta.37 and before have to go before a deploy; a newer
+// release and a build without one do not.
+func TestOldDaemon(t *testing.T) {
+	for version, want := range map[string]bool{"v1.0.0-beta.37": true, "v1.0.0-beta.9": true, "v1.0.0-beta.38": false, "v1.0.0": false, "dev": false, "": false} {
+		if got := oldDaemon(version); got != want {
+			t.Errorf("oldDaemon(%q) = %v, want %v", version, got, want)
+		}
+	}
+}
+
 // TestServerName drops the user of user@host.
 func TestServerName(t *testing.T) {
 	for server, want := range map[string]string{"prod": "prod", "root@203.0.113.7": "203.0.113.7"} {
