@@ -48,7 +48,7 @@ func TestReceiveAndMail(t *testing.T) {
 		t.Error("the first report did not start the trial")
 	}
 	ws.save()
-	if saved, _, _ := store.WatcherState(space.ID); !strings.Contains(string(saved), `"prod"`) {
+	if saved, _ := store.WatcherState(space.ID); !strings.Contains(string(saved), `"prod"`) {
 		t.Errorf("saved = %s", saved)
 	}
 

@@ -178,11 +178,11 @@ func (s *Store) TrialMailSent(id string, day int) error {
 	return err
 }
 
-// WatcherState is what the watcher of a workspace saved, and where its
-// alerts go besides the mail, as JSON.
-func (s *Store) WatcherState(id string) (state []byte, alerts string, err error) {
-	err = s.db.QueryRow(`SELECT watcher_state, alerts FROM workspaces WHERE id = ?`, id).Scan(&state, &alerts)
-	return state, alerts, err
+// WatcherState is what the watcher of a workspace saved.
+func (s *Store) WatcherState(id string) ([]byte, error) {
+	var state []byte
+	err := s.db.QueryRow(`SELECT watcher_state FROM workspaces WHERE id = ?`, id).Scan(&state)
+	return state, err
 }
 
 // SaveWatcherState keeps what the watcher of a workspace knows.

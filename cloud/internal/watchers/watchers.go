@@ -6,7 +6,6 @@ package watchers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -103,16 +102,11 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	saved, more, err := ws.store.WatcherState(id)
+	saved, err := ws.store.WatcherState(id)
 	if err != nil {
 		return nil, err
 	}
-	alerts := []alert.Destination{{Kind: mailKind}}
-	var others []alert.Destination
-	if err := json.Unmarshal([]byte(more), &others); err != nil {
-		return nil, fmt.Errorf("the alerts of workspace %s: %w", id, err)
-	}
-	w, err := watcher.New(servers, append(alerts, others...), saved)
+	w, err := watcher.New(servers, []alert.Destination{{Kind: mailKind}}, saved)
 	if err != nil {
 		return nil, fmt.Errorf("workspace %s: %w", id, err)
 	}
@@ -122,11 +116,10 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	return w, nil
 }
 
-// sender sends an alert: a mail to the workspace, or any kind a watcher
-// you run sends too. After the trial, unpaid, no alert goes out: it is
-// dropped, not kept for later.
+// sender mails an alert to the workspace. After the trial, unpaid, no
+// alert goes out: it is dropped, not kept for later.
 func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destination, alert.Message) error {
-	return func(ctx context.Context, d alert.Destination, m alert.Message) error {
+	return func(ctx context.Context, _ alert.Destination, m alert.Message) error {
 		space, err := ws.store.Workspace(id)
 		if err != nil {
 			return err
@@ -134,9 +127,6 @@ func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destinatio
 		if !space.AlertsOn(time.Now()) {
 			slog.Info("alert not sent, the trial is over", "workspace", id, "title", m.Title)
 			return nil
-		}
-		if d.Kind != mailKind {
-			return alert.Send(ctx, d, m)
 		}
 		text := m.Text
 		if text != "" {
