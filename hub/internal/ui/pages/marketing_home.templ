@@ -19,7 +19,7 @@ import (
 // moin ships.
 templ Home(network model.Network, open HomeOpen) {
 	@layouts.Home(layouts.SEOProps{
-		Title:       "Deploy anything. Lose nothing.",
+		Title:       "Deploy anything. Lose nothing. Open source.",
 		Description: brand.Description,
 		Path:        ctxkeys.URLPath(ctx),
 	}) {
@@ -63,8 +63,8 @@ func homeStartLabel(ctx context.Context) string {
 
 // ---------------------------------------------------------------- hero
 // HomeHero is the whole first screen, up behind the floating navbar, whose
-// height its top padding adds back: the promise and the two buttons on
-// top, and the overview video below.
+// height its top padding adds back: the promise, the two buttons and that
+// the code is open on top, and the overview video below.
 templ HomeHero() {
 	<section class="moin-hero">
 		<div class="moin-page">
@@ -76,11 +76,14 @@ templ HomeHero() {
 				</h1>
 				<p class="moin-lead moin-center moin-hidden-phone" style="--measure:34ch">Your apps on your servers. Backups on your schedule. Checked every day.</p>
 			</div>
-			<div class="moin-row" data-gap="2" data-center data-wrap>
-				@homePrimary()
-				@components.Button(components.ButtonProps{Href: "/docs"}) {
-					Read the docs
-				}
+			<div class="moin-stack" data-gap="3" data-center>
+				<div class="moin-row" data-gap="2" data-center data-wrap>
+					@homePrimary()
+					@components.Button(components.ButtonProps{Href: "/docs"}) {
+						Read the docs
+					}
+				</div>
+				<p class="moin-small moin-muted">Open source. <a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground">Read every line</a> that runs on your server.</p>
 			</div>
 		</div>
 		<div class="moin-page">

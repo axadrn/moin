@@ -14,12 +14,12 @@ import (
 templ DocsHome(groups []model.DocGroup) {
 	@layouts.Home(layouts.SEOProps{
 		Title:        "Docs",
-		Description:  "Get started, every guide and the reference of " + brand.Name + ".",
+		Description:  "Get started, every guide and the reference of " + brand.Name + ". Open source, free to host yourself.",
 		Path:         "/docs",
 		MarkdownPath: "/docs.md",
 	}) {
 		<main class="moin-page moin-content">
-			@components.Header(components.HeaderProps{Title: "Docs"})
+			@components.Header(components.HeaderProps{Title: "Docs", Line: docsHomeLine()})
 			<div class="moin-columns">
 				for _, group := range groups {
 					<section class="moin-section">
@@ -38,6 +38,11 @@ templ DocsHome(groups []model.DocGroup) {
 			</div>
 		</main>
 	}
+}
+
+// docsHomeLine says the daemon is open source, and links to its code.
+templ docsHomeLine() {
+	Open source. <a href={ templ.SafeURL(layouts.GitHubURL + "/tree/main/internal/daemon") } class="moin-link moin-foreground">Read every line</a> of the daemon on your server.
 }
 
 // Docs is one page: one column in the middle, short enough to read, with
