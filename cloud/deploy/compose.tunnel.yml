@@ -1,6 +1,6 @@
 # The site behind a Cloudflare Tunnel. No port is open. cloudflared gets
 # the tunnel's token and nothing else; its public hostname points at
-# http://hub:8090.
+# http://cloud:8090.
 services:
   cloudflared:
     image: cloudflare/cloudflared:2026.10.3

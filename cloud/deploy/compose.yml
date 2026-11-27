@@ -1,7 +1,7 @@
 # The site at moin.run. Its settings are in .env next to this file, and
 # COMPOSE_FILE there adds compose.tunnel.yml. stable is the newest release.
 services:
-  hub:
+  cloud:
     image: ${MOIN_IMAGE:-ghcr.io/axadrn/moin:stable}
     restart: unless-stopped
     env_file: .env

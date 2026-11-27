@@ -183,11 +183,11 @@ jobs:
             tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "cloud/deploy/$file"
           done
           # The settings come from 1Password. The token in
-          # /etc/moin-hub/op-token fills the op:// references of .env.tpl
+          # /etc/moin-cloud/op-token fills the op:// references of .env.tpl
           # into .env. If that fails, this step fails and the running site
           # stays.
           tailscale ssh "root@$HOST" 'set -eu; umask 077; cd /opt/moin
-            OP_SERVICE_ACCOUNT_TOKEN=$(cat /etc/moin-hub/op-token) docker run --rm -i -e OP_SERVICE_ACCOUNT_TOKEN 1password/op:2 op inject < .env.tpl > .env.new
+            OP_SERVICE_ACCOUNT_TOKEN=$(cat /etc/moin-cloud/op-token) docker run --rm -i -e OP_SERVICE_ACCOUNT_TOKEN 1password/op:2 op inject < .env.tpl > .env.new
             mv .env.new .env'
           tailscale ssh "root@$HOST" "cd /opt/moin && MOIN_IMAGE='$IMAGE' sh update.sh"
       - name: Wait until it answers
