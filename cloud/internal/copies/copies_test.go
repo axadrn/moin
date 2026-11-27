@@ -257,3 +257,60 @@ func TestPrune(t *testing.T) {
 		t.Fatalf("after the grace %v", got)
 	}
 }
+
+// What only a real R2 bucket with its 14-day lock shows: the signed size
+// and If-None-Match hold, and nobody deletes a copy inside the lock. Run
+// with the settings of moin cloud's bucket (config.go):
+//
+//	COPIES_ENDPOINT=… COPIES_BUCKET=… COPIES_ACCESS_KEY=… COPIES_SECRET_KEY=… go test -run R2 ./cloud/internal/copies/
+//
+// The object it leaves stays 14 days: use a bucket for tests.
+func TestR2(t *testing.T) {
+	endpoint := os.Getenv("COPIES_ENDPOINT")
+	if endpoint == "" {
+		t.Skip("set COPIES_ENDPOINT and the rest to an R2 bucket with a lock")
+	}
+	ctx := context.Background()
+	bucket := NewBucket(endpoint, os.Getenv("COPIES_BUCKET"), os.Getenv("COPIES_ACCESS_KEY"), os.Getenv("COPIES_SECRET_KEY"))
+	key := "test/" + time.Now().UTC().Format("20060102T150405.000000000") + ".age"
+	body := []byte("age-encryption.org/v1 and the copy")
+	address, err := bucket.UploadURL(ctx, key, int64(len(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := put(t, address, append(body, "more"...)); status/100 == 2 {
+		t.Errorf("more bytes than signed went in: HTTP %d", status)
+	}
+	request, _ := http.NewRequest(http.MethodPut, address, bytes.NewReader(body))
+	if response, err := http.DefaultClient.Do(request); err != nil || response.StatusCode/100 == 2 {
+		t.Errorf("an upload without If-None-Match went in: %v %v", err, response.Status)
+	}
+	if status := put(t, address, body); status != http.StatusOK {
+		t.Fatalf("upload: HTTP %d", status)
+	}
+	if status := put(t, address, body); status != http.StatusPreconditionFailed {
+		t.Errorf("an overwrite: HTTP %d", status)
+	}
+	if size, err := bucket.Size(ctx, key); err != nil || size != int64(len(body)) {
+		t.Errorf("size %d, %v", size, err)
+	}
+	if err := bucket.Delete(ctx, key); !errors.Is(err, errLocked) {
+		t.Errorf("a delete inside the lock: %v", err)
+	}
+	download, err := bucket.DownloadURL(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.Get(download)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := io.ReadAll(response.Body)
+	response.Body.Close()
+	if !bytes.Equal(got, body) {
+		t.Errorf("downloaded %q", got)
+	}
+	if _, err := bucket.Size(ctx, "test/nothing.age"); !errors.Is(err, errMissing) {
+		t.Errorf("a missing object: %v", err)
+	}
+}
