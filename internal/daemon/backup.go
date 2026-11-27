@@ -331,6 +331,11 @@ func (b *backups) copyTo(ctx context.Context, app string, database protocol.Data
 	check := scheduled && b.checkDue(app, database)
 	if check {
 		if err := b.checkFile(ctx, app, database, id, file, size); err != nil {
+			// A daemon that stops cuts the check off: that says nothing
+			// about the copy.
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
 			b.noteCheck(app, database, id, false, err)
 			return "", fmt.Errorf("copy %s: %w", database.Path, errNotRestored)
 		}
@@ -836,8 +841,9 @@ func (b *backups) check(ctx context.Context, app string, database protocol.Datab
 		slog.Warn("backup: reading the copy for the check broke, once more", "app", app, "database", database.Path, "copy", newest.ID, "error", err)
 		cut, err = b.checkOnce(ctx, app, database, newest)
 	}
-	if errors.Is(err, errNoCopy) {
-		// A newer copy came and the old one went meanwhile.
+	// A newer copy came and the old one went meanwhile, or the daemon
+	// stops: neither says anything about the copy.
+	if errors.Is(err, errNoCopy) || ctx.Err() != nil {
 		return
 	}
 	b.noteCheck(app, database, newest.ID, cut, err)
