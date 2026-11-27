@@ -156,7 +156,11 @@ func restoreHere(ctx context.Context, a *apps, r Restore, out io.Writer) (Restor
 	fmt.Fprintf(out, "restoring %s to %s\n", database.Path, cmp.Or(request.Copy, r.To))
 	undo, err := b.restore(ctx, request, out)
 	if errors.Is(err, errWrongKey) && r.Key == "" {
-		return Restored{}, fmt.Errorf("the key of this server does not open the copy: another server made it. Nothing changed. Open it with your backup key: %s restore %s --to %s --key", build.Name, r.App, request.Copy)
+		from := ""
+		if r.From != "" {
+			from = " --from " + r.From
+		}
+		return Restored{}, fmt.Errorf("the key of this server does not open the copy: another server made it. Nothing changed. Open it with your backup key: %s restore %s%s --to %s --key", build.Name, r.App, from, request.Copy)
 	}
 	if err != nil {
 		return Restored{}, err
