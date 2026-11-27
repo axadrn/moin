@@ -2,9 +2,12 @@ package daemon
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/protocol"
 )
 
 // Status is what runs on this server, for `moin` and `moin apps` on your
@@ -46,7 +49,8 @@ func StatusHere(ctx context.Context, dir string) Status {
 	status.PublicSSH = PublicSSHHere(ctx, dir)
 	status.KnocksToday = knocksToday(dir)
 	if config, err := LoadConfig(); err == nil {
-		status.Needs = append(backupKeyNeeds(config), tailnetStatusNeeds(ctx, dir, config.Name)...)
+		status.Needs = append(backupKeyNeeds(config), backupNeeds(config, a.backups.statuses(ctx))...)
+		status.Needs = append(status.Needs, tailnetStatusNeeds(ctx, dir, config.Name)...)
 	}
 	for _, app := range a.names() {
 		release := a.current(app)
@@ -77,6 +81,39 @@ func backupKeyNeeds(config Config) []Need {
 		return []Need{{Text: config.Name + ": your backup key is not confirmed. Without it nobody can read the copies when the server is gone.", Command: build.Name + " bucket confirm " + config.Name}}
 	}
 	return nil
+}
+
+// backupNeeds says what the backups of the apps need: an app with a
+// database but no bucket has no copy at all, and a copy that did not
+// restore in the daily check may not come back either. They come from
+// what the daemon wrote down, by app.
+func backupNeeds(config Config, statuses map[string][]protocol.DatabaseBackup) []Need {
+	var needs []Need
+	for _, app := range slices.Sorted(maps.Keys(statuses)) {
+		databases := statuses[app]
+		if len(databases) == 0 {
+			continue
+		}
+		if config.Bucket == nil {
+			needs = append(needs, Need{Text: app + ": no backup yet.", Command: build.Name + " bucket set " + config.Name})
+			continue
+		}
+		for _, database := range databases {
+			if database.CheckError == "" {
+				continue
+			}
+			what := "today's backup"
+			if len(databases) > 1 {
+				what += " of " + database.Database
+			}
+			proven := "Last proven copy: none yet."
+			if at, ok := protocol.CopyTime(database.CheckedCopy); ok {
+				proven = "Last proven copy: " + at.UTC().Format("Jan 2 15:04 UTC") + "."
+			}
+			needs = append(needs, Need{Text: app + ": " + what + " did not restore. " + proven, Command: build.Name + " backups " + app})
+		}
+	}
+	return needs
 }
 
 // running reports whether at least one container of the app runs.
