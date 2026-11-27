@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -42,7 +43,7 @@ INSERT INTO workspace_members (id, workspace_id, user_id, role) VALUES
 	('m4', 'w-coupon', 'u-cy', 'owner'), ('m5', 'w-free', 'u-dan', 'owner'), ('m6', 'w-paid', 'u-dan', 'member');
 INSERT INTO subscriptions (id, workspace_id, plan_id, status, provider_customer_id, provider_subscription_id, current_period_end, interval, coupon_id) VALUES
 	('s1', 'w-paid', 'pro', 'active', 'cus_ada', 'sub_ada', '2027-01-02 00:00:00.123+00:00', 'year', NULL),
-	('s2', 'w-second', 'pro', 'active', 'cus_ada2', 'sub_ada2', '2027-01-02 00:00:00', 'month', NULL),
+	('s2', 'w-second', 'pro', 'canceled', 'cus_ada2', 'sub_ada2', '2026-01-02 00:00:00', 'month', NULL),
 	('s3', 'w-coupon', 'pro', 'trialing', NULL, NULL, NULL, NULL, 'BACKER'),
 	('s4', 'w-free', 'free', 'active', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO offers (email, trial_days, coupon_id, created_at, claimed_at, claimed_workspace_id) VALUES
@@ -115,5 +116,31 @@ func TestImport(t *testing.T) {
 	}
 	if _, err := importOld(t.Context(), filepath.Join(t.TempDir(), "missing.db"), newPath); err == nil {
 		t.Error("imported a database that is not there")
+	}
+}
+
+func TestImportKeepsEveryPayingWorkspace(t *testing.T) {
+	oldPath := oldDatabase(t)
+	old, err := sql.Open("sqlite", oldPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ada pays for a second workspace too.
+	if _, err := old.Exec(`UPDATE subscriptions SET status = 'active' WHERE workspace_id = 'w-second'`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	newPath := filepath.Join(t.TempDir(), "cloud.db")
+	if _, err := importOld(t.Context(), oldPath, newPath); err == nil || !strings.Contains(err.Error(), "w-second") {
+		t.Fatalf("err = %v, want one that names w-second", err)
+	}
+	database, err := sql.Open("sqlite", newPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	var n int
+	if err := database.QueryRow(`SELECT count(*) FROM workspaces`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("%d workspaces after a refused import, %v", n, err)
 	}
 }

@@ -6,7 +6,8 @@
 // It opens the old database read-only and takes only the workspaces that
 // have a Stripe customer, a subscription, a coupon or an offer. Each keeps
 // its old id, so the workspace_id in Stripe's metadata still matches, and
-// gets the mail of its owner. An offer nobody claimed yet, the early
+// gets the mail of its owner. It refuses, and imports nothing, when a
+// paying workspace would be left out. An offer nobody claimed yet, the early
 // backers' deal, becomes a workspace of its mail with the coupon, so the
 // discount is there at the first sign-in. Running it twice adds nothing
 // twice.
@@ -111,6 +112,19 @@ ON CONFLICT DO NOTHING`)
 	n, _ := inserted.RowsAffected()
 	r.imported = int(n)
 	r.sameMail = candidates - r.imported
+	// A paying workspace whose owner has another one is left out above:
+	// moin cloud has one workspace per mail. Nobody may pay for nothing,
+	// so then nothing is imported.
+	var dropped string
+	err = tx.QueryRowContext(ctx, `SELECT coalesce(group_concat(s.workspace_id, ', '), '') FROM old.subscriptions s
+		WHERE s.provider_subscription_id IS NOT NULL AND s.status IN ('active', 'past_due', 'trialing')
+		AND NOT EXISTS (SELECT 1 FROM workspaces n WHERE n.id = s.workspace_id AND n.stripe_subscription = s.provider_subscription_id)`).Scan(&dropped)
+	if err != nil {
+		return r, err
+	}
+	if dropped != "" {
+		return r, fmt.Errorf("these paying workspaces share their owner's mail with another workspace, and moin cloud has one per mail: %s. Nothing was imported. Move each subscription to one workspace in Stripe first", dropped)
+	}
 	// The offers nobody claimed yet and that still hold, as the old
 	// service let them be claimed.
 	offers, err := tx.ExecContext(ctx, `
