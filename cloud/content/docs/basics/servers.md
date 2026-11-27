@@ -70,5 +70,3 @@ Two things come with it:
 - **Root access over SSH.** From your laptop: `ssh root@203.0.113.7`.
 
 The server is empty. Linux, and nothing else. moin installs the rest the first time you deploy.
-
-Next: [Linux and the terminal](/docs/basics/linux), the ten commands you need on it.

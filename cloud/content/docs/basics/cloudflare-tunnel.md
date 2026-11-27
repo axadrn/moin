@@ -84,5 +84,3 @@ Skip it when:
 - you want the instant address while you try things
 
 Without a tunnel, moin keeps 80 and 443 open, and nothing else. That is a fine place to be too. HTTPS comes from Let's Encrypt, on your server, and nobody in between sees your traffic.
-
-Next: [domains and DNS](/docs/basics/dns), how a name finds your server.

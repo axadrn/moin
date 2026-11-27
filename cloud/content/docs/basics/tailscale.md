@@ -92,5 +92,3 @@ Your provider's web console still works. Log in there and run:
 ```
 
 Port 22 opens to the internet again. [The way back in](/docs/security#the-way-back-in)
-
-Next: [Cloudflare Tunnel](/docs/basics/cloudflare-tunnel), visitors in without an open port.

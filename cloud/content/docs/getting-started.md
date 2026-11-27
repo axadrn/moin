@@ -122,5 +122,3 @@ Where you bought the domain, add an A record: `shop.example.com` to your server'
 - **The first deploy fails halfway.** Run `moin deploy prod` again. What is installed already stays.
 - **`cli.sh` says the signature does not check out.** `ssh -V` shows your OpenSSH. Older than 8.1? Update it, then run `cli.sh` again.
 - **Locked out after closing SSH.** In your provider's web console, run `/usr/local/bin/moin unlock`. [The way back in](/docs/security#the-way-back-in)
-
-Next: [how it works](/docs/how-it-works), in one picture.

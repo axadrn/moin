@@ -94,5 +94,3 @@ moin restore shop
 ```
 
 Pick a copy, and moin puts it back. It builds the database beside the live one, switches in one quick step, and keeps the old data as an undo. [Restore](/docs/backups#restore)
-
-Next: [from zero to live](/docs/basics/from-zero-to-live), all of it in one go.

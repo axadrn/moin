@@ -111,5 +111,3 @@ From your laptop, the same through moin:
 moin logs shop
 moin exec shop -- sh
 ```
-
-Next: [what a backup is](/docs/basics/backups), and why one you never restored is a hope.

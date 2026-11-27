@@ -114,5 +114,3 @@ moin keys rm prod anna@laptop
 - **`Permission denied (publickey)`.** The server does not know this key. Check that the `.pub` line is on the server, and that `IdentityFile` names the right file.
 - **Lost the laptop.** Take its key out from another laptop: `moin keys rm prod ada@laptop`. Or in your provider's web console.
 - **The private key leaked.** Same: take it out now, and make a new one.
-
-Next: [ports and the firewall](/docs/basics/ports), the doors of your server.

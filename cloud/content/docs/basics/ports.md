@@ -109,5 +109,3 @@ Every change of moin's that could lock you out undoes itself after 2 minutes, un
 ```
 
 It opens port 22 again. [The way back in](/docs/security#the-way-back-in)
-
-Next: [Tailscale](/docs/basics/tailscale), your own private network.

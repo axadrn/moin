@@ -125,5 +125,3 @@ moin exec shop -- sh
 ```
 
 `moin logs` shows the app's logs. `moin exec` runs a command in the app's container, here a shell. [Deploy](/docs/deploy#logs)
-
-Next: [SSH and keys](/docs/basics/ssh), how your laptop gets in.

@@ -87,5 +87,3 @@ Behind a Cloudflare Tunnel it goes the other way. The domain points at Cloudflar
 - **The browser finds no server.** `dig +short` shows nothing, or an old address. Check the record. Wait for the TTL.
 - **The browser warns about the certificate.** The name points at the server only since a moment. The certificate follows within a few minutes.
 - **The bare domain should work too.** Add an A record for `@` as well, and `moin domains add shop example.com`.
-
-Next: [Docker and compose](/docs/basics/docker), how your app runs on the server.
