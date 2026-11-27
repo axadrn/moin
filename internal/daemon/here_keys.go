@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+
+	"github.com/axadrn/moin/internal/build"
 )
 
 // Who may run moin on a server is whoever can SSH to it as root: a team
@@ -80,7 +82,7 @@ func RemoveKeyHere(ctx context.Context, match, session string) (Key, error) {
 		}
 	}
 	if len(matches) == 0 {
-		return Key{}, fmt.Errorf("no key %q: see them with `moin keys <server>`", match)
+		return Key{}, fmt.Errorf("no key %q: see them with `%s keys <server>`", match, build.Name)
 	}
 	if len(matches) > 1 {
 		return Key{}, fmt.Errorf("%d keys are called %q: name the one to remove by its fingerprint", len(matches), match)
@@ -88,7 +90,7 @@ func RemoveKeyHere(ctx context.Context, match, session string) (Key, error) {
 	key := matches[0]
 	own := sessionKey(ctx, session)
 	if own == "" {
-		return Key{}, errors.New("cannot tell which key this SSH session uses, so moin removes none. Remove the line from " + authorizedKeys + " by hand")
+		return Key{}, errors.New("cannot tell which key this SSH session uses, so " + build.Name + " removes none. Remove the line from " + authorizedKeys + " by hand")
 	}
 	if own == key.Fingerprint {
 		return Key{}, errors.New("this SSH session logged in with that key: remove it from another key's session")

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
@@ -60,6 +61,9 @@ func envEdit(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	if err != nil {
 		return err
 	}
+	if !isTerminal(stdin) {
+		return errors.New("env edit needs a terminal: it opens your $EDITOR")
+	}
 	return onApp(ctx, flags, app, func(server string) error {
 		return editEnv(ctx, server, app, stdin, stdout)
 	})
@@ -72,16 +76,13 @@ func editEnv(ctx context.Context, server, app string, stdin io.Reader, stdout io
 	if err != nil {
 		return err
 	}
-	after, err := editText(ctx, app, before, stdin, stdout)
+	after, err := editUntilValid(ctx, app, before, stdin, stdout)
 	if err != nil {
 		return err
 	}
 	if bytes.Equal(before, after) {
 		fmt.Fprintln(stdout, style.Muted.Render("Nothing changed."))
 		return nil
-	}
-	if _, err := dotenv.Parse(string(after)); err != nil {
-		return fmt.Errorf("nothing changed, the file has a mistake: %w", err)
 	}
 	var change dotenv.Change
 	if err := sshJSON(ctx, server, []string{"env", "set", app}, bytes.NewReader(after), &change); err != nil {
@@ -100,29 +101,50 @@ func editEnv(ctx context.Context, server, app string, stdin io.Reader, stdout io
 	return nil
 }
 
-// editText opens text in $EDITOR, or vi, in a file only you can read, and
-// returns what was saved. The file is gone afterwards.
-func editText(ctx context.Context, app string, text []byte, stdin io.Reader, stdout io.Writer) ([]byte, error) {
-	file, err := os.CreateTemp("", build.Name+"-"+app+"-*.env")
+// editUntilValid opens text in $EDITOR, in a folder only you can read,
+// and opens it again while what you saved has a mistake. The folder goes
+// afterwards, with any backup the editor left in it.
+func editUntilValid(ctx context.Context, app string, text []byte, stdin io.Reader, stdout io.Writer) ([]byte, error) {
+	dir, err := os.MkdirTemp("", build.Name+"-env-")
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(file.Name())
-	_, err = file.Write(text)
-	if closeErr := file.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
+	defer os.RemoveAll(dir)
+	file := filepath.Join(dir, app+".env")
+	if err := os.WriteFile(file, text, 0o600); err != nil {
 		return nil, err
 	}
+	var mistake []byte
+	for {
+		if err := runEditor(ctx, file, stdin, stdout); err != nil {
+			return nil, err
+		}
+		saved, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		_, parseErr := dotenv.Parse(string(saved))
+		if parseErr == nil {
+			return saved, nil
+		}
+		if bytes.Equal(saved, mistake) {
+			return nil, fmt.Errorf("nothing changed, the file still has a mistake: %w", parseErr)
+		}
+		mistake = saved
+		printError(stdout, fmt.Errorf("%w. Opening it again: fix it, or quit without saving to keep the env as it was", parseErr))
+	}
+}
+
+// runEditor opens file in $EDITOR, or vi.
+func runEditor(ctx context.Context, file string, stdin io.Reader, stdout io.Writer) error {
 	editor := strings.Fields(os.Getenv("EDITOR"))
 	if len(editor) == 0 {
 		editor = []string{"vi"}
 	}
-	cmd := exec.CommandContext(ctx, editor[0], append(editor[1:], file.Name())...)
+	cmd := exec.CommandContext(ctx, editor[0], append(editor[1:], file)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		return nil, errors.New("the editor did not end well, so nothing changed: " + err.Error())
+		return errors.New("the editor did not end well, so nothing changed: " + err.Error())
 	}
-	return os.ReadFile(file.Name())
+	return nil
 }

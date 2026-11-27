@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/daemon"
@@ -57,8 +58,8 @@ func addKey(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	server, file := flags.Arg(0), flags.Arg(1)
 	body, err := os.ReadFile(file)
-	if err != nil {
-		return fmt.Errorf("cannot read %s: pass the public key, like ~/.ssh/id_ed25519.pub", file)
+	if err != nil || !isPublicKey(body) {
+		return fmt.Errorf("%s is not a public SSH key: pass the .pub file, like ~/.ssh/id_ed25519.pub, never the private key", file)
 	}
 	var key daemon.Key
 	if err := sshJSON(ctx, server, []string{"keys", "add"}, bytes.NewReader(body), &key); err != nil {
@@ -66,6 +67,16 @@ func addKey(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	done(stdout, "%s may log in to %s as root now", dash(key.Comment), server)
 	return nil
+}
+
+// isPublicKey reports whether body looks like a .pub file: one line that
+// starts with a key type. A private key never leaves this computer.
+func isPublicKey(body []byte) bool {
+	line := strings.TrimSpace(string(body))
+	if strings.Contains(line, "\n") {
+		return false
+	}
+	return strings.HasPrefix(line, "ssh-") || strings.HasPrefix(line, "ecdsa-") || strings.HasPrefix(line, "sk-")
 }
 
 // removeKey removes a key by its name, the comment at its end, or its

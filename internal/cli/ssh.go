@@ -125,7 +125,7 @@ func sshError(server string, err error) error {
 	case 255:
 		return fmt.Errorf("cannot reach %s over SSH. Check that `ssh %s` works", server, server)
 	case noSudo:
-		return fmt.Errorf("moin runs as root on %s, and your user there may not use sudo without a password. Log in as root, or allow sudo for it", server)
+		return fmt.Errorf("%s runs as root on %s, and your user there may not use sudo without a password. Log in as root, or allow sudo for it", build.Name, server)
 	case noAppCode:
 		return errNoApp
 	}
@@ -158,7 +158,7 @@ func sshAnswer(ctx context.Context, server string, args []string, stdin io.Reade
 // of moin may answer something else.
 func readAnswer(server string, out []byte, value any) error {
 	if err := json.Unmarshal(out, value); err != nil {
-		return fmt.Errorf("%s answered something moin cannot read. Put this version there with `%s update %s`", server, build.Name, server)
+		return fmt.Errorf("%s answered something %s cannot read. Put this version there with `%s update %s`", server, build.Name, build.Name, server)
 	}
 	return nil
 }

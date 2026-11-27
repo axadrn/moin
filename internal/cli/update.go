@@ -193,7 +193,7 @@ func updateServer(ctx context.Context, server string, stdout io.Writer) error {
 		return err
 	}
 	if info.version == "" {
-		return fmt.Errorf("moin is not on %s yet. Set it up with `%s deploy %s`", server, build.Name, server)
+		return fmt.Errorf("%s is not on %s yet. Set it up with `%s deploy %s`", build.Name, server, build.Name, server)
 	}
 	if build.IsRelease(build.Version) && info.version == build.Version {
 		done(stdout, "%s runs %s %s already", server, build.Name, build.Version)

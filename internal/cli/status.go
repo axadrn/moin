@@ -182,7 +182,7 @@ func removeServerCommand(args []string, stdout io.Writer) error {
 	apps := loadApps()
 	updateApps(apps, server, nil)
 	_ = saveApps(apps)
-	done(stdout, "moin forgot %s. Nothing changed on the server", server)
+	done(stdout, "%s forgot %s. Nothing changed on the server", build.Name, server)
 	return nil
 }
 
@@ -311,22 +311,26 @@ func printApps(stdout io.Writer, rows []serverRow) {
 
 // serverJSON is one server in `moin --json`.
 type serverJSON struct {
-	Server  string             `json:"server"`
-	Version string             `json:"version,omitempty"`
-	Error   string             `json:"error,omitempty"`
-	Apps    []daemon.AppStatus `json:"apps"`
+	Server   string             `json:"server"`
+	Version  string             `json:"version,omitempty"`
+	Error    string             `json:"error,omitempty"`
+	Apps     []daemon.AppStatus `json:"apps"`
+	Watchers []string           `json:"watchers"`
 }
 
 // overviewJSON is the table of `moin` for scripts.
 func overviewJSON(rows []serverRow) []serverJSON {
 	list := []serverJSON{}
 	for _, row := range rows {
-		entry := serverJSON{Server: row.server, Version: row.status.Version, Apps: row.status.Apps}
+		entry := serverJSON{Server: row.server, Version: row.status.Version, Apps: row.status.Apps, Watchers: row.status.Watchers}
 		if row.err != nil {
 			entry.Error = explain(row.err)
 		}
 		if entry.Apps == nil {
 			entry.Apps = []daemon.AppStatus{}
+		}
+		if entry.Watchers == nil {
+			entry.Watchers = []string{}
 		}
 		list = append(list, entry)
 	}

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/axadrn/moin/internal/daemon"
@@ -118,5 +119,17 @@ func TestTwoServersNeedsS(t *testing.T) {
 	*flags.serverFlag = "staging"
 	if err := onApp(t.Context(), flags, "shop", func(server string) error { ran = server; return nil }); err != nil || ran != "staging" {
 		t.Errorf("with -s staging ran on %q, %v", ran, err)
+	}
+}
+
+// TestOnAppRunsOnce: after the known server says no, moin asks the others
+// and does not run the command there again.
+func TestOnAppRunsOnce(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	rememberApp("prod", "shop")
+	runs := 0
+	err := onApp(t.Context(), newFlags("logs", "logs [app]").withServer(), "shop", func(string) error { runs++; return errNoApp })
+	if runs != 1 || err == nil || !strings.Contains(err.Error(), "none of your servers runs shop") {
+		t.Errorf("ran %d times, err %v", runs, err)
 	}
 }

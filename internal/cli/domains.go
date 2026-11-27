@@ -12,9 +12,9 @@ import (
 // domains is `moin domains [app]`, and `moin domains add|rm [app]
 // <domain>`, which start the app again with its new domains, without a
 // build.
-func domains(ctx context.Context, args []string, stdout io.Writer) error {
+func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) > 0 && (args[0] == "add" || args[0] == "rm") {
-		return changeDomain(ctx, args[0], args[1:], stdout)
+		return changeDomain(ctx, args[0], args[1:], stdin, stdout)
 	}
 	flags := newFlags("domains", "domains [app] [-s server] [--json], or domains add|rm [app] <domain>").withServer().withJSON()
 	if err := flags.parse(args); err != nil {
@@ -44,8 +44,12 @@ func domains(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 // changeDomain adds or removes one domain.
-func changeDomain(ctx context.Context, verb string, args []string, stdout io.Writer) error {
+func changeDomain(ctx context.Context, verb string, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("domains "+verb, "domains "+verb+" [app] <domain> [-s server]").withServer()
+	if verb == "rm" {
+		flags.usage += " [-y]"
+		flags.withYes()
+	}
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -54,6 +58,11 @@ func changeDomain(ctx context.Context, verb string, args []string, stdout io.Wri
 		return err
 	}
 	domain := rest[0]
+	if verb == "rm" {
+		if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Take %s off %s? Visitors there get no answer.", domain, app)); err != nil {
+			return err
+		}
+	}
 	return onApp(ctx, flags, app, func(server string) error {
 		if _, err := runRelease(ctx, server, []string{"domains", verb, app, domain}, nil, stdout, "starting "+app+" with its domains"); err != nil {
 			return err

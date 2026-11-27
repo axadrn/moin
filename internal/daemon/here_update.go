@@ -5,9 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -111,38 +109,20 @@ func checkVersion(ctx context.Context, path, version string) error {
 	return nil
 }
 
-// UpdateHere puts a new moin in place of this server's: the binary read
-// from binary, a build the CLI sent, or with nil the signed release
-// version. Then it restarts the daemon, when one runs.
-func UpdateHere(ctx context.Context, version string, binary io.Reader) error {
+// UpdateHere puts the signed release version in place of this server's
+// moin, then restarts the daemon, when one runs.
+func UpdateHere(ctx context.Context, version string) error {
 	path, err := ownPath()
 	if err != nil {
 		return err
 	}
-	if binary == nil {
-		err = InstallRelease(ctx, version, path)
-	} else {
-		err = installSent(ctx, binary, version, path)
-	}
-	if err != nil {
+	if err := InstallRelease(ctx, version, path); err != nil {
 		return err
 	}
 	// try-restart leaves a daemon alone that does not run; a server
 	// without one has nothing to restart.
 	_ = exec.CommandContext(ctx, "systemctl", "try-restart", build.Name+"-daemon").Run()
 	return nil
-}
-
-// installSent installs the binary the CLI sent over SSH.
-func installSent(ctx context.Context, binary io.Reader, version, path string) error {
-	body, err := io.ReadAll(io.LimitReader(binary, maxBinarySize+1))
-	if err != nil {
-		return err
-	}
-	if len(body) > maxBinarySize {
-		return errors.New("the new binary is too large")
-	}
-	return InstallBinary(ctx, body, version, path)
 }
 
 // ownPath is the file of the running binary, links resolved.

@@ -34,6 +34,14 @@ func (f *flagSet) withServer() *flagSet {
 	return f
 }
 
+// serverNamed is what -s named, "" without it.
+func (f *flagSet) serverNamed() string {
+	if f.serverFlag == nil {
+		return ""
+	}
+	return *f.serverFlag
+}
+
 // appArgs reads the app and the other arguments of an app command: the
 // app comes first and may be left out in its folder. others is how many
 // arguments come after it, like the domain of `domains add`.
@@ -41,10 +49,7 @@ func appArgs(flags *flagSet, others int) (app string, rest []string, err error) 
 	switch flags.NArg() {
 	case others + 1:
 		app, rest = flags.Arg(0), flags.Args()[1:]
-		if !protocol.ValidAppName(app) {
-			return "", nil, fmt.Errorf("%q is not an app name: lowercase letters, digits and dashes", app)
-		}
-		return app, rest, nil
+		return app, rest, checkApp(app)
 	case others:
 		app, err = folderApp()
 		return app, flags.Args(), err
@@ -52,63 +57,88 @@ func appArgs(flags *flagSet, others int) (app string, rest []string, err error) 
 	return "", nil, flags.wrong()
 }
 
+// checkApp fails for a name that cannot be an app.
+func checkApp(name string) error {
+	if !protocol.ValidAppName(name) {
+		return fmt.Errorf("%q is not an app name: lowercase letters, digits and dashes", name)
+	}
+	return nil
+}
+
 // onApp runs do on the server that runs app: the one -s names, else the
-// one apps.json knows, else the one that answers it runs the app.
+// one apps.json knows, else the one that answers it runs the app. do runs
+// at most once on a server, so a command never runs twice.
 func onApp(ctx context.Context, flags *flagSet, app string, do func(server string) error) error {
-	if flags.serverFlag != nil && *flags.serverFlag != "" {
-		return do(*flags.serverFlag)
+	if named := flags.serverNamed(); named != "" {
+		return notThere(do(named), named, app)
 	}
 	known := knownServers(app)
-	if len(known) > 1 {
-		return twoServers(app, known)
-	}
 	if len(known) == 1 {
 		err := do(known[0])
 		if !errors.Is(err, errNoApp) {
 			return err
 		}
 	}
-	found, err := findServers(ctx, app)
+	found, unreachable, err := findServers(ctx, app)
 	if err != nil {
 		return err
 	}
-	switch len(found) {
-	case 0:
-		return noServer(app)
-	case 1:
-		return do(found[0])
+	switch {
+	case len(found) == 0:
+		return noServer(app, unreachable)
+	case len(found) > 1:
+		return twoServers(app, found)
+	case len(known) == 1 && found[0] == known[0]:
+		// It ran there already and found no app: the server changed its
+		// mind since. Do not run it twice.
+		return notThere(errNoApp, known[0], app)
 	}
-	return twoServers(app, found)
+	return do(found[0])
+}
+
+// notThere turns errNoApp into words: which server does not run which app.
+func notThere(err error, server, app string) error {
+	if errors.Is(err, errNoApp) {
+		return fmt.Errorf("%s does not run %s. See its apps with `%s apps`", server, app, build.Name)
+	}
+	return err
 }
 
 // findServers asks every server of your list which apps it runs, keeps
-// the answers, and returns the servers that run app.
-func findServers(ctx context.Context, app string) ([]string, error) {
+// the answers, and returns the servers that run app and those that did
+// not answer.
+func findServers(ctx context.Context, app string) (found, unreachable []string, err error) {
 	servers, err := loadServers()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rows := askServers(ctx, servers)
 	rememberApps(rows)
-	var found []string
 	for _, row := range rows {
+		if row.err != nil {
+			unreachable = append(unreachable, row.server)
+		}
 		for _, each := range row.status.Apps {
 			if each.Name == app {
 				found = append(found, row.server)
 			}
 		}
 	}
-	return found, nil
+	return found, unreachable, nil
 }
 
 // twoServers asks you to pick one of the servers that run app.
 func twoServers(app string, servers []string) error {
-	return fmt.Errorf("%s runs on %s. Name one with -s, like `%s … -s %s`", app, strings.Join(servers, " and "), build.Name, servers[0])
+	return fmt.Errorf("%s runs on %s. Name one with -s, like -s %s", app, strings.Join(servers, " and "), servers[0])
 }
 
-// noServer says no server of yours runs app.
-func noServer(app string) error {
-	return fmt.Errorf("none of your servers runs %s. Deploy it with `%s deploy <server>`, or add the server it runs on with `%s servers add <server>`", app, build.Name, build.Name)
+// noServer says no server of yours runs app, and which did not answer.
+func noServer(app string, unreachable []string) error {
+	text := fmt.Sprintf("none of your servers runs %s", app)
+	if len(unreachable) > 0 {
+		text += fmt.Sprintf(", as far as %s can tell: %s did not answer", build.Name, strings.Join(unreachable, " and "))
+	}
+	return fmt.Errorf("%s. Deploy it with `%s deploy <server>`, or add the server it runs on with `%s servers add <server>`", text, build.Name, build.Name)
 }
 
 // appsFile keeps which servers run which app.
@@ -200,7 +230,7 @@ func folderApp() (string, error) {
 		return "", err
 	}
 	name := strings.ToLower(filepath.Base(dir))
-	if !protocol.ValidAppName(name) {
+	if checkApp(name) != nil {
 		return "", fmt.Errorf("name the app, like `%s logs shop`: this folder's name %q is not an app name", build.Name, name)
 	}
 	return name, nil

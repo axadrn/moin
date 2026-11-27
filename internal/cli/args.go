@@ -11,7 +11,6 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/style"
-	"github.com/axadrn/moin/protocol"
 	"golang.org/x/term"
 )
 
@@ -21,24 +20,17 @@ import (
 type flagSet struct {
 	*flag.FlagSet
 	usage      string
-	appFlag    *string
 	serverFlag *string
 	yesFlag    *bool
 	jsonFlag   *bool
 }
 
 // newFlags makes the flags of a command. usage is the command line without
-// the binary name, like "logs <server> [--tail 200]".
+// the binary name, like "logs [app] [-f] [--tail 200]".
 func newFlags(name, usage string) *flagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	return &flagSet{FlagSet: flags, usage: build.Name + " " + usage}
-}
-
-// withApp adds --app.
-func (f *flagSet) withApp() *flagSet {
-	f.appFlag = f.String("app", "", "the app's name; default this folder's name")
-	return f
 }
 
 // withYes adds --yes and -y, which skip the question before a destructive
@@ -61,12 +53,6 @@ func (f *flagSet) withJSON() *flagSet {
 // "--" everything is an argument.
 func (f *flagSet) parse(args []string) error {
 	return f.check(parseAnywhere(f.FlagSet, args), args)
-}
-
-// parseStrict reads flags only before the arguments, for commands like
-// `run -- <command>` whose arguments carry their own flags.
-func (f *flagSet) parseStrict(args []string) error {
-	return f.check(f.Parse(args), args)
 }
 
 // check turns a parse error into the command's help or a message with its
@@ -99,24 +85,13 @@ func (f *flagSet) yes() bool { return f.yesFlag != nil && *f.yesFlag }
 // json reports whether --json was given.
 func (f *flagSet) json() bool { return f.jsonFlag != nil && *f.jsonFlag }
 
-// server is the one argument, the server, when the command takes nothing
-// else.
+// server is the one argument of a command that takes one, like the
+// server of `keys prod` or the app of `moin here logs shop`.
 func (f *flagSet) server() (string, error) {
 	if f.NArg() != 1 {
 		return "", f.wrong()
 	}
 	return f.Arg(0), nil
-}
-
-// app is the app of deploy: --app, or the name of this folder.
-func (f *flagSet) app() (string, error) {
-	if f.appFlag == nil || *f.appFlag == "" {
-		return folderApp()
-	}
-	if !protocol.ValidAppName(*f.appFlag) {
-		return "", fmt.Errorf("%q is not an app name: lowercase letters, digits and dashes", *f.appFlag)
-	}
-	return *f.appFlag, nil
 }
 
 // helpError carries the help of a command: Run prints it and exits with 0.
@@ -212,9 +187,9 @@ func confirm(stdin io.Reader, stdout io.Writer, yes bool, question string) error
 // readSecret reads one line without echo from a terminal, or plainly from
 // a pipe.
 func readSecret(stdin io.Reader) (string, error) {
-	if file, ok := stdin.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
-		secret, err := term.ReadPassword(int(file.Fd()))
-		return strings.TrimSpace(string(secret)), err
+	if !isTerminal(stdin) {
+		return readLine(stdin)
 	}
-	return readLine(stdin)
+	secret, err := term.ReadPassword(int(stdin.(*os.File).Fd()))
+	return strings.TrimSpace(string(secret)), err
 }

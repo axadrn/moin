@@ -57,29 +57,9 @@ func SetEnvHere(dir, app, text string) (dotenv.Change, error) {
 	if err != nil {
 		return dotenv.Change{}, err
 	}
-	change := envChange(old, next)
+	change := dotenv.Diff(old, next)
 	if change.None() {
 		return change, nil
 	}
 	return change, writeEnv(a.envFile(app), next)
-}
-
-// envChange compares two envs by name: added, with another value, removed.
-func envChange(old, next map[string]string) dotenv.Change {
-	change := dotenv.Change{Added: []string{}, Replaced: []string{}, Removed: []string{}}
-	for _, key := range slices.Sorted(maps.Keys(next)) {
-		value, ok := old[key]
-		switch {
-		case !ok:
-			change.Added = append(change.Added, key)
-		case value != next[key]:
-			change.Replaced = append(change.Replaced, key)
-		}
-	}
-	for _, key := range slices.Sorted(maps.Keys(old)) {
-		if _, ok := next[key]; !ok {
-			change.Removed = append(change.Removed, key)
-		}
-	}
-	return change
 }

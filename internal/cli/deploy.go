@@ -20,16 +20,17 @@ import (
 // folder to the server, which builds and starts it. The first deploy to a
 // server sets moin up there; later ones go to where the app runs.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [server] [--image <local image> | --catalog <name>] [--app <name>] [--yes]").withApp().withYes().withJSON()
+	flags := newFlags("deploy", "deploy [server] [--image <local image> | --catalog <name>] [--app <name>] [-y] [--json]").withServer().withYes().withJSON()
 	image := flags.String("image", "", "send this local image, like shop:dev, instead of building on the server")
 	catalogApp := flags.String("catalog", "", "deploy an app of the catalog, like umami, without a repo")
+	appName := flags.String("app", "", "the app's name; default this folder's name, or the catalog app's")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if *image != "" && *catalogApp != "" {
 		return errors.New("deploy takes --image or --catalog, not both")
 	}
-	app, err := deployedApp(flags, *catalogApp)
+	app, err := deployedApp(*appName, *catalogApp)
 	if err != nil {
 		return err
 	}
@@ -50,6 +51,11 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err := setUp(ctx, server, app, flags.yes(), stdin, log); err != nil {
 		return err
 	}
+	// In the list from now on, so `moin` shows the server even when this
+	// first deploy fails.
+	if err := addServer(server); err != nil {
+		return err
+	}
 	if *image != "" {
 		if err := sendImage(ctx, server, *image, log); err != nil {
 			return err
@@ -59,38 +65,41 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
-	if err := addServer(server); err != nil {
-		return err
-	}
 	rememberApp(server, app)
 	if flags.json() {
 		return printJSON(stdout, result)
 	}
-	printLive(stdout, server, result)
+	printLive(stdout, result)
 	return nil
 }
 
-// deployedApp is the app's name: --app, the catalog app's name, or this
-// folder's.
-func deployedApp(flags *flagSet, catalogApp string) (string, error) {
-	if catalogApp != "" && *flags.appFlag == "" {
-		*flags.appFlag = catalogApp
+// deployedApp is the app's name: --app, else the catalog app's name, else
+// this folder's.
+func deployedApp(appName, catalogApp string) (string, error) {
+	if appName == "" && catalogApp != "" {
+		appName = catalogApp
 	}
-	return flags.app()
+	if appName == "" {
+		return folderApp()
+	}
+	return appName, checkApp(appName)
 }
 
 // deployServer is where the deploy goes: the server named, else the one
 // that runs the app already.
 func deployServer(ctx context.Context, flags *flagSet, app string) (string, error) {
-	if flags.NArg() == 1 {
-		return flags.Arg(0), nil
-	}
 	if flags.NArg() > 1 {
 		return "", flags.wrong()
 	}
+	if flags.NArg() == 1 {
+		return flags.Arg(0), nil
+	}
+	if named := flags.serverNamed(); named != "" {
+		return named, nil
+	}
 	servers := knownServers(app)
-	if len(servers) == 0 {
-		found, err := findServers(ctx, app)
+	if len(servers) != 1 {
+		found, _, err := findServers(ctx, app)
 		if err != nil {
 			return "", err
 		}
@@ -102,7 +111,7 @@ func deployServer(ctx context.Context, flags *flagSet, app string) (string, erro
 	case 1:
 		return servers[0], nil
 	}
-	return "", fmt.Errorf("%s runs on %s. Name the one to deploy to: `%s deploy %s`", app, strings.Join(servers, " and "), build.Name, servers[0])
+	return "", twoServers(app, servers)
 }
 
 // deploySource says what the deploy sends, like "3f2a9c1" or "catalog
@@ -117,7 +126,7 @@ func deploySource(ctx context.Context, image, catalogApp string, stdout io.Write
 		return "", errors.New("deploy sends the committed source of this folder: run it in a git repository with a commit, or deploy an app of the catalog with --catalog")
 	}
 	if dirty, _ := gitOutput(ctx, "status", "--porcelain"); dirty != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("Changes that are not committed stay here: moin sends "+commit+"."))
+		fmt.Fprintln(stdout, style.Muted.Render("Changes that are not committed stay here: "+build.Name+" sends "+commit+"."))
 	}
 	if image != "" {
 		return commit + " with image " + image, nil
@@ -145,6 +154,8 @@ func runDeploy(ctx context.Context, server, app, image, catalogApp string, stdou
 			return daemon.Result{}, err
 		}
 		defer archive.Wait()
+		// Closed first: git ends even when the server stops reading early.
+		defer pipe.Close()
 		source = pipe
 	}
 	return runRelease(ctx, server, args, source, stdout, "sending the source")
@@ -166,9 +177,9 @@ func runRelease(ctx context.Context, server string, args []string, stdin io.Read
 }
 
 // printLive says the app is live, with its address and what to do next.
-func printLive(stdout io.Writer, server string, result daemon.Result) {
+func printLive(stdout io.Writer, result daemon.Result) {
 	if len(result.Addresses) == 0 {
-		done(stdout, "%s. %s runs v%d. It has no address yet: `%s domains add %s <domain>`", build.Name, result.App, result.Release, build.Name, server)
+		done(stdout, "%s. %s runs v%d. It has no address yet: `%s domains add %s <domain>`", build.Name, result.App, result.Release, build.Name, result.App)
 		return
 	}
 	done(stdout, "%s. %s is live: %s", build.Name, result.App, result.Addresses[0])
@@ -176,7 +187,7 @@ func printLive(stdout io.Writer, server string, result daemon.Result) {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("also "+address))
 	}
 	if len(result.Databases) > 0 {
-		hint(stdout, strings.Join(result.Databases, " and ")+" found. See its backups:", build.Name+" backups "+server)
+		hint(stdout, strings.Join(result.Databases, " and ")+" found. See its backups:", build.Name+" backups "+result.App)
 	}
 }
 
@@ -184,7 +195,7 @@ func printLive(stdout io.Writer, server string, result daemon.Result) {
 // load there.
 func sendImage(ctx context.Context, server, image string, stdout io.Writer) error {
 	step(stdout, "sending image %s", image)
-	save := exec.CommandContext(ctx, "docker", "save", image)
+	save := exec.CommandContext(ctx, "docker", "save", "--", image)
 	save.Stderr = os.Stderr
 	pipe, err := save.StdoutPipe()
 	if err != nil {
@@ -194,10 +205,17 @@ func sendImage(ctx context.Context, server, image string, stdout io.Writer) erro
 		return fmt.Errorf("docker save %s: %w", image, err)
 	}
 	loadErr := sshRun(ctx, server, shellJoin([]string{"docker", "load"}), pipe, io.Discard, os.Stderr)
-	if err := save.Wait(); err != nil {
-		return fmt.Errorf("docker save %s: %w. Is the image on this computer? See `docker images`", image, err)
+	// Closed first, so docker save ends even when the server stopped
+	// reading early.
+	pipe.Close()
+	saveErr := save.Wait()
+	if loadErr != nil {
+		return loadErr
 	}
-	return loadErr
+	if saveErr != nil {
+		return fmt.Errorf("docker save %s: %w. Is the image on this computer? See `docker images`", image, saveErr)
+	}
+	return nil
 }
 
 // serverInfo is what a server has before a deploy.
@@ -252,7 +270,10 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 		return nil
 	}
 	if info.arch == "" {
-		return fmt.Errorf("%s is not a 64-bit Intel or ARM server, which moin needs", server)
+		return fmt.Errorf("%s is not a 64-bit Intel or ARM server, which %s needs", server, build.Name)
+	}
+	if info.version == "" && !daemon.ValidServerName(serverName(server)) {
+		return fmt.Errorf("the server calls itself %q for its backups and watchers, and that cannot be a name. Give it one in your ssh config, like Host prod, and deploy to prod", serverName(server))
 	}
 	question := fmt.Sprintf("Set up %s on %s and deploy %s?", build.Name, server, app)
 	if err := confirm(stdin, stdout, yes, question); err != nil {
@@ -309,7 +330,7 @@ func moinFor(ctx context.Context, arch string) ([]byte, error) {
 		return daemon.FetchRelease(ctx, build.Version, "linux", arch)
 	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != arch {
-		return nil, fmt.Errorf("this build of moin is %s/%s and cannot run on a linux/%s server. Use a release, or build moin for linux/%s", runtime.GOOS, runtime.GOARCH, arch, arch)
+		return nil, fmt.Errorf("this build of %s is %s/%s and cannot run on a linux/%s server. Use a release, or build it for linux/%s", build.Name, runtime.GOOS, runtime.GOARCH, arch, arch)
 	}
 	self, err := os.Executable()
 	if err != nil {

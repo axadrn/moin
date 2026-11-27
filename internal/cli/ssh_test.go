@@ -2,7 +2,9 @@ package cli
 
 import (
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -79,5 +81,60 @@ func TestPickRelease(t *testing.T) {
 	}
 	if _, err := pickRelease(strings.NewReader("\n"), io.Discard, "shop", releases[:1], time.Now()); err == nil {
 		t.Error("only the live release: want an error")
+	}
+}
+
+// TestIsPublicKey takes one line of a .pub file, never a private key.
+func TestIsPublicKey(t *testing.T) {
+	for body, want := range map[string]bool{
+		"ssh-ed25519 AAAAC3Nz ada@laptop\n":                           true,
+		"ecdsa-sha2-nistp256 AAAAE2 ada\n":                            true,
+		"-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEA\n": false,
+		"ssh-ed25519 AAAA a\nssh-ed25519 BBBB b\n":                    false,
+	} {
+		if got := isPublicKey([]byte(body)); got != want {
+			t.Errorf("isPublicKey(%q) = %v, want %v", body, got, want)
+		}
+	}
+}
+
+// TestDeployedApp: --app, then the catalog app, then the folder.
+func TestDeployedApp(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, test := range [][3]string{{"blog", "umami", "blog"}, {"", "umami", "umami"}} {
+		if got, err := deployedApp(test[0], test[1]); err != nil || got != test[2] {
+			t.Errorf("deployedApp(%q, %q) = %q, %v", test[0], test[1], got, err)
+		}
+	}
+	if _, err := deployedApp("Not_An_App", ""); err == nil {
+		t.Error("a bad --app: want an error")
+	}
+}
+
+// TestEditUntilValid opens the editor again after a mistake and keeps the
+// fixed file.
+func TestEditUntilValid(t *testing.T) {
+	dir := t.TempDir()
+	editor := filepath.Join(dir, "editor.sh")
+	script := "#!/bin/sh\nif [ -e " + dir + "/once ]; then echo 'A=\"fixed\"' > \"$1\"; else touch " + dir + "/once; echo 'A=\"broken' > \"$1\"; fi\n"
+	if err := os.WriteFile(editor, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EDITOR", editor)
+	got, err := editUntilValid(t.Context(), "shop", []byte("A=\"1\"\n"), strings.NewReader(""), io.Discard)
+	if err != nil || string(got) != "A=\"fixed\"\n" {
+		t.Errorf("got %q, %v", got, err)
+	}
+}
+
+// TestEditUntilValidGivesUp when the editor saves the same mistake again.
+func TestEditUntilValidGivesUp(t *testing.T) {
+	editor := filepath.Join(t.TempDir(), "editor.sh")
+	if err := os.WriteFile(editor, []byte("#!/bin/sh\necho 'A=\"broken' > \"$1\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EDITOR", editor)
+	if _, err := editUntilValid(t.Context(), "shop", []byte("A=\"1\"\n"), strings.NewReader(""), io.Discard); err == nil {
+		t.Error("the same mistake twice: want an error")
 	}
 }

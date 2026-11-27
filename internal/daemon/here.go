@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/axadrn/moin/catalog"
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -64,7 +65,7 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 	switch {
 	case d.Catalog != "":
 		if _, ok := catalog.Compose(d.Catalog); !ok {
-			return Result{}, fmt.Errorf("the catalog has no %s: see them with `moin catalog`", d.Catalog)
+			return Result{}, fmt.Errorf("the catalog has no %s: see them with `%s catalog`", d.Catalog, build.Name)
 		}
 		if err := a.catalogEnv(d.App, start.Domains); err != nil {
 			return Result{}, err
@@ -221,7 +222,7 @@ func (a *apps) receiveSource(source io.Reader) (string, error) {
 // pinImage tags a loaded image by its content, like moin-shop:3f2a9c1e0b4d,
 // so each release keeps its own image and a rollback finds it again.
 func (a *apps) pinImage(ctx context.Context, app, image string) (string, error) {
-	id, err := a.output(ctx, "docker", "image", "inspect", "--format", "{{.Id}}", image)
+	id, err := a.output(ctx, "docker", "image", "inspect", "--format", "{{.Id}}", "--", image)
 	if err != nil {
 		return "", fmt.Errorf("image %s is not on the server: %w", image, err)
 	}
@@ -230,7 +231,7 @@ func (a *apps) pinImage(ctx context.Context, app, image string) (string, error) 
 		return "", fmt.Errorf("image %s has no ID", image)
 	}
 	pinned := project(app) + ":" + id[:12]
-	if _, err := a.output(ctx, "docker", "tag", image, pinned); err != nil {
+	if _, err := a.output(ctx, "docker", "tag", "--", image, pinned); err != nil {
 		return "", err
 	}
 	return pinned, nil
@@ -276,6 +277,11 @@ func runTo(ctx context.Context, stdout, stderr io.Writer, stdin io.Reader, name 
 // ErrNoApp is the error of a command for an app this server does not
 // run. The CLI then looks for the app on your other servers.
 var ErrNoApp = errors.New("no such app on this server")
+
+// ValidServerName reports whether name can name a server, for its
+// backups and its watchers: the first deploy checks it before it sets
+// the server up.
+func ValidServerName(name string) bool { return serverName.MatchString(name) }
 
 // mustHave fails when app has no release on this server.
 func (a *apps) mustHave(app string) error {

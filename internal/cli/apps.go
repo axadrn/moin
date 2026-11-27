@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,14 +36,16 @@ func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	if err != nil {
 		return err
 	}
+	// With --json, stdout is for the JSON alone: the picker and the log go
+	// to stderr.
+	log := stdout
+	if flags.json() {
+		log = terminal(os.Stderr)
+	}
 	return onApp(ctx, flags, app, func(server string) error {
-		number, err := rollbackTarget(ctx, server, app, *to, stdin, stdout)
+		number, err := rollbackTarget(ctx, server, app, *to, stdin, log)
 		if err != nil {
 			return err
-		}
-		log := stdout
-		if flags.json() {
-			log = terminal(os.Stderr)
 		}
 		result, err := rollBack(ctx, server, app, number, log)
 		if err != nil {
@@ -237,7 +241,14 @@ func execCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	return onApp(ctx, flags, app, func(server string) error {
 		cmd := sshCommand(ctx, server, asRoot(hereLine(line...)), tty)
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, os.Stderr
-		return sshError(server, cmd.Run())
+		// Every exit code is the command's own, also 97, 98 or 255: read
+		// as moin's, a command could run twice.
+		err := cmd.Run()
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return exitCode(exit.ExitCode())
+		}
+		return err
 	})
 }
 

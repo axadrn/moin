@@ -243,10 +243,6 @@ func (p *progress) end() {
 	p.mu.Unlock()
 }
 
-func (p *progress) elapsed() string {
-	return human.Duration(time.Since(p.started))
-}
-
 // clip cuts text to width cells and ends it with … when it was longer.
 func clip(text string, width int) string {
 	if lipgloss.Width(text) <= width {

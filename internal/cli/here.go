@@ -8,7 +8,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/internal/build"
@@ -20,11 +22,17 @@ import (
 // people should see goes to stderr, like the log of a deploy.
 func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("moin here runs on a server, for the CLI on your laptop")
+		return errors.New(build.Name + " here runs on a server, for the CLI on your laptop")
 	}
+	// When you press Ctrl-C on your laptop, ssh goes and so do stdout and
+	// stderr. A deploy goes on to its end instead of dying on a write.
+	signal.Ignore(syscall.SIGPIPE)
 	dir := daemon.StateDir()
 	log := os.Stderr
 	verb, args := args[0], args[1:]
+	// name is the one argument of a here command without flags, like the
+	// app of `here stop shop`.
+	name := func() (string, error) { return hereApp(newFlags("here "+verb, "here "+verb+" <name>"), args) }
 	switch verb {
 	case "apps":
 		return printJSON(stdout, daemon.StatusHere(ctx, dir))
@@ -40,13 +48,25 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		value, err := daemon.RollbackHere(ctx, dir, app, *to, log)
 		return respond(stdout, value, err)
 	case "releases":
-		value, err := daemon.ReleasesHere(dir, oneArg(args))
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		value, err := daemon.ReleasesHere(dir, app)
 		return respond(stdout, value, err)
 	case "restart", "start":
-		value, err := daemon.ApplyHere(ctx, dir, oneArg(args), log)
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		value, err := daemon.ApplyHere(ctx, dir, app, log)
 		return respond(stdout, value, err)
 	case "stop":
-		return daemon.StopHere(ctx, dir, oneArg(args))
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		return daemon.StopHere(ctx, dir, app)
 	case "logs":
 		flags := newFlags("here logs", "here logs <app> [--tail 200] [--follow]")
 		tail := flags.Int("tail", 200, "lines")
@@ -65,14 +85,30 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	case "keys":
 		return hereKeys(ctx, args, stdin, stdout)
 	case "update":
-		return daemon.UpdateHere(ctx, oneArg(args), nil)
+		version, err := name()
+		if err != nil {
+			return err
+		}
+		return daemon.UpdateHere(ctx, version)
 	case "setup":
-		return daemon.SetUpHere(ctx, oneArg(args))
+		server, err := name()
+		if err != nil {
+			return err
+		}
+		return daemon.SetUpHere(ctx, server)
 	case "backups":
-		value, err := daemon.BackupsHere(ctx, dir, oneArg(args))
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		value, err := daemon.BackupsHere(ctx, dir, app)
 		return respond(stdout, value, err)
 	case "backup":
-		value, err := daemon.BackupHere(ctx, dir, oneArg(args), log)
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		value, err := daemon.BackupHere(ctx, dir, app, log)
 		return respond(stdout, value, err)
 	case "restore":
 		flags := newFlags("here restore", "here restore <app> --to <copy|time|undo-…> [--database <name>]")
@@ -91,7 +127,7 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	case "watchers":
 		return hereWatchers(args, stdin, stdout)
 	}
-	return fmt.Errorf("moin on this server does not know `here %s`: put the CLI's version here with `moin update <server>`", verb)
+	return fmt.Errorf("%s on this server does not know `here %s`: put the CLI's version here with `%s update <server>`", build.Name, verb, build.Name)
 }
 
 // hereDeploy reads the source of a deploy from stdin, unless it is an app
@@ -126,6 +162,11 @@ func hereExec(ctx context.Context, dir string, args []string, stdin io.Reader, s
 	if code := exitCodeOf(err); code > 0 {
 		return exitCode(code)
 	}
+	if errors.Is(err, daemon.ErrNoApp) {
+		// Said here, not quietly: the CLI never runs a command twice, so
+		// it does not look on other servers after exec.
+		return fmt.Errorf("there is no app %s on this server", app)
+	}
 	return err
 }
 
@@ -148,7 +189,10 @@ func hereEnv(ctx context.Context, dir string, args []string, stdin io.Reader, st
 		value, err := daemon.SetEnvHere(dir, args[1], string(text))
 		return respond(stdout, value, err)
 	}
-	value, err := daemon.EnvNamesHere(dir, oneArg(args))
+	if len(args) != 1 {
+		return errors.New("usage: here env <app> | get <app> | set <app>")
+	}
+	value, err := daemon.EnvNamesHere(dir, args[0])
 	return respond(stdout, value, err)
 }
 
@@ -163,7 +207,10 @@ func hereDomains(ctx context.Context, dir string, args []string, stdout io.Write
 		value, err := daemon.RemoveDomainHere(ctx, dir, args[1], args[2], os.Stderr)
 		return respond(stdout, value, err)
 	}
-	value, err := daemon.DomainsHere(dir, oneArg(args))
+	if len(args) != 1 {
+		return errors.New("usage: here domains <app> | add <app> <domain> | rm <app> <domain>")
+	}
+	value, err := daemon.DomainsHere(dir, args[0])
 	return respond(stdout, value, err)
 }
 
@@ -197,19 +244,7 @@ func hereApp(flags *flagSet, args []string) (string, error) {
 	if err := flags.parse(args); err != nil {
 		return "", err
 	}
-	if flags.NArg() != 1 {
-		return "", flags.wrong()
-	}
-	return flags.Arg(0), nil
-}
-
-// oneArg is the only argument, "" when there is not exactly one: the
-// daemon then says the name is not valid.
-func oneArg(args []string) string {
-	if len(args) != 1 {
-		return ""
-	}
-	return args[0]
+	return flags.server()
 }
 
 // respond prints the value a here command returns as JSON, or returns

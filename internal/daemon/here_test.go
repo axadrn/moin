@@ -3,22 +3,9 @@ package daemon
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 )
-
-// TestEnvChangeByValue: moin on the server sees the values, so a key whose
-// value stays is no change.
-func TestEnvChangeByValue(t *testing.T) {
-	change := envChange(map[string]string{"A": "1", "B": "2", "C": "3"}, map[string]string{"A": "1", "B": "two", "D": "4"})
-	if !reflect.DeepEqual(change.Added, []string{"D"}) || !reflect.DeepEqual(change.Replaced, []string{"B"}) || !reflect.DeepEqual(change.Removed, []string{"C"}) {
-		t.Errorf("change = %+v", change)
-	}
-	if !envChange(map[string]string{"A": "1"}, map[string]string{"A": "1"}).None() {
-		t.Error("the same env is a change")
-	}
-}
 
 // TestPreviousRelease skips releases with the live images, like a restart,
 // and failed ones.

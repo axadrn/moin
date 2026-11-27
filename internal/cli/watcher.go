@@ -8,17 +8,27 @@ import (
 	"io/fs"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/internal/watcher"
 )
 
-// watcherCommand is `moin watcher run` and `moin watcher token`, the two
-// commands of the machine that runs a watcher.
-func watcherCommand(ctx context.Context, args []string, stdout io.Writer) error {
-	if len(args) > 0 && args[0] == "run" {
-		return watcherRun(ctx, args[1:])
+// watcherCommand is `moin watcher run` and `moin watcher token`, on the
+// machine that runs a watcher, and `watcher connect` and `watcher
+// disconnect`, on your laptop.
+func watcherCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	verb := ""
+	if len(args) > 0 {
+		verb, args = args[0], args[1:]
 	}
-	if len(args) > 0 && args[0] == "token" {
-		return watcherToken(args[1:], stdout)
+	switch verb {
+	case "run":
+		return watcherRun(ctx, args)
+	case "token":
+		return watcherToken(args, stdin, stdout)
+	case "connect":
+		return watcherConnect(ctx, args, stdout)
+	case "disconnect":
+		return watcherDisconnect(ctx, args, stdin, stdout)
 	}
 	return fmt.Errorf("usage: `%s watcher run`, `%s watcher token <server> --url <url>`, `%s watcher connect <server> <url> <token>` or `%s watcher disconnect <server> <url>`", build.Name, build.Name, build.Name, build.Name)
 }
@@ -38,20 +48,40 @@ func watcherRun(ctx context.Context, args []string) error {
 	return watcher.Run(ctx, *listen, *config, *dir)
 }
 
+// askWatcherURL asks for the watcher's own address, which it cannot know:
+// on a terminal, or else an error that names --url.
+func askWatcherURL(stdin io.Reader, stdout io.Writer) (string, error) {
+	if !isTerminal(stdin) {
+		return "", errors.New("name the address daemons reach this watcher at with --url, like --url https://watcher.example.com")
+	}
+	fmt.Fprint(stdout, style.Warning.Render("?")+" The address daemons reach this watcher at, like https://watcher.example.com: ")
+	address, err := readLine(stdin)
+	if err == nil && address == "" {
+		err = errors.New("no address, so no token. Name it with --url")
+	}
+	return address, err
+}
+
 // watcherToken prints a new token for a server: the line for the watcher's
 // config, or a whole starter config when there is none yet, and the
 // command that points the server at this watcher.
-func watcherToken(args []string, stdout io.Writer) error {
-	flags := newFlags("watcher token", "watcher token <server> --url https://watcher.example.com [--config "+watcher.DefaultConfig+"]")
-	address := flags.String("url", "", "the address daemons reach this watcher at")
+func watcherToken(args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("watcher token", "watcher token <server> [--url https://watcher.example.com] [--config "+watcher.DefaultConfig+"]")
+	address := flags.String("url", "", "the address daemons reach this watcher at; asked on a terminal")
 	path := flags.String("config", watcher.DefaultConfig, "the config file")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 1 || *address == "" {
-		return flags.wrong()
+	name, err := flags.server()
+	if err != nil {
+		return err
 	}
-	name := flags.Arg(0)
+	if *address == "" {
+		*address, err = askWatcherURL(stdin, stdout)
+		if err != nil {
+			return err
+		}
+	}
 	if err := watcher.CheckName(name); err != nil {
 		return err
 	}

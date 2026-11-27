@@ -38,7 +38,7 @@ Apps
   env edit                 Change them in $EDITOR; the app restarts with them: env edit [app]
   domains                  The app's domains: domains [app] [--json]
   domains add              Add one; the certificate follows by itself: domains add [app] shop.example.com
-  domains rm               Remove one: domains rm [app] shop.example.com
+  domains rm               Remove one: domains rm [app] shop.example.com [-y]
   catalog                  Open source apps to deploy with deploy --catalog [--json]
 
 Backups
@@ -64,12 +64,11 @@ Servers
 
 Watcher
   watcher run              Run a watcher, on another machine than your servers
-  watcher token            On the watcher: the line that connects a server: watcher token prod --url https://watcher.example.com
+  watcher token            On the watcher: the line that connects a server: watcher token prod [--url https://watcher.example.com]
   watcher connect          On your laptop: the server reports there: watcher connect prod <url> <token>
   watcher disconnect       It no longer does: watcher disconnect prod <url>
 
 On the server
-  daemon                   Run the timers: backups, restore checks, reports
   daemon uninstall         Remove moin from this server; the apps keep running: daemon uninstall [--apps] [-y]
 
   version                  Show the version
@@ -126,7 +125,8 @@ func usageEntry(line string) (name, description string, ok bool) {
 
 // Run runs one command and returns the exit code.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// SIGHUP too: a closed terminal still lets env edit remove its file.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
 	stdout, stderr = terminal(stdout), terminal(stderr)
@@ -134,6 +134,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		warnNewer(ctx, stderr)
 	}
 	err := run(ctx, args, stdin, stdout)
+	onServer := len(args) > 0 && args[0] == "here"
 	var help helpError
 	var code exitCode
 	switch {
@@ -142,17 +143,18 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case errors.As(err, &help):
 		help.print(stdout)
 		return 0
+	case ctx.Err() != nil && !onServer:
+		// Ctrl-C ends the ssh session, not the work on the server.
+		fmt.Fprintln(stderr)
+		printError(stderr, fmt.Errorf("stopped watching. It goes on on the server: `%s`", build.Name))
 	case errors.As(err, &code):
 		// The command said why itself, on the server.
 		return int(code)
-	case errors.Is(err, daemon.ErrNoApp) && args[0] == "here":
+	case errors.Is(err, daemon.ErrNoApp) && onServer:
 		// Quiet: the CLI looks on your other servers, and says it if none
 		// runs the app.
 		return noAppCode
 	case errors.Is(err, errReported):
-	case ctx.Err() != nil:
-		fmt.Fprintln(stderr)
-		printError(stderr, errors.New("stopped"))
 	default:
 		printError(stderr, err)
 	}
@@ -208,7 +210,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "env":
 		return env(ctx, rest, stdin, stdout)
 	case "domains":
-		return domains(ctx, rest, stdout)
+		return domains(ctx, rest, stdin, stdout)
 	case "keys":
 		return keys(ctx, rest, stdin, stdout)
 	case "catalog":
@@ -224,13 +226,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "alerts":
 		return alerts(ctx, rest, stdin, stdout)
 	case "watcher":
-		if len(rest) > 0 && rest[0] == "connect" {
-			return watcherConnect(ctx, rest[1:], stdout)
-		}
-		if len(rest) > 0 && rest[0] == "disconnect" {
-			return watcherDisconnect(ctx, rest[1:], stdin, stdout)
-		}
-		return watcherCommand(ctx, rest, stdout)
+		return watcherCommand(ctx, rest, stdin, stdout)
 	case "here":
 		return here(ctx, rest, stdin, stdout)
 	case "daemon":
@@ -283,9 +279,9 @@ func uninstallDaemon(ctx context.Context, dir string, args []string, stdin io.Re
 	if flags.NArg() > 0 {
 		return flags.wrong()
 	}
-	question := "Remove moin from this server? The apps keep running."
+	question := "Remove " + build.Name + " from this server? The apps keep running."
 	if *withApps {
-		question = "Remove moin and every app on this server with its data? This cannot be undone."
+		question = "Remove " + build.Name + " and every app on this server with its data? This cannot be undone."
 	}
 	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
 		return err
@@ -294,7 +290,7 @@ func uninstallDaemon(ctx context.Context, dir string, args []string, stdin io.Re
 	if err != nil {
 		return err
 	}
-	done(stdout, "moin is removed from this server")
+	done(stdout, "%s is removed from this server", build.Name)
 	if len(kept) > 0 {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Still here: "+strings.Join(kept, "; ")+"."))
 	}
