@@ -61,12 +61,12 @@ func InstallRelease(ctx context.Context, version, path string) error {
 	if err != nil {
 		return err
 	}
-	return InstallBinary(ctx, body, version, path)
+	return installBinary(ctx, body, version, path)
 }
 
-// InstallBinary writes body next to path, checks that it runs and says
-// it is version when version is a release, then moves it over path.
-func InstallBinary(ctx context.Context, body []byte, version, path string) error {
+// installBinary writes body next to path, checks that it runs and says it
+// is version, then moves it over path.
+func installBinary(ctx context.Context, body []byte, version, path string) error {
 	file, err := os.CreateTemp(filepath.Dir(path), "."+build.Name+"-update-*")
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func InstallBinary(ctx context.Context, body []byte, version, path string) error
 }
 
 // checkVersion runs the binary at path and checks the first line it
-// prints, like "moin v1.2.3". A build that is not a release only has to run.
+// prints, like "moin v1.2.3".
 func checkVersion(ctx context.Context, path, version string) error {
 	ctx, cancel := context.WithTimeout(ctx, versionTimeout)
 	defer cancel()
@@ -103,7 +103,7 @@ func checkVersion(ctx context.Context, path, version string) error {
 		return fmt.Errorf("the new binary does not run here: %w", err)
 	}
 	got, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
-	if build.IsRelease(version) && got != build.Name+" "+version {
+	if got != build.Name+" "+version {
 		return fmt.Errorf("the new binary says %q, not %s %s", got, build.Name, version)
 	}
 	return nil

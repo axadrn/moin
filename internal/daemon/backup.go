@@ -210,7 +210,7 @@ func (b *backups) configure(config Config) {
 func (b *backups) on() bool { return b.config().Bucket != nil }
 
 // errNoBucket is why nothing is copied on a server without a bucket.
-var errNoBucket = errors.New("no bucket yet: set one with `" + build.Name + " bucket <server> set`")
+var errNoBucket = errors.New("no bucket yet: set one with `" + build.Name + " bucket set <server>`")
 
 // where is the bucket of a database and its folder in it.
 func (b *backups) where(app string, database protocol.Database) (*Bucket, string, error) {

@@ -25,31 +25,22 @@ var (
 // them down too, data included, and the config with the keys of the
 // bucket and the server's backup key. It returns what stays on the server.
 func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string, ...any)) ([]string, error) {
-	units := map[string]string{build.Name + "-daemon": unitFile}
-	var installed []string
-	for unit, file := range units {
-		if _, err := os.Stat(file); err == nil {
-			installed = append(installed, unit)
+	if _, err := os.Stat(unitFile); err == nil {
+		if os.Geteuid() != 0 {
+			return nil, errors.New("run it as root, or put sudo in front: sudo " + build.Name + " daemon uninstall")
 		}
-	}
-	if len(installed) > 0 && os.Geteuid() != 0 {
-		return nil, errors.New("run it as root, or put sudo in front: sudo " + build.Name + " daemon uninstall")
-	}
-	for _, unit := range installed {
+		unit := build.Name + "-daemon"
 		logf("stopping the %s service", unit)
 		_ = exec.CommandContext(ctx, "systemctl", "disable", "--now", unit).Run()
-		if err := os.Remove(units[unit]); err != nil {
+		if err := os.Remove(unitFile); err != nil {
 			return nil, err
 		}
-	}
-	if len(installed) > 0 {
 		_ = exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
 	}
-	var err error
 
 	a := newApps(dir)
 	appNames := a.names()
-	_, err = exec.LookPath("docker")
+	_, err := exec.LookPath("docker")
 	hasDocker := err == nil
 	if withApps {
 		for _, app := range appNames {
