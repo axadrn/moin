@@ -12,7 +12,7 @@ import (
 	"github.com/a-h/templ/parser/v2"
 )
 
-// TestFormatted: every .go and .templ file is formatted. "cd hub && task fmt"
+// TestFormatted: every .go and .templ file is formatted. "cd cloud && task fmt"
 // fixes it.
 func TestFormatted(t *testing.T) {
 	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, err error) error {
@@ -45,7 +45,7 @@ func TestFormatted(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s: %v", path, err)
 		} else if !bytes.Equal(source, formatted) {
-			t.Errorf("%s is not formatted, run: cd hub && task fmt", path)
+			t.Errorf("%s is not formatted, run: cd cloud && task fmt", path)
 		}
 		return nil
 	})
