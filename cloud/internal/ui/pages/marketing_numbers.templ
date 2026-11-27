@@ -41,8 +41,8 @@ func numberRows(t counts.Totals) []numberRow {
 	return rows
 }
 
-// homeNumbers are the only numbers we have: the free software sends none,
-// the rest is counted, never guessed. A number not counted yet stays away.
+// homeNumbers are the numbers we have, counted, never guessed. A number
+// not counted yet stays away.
 templ homeNumbers(n HomeNumbers) {
 	{{ rows := numberRows(n.Totals) }}
 	<section id="numbers" class="moin-band">
@@ -53,7 +53,6 @@ templ homeNumbers(n HomeNumbers) {
 			</div>
 		}
 		<div class="moin-grid" data-cols="2">
-			@numberCard("0 bytes", "Sent to us by the free software. Read the source.", layouts.GitHubURL)
 			if n.Stars != "" {
 				@numberCard(n.Stars+" stars", "On GitHub.", layouts.GitHubURL)
 			}

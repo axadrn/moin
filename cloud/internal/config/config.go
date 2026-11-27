@@ -13,11 +13,7 @@ import (
 
 type Config struct {
 	RenderConfig
-	// Development reads content/ and assets/ from disk on every request,
-	// so an edit shows on reload: APP_ENV=development. The image sets
-	// APP_ENV=production.
-	Development bool
-	Port        string
+	Port string
 	// OldURLs are addresses the site had before APP_URL, such as
 	// https://old.example.com. A request on one goes on to APP_URL.
 	OldURLs []string
@@ -58,6 +54,11 @@ type Config struct {
 // RenderConfig is what templates may know of the settings: nothing secret.
 type RenderConfig struct {
 	AppURL string
+	// Development reads content/ and assets/ from disk on every request,
+	// so an edit shows on reload, and shows every part of a page, made-up
+	// numbers too, marked: APP_ENV=development. The image sets
+	// APP_ENV=production.
+	Development bool
 	// The Umami page counter, on the Umami server UmamiHost, such as
 	// umami.example.com. Off without both.
 	UmamiWebsiteID string

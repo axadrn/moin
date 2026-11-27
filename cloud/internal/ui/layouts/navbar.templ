@@ -54,7 +54,7 @@ templ Navbar() {
 			}
 		</span>
 		<span class="moin-hidden-phone">
-			if stars := githubrepo.Stars(); stars != "" {
+			if stars := githubrepo.Stars(ctxkeys.RenderConfig(ctx).Development); stars != "" {
 				@components.Button(components.ButtonProps{Href: GitHubURL, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
 					<i class="moin-icon moin-icon-git-hub"></i>
 					{ stars }

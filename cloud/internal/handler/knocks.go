@@ -69,19 +69,28 @@ var sampleTotals = counts.Totals{
 	Apps:    143,
 }
 
+// numbersShowAt is how many downloads it takes before the landing page
+// shows its numbers: fewer would read as empty.
+const numbersShowAt = 100
+
 // SiteNumbers are the numbers of the landing page: the stars and the
-// downloads on GitHub, and what moin cloud counted. Development shows sample numbers, so every
-// number can be seen before it is counted.
-func (c *Cloud) SiteNumbers(development bool) func() pages.HomeNumbers {
-	return func() pages.HomeNumbers {
+// downloads on GitHub, and what moin cloud counted. nil: not yet, below
+// numbersShowAt downloads. Development always shows them, sample numbers
+// marked as such.
+func (c *Cloud) SiteNumbers(development bool) func() *pages.HomeNumbers {
+	return func() *pages.HomeNumbers {
 		if development {
-			return pages.HomeNumbers{Stars: githubrepo.Stars(), Downloads: sampleDownloads, Totals: sampleTotals, Sample: true}
+			return &pages.HomeNumbers{Stars: githubrepo.Stars(true), Downloads: sampleDownloads, Totals: sampleTotals, Sample: true}
+		}
+		downloads := githubrepo.Now().Downloads
+		if downloads < numbersShowAt {
+			return nil
 		}
 		totals, err := c.watchers.Counts().Totals(time.Now())
 		if err != nil {
 			slog.Warn("home: counts", "error", err)
 			totals = counts.Totals{}
 		}
-		return pages.HomeNumbers{Stars: githubrepo.Stars(), Downloads: githubrepo.Now().Downloads, Totals: totals}
+		return &pages.HomeNumbers{Stars: githubrepo.Stars(false), Downloads: downloads, Totals: totals}
 	}
 }

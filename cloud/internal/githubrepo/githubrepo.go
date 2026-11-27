@@ -113,13 +113,19 @@ func get(path string, into any) error {
 	return json.NewDecoder(response.Body).Decode(into)
 }
 
+// starsShowAt is how many stars it takes before the site shows the
+// count: a small one reads as weak. Development always shows it.
+const starsShowAt = 100
+
 // Stars are the stars as the site shows them, everywhere: the count the
-// way GitHub writes it, "" before GitHub answered or when it failed.
-func Stars() string {
-	if stars := Now().Stars; stars > 0 {
-		return Short(stars)
+// way GitHub writes it, "" before GitHub answered, when it failed, or
+// below starsShowAt outside development.
+func Stars(development bool) string {
+	stars := Now().Stars
+	if stars == 0 || (stars < starsShowAt && !development) {
+		return ""
 	}
-	return ""
+	return Short(stars)
 }
 
 // Short writes a count the way GitHub does: 950, 1.2k, 12k.

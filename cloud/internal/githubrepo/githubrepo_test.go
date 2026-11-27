@@ -42,8 +42,8 @@ func TestNowAsksGitHubOnceAnHour(t *testing.T) {
 	if got := Now(); got != want || calls.Load() != 2 {
 		t.Fatalf("numbers = %+v after %d calls, want %+v after 2", got, calls.Load(), want)
 	}
-	if Stars() != "1.2k" {
-		t.Errorf("Stars() = %q", Stars())
+	if Stars(false) != "1.2k" {
+		t.Errorf("Stars(false) = %q", Stars(false))
 	}
 }
 
@@ -52,5 +52,19 @@ func TestShort(t *testing.T) {
 		if got := Short(stars); got != want {
 			t.Errorf("Short(%d) = %q, want %q", stars, got, want)
 		}
+	}
+}
+
+// TestStarsHideASmallCount: below 100 the count shows only in
+// development.
+func TestStarsHideASmallCount(t *testing.T) {
+	mu.Lock()
+	numbers, checked = Numbers{Stars: 9}, time.Now()
+	mu.Unlock()
+	if got := Stars(false); got != "" {
+		t.Errorf("Stars(false) = %q, want none", got)
+	}
+	if got := Stars(true); got != "9" {
+		t.Errorf("Stars(true) = %q, want 9", got)
 	}
 }

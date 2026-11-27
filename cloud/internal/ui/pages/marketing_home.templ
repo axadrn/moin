@@ -3,7 +3,6 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
-	"github.com/axadrn/moin/cloud/internal/githubrepo"
 	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
@@ -16,7 +15,7 @@ import (
 // in. Every part shows a real thing moin prints, sends or counts. posts
 // are the posts from X, knocks the site's own server's (nil: none),
 // numbers what moin counted.
-templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers HomeNumbers) {
+templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
 		Description: brand.Description,
@@ -36,7 +35,9 @@ templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers HomeNumbers) {
 				@HomeLoseNothing()
 				@HomeCompare()
 				@HomePricing()
-				@homeNumbers(numbers)
+				if numbers != nil {
+					@homeNumbers(*numbers)
+				}
 				@HomeEnd()
 			</div>
 		</main>
@@ -68,18 +69,15 @@ templ HomeHero() {
 					<span class="moin-muted">Lose nothing.</span>
 				</h1>
 				<p class="moin-lead moin-center"><a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground moin-hero-open" data-quiet>Open source.</a>{ " " }<br class="moin-only-phone"/>One command to your own server.<br/>Every backup proven, every day.</p>
+				<p class="moin-text moin-muted moin-center">The open source alternative to Coolify and Kamal. No open SSH port.</p>
 			</div>
 			<div class="moin-stack moin-hero-start" data-gap="6">
 				@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
 				<div class="moin-row" data-gap="2" data-center data-wrap>
 					@homePrimary()
-					// The code, and its stars once GitHub answered.
 					@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
 						<i class="moin-icon moin-icon-git-hub"></i>
-						GitHub
-						if stars := githubrepo.Stars(); stars != "" {
-							<span class="moin-muted moin-digits">{ stars }</span>
-						}
+						Star on GitHub
 					}
 				</div>
 			</div>
@@ -164,6 +162,7 @@ templ HomeNobodyGetsIn() {
 			@homeFact("No surprise updates.", "Your server updates when you say so.")
 			@homeFact("A hacked watcher is harmless.", "It can read. It can't command.")
 		</div>
+		@components.Fact(components.FactProps{Name: "0 bytes", Note: "Sent to us by the free software. Read the source.", Href: layouts.GitHubURL})
 		@homeMore("/docs/security", "Security in detail")
 	</section>
 }
@@ -269,14 +268,18 @@ templ HomePricing() {
 				Name: brand.Name + " cloud", Chip: "Launch price", Price: "$7", Per: "a month, or $49 a year", Line: "A watcher and a copy.",
 				Rows: []string{"Everything in " + brand.Name, "We watch your servers", "A copy nobody can delete", "Encrypted. We can't read it", "No bucket to set up"},
 			}) {
-				@components.Button(components.ButtonProps{Href: "mailto:" + brand.SupportEmail + "?subject=moin%20cloud"}) {
-					Get in early
+				@components.Button(components.ButtonProps{Href: "/login"}) {
+					Start free trial
 				}
 			}
 		</div>
-		<p class="moin-text moin-muted moin-center">Your apps never leave your server. The launch price stays yours. <a href="/free-year" class="moin-link moin-foreground">Or get a year free.</a></p>
+		<p class="moin-text moin-muted moin-center">Your apps never leave your server. The launch price stays yours. <a href={ templ.SafeURL(homeFreeYear) } class="moin-link moin-foreground">Or get a year free.</a></p>
 	</section>
 }
+
+// homeFreeYear is where the free year of moin cloud is explained, for
+// now the discussions of the repo.
+const homeFreeYear = layouts.GitHubURL + "/discussions"
 
 // homePlanProps are one plan: its name, maybe a chip, the price and what
 // it is per, one line, and its rows.

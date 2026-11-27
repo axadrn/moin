@@ -10,8 +10,9 @@ import (
 )
 
 // Home is the landing page. knocks are the knocks of the site's own
-// server, nil when there are none; numbers what moin counted.
-func Home(files fs.FS, knocks func() *pages.HomeKnocks, numbers func() pages.HomeNumbers) http.HandlerFunc {
+// server, nil when there are none; numbers what moin counted, nil while
+// too few.
+func Home(files fs.FS, knocks func() *pages.HomeKnocks, numbers func() *pages.HomeNumbers) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Posts that cannot be read hide their section, nothing more.
 		posts, err := tweets.Load(files)

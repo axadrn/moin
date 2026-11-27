@@ -53,7 +53,7 @@ func knocksCloud(t *testing.T, knocks *report.Knocks) (*Cloud, string) {
 func homePage(t *testing.T, knocks func() *pages.HomeKnocks) string {
 	t.Helper()
 	w := httptest.NewRecorder()
-	numbers := func() pages.HomeNumbers { return pages.HomeNumbers{} }
+	numbers := func() *pages.HomeNumbers { return nil }
 	Home(os.DirFS("../../content"), knocks, numbers)(w, httptest.NewRequest("GET", "/", nil))
 	body, _ := io.ReadAll(w.Result().Body)
 	return string(body)
@@ -92,14 +92,14 @@ func TestProductionNeverShowsSampleKnocks(t *testing.T) {
 	}
 }
 
-// TestProductionNeverShowsSampleNumbers: before anything is counted,
-// production shows no counts; development shows marked sample numbers.
+// TestProductionNeverShowsSampleNumbers: below 100 downloads production
+// shows no numbers; development shows marked sample numbers.
 func TestProductionNeverShowsSampleNumbers(t *testing.T) {
 	cloud, _ := knocksCloud(t, nil)
-	if numbers := cloud.SiteNumbers(false)(); numbers.Sample || numbers.Totals != (counts.Totals{}) {
+	if numbers := cloud.SiteNumbers(false)(); numbers != nil {
 		t.Errorf("production numbers = %+v, want none", numbers)
 	}
-	if numbers := cloud.SiteNumbers(true)(); !numbers.Sample {
+	if numbers := cloud.SiteNumbers(true)(); numbers == nil || !numbers.Sample {
 		t.Error("development shows no marked sample numbers")
 	}
 }
