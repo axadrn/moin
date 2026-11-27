@@ -3,6 +3,7 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/service"
 	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
@@ -11,11 +12,12 @@ import (
 // Home is the landing page, top to bottom: the promise and a real
 // deploy; real posts that say the problem; zero trust, how nobody gets
 // in; the knocks the site's own server dropped, as proof; how nothing
-// gets lost; the others; the two prices; the numbers we have; the way
-// in. Every part shows a real thing moin prints, sends or counts. posts
-// are the posts from X, knocks the site's own server's (nil: none),
-// numbers what moin counted.
-templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers) {
+// gets lost; the others; the two prices; the numbers we have; the
+// latest posts of the blog; the way in. Every part shows a real thing
+// moin prints, sends or counts. posts are the posts from X, knocks the
+// site's own server's (nil: none), numbers what moin counted, blog the
+// newest posts of the blog.
+templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers, blog []service.BlogPost) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
 		Description: brand.Description,
@@ -37,6 +39,9 @@ templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers) {
 				@HomePricing()
 				if numbers != nil {
 					@homeNumbers(*numbers)
+				}
+				if len(blog) > 0 {
+					@homeBlog(blog)
 				}
 				@HomeStory()
 				@HomeEnd()
@@ -324,6 +329,15 @@ templ homePlanRows(rows ...string) {
 			</li>
 		}
 	</ul>
+}
+
+// homeBlog is the newest posts of the blog, as the list /blog shows.
+templ homeBlog(posts []service.BlogPost) {
+	<section id="blog" class="moin-band">
+		@homeHead("Latest writing.", "Short posts on running your own apps.")
+		@blogList(posts)
+		@homeMore("/blog", "See all")
+	</section>
 }
 
 // ---------------------------------------------------------------- end

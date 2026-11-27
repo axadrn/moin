@@ -5,13 +5,14 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/axadrn/moin/cloud/internal/service"
 	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // Home is the landing page. knocks are the knocks of the site's own
 // server, nil when there are none; numbers what moin counted, nil while
-// too few.
+// too few. Under them, the three newest posts of the blog.
 func Home(files fs.FS, knocks func() *pages.HomeKnocks, numbers func() *pages.HomeNumbers) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Posts that cannot be read hide their section, nothing more.
@@ -19,7 +20,11 @@ func Home(files fs.FS, knocks func() *pages.HomeKnocks, numbers func() *pages.Ho
 		if err != nil {
 			slog.Warn("home: tweets", "error", err)
 		}
-		render(w, r, pages.Home(posts, knocks(), numbers()))
+		blog, err := service.BlogPosts(files)
+		if err != nil {
+			slog.Warn("home: blog", "error", err)
+		}
+		render(w, r, pages.Home(posts, knocks(), numbers(), blog[:min(len(blog), 3)]))
 	}
 }
 
