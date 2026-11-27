@@ -278,12 +278,11 @@ type KeyCopy struct {
 
 // KeyCopyHere takes a copy of the smallest database on the server now,
 // encrypted for your key as it is in the config, and names it. A server
-// without a database answers nil: there is nothing to open yet.
+// without a bucket only names the database: its copy is made when it is
+// sent (SendCopyHere). A server without a database answers nil: there is
+// nothing to open yet.
 func KeyCopyHere(ctx context.Context, dir string, out io.Writer) (*KeyCopy, error) {
 	b := newApps(dir).backups
-	if !b.on() {
-		return nil, errNoBucket
-	}
 	var smallest *KeyCopy
 	var smallestDatabase protocol.Database
 	smallestSize := int64(0)
@@ -295,8 +294,8 @@ func KeyCopyHere(ctx context.Context, dir string, out io.Writer) (*KeyCopy, erro
 			}
 		}
 	}
-	if smallest == nil {
-		return nil, nil
+	if smallest == nil || !b.on() {
+		return smallest, nil
 	}
 	fmt.Fprintf(out, "copying %s of %s\n", smallest.Database, smallest.App)
 	id, err := b.copyNow(ctx, smallest.App, smallestDatabase)
@@ -305,11 +304,16 @@ func KeyCopyHere(ctx context.Context, dir string, out io.Writer) (*KeyCopy, erro
 }
 
 // SendCopyHere writes a copy to out as it lies in the bucket: encrypted.
+// A copy without an ID is made now and written as it would leave the
+// server, for one that has no bucket.
 func SendCopyHere(ctx context.Context, dir string, copy KeyCopy, out io.Writer) error {
 	b := newApps(dir).backups
 	database, err := b.one(copy.App, copy.Database)
 	if err != nil {
 		return err
+	}
+	if copy.Copy == "" {
+		return b.copyEncrypted(ctx, b.engine(copy.App, database), out)
 	}
 	body, _, err := b.readCopy(ctx, copy.App, database, protocol.Copy{ID: copy.Copy})
 	if err != nil {

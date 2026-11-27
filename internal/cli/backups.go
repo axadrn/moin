@@ -416,8 +416,7 @@ func newBackupKey(ctx context.Context, server, public string, stdin io.Reader, s
 }
 
 // bucketConfirm is `moin bucket confirm <server>`: you paste your backup
-// key, and moin opens a fresh copy from the bucket with it, here on your
-// laptop. Until that worked, `moin` shows the server in red.
+// key, and moin opens a fresh copy with it, here on your laptop. Until that worked, `moin` shows the server in red.
 func bucketConfirm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("bucket confirm", "bucket confirm <server>")
 	if err := flags.parse(args); err != nil {
@@ -432,7 +431,8 @@ func bucketConfirm(ctx context.Context, args []string, stdin io.Reader, stdout i
 
 // confirmBackupKey asks for your backup key and proves it: the server
 // takes a copy of its smallest database now, moin fetches it as it lies
-// in the bucket, and opens and reads it here with your key. Then the
+// in the bucket, and opens and reads it here with your key. A server
+// without a bucket sends that copy straight from the database. Then the
 // server writes down that the key is confirmed.
 func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdout io.Writer) error {
 	has, err := backupKey(ctx, server)
@@ -455,7 +455,7 @@ func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdou
 	}
 	if copy != nil {
 		if err := fetchAndOpen(ctx, server, *copy, key); err != nil {
-			return fmt.Errorf("your key did not open the copy %s of %s: %w", copy.Copy, copy.Database, err)
+			return fmt.Errorf("your key did not open the copy of %s: %w", copy.Database, err)
 		}
 	}
 	if err := sendJSON(ctx, server, daemon.BackupKey{Public: has.Public}, "bucket", "key", "confirm"); err != nil {
@@ -465,12 +465,17 @@ func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdou
 		done(stdout, "This is the backup key of %s. It has no database to copy yet", server)
 		return nil
 	}
+	if copy.Copy == "" {
+		done(stdout, "Your key opens the copies of %s: it read a fresh copy of %s to the end", server, copy.Database)
+		return nil
+	}
 	done(stdout, "Your key opens the copies of %s: it read the copy %s of %s from the bucket to the end", server, copy.Copy, copy.Database)
 	return nil
 }
 
 // fetchAndOpen fetches a copy from the server as it lies in the bucket,
-// and opens it here with key.
+// or a fresh one from a server without a bucket, and opens it here with
+// key.
 func fetchAndOpen(ctx context.Context, server string, copy daemon.KeyCopy, key age.Identity) error {
 	reader, writer := io.Pipe()
 	defer reader.Close()
@@ -517,7 +522,8 @@ func openCopy(encrypted io.Reader, postgres bool, key age.Identity) error {
 // hereBucketKey is `moin here bucket key …`, the server's side of your
 // backup key: `key` answers its public half, `key set` and `key confirm`
 // read one from stdin, `key copy` takes the copy that proves it, and
-// `key send` writes that copy to stdout as it lies in the bucket.
+// `key send` writes that copy to stdout as it lies in the bucket, or a
+// fresh one when --copy names none.
 func hereBucketKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	verb := ""
 	if len(args) > 0 {
@@ -540,7 +546,7 @@ func hereBucketKey(ctx context.Context, args []string, stdin io.Reader, stdout i
 		copy, err := daemon.KeyCopyHere(ctx, daemon.StateDir(), os.Stderr)
 		return respond(stdout, copy, err)
 	case "send":
-		flags := newFlags("here bucket key send", "here bucket key send <app> --database <name> --copy <id>")
+		flags := newFlags("here bucket key send", "here bucket key send <app> --database <name> [--copy <id>]")
 		database := flags.String("database", "", "the database")
 		copy := flags.String("copy", "", "the copy")
 		app, err := hereApp(flags, args[1:])

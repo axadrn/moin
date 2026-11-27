@@ -49,7 +49,8 @@ func StatusHere(ctx context.Context, dir string) Status {
 	status.PublicSSH = PublicSSHHere(ctx, dir)
 	status.KnocksToday = knocksToday(dir)
 	if config, err := LoadConfig(); err == nil {
-		status.Needs = append(backupKeyNeeds(config), backupNeeds(config, a.backups.statuses(ctx))...)
+		statuses := a.backups.statuses(ctx)
+		status.Needs = append(backupKeyNeeds(config, statuses), backupNeeds(config, statuses)...)
 		status.Needs = append(status.Needs, tailnetStatusNeeds(ctx, dir, config.Name)...)
 	}
 	for _, app := range a.names() {
@@ -68,12 +69,16 @@ func StatusHere(ctx context.Context, dir string) Status {
 	return status
 }
 
-// backupKeyNeeds says what your backup key needs: a server with a bucket
-// whose copies only the server itself could open is one fire away from
-// copies nobody can read.
-func backupKeyNeeds(config Config) []Need {
+// backupKeyNeeds says what your backup key needs: a server with a bucket,
+// or one whose copies a watcher took, is one fire away from copies nobody
+// can read when only the server itself could open them.
+func backupKeyNeeds(config Config, statuses map[string][]protocol.DatabaseBackup) []Need {
+	copied := false
+	for _, databases := range statuses {
+		copied = copied || slices.ContainsFunc(databases, func(database protocol.DatabaseBackup) bool { return database.CopiedAt != nil })
+	}
 	switch {
-	case config.Bucket == nil:
+	case config.Bucket == nil && !copied:
 		return nil
 	case config.BackupKey == nil:
 		return []Need{{Text: config.Name + ": no backup key of yours. When the server is gone, nobody can read its copies.", Command: build.Name + " bucket key " + config.Name}}

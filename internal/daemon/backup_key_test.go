@@ -2,12 +2,15 @@ package daemon
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"filippo.io/age"
 
@@ -129,7 +132,7 @@ func TestBackupKeyHere(t *testing.T) {
 	needs := func() string {
 		config, _ := LoadConfig()
 		said := ""
-		for _, need := range backupKeyNeeds(config) {
+		for _, need := range backupKeyNeeds(config, nil) {
 			said += need.Text + " " + need.Command
 		}
 		return said
@@ -164,8 +167,40 @@ func TestBackupKeyHere(t *testing.T) {
 	if key, _ := BackupKeyHere(); key.Confirmed {
 		t.Fatal("a new key is confirmed")
 	}
-	// A server without a bucket needs no key.
-	if got := backupKeyNeeds(Config{Name: "prod"}); got != nil {
+	// A server without a bucket needs no key, until a watcher took a copy.
+	if got := backupKeyNeeds(Config{Name: "prod"}, nil); got != nil {
 		t.Fatalf("without a bucket: %v", got)
+	}
+	at := time.Now()
+	copied := map[string][]protocol.DatabaseBackup{"shop": {{Database: "/data/app.db", CopiedAt: &at}}}
+	if got := backupKeyNeeds(Config{Name: "prod"}, copied); len(got) != 1 || got[0].Command != "moin bucket key prod" {
+		t.Fatalf("without a bucket, with a copy at a watcher: %v", got)
+	}
+}
+
+// A server without a bucket proves your key with a copy made now and
+// sent as it would leave the server: your key opens it.
+func TestSendCopyWithoutABucket(t *testing.T) {
+	journal(t)
+	b, database := shopWithSQLite(t)
+	yours, _ := age.GenerateX25519Identity()
+	if err := SetBackupKeyHere(yours.Recipient().String()); err != nil {
+		t.Fatal(err)
+	}
+	var sent bytes.Buffer
+	if err := SendCopyHere(context.Background(), filepath.Dir(b.apps.dir), KeyCopy{App: "shop", Database: database.Path}, &sent); err != nil {
+		t.Fatal(err)
+	}
+	plain, err := DecryptCopy(&sent, yours)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unzipped, err := gzip.NewReader(plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err := io.ReadAll(unzipped)
+	if err != nil || !bytes.HasPrefix(file, []byte("SQLite format 3\x00")) {
+		t.Fatalf("what your key opened is no database: %v", err)
 	}
 }
