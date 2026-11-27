@@ -288,7 +288,8 @@ func TestR2(t *testing.T) {
 	if status := put(t, address, body); status != http.StatusOK {
 		t.Fatalf("upload: HTTP %d", status)
 	}
-	if status := put(t, address, body); status != http.StatusPreconditionFailed {
+	// R2's lock answers before If-None-Match does: 409, not 412.
+	if status := put(t, address, body); status != http.StatusConflict && status != http.StatusPreconditionFailed {
 		t.Errorf("an overwrite: HTTP %d", status)
 	}
 	if size, err := bucket.Size(ctx, key); err != nil || size != int64(len(body)) {
