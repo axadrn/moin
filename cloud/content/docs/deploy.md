@@ -68,7 +68,27 @@ moin sends the image you built on your laptop. The server builds nothing. This o
 
 ## Deploy from CI
 
-Coming: `moin follow`. The server watches a branch with a read-only key and deploys each new commit. CI needs no key to your server. Whoever can push to that branch can deploy, so pick the branch with care.
+The server pulls. CI needs no key to your server.
+
+```bash
+moin follow shop --branch main
+```
+
+```text
+→ adding a read-only deploy key to you/shop with gh
+✓ shop follows main. It deploys 3f2a9c1 within a minute, then each new commit
+  Whoever can push to main deploys to prod. A deploy that fails alerts.
+```
+
+- The server makes a deploy key, `/var/lib/moin/follow/shop/key`. Only its public half leaves the server.
+- With `gh` logged in, moin adds it to the GitHub repo by itself. Else it prints the key, and you add it as a deploy key with write access off.
+- Every minute the server asks the repo for the newest commit of the branch. A new one is cloned and deployed like a deploy from your laptop.
+- In the folder of the app, the branch and the repo come from git. Else name them: `--branch main --repo git@github.com:you/shop.git`.
+- The repo goes over SSH. An `https://` address becomes its SSH address.
+- Each commit is tried once. A deploy that fails alerts once, and the next good one says it is over.
+- `moin follow shop --off` stops it and removes the key from the server. Remove it from the repo too.
+
+Whoever can push to that branch can deploy, so pick the branch with care.
 
 ## Roll back
 

@@ -15,7 +15,7 @@ Whoever can SSH to it as root. Nobody else.
 
 - Not a watcher, not moin cloud, not us. They only receive reports.
 - Every SSH user who may run moin is as strong as root on that server. For a user who is not root, moin runs `sudo` by itself. That needs sudo without a password.
-- Coming: `moin follow`. Then whoever can push to the branch it follows can deploy too.
+- With `moin follow`, whoever can push to the branch it follows can deploy too. [Deploy from CI](/docs/deploy#deploy-from-ci)
 
 ## The team
 
@@ -36,7 +36,7 @@ With Tailscale, your tailnet's rules decide too: who may reach the server at all
 
 ## SSH only over Tailscale
 
-Coming. A fresh server only answers SSH on public port 22. So the first deploy goes that way. Right after it, moin asks:
+A fresh server only answers SSH on public port 22. So the first deploy goes that way. Right after it, moin asks:
 
 ```text
 Close public SSH, only Tailscale from now on? [Y/n]
@@ -44,18 +44,25 @@ Close public SSH, only Tailscale from now on? [Y/n]
 
 Enter means yes. Then:
 
-1. moin puts the server in your tailnet, your own private network.
-2. It opens a new SSH session over Tailscale.
-3. Only when that works, it closes public port 22.
-4. It points your `prod` alias at the server's tailnet name.
+1. moin puts the server in your tailnet, your own private network. Paste a Tailscale auth key, or press Enter for a link to log in.
+2. It opens a new SSH session over Tailscale. The server must show the same host key as on its public address.
+3. Only when that works, the server closes public port 22. First it sets a guard: in 2 minutes it opens port 22 again by itself.
+4. moin opens one more new SSH session over Tailscale. That session stops the guard. If it never comes, the guard opens port 22 again. So a change that would lock you out undoes itself.
+5. moin prints the line for your `~/.ssh/config`. It never edits that file itself:
+
+```text
+  Point prod at the tailnet. In ~/.ssh/config, set:
+    Host prod
+      HostName prod.tail0000.ts.net
+```
 
 From then on, `moin deploy` goes over Tailscale. To the rest of the internet, port 22 is gone.
 
 - It needs a Tailscale account. The free plan works.
-- With Tailscale SSH, the server needs no SSH daemon at all.
+- sshd must listen on port 22. If it listens on another one, moin leaves public SSH open.
 - Tailscale keeps `41641/udp` open, for direct connections. If it is closed, Tailscale still works, through its relays.
 - Said no? `moin` shows a red line until it is closed: `prod: port 22 open to the internet`.
-- A server's Tailscale key expires. A watcher warns you before it does.
+- A server's Tailscale key expires, and then SSH to it stops. Two weeks before, the server alerts and `moin` shows it. Better: turn key expiry off for the server. Tailscale admin console, Machines, the server, the ⋯ menu, Disable key expiry.
 
 ## Tailnet Lock
 
@@ -65,11 +72,11 @@ Without it, whoever controls your Tailscale account could add a device to your t
 
 ## Cloudflare Tunnel and the firewall
 
-Coming.
-
 ```bash
 moin secure prod
 ```
+
+It closes public SSH as above, then asks for the token of a Cloudflare Tunnel. Make one in the Cloudflare dashboard: Networks, Tunnels, Create a tunnel, Cloudflared. The token is the long text after `--token`. Enter without one keeps the web on ports 80 and 443.
 
 This closes the last open ports:
 
@@ -82,10 +89,14 @@ After it, no public TCP port is left on the server.
 - Cloudflare sees the web traffic it carries. That is the trade.
 - The instant address, `*.sslip.io`, needs ports 80 and 443. Behind the tunnel, use your own domain.
 - Your provider may have a cloud firewall in front of the server. moin does not touch it.
+- Ports your apps publish, like `5432` in a `compose.yml`, are closed to the internet too. Your tailnet still reaches them. Without a tunnel, 80 and 443 stay open for the web.
+- The tunnel takes the web only once it reaches Cloudflare. With a wrong token, the web stays where it was.
+- In the tunnel's Public Hostnames, send each domain to `http://moin-traefik:8080`.
+- `moin secure prod --tunnel off` takes the web out of the tunnel. It comes on ports 80 and 443 again.
 
 ## Knocks
 
-Bots try every new server within minutes: SSH, databases, admin pages. Each try is a knock. Once public SSH is closed, moin's firewall drops them, and counts each one under the name of its port.
+Bots try every new server within minutes: SSH, databases, admin pages. Each connection attempt is a knock. Once public SSH is closed, moin's firewall drops them, and counts each one under the name of its port.
 
 ```bash
 moin knocks prod
@@ -97,7 +108,7 @@ PORT       HOUR   TODAY   7 DAYS   YEAR      TOTAL     PER MINUTE
 ssh        47     1,120   7,904    131,220   240,017   0.8
 postgres   6      142     1,003    17,436    30,551    0.1
 all        71     1,843   12,880   212,904   389,117   1.2
-All dropped. Counted since March 2, 2026.
+Connection attempts, all dropped. Counted since March 2, 2026.
 ```
 
 - Without a server, it shows every server, one after the other. `--json` prints the numbers for a script.
@@ -107,15 +118,36 @@ All dropped. Counted since March 2, 2026.
 
 ## The way back in
 
-Coming, with `moin secure`. Lost your laptop, or your tailnet? Use your provider's web console. It is a screen and a keyboard on the server, in your browser.
+Lost your laptop, or your tailnet? Use your provider's web console. It is a screen and a keyboard on the server, in your browser.
 
 Log in there as root and run:
 
 ```bash
-moin unlock
+/usr/local/bin/moin unlock
 ```
 
-It opens public port 22 again. Then SSH works as on day one. No port ever opens by itself: only `moin unlock`, typed on the server.
+It opens public port 22 again, and starts sshd if it is off. Then SSH works as on day one. The full path also works with `sudo`, which may not look in `/usr/local/bin`.
+
+Otherwise no port opens by itself. Only the guard does, in the 2 minutes after a change that did not let you back in.
+
+`moin daemon uninstall` without `--apps` opens port 22 too, and takes the firewall away: `moin unlock` goes with moin, so nothing may stay closed behind it. [Remove moin](/docs/cli#remove-moin-from-a-server)
+
+## Troubleshooting
+
+**This computer does not reach the server over Tailscale.** moin says so, and public SSH stays open. Turn Tailscale on here, in the same tailnet, then `moin secure prod` again.
+
+**Both are in the tailnet, but port 22 does not answer.** Your tailnet's rules keep them apart. moin prints the fix, with the name your rules know this computer by. In the Tailscale admin console, Access controls, add a tag for servers and let this computer reach it on port 22:
+
+```json
+"tagOwners": {"tag:server": ["autogroup:admin"]},
+"grants": [{"src": ["ada@example.com"], "dst": ["tag:server"], "ip": ["tcp:22"]}]
+```
+
+The source is this computer: its tags if it has any, like `tag:laptop`, else your login. Then give the server the tag: Machines, the server, the ⋯ menu, Edit ACL tags, `tag:server`. Then `moin secure prod` again. A tagged server's key does not expire.
+
+**moin says "No new SSH session over Tailscale came through".** The change closed something that kept you out. Wait 2 minutes: the guard opens port 22 again by itself. Then `ssh prod` over the public address works, and `moin secure prod` tries again.
+
+**`moin` says Tailscale does not run on the server.** SSH only comes through it. In your provider's web console, run `tailscale up`, or `/usr/local/bin/moin unlock`.
 
 ## Updates
 
@@ -172,5 +204,7 @@ On your server, and only there. Root only.
 | --- | --- |
 | `/var/lib/moin/apps/<app>/app.env` | the env vars of one app |
 | `/etc/moin/config.yml` | the bucket key, the alert tokens, the watcher tokens |
+| `/var/lib/moin/server.json` | the Cloudflare Tunnel token, and what is closed |
+| `/var/lib/moin/follow/<app>/key` | the read-only deploy key of an app that follows a branch |
 
 They reach the server over your SSH connection, and nothing else. No copy of them is kept anywhere but on the server.

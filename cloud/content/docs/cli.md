@@ -143,7 +143,17 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin version` | the version |
 | `moin help` | every command |
 
-Coming: `moin secure <server>` and `moin unlock`. [Security](/docs/security)
+## Security
+
+| Command | What it does |
+| --- | --- |
+| `moin secure <server>` | SSH only over Tailscale, the web through a Cloudflare Tunnel, a firewall for the rest |
+| `moin secure <server> --tunnel off` | the web on ports 80 and 443 again, not through the tunnel |
+| `moin unlock` | on the server, in your provider's web console: open port 22 again |
+| `moin knocks [server]` | the connection attempts the firewall dropped, by port |
+| `moin follow [app] --branch main` | the server deploys each new commit of the branch. `--off` stops it |
+
+[Security](/docs/security)
 
 ## Remove moin from a server
 
@@ -159,11 +169,12 @@ moin daemon uninstall
 → stopping the moin-daemon service
 → removing /usr/local/bin/moin
 ✓ moin is removed from this server
-  Still here: the apps shop with their data in /var/lib/moin/apps; the proxy container moin-traefik, and the tunnel and firewall when they were on; the config in /etc/moin/config.yml; Docker.
+  Still here: the apps shop with their data in /var/lib/moin/apps; the proxy container moin-traefik, and the tunnel when it was on; the config in /etc/moin/config.yml; Docker.
   Remove the apps and their data too, as root, with moin daemon uninstall --apps
 ```
 
 - Without `--apps`: the daemon goes, and with it the backups, the restore checks and the reports. The apps keep running, with their data and HTTPS.
+- Without `--apps`, public port 22 opens again and the firewall goes: `moin unlock` goes with moin, so nothing may stay closed behind it.
 - With `--apps`: every app goes too, with its data, its images, the proxy, the tunnel and the firewall. This can't be undone.
 - What stays either way: the config in `/etc/moin/config.yml`, and Docker.
 - In a script, add `-y`.
