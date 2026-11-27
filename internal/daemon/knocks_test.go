@@ -5,27 +5,8 @@ import (
 	"time"
 )
 
-// A counter that went down started again: all it holds is new. So is the
-// first read.
-func TestKnocksSince(t *testing.T) {
-	cases := []struct {
-		last, now int64
-		seen      bool
-		want      int64
-	}{
-		{0, 12, false, 12}, // the first read
-		{10, 15, true, 5},  // five more
-		{15, 15, true, 0},  // none
-		{500, 3, true, 3},  // a reload or a reboot set it back
-	}
-	for _, c := range cases {
-		if got := knocksSince(c.last, c.now, c.seen); got != c.want {
-			t.Errorf("knocksSince(%d, %d, %v) = %d, want %d", c.last, c.now, c.seen, got, c.want)
-		}
-	}
-}
-
-// Each window counts what it should, from reads across a year.
+// Each window counts what it should, from reads across a year. Each read
+// is what came since the one before.
 func TestKnocksPerWindow(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 11, 27, 14, 30, 0, 0, time.UTC)
@@ -33,11 +14,11 @@ func TestKnocksPerWindow(t *testing.T) {
 		at  time.Time
 		ssh int64
 	}{
-		{time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC), 100}, // the first read: 100, this year
-		{now.AddDate(0, 0, -3), 150},                       // 50, this week
-		{now.Add(-3 * time.Hour), 10},                      // reset: 10, today
-		{now.Add(-30 * time.Minute), 30},                   // 20, this hour
-		{now.Add(-5 * time.Minute), 40},                    // 10, the last 10 minutes
+		{time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC), 100}, // this year
+		{now.AddDate(0, 0, -3), 50},                        // this week
+		{now.Add(-3 * time.Hour), 10},                      // today
+		{now.Add(-30 * time.Minute), 20},                   // this hour
+		{now.Add(-5 * time.Minute), 10},                    // the last 10 minutes
 	}
 	for _, read := range reads {
 		if err := saveKnocks(dir, read.at, map[string]int64{"ssh": read.ssh, "postgres": 0}); err != nil {
@@ -72,5 +53,30 @@ func TestParseCounters(t *testing.T) {
 	counters, err := parseCounters([]byte(out))
 	if err != nil || counters["ssh"] != 42 || counters["node-red"] != 0 || len(counters) != 2 {
 		t.Fatalf("counters = %v, %v", counters, err)
+	}
+}
+
+// Minutes older than two days fold into one row per day, and count the
+// same as before.
+func TestKnocksFoldIntoDays(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 11, 27, 14, 30, 0, 0, time.UTC)
+	for _, at := range []time.Time{now.AddDate(0, 0, -5).Add(time.Minute), now.AddDate(0, 0, -5).Add(2 * time.Hour), now.Add(-time.Hour)} {
+		if err := saveKnocks(dir, at, map[string]int64{"ssh": 3}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db, err := openKnocks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var rows int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM knocks`).Scan(&rows); err != nil || rows != 2 {
+		t.Fatalf("rows = %d, %v, want one day and one minute", rows, err)
+	}
+	knocks, err := countKnocksAt(dir, now)
+	if err != nil || knocks.All.Total != 9 || knocks.All.Week != 9 || knocks.All.Today != 3 {
+		t.Fatalf("all = %+v, %v", knocks.All, err)
 	}
 }

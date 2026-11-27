@@ -213,9 +213,13 @@ func (fw *follower) look(ctx context.Context, f Follow) Follow {
 		return f
 	}
 	commit, err := fw.deploy(ctx, f)
-	f.Commit = cmp.Or(commit, head)
+	// A deploy that got no commit did not start, like a clone in a
+	// network blip: the next look tries again.
+	if commit != "" {
+		f.Commit = commit
+	}
 	if err != nil {
-		return fw.problem(ctx, f, fmt.Sprintf("%s: the deploy of %s from %s failed", f.App, short(f.Commit), f.Branch), err)
+		return fw.problem(ctx, f, fmt.Sprintf("%s: the deploy of %s from %s failed", f.App, short(cmp.Or(commit, head)), f.Branch), err)
 	}
 	slog.Info("follow: deployed", "app", f.App, "branch", f.Branch, "commit", short(f.Commit))
 	if f.Problem != "" {
@@ -280,7 +284,9 @@ func (fw *follower) git(ctx context.Context, f Follow, args ...string) (string, 
 		" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new" +
 		" -o UserKnownHostsFile=" + shellQuote(filepath.Join(folder, "known_hosts"))
 	command := exec.CommandContext(ctx, "git", args...)
-	command.Env = append(os.Environ(), "GIT_SSH_COMMAND="+ssh, "GIT_TERMINAL_PROMPT=0")
+	// Only ssh: a repo URL like ext:: or file:// would run commands or
+	// read files on the server.
+	command.Env = append(os.Environ(), "GIT_SSH_COMMAND="+ssh, "GIT_TERMINAL_PROMPT=0", "GIT_ALLOW_PROTOCOL=ssh")
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	out, err := command.Output()

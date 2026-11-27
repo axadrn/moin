@@ -63,7 +63,7 @@ Servers
   alerts add               Add one: alerts add prod telegram --token … --chat-id …, or slack|discord|webhook --url …
   alerts rm                Remove one: alerts rm prod 2
   alerts test              Send a test alert: alerts test prod
-  secure                   SSH only over Tailscale, the web through a Cloudflare Tunnel, a firewall for the rest: secure prod
+  secure                   SSH only over Tailscale, the web through a Cloudflare Tunnel, a firewall for the rest: secure prod [--tunnel off]
   knocks                   What the firewall dropped, by port: knocks [server] [--json]
   update                   Update this CLI to the newest release
   update <server>          Put this CLI's version of moin on a server: update prod

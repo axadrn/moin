@@ -80,7 +80,7 @@ func knocks(ctx context.Context, args []string, stdout io.Writer) error {
 			rows = append(rows, []string{count.Name, human.Count(count.Hour), human.Count(count.Today), human.Count(count.Week), human.Count(count.Year), human.Count(count.Total), strconv.FormatFloat(count.PerMinute, 'f', 1, 64)})
 		}
 		table(stdout, []string{"PORT", "HOUR", "TODAY", "7 DAYS", "YEAR", "TOTAL", "PER MINUTE"}, rows)
-		fmt.Fprintln(stdout, style.Muted.Render("All dropped. Counted since "+result.Knocks.Since.Local().Format("January 2, 2006")+"."))
+		fmt.Fprintln(stdout, style.Muted.Render("Connection attempts, all dropped. Counted since "+result.Knocks.Since.Local().Format("January 2, 2006")+"."))
 	}
 	return nil
 }

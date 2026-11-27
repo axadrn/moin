@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
-	"math"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -17,10 +16,12 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// A knock is a connection from the internet that moin's firewall drops.
-// Bots try every new server within minutes: SSH, databases, admin pages.
-// The firewall counts each knock under the name of its port, the daemon
-// reads the counters every minute and keeps the counts in knocks.db.
+// A knock is a connection attempt from the internet that moin's firewall
+// drops. Bots try every new server within minutes: SSH, databases, admin
+// pages. The firewall counts each knock under the name of its port. Every
+// minute the daemon reads the counters, sets them back to zero in the
+// same step, and adds what they said to knocks.db. Minutes older than two
+// days fold into one row per day.
 
 // knockPorts are the ports knocks are counted by: report.KnockPorts, one
 // place for the daemon and the site.
@@ -64,20 +65,21 @@ func countKnocks(ctx context.Context, dir string) {
 	}
 }
 
-// readCounters reads the knock counters of moin's table, by name. Without
-// the table there are none.
+// readCounters reads the knock counters of moin's table, by name, and
+// sets them back to zero: what they say is new since the last read.
+// Without the table there are none.
 func readCounters(ctx context.Context) (map[string]int64, error) {
 	if !tableLoaded(ctx) {
 		return nil, nil
 	}
-	out, err := exec.CommandContext(ctx, "nft", "-j", "list", "counters", "table", "inet", firewallTable).Output()
+	out, err := exec.CommandContext(ctx, "nft", "-j", "reset", "counters", "table", "inet", firewallTable).Output()
 	if err != nil {
 		return nil, err
 	}
 	return parseCounters(out)
 }
 
-// parseCounters reads what `nft -j list counters` prints: packets by
+// parseCounters reads what `nft -j reset counters` prints: packets by
 // knock name.
 func parseCounters(out []byte) (map[string]int64, error) {
 	var listed struct {
@@ -103,16 +105,15 @@ func parseCounters(out []byte) (map[string]int64, error) {
 	return counters, nil
 }
 
-// openKnocks opens knocks.db and makes its tables. knocks holds the
-// count of each name per minute. last holds what each counter said the
-// last time, for the next difference.
+// openKnocks opens knocks.db and makes its table: the count of each name
+// per minute, or per day for the days before yesterday. A day's row
+// stands on the first minute of the day, in UTC.
 func openKnocks(dir string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, knocksFile)+"?_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, err
 	}
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS knocks (minute INTEGER, name TEXT, count INTEGER, PRIMARY KEY (minute, name));
-CREATE TABLE IF NOT EXISTS last (name TEXT PRIMARY KEY, value INTEGER)`)
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS knocks (minute INTEGER, name TEXT, count INTEGER, PRIMARY KEY (minute, name))`)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -120,19 +121,12 @@ CREATE TABLE IF NOT EXISTS last (name TEXT PRIMARY KEY, value INTEGER)`)
 	return db, nil
 }
 
-// knocksSince is how many knocks came since the last read. A counter
-// lower than last time started again, after a reload or a reboot: all
-// it holds is new. So is the first read.
-func knocksSince(last, now int64, seen bool) int64 {
-	if !seen || now < last {
-		return now
-	}
-	return now - last
-}
+// minutesPerDay is how many minutes a day has, for the day rows.
+const minutesPerDay = 24 * 60
 
-// saveKnocks keeps the knocks since the last read under the minute of
-// at, and what each counter says now.
-func saveKnocks(dir string, at time.Time, counters map[string]int64) error {
+// saveKnocks adds the knocks counted since the last read to the minute
+// of at, and folds the minutes older than two days into their days.
+func saveKnocks(dir string, at time.Time, counts map[string]int64) error {
 	db, err := openKnocks(dir)
 	if err != nil {
 		return err
@@ -144,23 +138,27 @@ func saveKnocks(dir string, at time.Time, counters map[string]int64) error {
 	}
 	defer tx.Rollback()
 	minute := at.Unix() / 60
-	for name, now := range counters {
-		var last int64
-		err := tx.QueryRow(`SELECT value FROM last WHERE name = ?`, name).Scan(&last)
-		if err != nil && err != sql.ErrNoRows {
-			return err
+	for name, count := range counts {
+		if count == 0 {
+			continue
 		}
-		count := knocksSince(last, now, err == nil)
-		if count > 0 {
-			_, err = tx.Exec(`INSERT INTO knocks (minute, name, count) VALUES (?, ?, ?)
+		_, err = tx.Exec(`INSERT INTO knocks (minute, name, count) VALUES (?, ?, ?)
 ON CONFLICT (minute, name) DO UPDATE SET count = count + excluded.count`, minute, name, count)
-			if err != nil {
-				return err
-			}
-		}
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO last (name, value) VALUES (?, ?)`, name, now); err != nil {
+		if err != nil {
 			return err
 		}
+	}
+	// Whole days only: from the start of the day two days ago back.
+	before := minute - 2*minutesPerDay
+	before -= before % minutesPerDay
+	_, err = tx.Exec(`INSERT INTO knocks (minute, name, count)
+SELECT minute - minute % ?1, name, SUM(count) FROM knocks WHERE minute < ?2 AND minute % ?1 != 0 GROUP BY 1, 2
+ON CONFLICT (minute, name) DO UPDATE SET count = count + excluded.count`, minutesPerDay, before)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM knocks WHERE minute < ?2 AND minute % ?1 != 0`, minutesPerDay, before); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
@@ -174,9 +172,9 @@ type Knocks struct {
 	Names []KnockCount `json:"names"`
 }
 
-// KnockCount is how many knocks one name had: in the last hour, today,
-// the last 7 days, this year and since the first count. PerMinute is the
-// rate of the last 10 minutes.
+// KnockCount is how many connection attempts one name had: in the last
+// hour, today, the last 7 days, this year and since the first count.
+// PerMinute is the rate of the last 10 minutes.
 type KnockCount struct {
 	Name      string  `json:"name"`
 	Hour      int64   `json:"hour"`
@@ -221,13 +219,15 @@ FROM knocks GROUP BY name`,
 		return knocks, err
 	}
 	defer rows.Close()
+	var allLastTen int64
 	for rows.Next() {
 		var count KnockCount
 		var lastTen, first int64
 		if err := rows.Scan(&count.Name, &count.Hour, &count.Today, &count.Week, &count.Year, &count.Total, &lastTen, &first); err != nil {
 			return knocks, err
 		}
-		count.PerMinute = math.Round(float64(lastTen)) / 10
+		count.PerMinute = float64(lastTen) / 10
+		allLastTen += lastTen
 		since := time.Unix(first*60, 0).UTC()
 		if knocks.Since.IsZero() || since.Before(knocks.Since) {
 			knocks.Since = since
@@ -235,7 +235,7 @@ FROM knocks GROUP BY name`,
 		knocks.Names = append(knocks.Names, count)
 		all := &knocks.All
 		all.Hour, all.Today, all.Week, all.Year, all.Total = all.Hour+count.Hour, all.Today+count.Today, all.Week+count.Week, all.Year+count.Year, all.Total+count.Total
-		all.PerMinute = math.Round((all.PerMinute+count.PerMinute)*10) / 10
+		all.PerMinute = float64(allLastTen) / 10
 	}
 	slices.SortFunc(knocks.Names, func(a, b KnockCount) int {
 		return cmp.Or(cmp.Compare(b.Total, a.Total), cmp.Compare(a.Name, b.Name))

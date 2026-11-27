@@ -3,9 +3,7 @@ package daemon
 import (
 	"context"
 	"errors"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -85,37 +83,37 @@ func TestFollowAlertsABranchItCannotReadOnce(t *testing.T) {
 	}
 }
 
-// The real git: ls-remote reads the newest commit of a branch in a repo
-// on disk.
-func TestFollowReadsTheBranchWithGit(t *testing.T) {
+// The real git: a repo that is not reached over ssh is refused, like a
+// file:// URL that would read the server's own disk.
+func TestFollowReadsOnlyOverSSH(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("no git")
 	}
 	repo := t.TempDir()
-	run := func(args ...string) string {
-		t.Helper()
-		command := exec.Command("git", args...)
-		command.Dir = repo
-		command.Env = append(os.Environ(), "GIT_AUTHOR_NAME=a", "GIT_AUTHOR_EMAIL=ada@example.com", "GIT_COMMITTER_NAME=a", "GIT_COMMITTER_EMAIL=ada@example.com")
-		out, err := command.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %s: %s", args, out)
-		}
-		return strings.TrimSpace(string(out))
+	command := exec.Command("git", "init", "-q", "-b", "main", repo)
+	if out, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %s", out)
 	}
-	run("init", "-q", "-b", "main")
-	os.WriteFile(filepath.Join(repo, "index.js"), []byte("1"), 0o644)
-	run("add", ".")
-	run("commit", "-qm", "one")
-	want := run("rev-parse", "HEAD")
-	dir := t.TempDir()
-	fw := newFollower(&apps{}, dir)
-	head, err := fw.head(t.Context(), Follow{App: "shop", Repo: "file://" + repo, Branch: "main"})
-	if err != nil || head != want {
-		t.Fatalf("head = %q, %v, want %q", head, err, want)
+	fw := newFollower(&apps{}, t.TempDir())
+	_, err := fw.head(t.Context(), Follow{App: "shop", Repo: "file://" + repo, Branch: "main"})
+	if err == nil || !strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("a file:// repo: %v", err)
 	}
-	if _, err := fw.head(t.Context(), Follow{App: "shop", Repo: "file://" + repo, Branch: "nope"}); err == nil || !strings.Contains(err.Error(), "no branch nope") {
-		t.Fatalf("a missing branch: %v", err)
+}
+
+// A deploy that got no commit, like a clone in a network blip, is tried
+// again at the next look.
+func TestFollowTriesAgainWhenTheDeployGotNoCommit(t *testing.T) {
+	fake := &fakeFollower{head: "aaa1111"}
+	fw := fake.follower()
+	fw.deploy = func(context.Context, Follow) (string, error) {
+		fake.deployed = append(fake.deployed, "")
+		return "", errors.New("git: could not resolve host")
+	}
+	f := fw.look(t.Context(), Follow{App: "shop", Branch: "main"})
+	f = fw.look(t.Context(), f)
+	if f.Commit != "" || len(fake.deployed) != 2 || len(fake.alerts) != 1 {
+		t.Fatalf("after two failed clones: %+v, deployed %q, alerts %+v", f, fake.deployed, fake.alerts)
 	}
 }
 

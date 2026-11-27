@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,8 +24,13 @@ import (
 // first deploy goes that way. Right after it moin offers to close it:
 // the server joins your tailnet, moin tries a new SSH session over
 // Tailscale, and only when that works does port 22 close to the rest of
-// the internet. `moin secure` closes the rest too. `moin unlock`, typed in
-// your provider's web console, opens port 22 again.
+// the internet. `moin secure` closes the rest too.
+//
+// Before the server closes anything, it sets a guard: in two minutes it
+// opens port 22 again by itself. moin then opens one more new SSH session
+// over Tailscale, and only that session stops the guard. So a change that
+// would lock you out undoes itself. `moin unlock`, typed in your
+// provider's web console, opens port 22 again too.
 
 // offerClose is the question after the first deploy to a server.
 func offerClose(ctx context.Context, server string, stdin io.Reader, stdout io.Writer) error {
@@ -50,15 +56,24 @@ func offerClose(ctx context.Context, server string, stdin io.Reader, stdout io.W
 
 // secure is `moin secure <server>`: public SSH closes, the web goes
 // through a Cloudflare Tunnel when you paste its token, and a firewall
-// closes every other port.
+// closes every other port. With --tunnel off the web leaves the tunnel
+// and comes on ports 80 and 443 again.
 func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("secure", "secure <server>")
+	flags := newFlags("secure", "secure <server> [--tunnel off]")
+	tunnel := flags.String("tunnel", "", "off: the web on ports 80 and 443 again, not through the tunnel")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	server, err := flags.server()
 	if err != nil {
 		return err
+	}
+	switch *tunnel {
+	case "":
+	case "off":
+		return lockDown(ctx, server, daemon.Secure{TunnelOff: true}, stdin, stdout)
+	default:
+		return fmt.Errorf("--tunnel takes only off: %s", flags.usage)
 	}
 	token, err := askTunnelToken(stdin, stdout)
 	if err != nil {
@@ -82,9 +97,10 @@ func askTunnelToken(stdin io.Reader, stdout io.Writer) (string, error) {
 	return token, err
 }
 
-// lockDown closes what change asks for. When it closes SSH it first
-// makes sure a new session over Tailscale works, so you never lock
-// yourself out.
+// lockDown makes change on the server. It first makes sure a new SSH
+// session over Tailscale works. After the change, one more new session
+// over Tailscale stops the guard, so a change that locks you out undoes
+// itself within two minutes.
 func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io.Reader, stdout io.Writer) error {
 	public, err := sshHostname(ctx, server)
 	if err != nil {
@@ -94,8 +110,7 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 	if err != nil {
 		return err
 	}
-	// Already reached through the tailnet: nothing to try, nothing to
-	// point elsewhere.
+	// Already reached through the tailnet: nothing to point elsewhere.
 	viaTailnet := public == tailnet.Name || public == tailnet.IP
 	reach := public
 	if !viaTailnet {
@@ -110,15 +125,35 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 	if err != nil {
 		return err
 	}
-	var now daemon.Security
-	if err := sshJSON(ctx, server, []string{"secure"}, strings.NewReader(string(body)), &now); err != nil {
-		return err
+	// The server may fail after it closed something: what closed still
+	// has to prove it lets you in.
+	var ignored daemon.Security
+	failed := sshJSON(ctx, server, []string{"secure"}, strings.NewReader(string(body)), &ignored)
+	step(stdout, "trying one more new SSH session over Tailscale, with the ports closed")
+	now, err := confirmTailnet(ctx, server, reach)
+	if err != nil {
+		fmt.Fprintln(stdout, style.Warning.Render("!")+" No new SSH session over Tailscale came through. Within 2 minutes "+server+" opens port 22 again by itself.")
+		return errors.Join(failed, err)
 	}
-	if !viaTailnet && portAnswers(public, "22") {
+	printSecurity(stdout, server, public, viaTailnet, change, now)
+	if !viaTailnet && !now.PublicSSH {
+		pointAlias(stdout, server, reach)
+	}
+	return failed
+}
+
+// printSecurity says what is closed on the server now.
+func printSecurity(stdout io.Writer, server, public string, viaTailnet bool, change daemon.Secure, now daemon.Security) {
+	switch {
+	case now.PublicSSH && change.CloseSSH:
+		fmt.Fprintln(stdout, style.Warning.Render("!")+" Port 22 of "+server+" is still open to the internet.")
+	case now.PublicSSH:
+	case !viaTailnet && portAnswers(public, "22"):
 		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+public+" still answers on port 22 from here. Check it with `"+build.Name+"`.")
-	} else {
+	default:
 		done(stdout, "Public port 22 is closed. %s answers SSH only over Tailscale", server)
 	}
+	apps := slices.DeleteFunc(slices.Clone(now.Published), func(port string) bool { return port == "80/tcp" || port == "443/tcp" })
 	if now.Firewall {
 		ports := slices.DeleteFunc(slices.Clone(now.OpenPorts), func(port string) bool { return port == "41641/udp" })
 		open := "none"
@@ -126,14 +161,22 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 			open = strings.Join(ports, ", ")
 		}
 		done(stdout, "The firewall is on. Open to the internet: %s", open)
+		if len(apps) > 0 {
+			fmt.Fprintln(stdout, "  "+style.Muted.Render("Apps publish "+strings.Join(apps, ", ")+". Only your tailnet reaches them."))
+		}
+	} else if len(apps) > 0 {
+		fmt.Fprintln(stdout, style.Warning.Render("!")+" Apps publish "+strings.Join(apps, ", ")+" to the internet. Close them with `"+build.Name+" secure "+server+"`.")
 	}
 	if now.Tunnel {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("In the tunnel's Public Hostnames, send each domain to http://"+build.Name+"-traefik:8080."))
 	}
-	if !viaTailnet {
-		pointAlias(stdout, server, reach)
+	if now.PublicSSH {
+		return
 	}
-	return nil
+	if !now.Tailnet.KeyExpiry.IsZero() {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Its Tailscale key expires on "+now.Tailnet.KeyExpiry.Local().Format("January 2")+", then SSH stops. "+daemon.KeyExpiryHint(now.Tailnet.Name)))
+	}
+	hint(stdout, "Locked out one day? In your provider's web console:", remoteBinary+" unlock")
 }
 
 // joinTailnet puts the server in your tailnet when it is in none: with
@@ -161,28 +204,126 @@ func joinTailnet(ctx context.Context, server string, stdin io.Reader, stdout io.
 	return tailnet, err
 }
 
+// tailnetWait is how long moin tries to reach a server over Tailscale.
+// A server that just joined takes a few seconds to show up.
+const tailnetWait = 60 * time.Second
+
+// tailnetSSH is ssh to server at reach, a tailnet name or address, in a
+// new session of its own: never through a connection ssh keeps open to
+// the public address, and with nothing to ask.
+func tailnetSSH(ctx context.Context, server, reach, line string, options ...string) *exec.Cmd {
+	ssh := sshCommand(ctx, server, line, false)
+	options = append([]string{"-o", "BatchMode=yes", "-o", "ControlPath=none", "-o", "HostName=" + reach}, options...)
+	ssh.Args = slices.Insert(ssh.Args, 1, options...)
+	return ssh
+}
+
+// untilTailnetWait runs try every few seconds until it works or
+// tailnetWait is over.
+func untilTailnetWait(ctx context.Context, try func() bool) bool {
+	deadline := time.Now().Add(tailnetWait)
+	for {
+		if try() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(3 * time.Second):
+		}
+	}
+}
+
 // tryTailnet opens a new SSH session to the server over the tailnet: its
 // name, else its address. The server must show the host key it shows on
 // its public address, so it is the same machine. Then ssh keeps that key
 // under the tailnet name too, as it does for any new host. It returns
 // what reached the server.
 func tryTailnet(ctx context.Context, server, public string, tailnet daemon.Tailnet) (string, error) {
-	for _, reach := range []string{tailnet.Name, tailnet.IP} {
-		if reach == "" {
-			continue
+	reached := ""
+	untilTailnetWait(ctx, func() bool {
+		for _, reach := range []string{tailnet.Name, tailnet.IP} {
+			if reach == "" {
+				continue
+			}
+			if tailnetSSH(ctx, server, reach, asRoot("true"), "-o", "HostKeyAlias="+public).Run() != nil {
+				continue
+			}
+			if tailnetSSH(ctx, server, reach, "true", "-o", "StrictHostKeyChecking=accept-new").Run() == nil {
+				reached = reach
+				return true
+			}
 		}
-		same := sshCommand(ctx, server, asRoot("true"), false)
-		same.Args = slices.Insert(same.Args, 1, "-o", "BatchMode=yes", "-o", "HostName="+reach, "-o", "HostKeyAlias="+public)
-		if same.Run() != nil {
-			continue
-		}
-		keep := sshCommand(ctx, server, "true", false)
-		keep.Args = slices.Insert(keep.Args, 1, "-o", "BatchMode=yes", "-o", "HostName="+reach, "-o", "StrictHostKeyChecking=accept-new")
-		if keep.Run() == nil {
-			return reach, nil
-		}
+		return false
+	})
+	if reached != "" {
+		return reached, nil
 	}
-	return "", fmt.Errorf("this computer does not reach %s over Tailscale. Turn Tailscale on here, in the same tailnet, then `%s secure %s`. Public SSH stays open", server, build.Name, server)
+	return "", tailnetBlocked(ctx, server, tailnet)
+}
+
+// confirmTailnet stops the guard on the server over a new session through
+// the tailnet, and says what is closed now.
+func confirmTailnet(ctx context.Context, server, reach string) (daemon.Security, error) {
+	var now daemon.Security
+	var err error
+	untilTailnetWait(ctx, func() bool {
+		var out []byte
+		out, err = tailnetSSH(ctx, server, reach, asRoot(hereLine("secure", "confirm"))).Output()
+		if err == nil {
+			err = readAnswer(server, out, &now)
+		}
+		return err == nil
+	})
+	return now, err
+}
+
+// thisComputer is this computer in Tailscale: whether it runs, its tags
+// and the login it runs as.
+type thisComputer struct {
+	BackendState string
+	Self         struct {
+		Tags   []string
+		UserID int64
+	}
+	User map[string]struct{ LoginName string }
+}
+
+// tailnetBlocked says why this computer does not reach the server over
+// Tailscale, and how to fix it. When both are in the tailnet, the
+// tailnet's rules keep them apart.
+func tailnetBlocked(ctx context.Context, server string, tailnet daemon.Tailnet) error {
+	var self thisComputer
+	out, err := exec.CommandContext(ctx, "tailscale", "status", "--self", "--peers=false", "--json").Output()
+	if err != nil || json.Unmarshal(out, &self) != nil || self.BackendState != "Running" {
+		return fmt.Errorf("this computer does not reach %s over Tailscale. Turn Tailscale on here, in the same tailnet, then `%s secure %s`. Public SSH stays open", server, build.Name, server)
+	}
+	return errors.New(tailnetRulesFix(server, tailnet, self))
+}
+
+// tailnetRulesFix is what to add to the tailnet's rules, so this computer
+// reaches the server on port 22: a tag for servers, and a grant from
+// this computer to it.
+func tailnetRulesFix(server string, tailnet daemon.Tailnet, self thisComputer) string {
+	source := "autogroup:member"
+	if len(self.Self.Tags) > 0 {
+		source = strings.Join(self.Self.Tags, `", "`)
+	} else if user, ok := self.User[strconv.FormatInt(self.Self.UserID, 10)]; ok && user.LoginName != "" {
+		source = user.LoginName
+	}
+	machine, _, _ := strings.Cut(tailnet.Name, ".")
+	if machine == "" {
+		machine = server
+	}
+	return fmt.Sprintf(`this computer is in your tailnet, but the tailnet's rules do not let it reach %s on port 22. Public SSH stays open.
+  Fix it in the Tailscale admin console, Access controls. Add a tag for servers and let this computer reach it:
+    "tagOwners": {"tag:server": ["autogroup:admin"]},
+    "grants": [{"src": ["%s"], "dst": ["tag:server"], "ip": ["tcp:22"]}]
+  Then give the server the tag: Machines, %s, the ⋯ menu, Edit ACL tags, tag:server.
+  Then run %s secure %s again`, server, source, machine, build.Name, server)
 }
 
 // pointAlias says how to reach the server from now on. moin does not
@@ -269,8 +410,16 @@ func hereTailnet(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	return errors.New("usage: here tailnet [up]")
 }
 
-// hereSecure is `here secure`, with what to close as JSON on stdin.
-func hereSecure(ctx context.Context, stdin io.Reader, stdout io.Writer) error {
+// hereSecure is `here secure`, with what to close as JSON on stdin, and
+// `here secure confirm`, which stops the guard.
+func hereSecure(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	switch {
+	case len(args) == 1 && args[0] == "confirm":
+		now, err := daemon.ConfirmHere(ctx, daemon.StateDir())
+		return respond(stdout, now, err)
+	case len(args) > 0:
+		return errors.New("usage: here secure [confirm]")
+	}
 	var change daemon.Secure
 	if err := json.NewDecoder(stdin).Decode(&change); err != nil {
 		return fmt.Errorf("read what to close: %w", err)

@@ -21,7 +21,7 @@ var (
 
 // Uninstall removes the daemon from this server: its systemd service, its
 // binary and its state in dir. The apps keep running with their data, the
-// proxy, the tunnel and the firewall, unless withApps: then it takes all of
+// proxy and the tunnel, unless withApps: then it takes all of
 // them down too, data included, and the config with the keys of the
 // bucket and the server's backup key. It returns what stays on the server.
 func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string, ...any)) ([]string, error) {
@@ -94,6 +94,14 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 		// The folder goes when nothing else is in it.
 		_ = os.Remove(filepath.Dir(ConfigFile()))
 	} else {
+		// moin unlock goes with moin, so nothing may stay closed behind
+		// it: port 22 opens. The tunnel keeps carrying the web.
+		if file, _ := loadServerFile(dir); file.SSHOnTailscale || file.Firewall {
+			if err := OpenSSHHere(ctx); err != nil {
+				return nil, err
+			}
+			logf("port 22 is open to the internet again, and the firewall is off")
+		}
 		entries, _ := os.ReadDir(dir)
 		for _, entry := range entries {
 			// The apps keep their data and the proxy its certificates.
@@ -126,7 +134,7 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 	}
 	if !withApps && hasDocker {
 		if _, err := a.output(ctx, "docker", "inspect", proxyName); err == nil {
-			kept = append(kept, "the proxy container "+proxyName+", and the tunnel and firewall when they were on")
+			kept = append(kept, "the proxy container "+proxyName+", and the tunnel when it was on")
 		}
 	}
 	if _, err := os.Stat(ConfigFile()); err == nil {

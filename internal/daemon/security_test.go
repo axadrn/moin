@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestFirewallRules: what each switch closes, and what it leaves open.
@@ -15,6 +16,7 @@ func TestFirewallRules(t *testing.T) {
 	if rules := firewallRules(serverFile{}); rules != "" {
 		t.Fatalf("nothing closed, but rules:\n%s", rules)
 	}
+	syn := "tcp flags & (syn | ack) == syn"
 	cases := []struct {
 		name          string
 		file          serverFile
@@ -24,25 +26,33 @@ func TestFirewallRules(t *testing.T) {
 			name: "ssh only",
 			file: serverFile{SSHOnTailscale: true},
 			want: []string{"policy accept", "ct state established,related accept", "iif lo accept",
-				`iifname != "tailscale0" tcp dport 22 counter name knock_ssh drop`},
-			unwants: []string{"policy drop", "dport 80", "dport 443", `name knock_other drop`},
+				`iifname != "tailscale0" tcp dport 22 ` + syn + ` counter name knock_ssh drop`,
+				`iifname != "tailscale0" tcp dport 22 drop`},
+			unwants: []string{"policy drop", "dport 80", "dport 443", `name knock_other drop`, "chain forward"},
 		},
 		{
 			name: "firewall web direct ssh public",
 			file: serverFile{Firewall: true},
 			want: []string{"policy drop", "ct state established,related accept", "tcp dport 22 accept",
 				"tcp dport 80 accept", "tcp dport 443 accept", "udp dport 41641 accept",
-				`tcp dport { 23, 2323 } counter name knock_telnet drop`,
-				`tcp dport 5432 counter name knock_postgres drop`,
-				`meta l4proto tcp counter name knock_other drop`},
-			unwants: []string{"tailscale0", `knock_ssh drop`},
+				`tcp dport { 23, 2323 } ` + syn + ` counter name knock_telnet drop`,
+				`tcp dport 5432 ` + syn + ` counter name knock_postgres drop`,
+				syn + ` counter name knock_other drop`,
+				// A port an app publishes: only the web from everywhere.
+				"type filter hook forward priority filter - 1; policy accept;",
+				"ct status dnat ct original proto-dst { 80, 443 } accept",
+				`ct status dnat iifname "tailscale0" accept`,
+				"ct status dnat drop"},
+			unwants: []string{`knock_ssh drop`, "\t\tiifname \"tailscale0\" accept"},
 		},
 		{
 			name: "firewall tunnel ssh on tailscale",
 			file: serverFile{Firewall: true, SSHOnTailscale: true, TunnelToken: "token"},
-			want: []string{"policy drop", `iifname "tailscale0" tcp dport 22 accept`, "udp dport 41641 accept",
-				`tcp dport 22 counter name knock_ssh drop`},
-			unwants: []string{"tcp dport 80 accept", "tcp dport 443 accept", "\t\ttcp dport 22 accept"},
+			// SSH through the tailnet on any port: sshd may listen on
+			// another one.
+			want: []string{"policy drop", `iifname "tailscale0" accept`, "udp dport 41641 accept",
+				`tcp dport 22 ` + syn + ` counter name knock_ssh drop`, "ct status dnat drop"},
+			unwants: []string{"tcp dport 80 accept", "tcp dport 443 accept", "\t\ttcp dport 22 accept", "proto-dst { 80, 443 }"},
 		},
 	}
 	for _, c := range cases {
@@ -177,5 +187,47 @@ func TestValidTunnelToken(t *testing.T) {
 		if validTunnelToken(token) != want {
 			t.Errorf("validTunnelToken(%q) = %v", token, !want)
 		}
+	}
+}
+
+// Tailscale's key: under two weeks left, moin says so. Tailscale that
+// does not run is a need too: SSH only comes through it.
+func TestTailnetNeeds(t *testing.T) {
+	now := time.Date(2026, 11, 27, 12, 0, 0, 0, time.UTC)
+	state, tailnet := parseTailscaleStatus([]byte(`{"BackendState":"Running","Self":{"DNSName":"prod.tail0000.ts.net.","TailscaleIPs":["100.64.0.7"],"KeyExpiry":"2026-12-03T10:00:00Z"}}`))
+	if state != "Running" || tailnet.IP != "100.64.0.7" || !tailnet.KeyExpiry.Equal(time.Date(2026, 12, 3, 10, 0, 0, 0, time.UTC)) {
+		t.Fatalf("parsed %q, %+v", state, tailnet)
+	}
+	needs := needsOf(state, tailnet, now)
+	if len(needs) != 1 || needs[0].key != "tailnet/key" || !strings.Contains(needs[0].title, "December 3") || !strings.Contains(needs[0].text, "Machines, prod,") {
+		t.Fatalf("a key that expires in six days: %+v", needs)
+	}
+	if needs := needsOf(state, tailnet, now.AddDate(0, 0, -30)); len(needs) != 0 {
+		t.Fatalf("a key with a month left: %+v", needs)
+	}
+	// Key expiry turned off: Tailscale names no date.
+	_, never := parseTailscaleStatus([]byte(`{"BackendState":"Running","Self":{"DNSName":"prod.tail0000.ts.net.","TailscaleIPs":["100.64.0.7"]}}`))
+	if needs := needsOf("Running", never, now); len(needs) != 0 {
+		t.Fatalf("no expiry: %+v", needs)
+	}
+	if needs := needsOf("NeedsLogin", Tailnet{}, now); len(needs) != 1 || needs[0].key != "tailnet/down" {
+		t.Fatalf("Tailscale logged out: %+v", needs)
+	}
+}
+
+// A server that never closed SSH needs nothing from its tailnet.
+func TestTailnetNeedsOnlyWithSSHClosed(t *testing.T) {
+	fakeCommand(t, "tailscale", `echo '{"BackendState":"Stopped"}'`)
+	if needs := tailnetNeeds(t.Context(), t.TempDir(), time.Now()); len(needs) != 0 {
+		t.Fatalf("needs = %+v", needs)
+	}
+}
+
+// The tunnel's label tells tokens apart, but gives away nothing of one.
+func TestTokenLabel(t *testing.T) {
+	token := base64.StdEncoding.EncodeToString([]byte(`{"a":"account","t":"tunnel-id","s":"secret-secret"}`))
+	label := tokenLabel(token)
+	if len(label) != 12 || strings.Contains(token, label) || label == tokenLabel(token+"x") || tokenLabel("") != "" {
+		t.Fatalf("label %q for %q", label, token)
 	}
 }

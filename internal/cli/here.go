@@ -141,7 +141,7 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	case "tailnet":
 		return hereTailnet(ctx, args, stdin, stdout)
 	case "secure":
-		return hereSecure(ctx, stdin, stdout)
+		return hereSecure(ctx, args, stdin, stdout)
 	case "follow":
 		return hereFollow(ctx, args, stdin, stdout)
 	case "knocks":

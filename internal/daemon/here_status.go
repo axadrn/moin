@@ -46,7 +46,7 @@ func StatusHere(ctx context.Context, dir string) Status {
 	status.PublicSSH = PublicSSHHere(ctx, dir)
 	status.KnocksToday = knocksToday(dir)
 	if config, err := LoadConfig(); err == nil {
-		status.Needs = backupKeyNeeds(config)
+		status.Needs = append(backupKeyNeeds(config), tailnetStatusNeeds(ctx, dir, config.Name)...)
 	}
 	for _, app := range a.names() {
 		release := a.current(app)

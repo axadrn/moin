@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -131,6 +132,7 @@ func (w *watch) look(ctx context.Context) {
 		slog.Error("the config has a mistake: the last good one keeps working", "error", mistake)
 		problems["config"] = alert.Message{Server: config.Name, Title: "the config has a mistake", Text: mistake.Error() + ". Nothing changed: the last good config keeps working."}
 	}
+	maps.Copy(problems, tailnetAlerts(ctx, filepath.Dir(w.apps.dir), config.Name))
 	w.alert(ctx, config, problems)
 	w.save()
 }
