@@ -14,6 +14,7 @@ moin keeps the doors shut. And no service holds a key to your server: only you d
 Whoever can SSH to it as root. Nobody else.
 
 - Not a watcher, not moin cloud, not us. They only receive reports, and moin cloud copies.
+- The daemon acts on nothing a watcher answers, with one exception. After a copy, moin cloud answers with one address to upload that copy to. The daemon uses it only over https, only to a public address, for one PUT, and follows no redirect.
 - Every SSH user who may run moin is as strong as root on that server. For a user who is not root, moin runs `sudo` by itself. That needs sudo without a password.
 - With `moin follow`, whoever can push to the branch it follows can deploy too. [Deploy from CI](/docs/deploy#deploy-from-ci)
 
@@ -47,7 +48,7 @@ Enter means yes. Then:
 1. moin puts the server in your tailnet, your own private network. Paste a Tailscale auth key, or press Enter for a link to log in.
 2. It opens a new SSH session over Tailscale. The server must show the same host key as on its public address.
 3. Only when that works, the server closes public port 22. First it sets a guard: in 2 minutes it opens port 22 again by itself.
-4. moin opens one more new SSH session over Tailscale. That session stops the guard. If it never comes, the guard opens port 22 again. So a change that would lock you out undoes itself.
+4. moin opens one more new SSH session over Tailscale. That session runs `moin here secure confirm`, which stops the guard. If it never comes, the guard opens port 22 again. So a change that would lock you out undoes itself.
 5. moin prints the line for your `~/.ssh/config`. It never edits that file itself:
 
 ```text
@@ -165,22 +166,26 @@ moin update prod
 
 Each release is signed. moin checks the signature before it installs anything. The signing key never leaves a protected place in GitHub: only a release tag reaches it, and only after a maintainer approves.
 
-Check a download by hand:
+- Every download comes from the GitHub release: the binaries, `SHA256SUMS`, and two signatures of it.
+- `SHA256SUMS.sig` is for `moin update` and `moin update prod`. They check it themselves.
+- `SHA256SUMS.sshsig` is for `cli.sh`. It checks it with `ssh-keygen`, which every Mac and Linux has. It needs OpenSSH 8.1 or newer: `ssh -V` says which.
+- Both are made with the same key. A spare key, kept offline, may sign one day instead.
+
+Check a download by hand, the way `cli.sh` does:
 
 ```bash
 curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/moin-linux-amd64
 curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS
-curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS.sig
-cat > moin-release.pem <<'KEY'
------BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAdkwXdu3Ecl8Rs4tfXxIrvipOfRa5R61tfWEdKISw3LA=
------END PUBLIC KEY-----
-KEY
-openssl pkeyutl -verify -pubin -inkey moin-release.pem -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
+curl -fsSLO https://github.com/axadrn/moin/releases/download/v1.2.3/SHA256SUMS.sshsig
+cat > allowed_signers <<'KEYS'
+moin-release ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZMF3btxHJfEbOLX18SK74qTn0WuUetbX1hHSiEsNyw
+moin-release ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICtglRxa7QWCtSE+7Pvtv0fy2TcTuvoxj3OvBGYlAyoU
+KEYS
+ssh-keygen -Y verify -f allowed_signers -I moin-release -n moin-release -s SHA256SUMS.sshsig < SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-You want `Signature Verified Successfully`, then `OK` next to the binary. Anything else: do not run it.
+You want `Good "moin-release" signature`, then `OK` next to the binary. On a Mac, `shasum -a 256 --check --ignore-missing SHA256SUMS`. Anything else: do not run it.
 
 ## If a watcher is hacked
 
@@ -188,7 +193,7 @@ A watcher only listens. If someone takes it over:
 
 - **They see** the names of your servers and apps, your domains, and when backups and checks ran.
 - **They can** silence its alerts. So run two watchers, best at two providers.
-- **They can't** reach any server. A daemon sends reports out, and acts on nothing that comes back.
+- **They can't** reach any server. A daemon sends reports out, and acts on nothing that comes back. The one exception is the upload address of a copy, above: the most a false one gets is an encrypted copy.
 
 ## If a server is hacked
 
