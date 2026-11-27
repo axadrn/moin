@@ -102,7 +102,7 @@ var Competitors = []Competitor{
 		Lead: "Coolify is a dashboard that logs in to your servers over SSH with a key it keeps. " + brand.Name + " has no dashboard: only who has SSH can command your server.",
 		Cells: []Cell{
 			no("Whoever runs Coolify", "It logs in over SSH with your private key, as root or a sudo user. Coolify Cloud gets that key from you.", "https://coolify.io/docs/start-with-cloud"),
-			part("SSH, or a Cloudflare Tunnel", "Port 22 open to Coolify, unless a tunnel carries it.", "https://coolify.io/docs/knowledge-base/server/firewall"),
+			part("SSH, or a Cloudflare Tunnel", "Port 22 open to Coolify, unless a Cloudflare Tunnel carries SSH.", "https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh"),
 			yes("Six engines, on a schedule", "PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse and SQLite. On the server, and in S3 if you add it.", "https://coolify.io/docs/databases/backups"),
 			no("By hand", "Its docs: a successful backup only proves that Coolify created a file. Restore one yourself to check it.", "https://coolify.io/docs/databases/backups"),
 			plain("Its key can delete", "Coolify removes old copies from S3 by your retention, and deletes a backup from every S3 storage.", "https://coolify.io/docs/databases/backups"),
@@ -128,7 +128,7 @@ var Competitors = []Competitor{
 			part("Settings in its dashboard", "GitHub, GitLab, Bitbucket, Gitea, Git, Docker, or a zip you upload.", "https://docs.dokploy.com/docs/core/providers"),
 			notDocumented("https://docs.dokploy.com/docs/core/remote-servers/instructions"),
 			plain("Several servers", "Remote servers over SSH.", "https://docs.dokploy.com/docs/core/remote-servers/instructions"),
-			yes("Yes", "Apache-2.0, except a source-available part.", "https://github.com/Dokploy/dokploy/blob/canary/LICENSE.MD"),
+			yes("Yes", "Apache-2.0, except the code in its proprietary folder.", "https://github.com/Dokploy/dokploy/blob/canary/LICENSE.MD"),
 		},
 	},
 	{
