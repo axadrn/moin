@@ -16,7 +16,7 @@ var homeAnswer = "That's why " + brand.Name + " closes the door after your first
 // moves slowly to the left, then the answer.
 templ HomeVoices(posts []tweets.Tweet) {
 	<section class="moin-band" aria-label="Posts from X">
-		<div class="moin-page">
+		<div class="moin-page moin-stack">
 			@homeHead("Everyone is moving to a VPS.", "Not everyone closes the door.")
 		</div>
 		// site.js moves the row and lets a hand drag it.

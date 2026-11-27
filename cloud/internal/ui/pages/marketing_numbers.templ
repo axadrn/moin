@@ -52,7 +52,7 @@ templ homeNumbers(n HomeNumbers) {
 				@components.Chip("Sample data · development only")
 			</div>
 		}
-		<div class="moin-grid" data-cols="3">
+		<div class="moin-grid" data-cols="2">
 			@numberCard("0 bytes", "Sent to us by the free software. Read the source.", layouts.GitHubURL)
 			if n.Stars != "" {
 				@numberCard(n.Stars+" stars", "On GitHub.", layouts.GitHubURL)
@@ -60,13 +60,10 @@ templ homeNumbers(n HomeNumbers) {
 			if n.Downloads > 0 {
 				@numberCard(human.Count(n.Downloads)+" downloads", "Of the files of every release, on GitHub.", layouts.GitHubURL+"/releases")
 			}
+			if n.Totals.Servers > 0 {
+				@numberCard(strconv.FormatInt(n.Totals.Servers, 10)+" servers", "On "+brand.Name+" cloud right now, with "+strconv.FormatInt(n.Totals.Apps, 10)+" apps.", "")
+			}
 		</div>
-		if n.Totals.Servers > 0 {
-			<div class="moin-grid" data-cols="2">
-				@numberCard(strconv.FormatInt(n.Totals.Servers, 10)+" servers", "On "+brand.Name+" cloud, right now.", "")
-				@numberCard(strconv.FormatInt(n.Totals.Apps, 10)+" apps", "On those servers, right now.", "")
-			</div>
-		}
 		if len(rows) > 0 {
 			@components.Card(components.CardProps{}) {
 				<div class="moin-numbers">
