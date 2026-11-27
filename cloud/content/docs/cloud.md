@@ -31,7 +31,7 @@ The same is on [moin.run/cloud](/cloud) in the browser. It only shows. Nothing o
 
 Your mail is your account. One mail, one workspace, every server in it. GitHub and the mail link land in the same workspace when the mail is the same.
 
-Delete it under Settings. That cancels your subscription first, and you get a mail. Then the workspace, the tokens of its servers and every session are gone. Your servers keep running.
+Delete it under Settings, on [moin.run/cloud](/cloud): type your mail to confirm. That cancels your subscription first. Then the workspace, the tokens of its servers and every session are gone. Its copies go as soon as their 14-day lock lets them. Your servers keep running, and your own bucket keeps its copies.
 
 ## Trial
 
@@ -49,7 +49,7 @@ $7 a month, or $49 a year, for the whole workspace. Every server, every app.
 - `moin cloud` and the page link Billing: your invoices, your card, cancel.
 - Cancel there any time. Alerts stay on until the paid time ends. Then you get a mail, and alerts are off.
 
-Early backers of the hosted hub sign in with the same mail. Their discount is applied at the checkout by itself.
+Early backers sign in with the mail they paid with. Their discount is applied at the checkout by itself.
 
 ## What it can't do
 
