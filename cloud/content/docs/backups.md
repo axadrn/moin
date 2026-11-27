@@ -162,9 +162,9 @@ A database copied less often than once a day: on the days between, moin restores
 If it fails:
 
 - That copy is not uploaded.
-- You get an alert: `<app>: a backup of <database> did not restore`.
+- You get an alert: `<app>: the restore check of <database> failed`.
 - `moin backups shop` shows it with a ✗, and the last copy that did restore.
-- `moin` shows it in red: `shop: today's backup did not restore. Last proven copy: Nov 26 14:00 UTC.`
+- `moin` shows it in red: `shop: today's backup is not proven. Last proven copy: Nov 26 14:00 UTC.`
 - The next copy, an hour later, is checked before it leaves too, until one restores.
 
 ## Restore
