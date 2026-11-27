@@ -28,7 +28,7 @@ Legal basis: our legitimate interest in knowing which pages help (Art. 6(1)(f) G
 
 ## Posts from X
 
-The home page and `/why` show posts from X. The text of each post is on our page, but the profile pictures and photos in them load straight from X's servers (`pbs.twimg.com`). So when your browser shows those pictures, X gets your IP address, your browser and the page you came from, like with any image from another site. What X does with it is covered by [X's privacy policy](https://x.com/privacy).
+The home page shows posts from X. The text of each post is on our page, but the profile pictures and photos in them load straight from X's servers (`pbs.twimg.com`). So when your browser shows those pictures, X gets your IP address, your browser and the page you came from, like with any image from another site. What X does with it is covered by [X's privacy policy](https://x.com/privacy).
 
 Legal basis: our legitimate interest in showing what people say about the problem moin solves (Art. 6(1)(f) GDPR).
 

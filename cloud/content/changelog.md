@@ -29,14 +29,14 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Alerts from the server**: A failed backup, a failed check, a crashing app or a full disk, to Telegram, Slack, Discord or a webhook. `moin alerts add prod telegram --token … --chat-id …`.
 - **Your own watcher**: `moin watcher run`, on another machine. It alerts when a server goes silent, or a domain is down from outside.
 - **moin cloud**: A watcher we run for you, with alerts by mail. `moin cloud login`, then `moin cloud connect prod`. 30 days free from the first report, then $7 a month or $49 a year. (#174)
-- **A copy nobody can delete**: moin cloud keeps a second copy of every backup. Your server can add one, never delete one. TODO(check): ships in beta.38, or only on the landing page?
+- **A copy nobody can delete**: moin cloud keeps a copy of every scheduled backup. Your server can add one, never delete one.
 
 ### Changed
 - **Nobody else can command your server**: Only who has SSH to it as root. Not a watcher, not moin cloud, not us.
 - **Code comes from your laptop**: A deploy sends your committed code over SSH, not from GitHub. `--image shop:dev` sends a local image instead.
 - **Your server never updates by itself**: `moin update prod` puts your CLI's version on it, signed and checked. The CLI says once a day when a new release is out.
 - **Settings live on the server**: The bucket, the alerts, the watchers and the backup schedule are in `/etc/moin/config.yml`, for root only.
-- **A failed copy stops the deploy**: moin copies the databases right before a deploy. If that fails, the deploy stops. `moin deploy --no-copy` goes on without it. TODO(check): new in beta.38?
+- **A failed copy stops the deploy**: moin copies the databases right before a deploy. If that fails, the deploy stops. `moin deploy --no-copy` goes on without it.
 - **Apache-2.0**: moin is under Apache-2.0 now, not AGPL. [What it covers](/docs/faq#is-moin-open-source)
 
 ### Removed

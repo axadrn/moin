@@ -191,14 +191,14 @@ moin daemon uninstall
 → stopping the moin-daemon service
 → removing /usr/local/bin/moin
 ✓ moin is removed from this server
-  Still here: the apps shop with their data in /var/lib/moin/apps; the proxy container moin-traefik, and the tunnel when it was on; the config in /etc/moin/config.yml; Docker.
+  Still here: the apps shop with their data in /var/lib/moin/apps; the proxy container moin-traefik, and the tunnel when it was on; the config in /etc/moin/config.yml, which holds the keys of the bucket, and the server's backup key next to it; Docker.
   Remove the apps and their data too, as root, with moin daemon uninstall --apps
 ```
 
 - Without `--apps`: the daemon goes, and with it the backups, the restore checks and the reports. The apps keep running, with their data and HTTPS.
 - Without `--apps`, public port 22 opens again and the firewall goes: `moin unlock` goes with moin, so nothing may stay closed behind it.
-- With `--apps`: every app goes too, with its data, its images, the proxy, the tunnel and the firewall. This can't be undone.
-- What stays either way: the config in `/etc/moin/config.yml`, and Docker.
+- With `--apps`: every app goes too, with its data, its images, the proxy, the tunnel and the firewall. So do `/etc/moin/config.yml` and the server's backup key. Your own backup key still opens the copies in the bucket. This can't be undone.
+- Docker stays either way.
 - In a script, add `-y`.
 
 Then, on your laptop: `moin watcher disconnect prod <url>` for each watcher, or it says the server went silent. And `moin servers rm prod`.
