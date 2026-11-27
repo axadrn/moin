@@ -1,8 +1,8 @@
 // Package daemon is moin on a server: `moin daemon`, which runs the timers,
 // and what `moin here …` does there for the CLI on your laptop, over SSH.
 // The daemon takes no commands and listens nowhere. It copies the
-// databases into the bucket, checks every day that the newest copy
-// restores, alerts and reports to the watchers.
+// databases into the bucket and to the watchers that take copies, proves
+// every day that a copy restores, alerts and reports to the watchers.
 package daemon
 
 import (

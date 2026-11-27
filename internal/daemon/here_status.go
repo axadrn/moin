@@ -84,9 +84,9 @@ func backupKeyNeeds(config Config) []Need {
 }
 
 // backupNeeds says what the backups of the apps need: an app with a
-// database but no bucket has no copy at all, and a copy that did not
-// restore in the daily check may not come back either. They come from
-// what the daemon wrote down, by app.
+// database on a server without a bucket has no copy at all, unless a
+// watcher took one, and a copy that did not restore in its check may not
+// come back either. They come from what the daemon wrote down, by app.
 func backupNeeds(config Config, statuses map[string][]protocol.DatabaseBackup) []Need {
 	var needs []Need
 	for _, app := range slices.Sorted(maps.Keys(statuses)) {
@@ -94,7 +94,8 @@ func backupNeeds(config Config, statuses map[string][]protocol.DatabaseBackup) [
 		if len(databases) == 0 {
 			continue
 		}
-		if config.Bucket == nil {
+		copied := slices.ContainsFunc(databases, func(database protocol.DatabaseBackup) bool { return database.CopiedAt != nil })
+		if config.Bucket == nil && !copied {
 			needs = append(needs, Need{Text: app + ": no backup yet.", Command: build.Name + " bucket set " + config.Name})
 			continue
 		}

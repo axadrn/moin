@@ -9,10 +9,16 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"filippo.io/age"
+
+	"github.com/axadrn/moin/protocol"
 )
 
 // The address of a copy is https to a public address, nothing else.
@@ -36,10 +42,12 @@ func TestCopyAddresses(t *testing.T) {
 }
 
 // fakeCloud is moin cloud and the bucket it hands out addresses to, over
-// https, in memory. taking says whether it takes copies.
+// https, in memory. taking says whether it takes copies, asked how often
+// a daemon asked that before it made a copy.
 type fakeCloud struct {
 	mu       sync.Mutex
 	taking   bool
+	asked    int
 	started  []copyStart
 	uploaded [][]byte
 	signed   []string
@@ -72,6 +80,11 @@ func newFakeCloud(t *testing.T) *fakeCloud {
 		case r.URL.Path == "/api/copies":
 			var start copyStart
 			json.NewDecoder(r.Body).Decode(&start)
+			if start.App == "" {
+				cloud.asked++
+				http.Error(w, "not a copy", http.StatusBadRequest)
+				return
+			}
 			cloud.started = append(cloud.started, start)
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(copyUpload{ID: "C1", URL: bucket.URL + "/copies/C1.age"})
@@ -127,8 +140,13 @@ func TestCopyToTheBucketOnly(t *testing.T) {
 	defer own.Close()
 	bucket := withFakeBucket(t, b, Config{Watchers: []Watcher{{URL: own.URL, Token: "own-token"}}})
 	b.copyIfDue(context.Background(), "shop", database)
-	if status := b.status(context.Background(), "shop", database, true); status.Error != "" || len(status.Copies) != 1 {
+	status := b.status(context.Background(), "shop", database, true)
+	if status.Error != "" || len(status.Copies) != 1 {
 		t.Fatalf("status: %+v", status)
+	}
+	// It was restored here before it went up: it is the proven copy.
+	if status.CheckError != "" || status.CheckedCopy != status.Copies[0].ID {
+		t.Errorf("proven %q, the copy is %q: %s", status.CheckedCopy, status.Copies[0].ID, status.CheckError)
 	}
 	for _, body := range bucket.objects {
 		opens(t, body)
@@ -137,8 +155,8 @@ func TestCopyToTheBucketOnly(t *testing.T) {
 }
 
 // A server without a bucket has its copy at moin cloud: the schedule
-// counts from it, nothing is called a problem, and no check runs, since
-// the daemon can read no copy back.
+// counts from it and nothing is called a problem. The daemon can read no
+// copy back, so it restored this one before it went up: it is proven.
 func TestCopyToCloudOnly(t *testing.T) {
 	journal(t)
 	b, database := shopWithSQLite(t)
@@ -155,8 +173,14 @@ func TestCopyToCloudOnly(t *testing.T) {
 		t.Errorf("started %+v, signed %q", start, cloud.signed[0])
 	}
 	status := b.status(ctx, "shop", database, false)
-	if status.Error != "" || status.CopiedAt == nil || status.CheckedAt != nil {
+	if status.Error != "" || status.CopiedAt == nil || status.CheckedAt == nil || status.CheckError != "" {
 		t.Errorf("status: %+v", status)
+	}
+	if at, _ := protocol.CopyTime(status.CheckedCopy); !at.Equal(cloud.started[0].MadeAt) {
+		t.Errorf("proven %q, the copy was made at %s", status.CheckedCopy, cloud.started[0].MadeAt)
+	}
+	if needs := backupNeeds(b.config(), map[string][]protocol.DatabaseBackup{"shop": {status}}); len(needs) != 0 {
+		t.Errorf("needs: %+v", needs)
 	}
 	// The next copy waits for its time.
 	b.copyIfDue(ctx, "shop", database)
@@ -182,6 +206,9 @@ func TestCopyToTheBucketAndCloud(t *testing.T) {
 		}
 		opens(t, body)
 	}
+	if status := b.status(context.Background(), "shop", database, true); status.CheckError != "" || status.CheckedCopy != status.Copies[0].ID {
+		t.Errorf("proven %q, the copy is %q: %s", status.CheckedCopy, status.Copies[0].ID, status.CheckError)
+	}
 	// moin cloud away: the copy in the bucket counts, nothing is a problem.
 	cloud.taking = false
 	b.mu.Lock()
@@ -199,8 +226,8 @@ func TestCopyToTheBucketAndCloud(t *testing.T) {
 }
 
 // Without a bucket and with no watcher that takes copies, the server has
-// no backup: it says "no bucket yet", alerts nothing, and waits before it
-// makes the next copy for nobody.
+// no backup and makes no copy for nobody: it asks the watcher, says "no
+// bucket yet", alerts nothing, and waits before it asks again.
 func TestCopyNobodyTakes(t *testing.T) {
 	journal(t)
 	b, database := shopWithSQLite(t)
@@ -208,21 +235,98 @@ func TestCopyNobodyTakes(t *testing.T) {
 	cloud.taking = false
 	b.configure(Config{Name: "prod", Watchers: []Watcher{cloud.watcher}})
 	ctx := context.Background()
+	// A copy of a database that is away fails: none is made.
+	live := database.HostPath
+	os.Rename(live, live+".away")
 	b.copyIfDue(ctx, "shop", database)
+	os.Rename(live+".away", live)
 	b.mu.Lock()
 	s := *b.state("shop", database)
 	b.mu.Unlock()
-	if s.CopyError != "" || s.CloudTried.IsZero() || !s.LastCopy.IsZero() {
+	if s.CopyError != "" || s.CloudTried.IsZero() || !s.LastCopy.IsZero() || !s.CheckedAt.IsZero() {
 		t.Fatalf("state: %+v", s)
 	}
-	if status := b.status(ctx, "shop", database, false); status.Error != errNoBucket.Error() {
+	status := b.status(ctx, "shop", database, false)
+	if status.Error != errNoBucket.Error() {
 		t.Errorf("status: %+v", status)
+	}
+	if needs := backupNeeds(b.config(), map[string][]protocol.DatabaseBackup{"shop": {status}}); len(needs) != 1 || needs[0].Text != "shop: no backup yet." {
+		t.Errorf("needs: %+v", needs)
 	}
 	// It takes copies now, but the next try waits.
 	cloud.taking = true
 	b.copyIfDue(ctx, "shop", database)
-	if len(cloud.uploaded) != 0 {
-		t.Error("a second copy at once")
+	if len(cloud.started) != 0 || len(cloud.uploaded) != 0 {
+		t.Error("a second try at once")
+	}
+	noTempLeft(t, b)
+}
+
+// A server with no bucket and no watcher at all does nothing in its round.
+func TestNoCopyWithoutBucketAndWatcher(t *testing.T) {
+	journal(t)
+	b, database := shopWithSQLite(t)
+	b.configure(Config{Name: "prod"})
+	b.tick(context.Background())
+	b.mu.Lock()
+	s := *b.state("shop", database)
+	b.mu.Unlock()
+	if s != (state{}) {
+		t.Fatalf("state: %+v", s)
+	}
+	noTempLeft(t, b)
+}
+
+// A copy that does not restore goes nowhere, not into the bucket and not
+// to moin cloud, and is the problem every surface alerts. The next copy
+// waits, is restored first again, and proves the backup.
+func TestACopyThatDoesNotRestoreIsNotUploaded(t *testing.T) {
+	journal(t)
+	b, database := shopWithSQLite(t)
+	cloud := newFakeCloud(t)
+	bucket := withFakeBucket(t, b, Config{Watchers: []Watcher{cloud.watcher}})
+	ctx := context.Background()
+	// A key that does not open the copy: it cannot be restored.
+	b.key, _ = age.GenerateX25519Identity()
+	b.copyIfDue(ctx, "shop", database)
+	if len(bucket.objects) != 0 || len(cloud.started) != 0 || len(cloud.uploaded) != 0 {
+		t.Fatalf("a copy that did not restore: the bucket has %d, moin cloud %d", len(bucket.objects), len(cloud.uploaded))
+	}
+	status := b.status(ctx, "shop", database, false)
+	if !strings.Contains(status.CheckError, " did not restore: ") || status.CheckedCopy != "" || status.CopiedAt != nil || status.Error != "" {
+		t.Fatalf("status: %+v", status)
+	}
+	needs := backupNeeds(b.config(), map[string][]protocol.DatabaseBackup{"shop": {status}})
+	if len(needs) != 1 || needs[0].Text != "shop: today's backup did not restore. Last proven copy: none yet." {
+		t.Errorf("needs: %+v", needs)
+	}
+	problems := newWatch(b.apps).problems(b.config(), nil, map[string][]protocol.DatabaseBackup{"shop": {status}})
+	if _, ok := problems["check/shop/"+database.Path]; !ok {
+		t.Errorf("no alert: %+v", problems)
+	}
+	// The next copy waits an hour.
+	b.key = nil
+	b.copyIfDue(ctx, "shop", database)
+	if len(bucket.objects) != 0 {
+		t.Fatal("the next copy at once")
+	}
+	b.mu.Lock()
+	b.state("shop", database).CheckedAt = time.Now().Add(-2 * time.Hour)
+	b.mu.Unlock()
+	b.copyIfDue(ctx, "shop", database)
+	status = b.status(ctx, "shop", database, true)
+	if len(status.Copies) != 1 || len(cloud.uploaded) != 1 || status.CheckError != "" || status.CheckedCopy != status.Copies[0].ID {
+		t.Fatalf("the copy after: %+v", status)
+	}
+	// One proven copy a day: the next one today goes up as it is.
+	b.key, _ = age.GenerateX25519Identity()
+	b.mu.Lock()
+	b.state("shop", database).LastCopy = time.Time{}
+	b.mu.Unlock()
+	bucket.objects = map[string][]byte{}
+	b.copyIfDue(ctx, "shop", database)
+	if after := b.status(ctx, "shop", database, false); len(bucket.objects) != 1 || after.CheckError != "" || after.CheckedCopy != status.CheckedCopy {
+		t.Errorf("the second copy of the day: %d in the bucket, %+v", len(bucket.objects), after)
 	}
 	noTempLeft(t, b)
 }

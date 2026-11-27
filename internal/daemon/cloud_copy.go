@@ -28,8 +28,10 @@ import (
 // A copy a hacked server can't delete. The daemon sends each copy it
 // takes on its schedule, encrypted as it is, to every watcher that takes
 // copies: moin cloud, for a paid workspace. A bucket of your own is not
-// needed for it.
+// needed for it. The daemon can never read such a copy back, so it is
+// restored and read here before it leaves (checkDue).
 //
+//	daemon ── POST <watcher>/api/copies ──▶ nothing in it: do you take copies?
 //	daemon ── POST <watcher>/api/copies ──▶ an ID and one address to upload to
 //	daemon ── PUT the .age file ──────────▶ that address, 15 minutes long
 //	daemon ── POST …/copies/<id>/done ────▶ moin cloud looks it is there
@@ -59,10 +61,28 @@ type copyUpload struct {
 // yourself, or moin cloud for a workspace that does not pay.
 var errTakesNoCopies = errors.New("takes no copies")
 
+// takingCopies are the watchers that take copies, asked before a copy is
+// made, so no database is copied for nobody. The question is a copy with
+// nothing in it. A watcher that takes none says so before it looks at it:
+// 404 from one you run yourself, 402 from moin cloud for a workspace that
+// does not pay. A watcher that gave no answer counts, so the copy says
+// what is wrong with it.
+func takingCopies(ctx context.Context, watchers []Watcher) []Watcher {
+	var taking []Watcher
+	for _, watcher := range watchers {
+		_, status, err := callWatcher(ctx, watcher, "/api/copies", copyStart{})
+		if err == nil && (status == http.StatusNotFound || status == http.StatusPaymentRequired) {
+			continue
+		}
+		taking = append(taking, watcher)
+	}
+	return taking
+}
+
 // toCloud sends the copy id of a database, encrypted as it is in file, to
-// every watcher that takes it. One that took it is enough: only when none
-// did, it says why, errNoTaker when none takes copies.
-func (b *backups) toCloud(ctx context.Context, app string, database protocol.Database, id string, file *os.File) error {
+// each of watchers that takes it. One that took it is enough: only when
+// none did, it says why, errNoTaker when none takes copies.
+func (b *backups) toCloud(ctx context.Context, app string, database protocol.Database, id string, file *os.File, watchers []Watcher) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
@@ -70,7 +90,7 @@ func (b *backups) toCloud(ctx context.Context, app string, database protocol.Dat
 	at, _ := protocol.CopyTime(id)
 	start := copyStart{App: app, Database: database.Path, MadeAt: at, Size: info.Size()}
 	sent, failed := false, error(nil)
-	for _, watcher := range b.config().Watchers {
+	for _, watcher := range watchers {
 		upload, err := startCopy(ctx, watcher, start)
 		if errors.Is(err, errTakesNoCopies) {
 			continue

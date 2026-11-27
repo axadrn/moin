@@ -31,14 +31,16 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// A backup is a copy of a database in the user's own bucket, taken here
-// on the server on the app's schedule and kept as long as the app says;
-// every day moin checks that the newest one restores. Data goes from the
-// server to the bucket and nowhere else. One engine per kind of
-// database, with the same verbs:
+// A backup is a copy of a database in the user's own bucket, at a watcher
+// that takes copies, or both, taken here on the server on the app's
+// schedule. The first copy of each day is restored and read here before it
+// leaves, so a copy that does not restore is never uploaded. A server with
+// neither a bucket nor such a watcher makes no copies. One engine per kind
+// of database, with the same verbs:
 //
-//	database ── Copy ───▶ bucket <database>/copies/<id>
+//	database ── Copy ───▶ a file here, encrypted
 //	copy ────── Check ──▶ a throwaway database, read through
+//	copy ────── upload ─▶ bucket <database>/copies/<id>, and the watchers
 //	copy ────── Restore ▶ built beside the live one, one switch,
 //	                      the live one kept as the undo
 //
@@ -113,8 +115,8 @@ type backups struct {
 }
 
 // state is what the daemon knows of one database: its newest copy, why
-// the last one failed and since when, the newest daily check, and the
-// copy the last check that worked restored. BucketDown says the copy
+// the last one failed and since when, the newest check, and the copy the
+// last check that worked restored. BucketDown says the copy
 // failed at the bucket, not at the database.
 type state struct {
 	LastCopy     time.Time `json:"last_copy,omitzero"`
@@ -124,8 +126,8 @@ type state struct {
 	CheckedAt    time.Time `json:"checked_at,omitzero"`
 	CheckError   string    `json:"check_error,omitempty"`
 	CheckedCopy  string    `json:"checked_copy,omitempty"`
-	// CloudTried is when a server without a bucket last made a copy that
-	// no watcher took.
+	// CloudTried is when a server without a bucket last had a copy due
+	// that no watcher took.
 	CloudTried time.Time `json:"cloud_tried,omitzero"`
 }
 
@@ -285,7 +287,8 @@ func (r *remember) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// copy takes a copy of a database into the bucket as id.
+// copy takes a copy of a database into the bucket as id, now: before a
+// deploy, or when you ask for one. It is not restored first.
 func (b *backups) copy(ctx context.Context, app string, database protocol.Database, id string) (string, error) {
 	return b.copyTo(ctx, app, database, id, false)
 }
@@ -294,15 +297,28 @@ func (b *backups) copy(ctx context.Context, app string, database protocol.Databa
 // watcher it reports to takes copies.
 var errNoTaker = errors.New("no bucket, and no watcher that takes copies")
 
+// errNotRestored is a copy that did not restore here, so it was not
+// uploaded. Why is in the state of its database (noteCheck).
+var errNotRestored = errors.New("the copy did not restore, so it was not uploaded")
+
 // copyTo takes a copy of a database as id. It is written to a file on
 // the server first, encrypted (encrypt), so its size is known. From there
-// it goes into the bucket, when the server has one, and with cloud to the
-// watchers that take copies (toCloud). A server without a bucket has its
-// copy when one watcher took it.
-func (b *backups) copyTo(ctx context.Context, app string, database protocol.Database, id string, cloud bool) (string, error) {
+// it goes into the bucket, when the server has one. A scheduled copy also
+// goes to the watchers that take copies (toCloud), and when a check is due
+// (checkDue) it is restored from the file first: only a copy that restores
+// is uploaded, and exactly the bytes that did. Nothing is copied for
+// nobody: the watchers are asked before the copy is made. A server
+// without a bucket has its copy when one watcher took it.
+func (b *backups) copyTo(ctx context.Context, app string, database protocol.Database, id string, scheduled bool) (string, error) {
 	config, mistake := b.configNow()
-	cloud = cloud && len(config.Watchers) > 0
-	if config.Bucket == nil && !cloud {
+	var takers []Watcher
+	if scheduled {
+		takers = takingCopies(ctx, config.Watchers)
+	}
+	if config.Bucket == nil && len(takers) == 0 {
+		if scheduled && len(config.Watchers) > 0 {
+			return "", errNoTaker
+		}
 		// A config that never read well may have a bucket nobody knows of.
 		return "", cmp.Or(mistake, errNoBucket)
 	}
@@ -312,16 +328,27 @@ func (b *backups) copyTo(ctx context.Context, app string, database protocol.Data
 	}
 	defer os.Remove(file.Name())
 	defer file.Close()
+	check := scheduled && b.checkDue(app, database)
+	if check {
+		if err := b.checkFile(ctx, app, database, id, file, size); err != nil {
+			b.noteCheck(app, database, id, false, err)
+			return "", fmt.Errorf("copy %s: %w", database.Path, errNotRestored)
+		}
+	}
 	if config.Bucket != nil {
 		if err := b.upload(ctx, app, database, id, file, size); err != nil {
 			return "", fmt.Errorf("copy %s: %w", database.Path, err)
 		}
 	}
-	if cloud {
+	if len(takers) > 0 {
 		// With a bucket the copy is safe there: what fails here is logged.
-		if err := b.toCloud(ctx, app, database, id, file); err != nil && config.Bucket == nil {
+		if err := b.toCloud(ctx, app, database, id, file, takers); err != nil && config.Bucket == nil {
 			return "", fmt.Errorf("copy %s: %w", database.Path, err)
 		}
+	}
+	// Proven is a copy that restored and is where it belongs.
+	if check {
+		b.noteCheck(app, database, id, false, nil)
 	}
 	at, _ := protocol.CopyTime(id)
 	b.mu.Lock()
@@ -571,7 +598,7 @@ func (b *backups) tick(ctx context.Context) {
 		return
 	}
 	defer b.ticking.Unlock()
-	// Without a bucket there is still the copy a watcher may take.
+	// Nobody to copy for: no bucket, and no watcher that may take a copy.
 	if !b.on() && len(b.config().Watchers) == 0 {
 		return
 	}
@@ -599,15 +626,20 @@ func (b *backups) copyIfDue(ctx context.Context, app string, database protocol.D
 	}
 	b.mu.Lock()
 	copied, tried := b.state(app, database).LastCopy, b.state(app, database).CloudTried
+	checked, checkFailed := b.state(app, database).CheckedAt, b.state(app, database).CheckError != ""
 	b.mu.Unlock()
 	due, _ := b.config().schedule(app)
 	// A copy from the future, after the clock jumped, is no reason to wait.
 	if time.Since(copied) < due && !copied.After(time.Now()) {
 		return
 	}
-	// A copy no watcher took cost a whole copy on the disk: the next try
-	// waits (cloudAgain).
+	// No watcher took a copy: the next try waits (cloudAgain).
 	if !b.on() && time.Since(tried) < min(due, cloudAgain) && !tried.After(time.Now()) {
+		return
+	}
+	// After a check that failed the next copy is restored before it is
+	// uploaded (checkDue). That is no work for every minute: it waits.
+	if checkFailed && time.Since(checked) < checkAgain && !checked.After(time.Now()) {
 		return
 	}
 	err := b.copyDue(ctx, app, database, due)
@@ -616,6 +648,12 @@ func (b *backups) copyIfDue(ctx context.Context, app string, database protocol.D
 	s := b.state(app, database)
 	if !b.on() && err != nil {
 		s.CloudTried = time.Now().UTC()
+	}
+	// The copy itself worked. That it did not restore is the check's
+	// problem, written down there.
+	if errors.Is(err, errNotRestored) {
+		slog.Error("backup: the copy did not restore and was not uploaded", "app", app, "database", database.Path)
+		return
 	}
 	// No watcher takes copies: nothing failed, the server has no bucket.
 	if errors.Is(err, errNoTaker) {
@@ -634,16 +672,29 @@ func (b *backups) copyIfDue(ctx context.Context, app string, database protocol.D
 	s.CopyError, s.BucketDown = err.Error(), errors.As(err, &down)
 }
 
-// cloudAgain is how long a server without a bucket waits after a copy no
-// watcher took, before it makes the next one.
+// cloudAgain is how long a server without a bucket waits before it asks
+// its watchers again, after none took a copy.
 const cloudAgain = time.Hour
 
 // checkAgain is how long after a check that failed the next one runs: a
 // bucket that was away, or a newer copy, may prove the backup again.
 const checkAgain = time.Hour
 
-// checkIfDue runs the daily check of one database: a day after the last
-// one, or checkAgain after one that failed.
+// checkDue says the next scheduled copy of a database is restored before
+// it is uploaded: the first copy of each day, UTC, and every copy after a
+// check that failed. Restoring every hourly copy would keep a big Postgres
+// busy all day; one proven copy a day is what the old daily check gave.
+func (b *backups) checkDue(app string, database protocol.Database) bool {
+	b.mu.Lock()
+	s := *b.state(app, database)
+	b.mu.Unlock()
+	today := time.Now().UTC().Truncate(day)
+	return s.CheckError != "" || !s.CheckedAt.UTC().Truncate(day).Equal(today)
+}
+
+// checkIfDue checks the newest copy in the bucket when no copy was checked
+// before its upload for more than a day, like for a database that is
+// copied less often, or checkAgain after a check that failed.
 func (b *backups) checkIfDue(ctx context.Context, app string, database protocol.Database) {
 	// The check reads the copy from the bucket: the daemon can add copies
 	// to a watcher and never read one.
@@ -654,7 +705,7 @@ func (b *backups) checkIfDue(ctx context.Context, app string, database protocol.
 	s := *b.state(app, database)
 	b.mu.Unlock()
 	since := time.Since(s.CheckedAt)
-	if since >= day || s.CheckError != "" && since >= checkAgain {
+	if since >= day+checkAgain || s.CheckError != "" && since >= checkAgain {
 		b.check(ctx, app, database)
 	}
 }
@@ -770,8 +821,8 @@ func (b *backups) statuses(ctx context.Context) map[string][]protocol.DatabaseBa
 	return all
 }
 
-// check restores the newest copy of one database into a throwaway one,
-// reads it and notes how it went. Without a copy there is nothing to
+// check checks the newest copy of one database in the bucket and notes
+// how it went. Without a copy there is nothing to
 // check, and a bucket that is away already shows as its own problem. A
 // copy whose reading broke is read once more.
 func (b *backups) check(ctx context.Context, app string, database protocol.Database) {
@@ -782,33 +833,57 @@ func (b *backups) check(ctx context.Context, app string, database protocol.Datab
 	newest := copies[0]
 	cut, err := b.checkOnce(ctx, app, database, newest)
 	if cut {
-		slog.Warn("backup: reading the copy for the daily check broke, once more", "app", app, "database", database.Path, "copy", newest.ID, "error", err)
+		slog.Warn("backup: reading the copy for the check broke, once more", "app", app, "database", database.Path, "copy", newest.ID, "error", err)
 		cut, err = b.checkOnce(ctx, app, database, newest)
 	}
 	if errors.Is(err, errNoCopy) {
 		// A newer copy came and the old one went meanwhile.
 		return
 	}
+	b.noteCheck(app, database, newest.ID, cut, err)
+}
+
+// noteCheck writes down how the check of the copy id went: the copy is
+// proven, or why not. cut says it could not be read from the bucket.
+func (b *backups) noteCheck(app string, database protocol.Database, id string, cut bool, err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	s := b.state(app, database)
 	s.CheckedAt, s.CheckError = time.Now().UTC(), ""
 	switch {
 	case err == nil:
-		s.CheckedCopy = newest.ID
-		slog.Info("backup: the daily check restored the newest copy", "app", app, "database", database.Path, "copy", newest.ID)
+		s.CheckedCopy = id
+		slog.Info("backup: the check restored the copy", "app", app, "database", database.Path, "copy", id)
 		return
 	case cut:
-		s.CheckError = "could not read the copy " + newest.ID + ": " + shortS3(err)
+		s.CheckError = "could not read the copy " + id + ": " + shortS3(err)
 	default:
-		s.CheckError = "the copy " + newest.ID + " did not restore: " + err.Error()
+		s.CheckError = "the copy " + id + " did not restore: " + err.Error()
 	}
-	slog.Error("backup: the daily check failed", "app", app, "database", database.Path, "copy", newest.ID, "error", err)
+	slog.Error("backup: the check failed", "app", app, "database", database.Path, "copy", id, "error", err)
 }
 
-// checkOnce restores one copy into a throwaway database and reads it. cut
-// says the reading from the bucket broke or stopped moving, which says
-// nothing about the copy.
+// checkCopy opens a copy with the server's key, restores it into a
+// throwaway database and reads it. It is the one check: of a copy in its
+// file before the upload, and of a copy read from the bucket.
+func (b *backups) checkCopy(ctx context.Context, app string, database protocol.Database, copy protocol.Copy, body io.Reader, size int64) error {
+	plain, err := b.decrypt(copy, body)
+	if err != nil {
+		return err
+	}
+	return b.engine(app, database).Check(ctx, source{copy: plain, size: size})
+}
+
+// checkFile checks the copy id as it lies in file, before it is uploaded.
+func (b *backups) checkFile(ctx context.Context, app string, database protocol.Database, id string, file *os.File, size int64) error {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return b.checkCopy(ctx, app, database, protocol.Copy{ID: id}, file, size)
+}
+
+// checkOnce checks one copy in the bucket. cut says the reading from the
+// bucket broke or stopped moving, which says nothing about the copy.
 func (b *backups) checkOnce(ctx context.Context, app string, database protocol.Database, copy protocol.Copy) (cut bool, err error) {
 	ctx, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
@@ -821,10 +896,7 @@ func (b *backups) checkOnce(ctx context.Context, app string, database protocol.D
 	watched, stopWatching := stopWhenStuck(fromBucket, stallLimit, stallLimit, stop)
 	defer stopWatching()
 	// After the last byte the bucket is done: what follows is work here.
-	plain, err := b.decrypt(copy, &untilEnd{reader: watched, done: stopWatching})
-	if err == nil {
-		err = b.engine(app, database).Check(ctx, source{copy: plain, size: size})
-	}
+	err = b.checkCopy(ctx, app, database, copy, &untilEnd{reader: watched, done: stopWatching}, size)
 	if stuck := context.Cause(ctx); stuck != nil {
 		return true, stuck
 	}
