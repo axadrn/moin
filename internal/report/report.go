@@ -12,7 +12,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	neturl "net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -88,18 +90,45 @@ func Send(ctx context.Context, url, token string, r Report) error {
 	return nil
 }
 
-// checkURL wants https, or http to this machine only: the token must not
-// travel in the clear.
+// checkURL wants https, or http to this machine or a tailnet only: the
+// token must not travel in the clear.
 func checkURL(address string) error {
 	parsed, err := neturl.Parse(address)
 	if err != nil || parsed.Host == "" {
 		return fmt.Errorf("the watcher url %q is not a valid URL", address)
 	}
-	host := parsed.Hostname()
-	ip := net.ParseIP(host)
-	loopback := host == "localhost" || ip != nil && ip.IsLoopback()
-	if parsed.Scheme == "https" || parsed.Scheme == "http" && loopback {
+	if parsed.Scheme == "https" || parsed.Scheme == "http" && PlainHTTP(parsed.Hostname()) {
 		return nil
 	}
-	return fmt.Errorf("the watcher url %q must start with https:// (http:// only to this machine)", address)
+	return fmt.Errorf("the watcher url %q must start with https:// (http:// only to this machine or a tailnet address)", address)
+}
+
+// tailnets are the addresses Tailscale gives its devices.
+var tailnets = []netip.Prefix{netip.MustParsePrefix("100.64.0.0/10"), netip.MustParsePrefix("fd7a:115c:a1e0::/48")}
+
+// PlainHTTP says whether http without TLS may go to host: this machine,
+// or a host whose every address is in a tailnet, whose traffic WireGuard
+// encrypts already. A name is looked up now.
+func PlainHTTP(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	addresses := []string{host}
+	if _, err := netip.ParseAddr(host); err != nil {
+		addresses, err = net.LookupHost(host)
+		if err != nil || len(addresses) == 0 {
+			return false
+		}
+	}
+	for _, address := range addresses {
+		ip, err := netip.ParseAddr(address)
+		if err != nil {
+			return false
+		}
+		ip = ip.Unmap()
+		if !ip.IsLoopback() && !slices.ContainsFunc(tailnets, func(tailnet netip.Prefix) bool { return tailnet.Contains(ip) }) {
+			return false
+		}
+	}
+	return true
 }
