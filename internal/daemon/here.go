@@ -48,21 +48,12 @@ type Result struct {
 	Databases []string `json:"databases,omitempty"`
 }
 
-// hereApps is the daemon's apps without a daemon, with no registry
-// logins. The proxy runs in the mode server.json sets: behind a tunnel
-// once `moin secure` set one.
-func hereApps(dir string) *apps {
-	a := newApps(dir)
-	a.registryLogin = func(string) string { return "" }
-	return a
-}
-
 // DeployHere deploys d on this server and writes the deploy log to out.
 func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Result, error) {
 	if !protocol.ValidAppName(d.App) {
 		return Result{}, fmt.Errorf("%q is not a valid app name: lowercase letters, digits and dashes", d.App)
 	}
-	a := hereApps(dir)
+	a := newApps(dir)
 	start := a.newStart(d.App)
 	start.NoCopy = d.NoCopy
 	switch {
@@ -96,7 +87,7 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 // domains as they are now, without a build: a restart, or a start after
 // a stop.
 func ApplyHere(ctx context.Context, dir, app string, out io.Writer) (Result, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return Result{}, err
 	}
@@ -106,7 +97,7 @@ func ApplyHere(ctx context.Context, dir, app string, out io.Writer) (Result, err
 // StopHere stops the app's containers. They stay stopped after a reboot,
 // until a start, a restart or a deploy.
 func StopHere(ctx context.Context, dir, app string) error {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return err
 	}
@@ -116,7 +107,7 @@ func StopHere(ctx context.Context, dir, app string) error {
 // LogsHere writes the last tail lines of the app's containers to out and,
 // with follow, what they write from then on, until ctx ends.
 func LogsHere(ctx context.Context, dir, app string, tail int, follow bool, out io.Writer) error {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return err
 	}
@@ -131,7 +122,7 @@ func LogsHere(ctx context.Context, dir, app string, tail int, follow bool, out i
 // or the main service, with stdin and stdout passed through: with tty as
 // on a terminal, for psql or a shell.
 func ExecHere(ctx context.Context, dir, app, service string, tty bool, argv []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return err
 	}

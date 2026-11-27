@@ -13,8 +13,7 @@ import (
 // file of the running release. Without source, image and FromNumber the
 // deploy applies env and domains to the running release, without a build.
 // The env never travels with a deploy: every release runs with the app's
-// app.env on the server as it is then (EnvSet), and a login for Image comes
-// from the server too (SecretSet).
+// app.env on the server as it is then (EnvSet).
 type DeployStart struct {
 	DeployID string `json:"deploy_id"`
 	// App names the app on the server in every message: its folder, the
@@ -77,16 +76,6 @@ func InstantHost(app, ip, provider string) string {
 		return ""
 	}
 	return app + "." + strings.ReplaceAll(address.String(), ".", "-") + "." + provider
-}
-
-// RegistryHost is the registry of an image reference: its first part when
-// that looks like a host, else Docker Hub.
-func RegistryHost(image string) string {
-	first, _, found := strings.Cut(image, "/")
-	if found && (strings.ContainsAny(first, ".:") || first == "localhost") {
-		return first
-	}
-	return "docker.io"
 }
 
 // DeployLog is one line of build or start output.

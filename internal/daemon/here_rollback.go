@@ -15,7 +15,7 @@ import (
 // with 0 the newest one that ran other images than the live one. The env
 // and the domains stay as they are now.
 func RollbackHere(ctx context.Context, dir, app string, number int, out io.Writer) (Result, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return Result{}, err
 	}
@@ -51,7 +51,7 @@ type Release struct {
 // ReleasesHere lists the releases of app that can run again, newest
 // first.
 func ReleasesHere(dir, app string) ([]Release, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return nil, err
 	}

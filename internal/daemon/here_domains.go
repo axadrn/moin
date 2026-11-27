@@ -24,7 +24,7 @@ func (a *apps) domains(app string) []string {
 
 // DomainsHere lists the app's domains.
 func DomainsHere(dir, app string) ([]string, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func DomainsHere(dir, app string) ([]string, error) {
 // AddDomainHere gives the app one more domain and starts it with it, without
 // a build. When that fails, the domains stay as they were.
 func AddDomainHere(ctx context.Context, dir, app, domain string, out io.Writer) (Result, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return Result{}, err
 	}
@@ -50,7 +50,7 @@ func AddDomainHere(ctx context.Context, dir, app, domain string, out io.Writer) 
 
 // RemoveDomainHere takes a domain off the app and starts it without it.
 func RemoveDomainHere(ctx context.Context, dir, app, domain string, out io.Writer) (Result, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return Result{}, err
 	}

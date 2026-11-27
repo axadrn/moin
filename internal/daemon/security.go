@@ -49,8 +49,6 @@ type serverFile struct {
 	// TunnelToken runs cloudflared. The web comes through it while
 	// there is one.
 	TunnelToken string `json:"tunnel_token,omitempty"`
-	// Registries are the registry logins by host, as <username>:<password>.
-	Registries map[string]string `json:"registries,omitempty"`
 }
 
 // loadServerFile reads server.json from dir. ok is false when there is
@@ -89,12 +87,6 @@ func (s *security) proxyMode() string {
 		return "tunnel"
 	}
 	return "direct"
-}
-
-// registryLogin is the server's login for a registry host, as
-// <username>:<password>, "" for none.
-func (s *security) registryLogin(host string) string {
-	return s.file.Registries[host]
 }
 
 // Security is what is closed on this server, for the CLI.

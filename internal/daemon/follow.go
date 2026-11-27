@@ -67,7 +67,7 @@ func saveFollow(dir string, f Follow) error {
 // FollowHere makes app follow branch of repo. It makes the deploy key
 // the first time and returns its public half.
 func FollowHere(dir, app, repo, branch string) (Follow, error) {
-	if err := hereApps(dir).mustHave(app); err != nil {
+	if err := newApps(dir).mustHave(app); err != nil {
 		return Follow{}, err
 	}
 	if repo == "" || strings.HasPrefix(repo, "-") {
@@ -109,7 +109,7 @@ func CheckFollowHere(ctx context.Context, dir, app string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s follows no branch", app)
 	}
-	return newFollower(hereApps(dir), dir).head(ctx, f)
+	return newFollower(newApps(dir), dir).head(ctx, f)
 }
 
 // UnfollowHere stops app from following, and removes its deploy key.

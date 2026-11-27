@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -649,29 +648,9 @@ func (a *apps) copySource(ctx context.Context, app string, number int, target st
 	return nil
 }
 
-// pull fetches the main service's image, with the server's login for its
-// registry when it keeps one. The login goes into a throwaway Docker
-// config, so Docker keeps no copy of it.
+// pull fetches the main service's image.
 func (a *apps) pull(ctx context.Context, release *release) error {
-	start := release.start
-	args := a.composeArgs(start.App, release.composeJSON, "--progress", "plain", "pull", release.detected.Service)
-	host := protocol.RegistryHost(start.Image)
-	login := a.registryLogin(host)
-	if login == "" {
-		return a.run(ctx, release.logf, nil, args...)
-	}
-	dir, err := os.MkdirTemp("", tempName("docker-"))
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	auth := base64.StdEncoding.EncodeToString([]byte(login))
-	config, _ := json.Marshal(map[string]any{"auths": map[string]any{host: map[string]string{"auth": auth}}})
-	err = os.WriteFile(filepath.Join(dir, "config.json"), config, 0o600)
-	if err != nil {
-		return err
-	}
-	return a.run(ctx, release.logf, []string{"DOCKER_CONFIG=" + dir}, args...)
+	return a.run(ctx, release.logf, nil, a.composeArgs(release.start.App, release.composeJSON, "--progress", "plain", "pull", release.detected.Service)...)
 }
 
 var imagePattern = regexp.MustCompile(`"image": "([^"]+)"`)

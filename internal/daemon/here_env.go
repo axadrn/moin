@@ -10,7 +10,7 @@ import (
 
 // EnvNamesHere names the app's env vars, never a value.
 func EnvNamesHere(dir, app string) ([]string, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func EnvNamesHere(dir, app string) ([]string, error) {
 // EnvFileHere is the app's env as a .env text, values and all, for the
 // editor of `moin env edit` on your laptop.
 func EnvFileHere(dir, app string) (string, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return "", err
 	}
@@ -38,7 +38,7 @@ func EnvFileHere(dir, app string) (string, error) {
 // SetEnvHere replaces the app's env with the .env text and says what
 // changed, by name. The app takes it on its next start.
 func SetEnvHere(dir, app, text string) (dotenv.Change, error) {
-	a := hereApps(dir)
+	a := newApps(dir)
 	if err := a.mustHave(app); err != nil {
 		return dotenv.Change{}, err
 	}

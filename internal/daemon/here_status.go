@@ -41,7 +41,7 @@ type AppStatus struct {
 
 // StatusHere looks at every app on this server.
 func StatusHere(ctx context.Context, dir string) Status {
-	a := hereApps(dir)
+	a := newApps(dir)
 	status := Status{Version: build.Version, Apps: []AppStatus{}, Watchers: []string{}}
 	if watchers, err := WatchersHere(); err == nil && watchers != nil {
 		status.Watchers = watchers

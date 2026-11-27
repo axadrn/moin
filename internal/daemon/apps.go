@@ -50,9 +50,6 @@ type apps struct {
 	backups *backups
 	// proxyMode is "direct" or "tunnel", from the server config.
 	proxyMode func() string
-	// registryLogin is the server's login for a registry host, as
-	// <username>:<password>, "" for none.
-	registryLogin func(host string) string
 	// envMu keeps the changes of env files in a row.
 	envMu sync.Mutex
 
@@ -63,10 +60,9 @@ type apps struct {
 func newApps(dir string) *apps {
 	a := &apps{dir: filepath.Join(dir, "apps"), locks: map[string]*sync.Mutex{}}
 	a.backups = newBackups(a)
-	// The tunnel and the registry logins are in server.json, read each
-	// time, so a change by another command counts at once.
+	// The tunnel is in server.json, read each time, so a change by
+	// another command counts at once.
 	a.proxyMode = func() string { return newSecurity(dir, a).proxyMode() }
-	a.registryLogin = func(host string) string { return newSecurity(dir, a).registryLogin(host) }
 	return a
 }
 

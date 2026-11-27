@@ -10,7 +10,7 @@ import (
 // TestPreviousRelease skips releases with the live images, like a restart,
 // and failed ones.
 func TestPreviousRelease(t *testing.T) {
-	a := hereApps(t.TempDir())
+	a := newApps(t.TempDir())
 	release := func(number int, kind, image string) {
 		dir := a.releaseDir("shop", number)
 		if err := os.MkdirAll(dir, 0o700); err != nil {
