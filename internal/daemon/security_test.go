@@ -75,14 +75,14 @@ func TestFirewallRules(t *testing.T) {
 func TestKnockPortsAreOnePlaceAndNeverTheWeb(t *testing.T) {
 	seen := map[int]string{}
 	for _, knock := range knockPorts {
-		for _, port := range knock.ports {
+		for _, port := range knock.Ports {
 			if port == 80 || port == 443 {
-				t.Errorf("%s counts the web port %d", knock.name, port)
+				t.Errorf("%s counts the web port %d", knock.Name, port)
 			}
 			if other, ok := seen[port]; ok {
-				t.Errorf("port %d is %s and %s", port, other, knock.name)
+				t.Errorf("port %d is %s and %s", port, other, knock.Name)
 			}
-			seen[port] = knock.name
+			seen[port] = knock.Name
 		}
 	}
 }

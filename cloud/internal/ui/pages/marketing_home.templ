@@ -3,17 +3,21 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/githubstars"
 	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 )
 
-// Home is the landing page, in seven parts: the promise and a real
-// deploy, real posts that say the problem, how nothing gets lost, how
-// nobody gets in, the others, the two prices, and the way in. Every part
-// shows a real thing moin prints or sends. open is what the changelog says
-// about how moin ships; posts are the posts from X.
-templ Home(open HomeOpen, posts []tweets.Tweet) {
+// Home is the landing page, top to bottom: the promise and a real
+// deploy; real posts that say the problem; zero trust, how nobody gets
+// in; the knocks the site's own server dropped, as proof; how nothing
+// gets lost; the others; the two prices; the numbers we have; the way
+// in. Every part shows a real thing moin prints, sends or counts. open is
+// what the changelog says about how moin ships, posts are the posts from
+// X, knocks the site's own server's (nil: none), numbers what moin
+// counted.
+templ Home(open HomeOpen, posts []tweets.Tweet, knocks *HomeKnocks, numbers HomeNumbers) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
 		Description: brand.Description,
@@ -26,10 +30,14 @@ templ Home(open HomeOpen, posts []tweets.Tweet) {
 				@HomeVoices(posts)
 			}
 			<div class="moin-page">
-				@HomeLoseNothing()
 				@HomeNobodyGetsIn()
+				if knocks != nil {
+					@homeKnocks(*knocks)
+				}
+				@HomeLoseNothing()
 				@HomeCompare()
 				@HomePricing(open)
+				@homeNumbers(numbers)
 				@HomeEnd()
 			</div>
 		</main>
@@ -59,14 +67,19 @@ templ HomeHero() {
 					<span>Deploy anything.</span>
 					<span class="moin-muted">Lose nothing.</span>
 				</h1>
-				<p class="moin-lead moin-center">Your app on your server, in one command.<br/>Every backup proven, every day.</p>
+				<p class="moin-lead moin-center"><a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground moin-hero-open" data-quiet>Open source.</a> One command to your own server.<br/>Every backup proven, every day.</p>
 			</div>
 			<div class="moin-stack moin-hero-start" data-gap="6">
-				@components.Command(components.CommandProps{Text: homeInstall(ctxkeys.RenderConfig(ctx).AppURL)})
+				@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
 				<div class="moin-row" data-gap="2" data-center data-wrap>
 					@homePrimary()
-					@components.Button(components.ButtonProps{Href: "/docs/how-it-works"}) {
-						How it works
+					// The code, and its stars once GitHub answered.
+					@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
+						<i class="moin-icon moin-icon-git-hub"></i>
+						GitHub
+						if stars := githubstars.Count(); stars > 0 {
+							<span class="moin-muted moin-digits">{ githubstars.Short(stars) }</span>
+						}
 					}
 				</div>
 			</div>
@@ -146,7 +159,7 @@ templ HomeNobodyGetsIn() {
 			@homeRoadsTall()
 		}
 		<div class="moin-grid" data-cols="2">
-			@homeFact("No open ports.", "Nothing listens for moin. Public SSH closes after the first deploy.")
+			@homeFact("No open ports.", "Nothing listens for moin. Public SSH closes after the first deploy. It counts every knock.")
 			@homeFact("Tailscale and Cloudflare, built in.", "SSH in your tailnet. Visitors through a tunnel.")
 			@homeFact("No surprise updates.", "Your server updates when you say so.")
 			@homeFact("A hacked watcher is harmless.", "It can read. It can't command.")
@@ -334,7 +347,7 @@ templ HomeEnd() {
 			<p class="moin-statement">
 				Deploy anything. <span class="moin-muted">Lose nothing.</span>
 			</p>
-			@components.Command(components.CommandProps{Text: homeInstall(ctxkeys.RenderConfig(ctx).AppURL)})
+			@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
 			<div class="moin-row" data-gap="2" data-wrap>
 				@homePrimary()
 				@components.Button(components.ButtonProps{Href: "/docs"}) {

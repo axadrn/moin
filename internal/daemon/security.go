@@ -290,9 +290,9 @@ func firewallRules(file serverFile) string {
 	}
 	open := openPorts(file)
 	for _, knock := range knockPorts {
-		closed := slices.DeleteFunc(slices.Clone(knock.ports), func(port int) bool { return slices.Contains(open, fmt.Sprintf("%d/tcp", port)) })
+		closed := slices.DeleteFunc(slices.Clone(knock.Ports), func(port int) bool { return slices.Contains(open, fmt.Sprintf("%d/tcp", port)) })
 		if len(closed) > 0 {
-			rule(fmt.Sprintf("tcp dport %s counter name %s drop", portSet(closed), knockCounter(knock.name)))
+			rule(fmt.Sprintf("tcp dport %s counter name %s drop", portSet(closed), knockCounter(knock.Name)))
 		}
 	}
 	rule(fmt.Sprintf("meta l4proto tcp counter name %s drop", knockCounter(knockOther)))

@@ -1,0 +1,97 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/counts"
+	"github.com/axadrn/moin/cloud/internal/githubstars"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
+	"strconv"
+)
+
+// HomeNumbers are the numbers of the landing page: the stars on GitHub,
+// 0 before GitHub answered, and what moin cloud counted. Sample marks
+// made-up numbers, which only development shows.
+type HomeNumbers struct {
+	Stars  int
+	Totals counts.Totals
+	Sample bool
+}
+
+// numberRow is one line of counts: a name, and its month, year and all.
+type numberRow struct {
+	Name   string
+	Period counts.Period
+}
+
+// numberRows are the counts that have counted something; a count of 0
+// says nothing yet, so it stays away.
+func numberRows(t counts.Totals) []numberRow {
+	var rows []numberRow
+	for _, row := range []numberRow{
+		{"Deploys", t.Deploys},
+		{"Knocks dropped", t.Knocks},
+		{brand.Name + " installs", t.Installs},
+	} {
+		if row.Period.Total > 0 {
+			rows = append(rows, row)
+		}
+	}
+	return rows
+}
+
+// homeNumbers are the only numbers we have: the free software sends none,
+// the rest is counted, never guessed. A number not counted yet stays away.
+templ homeNumbers(n HomeNumbers) {
+	{{ rows := numberRows(n.Totals) }}
+	<section id="numbers" class="moin-band">
+		@homeHead("Counted, not guessed.", "No telemetry. These are all the numbers we have.")
+		if n.Sample {
+			<div class="moin-row" data-center>
+				@components.Chip("Sample data · development only")
+			</div>
+		}
+		<div class="moin-grid" data-cols="2">
+			@numberCard("0 bytes", "Sent to us by the free software. Read the source.", layouts.GitHubURL)
+			if n.Stars > 0 {
+				@numberCard(githubstars.Short(n.Stars)+" stars", "On GitHub.", layouts.GitHubURL)
+			}
+		</div>
+		if n.Totals.Servers > 0 {
+			<div class="moin-grid" data-cols="2">
+				@numberCard(strconv.FormatInt(n.Totals.Servers, 10)+" servers", "On "+brand.Name+" cloud, right now.", "")
+				@numberCard(strconv.FormatInt(n.Totals.Apps, 10)+" apps", "On those servers, right now.", "")
+			</div>
+		}
+		if len(rows) > 0 {
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"style": "--pad:2rem"}}) {
+				<div class="moin-numbers">
+					<div class="moin-numbers-row moin-small moin-muted">
+						<span>On { brand.Name } cloud</span>
+						<span>This month</span>
+						<span>This year</span>
+						<span>Total</span>
+					</div>
+					for _, row := range rows {
+						<div class="moin-numbers-row">
+							<span class="moin-strong">{ row.Name }</span>
+							<span class="moin-digits">{ human.Count(row.Period.Month) }</span>
+							<span class="moin-digits">{ human.Count(row.Period.Year) }</span>
+							<span class="moin-digits">{ human.Count(row.Period.Total) }</span>
+						</div>
+					}
+				</div>
+			}
+		}
+	</section>
+}
+
+// numberCard is one number in a card like the facts above, and a short
+// line under it. With href the whole card is a link.
+templ numberCard(number, note, href string) {
+	@components.Card(components.CardProps{Href: href, Attrs: templ.Attributes{"data-gap": "1", "style": "--pad:2rem"}}) {
+		<span class="moin-fact-name moin-digits">{ number }</span>
+		<span class="moin-text moin-muted">{ note }</span>
+	}
+}

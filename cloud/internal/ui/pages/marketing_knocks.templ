@@ -1,0 +1,104 @@
+package pages
+
+import (
+	"cmp"
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/report"
+	"net/url"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+// HomeKnocks are the knocks of the site's own server: what its firewall
+// dropped, as its last report to moin cloud said. Sample marks made-up
+// numbers, which only development shows.
+type HomeKnocks struct {
+	report.Knocks
+	Sample bool
+}
+
+// knockRow is one port of today: the name people know it by, its port
+// numbers, its knocks and its share of today.
+type knockRow struct {
+	Label, Ports string
+	Count        int64
+	Share        int64
+}
+
+// knockRows are the eight ports with the most knocks today, the most
+// first, named as report.KnockPorts names them.
+func knockRows(k report.Knocks) []knockRow {
+	var rows []knockRow
+	for name, count := range k.TodayByName {
+		row := knockRow{Label: "Other ports", Count: count}
+		if k.Today > 0 {
+			row.Share = count * 100 / k.Today
+		}
+		for _, port := range report.KnockPorts {
+			if port.Name == name {
+				row.Label = port.Label
+				var numbers []string
+				for _, number := range port.Ports {
+					numbers = append(numbers, strconv.Itoa(number))
+				}
+				row.Ports = strings.Join(numbers, ", ")
+			}
+		}
+		rows = append(rows, row)
+	}
+	slices.SortFunc(rows, func(a, b knockRow) int {
+		return cmp.Or(cmp.Compare(b.Count, a.Count), cmp.Compare(a.Label, b.Label))
+	})
+	return rows[:min(8, len(rows))]
+}
+
+// siteHost is the site's own address without https://, like moin.run.
+func siteHost(site string) string {
+	if u, err := url.Parse(site); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return site
+}
+
+// homeKnocks is the proof after zero trust: the site's own server, every
+// knock dropped. Four facts like the ones above, then the ports bots
+// tried most today.
+templ homeKnocks(k HomeKnocks) {
+	{{ rows := knockRows(k.Knocks) }}
+	<section id="knocks" class="moin-band">
+		@homeHead(siteHost(brand.Site)+", right now.", "Every knock on a closed port. All dropped.")
+		if k.Sample {
+			<div class="moin-row" data-center>
+				@components.Chip("Sample data · development only")
+			</div>
+		}
+		<div class="moin-grid" data-cols="2">
+			@homeFact(human.Count(k.Today), "Today. All dropped.")
+			@homeFact(human.Count(k.Year), "This year. Nothing answered.")
+			@homeFact(human.Count(k.Total), "Since the first count.")
+			if len(rows) > 0 {
+				@homeFact(rows[0].Label, "Most tried: "+strconv.FormatInt(rows[0].Share, 10)+"% of today.")
+			}
+		</div>
+		if len(rows) > 0 {
+			@components.Card(components.CardProps{Attrs: templ.Attributes{"style": "--pad:2rem"}}) {
+				<span class="moin-fact-name">Most tried today</span>
+				<ol class="moin-knocks">
+					for _, row := range rows {
+						<li>
+							<span>{ row.Label } <span class="moin-muted">{ row.Ports }</span></span>
+							<span class="moin-digits">{ human.Count(row.Count) }</span>
+							<span class="moin-knocks-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + strconv.FormatInt(row.Share, 10) + "%") }></span></span>
+						</li>
+					}
+				</ol>
+			}
+		}
+		<p class="moin-text moin-muted moin-center">
+			Every { brand.Name } server counts its knocks. See yours: <code class="moin-mono moin-foreground">{ brand.Name } knocks</code>
+		</p>
+	</section>
+}

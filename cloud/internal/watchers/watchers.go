@@ -67,6 +67,11 @@ func New(store *workspace.Store, counts *counts.Counts, mailer mailer.Mailer, ap
 	}
 }
 
+// Counts are the counts the reports add to, for the landing page.
+func (ws *Watchers) Counts() *counts.Counts {
+	return ws.counts
+}
+
 // Load makes the watcher of every workspace with a server, so silence is
 // noticed after a restart too.
 func (ws *Watchers) Load() error {

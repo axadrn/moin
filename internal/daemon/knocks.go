@@ -21,64 +21,18 @@ import (
 // The firewall counts each knock under the name of its port, the daemon
 // reads the counters every minute and keeps the counts in knocks.db.
 
-// knockPort is a well-known port bots knock on, with its name.
-type knockPort struct {
-	name  string
-	ports []int
-}
-
-// knockPorts are the ports knocks are counted by, one place. 80 and 443
-// are missing on purpose: who comes there is a visitor.
-var knockPorts = []knockPort{
-	{"ssh", []int{22}},
-	{"telnet", []int{23, 2323}},
-	{"ftp", []int{21}},
-	{"smtp", []int{25}},
-	{"dns", []int{53}},
-	{"rpc", []int{111}},
-	{"smb", []int{139, 445}},
-	{"ldap", []int{389}},
-	{"rsync", []int{873}},
-	{"mssql", []int{1433}},
-	{"oracle", []int{1521}},
-	{"pptp", []int{1723}},
-	{"node-red", []int{1880}},
-	{"mqtt", []int{1883}},
-	{"nfs", []int{2049}},
-	{"docker", []int{2375, 2376}},
-	{"etcd", []int{2379}},
-	{"grafana", []int{3000}},
-	{"mysql", []int{3306}},
-	{"rdp", []int{3389}},
-	{"postgres", []int{5432}},
-	{"adb", []int{5555}},
-	{"rabbitmq", []int{5672, 15672}},
-	{"vnc", []int{5900}},
-	{"couchdb", []int{5984}},
-	{"x11", []int{6000}},
-	{"redis", []int{6379}},
-	{"kubernetes", []int{6443}},
-	{"http-alt", []int{8000, 8008, 8080, 8443, 8888}},
-	{"influxdb", []int{8086}},
-	{"minio", []int{9000}},
-	{"prometheus", []int{9090}},
-	{"kafka", []int{9092}},
-	{"elasticsearch", []int{9200}},
-	{"webmin", []int{10000}},
-	{"kubelet", []int{10250}},
-	{"memcached", []int{11211}},
-	{"ollama", []int{11434}},
-	{"mongodb", []int{27017}},
-}
+// knockPorts are the ports knocks are counted by: report.KnockPorts, one
+// place for the daemon and the site.
+var knockPorts = report.KnockPorts
 
 // knockOther counts the knocks on every other port.
-const knockOther = "other"
+const knockOther = report.KnockOther
 
 // knockNames are the names of knockPorts, and other.
 func knockNames() []string {
 	names := []string{}
 	for _, knock := range knockPorts {
-		names = append(names, knock.name)
+		names = append(names, knock.Name)
 	}
 	return append(names, knockOther)
 }

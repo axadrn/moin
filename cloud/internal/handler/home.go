@@ -10,8 +10,9 @@ import (
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
-// Home is the landing page.
-func Home(files fs.FS) http.HandlerFunc {
+// Home is the landing page. knocks are the knocks of the site's own
+// server, nil when there are none; numbers what moin counted.
+func Home(files fs.FS, knocks func() *pages.HomeKnocks, numbers func() pages.HomeNumbers) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// A changelog that cannot be read hides Built in the open, nothing more.
 		releases, err := service.ChangelogReleases(files)
@@ -23,7 +24,7 @@ func Home(files fs.FS) http.HandlerFunc {
 		if err != nil {
 			slog.Warn("home: tweets", "error", err)
 		}
-		render(w, r, pages.Home(pages.NewHomeOpen(releases), posts))
+		render(w, r, pages.Home(pages.NewHomeOpen(releases), posts, knocks(), numbers()))
 	}
 }
 

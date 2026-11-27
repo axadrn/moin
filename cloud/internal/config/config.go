@@ -36,6 +36,11 @@ type Config struct {
 	GitHubClientSecret string
 	GitHubURL          string
 	GitHubAPIURL       string
+	// The landing page shows the knocks of one server in moin cloud:
+	// KNOCKS_SERVER, the workspace id and the server's name, like
+	// 3f9c/web-1. Without it the landing page shows none.
+	KnocksWorkspace string
+	KnocksServer    string
 }
 
 // RenderConfig is what templates may know of the settings: nothing secret.
@@ -91,6 +96,13 @@ func Load() (*Config, error) {
 	}
 	if (cfg.GitHubClientID == "") != (cfg.GitHubClientSecret == "") {
 		errs = append(errs, errors.New("GitHub sign-in needs both GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET, or neither"))
+	}
+	if knocks := env("KNOCKS_SERVER", ""); knocks != "" {
+		var found bool
+		cfg.KnocksWorkspace, cfg.KnocksServer, found = strings.Cut(knocks, "/")
+		if !found || cfg.KnocksWorkspace == "" || cfg.KnocksServer == "" {
+			errs = append(errs, errors.New("KNOCKS_SERVER must be a workspace id and a server name, like 3f9c/web-1"))
+		}
 	}
 	if port, err := strconv.Atoi(cfg.Port); err != nil || port < 1 || port > 65535 {
 		errs = append(errs, errors.New("PORT must be a number between 1 and 65535"))

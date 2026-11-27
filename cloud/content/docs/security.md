@@ -83,6 +83,28 @@ After it, no public TCP port is left on the server.
 - The instant address, `*.sslip.io`, needs ports 80 and 443. Behind the tunnel, use your own domain.
 - Your provider may have a cloud firewall in front of the server. moin does not touch it.
 
+## Knocks
+
+Bots try every new server within minutes: SSH, databases, admin pages. Each try is a knock. Once public SSH is closed, moin's firewall drops them, and counts each one under the name of its port.
+
+```bash
+moin knocks prod
+```
+
+```text
+prod
+PORT       HOUR   TODAY   7 DAYS   YEAR      TOTAL     PER MINUTE
+ssh        47     1,120   7,904    131,220   240,017   0.8
+postgres   6      142     1,003    17,436    30,551    0.1
+all        71     1,843   12,880   212,904   389,117   1.2
+All dropped. Counted since March 2, 2026.
+```
+
+- Without a server, it shows every server, one after the other. `--json` prints the numbers for a script.
+- Ports 80 and 443 are not counted: who comes there is a visitor.
+- Until public SSH is closed, nothing is counted.
+- Every report tells your watchers the knocks of the day.
+
 ## The way back in
 
 Coming, with `moin secure`. Lost your laptop, or your tailnet? Use your provider's web console. It is a screen and a keyboard on the server, in your browser.

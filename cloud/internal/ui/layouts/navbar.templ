@@ -32,9 +32,10 @@ func navLinks(path string) []components.BarLink {
 // the count.
 const starsShowAt = 1000
 
-// Navbar is the floating pill of the site: the wordmark, the places, and
-// the one way in. On a phone it keeps the wordmark, Docs and
-// the way in; the footer has the rest. No menu: links change pages.
+// Navbar is the floating pill of the site: the wordmark, the places, the
+// search, GitHub and the one way in. On a phone it keeps the wordmark,
+// the search and Docs; the footer has the rest, X too. No menu: links
+// change pages.
 templ Navbar() {
 	@components.Bar() {
 		<a href="/" class="moin-row" data-gap="2" aria-label={ brand.Name + " home" }>
@@ -71,12 +72,9 @@ templ Navbar() {
 			}
 		</span>
 		<span class="moin-hidden-phone">
-			@components.Button(components.ButtonProps{Href: XURL, Icon: true, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "X"}}) {
-				<i class="moin-icon moin-icon-x-logo"></i>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs/getting-started"}) {
+				Get started
 			}
 		</span>
-		@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs"}) {
-			Get started
-		}
 	}
 }

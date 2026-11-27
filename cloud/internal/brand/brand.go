@@ -8,6 +8,9 @@ const (
 	Tagline = "Deploy anything. Lose nothing."
 	// Company runs moin cloud and holds the copyright.
 	Company = "Berry Good Ideas LLC"
+	// Site is the one address of the site: it serves the install script
+	// and moin cloud. The landing page shows it, in development too.
+	Site = "https://moin.run"
 	// SupportEmail is where people write about moin.
 	SupportEmail = "hello@moin.run"
 	// Description is what search engines show for the home page, at most

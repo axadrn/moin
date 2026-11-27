@@ -27,6 +27,9 @@ type ServerView struct {
 	Name, Version, State, Problem string
 	OK                            bool
 	Apps                          []AppView
+	// Knocks are what the server's firewall dropped, as its last report
+	// said; nil while it counted none.
+	Knocks *report.Knocks
 }
 
 // AppView is one app of a server.
@@ -84,7 +87,7 @@ func (w *Watcher) serverView(name string, now time.Time) ServerView {
 		return ServerView{Name: name, State: "no report yet",
 			Problem: name + " has not reported yet. On your laptop: " + w.Connect(name)}
 	}
-	server := ServerView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received)}
+	server := ServerView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received), Knocks: srv.Report.Knocks}
 	if srv.Silent {
 		server.Problem = name + " stopped reporting " + ago(now, srv.Received) + ". Look: ssh " + name
 	}
