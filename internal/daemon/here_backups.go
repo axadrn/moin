@@ -240,9 +240,9 @@ func RemoveAlertHere(number int) error {
 	return SaveConfig(config)
 }
 
-// TestAlertsHere sends a test alert to every destination and says which
+// SendTestAlertHere sends a test alert to every destination and says which
 // did not take it.
-func TestAlertsHere(ctx context.Context) error {
+func SendTestAlertHere(ctx context.Context) error {
 	config, err := LoadConfig()
 	if err != nil {
 		return err

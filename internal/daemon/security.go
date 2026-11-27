@@ -17,9 +17,9 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// How a server is reached and locked down. The hub decides, the
-// daemon applies it and keeps it in server.json, so the proxy starts in the
-// right mode before the first session.
+// How a server is reached and locked down. `moin secure` decides, the
+// daemon keeps it: the config is in server.json, and every few minutes
+// the daemon puts back what drifted.
 //
 //	direct  Traefik takes 80 and 443 and gets certificates itself.
 //	tunnel  cloudflared carries all app traffic from Cloudflare to Traefik's
@@ -32,7 +32,7 @@ const (
 	tailscalePort    = "41641"
 )
 
-// serverFile is server.json, 0600: the config the hub sent, and the
+// serverFile is server.json, 0600: the config `moin secure` set, and the
 // secrets of the server, which only the daemon keeps (protocol.SecretSet).
 // The hub forwards a secret once and knows only its name.
 type serverFile struct {
@@ -77,7 +77,7 @@ func (s *security) current() serverFile {
 	return s.file
 }
 
-// known is whether the hub ever sent a config, which always names SSH:
+// known is whether a config was ever set, which always names SSH:
 // without one there is nothing to keep, only what is to report.
 func (f serverFile) known() bool { return f.SSH != "" }
 
@@ -134,7 +134,7 @@ func setOrRemove(values map[string]string, key, value string) map[string]string 
 	return values
 }
 
-// apply sets up what the hub asks for. SSH that was off starts again when
+// apply sets up what config asks for. SSH that was off starts again when
 // it no longer is.
 func (s *security) apply(ctx context.Context, config protocol.ServerConfig) protocol.ServerConfigResult {
 	s.applying.Lock()
@@ -162,9 +162,9 @@ func (s *security) apply(ctx context.Context, config protocol.ServerConfig) prot
 	return result
 }
 
-// keep checks that the server still has what the hub set and puts back
+// keep checks that the server still has what was set and puts back
 // what drifted: the tunnel, the tailnet, sshd off, the firewall. It never
-// starts sshd. Without a config from the hub it only looks.
+// starts sshd. Without a config it only looks.
 func (s *security) keep(ctx context.Context) protocol.ServerConfigResult {
 	s.applying.Lock()
 	defer s.applying.Unlock()

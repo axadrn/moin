@@ -527,7 +527,7 @@ func hereAlerts(ctx context.Context, verb, number string, stdin io.Reader, stdou
 		n, _ := strconv.Atoi(number)
 		return daemon.RemoveAlertHere(n)
 	case "test":
-		return daemon.TestAlertsHere(ctx)
+		return daemon.SendTestAlertHere(ctx)
 	}
 	names, err := daemon.AlertsHere()
 	return respond(stdout, names, err)
