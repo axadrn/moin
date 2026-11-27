@@ -15,7 +15,9 @@ const (
 // undoes that restore. CheckedAt is the newest daily check: it restored
 // the newest copy into a throwaway database and read it, and CheckError
 // says why it failed. Error says what keeps the backup from working, and
-// BucketDown that it is the bucket, not this database.
+// BucketDown that it is the bucket, not this database. CloudError says
+// why no watcher that takes copies took the last one of a server with a
+// bucket, and CloudFailingSince since when none did.
 type DatabaseBackup struct {
 	Database   string     `json:"database"`
 	Kind       string     `json:"kind,omitempty"`
@@ -28,6 +30,9 @@ type DatabaseBackup struct {
 	CheckedCopy string `json:"checked_copy,omitempty"`
 	Error       string `json:"error,omitempty"`
 	BucketDown  bool   `json:"bucket_down,omitempty"`
+
+	CloudError        string     `json:"cloud_error,omitempty"`
+	CloudFailingSince *time.Time `json:"cloud_failing_since,omitempty"`
 }
 
 // Copy is one copy of a database in the bucket, or one state before a

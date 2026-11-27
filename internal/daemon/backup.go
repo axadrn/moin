@@ -129,6 +129,10 @@ type state struct {
 	// CloudTried is when a server without a bucket last had a copy due
 	// that no watcher took.
 	CloudTried time.Time `json:"cloud_tried,omitzero"`
+	// CloudError is why no watcher took the last scheduled copy of a
+	// server with a bucket, and CloudFailingSince since when none did.
+	CloudError        string    `json:"cloud_error,omitempty"`
+	CloudFailingSince time.Time `json:"cloud_failing_since,omitzero"`
 }
 
 func newBackups(a *apps) *backups {
@@ -357,11 +361,17 @@ func (b *backups) copyTo(ctx context.Context, app string, database protocol.Data
 			return "", fmt.Errorf("copy %s: %w", database.Path, err)
 		}
 	}
+	var cloudErr error
 	if len(takers) > 0 {
-		// With a bucket the copy is safe there: what fails here is logged.
-		if err := b.toCloud(ctx, app, database, id, file, takers); err != nil && config.Bucket == nil {
-			return "", fmt.Errorf("copy %s: %w", database.Path, err)
+		cloudErr = b.toCloud(ctx, app, database, id, file, takers)
+		if cloudErr != nil && config.Bucket == nil {
+			return "", fmt.Errorf("copy %s: %w", database.Path, cloudErr)
 		}
+	}
+	// With a bucket the copy is safe there. That no watcher took it is
+	// written down beside it.
+	if scheduled {
+		b.noteCloud(app, database, cloudErr)
 	}
 	// Proven is a copy that restored and is where it belongs.
 	if check {
@@ -374,6 +384,23 @@ func (b *backups) copyTo(ctx context.Context, app string, database protocol.Data
 	}
 	b.mu.Unlock()
 	return id, nil
+}
+
+// noteCloud writes down whether the watchers that take copies took the
+// last scheduled one: err is why none did. Watchers that take none are no
+// problem.
+func (b *backups) noteCloud(app string, database protocol.Database, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	s := b.state(app, database)
+	if err == nil || errors.Is(err, errNoTaker) {
+		s.CloudError, s.CloudFailingSince = "", time.Time{}
+		return
+	}
+	if s.CloudError == "" {
+		s.CloudFailingSince = time.Now().UTC()
+	}
+	s.CloudError = err.Error()
 }
 
 // copyToFile writes an encrypted copy of a database into a new file in
@@ -791,6 +818,9 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 	}
 	if !s.CheckedAt.IsZero() {
 		status.CheckedAt, status.CheckError, status.CheckedCopy = &s.CheckedAt, s.CheckError, s.CheckedCopy
+	}
+	if b.on() && s.CloudError != "" {
+		status.CloudError, status.CloudFailingSince = s.CloudError, &s.CloudFailingSince
 	}
 	switch {
 	// A server without a bucket may still have its copies at a watcher.

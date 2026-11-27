@@ -94,6 +94,9 @@ func printBackup(stdout io.Writer, app string, database protocol.DatabaseBackup,
 		fmt.Fprintln(stdout, "  "+style.Danger.Render("✗")+" "+database.Error)
 	}
 	fmt.Fprintln(stdout, "  "+checkLine(database, now))
+	if database.CloudError != "" {
+		fmt.Fprintln(stdout, "  "+style.Danger.Render("✗")+" No watcher took the last copy: "+database.CloudError)
+	}
 	rows := [][]string{}
 	for index, copy := range database.Copies {
 		if index == shownCopies {

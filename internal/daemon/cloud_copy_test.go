@@ -231,6 +231,48 @@ func TestCopyToTheBucketAndCloud(t *testing.T) {
 	noTempLeft(t, b)
 }
 
+// With a bucket, a copy no watcher took is no failed backup: the copy is
+// in the bucket. It is written down, the status and the report show it,
+// and after a day it is an alert. The next copy a watcher takes ends it.
+func TestACopyOnlyTheBucketTookIsWrittenDown(t *testing.T) {
+	journal(t)
+	b, database := shopWithSQLite(t)
+	cloud := newFakeCloud(t)
+	cloud.tooSoon = true
+	bucket := withFakeBucket(t, b, Config{Watchers: []Watcher{cloud.watcher}})
+	ctx := context.Background()
+	b.copyIfDue(ctx, "shop", database)
+	status := b.status(ctx, "shop", database, false)
+	if len(bucket.objects) != 1 || status.Error != "" || !strings.Contains(status.CloudError, "takes no copy right now") || status.CloudFailingSince == nil {
+		t.Fatalf("the bucket has %d, status %+v", len(bucket.objects), status)
+	}
+	if reported := reportDatabase(status); reported.Error != status.CloudError {
+		t.Errorf("the report says %q", reported.Error)
+	}
+	statuses := map[string][]protocol.DatabaseBackup{"shop": {status}}
+	key := "cloud-copy/shop/" + database.Path
+	if _, ok := newWatch(b.apps).problems(b.config(), nil, statuses)[key]; ok {
+		t.Error("an alert at once")
+	}
+	b.mu.Lock()
+	b.state("shop", database).CloudFailingSince = time.Now().Add(-25 * time.Hour)
+	b.mu.Unlock()
+	statuses["shop"][0] = b.status(ctx, "shop", database, false)
+	if problem, ok := newWatch(b.apps).problems(b.config(), nil, statuses)[key]; !ok || problem.Text != status.CloudError {
+		t.Errorf("no alert after a day: %+v", problem)
+	}
+	cloud.tooSoon = false
+	b.mu.Lock()
+	b.state("shop", database).LastCopy = time.Time{}
+	b.mu.Unlock()
+	bucket.objects = map[string][]byte{}
+	b.copyIfDue(ctx, "shop", database)
+	if status := b.status(ctx, "shop", database, false); len(cloud.uploaded) != 1 || status.CloudError != "" || status.CloudFailingSince != nil {
+		t.Errorf("after a copy moin cloud took: %+v", status)
+	}
+	noTempLeft(t, b)
+}
+
 // A watcher that answers 429 takes copies, only not this one: that is a
 // copy that failed, with what the watcher said, not "takes no copies".
 func TestACopyThatCameTooSoonFails(t *testing.T) {

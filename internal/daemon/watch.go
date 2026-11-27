@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,6 +45,10 @@ const (
 	// checkLate is how old the newest daily check may get before that is
 	// a problem of its own: something keeps the checks from running.
 	checkLate = 2 * day
+	// cloudLate is how long the watchers that take copies may take none
+	// of a server with a bucket before that is a problem: the copies in
+	// the bucket are there.
+	cloudLate = day
 )
 
 // watch is the daemon's look at its server, once a minute.
@@ -242,9 +247,7 @@ func reportDatabase(status protocol.DatabaseBackup) report.Database {
 		d.CheckOK = status.CheckError == ""
 	}
 	d.CheckedCopy, _ = protocol.CopyTime(status.CheckedCopy)
-	if d.Error == "" {
-		d.Error = status.CheckError
-	}
+	d.Error = cmp.Or(d.Error, status.CheckError, status.CloudError)
 	return d
 }
 
@@ -278,6 +281,9 @@ func (w *watch) problems(config Config, containers map[string]appContainers, sta
 			}
 			if status.CheckError != "" {
 				add("check/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the restore check of %s failed", app, status.Database), status.CheckError)
+			}
+			if status.CloudFailingSince != nil && time.Since(*status.CloudFailingSince) > cloudLate {
+				add("cloud-copy/"+app+"/"+status.Database, app, fmt.Sprintf("%s: no watcher took a copy of %s for a day", app, status.Database), status.CloudError)
 			}
 			if status.CheckedAt != nil && config.Bucket != nil && time.Since(*status.CheckedAt) > checkLate {
 				add("check-late/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the restore check of %s is late", app, status.Database), "The last one ran "+status.CheckedAt.UTC().Format("Jan 2 15:04 UTC")+". One should run every day.")
