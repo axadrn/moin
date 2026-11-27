@@ -48,6 +48,7 @@ func TestCopyAddresses(t *testing.T) {
 type fakeCloud struct {
 	mu       sync.Mutex
 	taking   bool
+	tooSoon  bool
 	asked    int
 	started  []copyStart
 	uploaded [][]byte
@@ -84,6 +85,10 @@ func newFakeCloud(t *testing.T) *fakeCloud {
 			if start.App == "" {
 				cloud.asked++
 				http.Error(w, "not a copy", http.StatusBadRequest)
+				return
+			}
+			if cloud.tooSoon {
+				http.Error(w, "a copy of this database came less than 50 minutes ago", http.StatusTooManyRequests)
 				return
 			}
 			cloud.started = append(cloud.started, start)
@@ -222,6 +227,24 @@ func TestCopyToTheBucketAndCloud(t *testing.T) {
 	b.mu.Unlock()
 	if len(bucket.objects) != 1 || s.CopyError != "" || s.LastCopy.IsZero() {
 		t.Errorf("the bucket has %d, state %+v", len(bucket.objects), s)
+	}
+	noTempLeft(t, b)
+}
+
+// A watcher that answers 429 takes copies, only not this one: that is a
+// copy that failed, with what the watcher said, not "takes no copies".
+func TestACopyThatCameTooSoonFails(t *testing.T) {
+	journal(t)
+	b, database := shopWithSQLite(t)
+	cloud := newFakeCloud(t)
+	cloud.tooSoon = true
+	b.load = func() (Config, error) { return Config{Watchers: []Watcher{cloud.watcher}}, nil }
+	b.copyIfDue(context.Background(), "shop", database)
+	b.mu.Lock()
+	s := *b.state("shop", database)
+	b.mu.Unlock()
+	if !strings.Contains(s.CopyError, "takes no copy right now: a copy of this database came less than 50 minutes ago") {
+		t.Errorf("state: %+v", s)
 	}
 	noTempLeft(t, b)
 }

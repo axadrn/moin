@@ -122,9 +122,13 @@ func startCopy(ctx context.Context, watcher Watcher, start copyStart) (copyUploa
 	case err != nil:
 		return upload, err
 	// No such address: a watcher that takes no copies. 402: moin cloud for
-	// a workspace that does not pay. 429: a copy came a moment ago.
-	case status == http.StatusNotFound || status == http.StatusPaymentRequired || status == http.StatusTooManyRequests:
+	// a workspace that does not pay.
+	case status == http.StatusNotFound || status == http.StatusPaymentRequired:
 		return upload, errTakesNoCopies
+	// A watcher that takes copies, but not this one: moin cloud takes one
+	// of a database every 50 minutes, counted from when it was made.
+	case status == http.StatusTooManyRequests:
+		return upload, fmt.Errorf("the watcher at %s takes no copy right now: %s", watcher.URL, answer)
 	case status != http.StatusCreated:
 		return upload, fmt.Errorf("the watcher at %s answered HTTP %d: %s", watcher.URL, status, answer)
 	}
