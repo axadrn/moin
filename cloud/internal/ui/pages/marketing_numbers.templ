@@ -64,7 +64,7 @@ templ homeNumbers(n HomeNumbers) {
 			</div>
 		}
 		if len(rows) > 0 {
-			@components.Card(components.CardProps{Attrs: templ.Attributes{"style": "--pad:2rem"}}) {
+			@components.Card(components.CardProps{}) {
 				<div class="moin-numbers">
 					<div class="moin-numbers-row moin-small moin-muted">
 						<span>On { brand.Name } cloud</span>
@@ -89,8 +89,5 @@ templ homeNumbers(n HomeNumbers) {
 // numberCard is one number in a card like the facts above, and a short
 // line under it. With href the whole card is a link.
 templ numberCard(number, note, href string) {
-	@components.Card(components.CardProps{Href: href, Attrs: templ.Attributes{"data-gap": "1", "style": "--pad:2rem"}}) {
-		<span class="moin-fact-name moin-digits">{ number }</span>
-		<span class="moin-text moin-muted">{ note }</span>
-	}
+	@components.Fact(components.FactProps{Name: number, Note: note, Href: href})
 }

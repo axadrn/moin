@@ -2035,8 +2035,8 @@
 .moin-marquee-row { display: flex; width: max-content; }
 .moin-marquee-track {
   display: flex;
-  gap: var(--space-3);
-  padding-inline-end: var(--space-3);
+  gap: var(--space-4);
+  padding-inline-end: var(--space-4);
 }
 @media (prefers-reduced-motion: reduce) {
   .moin-marquee { padding-inline: var(--gutter, 1rem); }

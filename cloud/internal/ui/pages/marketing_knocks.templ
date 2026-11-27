@@ -84,7 +84,7 @@ templ homeKnocks(k HomeKnocks) {
 			}
 		</div>
 		if len(rows) > 0 {
-			@components.Card(components.CardProps{Attrs: templ.Attributes{"style": "--pad:2rem"}}) {
+			@components.Card(components.CardProps{}) {
 				<span class="moin-fact-name">Most tried today</span>
 				<ol class="moin-knocks">
 					for _, row := range rows {

@@ -13,11 +13,10 @@ import (
 // deploy; real posts that say the problem; zero trust, how nobody gets
 // in; the knocks the site's own server dropped, as proof; how nothing
 // gets lost; the others; the two prices; the numbers we have; the way
-// in. Every part shows a real thing moin prints, sends or counts. open is
-// what the changelog says about how moin ships, posts are the posts from
-// X, knocks the site's own server's (nil: none), numbers what moin
-// counted.
-templ Home(open HomeOpen, posts []tweets.Tweet, knocks *HomeKnocks, numbers HomeNumbers) {
+// in. Every part shows a real thing moin prints, sends or counts. posts
+// are the posts from X, knocks the site's own server's (nil: none),
+// numbers what moin counted.
+templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers HomeNumbers) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
 		Description: brand.Description,
@@ -36,7 +35,7 @@ templ Home(open HomeOpen, posts []tweets.Tweet, knocks *HomeKnocks, numbers Home
 				}
 				@HomeLoseNothing()
 				@HomeCompare()
-				@HomePricing(open)
+				@HomePricing()
 				@homeNumbers(numbers)
 				@HomeEnd()
 			</div>
@@ -154,7 +153,7 @@ templ homeAlert(title, text string) {
 templ HomeNobodyGetsIn() {
 	<section id="security" class="moin-band">
 		@homeHead("Zero trust deploys.", "No dashboard holds a key to your server. Not even ours.")
-		@components.Card(components.CardProps{Attrs: templ.Attributes{"style": "--pad:2rem"}}) {
+		@components.Card(components.CardProps{}) {
 			@homeRoads()
 			@homeRoadsTall()
 		}
@@ -185,10 +184,7 @@ templ homeMore(href, text string) {
 
 // homeFact is one short fact: a name, and a line under it.
 templ homeFact(name, note string) {
-	@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "1", "style": "--pad:2rem"}}) {
-		<span class="moin-fact-name">{ name }</span>
-		<span class="moin-text moin-muted">{ note }</span>
-	}
+	@components.Fact(components.FactProps{Name: name, Note: note})
 }
 
 // homeRoads draws the two one-way roads: laptop to server over SSH, server
@@ -256,66 +252,57 @@ templ homeRoadsTall() {
 	</svg>
 }
 
-// ---------------------------------------------------------------- pricing
-// HomePricing puts the free moin next to moin cloud: everything is open
-// source and free; the cloud takes two jobs off your hands.
-templ HomePricing(open HomeOpen) {
+// HomePricing puts the free moin next to moin cloud, in two cards of the
+// same shape: a name, a price, one line, five rows, a button.
+templ HomePricing() {
 	<section id="pricing" class="moin-band">
 		@homeHead("Free. Or free of worries.", "Open source, all of it. Or let us watch.")
 		<div class="moin-grid" data-cols="2">
-			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem"}}) {
-				<div class="moin-stack" data-gap="1">
-					<span class="moin-strong">{ brand.Name }</span>
-					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$0</span><span class="moin-small moin-muted">forever, open source</span></span>
-					<span class="moin-small moin-muted">{ homeShips(open) }</span>
-				</div>
-				@homePlanRows(
-					"Deploy, rollback, logs, env, domains",
-					"Backups into your own bucket",
-					"A restore check every day",
-					"Alerts while your server lives",
-					"Run your own watcher on a second server",
-					"AI agents use the same CLI",
-				)
-				<div class="moin-card-end">
-					@homePrimary()
-				</div>
+			@homePlan(homePlanProps{
+				Name: brand.Name, Price: "$0", Per: "forever", Line: "Open source. All of it.",
+				Rows: []string{"Deploy, rollback, logs", "Backups to your own bucket", "A restore check every day", "Alerts while your server lives", "Your own watcher"},
+			}) {
+				@homePrimary()
 			}
-			@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "6", "style": "--pad:2rem"}}) {
-				<div class="moin-stack" data-gap="1">
-					<span class="moin-row" data-gap="2">
-						<span class="moin-strong">{ brand.Name } cloud</span>
-						@components.Chip("Launch price")
-					</span>
-					<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">$7</span><span class="moin-small moin-muted">a month. Or $49 a year.</span></span>
-					<span class="moin-small moin-muted">The only cloud in { brand.Name }: a watcher and a copy. Your apps never leave your server.</span>
-					<span class="moin-small moin-muted">It costs more later. Yours stays as long as you stay.</span>
-				</div>
-				@homePlanRows(
-					"Everything in "+brand.Name,
-					"A watcher we run: you know when a server dies",
-					"A copy of every backup your server can add to, never delete",
-					"Encrypted on your server. We can't read it",
-					"No bucket to set up",
-					"Unlimited servers and apps",
-				)
-				<div class="moin-card-end">
-					@components.Button(components.ButtonProps{Href: "mailto:hello@moin.run?subject=moin%20cloud"}) {
-						Get in early
-					}
-				</div>
+			@homePlan(homePlanProps{
+				Name: brand.Name + " cloud", Chip: "Launch price", Price: "$7", Per: "a month, or $49 a year", Line: "A watcher and a copy.",
+				Rows: []string{"Everything in " + brand.Name, "We watch your servers", "A copy nobody can delete", "Encrypted. We can't read it", "No bucket to set up"},
+			}) {
+				@components.Button(components.ButtonProps{Href: "mailto:" + brand.SupportEmail + "?subject=moin%20cloud"}) {
+					Get in early
+				}
 			}
 		</div>
-		<p class="moin-small moin-muted moin-center">{ brand.Name } cloud opens soon. Write to us, and the launch price is yours.</p>
+		<p class="moin-text moin-muted moin-center">Your apps never leave your server. The launch price stays yours.</p>
 	</section>
 }
 
-// homeShips says how often moin ships, from the real changelog.
-func homeShips(open HomeOpen) string {
-	if open.Releases == 0 {
-		return "Every line on GitHub."
+// homePlanProps are one plan: its name, maybe a chip, the price and what
+// it is per, one line, and its rows.
+type homePlanProps struct {
+	Name, Chip, Price, Per, Line string
+	Rows                         []string
+}
+
+// homePlan is one plan in a card. Its button, the children, sits at the
+// bottom, so both cards end on the same line.
+templ homePlan(p homePlanProps) {
+	@components.Card(components.CardProps{}) {
+		<div class="moin-stack" data-gap="2">
+			<span class="moin-row" data-gap="2">
+				<span class="moin-strong">{ p.Name }</span>
+				if p.Chip != "" {
+					@components.Chip(p.Chip)
+				}
+			</span>
+			<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">{ p.Price }</span><span class="moin-small moin-muted">{ p.Per }</span></span>
+			<span class="moin-text moin-muted">{ p.Line }</span>
+		</div>
+		@homePlanRows(p.Rows...)
+		<div class="moin-card-end">
+			{ children... }
+		</div>
 	}
-	return "Every line on GitHub. " + homeVersions(open.Releases) + " since " + open.Since.Format("January 2, 2006") + "."
 }
 
 // homePlanRows are the lines of a plan, each with a check.
@@ -335,7 +322,7 @@ templ homePlanRows(rows ...string) {
 // from, the promise and the way in.
 templ HomeEnd() {
 	<section id="start" class="moin-band">
-		@components.Card(components.CardProps{Attrs: templ.Attributes{"data-gap": "8", "style": "--pad:clamp(2rem,6vw,3.5rem)"}}) {
+		@components.Card(components.CardProps{}) {
 			<div class="moin-huge">
 				@components.Wordmark(components.WordmarkProps{Size: "1em"})
 			</div>

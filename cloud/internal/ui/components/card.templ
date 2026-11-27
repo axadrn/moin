@@ -26,3 +26,20 @@ templ Card(p CardProps) {
 		</section>
 	}
 }
+
+// FactProps is a Fact: its name, a short note under it, and Href to make
+// the whole card a link.
+type FactProps struct {
+	Name string
+	Note string
+	Href string
+}
+
+// Fact is a card with one fact: a name a step bigger than text, and a
+// short note close under it.
+templ Fact(p FactProps) {
+	@Card(CardProps{Href: p.Href, Attrs: templ.Attributes{"data-gap": "1"}}) {
+		<span class="moin-fact-name">{ p.Name }</span>
+		<span class="moin-text moin-muted">{ p.Note }</span>
+	}
+}
