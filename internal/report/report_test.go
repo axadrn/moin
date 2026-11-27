@@ -54,3 +54,21 @@ func TestSendWantsHTTPS(t *testing.T) {
 		t.Errorf("err = %v, want https asked for", err)
 	}
 }
+
+// http without TLS goes only to this machine or into a tailnet, which
+// WireGuard encrypts.
+func TestPlainHTTP(t *testing.T) {
+	for host, want := range map[string]bool{
+		"localhost": true, "127.0.0.1": true, "::1": true,
+		"100.64.0.1": true, "100.127.255.254": true, "fd7a:115c:a1e0::1": true,
+		"100.128.0.1": false, "100.63.255.255": false, "10.0.0.5": false, "203.0.113.7": false, "fd7a:115c:a1e1::1": false,
+		"": false,
+	} {
+		if got := PlainHTTP(host); got != want {
+			t.Errorf("PlainHTTP(%q) = %v, want %v", host, got, want)
+		}
+	}
+	if err := checkURL("http://100.101.102.103:8080"); err != nil {
+		t.Errorf("a tailnet watcher over http: %v", err)
+	}
+}

@@ -93,6 +93,7 @@ func TestSendRefusesBadDestination(t *testing.T) {
 	for _, d := range []Destination{
 		{Kind: "mail"}, {Kind: "telegram"}, {Kind: "webhook", URL: "ftp://example.com"},
 		{Kind: "slack", URL: "http://hooks.example.com/x"}, {Kind: "webhook", URL: "http://10.0.0.5/hook"}, {Kind: "discord"},
+		{Kind: "webhook", URL: "http://100.128.0.1/hook"}, {Kind: "webhook", URL: "http://203.0.113.7/hook"},
 	} {
 		if err := Send(context.Background(), d, down); err == nil {
 			t.Errorf("Send(%v) = nil, want an error", d)
@@ -106,6 +107,8 @@ func TestCheck(t *testing.T) {
 		{Kind: "webhook", URL: "https://example.com/hook"},
 		{Kind: "webhook", URL: "http://127.0.0.1:9000/hook"},
 		{Kind: "slack", URL: "http://localhost/hook"},
+		{Kind: "webhook", URL: "http://100.101.102.103:8080/hook"},
+		{Kind: "webhook", URL: "http://[fd7a:115c:a1e0::5]/hook"},
 	} {
 		if err := Check(d); err != nil {
 			t.Errorf("Check(%v) = %v", d, err)

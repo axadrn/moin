@@ -11,13 +11,13 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/report"
 )
 
 // Destination is where alerts go. Kind is "telegram", "slack", "discord" or "webhook".
@@ -61,23 +61,17 @@ func Check(d Destination) error {
 	return fmt.Errorf("unknown alert kind %q: use telegram, slack, discord or webhook", d.Kind)
 }
 
-// checkURL wants https, or http to this machine only: an alert says what
-// is down where, and a URL may hold a token.
+// checkURL wants https, or http to this machine or a tailnet only: an
+// alert says what is down where, and a URL may hold a token.
 func checkURL(address string) error {
 	parsed, err := url.Parse(address)
 	if err != nil || parsed.Host == "" {
 		return errors.New("the alert url is not a valid URL")
 	}
-	if parsed.Scheme == "https" || parsed.Scheme == "http" && isLoopback(parsed.Hostname()) {
+	if parsed.Scheme == "https" || parsed.Scheme == "http" && report.PlainHTTP(parsed.Hostname()) {
 		return nil
 	}
-	return errors.New("the alert url must start with https:// (http:// only to this machine)")
-}
-
-// isLoopback says whether host is this machine.
-func isLoopback(host string) bool {
-	ip := net.ParseIP(host)
-	return host == "localhost" || ip != nil && ip.IsLoopback()
+	return errors.New("the alert url must start with https:// (http:// only to this machine or a tailnet address)")
 }
 
 // Send sends m to d. The error never holds the token or URL of d: both
