@@ -1174,10 +1174,13 @@
 }
 
 @layer moin-components {
-  /* A command to copy. */
+  /* A command to copy: as wide as the command, never wider than its
+     place; there it scrolls inside. */
   .moin-command {
     --copy-gap: max(var(--scroll-edge), var(--space-1));
     display: flex;
+    width: fit-content;
+    max-width: 100%;
     height: var(--press);
     min-width: 0;
     align-items: center;

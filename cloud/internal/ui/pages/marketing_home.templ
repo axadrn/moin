@@ -70,7 +70,7 @@ templ HomeHero() {
 				</h1>
 				<p class="moin-lead moin-center"><a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link moin-foreground moin-hero-open" data-quiet>Open source.</a>{ " " }<br class="moin-only-phone"/>One command to your own server.<br/>Every backup proven, every day.</p>
 			</div>
-			<div class="moin-stack moin-hero-start" data-gap="6">
+			<div class="moin-stack moin-hero-start" data-gap="6" data-center>
 				@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
 				<div class="moin-row" data-gap="2" data-center data-wrap>
 					@homePrimary()
