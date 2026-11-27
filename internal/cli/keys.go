@@ -43,7 +43,7 @@ func keys(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	}
 	table(stdout, []string{"NAME", "FINGERPRINT"}, rows)
 	fmt.Fprintln(stdout)
-	hint(stdout, "Each key may log in as root and run moin. Add one with", build.Name+" keys add "+server+" anna.pub")
+	hint(stdout, "Each key may log in as root and run "+build.Name+". Add one with", build.Name+" keys add "+server+" anna.pub")
 	return nil
 }
 

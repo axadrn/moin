@@ -64,7 +64,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 			return printJSON(stdout, databases)
 		}
 		if len(databases) == 0 {
-			fmt.Fprintln(stdout, app+" has no database moin can copy: no SQLite file on a volume, no Postgres service.")
+			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres service.")
 			return nil
 		}
 		for _, database := range databases {
@@ -257,7 +257,7 @@ func pickCopy(ctx context.Context, server, app, name, from string, stdin io.Read
 // one you pick.
 func pickDatabase(app, name string, databases []protocol.DatabaseBackup, stdin io.Reader, stdout io.Writer) (protocol.DatabaseBackup, error) {
 	if len(databases) == 0 {
-		return protocol.DatabaseBackup{}, fmt.Errorf("%s has no database moin can copy", app)
+		return protocol.DatabaseBackup{}, fmt.Errorf("%s has no database %s can copy", app, build.Name)
 	}
 	if name == "" && len(databases) > 1 {
 		for _, database := range databases {
@@ -564,7 +564,7 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	flags.StringVar(&bucket.Endpoint, "endpoint", "", "the S3 endpoint, like https://s3.example.com; none for AWS")
 	flags.StringVar(&bucket.Region, "region", "", "the region; default us-east-1")
 	flags.StringVar(&bucket.Bucket, "bucket", "", "the bucket's name")
-	flags.StringVar(&bucket.Path, "path", "", "a folder in the bucket for moin")
+	flags.StringVar(&bucket.Path, "path", "", "a folder in the bucket for "+build.Name)
 	flags.StringVar(&bucket.AccessKey, "access-key", "", "the access key ID")
 	if err := flags.parse(args); err != nil {
 		return err

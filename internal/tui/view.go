@@ -123,7 +123,7 @@ func (m *model) appLines(rows int) []string {
 	case app.backupsError != "":
 		lines = append(lines, "  "+failed(app.backupsError))
 	case len(app.backups) == 0:
-		lines = append(lines, "  "+style.Muted.Render("No database moin can copy: no SQLite file on a volume, no Postgres service."))
+		lines = append(lines, "  "+style.Muted.Render("No database "+build.Name+" can copy: no SQLite file on a volume, no Postgres service."))
 	}
 	for _, database := range app.backups {
 		lines = append(lines, "  "+backupLine(database, time.Now()))
