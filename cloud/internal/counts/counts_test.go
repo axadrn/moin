@@ -33,6 +33,10 @@ func TestDeltas(t *testing.T) {
 		{"a new app counts once", Last{Releases: map[string]int{"shop": 7}}, report.Report{Apps: apps(map[string]int{"shop": 7, "blog": 4})}, 1, 0},
 		{"a lower total is a reset", Last{Knocks: 900}, report.Report{Knocks: knocks(12)}, 0, 12},
 		{"no knocks in the report keeps the total", Last{Knocks: 900}, report.Report{}, 0, 0},
+		{"a huge jump counts at most maxDeploys", Last{Releases: map[string]int{"shop": 7}}, report.Report{Apps: apps(map[string]int{"shop": 2_000_000_000})}, maxDeploys, 0},
+		{"a negative release counts nothing", Last{Releases: map[string]int{"shop": 7}}, report.Report{Apps: apps(map[string]int{"shop": -5})}, 0, 0},
+		{"huge knocks count at most maxKnocks", Last{}, report.Report{Knocks: knocks(9e18)}, 0, maxKnocks},
+		{"negative knocks count nothing", Last{Knocks: 40}, report.Report{Knocks: knocks(-9e18)}, 0, 0},
 	}
 	for _, c := range cases {
 		deploys, knocked, _ := Deltas(c.before, c.report)
@@ -81,5 +85,21 @@ func TestReportAndTotals(t *testing.T) {
 	}
 	if later, _ := c.Totals(now.Add(11 * time.Minute)); later.Servers != 0 || later.Apps != 0 {
 		t.Errorf("a silent server still counts: %+v", later)
+	}
+
+	// A report right after the last one counts nothing; the next in time
+	// counts what it held.
+	third := report.Report{Server: "prod", Apps: apps(map[string]int{"shop": 6, "blog": 1}), Knocks: &report.Knocks{Total: 140}}
+	if err := c.Report("w1", "prod", third, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if soon, _ := c.Totals(now); soon.Deploys.Total != 4 || soon.Knocks.Total != 130 {
+		t.Errorf("a report too soon counted: %+v", soon)
+	}
+	if err := c.Report("w1", "prod", third, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if later, _ := c.Totals(now.Add(time.Minute)); later.Deploys.Total != 5 || later.Knocks.Total != 140 {
+		t.Errorf("the report after the gap: %+v", later)
 	}
 }

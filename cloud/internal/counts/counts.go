@@ -20,6 +20,15 @@ const (
 // liveFor is how long a server counts as running after its last report.
 const liveFor = 10 * time.Minute
 
+// What one report can add at most. A daemon reports once a minute and
+// never comes near these, so a report that says more is not believed.
+const (
+	maxDeploys = 10      // per app
+	maxKnocks  = 100_000 // per server
+	// A report this soon after the one before counts nothing.
+	reportGap = 30 * time.Second
+)
+
 // Counts are the counts in the database.
 type Counts struct {
 	db *sql.DB
@@ -106,21 +115,24 @@ type Last struct {
 // each increase of an app's release number is a deploy, and a new app
 // counts its first release once. Knocks are the increase of the total;
 // a lower total is a reset, and the new total counts. Before a server's
-// first report every app is new and its knocks are all new.
+// first report every app is new and its knocks are all new. A negative
+// number counts as 0, an app adds at most maxDeploys and a report at
+// most maxKnocks.
 func Deltas(before Last, r report.Report) (deploys, knocks int64, after Last) {
 	after = Last{Releases: map[string]int{}}
 	for _, app := range r.Apps {
-		after.Releases[app.Name] = app.Release
+		release := max(app.Release, 0)
+		after.Releases[app.Name] = release
 		was, ok := before.Releases[app.Name]
 		switch {
-		case !ok && app.Release > 0:
+		case !ok && release > 0:
 			deploys++
-		case app.Release > was:
-			deploys += int64(app.Release - was)
+		case release > was:
+			deploys += int64(min(release-was, maxDeploys))
 		}
 	}
 	if r.Knocks != nil {
-		after.Knocks = r.Knocks.Total
+		after.Knocks = max(r.Knocks.Total, 0)
 	} else {
 		after.Knocks = before.Knocks
 	}
@@ -130,11 +142,12 @@ func Deltas(before Last, r report.Report) (deploys, knocks int64, after Last) {
 	default:
 		knocks = after.Knocks
 	}
-	return deploys, knocks, after
+	return deploys, min(knocks, maxKnocks), after
 }
 
 // Report counts the report of a server of a workspace, received at now,
-// and keeps what it said for the next one.
+// and keeps what it said for the next one. A report less than reportGap
+// after the last one changes nothing; the next one counts it.
 func (c *Counts) Report(workspaceID, server string, r report.Report, now time.Time) error {
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -143,10 +156,14 @@ func (c *Counts) Report(workspaceID, server string, r report.Report, now time.Ti
 	defer tx.Rollback()
 	var before Last
 	var releases string
-	err = tx.QueryRow(`SELECT releases, coalesce(knocks, 0) FROM servers WHERE workspace_id = ? AND name = ?`,
-		workspaceID, server).Scan(&releases, &before.Knocks)
+	var last int64
+	err = tx.QueryRow(`SELECT releases, coalesce(knocks, 0), coalesce(last_report, 0) FROM servers WHERE workspace_id = ? AND name = ?`,
+		workspaceID, server).Scan(&releases, &before.Knocks, &last)
 	if err != nil {
 		return err
+	}
+	if now.Sub(time.Unix(last, 0)) < reportGap {
+		return nil
 	}
 	if err := json.Unmarshal([]byte(releases), &before.Releases); err != nil {
 		return err
