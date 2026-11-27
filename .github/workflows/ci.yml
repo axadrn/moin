@@ -49,7 +49,7 @@ jobs:
       - name: Test with race detector
         run: go test -race ./...
 
-      # Real Docker: no file of the daemon but app.env and htpasswd holds a
+      # Real Docker: no file of the daemon but app.env holds a
       # secret of an app, and no message it sends does. The grep fails the
       # step when the test is gone or renamed, as -run alone would pass.
       - name: Test that no env value leaks
