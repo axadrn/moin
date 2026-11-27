@@ -17,8 +17,10 @@ CREATE TABLE workspaces (
     stripe_subscription TEXT,
     paid_until INTEGER,
     coupon TEXT,
-    -- Where alerts go besides the mail, as JSON.
-    alerts TEXT NOT NULL DEFAULT '[]',
+    -- When the subscription ended: 30 days later the copies go.
+    ended INTEGER,
+    -- When the last mail about a full storage went out: one a day at most.
+    storage_mail INTEGER NOT NULL DEFAULT 0,
     -- What the workspace's watcher knows, as it saves it.
     watcher_state BLOB,
     created INTEGER NOT NULL
@@ -62,21 +64,32 @@ CREATE TABLE servers (
     UNIQUE (workspace_id, name)
 );
 
--- A copy of a backup a server sent. It outlives its server: no foreign
--- key, so a disconnect never deletes the list of copies.
+-- A copy a server sent to moin cloud. It has the workspace and the
+-- server's name, no foreign key: a copy outlives its server, and a
+-- disconnect never hides one.
 CREATE TABLE copies (
     id TEXT PRIMARY KEY,
-    server_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    -- The name of the server that sent it.
+    server TEXT NOT NULL,
     app TEXT NOT NULL,
     database TEXT NOT NULL,
+    -- When the server took the copy.
     made_at INTEGER NOT NULL,
-    size INTEGER NOT NULL DEFAULT 0,
-    state TEXT NOT NULL
+    -- The bytes the server said it sends, and once it is done the bytes
+    -- that are in the bucket.
+    size INTEGER NOT NULL,
+    -- uploading: moin cloud gave out the address to upload to. done: the
+    -- server said it is done, and the copy is in the bucket.
+    state TEXT NOT NULL CHECK (state IN ('uploading', 'done')),
+    -- When moin cloud gave out the address. The bucket's lock counts from
+    -- about then.
+    created INTEGER NOT NULL
 );
-CREATE INDEX copies_server ON copies(server_id, app, database, made_at);
+CREATE INDEX copies_database ON copies(workspace_id, server, app, database, made_at);
 
--- Sums over everyone, by day (UTC), for the landing page: deploys, knocks,
--- installs. Nothing in it names a customer.
+-- Sums over everyone, by day (UTC), for the landing page: deploys and
+-- knocks. Nothing in it names a customer.
 CREATE TABLE counts (
     day TEXT NOT NULL,
     name TEXT NOT NULL,
