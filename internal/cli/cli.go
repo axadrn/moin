@@ -73,6 +73,8 @@ Cloud
   cloud login              Sign this laptop in, through the browser
   cloud connect            The server reports to moin cloud: cloud connect prod
   cloud disconnect         It no longer does: cloud disconnect prod [-y]
+  cloud copies             The copies a server sent, which it can't delete: cloud copies prod [app] [--json]
+  cloud restore            Put a database back to one, on any server: cloud restore [app] [--to <copy>] [-s server] [-y]
 
 Watcher
   watcher run              Run a watcher, on another machine than your servers

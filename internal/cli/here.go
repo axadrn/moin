@@ -132,6 +132,8 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		value, err := daemon.RestoreHere(ctx, dir, restore, log)
 		return respond(stdout, value, err)
+	case "cloud-restore":
+		return hereCloudRestore(ctx, dir, stdin, stdout)
 	case "bucket":
 		return hereBucket(ctx, args, stdin, stdout)
 	case "alerts":

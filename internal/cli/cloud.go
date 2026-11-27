@@ -38,8 +38,9 @@ func cloudURL() string {
 	return defaultCloudURL
 }
 
-// cloud is `moin cloud`, `moin cloud login`, `moin cloud connect <server>`
-// and `moin cloud disconnect <server>`.
+// cloud is `moin cloud`, `moin cloud login`, `moin cloud connect <server>`,
+// `moin cloud disconnect <server>`, and the copies in moin cloud
+// (cloud_copies.go).
 func cloud(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) > 0 {
 		switch args[0] {
@@ -49,6 +50,10 @@ func cloud(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer
 			return cloudConnect(ctx, args[1:], stdout)
 		case "disconnect":
 			return cloudDisconnect(ctx, args[1:], stdin, stdout)
+		case "copies":
+			return cloudCopies(ctx, args[1:], stdout)
+		case "restore":
+			return cloudRestore(ctx, args[1:], stdin, stdout)
 		}
 	}
 	return cloudStatus(ctx, args, stdout)
@@ -253,7 +258,7 @@ func cloudStatus(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	if flags.NArg() > 0 {
-		return fmt.Errorf("unknown command %q. `%s cloud` takes login, connect or disconnect", flags.Arg(0), build.Name)
+		return fmt.Errorf("unknown command %q. `%s cloud` takes login, connect, disconnect, copies or restore", flags.Arg(0), build.Name)
 	}
 	session, err := loadCloudSession()
 	if err != nil {
