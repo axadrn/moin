@@ -99,10 +99,10 @@ type backups struct {
 // the last one failed and since when, the newest daily check, and the
 // copy the last check that worked restored.
 type state struct {
-	LastCopy     time.Time `json:"last_copy"`
+	LastCopy     time.Time `json:"last_copy,omitzero"`
 	CopyError    string    `json:"copy_error,omitempty"`
-	FailingSince time.Time `json:"failing_since"`
-	CheckedAt    time.Time `json:"checked_at"`
+	FailingSince time.Time `json:"failing_since,omitzero"`
+	CheckedAt    time.Time `json:"checked_at,omitzero"`
 	CheckError   string    `json:"check_error,omitempty"`
 	CheckedCopy  string    `json:"checked_copy,omitempty"`
 }
