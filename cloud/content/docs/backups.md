@@ -1,11 +1,11 @@
 ---
 title: "Backups"
-description: "SQLite and Postgres, encrypted and copied into your bucket on a schedule. Every day one copy is restored and read. Restore it, even with the server gone."
+description: "SQLite and Postgres, encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
 group: "Servers and data"
 order: 1
 ---
 
-A backup you never restored is a hope. So every day moin restores one for real, and reads it.
+A backup you never restored is a hope. So every day moin restores one for real, and reads it, before it leaves the server.
 
 ## What moin backs up
 
@@ -42,7 +42,24 @@ Right after, moin shows your backup key, once, and asks you to paste it back. [Y
 - The key lives on the server, in `/etc/moin/config.yml`, readable only by root. [Server config](/docs/config#bucket)
 - `moin bucket prod` shows what is set, never the secret.
 
-Until there is a bucket, moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.` And `moin` shows each app with a database in red: `shop: no backup yet.`
+Without a bucket and without [moin cloud](#copies-to-moin-cloud), moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.` And `moin` shows each app with a database in red: `shop: no backup yet.`
+
+## Copies to moin cloud
+
+No bucket of your own? With a paid [moin cloud](/docs/cloud#a-copy-your-server-cant-delete) workspace, the copies go there. With a bucket, they go to both.
+
+```bash
+moin cloud connect prod
+moin bucket key prod
+```
+
+- **What goes**: every scheduled copy of every database, on the [schedule](#how-often).
+- **Encrypted with your key**: on the server, for the server's key and [your backup key](#your-backup-key). moin cloud can't read a copy. A restore from moin cloud needs your key, so make it first: `moin bucket key prod`.
+- **Proven first**: the first copy of each day is restored and read on your server before it leaves. A copy that does not restore is not uploaded. [The daily check](#the-daily-check)
+- **Out of reach**: your server can add a copy there. It can never read, list or delete one. Each stays 14 days.
+- **Restore**: `moin cloud copies prod` lists them. `moin cloud restore shop` puts one back, also on a new server. [Restore from moin cloud](/docs/cloud#a-copy-your-server-cant-delete)
+
+Without a bucket there is no copy before a deploy. `moin backup`, `moin backups` and `moin restore` work on your bucket only.
 
 ## Encryption
 
@@ -116,8 +133,9 @@ backups:
 ## How a copy is made
 
 ```text
-SQLite:   VACUUM INTO a temp file ─▶ gzip ─▶ age ─▶ your bucket
-Postgres: pg_dump ─▶ age ─▶ straight into your bucket
+SQLite:   VACUUM INTO a temp file ─▶ gzip ─▶ age ─▶ a file on the server
+Postgres: pg_dump ─▶ age ─▶ a file on the server
+Then:     the first copy of the day is restored and read ─▶ your bucket, moin cloud
 ```
 
 Both make a clean copy while your app keeps running.
@@ -135,16 +153,19 @@ Every deploy takes one too, just before the new release touches the data. If tha
 
 ## The daily check
 
-Every day moin takes the newest copy, opens it with the server's key, and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it.
+The first copy of each day is checked before it leaves the server. moin opens it with the server's key and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it. Only then does the copy go up, the very bytes that were read.
 
 So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while.
 
+A database copied less often than once a day: on the days between, moin restores its newest copy from your bucket.
+
 If it fails:
 
+- That copy is not uploaded.
 - You get an alert: `<app>: a backup of <database> did not restore`.
 - `moin backups shop` shows it with a ✗, and the last copy that did restore.
 - `moin` shows it in red: `shop: today's backup did not restore. Last proven copy: Nov 26 14:00 UTC.`
-- The check runs again an hour later, not a day.
+- The next copy, an hour later, is checked before it leaves too, until one restores.
 
 ## Restore
 

@@ -65,13 +65,13 @@ It sees what a report holds: names of servers and apps, domains, versions, times
 
 Your server holds the key to your own bucket. That key can delete copies, because old copies have to go. So someone who takes over your server can delete your backups too.
 
-So moin cloud keeps a second copy, for paying workspaces:
+So moin cloud keeps a copy, for paying workspaces:
 
-- After each scheduled copy to your bucket, your server sends the same copy to moin cloud.
+- Each scheduled copy of every database goes to moin cloud. With your own bucket it goes there too, and moin cloud holds the second copy. Without one, moin cloud holds the only copy. [Copies to moin cloud](/docs/backups#copies-to-moin-cloud)
+- Encrypted on your server, for the server's key and [your backup key](/docs/backups#your-backup-key). moin cloud can't read it. Make your key with `moin bucket key prod`: a restore needs it.
+- Proven before it leaves: the first copy of each day is restored and read on your server. A copy that does not restore is not uploaded.
 - Your server can add copies. It can never read, list, delete or overwrite one.
 - Each copy stays 14 days, then goes. The newest copy of a database always stays.
-- Encrypted on your server, with your [backup key](/docs/backups). moin cloud can't read it.
-- It does not replace your bucket. It is a second copy.
 
 ```bash
 moin cloud copies prod          # the copies prod sent
