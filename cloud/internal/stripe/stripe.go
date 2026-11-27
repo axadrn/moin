@@ -25,9 +25,6 @@ import (
 // 2025-03-31 or later.
 const version = "2026-04-22.dahlia"
 
-// BusinessOnly is what the checkout says above its button.
-const BusinessOnly = "For businesses only. You subscribe for your business, not as a consumer."
-
 // Settings are the keys and ids from the Stripe dashboard.
 type Settings struct {
 	// SecretKey calls the API; WebhookSecret checks what Stripe sends.
@@ -86,22 +83,22 @@ func (s *Stripe) Price(interval string) string {
 }
 
 // Checkout starts a checkout and returns its address. Stripe Managed
-// Payments sells it: Stripe is the seller, and handles tax.
+// Payments sells it: Stripe is the seller, and handles tax. Managed
+// Payments refuses custom_text, so /cloud says it is for businesses.
 func (s *Stripe) Checkout(ctx context.Context, c Checkout) (string, error) {
 	price := s.Price(c.Interval)
 	if price == "" {
 		return "", fmt.Errorf("pay monthly or yearly, not %q", c.Interval)
 	}
 	form := url.Values{
-		"mode":                                      {"subscription"},
-		"line_items[0][price]":                      {price},
-		"line_items[0][quantity]":                   {"1"},
-		"success_url":                               {c.SuccessURL},
-		"cancel_url":                                {c.CancelURL},
-		"client_reference_id":                       {c.Workspace},
-		"metadata[workspace_id]":                    {c.Workspace},
-		"managed_payments[enabled]":                 {"true"},
-		"custom_text[submit][message]":              {BusinessOnly},
+		"mode":                      {"subscription"},
+		"line_items[0][price]":      {price},
+		"line_items[0][quantity]":   {"1"},
+		"success_url":               {c.SuccessURL},
+		"cancel_url":                {c.CancelURL},
+		"client_reference_id":       {c.Workspace},
+		"metadata[workspace_id]":    {c.Workspace},
+		"managed_payments[enabled]": {"true"},
 		"subscription_data[metadata][workspace_id]": {c.Workspace},
 	}
 	if c.Customer != "" {

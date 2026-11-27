@@ -78,7 +78,7 @@ func fakeStripe(t *testing.T) (*Stripe, *url.Values) {
 }
 
 // A checkout sells the price of the interval through Managed Payments,
-// says it is for businesses, and carries the workspace.
+// and carries the workspace. Managed Payments refuses custom_text.
 func TestCheckout(t *testing.T) {
 	s, got := fakeStripe(t)
 	address, err := s.Checkout(context.Background(), Checkout{Workspace: "w1", Mail: "ada@example.com", Interval: "yearly"})
@@ -88,7 +88,7 @@ func TestCheckout(t *testing.T) {
 	for key, want := range map[string]string{
 		"mode": "subscription", "line_items[0][price]": "price_y", "managed_payments[enabled]": "true",
 		"customer_email": "ada@example.com", "client_reference_id": "w1",
-		"subscription_data[metadata][workspace_id]": "w1", "custom_text[submit][message]": BusinessOnly,
+		"subscription_data[metadata][workspace_id]": "w1", "custom_text[submit][message]": "",
 		"allow_promotion_codes": "true", "discounts[0][coupon]": "", "customer": "",
 	} {
 		if got.Get(key) != want {
