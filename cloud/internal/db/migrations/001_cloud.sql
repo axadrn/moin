@@ -10,6 +10,9 @@ CREATE TABLE workspaces (
     status TEXT NOT NULL DEFAULT 'trial' CHECK (status IN ('trial', 'paid', 'ended')),
     -- Empty until the first report: the trial starts then.
     trial_ends INTEGER,
+    -- The last trial mail sent: 0 none, 25 five days before the end, 30
+    -- at the end.
+    trial_mails INTEGER NOT NULL DEFAULT 0,
     stripe_customer TEXT,
     stripe_subscription TEXT,
     paid_until INTEGER,

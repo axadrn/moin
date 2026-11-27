@@ -1,0 +1,52 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+)
+
+// CloudSettingsProps is the settings page: the account, and what went
+// wrong when deleting it.
+type CloudSettingsProps struct {
+	Mail    string
+	Problem string
+}
+
+// CloudSettings shows the account and deletes it, after typing its mail.
+templ CloudSettings(p CloudSettingsProps) {
+	@cloudPage("Settings") {
+		@components.Header(components.HeaderProps{Title: "Settings", Back: components.Back{Label: brand.Name + " cloud", Href: "/cloud"}})
+		@components.Card(components.CardProps{Title: "Account"}) {
+			<p class="moin-text">{ p.Mail }</p>
+			<p class="moin-small moin-muted">Your email is your account. Sign in with it by GitHub or a link by mail.</p>
+		}
+		@components.Card(components.CardProps{Title: "Delete account"}) {
+			<p class="moin-text moin-muted">This deletes the workspace, the tokens of its servers and every session. Your servers keep running; their reports get no answer. Copies of backups stay under their 14-day lock and expire by themselves.</p>
+			<form method="post" action="/cloud/delete" class="moin-stack" data-gap="3">
+				<label for="mail" class="moin-small">Type { p.Mail } to confirm</label>
+				@components.Input(components.InputProps{ID: "mail", Name: "mail", Type: "email", Attrs: templ.Attributes{"required": true, "autocomplete": "off"}})
+				if p.Problem != "" {
+					<p class="moin-message" data-state="failed" role="alert">{ p.Problem }</p>
+				}
+				<div>
+					@components.Button(components.ButtonProps{Type: "submit"}) {
+						Delete account
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+// CloudDeleted says the account is gone.
+templ CloudDeleted() {
+	@cloudPage("Account deleted") {
+		@components.Header(components.HeaderProps{Title: "Account deleted"})
+		<p class="moin-text moin-muted">The workspace and its sessions are gone. Copies of backups expire by themselves within 14 days.</p>
+		<div>
+			@components.Button(components.ButtonProps{Href: "/"}) {
+				Back to home
+			}
+		</div>
+	}
+}

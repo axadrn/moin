@@ -29,6 +29,25 @@ type Workspace struct {
 	TrialEnds time.Time
 	PaidUntil time.Time
 	Coupon    string
+	// StripeSubscription is the subscription in Stripe, when there is one.
+	StripeSubscription string
+}
+
+// AlertsOn says whether alerts go out at now: when paid, and during the
+// trial. After the trial reports still count, but nobody is told.
+func (w Workspace) AlertsOn(now time.Time) bool {
+	switch w.Status {
+	case "paid":
+		return true
+	case "trial":
+		return w.TrialEnds.IsZero() || now.Before(w.TrialEnds)
+	}
+	return false
+}
+
+// TrialOver says whether the trial ran out and nothing is paid.
+func (w Workspace) TrialOver(now time.Time) bool {
+	return w.Status != "paid" && !w.AlertsOn(now)
 }
 
 // Store reads and writes the workspaces.
@@ -72,16 +91,23 @@ func (s *Store) Workspace(id string) (Workspace, error) {
 }
 
 // columns are what one reads into a Workspace.
-const columns = `id, mail, status, coalesce(trial_ends, 0), coalesce(paid_until, 0), coalesce(coupon, '')`
+const columns = `workspaces.id, workspaces.mail, workspaces.status, coalesce(workspaces.trial_ends, 0),
+	coalesce(workspaces.paid_until, 0), coalesce(workspaces.coupon, ''), coalesce(workspaces.stripe_subscription, '')`
 
 // one reads one workspace.
 func (s *Store) one(query string, args ...any) (Workspace, error) {
-	var w Workspace
-	var trialEnds, paidUntil int64
-	err := s.db.QueryRow(query, args...).Scan(&w.ID, &w.Mail, &w.Status, &trialEnds, &paidUntil, &w.Coupon)
+	w, err := scanWorkspace(s.db.QueryRow(query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return w, ErrNotFound
 	}
+	return w, err
+}
+
+// scanWorkspace reads the columns of a workspace, and then more.
+func scanWorkspace(row interface{ Scan(...any) error }, more ...any) (Workspace, error) {
+	var w Workspace
+	var trialEnds, paidUntil int64
+	err := row.Scan(append([]any{&w.ID, &w.Mail, &w.Status, &trialEnds, &paidUntil, &w.Coupon, &w.StripeSubscription}, more...)...)
 	w.TrialEnds, w.PaidUntil = unix(trialEnds), unix(paidUntil)
 	return w, err
 }
@@ -90,6 +116,62 @@ func (s *Store) one(query string, args ...any) (Workspace, error) {
 // report of its first server does.
 func (s *Store) StartTrial(id string, ends time.Time) error {
 	_, err := s.db.Exec(`UPDATE workspaces SET trial_ends = ? WHERE id = ? AND status = 'trial' AND trial_ends IS NULL`, ends.Unix(), id)
+	return err
+}
+
+// DeleteWorkspace deletes a workspace with its sessions, servers and
+// their tokens, and the logins of its mail.
+func (s *Store) DeleteWorkspace(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var mail string
+	if err := tx.QueryRow(`DELETE FROM workspaces WHERE id = ? RETURNING mail`, id).Scan(&mail); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM logins WHERE mail = ?`, mail); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// TrialMail is a mail about the trial that is due.
+type TrialMail struct {
+	Workspace Workspace
+	// Day is 25, five days before the end, or 30, at the end.
+	Day int
+}
+
+// TrialMailsDue are the trial mails due at now, at most one per workspace.
+func (s *Store) TrialMailsDue(now time.Time) ([]TrialMail, error) {
+	rows, err := s.db.Query(`SELECT `+columns+`, CASE WHEN trial_ends <= ? THEN 30 ELSE 25 END FROM workspaces
+		WHERE status = 'trial' AND trial_ends IS NOT NULL
+		AND ((trial_ends <= ? AND trial_mails < 30) OR (trial_ends - ? <= ? AND trial_mails < 25))`,
+		now.Unix(), now.Unix(), int64((5 * 24 * time.Hour).Seconds()), now.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var due []TrialMail
+	for rows.Next() {
+		var m TrialMail
+		var err error
+		if m.Workspace, err = scanWorkspace(rows, &m.Day); err != nil {
+			return nil, err
+		}
+		due = append(due, m)
+	}
+	return due, rows.Err()
+}
+
+// TrialMailSent notes that the trial mail of day went out.
+func (s *Store) TrialMailSent(id string, day int) error {
+	_, err := s.db.Exec(`UPDATE workspaces SET trial_mails = ? WHERE id = ?`, day, id)
 	return err
 }
 

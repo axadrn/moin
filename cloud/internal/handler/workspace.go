@@ -30,7 +30,7 @@ func (c *Cloud) WorkspacePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	render(w, r, pages.CloudWorkspace(pages.CloudWorkspaceProps{Mail: space.Mail, Plan: plan(space), View: view}))
+	render(w, r, pages.CloudWorkspace(pages.CloudWorkspaceProps{Mail: space.Mail, Plan: plan(space), TrialOver: space.TrialOver(time.Now()), View: view}))
 }
 
 // plan says in a few words what a workspace pays and until when.
@@ -45,7 +45,7 @@ func plan(space workspace.Workspace) string {
 	case space.TrialEnds.IsZero():
 		return "Trial, starts with the first report"
 	case space.TrialEnds.Before(time.Now()):
-		return "Trial ended " + space.TrialEnds.Format("January 2, 2006")
+		return "Trial ended " + space.TrialEnds.Format("January 2, 2006") + ", alerts are off"
 	}
 	return "Trial until " + space.TrialEnds.Format("January 2, 2006")
 }

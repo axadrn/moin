@@ -28,12 +28,9 @@ func (s *Store) SessionWorkspace(token string) (Workspace, error) {
 	if token == "" {
 		return Workspace{}, ErrNotFound
 	}
-	return s.one(`SELECT `+prefixed+` FROM sessions JOIN workspaces ON workspaces.id = sessions.workspace_id
+	return s.one(`SELECT `+columns+` FROM sessions JOIN workspaces ON workspaces.id = sessions.workspace_id
 		WHERE sessions.token_hash = ? AND sessions.expires > ?`, hash(token), time.Now().Unix())
 }
-
-// prefixed are the columns of a Workspace in a query with a join.
-const prefixed = `workspaces.id, workspaces.mail, workspaces.status, coalesce(workspaces.trial_ends, 0), coalesce(workspaces.paid_until, 0), coalesce(workspaces.coupon, '')`
 
 // EndSession signs a session out.
 func (s *Store) EndSession(token string) error {

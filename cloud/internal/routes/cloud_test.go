@@ -271,3 +271,24 @@ func mustQuery(t *testing.T, link, key string) string {
 	}
 	return parsed.Query().Get(key)
 }
+
+// Delete account asks for the mail typed, then the workspace is gone.
+func TestDeleteAccount(t *testing.T) {
+	server, browser, mails := testSite(t)
+	signIn(t, server, browser, mails, "ada@example.com")
+	if page := body(t, browser, server.URL+"/cloud/settings"); !strings.Contains(page, "Delete account") || !strings.Contains(page, "14-day lock") {
+		t.Fatal("no delete on the settings page")
+	}
+	response, _ := browser.PostForm(server.URL+"/cloud/delete", url.Values{"mail": {"bob@example.com"}})
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("the wrong mail: %s", response.Status)
+	}
+	response, _ = browser.PostForm(server.URL+"/cloud/delete", url.Values{"mail": {"Ada@example.com"}})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("delete: %s", response.Status)
+	}
+	response, _ = browser.Get(server.URL + "/cloud")
+	if response.Request.URL.Path != "/login" {
+		t.Errorf("still signed in after the delete: %s", response.Request.URL)
+	}
+}

@@ -71,6 +71,8 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /auth/github/callback", cloud.GitHubBack)
 	mux.HandleFunc("POST /logout", cloud.SignOut)
 	mux.HandleFunc("GET /cloud", cloud.WorkspacePage)
+	mux.HandleFunc("GET /cloud/settings", cloud.Settings)
+	mux.HandleFunc("POST /cloud/delete", cloud.DeleteAccount)
 	mux.HandleFunc("GET /cli", cloud.CLIPage)
 	mux.HandleFunc("POST /cli", cloud.AllowCLI)
 	mux.HandleFunc("POST /api/cli/login", cloud.StartCLILogin)

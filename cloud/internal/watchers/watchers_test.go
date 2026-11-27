@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/axadrn/moin/cloud/internal/db"
 	"github.com/axadrn/moin/cloud/internal/mailer"
@@ -50,7 +51,7 @@ func TestReceiveAndMail(t *testing.T) {
 		t.Errorf("saved = %s", saved)
 	}
 
-	send := ws.sender("ada@example.com")
+	send := ws.sender(space.ID, "ada@example.com")
 	if err := send(t.Context(), alert.Destination{Kind: mailKind}, alert.Message{Title: "prod stopped reporting", Text: "No report since 10:00."}); err != nil {
 		t.Fatal(err)
 	}
@@ -60,5 +61,42 @@ func TestReceiveAndMail(t *testing.T) {
 	view, _ := ws.View(space.ID)
 	if len(view.Servers) != 1 || view.Servers[0].Name != "prod" {
 		t.Errorf("view = %+v", view)
+	}
+}
+
+// After the trial, unpaid, reports count but alerts are dropped; the
+// trial mails go out once each.
+func TestTrialOver(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "cloud.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	store := workspace.NewStore(database)
+	mails := &outbox{}
+	ws := New(store, mails, "https://cloud.example.com")
+	space, _ := store.SignIn("ada@example.com")
+	if err := store.StartTrial(space.ID, time.Now().Add(4*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	ws.mailTrials(t.Context())
+	ws.mailTrials(t.Context())
+	if len(*mails) != 1 || !strings.Contains((*mails)[0].Subject, "ends in 5 days") {
+		t.Fatalf("mails = %+v", *mails)
+	}
+	if _, err := database.Exec(`UPDATE workspaces SET trial_ends = ?`, time.Now().Add(-time.Minute).Unix()); err != nil {
+		t.Fatal(err)
+	}
+	ws.mailTrials(t.Context())
+	ws.mailTrials(t.Context())
+	if len(*mails) != 2 || !strings.Contains((*mails)[1].Subject, "Alerts are off") {
+		t.Fatalf("mails = %+v", *mails)
+	}
+	send := ws.sender(space.ID, "ada@example.com")
+	if err := send(t.Context(), alert.Destination{Kind: mailKind}, alert.Message{Title: "prod stopped reporting"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*mails) != 2 {
+		t.Errorf("an alert went out after the trial: %+v", (*mails)[2])
 	}
 }

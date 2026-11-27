@@ -150,3 +150,49 @@ func TestServers(t *testing.T) {
 		t.Errorf("disconnected twice: %v", err)
 	}
 }
+
+// Deleting a workspace takes its sessions, servers and logins with it.
+func TestDeleteWorkspace(t *testing.T) {
+	s := testStore(t)
+	space, _ := s.SignIn("ada@example.com")
+	session, _ := s.StartSession(space.ID, "browser")
+	token, _ := s.ConnectServer(space.ID, "prod")
+	if _, err := s.NewMailLink("ada@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteWorkspace(space.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SessionWorkspace(session); !errors.Is(err, ErrNotFound) {
+		t.Errorf("session: %v", err)
+	}
+	if _, _, err := s.ServerByToken(token); !errors.Is(err, ErrNotFound) {
+		t.Errorf("server: %v", err)
+	}
+	var logins int
+	if err := s.db.QueryRow(`SELECT count(*) FROM logins`).Scan(&logins); err != nil || logins != 0 {
+		t.Errorf("logins left: %d, %v", logins, err)
+	}
+	if err := s.DeleteWorkspace(space.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("deleted twice: %v", err)
+	}
+}
+
+// Alerts go out while paid and during the trial, not after it.
+func TestAlertsOn(t *testing.T) {
+	now := time.Now()
+	for _, c := range []struct {
+		w    Workspace
+		want bool
+	}{
+		{Workspace{Status: "trial"}, true},
+		{Workspace{Status: "trial", TrialEnds: now.Add(time.Hour)}, true},
+		{Workspace{Status: "trial", TrialEnds: now.Add(-time.Hour)}, false},
+		{Workspace{Status: "paid", TrialEnds: now.Add(-time.Hour)}, true},
+		{Workspace{Status: "ended"}, false},
+	} {
+		if got := c.w.AlertsOn(now); got != c.want {
+			t.Errorf("%+v: alerts on = %v", c.w, got)
+		}
+	}
+}

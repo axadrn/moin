@@ -13,13 +13,18 @@ import (
 type CloudWorkspaceProps struct {
 	Mail string
 	Plan string
-	View watcher.View
+	// TrialOver is a trial that ran out, unpaid: alerts are off.
+	TrialOver bool
+	View      watcher.View
 }
 
 // CloudWorkspace is /cloud. It only reads: nothing on it changes a server.
 templ CloudWorkspace(p CloudWorkspaceProps) {
 	@cloudPage(brand.Name + " cloud") {
 		@components.Header(components.HeaderProps{Title: brand.Name + " cloud"}) {
+			@components.Button(components.ButtonProps{Href: "/cloud/settings", Quiet: true}) {
+				Settings
+			}
 			<form method="post" action="/logout">
 				@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
 					Sign out
@@ -27,6 +32,11 @@ templ CloudWorkspace(p CloudWorkspaceProps) {
 			</form>
 		}
 		<p class="moin-text moin-muted">{ p.Mail }. { p.Plan }.</p>
+		if p.TrialOver {
+			@components.Card(components.CardProps{Title: "Your trial is over. Alerts are off."}) {
+				<p class="moin-text moin-muted">Your servers still report, and this page still shows them. Nobody gets a mail when one goes silent.</p>
+			}
+		}
 		if len(p.View.Servers) == 0 {
 			@components.Card(components.CardProps{Title: "No servers yet"}) {
 				<p class="moin-text moin-muted">Connect one from your laptop. It reports here every minute, and you get a mail when it goes silent.</p>

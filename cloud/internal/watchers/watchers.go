@@ -108,16 +108,25 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("workspace %s: %w", id, err)
 	}
-	w.Send = ws.sender(space.Mail)
+	w.Send = ws.sender(id, space.Mail)
 	w.Connect = func(server string) string { return build.Name + " cloud connect " + server }
 	ws.byWorkspace[id] = w
 	return w, nil
 }
 
 // sender sends an alert: a mail to the workspace, or any kind a watcher
-// you run sends too.
-func (ws *Watchers) sender(to string) func(context.Context, alert.Destination, alert.Message) error {
+// you run sends too. After the trial, unpaid, no alert goes out: it is
+// dropped, not kept for later.
+func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destination, alert.Message) error {
 	return func(ctx context.Context, d alert.Destination, m alert.Message) error {
+		space, err := ws.store.Workspace(id)
+		if err != nil {
+			return err
+		}
+		if !space.AlertsOn(time.Now()) {
+			slog.Info("alert not sent, the trial is over", "workspace", id, "title", m.Title)
+			return nil
+		}
 		if d.Kind != mailKind {
 			return alert.Send(ctx, d, m)
 		}
@@ -163,6 +172,13 @@ func (ws *Watchers) Changed(id string) error {
 	return nil
 }
 
+// Forget drops the watcher of a workspace that is gone.
+func (ws *Watchers) Forget(id string) {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	delete(ws.byWorkspace, id)
+}
+
 // View is what the watcher of a workspace shows.
 func (ws *Watchers) View(id string) (watcher.View, error) {
 	w, err := ws.of(id)
@@ -189,6 +205,7 @@ func (ws *Watchers) Run(ctx context.Context) {
 		case <-visits.C:
 			ws.visit(ctx)
 			ws.tick(ctx)
+			ws.mailTrials(ctx)
 		}
 		ws.save()
 	}
