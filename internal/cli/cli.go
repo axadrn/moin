@@ -151,6 +151,10 @@ Daemon
   daemon uninstall   Remove the daemon from this server; the apps keep running: daemon uninstall [--apps] [--yes]
   daemon             Run the daemon on this server
 
+Watcher
+  watcher            Watch servers from outside, the only part that listens: watcher [--listen :8080] [--config /etc/moin/watcher.yml] [--dir /var/lib/moin/watcher]
+  watcher add        A new token for a server to report with: watcher add prod
+
   version            Show the version of moin and the hub, and a newer release
   update <app>       Update an app from the catalog; restore can go back to before it: update umami [--version 3.4.1]
   help               Show this help
@@ -316,6 +320,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return registry(ctx, rest, stdin, stdout)
 	case "exec":
 		return execCommand(ctx, rest, stdout)
+	case "watcher":
+		return watcherCommand(ctx, rest, stdout)
 	case "daemon":
 		return daemonCommand(ctx, rest, stdin, stdout)
 	case "agent":
