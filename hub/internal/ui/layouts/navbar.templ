@@ -18,55 +18,39 @@ const XHandle = "usemoin"
 // XURL is moin's account on X.
 const XURL = "https://x.com/" + XHandle
 
-// navLinks are the places of the public site. A self-hosted hub has no
-// prices to show.
-func navLinks(billing bool, path string) []components.BarLink {
-	links := []components.BarLink{
+// navLinks are the places of the site.
+func navLinks(path string) []components.BarLink {
+	return []components.BarLink{
 		{Label: "Docs", Href: "/docs", Current: strings.HasPrefix(path, "/docs")},
 		{Label: "Catalog", Href: "/catalog", Current: strings.HasPrefix(path, "/catalog")},
-		{Label: "UI", Href: "/ui", Current: inUI(path)},
+		{Label: "Blog", Href: "/blog", Current: strings.HasPrefix(path, "/blog")},
 	}
-	if billing {
-		links = append(links, components.BarLink{Label: "Pricing", Href: "/#pricing"})
-	}
-	return links
-}
-
-// inUI says a path is on the website of moin UI.
-func inUI(path string) bool {
-	return path == "/ui" || strings.HasPrefix(path, "/ui/")
 }
 
 // starsShowAt is how many GitHub stars it takes before the navbar shows
 // the count.
 const starsShowAt = 1000
 
-// Navbar is the floating pill of the public pages: the wordmark, the
-// places, and the one way in. On a phone it keeps the wordmark, Docs and
+// Navbar is the floating pill of the site: the wordmark, the places, and
+// the one way in. On a phone it keeps the wordmark, Docs and
 // the way in; the footer has the rest. No menu: links change pages.
 templ Navbar() {
-	{{ user := ctxkeys.User(ctx) }}
-	@components.Bar(components.BarProps{Float: true}) {
+	@components.Bar() {
 		<a href="/" class="moin-row" data-gap="2" aria-label={ brand.Name + " home" }>
 			@components.Wordmark(components.WordmarkProps{})
 			@components.Badge(components.BadgeProps{Class: "moin-hidden-phone"}) {
-				if inUI(ctxkeys.URLPath(ctx)) {
-					UI
-				} else {
-					Beta
-				}
+				Beta
 			}
 		</a>
-		@components.BarLinks(components.BarLinksProps{Label: "Main", Links: navLinks(ctxkeys.RenderConfig(ctx).Billing, ctxkeys.URLPath(ctx))})
+		@components.BarLinks(components.BarLinksProps{Label: "Main", Links: navLinks(ctxkeys.URLPath(ctx))})
 		<span class="moin-fill"></span>
-		// The one search of the site, where the app keeps its search: top
-		// right, on every public page. Without JavaScript it is the page
-		// /search.
+		// The one search of the site, top right on every page. Without
+		// JavaScript it is the page /search.
 		@components.Button(components.ButtonProps{Href: "/search", Icon: true, Quiet: true, Attrs: templ.Attributes{"data-site-search-open": true, "aria-label": "Search", "aria-keyshortcuts": "Meta+K /"}}) {
 			<i class="moin-icon moin-icon-search"></i>
 		}
 		// The star count shows from starsShowAt on: a small one says
-		// "nobody uses this", like the live numbers of the home page.
+		// "nobody uses this".
 		<span class="moin-only-phone">
 			@components.Button(components.ButtonProps{Href: "/docs", Quiet: true}) {
 				Docs
@@ -90,13 +74,8 @@ templ Navbar() {
 				<i class="moin-icon moin-icon-x-logo"></i>
 			}
 		</span>
-		// One way in: /auth signs in and signs up alike.
-		{{ href, label := "/auth", "Deploy now" }}
-		if user != nil {
-			{{ href, label = "/app", "Overview" }}
-		}
-		@components.Button(components.ButtonProps{Kind: components.Primary, Href: href}) {
-			{ label }
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs"}) {
+			Get started
 		}
 	}
 }

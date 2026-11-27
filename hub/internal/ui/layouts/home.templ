@@ -1,8 +1,8 @@
 package layouts
 
-// Home is the layout of the public site: it carries the page counter.
+// Home is the layout of every page of the site: the navbar, the page, the
+// footer and the search.
 templ Home(seo SEOProps) {
-	{{ seo.Public = true }}
 	@Base(seo) {
 		@Navbar()
 		{ children... }

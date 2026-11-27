@@ -1,40 +1,21 @@
 package handler
 
 import (
+	"io/fs"
 	"net/http"
 
 	"github.com/axadrn/moin/hub/internal/service"
 	"github.com/axadrn/moin/hub/internal/ui/pages"
 )
 
-type LegalHandler struct {
-	legalService *service.LegalService
-}
-
-func NewLegalHandler(legalService *service.LegalService) *LegalHandler {
-	handler := &LegalHandler{
-		legalService: legalService,
+// Legal shows the terms or the privacy policy at /legal/{page}.
+func Legal(files fs.FS, supportEmail string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		page, err := service.ReadLegalPage(files, r.PathValue("page"), supportEmail)
+		if err != nil {
+			NotFound(w, r)
+			return
+		}
+		render(w, r, pages.Legal(page))
 	}
-
-	// Load legal pages on initialization
-	err := handler.legalService.LoadPages()
-	if err != nil {
-		// Silently continue. Pages might be added later
-		_ = err
-	}
-
-	return handler
-}
-
-func (h *LegalHandler) ShowPage(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("page")
-
-	page, err := h.legalService.Page(slug)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		render(w, r, pages.NotFound())
-		return
-	}
-
-	render(w, r, pages.Legal(page))
 }

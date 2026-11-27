@@ -1,9 +1,8 @@
 package components
 
-// CardProps is a Card: its title, at most one action next to it.
+// CardProps is a Card with its title.
 type CardProps struct {
-	Title  string
-	Action templ.Component
+	Title string
 	// Href makes the whole card a link. Ink is the one card that stands out.
 	Href  string
 	Ink   bool
@@ -18,12 +17,9 @@ templ Card(p CardProps) {
 		</a>
 	} else {
 		<section class="moin-card" data-ink?={ p.Ink } { p.Attrs... }>
-			if p.Title != "" || p.Action != nil {
+			if p.Title != "" {
 				<div class="moin-card-head">
 					<h2 class="moin-heading">{ p.Title }</h2>
-					if p.Action != nil {
-						@p.Action
-					}
 				</div>
 			}
 			{ children... }

@@ -13,9 +13,6 @@ type SEOProps struct {
 	Path         string
 	NoIndex      bool
 	MarkdownPath string
-	// Public pages (home, docs, changelog, catalog, legal) carry the page
-	// counter; the app, the admin and sign-in never do.
-	Public bool
 }
 
 templ Base(props ...SEOProps) {
@@ -24,7 +21,6 @@ templ Base(props ...SEOProps) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<meta name="csrf-token" content={ ctxkeys.CSRFToken(ctx) }/>
 			if len(props) > 0 {
 				@seo(props[0])
 			} else {
@@ -36,52 +32,21 @@ templ Base(props ...SEOProps) {
 			// The text font loads with the stylesheet, not after it, so the
 			// first paint is already in Geist.
 			<link rel="preload" href={ components.AssetURL("/assets/fonts/geist/geist-variable.woff2") } as="font" type="font/woff2" crossorigin/>
-			// One stylesheet and one script: moin UI and the hub's own, joined
-			// at start (assets/bundle.go).
-			<link href={ components.AssetURL("/assets/app.css") } rel="stylesheet"/>
-			// Scripts in swapped content get the page's nonce, so the CSP lets
-			// them run.
+			<link href={ components.AssetURL("/assets/css/site.css") } rel="stylesheet"/>
+			// htmx answers the search palette (SiteSearch).
 			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
 			<script src={ components.AssetURL("/assets/js/htmx-4.0.0.min.js") }></script>
-			// Server-sent events swap HTML as it streams (hx-sse:connect).
-			<script src={ components.AssetURL("/assets/js/hx-sse-4.0.0.min.js") }></script>
-			<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/app.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/js/site.js") }></script>
 			// A link starts loading when the pointer rests on it, so the page
-			// is there on the click (Chrome and Edge; others ignore it). Only
-			// pages: never sign in or out, GitHub or the API.
+			// is there on the click (Chrome and Edge; others ignore it).
 			<script type="speculationrules" nonce={ templ.GetNonce(ctx) }>
-				{"prefetch":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/auth/*"}},{"not":{"href_matches":"/api/*"}},{"not":{"href_matches":"/*/github/*"}},{"not":{"href_matches":"/*\\?*"}}]},"eagerness":"moderate"}]}
+				{"prefetch":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/*\\?*"}}]},"eagerness":"moderate"}]}
 			</script>
-			// Site-wide enhancements
 			@themeScript()
-			if len(props) > 0 && props[0].Public {
-				@Analytics()
-			}
+			@Analytics()
 		</head>
-		<body
-			hx-headers:inherited={ `{"X-CSRF-Token":"` + ctxkeys.CSRFToken(ctx) + `"}` }
-		>
-			{{ session := ctxkeys.Session(ctx) }}
-			if session.IsImpersonating() {
-				<div class="moin-alert moin-text" data-state="running" data-sticky>
-					<span>You are viewing the application as another user.</span>
-					<form
-						action="/admin/impersonation/stop"
-						method="POST"
-						hx-post="/admin/impersonation/stop"
-						hx-swap="none"
-						hx-disable="find button[type='submit']"
-					>
-						@components.CSRF()
-						@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
-							Return to Admin
-						}
-					</form>
-				</div>
-			}
+		<body>
 			{ children... }
-			<div id="feedback" hidden></div>
-			@components.ConfirmDialog()
 		</body>
 	</html>
 }
@@ -134,51 +99,21 @@ templ seo(props SEOProps) {
 	<meta name="theme-color" content="#000000"/>
 }
 
+// themeScript sets the mode before the first paint: what this browser
+// chose with the switch in the footer, else what the system says.
 templ themeScript() {
 	<script nonce={ templ.GetNonce(ctx) }>
-		(function() {
-			window.themeUtils = window.themeUtils || {};
-			// One choice for all of moin. Browsers that chose before keep it.
-			if (localStorage.getItem('theme')) {
-				localStorage.setItem('moin-mode', localStorage.getItem('theme'));
-				localStorage.removeItem('theme');
-			}
-			const media = window.matchMedia('(prefers-color-scheme: dark)');
-			window.themeUtils.getThemePreference = function() {
-				return localStorage.getItem('moin-mode') || 'system';
-			};
-			window.themeUtils.applyTheme = function() {
-				const preference = window.themeUtils.getThemePreference();
-				const isDark = preference === 'system' ? media.matches : preference === 'dark';
+		(() => {
+			const media = matchMedia("(prefers-color-scheme: dark)");
+			window.applyMode = (mode) => {
 				const root = document.documentElement;
-				root.classList.toggle('dark', isDark);
-				root.classList.toggle('light', preference === 'light');
-				// moin.js pins the scheme for a stored choice; system follows
-				// the rules in the stylesheet again.
-				root.style.colorScheme = preference === 'system' ? '' : preference;
-				document.dispatchEvent(new CustomEvent('theme-changed'));
+				root.classList.toggle("dark", mode === "dark" || (mode === "system" && media.matches));
+				root.classList.toggle("light", mode === "light");
+				root.style.colorScheme = mode === "system" ? "" : mode;
 			};
-			// A theme tried in the editor, on the pages of moin UI only. Here,
-			// before the first paint, like the mode above.
-			window.themeUtils.applySavedTheme = function() {
-				if (!/^\/ui(\/|$)/.test(location.pathname)) return;
-				const root = document.documentElement;
-				let theme = {};
-				try { theme = JSON.parse(localStorage.getItem('moin-theme')) || {}; } catch {}
-				for (const name of [...root.style]) {
-					if (name.startsWith('--')) root.style.removeProperty(name);
-				}
-				if (theme.radius) root.style.setProperty('--radius', theme.radius);
-				for (const [name, value] of Object.entries(theme.vars || {})) root.style.setProperty(name, value);
-				for (const [name, [light, dark]] of Object.entries(theme.colors || {})) {
-					root.style.setProperty(name, `light-dark(${light}, ${dark})`);
-				}
-			};
-			window.themeUtils.applySavedTheme();
-			window.themeUtils.applyTheme();
-			media.addEventListener('change', function() {
-				if (window.themeUtils.getThemePreference() === 'system') window.themeUtils.applyTheme();
-			});
+			let mode = "system";
+			try { mode = localStorage.getItem("moin-mode") || "system"; } catch {}
+			applyMode(mode);
 		})();
 	</script>
 }

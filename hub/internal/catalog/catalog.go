@@ -1,8 +1,7 @@
-// Package catalog is the list of open source apps moin installs in one
-// click. Each entry is a folder in catalog/ at the root of the repo: app.md with what the
-// app is, compose.yml with how it runs, and an optional logo.svg. They ship
-// with moin, so a self-hosted hub has the same catalog. Versions
-// come from the image's registry, asked by every hub itself.
+// Package catalog is the list of open source apps moin deploys with one
+// command, as the site shows them. Each entry is a folder in catalog/ at
+// the root of the repo: app.md with what the app is, compose.yml with how
+// it runs, and an optional logo.svg.
 package catalog
 
 import (
@@ -10,7 +9,6 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"net/url"
 	"path"
 	"regexp"
 	"slices"
@@ -36,12 +34,6 @@ type Entry struct {
 	// up, or mysql, mongodb or clickhouse, which it does not yet; empty
 	// for none.
 	Database string
-	// Filter picks the tags that are releases; empty takes x.y.z, with or
-	// without a v.
-	Filter *regexp.Regexp
-	// Stable is a channel tag, such as stable: releases newer than the one
-	// it names are betas and stay out. Docker Hub only.
-	Stable string
 	// Login says how to sign in the first time, if the app has a default.
 	Login string
 	// Body is the description as HTML.
@@ -51,8 +43,6 @@ type Entry struct {
 	// media type; none shows the first letter instead.
 	Logo     []byte
 	LogoType string
-	// Secrets are the ${NAME}s of compose.yml moin generates on install.
-	Secrets []string
 }
 
 // Categories in the order the catalog shows them.
@@ -61,16 +51,7 @@ var Categories = []string{"AI", "Analytics", "Automation", "Monitoring", "Commun
 var (
 	slugPattern  = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
 	imagePattern = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$|^[a-z0-9._-]+(/[a-z0-9._-]+)*$`)
-	// defaultFilter takes 1.2.3 and v1.2.3: releases, not latest, nightly,
-	// rc or a commit.
-	defaultFilter = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+$`)
 )
-
-// NeedsURL reports whether the app needs its own address or domain, and so
-// a domain.
-func (e Entry) NeedsURL() bool {
-	return strings.Contains(string(e.Compose), "${"+catalogfiles.URLVar+"}") || strings.Contains(string(e.Compose), "${"+catalogfiles.DomainVar+"}")
-}
 
 // Load reads every entry of files, a folder each, sorted by name.
 func Load(files fs.FS) ([]Entry, error) {
@@ -113,15 +94,8 @@ func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, e
 	entry := Entry{
 		Slug: slug, Name: text("name"), Pitch: text("pitch"), Category: text("category"),
 		Website: text("website"), Source: text("source"), License: text("license"),
-		Image: text("image"), Database: text("database"), Login: text("login"), Stable: text("stable"),
+		Image: text("image"), Database: text("database"), Login: text("login"),
 		Body: template.HTML(body),
-	}
-	entry.Filter = defaultFilter
-	if filter := text("versions"); filter != "" {
-		entry.Filter, err = regexp.Compile(filter)
-		if err != nil {
-			return Entry{}, fmt.Errorf("versions: %w", err)
-		}
 	}
 	entry.Compose, err = fs.ReadFile(files, path.Join(dir, "compose.yml"))
 	if err != nil {
@@ -138,7 +112,6 @@ func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, e
 		entry.Logo, entry.LogoType = body, logo.kind
 		break
 	}
-	entry.Secrets = catalogfiles.Secrets(entry.Compose)
 	return entry, entry.validate()
 }
 
@@ -184,27 +157,6 @@ func (e Entry) DatabaseNote() string {
 		return "Runs on MySQL: moin backups for MySQL come next."
 	}
 	return "Runs on " + e.DatabaseName() + ": moin doesn't back it up yet."
-}
-
-// BackupRequestURL opens a GitHub issue that asks for backups of the app's
-// database, for one moin does not back up and has not planned yet; "" else.
-func (e Entry) BackupRequestURL() string {
-	if e.Database == "" || e.BackedUp() || e.Database == "mysql" {
-		return ""
-	}
-	return "https://github.com/axadrn/moin/issues/new?title=" + url.QueryEscape("Backups for "+e.DatabaseName()) + "&body=" + url.QueryEscape("I run "+e.Name+" from the catalog and want moin to back up its "+e.DatabaseName()+".")
-}
-
-// LoginSecrets are the secrets the first sign-in needs: those Login names,
-// such as ADMIN_PASSWORD. moin shows their values once, on install.
-func (e Entry) LoginSecrets() []string {
-	var names []string
-	for _, name := range e.Secrets {
-		if strings.Contains(e.Login, name) {
-			names = append(names, name)
-		}
-	}
-	return names
 }
 
 // Similar are up to n other apps of e's category, in the order of entries.

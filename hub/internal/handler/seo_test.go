@@ -8,7 +8,7 @@ import (
 )
 
 func TestSEOHandlerServesAbsoluteSitemapReference(t *testing.T) {
-	handler := NewSEOHandler(nil, nil, nil, "https://example.com/", os.DirFS(t.TempDir()), false, false)
+	handler := NewSEOHandler(nil, nil, "https://example.com/", os.DirFS(t.TempDir()), false)
 	recorder := httptest.NewRecorder()
 	handler.Robots(recorder, httptest.NewRequest("GET", "/robots.txt", nil))
 	if !strings.Contains(recorder.Body.String(), "Sitemap: https://example.com/sitemap.xml") {
@@ -17,7 +17,7 @@ func TestSEOHandlerServesAbsoluteSitemapReference(t *testing.T) {
 }
 
 func TestSEOHandlerDisallowsRobotsWhenNoIndexIsEnabled(t *testing.T) {
-	handler := NewSEOHandler(nil, nil, nil, "https://example.com/", os.DirFS(t.TempDir()), true, false)
+	handler := NewSEOHandler(nil, nil, "https://example.com/", os.DirFS(t.TempDir()), true)
 	recorder := httptest.NewRecorder()
 	handler.Robots(recorder, httptest.NewRequest("GET", "/robots.txt", nil))
 	if recorder.Body.String() != "User-agent: *\nDisallow: /\n" {

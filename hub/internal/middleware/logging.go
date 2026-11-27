@@ -37,14 +37,13 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 // Static asset paths are never logged (they would bury real requests).
 var skipLoggingPaths = []string{
 	"/assets/",
-	"/uploads/",
 	"/favicon.ico",
 }
 
 // RequestLogging returns middleware that logs each HTTP request (method, path,
 // status, duration). Static assets are always skipped. When enabled is false
 // it is a no-op pass-through (e.g. when a reverse proxy already logs requests).
-func RequestLogging(enabled bool, clientIPs ClientIPResolver) func(http.Handler) http.Handler {
+func RequestLogging(enabled bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if !enabled {
 			return next
@@ -69,33 +68,10 @@ func RequestLogging(enabled bool, clientIPs ClientIPResolver) func(http.Handler)
 
 			slog.Info("http request",
 				"method", r.Method,
-				"path", safeRequestLogPath(r.URL.Path),
+				"path", r.URL.Path,
 				"status", rw.statusCode,
 				"duration_ms", time.Since(start).Milliseconds(),
-				"remote_addr", clientIPs.ClientIP(r),
 			)
 		})
 	}
-}
-
-// safeRequestLogPath replaces the secret token of an email link or a deploy
-// hook with :token.
-func safeRequestLogPath(path string) string {
-	const apiInvitations = "/api/v1/invitations/"
-	if strings.HasPrefix(path, apiInvitations) {
-		if strings.HasSuffix(path, "/accept") {
-			return apiInvitations + ":token/accept"
-		}
-		return apiInvitations + ":token"
-	}
-	for _, prefix := range []string{
-		"/auth/verify-email-change/",
-		"/workspaces/invitations/",
-		"/webhooks/deploy/",
-	} {
-		if strings.HasPrefix(path, prefix) {
-			return prefix + ":token"
-		}
-	}
-	return path
 }

@@ -5,13 +5,10 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/axadrn/moin/hub/internal/app"
 	"github.com/axadrn/moin/hub/internal/config"
 )
 
@@ -28,19 +25,10 @@ var (
 // indexed. A new page that misses one of these fails here.
 func TestSitemapPagesAreReadyForSearch(t *testing.T) {
 	const appURL = "https://example.com"
-	hub, err := app.New(&config.Config{
-		AppEnv:        config.EnvironmentProduction,
-		AppURL:        appURL,
-		DBConnection:  filepath.Join(t.TempDir(), "app.db"),
-		SessionExpiry: time.Hour,
-		Billing:       true,
-		SecretsKey:    make([]byte, 32),
-	})
+	site, err := New(&config.Config{AppEnv: config.EnvironmentProduction, AppURL: appURL})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = hub.Close() })
-	site := SetupRoutes(hub)
 	get := func(path string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
 		site.ServeHTTP(w, httptest.NewRequest(http.MethodGet, appURL+path, nil))
@@ -51,18 +39,15 @@ func TestSitemapPagesAreReadyForSearch(t *testing.T) {
 		t.Errorf("robots.txt = %q, want it to start with User-agent", body)
 	}
 
-	// One address per page, and the copies and sign-in stay out of search.
+	// One address per page, and the copies stay out of search.
 	if w := get("/docs/getting-started/?q=1"); w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/docs/getting-started?q=1" {
 		t.Errorf("/docs/getting-started/ = %d to %q, want 301 to /docs/getting-started?q=1", w.Code, w.Header().Get("Location"))
-	}
-	if w := get("/ui/button/"); w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/ui/button" {
-		t.Errorf("/ui/button/ = %d to %q, want 301 to /ui/button", w.Code, w.Header().Get("Location"))
 	}
 	if w := get("/docs/getting-started.md"); w.Header().Get("X-Robots-Tag") != "noindex" {
 		t.Errorf("/docs/getting-started.md has X-Robots-Tag %q, want noindex", w.Header().Get("X-Robots-Tag"))
 	}
-	if robots := first(seoRobots, get("/auth").Body.String()); robots != "noindex, nofollow" {
-		t.Errorf("/auth has robots %q, want noindex, nofollow", robots)
+	if w := get("/app"); w.Code != http.StatusNotFound {
+		t.Errorf("/app = %d, want 404", w.Code)
 	}
 
 	var sitemap struct {
@@ -73,7 +58,7 @@ func TestSitemapPagesAreReadyForSearch(t *testing.T) {
 	if err := xml.Unmarshal(get("/sitemap.xml").Body.Bytes(), &sitemap); err != nil {
 		t.Fatal(err)
 	}
-	if len(sitemap.URLs) < 100 {
+	if len(sitemap.URLs) < 20 {
 		t.Fatalf("the sitemap lists %d pages, want every public page", len(sitemap.URLs))
 	}
 

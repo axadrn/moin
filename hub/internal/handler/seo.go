@@ -2,7 +2,6 @@ package handler
 
 import (
 	"fmt"
-	catalogfiles "github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
 	"github.com/axadrn/moin/hub/internal/compare"
@@ -15,37 +14,20 @@ import (
 type SEOHandler struct {
 	sitemapService *service.SitemapService
 	docsService    *service.DocsService
-	// catalog and compare are listed in llms.txt like in the sitemap.
-	catalog       []catalog.Entry
-	compare       []compare.Competitor
-	baseURL       string
-	files         fs.FS
-	robotsNoIndex bool
+	catalog        []catalog.Entry
+	baseURL        string
+	files          fs.FS
+	robotsNoIndex  bool
 }
 
-func NewSEOHandler(
-	docsService, uiDocs *service.DocsService,
-	uiFiles fs.FS,
-	baseURL string,
-	files fs.FS,
-	robotsNoIndex bool,
-	legal bool,
-) *SEOHandler {
-	sitemap := service.NewSitemapService(docsService, baseURL, legal)
-	sitemap.AddUI(uiDocs, uiFiles)
-	entries, err := catalog.Load(catalogfiles.Files)
-	if err == nil {
-		slugs := make([]string, 0, len(entries))
-		for _, entry := range entries {
-			slugs = append(slugs, entry.Slug)
-		}
-		sitemap.AddCatalog(slugs)
+func NewSEOHandler(docsService *service.DocsService, entries []catalog.Entry, baseURL string, files fs.FS, robotsNoIndex bool) *SEOHandler {
+	sitemap := service.NewSitemapService(docsService, baseURL)
+	slugs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		slugs = append(slugs, entry.Slug)
 	}
-	var competitors []compare.Competitor
-	if legal {
-		competitors = compare.Competitors
-		sitemap.AddCompare(compare.Slugs())
-	}
+	sitemap.AddCatalog(slugs)
+	sitemap.AddCompare(compare.Slugs())
 	if posts, err := service.BlogPosts(files); err == nil {
 		sitemap.AddBlog(posts)
 	}
@@ -56,7 +38,6 @@ func NewSEOHandler(
 		sitemapService: sitemap,
 		docsService:    docsService,
 		catalog:        entries,
-		compare:        competitors,
 		baseURL:        strings.TrimSuffix(baseURL, "/"),
 		files:          files,
 		robotsNoIndex:  robotsNoIndex,
@@ -105,9 +86,9 @@ func (h *SEOHandler) LLMs(w http.ResponseWriter, r *http.Request) {
 			_, _ = fmt.Fprintf(w, "- [%s](%s/catalog/%s): %s\n", entry.Name, h.baseURL, entry.Slug, entry.Pitch)
 		}
 	}
-	if len(h.compare) > 0 {
+	if len(compare.Competitors) > 0 {
 		_, _ = fmt.Fprint(w, "\n## Compare\n\n")
-		for _, competitor := range h.compare {
+		for _, competitor := range compare.Competitors {
 			_, _ = fmt.Fprintf(w, "- [%s vs %s](%s/compare/%s): %s\n", brand.Name, competitor.Name, h.baseURL, competitor.Slug, competitor.Lead)
 		}
 	}

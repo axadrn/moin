@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"sort"
@@ -17,51 +16,13 @@ type DocsService struct {
 	parser   *markdown.Parser
 	files    fs.FS
 	docsTree *model.DocPage
-	// appURL is this hub, which the docs show in place of the
-	// placeholder.
-	appURL string
-	// groups are the topics, in their order.
-	groups []string
 	// live reads the pages again on every request, in development.
 	live bool
-	// examples are the files of the example blocks. Only moin UI has them.
-	examples fs.FS
 }
-
-// docsPlaceholder is the hub in the doc sources. Every page but
-// the self-hosting guide shows the real APP_URL instead, so commands copy
-// as they are.
-const docsPlaceholder = "https://moin.example.com"
 
 // NewDocsService serves the pages under docs/ in files.
-func NewDocsService(files fs.FS, appURL string, live bool) *DocsService {
-	return &DocsService{
-		parser: markdown.NewParser(markdown.Examples(files)),
-		files:  files,
-		appURL: strings.TrimRight(appURL, "/"),
-		groups: docsGroups,
-		live:   live,
-	}
-}
-
-// NewUIDocsService serves the docs of moin UI, the same way, with its
-// examples.
-func NewUIDocsService(files fs.FS, appURL string, live bool) *DocsService {
-	docs := NewDocsService(files, appURL, live)
-	docs.groups = uiGroups
-	docs.examples = files
-	return docs
-}
-
-// withAppURL puts this hub in place of the placeholder. The
-// self-hosting guide keeps it: there it stands for the reader's own.
-func (s *DocsService) withAppURL(content []byte, relPath string) []byte {
-	if s.appURL == "" || relPath == "self-hosting.md" {
-		return content
-	}
-	host := strings.TrimPrefix(strings.TrimPrefix(s.appURL, "https://"), "http://")
-	content = bytes.ReplaceAll(content, []byte(docsPlaceholder), []byte(s.appURL))
-	return bytes.ReplaceAll(content, []byte(strings.TrimPrefix(docsPlaceholder, "https://")), []byte(host))
+func NewDocsService(files fs.FS, live bool) *DocsService {
+	return &DocsService{parser: markdown.NewParser(), files: files, live: live}
 }
 
 func (s *DocsService) BuildDocsTree() error {
@@ -116,7 +77,6 @@ func (s *DocsService) loadDocPage(fullPath, relPath string) (*model.DocPage, err
 	if err != nil {
 		return nil, err
 	}
-	content = s.withAppURL(content, relPath)
 
 	htmlContent, meta, err := s.parser.ParseWithFrontmatter(content)
 	if err != nil {
@@ -126,18 +86,11 @@ func (s *DocsService) loadDocPage(fullPath, relPath string) (*model.DocPage, err
 	// relPath already normalized to forward slashes
 	slug := strings.TrimSuffix(relPath, ".md")
 
-	// The markdown export shows surfaces blocks as plain lists and an
-	// example as its code.
-	plain := markdown.PlainSurfaces(content)
-	if s.examples != nil {
-		plain = markdown.PlainExamples(plain, s.examples)
-	}
-
 	page := &model.DocPage{
 		Slug:        slug,
 		Path:        relPath,
 		HTMLContent: string(htmlContent),
-		Content:     string(plain),
+		Content:     string(content),
 		Headings:    s.parser.ExtractHeadings(content),
 		Children:    []*model.DocPage{},
 	}
@@ -308,10 +261,6 @@ func (s *DocsService) DocsTree() (*model.DocPage, error) {
 // another, goes under "More" at the end.
 var docsGroups = []string{"Start", "Apps", "Every day", "Servers and data", "Team", "Reference"}
 
-// uiGroups are the topics of the docs of moin UI. Start holds the pages with
-// a tab of their own; the others are components, and Layout has a tab.
-var uiGroups = []string{"Start", "Forms", "Lists", "Status", "Content", "Charts", "Overlays", "Page", "Layout", "Stacks"}
-
 // Groups are the pages of the docs home: every page under its topic, the
 // topics in the order of docsGroups, the pages by their order.
 func (s *DocsService) Groups() []model.DocGroup {
@@ -320,14 +269,14 @@ func (s *DocsService) Groups() []model.DocGroup {
 	}
 	var leaves []*model.DocPage
 	s.collectPagesInOrder(s.docsTree, &leaves)
-	groups := make([]model.DocGroup, len(s.groups))
-	for i, title := range s.groups {
+	groups := make([]model.DocGroup, len(docsGroups))
+	for i, title := range docsGroups {
 		groups[i].Title = title
 	}
 	var more []*model.DocPage
 	for _, page := range leaves {
 		at := -1
-		for i, title := range s.groups {
+		for i, title := range docsGroups {
 			if page.Group == title {
 				at = i
 			}

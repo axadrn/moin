@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/xml"
-	"io/fs"
 	"log/slog"
 	"strings"
 	"time"
@@ -10,36 +9,24 @@ import (
 	"github.com/axadrn/moin/hub/internal/model"
 )
 
-// publicRoutes are the pages that are not docs, catalog apps or
-// comparisons. Sign-in is not one: it carries noindex.
+// publicRoutes are the pages that are not docs, blog posts, catalog apps
+// or comparisons.
 var publicRoutes = []string{
 	"/",
 	"/docs",
-	"/next",
-	"/ui",
-	"/ui/components",
-	"/ui/layout",
-	"/ui/stacks",
-	"/ui/blocks",
 	"/catalog",
 	"/roadmap",
+	"/legal/terms",
+	"/legal/privacy",
 }
-
-// legalRoutes are the terms and privacy pages of the hosted service.
-var legalRoutes = []string{"/legal/terms", "/legal/privacy"}
 
 type SitemapService struct {
 	docsService *DocsService
 	baseURL     string
-	// legal lists the terms and privacy pages, which only the hosted
-	// service serves.
-	legal bool
 	// catalog are the slugs of the catalog apps, each a page under /catalog.
 	catalog []string
 	// compare are the slugs of the tools with a page under /compare.
 	compare []string
-	// ui are the pages of moin UI.
-	ui []string
 	// blog are the posts, each with its date.
 	blog []BlogPost
 	// changelog is the date of the newest release. With the blog posts it
@@ -68,15 +55,10 @@ func (s *SitemapService) AddCompare(slugs []string) {
 	s.compare = slugs
 }
 
-func NewSitemapService(
-	docsService *DocsService,
-	baseURL string,
-	legal bool,
-) *SitemapService {
+func NewSitemapService(docsService *DocsService, baseURL string) *SitemapService {
 	return &SitemapService{
 		docsService: docsService,
 		baseURL:     strings.TrimSuffix(baseURL, "/"),
-		legal:       legal,
 	}
 }
 
@@ -94,7 +76,6 @@ func (s *SitemapService) GenerateSitemap() ([]byte, error) {
 func (s *SitemapService) staticURLs() []model.SitemapURL {
 	var paths []string
 	paths = append(paths, publicRoutes...)
-	paths = append(paths, s.ui...)
 	for _, slug := range s.catalog {
 		paths = append(paths, "/catalog/"+slug)
 	}
@@ -103,9 +84,6 @@ func (s *SitemapService) staticURLs() []model.SitemapURL {
 	}
 	for _, slug := range s.compare {
 		paths = append(paths, "/compare/"+slug)
-	}
-	if s.legal {
-		paths = append(paths, legalRoutes...)
 	}
 	urls := make([]model.SitemapURL, 0, len(paths)+len(s.blog)+2)
 	for _, path := range paths {
@@ -138,28 +116,4 @@ func (s *SitemapService) docsURLs() []model.SitemapURL {
 		urls = append(urls, model.SitemapURL{Loc: s.baseURL + "/docs/" + page.Slug})
 	}
 	return urls
-}
-
-// AddUI adds the pages of moin UI: its docs and its blocks.
-func (s *SitemapService) AddUI(docs *DocsService, files fs.FS) {
-	if docs == nil {
-		return
-	}
-	if _, err := docs.DocsTree(); err != nil {
-		return
-	}
-	for _, page := range docs.FlatDocsList() {
-		if page.Slug != "start" {
-			s.ui = append(s.ui, "/ui/"+page.Slug)
-		}
-	}
-	groups, err := UIBlocks(files)
-	if err != nil {
-		return
-	}
-	for _, group := range groups {
-		for _, block := range group.Blocks {
-			s.ui = append(s.ui, "/ui/blocks/"+block.Slug)
-		}
-	}
 }

@@ -1,10 +1,6 @@
 package components
 
-import (
-	"strconv"
-
-	"github.com/axadrn/moin/hub/internal/brand"
-)
+import "github.com/axadrn/moin/hub/internal/brand"
 
 // Back is the page one step up. A page at the top has none.
 type Back struct {
@@ -12,13 +8,12 @@ type Back struct {
 	Href  string
 }
 
-// HeaderProps is a Header: the way back, the title, a line under it such as
-// a status. Children are the actions.
+// HeaderProps is a Header: the way back, an icon and the title. Children
+// are the actions.
 type HeaderProps struct {
 	Back  Back
 	Icon  templ.Component
 	Title string
-	Line  templ.Component
 }
 
 // Header is the head of every page, the same on every page so a title never
@@ -35,11 +30,6 @@ templ Header(p HeaderProps) {
 				@p.Icon
 			}
 			<h1 class="moin-title">{ p.Title }</h1>
-			if p.Line != nil {
-				<p class="moin-header-line">
-					@p.Line
-				</p>
-			}
 			if templ.GetChildren(ctx) != nil {
 				<div class="moin-header-actions">
 					{ children... }
@@ -54,14 +44,6 @@ type Tab struct {
 	Label  string
 	Href   string
 	Active bool
-	// Icon is an icon before the label, like "folder"; Live a green dot
-	// after it, drawn by the kit: this one is in use.
-	Icon string
-	Live bool
-	// Key opens it from the keyboard. Attrs swap a part of a page instead,
-	// when the address should stay.
-	Key   string
-	Attrs templ.Attributes
 }
 
 // TabsProps is Tabs. Label names them for screen readers.
@@ -69,20 +51,12 @@ type TabsProps struct {
 	ID    string
 	Label string
 	Tabs  []Tab
-	Quiet bool
 }
 
 // Tabs are the parts of one page, each a plain link, so the address says
 // which one is open and the back button works.
 templ Tabs(p TabsProps) {
-	<nav
-		if p.ID != "" {
-			id={ p.ID }
-		}
-		class="moin-tabs"
-		data-quiet?={ p.Quiet }
-		aria-label={ p.Label }
-	>
+	<nav id={ p.ID } class="moin-tabs" aria-label={ p.Label }>
 		for _, tab := range p.Tabs {
 			<a
 				href={ templ.SafeURL(tab.Href) }
@@ -90,137 +64,20 @@ templ Tabs(p TabsProps) {
 				if tab.Active {
 					aria-current="page"
 				}
-				if tab.Key != "" {
-					data-key={ tab.Key }
-				}
-				data-live?={ tab.Live }
-				{ tab.Attrs... }
 			>
-				if tab.Live {
-					<span class="moin-sr-only">In use: </span>
-				}
-				if tab.Icon != "" {
-					<i class={ "moin-icon moin-icon-" + tab.Icon } aria-hidden="true"></i>
-				}
 				{ tab.Label }
 			</a>
 		}
 	</nav>
 }
 
-// CommandProps is a Command.
-type CommandProps struct {
-	Text string
-}
-
-// Command is a terminal command to copy.
-templ Command(p CommandProps) {
-	<div class="moin-command">
-		<code>{ p.Text }</code>
-		@Copy(CopyProps{Text: p.Text, Label: "Copy the command"})
-	</div>
-}
-
-// CopyProps is a Copy: the text it copies and what it says to screen
-// readers.
-type CopyProps struct {
-	Text  string
-	Label string
-}
-
-// Copy is the button that copies a text, the one of a Command.
-templ Copy(p CopyProps) {
-	<button type="button" class="moin-copy" data-copy={ p.Text } aria-label={ p.Label }>
-		<i class="moin-icon moin-icon-copy"></i>
-	</button>
-}
-
-// DialogProps is a Dialog: a title and a line under it. A script can fill
-// both (data-dialog-title, data-dialog-note).
-type DialogProps struct {
-	ID    string
-	Title string
-	Note  string
-}
-
-// Dialog is a question that floats over the page. A button with
-// data-open-dialog and its id opens it.
-templ Dialog(p DialogProps) {
-	<dialog id={ p.ID } class="moin-dialog" data-dialog aria-labelledby={ p.ID + "-title" }>
-		<div class="moin-stack" style="--gap:1.25rem">
-			<div class="moin-stack" data-gap="1">
-				<h2 id={ p.ID + "-title" } class="moin-heading" data-dialog-title>{ p.Title }</h2>
-				<p class="moin-text moin-muted" data-dialog-note>{ p.Note }</p>
-			</div>
+// Bar is the floating pill over the top of every page: a name, its
+// places, what you do.
+templ Bar() {
+	<header class="moin-bar" data-float>
+		<div class="moin-bar-inner">
 			{ children... }
 		</div>
-	</dialog>
-}
-
-// OpenDialog are the attributes of a button that opens the Dialog id.
-func OpenDialog(id string) templ.Attributes {
-	return templ.Attributes{"data-open-dialog": id, "aria-haspopup": "dialog"}
-}
-
-// CloseDialog are the attributes of a button that closes its Dialog.
-func CloseDialog() templ.Attributes {
-	return templ.Attributes{"data-close-dialog": true}
-}
-
-// DialogButtons are the buttons at the end of a Dialog.
-templ DialogButtons() {
-	<div class="moin-dialog-buttons">
-		{ children... }
-	</div>
-}
-
-// AvatarProps is an Avatar: a picture, or the initials without one. Name is
-// who it shows.
-type AvatarProps struct {
-	URL      string
-	Name     string
-	Initials string
-	Large    bool
-}
-
-// Avatar is a person.
-templ Avatar(p AvatarProps) {
-	<span class="moin-avatar" data-size?={ p.Large }>
-		if p.URL != "" {
-			<img src={ p.URL } alt=""/>
-		} else {
-			<span aria-hidden="true">{ p.Initials }</span>
-		}
-		<span class="moin-sr-only">{ p.Name }</span>
-	</span>
-}
-
-// BarProps is a Bar. Float is the pill over the page, for a public site.
-type BarProps struct {
-	ID    string
-	Float bool
-	Attrs templ.Attributes
-}
-
-// Bar is the top of every page: a name, its places, what you do.
-templ Bar(p BarProps) {
-	<header
-		if p.ID != "" {
-			id={ p.ID }
-		}
-		class="moin-bar"
-		data-float?={ p.Float }
-		{ p.Attrs... }
-	>
-		if p.Float {
-			<div class="moin-bar-inner">
-				{ children... }
-			</div>
-		} else {
-			<div class="moin-page moin-bar-inner">
-				{ children... }
-			</div>
-		}
 	</header>
 }
 
@@ -285,17 +142,9 @@ func wordmarkHeight(size string) string {
 	return size
 }
 
-// Page is the one width and edge of the hub.
-const Page = "moin-page"
-
-// Icon is one of the icons in ui/icons, by its file name.
+// Icon is one of the icons in assets/icons, by its file name.
 templ Icon(name string) {
 	<i class={ "moin-icon moin-icon-" + name }></i>
-}
-
-// Chevron ends something that opens.
-templ Chevron() {
-	<i class="moin-chevron"></i>
 }
 
 // ProseProps is markdown that is already HTML.
@@ -310,33 +159,6 @@ templ Prose(p ProseProps) {
 	</div>
 }
 
-// LiveProps is the stream of a page.
-type LiveProps struct {
-	URL string
-}
-
-// Live keeps the page live: it holds the server-sent event stream at URL and
-// lets every named event bubble up the page, where an element reloads itself
-// with hx-trigger="<event> from:body". It is the only way a page opens a
-// stream; the plugin closes it when the page is left.
-templ Live(p LiveProps) {
-	<div hx-sse:connect={ p.URL } hidden></div>
-}
-
-// FeedbackProps is the answer to a click.
-type FeedbackProps struct {
-	Kind  string
-	Title string
-	Note  string
-}
-
-// Feedback is sent out of band into #feedback. hub.js hands it to the element
-// that sent the request: "done" turns its button into a check for a moment,
-// "failed" and "note" put the words in a line under it.
-templ Feedback(p FeedbackProps) {
-	<output data-feedback={ p.Kind } data-title={ p.Title }>{ p.Note }</output>
-}
-
 // ModeSwitch is the round button between light and dark.
 templ ModeSwitch() {
 	@Button(ButtonProps{Icon: true, Quiet: true, Attrs: templ.Attributes{"data-mode-toggle": true, "aria-label": "Switch the theme"}}) {
@@ -344,36 +166,18 @@ templ ModeSwitch() {
 	}
 }
 
-// AppIconProps is the icon of a catalog app.
+// AppIconProps is the icon of a catalog app: the address of its logo.
 type AppIconProps struct {
-	Name    string
-	Initial string
-	Logo    string
-	Large   bool
+	Logo  string
+	Large bool
 }
 
-// AppIcon is a logo on a white tile in both themes, or a first letter on an
-// ink tile. Large is as high as a title.
+// AppIcon is a logo on a white tile in both themes. Large is as high as a
+// title.
 templ AppIcon(p AppIconProps) {
-	if p.Logo != "" {
-		<span class="moin-app-icon" data-large?={ p.Large } data-lead aria-hidden="true">
-			<img src={ p.Logo } alt="" loading="lazy" decoding="async"/>
-		</span>
-	} else {
-		<span class="moin-app-icon" data-large?={ p.Large } data-letter data-lead aria-hidden="true">{ p.Initial }</span>
-	}
-}
-
-// TextAreaProps is a field of several lines.
-type TextAreaProps struct {
-	Attrs templ.Attributes
-}
-
-// TextArea holds what is in it as children.
-templ TextArea(p TextAreaProps) {
-	<textarea class="moin-textarea" { p.Attrs... }>
-		{ children... }
-	</textarea>
+	<span class="moin-app-icon" data-large?={ p.Large } data-lead aria-hidden="true">
+		<img src={ p.Logo } alt="" loading="lazy" decoding="async"/>
+	</span>
 }
 
 // ExpandProps is an item that opens what is under it in place. Quiet is a
@@ -395,43 +199,4 @@ templ Expand(p ExpandProps) {
 			{ children... }
 		</div>
 	</details>
-}
-
-// ConfirmDialog asks before every request whose element has hx-confirm. The
-// question is the hx-confirm text: up to the first "? " the title, the rest
-// the note. With data-confirm-name on the element or one around it, the
-// button works only once that name is typed. hub.js opens it.
-templ ConfirmDialog() {
-	@Dialog(DialogProps{ID: "confirm-dialog"}) {
-		<div class="moin-stack" data-gap="3" data-confirm-typed hidden>
-			<div data-confirm-shown>
-				@Command(CommandProps{})
-			</div>
-			@Field(FieldProps{Label: "Type it to confirm", For: "confirm-name"}) {
-				@Input(InputProps{Attrs: templ.Attributes{"id": "confirm-name", "type": "text", "autocomplete": "off", "autocapitalize": "off", "spellcheck": "false", "data-confirm-input": true}})
-			}
-		</div>
-		@DialogButtons() {
-			@Button(ButtonProps{Attrs: CloseDialog()}) {
-				Cancel
-			}
-			@Button(ButtonProps{Kind: Danger, Attrs: templ.Attributes{"data-confirm-accept": true}}) {
-				Continue
-			}
-		}
-	}
-}
-
-// PaletteActionProps is an answer of the palette that does something.
-type PaletteActionProps struct {
-	ID       string
-	Selected bool
-	Attrs    templ.Attributes
-}
-
-// PaletteAction is one option of a palette that acts instead of opening a page.
-templ PaletteAction(p PaletteActionProps) {
-	<button type="button" id={ p.ID } role="option" aria-selected={ strconv.FormatBool(p.Selected) } class="moin-option" { p.Attrs... }>
-		{ children... }
-	</button>
 }

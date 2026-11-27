@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"github.com/axadrn/moin"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,10 +35,9 @@ func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {
 	}
 }
 
-func TestSiteSearchFindsDocsAndCatalogWithATypo(t *testing.T) {
+func TestSiteSearchFindsDocsAndCatalog(t *testing.T) {
 	docs := newDocsTestHandler(t).docsService
-	store := catalog.NewStore([]catalog.Entry{{Slug: "ntfy", Name: "ntfy", Category: "Communication", Pitch: "Push notifications."}}, catalog.Registry{})
-	search := NewSiteSearchHandler(docs, service.NewUIDocsService(moin.UI(false), "", false), moin.UI(false), service.NewCatalogService(store, nil))
+	search := NewSiteSearchHandler(docs, []catalog.Entry{{Slug: "ntfy", Name: "ntfy", Category: "Communication", Pitch: "Push notifications."}})
 	serve := func(path string, htmx bool) string {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		if htmx {
@@ -50,16 +48,16 @@ func TestSiteSearchFindsDocsAndCatalogWithATypo(t *testing.T) {
 		return recorder.Body.String()
 	}
 	// Without JavaScript the search is a page with what it finds.
-	page := serve("/search?q=domians", false)
-	if !strings.Contains(strings.ToLower(page), "<!doctype html>") || !strings.Contains(page, `href="/docs/guides/domains"`) || !strings.Contains(page, `value="domians"`) {
+	page := serve("/search?q=domains", false)
+	if !strings.Contains(strings.ToLower(page), "<!doctype html>") || !strings.Contains(page, `href="/docs/guides/domains"`) || !strings.Contains(page, `value="domains"`) {
 		t.Errorf("search page = %q", page)
 	}
 	// The palette gets only its answers: a section, and an app by its name.
 	if fragment := serve("/search?q=first", true); strings.Contains(strings.ToLower(fragment), "<!doctype html>") || !strings.Contains(fragment, `href="/docs/getting-started#first-step"`) {
 		t.Errorf("palette answer = %q", fragment)
 	}
-	if fragment := serve("/search?q=nfty", true); !strings.Contains(fragment, `href="/catalog/ntfy"`) {
-		t.Errorf("nfty does not find ntfy: %q", fragment)
+	if fragment := serve("/search?q=NTFY", true); !strings.Contains(fragment, `href="/catalog/ntfy"`) {
+		t.Errorf("NTFY does not find ntfy: %q", fragment)
 	}
 	// Nothing typed: the first steps and the catalog.
 	if fragment := serve("/search?q=", true); !strings.Contains(fragment, `href="/docs/getting-started"`) || !strings.Contains(fragment, `href="/catalog"`) {
@@ -125,7 +123,7 @@ func newDocsTestHandler(t *testing.T) *DocsHandler {
 			t.Fatalf("write docs page: %v", err)
 		}
 	}
-	return NewDocsHandler(service.NewDocsService(os.DirFS(contentPath), "", false))
+	return NewDocsHandler(service.NewDocsService(os.DirFS(contentPath), false))
 }
 
 func serveDocs(t *testing.T, handler *DocsHandler, path string) *httptest.ResponseRecorder {
@@ -136,7 +134,6 @@ func serveDocs(t *testing.T, handler *DocsHandler, path string) *httptest.Respon
 		SupportEmail: "support@example.com",
 	})
 	ctx = ctxkeys.WithURLPath(ctx, request.URL.Path)
-	ctx = ctxkeys.WithCSRFToken(ctx, "csrf-token")
 	request = request.WithContext(ctx)
 	recorder := httptest.NewRecorder()
 

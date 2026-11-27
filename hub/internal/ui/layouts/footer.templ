@@ -6,51 +6,30 @@ import (
 
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/compare"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
 	"github.com/axadrn/moin/hub/internal/ui/components"
 )
 
 // footerColumns are the links of the site footer. The maker's other open
 // source projects sit next to moin, as one family.
-func footerColumns(billing bool) []components.FooterColumn {
-	product := []components.FooterLink{
+var footerColumns = []components.FooterColumn{
+	{Title: "Product", Links: []components.FooterLink{
+		{Label: "Docs", Href: "/docs"},
 		{Label: "Catalog", Href: "/catalog"},
-		{Label: "UI", Href: "/ui"},
-	}
-	if billing {
-		product = append(product, components.FooterLink{Label: "Pricing", Href: "/#pricing"})
-	}
-	product = append(product,
-		components.FooterLink{Label: "Blog", Href: "/blog"},
-		components.FooterLink{Label: "Changelog", Href: "/changelog"},
-		components.FooterLink{Label: "Roadmap", Href: "/roadmap"},
-		components.FooterLink{Label: "Next", Href: "/next"},
-	)
-	columns := []components.FooterColumn{
-		{Title: "Product", Links: product},
-		{Title: "Docs", Links: []components.FooterLink{
-			{Label: "Get started", Href: "/docs/getting-started"},
-			{Label: "Self-hosting", Href: "/docs/self-hosting"},
-			{Label: "CLI", Href: "/docs/reference/cli"},
-			{Label: "API", Href: "/docs/reference/api"},
-		}},
-		{Title: "Open source", Links: []components.FooterLink{
-			{Label: brand.Name + " on GitHub", Href: GitHubURL, External: true},
-			{Label: "shadcn-templ", Href: "https://shadcn-templ.com/?ref=moin-footer", External: true},
-			{Label: "goilerplate", Href: "https://goilerplate.com/?ref=moin-footer", External: true},
-		}},
-		{Title: "Company", Links: []components.FooterLink{
-			{Label: "Why " + brand.Name, Href: "/docs/why-moin"},
-			{Label: brand.Name + " on X", Href: XURL, External: true},
-			{Label: "Terms", Href: "/legal/terms"},
-			{Label: "Privacy", Href: "/legal/privacy"},
-		}},
-	}
-	// The comparisons, like the legal pages, belong to the hosted service.
-	if billing {
-		columns = append(columns, components.FooterColumn{Title: "Compare", Links: compareLinks()})
-	}
-	return columns
+		{Label: "Blog", Href: "/blog"},
+		{Label: "Changelog", Href: "/changelog"},
+		{Label: "Roadmap", Href: "/roadmap"},
+	}},
+	{Title: "Open source", Links: []components.FooterLink{
+		{Label: brand.Name + " on GitHub", Href: GitHubURL, External: true},
+		{Label: "shadcn-templ", Href: "https://shadcn-templ.com/?ref=moin-footer", External: true},
+		{Label: "goilerplate", Href: "https://goilerplate.com/?ref=moin-footer", External: true},
+	}},
+	{Title: "Company", Links: []components.FooterLink{
+		{Label: brand.Name + " on X", Href: XURL, External: true},
+		{Label: "Terms", Href: "/legal/terms"},
+		{Label: "Privacy", Href: "/legal/privacy"},
+	}},
+	{Title: "Compare", Links: compareLinks()},
 }
 
 // compareLinks are every comparison and the page with all of them.
@@ -65,7 +44,7 @@ func compareLinks() []components.FooterLink {
 // Footer is the site footer: the wordmark and the promise, the columns, then
 // a line with the company and the maker.
 templ Footer() {
-	@components.Footer(components.FooterProps{Columns: footerColumns(ctxkeys.RenderConfig(ctx).Billing), End: footerEnd()}) {
+	@components.Footer(components.FooterProps{Columns: footerColumns, End: footerEnd()}) {
 		<a href="/" aria-label={ brand.Name + " home" }>
 			@components.Wordmark(components.WordmarkProps{})
 		</a>

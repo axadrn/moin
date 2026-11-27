@@ -20,18 +20,16 @@ type Parser struct {
 	md goldmark.Markdown
 }
 
-// NewParser reads the markdown of the site. extra are more extensions, as
-// Examples for the docs of moin UI.
-func NewParser(extra ...goldmark.Extender) *Parser {
+// NewParser reads the markdown of the site.
+func NewParser() *Parser {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
 			extension.Footnote,
 			extension.Typographer,
 			&frontmatter.Extender{},
-			surfacesExtension{},
+			codeExtension{},
 		),
-		goldmark.WithExtensions(extra...),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 		),

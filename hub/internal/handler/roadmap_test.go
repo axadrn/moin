@@ -1,34 +1,38 @@
 package handler
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/axadrn/moin/hub/internal/service"
 )
 
-var contentDir = filepath.Join("..", "..", "content")
+// roadmapContent is a docs/roadmap.md as the site reads it.
+func roadmapContent(t *testing.T) fs.FS {
+	t.Helper()
+	return fstest.MapFS{"docs/roadmap.md": {Data: []byte("---\ntitle: Roadmap\ndescription: What comes next\n---\n\nWhat moin does.\n\n## Now\n\n- **Deploys**: with [Deploy](/docs/deploy) and `moin status`.\n\n## Later\n\n- **Watcher**: see [#1](https://github.com/axadrn/moin/issues/1).\n")}}
+}
 
 // TestRoadmapIsCardsFromTheDocsPage: every heading of docs/roadmap.md is a
 // card with its list as a timeline, and the links in the text still work.
 func TestRoadmapIsCardsFromTheDocsPage(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	Roadmap(os.DirFS(contentDir))(recorder, httptest.NewRequest(http.MethodGet, "/roadmap", nil))
+	Roadmap(roadmapContent(t))(recorder, httptest.NewRequest(http.MethodGet, "/roadmap", nil))
 	body := recorder.Body.String()
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status %d", recorder.Code)
 	}
 	for _, want := range []string{
-		`class="moin-columns"`, `class="moin-timeline"`,
-		">Now</h2>", ">Soon</h2>", ">Later</h2>", ">moin next</h2>",
+		`class="moin-timeline"`, ">Now</h2>", ">Later</h2>",
 		`<span class="moin-strong">Deploys</span>`,
-		`<a href="/docs/guides/deploy">Deploy</a>`,
+		`<a href="/docs/deploy">Deploy</a>`,
 		`<a href="https://github.com/axadrn/moin/issues/1">#1</a>`,
-		"On every surface",
 		"<code>moin status</code>",
 	} {
 		if !strings.Contains(body, want) {
@@ -41,7 +45,7 @@ func TestRoadmapIsCardsFromTheDocsPage(t *testing.T) {
 }
 
 func TestDocsRoadmapMovedButItsMarkdownStays(t *testing.T) {
-	handler := NewDocsHandler(service.NewDocsService(os.DirFS(contentDir), "", false))
+	handler := NewDocsHandler(service.NewDocsService(roadmapContent(t), false))
 	if response := serveDocs(t, handler, "/docs/roadmap"); response.Code != http.StatusMovedPermanently || response.Header().Get("Location") != "/roadmap" {
 		t.Errorf("/docs/roadmap: %d to %q", response.Code, response.Header().Get("Location"))
 	}
@@ -54,7 +58,7 @@ func TestDocsRoadmapMovedButItsMarkdownStays(t *testing.T) {
 // newest open and the others closed, and the feed's links still land.
 func TestChangelogIsATimeline(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	Changelog(os.DirFS(contentDir))(recorder, httptest.NewRequest(http.MethodGet, "/changelog", nil))
+	Changelog(os.DirFS(filepath.Join("..", "..", "content")))(recorder, httptest.NewRequest(http.MethodGet, "/changelog", nil))
 	body := recorder.Body.String()
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status %d", recorder.Code)

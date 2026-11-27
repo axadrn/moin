@@ -1,0 +1,29 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/hub/internal/ui/layouts"
+)
+
+// NotFound is the page of every address the site does not have.
+templ NotFound() {
+	@StatusPage("Page not found", "The address does not exist or has moved.", "404 not found: "+ctxkeys.URLPath(ctx))
+}
+
+// StatusPage is the page for a 404 or an error: what happened, the way
+// back, and the code as a log line.
+templ StatusPage(title, description, line string) {
+	@layouts.Home(layouts.SEOProps{Title: title, Description: description, Path: ctxkeys.URLPath(ctx), NoIndex: true}) {
+		<main class="moin-page moin-narrow moin-content">
+			@components.Header(components.HeaderProps{Title: title})
+			<p class="moin-text moin-muted">{ description }</p>
+			<div>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/"}) {
+					Back to home
+				}
+			</div>
+			<p class="moin-small moin-mono moin-muted moin-break">{ line }</p>
+		</main>
+	}
+}

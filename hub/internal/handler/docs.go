@@ -40,7 +40,7 @@ func (h *DocsHandler) ShowDocs(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := h.docsService.DocsTree(); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		render(w, r, pages.ErrorPage(http.StatusInternalServerError, "Docs unavailable", "The docs could not be loaded. Try again."))
+		render(w, r, pages.StatusPage("Docs unavailable", "The docs could not be loaded. Try again.", "500 internal server error"))
 		return
 	}
 	groups := h.docsService.Groups()

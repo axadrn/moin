@@ -9,12 +9,8 @@ import (
 
 type SecurityHeadersConfig struct {
 	RobotsNoIndex bool
-	S3Endpoint    string
 	UmamiHost     string
 	PlausibleHost string
-	// GitHubURL is GitHub on the web, where a form creates the hub's
-	// GitHub App at /settings/apps/new.
-	GitHubURL string
 }
 
 // SecurityHeaders adds the security headers to all responses. The nonce
@@ -34,23 +30,6 @@ func SecurityHeaders(cfg SecurityHeadersConfig, next http.Handler) http.Handler 
 	})
 }
 
-// AllowOwnFrames lets this site show a response in a frame of its own. The
-// headers are set by then, so this changes them.
-func AllowOwnFrames(w http.ResponseWriter) {
-	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-	policy := w.Header().Get("Content-Security-Policy")
-	w.Header().Set("Content-Security-Policy", strings.Replace(policy, "frame-ancestors 'none'", "frame-ancestors 'self'", 1))
-}
-
-// githubAppForm is the one page of GitHub the form that creates the hub's
-// GitHub App posts to.
-func githubAppForm(cfg SecurityHeadersConfig) string {
-	if cfg.GitHubURL == "" {
-		return ""
-	}
-	return " " + strings.TrimRight(cfg.GitHubURL, "/") + "/settings/apps/new"
-}
-
 // contentSecurityPolicy says what a page may load and run. Scripts need the
 // nonce or one of the listed hosts, and nothing may frame the page.
 func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
@@ -58,25 +37,16 @@ func contentSecurityPolicy(cfg SecurityHeadersConfig, nonce string) string {
 	plausibleHost := plausibleSource(cfg)
 	return strings.Join([]string{
 		"default-src 'self'",
-		"script-src 'self' 'nonce-" + nonce + "'" + frontendScriptPolicy + " https://" + umamiHost + " https://" + plausibleHost + " https://www.googletagmanager.com",
+		"script-src 'self' 'nonce-" + nonce + "' https://" + umamiHost + " https://" + plausibleHost + " https://www.googletagmanager.com",
 		"style-src 'self' 'unsafe-inline'",
-		imageSources(cfg),
+		"img-src 'self' data: https:",
 		"media-src 'self' " + brand.Media,
 		"font-src 'self' data:",
 		"connect-src 'self' " + umamiConnect + " https://" + plausibleHost + " https://*.google-analytics.com https://analytics.google.com",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
-		"form-action 'self' https://sandbox.polar.sh https://polar.sh https://checkout.stripe.com" + githubAppForm(cfg),
+		"form-action 'self'",
 	}, "; ")
-}
-
-// imageSources allows any HTTPS image, and the S3 endpoint when it has one.
-func imageSources(cfg SecurityHeadersConfig) string {
-	sources := "img-src 'self' data: https:"
-	if cfg.S3Endpoint != "" {
-		sources += " " + cfg.S3Endpoint
-	}
-	return sources
 }
 
 // umamiSources is the host that serves Umami's script and the hosts it

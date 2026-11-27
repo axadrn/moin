@@ -1,97 +1,116 @@
 package pages
 
 import (
-	"github.com/axadrn/moin/hub/internal/ui/components"
-	"maps"
-	"slices"
-	"strconv"
-	"time"
+	"net/url"
+	"strings"
 
 	"github.com/axadrn/moin/hub/internal/brand"
 	"github.com/axadrn/moin/hub/internal/catalog"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/hub/internal/ui/components"
 	"github.com/axadrn/moin/hub/internal/ui/layouts"
 )
 
-// The catalog is one page in two frames: on the site (/catalog) and in a
-// workspace (<workspace>/catalog). Both have the same search, category,
-// order and rows, and the page of one app the same head, links and
-// versions; only the way back and the one action differ.
-
-// ---------------------------------------------------------------- public
-
 // Catalog is the public catalog: open source apps to run on your own
-// server.
-templ Catalog(view CatalogView) {
+// server, under their category.
+templ Catalog(entries []catalog.Entry) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Self-host open source apps on your own server",
-		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server in one click. Every version, updates with a backup first.",
+		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server with one command. Their databases backed up.",
 		Path:        "/catalog",
 	}) {
 		<main class="moin-page moin-content">
 			@components.Header(components.HeaderProps{Title: "Catalog"})
-			@catalogBody(view)
+			for _, category := range catalog.Categories {
+				{{ apps := inCategory(entries, category) }}
+				if len(apps) > 0 {
+					<section class="moin-section">
+						<div class="moin-section-head">
+							<h2>{ category }</h2>
+						</div>
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								for _, app := range apps {
+									@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: catalogIcon(app, false), Name: app.Name, Note: app.Pitch})
+								}
+							}
+						}
+					</section>
+				}
+			}
 		</main>
 	}
 }
 
-// CatalogApp is the public page of one catalog app: what it is, the way
-// to deploy it, what moin backs up, its compose.yml, its links, its
-// versions and the apps like it. All of it comes from its folder in the
-// catalog, so nothing on the page is kept by hand.
-templ CatalogApp(view CatalogEntryView, appURL string) {
+// CatalogApp is the public page of one catalog app: what it is, the
+// command that deploys it, what moin backs up, its compose.yml, its links
+// and the apps like it. All of it comes from its folder in the catalog.
+templ CatalogApp(entry catalog.Entry, similar []catalog.Entry, appURL string) {
 	@layouts.Home(layouts.SEOProps{
-		Title:       "Self-host " + view.Entry.Name + " with Docker Compose",
-		Description: catalogDescription(view.Entry),
-		Path:        "/catalog/" + view.Entry.Slug,
+		Title:       "Self-host " + entry.Name + " with Docker Compose",
+		Description: catalogDescription(entry),
+		Path:        "/catalog/" + entry.Slug,
 	}) {
-		@templ.Raw(catalogJSONLD(view, appURL+"/catalog/"+view.Entry.Slug))
+		@templ.Raw(catalogJSONLD(entry, appURL+"/catalog/"+entry.Slug))
 		<main class="moin-page moin-content">
-			@catalogHead(components.Back{Label: "Catalog", Href: "/catalog"}, view.Entry)
-			if view.Entry.Body != "" {
-				@components.Prose(components.ProseProps{HTML: string(view.Entry.Body)})
-			}
-			<div>
-				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/catalog/" + view.Entry.Slug + "/install", Attrs: templ.Attributes{"data-catalog-install": true}}) {
-					Deploy with { brand.Name }
-				}
+			<div class="moin-stack" data-gap="2">
+				@components.Header(components.HeaderProps{Back: components.Back{Label: "Catalog", Href: "/catalog"}, Icon: catalogIcon(entry, true), Title: entry.Name})
+				<p class="moin-small moin-muted">{ entry.Pitch }</p>
 			</div>
-			if view.Entry.Database != "" {
+			if entry.Body != "" {
+				@components.Prose(components.ProseProps{HTML: string(entry.Body)})
+			}
+			<section class="moin-section">
+				<div class="moin-section-head">
+					<h2>Deploy</h2>
+				</div>
+				@components.Code(components.CodeProps{ID: "catalog-command", Text: brand.Name + " deploy prod --catalog " + entry.Slug})
+			</section>
+			if entry.Database != "" {
 				<section class="moin-section">
 					<div class="moin-section-head">
 						<h2>Backups</h2>
 					</div>
-					<p class="moin-text" data-catalog-backup>
-						{ catalogBackup(view.Entry) }
-						<a href="/docs/guides/backups" class="moin-link moin-foreground" data-quiet>How backups work</a>
-					</p>
+					<p class="moin-text">{ catalogBackup(entry) }</p>
 				</section>
 			}
 			<section class="moin-section">
 				<div class="moin-section-head">
 					<h2>compose.yml</h2>
 				</div>
-				<p class="moin-text moin-muted">What { brand.Name } deploys. It fills in every <code>{ "${…}" }</code> on install: the version you pick, and new secrets.</p>
-				@components.Code(components.CodeProps{ID: "catalog-compose", Text: string(view.Entry.Compose)})
+				<p class="moin-text moin-muted">What { brand.Name } deploys. It fills in every <code>{ "${…}" }</code>: the version, and new secrets.</p>
+				@components.Code(components.CodeProps{ID: "catalog-compose", Text: string(entry.Compose)})
 			</section>
 			<section class="moin-section">
 				<div class="moin-section-head">
-					<h2>From the terminal</h2>
+					<h2>Links</h2>
 				</div>
-				@components.Code(components.CodeProps{ID: "catalog-command", Text: brand.Name + " catalog install " + view.Entry.Slug + " --server web-1"})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
+						if entry.Source != "" {
+							@catalogLink("Source", entry.License, "https://"+entry.Source, false)
+						}
+						@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
+					}
+				}
 			</section>
-			@catalogFacts(view)
-			if len(view.Similar) > 0 {
+			if entry.Login != "" {
 				<section class="moin-section">
 					<div class="moin-section-head">
-						<h2>More { view.Entry.Category }</h2>
+						<h2>First sign-in</h2>
+					</div>
+					<p class="moin-text">{ entry.Login }</p>
+				</section>
+			}
+			if len(similar) > 0 {
+				<section class="moin-section">
+					<div class="moin-section-head">
+						<h2>More { entry.Category }</h2>
 					</div>
 					@components.Card(components.CardProps{}) {
 						@components.List() {
-							for _, app := range view.Similar {
-								@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: components.AppIcon(components.AppIconProps{Name: app.Name, Initial: model.Initial(app.Name), Logo: catalogLogo(app)}), Name: app.Name, Note: app.Pitch})
+							for _, app := range similar {
+								@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: catalogIcon(app, false), Name: app.Name, Note: app.Pitch})
 							}
 						}
 					}
@@ -101,341 +120,92 @@ templ CatalogApp(view CatalogEntryView, appURL string) {
 	}
 }
 
-// ---------------------------------------------------------------- app
-
-// CatalogInApp is the catalog inside a workspace; its rows open the
-// install page.
-templ CatalogInApp(view CatalogView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	@layouts.App("Catalog") {
-		@panelPage() {
-			@components.Header(components.HeaderProps{Back: components.Back{Label: "New app", Href: basePath + "/new-app"}, Title: "Catalog"})
-			@catalogBody(view)
-		}
-	}
-}
-
-// CatalogInstall is the page of a catalog app in a workspace: its head,
-// the install form, its links and its versions.
-templ CatalogInstall(view CatalogInstallView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	{{ entry := view.App.Entry }}
-	@layouts.App("Install " + entry.Name) {
-		@panelPage() {
-			@catalogHead(components.Back{Label: "Catalog", Href: basePath + "/catalog"}, entry)
-			if len(view.Servers) == 0 {
-				@components.Card(components.CardProps{}) {
-					@components.List() {
-						@components.Item(components.ItemProps{Href: basePath + "/servers", Name: "Connect a server first", Note: "Apps run on your servers"})
-					}
-				}
-			} else {
-				@components.Card(components.CardProps{}) {
-					<form
-						id="catalog-install-form"
-						class="moin-stack"
-						data-gap="4"
-						hx-post={ basePath + "/catalog/" + entry.Slug + "/install" }
-						hx-swap="none"
-						hx-disable="find button[type='submit']"
-					>
-						@components.CSRF()
-						if note := entry.DatabaseNote(); note != "" {
-							<p class="moin-text moin-muted" data-catalog-database-note>{ note }</p>
-						}
-						<div class="moin-grid">
-							@components.Field(components.FieldProps{Label: "Version", For: "catalog-version"}) {
-								@components.Select(components.SelectProps{ID: "catalog-version", Name: "version", Label: "Version", Options: versionOptions(view.App.Versions), Disabled: len(view.App.Versions) == 0})
-							}
-							@components.Field(components.FieldProps{Label: "Server", For: "catalog-server"}) {
-								@components.Select(components.SelectProps{ID: "catalog-server", Name: "server", Label: "Server", Options: serverOptions(view.Servers)})
-							}
-							@components.Field(components.FieldProps{Label: "App name", For: "catalog-name", Hint: "Lowercase letters, digits and dashes"}) {
-								@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "catalog-name", "name": "name", "type": "text", "value": entry.Slug, "maxlength": "63", "autocomplete": "off", "spellcheck": "false"}})
-							}
-							@components.Field(components.FieldProps{Label: ifElse(entry.NeedsURL(), "Domain", "Domain, optional"), For: "catalog-domain", Hint: ifElse(entry.NeedsURL(), entry.Name+" links to it. Point its DNS to the server first", "Point its DNS to the server")}) {
-								@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "catalog-domain", "name": "domain", "type": "text", "placeholder": entry.Slug + ".example.com", "autocomplete": "off", "spellcheck": "false"}})
-							}
-						</div>
-						<div class="moin-row" data-end>
-							@components.Button(components.ButtonProps{Kind: components.Primary, Type: "submit", Attrs: templ.Attributes{"data-catalog-submit": true}}) {
-								Install
-							}
-						</div>
-					</form>
-				}
-			}
-			@catalogFacts(view.App)
-		}
-	}
-}
-
-// CatalogInstalled takes the place of the install form: the secrets the
-// first sign-in needs that moin made, such as ADMIN_PASSWORD, and the
-// app's password, which its domains and its instant address ask for.
-// moin keeps neither, so this is the one time they are shown.
-templ CatalogInstalled(appPath string, login map[string]string, password string) {
-	<div id="catalog-install-form" class="moin-stack" data-gap="4" data-catalog-installed>
-		<p class="moin-text">
-			Installed.
-			if password != "" {
-				The app's domains and its instant address ask for the password of { service.PasswordUser } until you turn it off.
-			}
-			Keep this in your password manager now: it is shown only this once.
-		</p>
-		@components.List() {
-			if password != "" {
-				@components.Item(components.ItemProps{}) {
-					<span class="moin-mono moin-text">{ service.PasswordUser }</span>
-					<span class="moin-fill moin-truncate moin-mono moin-text" data-new-password>{ password }</span>
-					@copyButton(password, "", "Copy the password")
-				}
-			}
-			for _, key := range slices.Sorted(maps.Keys(login)) {
-				@components.Item(components.ItemProps{}) {
-					<span class="moin-mono moin-text">{ key }</span>
-					<span class="moin-fill moin-truncate moin-mono moin-text" data-catalog-secret>{ login[key] }</span>
-					@copyButton(login[key], "", "Copy "+key)
-				}
-			}
-		}
-		<div class="moin-row" data-end>
-			@components.Button(components.ButtonProps{Kind: components.Primary, Href: appPath}) {
-				Open the app
-			}
-		</div>
-	</div>
-}
-
-// ---------------------------------------------------------------- parts
-
-// catalogBody is the catalog itself: the category and the order, then
-// the apps. A choice asks the server (htmx), which answers the list and
-// keeps the address bar in step; without JavaScript the form loads the
-// page. No search of its own: the magnifier of the navbar finds apps.
-templ catalogBody(view CatalogView) {
-	<form
-		id="catalog-form"
-		method="get"
-		action={ templ.SafeURL(view.Base) }
-		class="moin-grid moin-narrow"
-		data-fit
-		data-gap="2"
-		style="--min:8rem;--width:24rem"
-		hx-get={ view.Base }
-		hx-trigger="change, submit"
-		hx-target="#catalog-results"
-		hx-swap="outerHTML"
-		hx-sync="this:replace"
-	>
-		@components.Select(components.SelectProps{ID: "catalog-category", Name: "category", Label: "Category", Options: categoryOptions(view), Value: categorySlug(view.Category)})
-		@components.Select(components.SelectProps{ID: "catalog-sort", Name: "sort", Label: "Order", Options: []components.Option{{Value: SortUpdated, Label: "Updated"}, {Value: SortName, Label: "Name"}}, Value: view.Sort})
-	</form>
-	@CatalogResults(view)
-}
-
-// CatalogResults is the list of apps of the category, also the answer to
-// a choice of the category or the order.
-templ CatalogResults(view CatalogView) {
-	<div id="catalog-results" class="moin-stack" data-gap="2" data-catalog-results>
-		if len(view.Apps) > 0 {
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>{ appCount(len(view.Apps)) }</h2>
-				</div>
-				@components.Card(components.CardProps{}) {
-					@components.List() {
-						for _, app := range view.Apps {
-							@components.Item(components.ItemProps{Href: view.Base + "/" + app.Entry.Slug, Lead: components.AppIcon(components.AppIconProps{Name: app.Entry.Name, Initial: model.Initial(app.Entry.Name), Logo: catalogLogo(app.Entry)}), Name: app.Entry.Name, Note: app.Entry.Pitch})
-						}
-					}
-				}
-			</section>
-			<p class="moin-text moin-muted">
-				Missing one? <a href="/docs/guides/catalog#add-an-app" class="moin-link moin-foreground" data-quiet>Ask for it</a>
-			</p>
-		}
-	</div>
-}
-
-func appCount(n int) string {
-	if n == 1 {
-		return "1 app"
-	}
-	return strconv.Itoa(n) + " apps"
-}
-
-// catalogHead is the head of a catalog app's page: its icon before its
-// name, and its one sentence under it.
-templ catalogHead(back components.Back, entry catalog.Entry) {
-	<div class="moin-stack" data-gap="2">
-		@components.Header(components.HeaderProps{Back: back, Icon: components.AppIcon(components.AppIconProps{Name: entry.Name, Initial: model.Initial(entry.Name), Logo: catalogLogo(entry), Large: true}), Title: entry.Name})
-		<p class="moin-small moin-muted">
-			{ entry.Pitch }
-		</p>
-	</div>
-}
-
-// catalogFacts are what a catalog app's page tells under its action: its
-// links, its first sign-in, and its versions.
-templ catalogFacts(view CatalogEntryView) {
-	{{ entry := view.Entry }}
-	<section class="moin-section">
-		<div class="moin-section-head">
-			<h2>Links</h2>
-		</div>
-		@components.Card(components.CardProps{}) {
-			@components.List() {
-				if entry.Website != "" {
-					@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
-				}
-				if entry.Source != "" {
-					@catalogLink("Source", entry.License, "https://"+entry.Source, false)
-				}
-				if entry.Image != "" {
-					@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
-				}
-			}
-		}
-	</section>
-	if entry.Login != "" {
-		<section class="moin-section">
-			<div class="moin-section-head">
-				<h2>First sign-in</h2>
-			</div>
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					@components.Item(components.ItemProps{}) {
-						<p class="moin-fill moin-text" data-catalog-login>{ entry.Login }</p>
-					}
-				}
-			}
-		</section>
-	}
-	@catalogVersions(view.Versions)
-}
-
 // catalogLink is a row that opens another site in a new tab: what it is,
 // its value, and ↗.
 templ catalogLink(label, value, href string, mono bool) {
 	@components.Item(components.ItemProps{Href: href, External: true}) {
-		<span class="moin-strong" data-catalog-link={ label }>{ label }</span>
+		<span class="moin-strong">{ label }</span>
 		<span class={ "moin-item-value moin-end", templ.KV("moin-mono", mono) }>{ value }</span>
 	}
 }
 
-// catalogVersions lists the newest releases with when they came out. It
-// only tells: any of them can be installed, an older one too.
-templ catalogVersions(versions []catalog.Version) {
-	{{ now := time.Now() }}
-	<section class="moin-section">
-		<div class="moin-section-head">
-			<h2>Versions</h2>
-		</div>
-		<div class="moin-stack" data-gap="2" data-catalog-versions>
-			@components.Card(components.CardProps{}) {
-				@components.List() {
-					if len(versions) == 0 {
-						@components.Item(components.ItemProps{Name: "Not known yet", Note: "The registry has not answered. Try again in a minute."})
-					}
-					for _, version := range shownVersions(versions, 8) {
-						@components.Item(components.ItemProps{}) {
-							<span class="moin-fill moin-truncate moin-mono moin-text">{ version.Tag }</span>
-							<span class="moin-text moin-muted">{ released(version, now) }</span>
-						}
-					}
-				}
-			}
-			if more := len(versions) - 8; more > 0 {
-				<p class="moin-text moin-muted">{ strconv.Itoa(more) } older</p>
-			}
-		</div>
-	</section>
+// catalogIcon is an app's logo, or its first letter when it has none
+// (CatalogHandler.Logo).
+func catalogIcon(entry catalog.Entry, large bool) templ.Component {
+	return components.AppIcon(components.AppIconProps{Logo: "/catalog/" + entry.Slug + "/logo", Large: large})
 }
 
-// CatalogUpdate is the panel of an app from the catalog: the version it
-// runs, the newest, and the way to another one.
-templ CatalogUpdate(view CatalogUpdateView) {
-	{{ basePath := ctxkeys.AppBasePath(ctx) }}
-	<div id="catalog-update" data-catalog-update>
-		@components.Card(components.CardProps{}) {
-			<div class="moin-row" data-gap="4" data-phone="stack">
-				<div class="moin-fill">
-					<p class="moin-truncate moin-strong">{ view.Entry.Name }</p>
-					<p class="moin-small moin-muted">
-						{ catalogUpdateLine(view) }
-						if note := view.Entry.DatabaseNote(); note != "" {
-							<span data-catalog-database-note>{ note }</span>
-						}
-					</p>
-				</div>
-				<form
-					class="moin-row"
-					data-gap="2"
-					data-phone="stack"
-					hx-post={ basePath + "/apps/" + view.App.Link() + "/update" }
-					hx-swap="none"
-					hx-disable="find button[type='submit']"
-					hx-confirm={ catalogUpdateConfirm(view.Entry) }
-				>
-					@components.CSRF()
-					<div class="moin-width" style="--width:9rem">
-						@components.Select(components.SelectProps{ID: "catalog-update-version", Name: "version", Label: "Version", Options: versionOptions(view.Versions), Value: view.Latest.Tag, Disabled: len(view.Versions) == 0})
-					</div>
-					@components.Button(components.ButtonProps{Kind: catalogUpdateKind(view.Newer), Type: "submit", Attrs: templ.Attributes{"data-catalog-update-submit": true}}) {
-						if view.Newer {
-							Update
-						} else {
-							Deploy
-						}
-					}
-				</form>
-			</div>
+func inCategory(entries []catalog.Entry, category string) []catalog.Entry {
+	var apps []catalog.Entry
+	for _, entry := range entries {
+		if entry.Category == category {
+			apps = append(apps, entry)
 		}
-	</div>
-}
-
-// catalogUpdateLine says which version runs, and the newer one if there is.
-func catalogUpdateLine(view CatalogUpdateView) string {
-	switch {
-	case view.Version == "":
-		return ""
-	case view.Newer:
-		return view.Latest.Tag + " is out. You run " + view.Version + "."
 	}
-	return view.Version + ", the newest."
+	return apps
 }
 
-// catalogUpdateKind makes Update the primary button: it is the thing to do.
+// catalogBackup says what moin backs up of an app, from its database.
+func catalogBackup(entry catalog.Entry) string {
+	if !entry.BackedUp() {
+		return entry.DatabaseNote()
+	}
+	return brand.Name + " copies its " + entry.DatabaseName() + " database into your own bucket on a schedule. Every day it checks that a copy restores."
+}
+
 // catalogDescription is what search shows for an app's page. It promises
 // a backup only for an app whose database moin backs up.
 func catalogDescription(entry catalog.Entry) string {
 	if entry.BackedUp() {
-		return entry.Name + ": " + entry.Pitch + " One click to your own server. Its database backed up."
+		return entry.Name + ": " + entry.Pitch + " One command to your own server. Its database backed up."
 	}
-	return entry.Name + ": " + entry.Pitch + " One click to your own server, with HTTPS."
+	return entry.Name + ": " + entry.Pitch + " One command to your own server, with HTTPS."
 }
 
-// catalogUpdateConfirm asks before a version switch. It names the copy
-// before the deploy only for an app whose database moin backs up.
-func catalogUpdateConfirm(entry catalog.Entry) string {
-	confirm := "Deploy " + entry.Name + " in this version? Going back to an older one may not undo the migrations of a newer one."
-	if entry.BackedUp() {
-		confirm += " " + brand.Name + " backs it up first."
-	}
-	return confirm
+// catalogJSONLD describes the app for search engines, as JSON-LD.
+func catalogJSONLD(entry catalog.Entry, url string) string {
+	return jsonLD(map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "SoftwareApplication",
+		"name":                entry.Name,
+		"description":         entry.Pitch,
+		"applicationCategory": entry.Category,
+		"operatingSystem":     "Linux, Docker",
+		"url":                 url,
+		"sameAs":              entry.Website,
+		"license":             entry.License,
+		"offers":              map[string]any{"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+	})
 }
 
-func catalogUpdateKind(newer bool) components.Kind {
-	if newer {
-		return components.Primary
+// websiteHost is the host of an app's website, for its row: grafana.com.
+func websiteHost(website string) string {
+	u, err := url.Parse(website)
+	if err != nil || u.Host == "" {
+		return website
 	}
-	return ""
+	return strings.TrimPrefix(u.Host, "www.")
 }
 
-func firstVersion(versions []catalog.Version) string {
-	if len(versions) == 0 {
-		return ""
+// imageURL is the registry page of an image: Docker Hub for a plain name
+// (wordpress, grafana/grafana), quay.io's repository page, and the image
+// itself on another registry: ghcr.io sends a browser on to its package
+// page.
+func imageURL(image string) string {
+	host, path, found := strings.Cut(image, "/")
+	if found && (strings.ContainsAny(host, ".:") || host == "localhost") {
+		switch host {
+		case "docker.io", "index.docker.io", "registry-1.docker.io":
+			image = path
+		case "quay.io":
+			return "https://quay.io/repository/" + path
+		default:
+			return "https://" + image
+		}
 	}
-	return versions[0].Tag
+	image = strings.TrimPrefix(image, "library/")
+	if !strings.Contains(image, "/") {
+		return "https://hub.docker.com/_/" + image
+	}
+	return "https://hub.docker.com/r/" + image
 }

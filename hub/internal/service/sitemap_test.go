@@ -5,21 +5,17 @@ import (
 	"testing"
 )
 
-// TestSitemapListsLegalPagesOnlyWhereServed lists terms and privacy on the
-// hosted service and never the password sign-in page.
-func TestSitemapListsLegalPagesOnlyWhereServed(t *testing.T) {
-	for _, legal := range []bool{true, false} {
-		locs := []string{}
-		for _, url := range NewSitemapService(nil, "https://example.com/", legal).staticURLs() {
-			locs = append(locs, url.Loc)
-		}
-		if slices.Contains(locs, "https://example.com/auth/password") {
-			t.Fatalf("sitemap lists /auth/password: %v", locs)
-		}
-		for _, page := range []string{"https://example.com/legal/terms", "https://example.com/legal/privacy"} {
-			if slices.Contains(locs, page) != legal {
-				t.Fatalf("legal %v: sitemap %v, page %s", legal, locs, page)
-			}
+// The sitemap lists the legal pages, the catalog and the blog.
+func TestSitemapListsThePublicPages(t *testing.T) {
+	sitemap := NewSitemapService(nil, "https://example.com/")
+	sitemap.AddCatalog([]string{"umami"})
+	var locs []string
+	for _, url := range sitemap.staticURLs() {
+		locs = append(locs, url.Loc)
+	}
+	for _, page := range []string{"https://example.com/legal/terms", "https://example.com/catalog/umami", "https://example.com/changelog"} {
+		if !slices.Contains(locs, page) {
+			t.Errorf("sitemap misses %s: %v", page, locs)
 		}
 	}
 }

@@ -1,10 +1,11 @@
+// The site at moin.run: the landing page, the docs, the blog, the
+// changelog, the catalog and the legal pages.
 package main
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/axadrn/moin/hub/internal/dbbackup"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,162 +13,48 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/app"
 	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/logger"
 	"github.com/axadrn/moin/hub/internal/routes"
-	"github.com/joho/godotenv"
 )
 
-const shutdownTimeout = 10 * time.Second
-
 func main() {
-	envErr := godotenv.Load()
-	if envErr != nil && !errors.Is(envErr, os.ErrNotExist) {
-		logger.Errors("application stopped", fmt.Errorf("load .env: %w", envErr))
-		os.Exit(1)
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		logger.Errors("application stopped", err)
-		os.Exit(1)
-	}
-	// A word after the binary is a one-off task for the operator, run next
-	// to the server on the same database. Only its result goes to stdout.
-	if len(os.Args) > 1 {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
-		err = command(cfg, os.Args[1:])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		return
-	}
-	logger.Init(logger.Load(cfg.IsDevelopment()))
-	err = run(cfg)
-	if err != nil {
-		logger.Errors("application stopped", err)
+	if err := run(); err != nil {
+		slog.Error("site stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(cfg *config.Config) error {
-	// The database comes back from the bucket before anything opens it.
-	bucket := dbbackup.Bucket{Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket, AccessKey: cfg.S3AccessKey, SecretKey: cfg.S3SecretKey}
-	file := dbbackup.File(cfg.DBConnection)
-	backup := cfg.BackupDatabase && file != ""
-	if backup {
-		restoreCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		err := dbbackup.RestoreIfMissing(restoreCtx, bucket, file)
-		cancel()
-		if err != nil {
-			return err
-		}
-	} else if cfg.IsProduction() {
-		slog.Warn("database backup off: a dead server takes the database with it; set S3_BUCKET and BACKUP_DATABASE=true")
-	}
-	if cfg.IsProduction() && cfg.CloudflareAccountID == "" {
-		slog.Warn("email off: invitations and alerts go to this log instead; set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN")
-	}
-	application, err := app.New(cfg)
+func run() error {
+	cfg, err := config.Load()
 	if err != nil {
-		return fmt.Errorf("initialize app: %w", err)
+		return err
 	}
-	if backup {
-		hubBackup, err := dbbackup.Start(context.Background(), bucket, file)
-		if err != nil {
-			return err
-		}
-		defer hubBackup.Stop()
-		application.UpdateService.UseHubBackup(hubBackup)
+	site, err := routes.New(cfg)
+	if err != nil {
+		return err
 	}
-	telemetry, stopTelemetry := context.WithCancel(context.Background())
-	defer stopTelemetry()
-	go application.TelemetryService.Run(telemetry)
-	go application.UpdateService.Run(telemetry)
-	go application.CatalogService.Run(telemetry)
-	go application.OldDomainService.Run(telemetry)
-	defer func() {
-		if closeErr := application.Close(); closeErr != nil {
-			slog.Error("failed to close app", "error", closeErr)
-		}
-	}()
-	// Uptime stops before the database closes: this defer runs
-	// first.
-	if cfg.Uptime {
-		uptime, stopUptime := context.WithCancel(context.Background())
-		stopped := make(chan struct{})
-		go func() {
-			application.AppService.RunUptime(uptime)
-			close(stopped)
-		}()
-		defer func() {
-			stopUptime()
-			<-stopped
-		}()
-	}
-	// Unknown restores are asked about until the database closes.
-	restores, stopRestores := context.WithCancel(context.Background())
-	restoresStopped := make(chan struct{})
-	go func() {
-		application.AppService.RunRestores(restores)
-		close(restoresStopped)
-	}()
-	defer func() {
-		stopRestores()
-		<-restoresStopped
-	}()
-	// Metrics write their last minutes before the database closes, too.
-	metrics, stopMetrics := context.WithCancel(context.Background())
-	metricsStopped := make(chan struct{})
-	go func() {
-		application.AppService.RunMetrics(metrics)
-		close(metricsStopped)
-	}()
-	defer func() {
-		stopMetrics()
-		<-metricsStopped
-	}()
 	server := &http.Server{
-		Addr: ":" + cfg.Port, Handler: routes.SetupRoutes(application),
+		Addr: ":" + cfg.Port, Handler: site,
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 	}
-	slog.Info("server starting", "port", cfg.Port, "env", cfg.AppEnv, "url", "http://localhost:"+cfg.Port)
-	if err := serve(server); err != nil {
-		return err
-	}
-	slog.Info("server stopped")
-	return nil
-}
+	slog.Info("site starting", "port", cfg.Port, "env", cfg.AppEnv, "url", cfg.AppURL)
 
-func serve(server *http.Server) error {
+	// It runs until SIGTERM or ctrl+c, then lets open requests finish.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	// ListenAndServe blocks. Keep SIGTERM responsive.
-	serverError := make(chan error, 1)
-	go func() {
-		serverError <- server.ListenAndServe()
-	}()
-
+	failed := make(chan error, 1)
+	go func() { failed <- server.ListenAndServe() }()
 	select {
-	case err := <-serverError:
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
+	case err := <-failed:
 		return fmt.Errorf("serve HTTP: %w", err)
 	case <-ctx.Done():
 	}
-
-	slog.Info("server shutting down")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		// The grace period is over. Close what remains.
-		_ = server.Close()
+	if err := server.Shutdown(shutdown); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("shut down HTTP server: %w", err)
 	}
+	slog.Info("site stopped")
 	return nil
 }
