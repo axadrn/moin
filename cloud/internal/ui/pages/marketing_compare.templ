@@ -107,7 +107,7 @@ templ Compare(competitor compare.Competitor) {
 		<main class="moin-page moin-content">
 			@components.Header(components.HeaderProps{Title: brand.Name + " or " + competitor.Name + "?"})
 			<p class="moin-lead">{ competitor.Lead }</p>
-			<p class="moin-title moin-digits">{ competitor.ScoreLine() }</p>
+			<p class="moin-statement moin-digits">{ competitor.ScoreLine() }</p>
 			<div class="moin-stack" data-gap="6">
 				@compareHeader(competitor.Name, score)
 				for _, group := range compare.Groups {
@@ -156,16 +156,16 @@ templ compareFact(row compare.Row, name string, cell compare.Cell) {
 	@components.Item(components.ItemProps{}) {
 		<div class="moin-grid moin-fill" data-cols="2-3-3">
 			<span class="moin-strong">{ row.Label }</span>
-			@compareAnswer(brand.Name, row.Ours)
-			@compareAnswer(name, cell)
+			@compareAnswer(brand.Name, row.Ours, true)
+			@compareAnswer(name, cell, false)
 		</div>
 	}
 }
 
 // compareAnswer is one side of a fact: its mark, its words, the line under
 // them and where it says so.
-templ compareAnswer(whose string, cell compare.Cell) {
-	<div class="moin-row" data-gap="2" data-top>
+templ compareAnswer(whose string, cell compare.Cell, ours bool) {
+	<div class="moin-row moin-answer" data-gap="3" data-top data-ours?={ ours }>
 		@compareMarkIcon(cell.Mark)
 		<div class="moin-stack moin-text" style="--gap:2px">
 			<span><span class="moin-muted moin-only-phone">{ whose }: </span><span class="moin-strong">{ cell.Short }</span></span>
@@ -173,7 +173,7 @@ templ compareAnswer(whose string, cell compare.Cell) {
 				<span class="moin-small moin-muted">{ cell.Detail }</span>
 			}
 			if cell.Source != "" {
-				<span class="moin-small moin-muted"><a href={ templ.SafeURL(cell.Source) } target="_blank" rel="noopener" class="moin-link">Source</a></span>
+				<a href={ templ.SafeURL(cell.Source) } target="_blank" rel="noopener" class="moin-small moin-source">Source ↗</a>
 			}
 		</div>
 	</div>

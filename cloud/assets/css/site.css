@@ -1908,3 +1908,17 @@
 @media (min-width: 56rem) { .moin-grid[data-cols="3-2"] { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
 /* A fact of zero trust: a title a step bigger than text. */
 .moin-fact-name { font-family: var(--font-heading); font-size: 1.25rem; font-weight: var(--weight-title); letter-spacing: var(--tracking-title); line-height: 1.3; }
+
+/* The compare page: marks in the status colors, moin's answers on a light
+   tint, sources quiet until you point at them. */
+.moin-mark[data-kind="yes"] { background: var(--live); color: #fff; }
+.moin-mark[data-kind="no"] { border-color: color-mix(in oklab, var(--failed) 55%, transparent); color: var(--failed-text); }
+.moin-mark[data-kind="part"] { border-color: color-mix(in oklab, var(--foreground) 30%, transparent); color: var(--muted-foreground); }
+.moin-answer[data-ours] {
+  margin: calc(var(--space-3) * -1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+.moin-source { color: var(--muted-foreground); text-decoration: none; }
+.moin-source:hover { color: var(--foreground); text-decoration: underline; }
