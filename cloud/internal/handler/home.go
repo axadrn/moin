@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
@@ -17,7 +18,24 @@ func Home(files fs.FS) http.HandlerFunc {
 		if err != nil {
 			slog.Warn("home: changelog", "error", err)
 		}
-		render(w, r, pages.Home(pages.NewHomeOpen(releases)))
+		// Posts that cannot be read hide their section, nothing more.
+		posts, err := tweets.Load(files)
+		if err != nil {
+			slog.Warn("home: tweets", "error", err)
+		}
+		render(w, r, pages.Home(pages.NewHomeOpen(releases), posts))
+	}
+}
+
+// Why is /why: every post from X that says the problem moin answers.
+func Why(files fs.FS) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		posts, err := tweets.Load(files)
+		if err != nil {
+			renderError(w, "why: tweets", err)
+			return
+		}
+		render(w, r, pages.Why(posts))
 	}
 }
 

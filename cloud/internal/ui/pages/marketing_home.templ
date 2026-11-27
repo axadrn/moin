@@ -3,15 +3,17 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 )
 
-// Home is the landing page, in six parts: the promise and a real deploy,
-// how nothing gets lost, how nobody gets in, the others, the two prices,
-// and the way in. Every part shows a real thing moin prints or sends.
-// open is what the changelog says about how moin ships.
-templ Home(open HomeOpen) {
+// Home is the landing page, in seven parts: the promise and a real
+// deploy, real posts that say the problem, how nothing gets lost, how
+// nobody gets in, the others, the two prices, and the way in. Every part
+// shows a real thing moin prints or sends. open is what the changelog says
+// about how moin ships; posts are the posts from X.
+templ Home(open HomeOpen, posts []tweets.Tweet) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Deploy anything. Lose nothing.",
 		Description: brand.Description,
@@ -20,6 +22,9 @@ templ Home(open HomeOpen) {
 		@templ.Raw(homeJSONLD(ctxkeys.RenderConfig(ctx).AppURL))
 		<main>
 			@HomeHero()
+			if len(posts) > 0 {
+				@HomeVoices(posts)
+			}
 			<div class="moin-page">
 				@HomeLoseNothing()
 				@HomeNobodyGetsIn()

@@ -1,0 +1,173 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/tweets"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+	"strconv"
+)
+
+// Posts from X say the problem; moin is the answer. Nobody in them talks
+// about moin, and the page never says they do.
+
+// whyClosing is the answer under the posts, on the home page and on /why.
+var whyClosing = "That's why " + brand.Name + " closes public SSH after the first deploy, and proves every backup, every day."
+
+// whyTopics are the groups of /why, in order: the topic and its heading.
+var whyTopics = []struct{ Topic, Title string }{
+	{"vps", "The move to a VPS"},
+	{"hacked", "Servers getting hacked"},
+	{"backups", "Backups that didn't come back"},
+	{"complexity", "Too much complexity"},
+}
+
+// ---------------------------------------------------------------- home
+// HomeVoices is the section after the hero: the loudest posts, in two rows
+// drifting in opposite directions, then the answer.
+templ HomeVoices(posts []tweets.Tweet) {
+	{{ loudest := tweets.Loudest(posts, 24) }}
+	<section class="moin-band" aria-label="Posts from X">
+		<div class="moin-page">
+			@homeHead("Everyone is moving to a VPS.", "Not everyone closes the door.")
+		</div>
+		<div class="moin-marquee">
+			@tweetRow(everyOther(loudest, 0), false)
+			@tweetRow(everyOther(loudest, 1), true)
+		</div>
+		<div class="moin-page moin-stack" data-gap="6" data-center>
+			<p class="moin-lead moin-center">{ whyClosing }</p>
+			@homeMore("/why", "Read all "+strconv.Itoa(len(posts)))
+		</div>
+	</section>
+}
+
+// tweetRow is one row of the marquee. The second copy of the posts makes
+// the loop seamless; screen readers and the keyboard skip it.
+templ tweetRow(posts []tweets.Tweet, reverse bool) {
+	<div class="moin-marquee-lane">
+		<div class="moin-marquee-row" data-reverse?={ reverse } style={ "--drift:" + strconv.Itoa(len(posts)*8) + "s" }>
+			<div class="moin-marquee-track">
+				for _, post := range posts {
+					@tweetCard(post, true)
+				}
+			</div>
+			<div class="moin-marquee-track" aria-hidden="true" inert>
+				for _, post := range posts {
+					@tweetCard(post, true)
+				}
+			</div>
+		</div>
+	</div>
+}
+
+// everyOther is every second post, from the first or the second.
+func everyOther(posts []tweets.Tweet, from int) []tweets.Tweet {
+	var picked []tweets.Tweet
+	for i := from; i < len(posts); i += 2 {
+		picked = append(picked, posts[i])
+	}
+	return picked
+}
+
+// ---------------------------------------------------------------- /why
+// Why is every post, grouped by topic, then the answer.
+templ Why(posts []tweets.Tweet) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Why " + brand.Name,
+		Description: "Real posts from X: servers getting hacked, backups that didn't come back, too much complexity. And what " + brand.Name + " does about it.",
+		Path:        "/why",
+	}) {
+		<main class="moin-page moin-content">
+			@components.Header(components.HeaderProps{Title: "Why " + brand.Name})
+			<p class="moin-lead">Everyone is moving to a VPS. Not everyone closes the door. Real posts from X, as they were posted.</p>
+			for _, group := range whyTopics {
+				if on := tweets.About(posts, group.Topic); len(on) > 0 {
+					<section class="moin-stack" data-gap="6">
+						<h2 class="moin-fact-name">{ group.Title }</h2>
+						<div class="moin-tweets">
+							for _, post := range on {
+								@tweetCard(post, false)
+							}
+						</div>
+					</section>
+				}
+			}
+			<div class="moin-stack moin-why-end" data-gap="6" data-center>
+				<p class="moin-statement moin-center">{ whyClosing }</p>
+				@homePrimary()
+			</div>
+		</main>
+	}
+}
+
+// ---------------------------------------------------------------- card
+// tweetCard is a post as X shows it. View on X stretches over the whole
+// card, so a click anywhere opens the post; the links inside sit on top.
+// compact is the marquee: one size for every card, the text cut to fit,
+// no photo, no preview, no Show more (the whole card opens the post).
+templ tweetCard(post tweets.Tweet, compact bool) {
+	<article class="moin-tweet" data-compact?={ compact }>
+		<header class="moin-tweet-head">
+			<img class="moin-tweet-face" src={ post.Avatar } alt="" width="32" height="32" loading="lazy" decoding="async"/>
+			<div class="moin-tweet-who">
+				<span class="moin-tweet-name">
+					<span class="moin-truncate">{ post.Name }</span>
+					if post.Verified {
+						@tweetVerified()
+					}
+				</span>
+				<span class="moin-tweet-meta moin-truncate">
+					{ "@" + post.Handle } · <time datetime={ post.Date.Format("2006-01-02") }>{ post.Day() }</time>
+				</span>
+			</div>
+			<i class="moin-icon moin-icon-x-logo" data-size="s" aria-hidden="true"></i>
+		</header>
+		<p class="moin-tweet-text">
+			for _, part := range post.Parts() {
+				if part.Href != "" {
+					<a href={ templ.SafeURL(part.Href) } class="moin-tweet-inner" rel="noopener nofollow" target="_blank">{ part.Text }</a>
+				} else {
+					{ part.Text }
+				}
+			}
+		</p>
+		if post.Truncated && !compact {
+			<a href={ templ.SafeURL(post.URL) } class="moin-tweet-inner moin-tweet-more" rel="noopener" target="_blank">Show more</a>
+		}
+		if compact {
+			// No photo or preview in the marquee: every card the same height.
+		} else if post.Photo != nil {
+			<img class="moin-tweet-photo" src={ post.Photo.URL } alt="" width={ strconv.Itoa(post.Photo.Width) } height={ strconv.Itoa(post.Photo.Height) } loading="lazy" decoding="async"/>
+		} else if post.Card != nil {
+			<a href={ templ.SafeURL(post.Card.Href) } class="moin-tweet-inner moin-tweet-preview" rel="noopener nofollow" target="_blank">
+				if post.Card.Image != "" {
+					<img src={ post.Card.Image } alt="" loading="lazy" decoding="async"/>
+				}
+				<span class="moin-small moin-muted">{ post.Card.Domain }</span>
+				<span class="moin-text">{ post.Card.Title }</span>
+			</a>
+		}
+		<footer class="moin-tweet-foot">
+			<span>{ tweetCount(post.Likes, "like", "likes") }</span>
+			<span>{ tweetCount(post.Replies, "reply", "replies") }</span>
+			<a href={ templ.SafeURL(post.URL) } class="moin-tweet-view" rel="noopener" target="_blank">View on X</a>
+		</footer>
+	</article>
+}
+
+// tweetCount is a count with its word: 1 reply, 3.7K likes.
+func tweetCount(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return tweets.Count(n) + " " + many
+}
+
+// tweetVerified is the small check next to a verified name.
+templ tweetVerified() {
+	<svg class="moin-tweet-check" viewBox="0 0 24 24" width="16" height="16" role="img" aria-label="Verified">
+		<circle cx="12" cy="12" r="11" fill="currentColor"></circle>
+		<path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="var(--card)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+	</svg>
+}

@@ -1,0 +1,1441 @@
+[
+ {
+  "id": "1980245233339408596",
+  "url": "https://x.com/dhh/status/1980245233339408596",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2025-10-20T12:10:29.000Z",
+  "likes": 3737,
+  "replies": 112,
+  "topic": "vps",
+  "text": "Cloud marketing convinced a generation of programmers that the scariest thing in the world was to connect their own server to the internet. All so they could be sold and resold the same centralized dependencies at huge markups.\nhttps://t.co/2JlPY9Pcz0 https://t.co/yB9ZBPJr0J",
+  "range": [
+   0,
+   251
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/2JlPY9Pcz0",
+    "href": "https://www.youtube.com/watch?v=-cEn_83zRFw&t=1306s",
+    "shown": "youtube.com/watch?v=-cEn_8…",
+    "at": [
+     228,
+     251
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/yB9ZBPJr0J",
+    "at": [
+     252,
+     275
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/G3s-a0kWMAAvBGx.jpg",
+   "width": 1716,
+   "height": 1446
+  },
+  "card": null
+ },
+ {
+  "id": "2113587042185576853",
+  "url": "https://x.com/levelsio/status/2113587042185576853",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-10-23T11:03:14.000Z",
+  "likes": 6512,
+  "replies": 164,
+  "topic": "hacked",
+  "text": "Maybe important to repost this now that everyone is getting hacked\n\nIf you have a VPS, I recommend you to get if off the public internet and into a Tailscale network and Cloudflare Tunnel ASAP\n\nIt doesn't matter you have SSH key login, this is about exploits and vulnerabilities",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2116949634111115348",
+  "url": "https://x.com/levelsio/status/2116949634111115348",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-11-01T17:44:58.000Z",
+  "likes": 4389,
+  "replies": 88,
+  "topic": "hacked",
+  "text": "This is why I said you want your VPS ports all closed\n\nThen only let it be accessible inside your Tailscale for SSH and via a Cloudflare Tunnel to receive web traffic\n\nAny Linux box can be taken over with just a single TCP port exposed to the internet now\n\nA stop gap is disabling",
+  "range": [
+   0,
+   280
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1972713630044127464",
+  "url": "https://x.com/levelsio/status/1972713630044127464",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2025-09-29T17:22:35.000Z",
+  "likes": 9297,
+  "replies": 308,
+  "topic": "vps",
+  "text": "Get a VPS at @Hetzner_Online already",
+  "range": [
+   0,
+   36
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [
+   {
+    "handle": "Hetzner_Online",
+    "at": [
+     13,
+     28
+    ]
+   }
+  ],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2029939740196114827",
+  "url": "https://x.com/levelsio/status/2029939740196114827",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-03-06T15:18:43.000Z",
+  "likes": 2149,
+  "replies": 123,
+  "topic": "backups",
+  "text": "The 3-2-1 Backup Rule is more important than ever if you code with AI because fatal accidents can happen\n\nIt means you should have 3 copies of your data, in 2 different media types and 1 copy off-site\n\n1) One is the actual data on your own server (the hard drive) or DB server\n2)",
+  "range": [
+   0,
+   279
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2044441858063941980",
+  "url": "https://x.com/dhh/status/2044441858063941980",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-15T15:44:57.000Z",
+  "likes": 6799,
+  "replies": 249,
+  "topic": "vps",
+  "text": "In 2023, we spent $3,934,099 on AWS + other hosting. In 2026, our hosting + support bill is down to ~$1m/year due to the cloud exit. Even including all the hardware buying, we will already have saved ~$4m by the end of this year. And going forward, it's ~$3m/yr in savings 🤑",
+  "range": [
+   0,
+   275
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1827348869677461740",
+  "url": "https://x.com/dhh/status/1827348869677461740",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2024-08-24T14:14:55.000Z",
+  "likes": 874,
+  "replies": 33,
+  "topic": "complexity",
+  "text": "The thing to know about merchants of complexity is that they never go away, they merely migrate. From WS-DeathStar to microservices to premature k8s to auth services to GraphQL and beyond. There's always a new insecurity popping up to prey on. https://t.co/7YfcYYbmeQ",
+  "range": [
+   0,
+   267
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/7YfcYYbmeQ",
+    "href": "https://world.hey.com/dhh/they-re-rebuilding-the-death-star-of-complexity-4fb5d08d",
+    "shown": "world.hey.com/dhh/they-re-re…",
+    "at": [
+     244,
+     267
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": {
+   "title": "They're rebuilding the Death Star of complexity",
+   "description": "I started my career in programming during heydays of Java Enterprise Edition (J2EE). This was late 90s/early 00s, and there was a rich ecosystem of enterprise vendors hawking application servers,...",
+   "domain": "world.hey.com",
+   "href": "https://world.hey.com/dhh/they-re-rebuilding-the-death-star-of-complexity-4fb5d08d",
+   "image": "https://pbs.twimg.com/card_img/2124781831450959873/EbZ6fLqV?format=png&name=420x420_2"
+  }
+ },
+ {
+  "id": "1907118122596979149",
+  "url": "https://x.com/TheHackersNews/status/1907118122596979149",
+  "name": "The Hacker News",
+  "handle": "TheHackersNews",
+  "avatar": "https://pbs.twimg.com/profile_images/1597647879811657728/FLgHrLHy_200x200.jpg",
+  "verified": false,
+  "date": "2025-04-01T17:09:27.000Z",
+  "likes": 73,
+  "replies": 1,
+  "topic": "hacked",
+  "text": "🔥 1,500+ PostgreSQL servers hacked for crypto mining.\n\nA threat group tracked as JINX-0126 is exploiting publicly exposed PostgreSQL instances with weak passwords.\n\nWhat’s happening:\n• Malware: PG_MEM (fileless, evasive)\n• Goal: Deploy XMRig miner\n• Victims: Over 1,500 https://t.co/q2O22fNevA",
+  "range": [
+   0,
+   270
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/q2O22fNevA",
+    "at": [
+     270,
+     293
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/Gndx0EWaMAQWBWg.jpg",
+   "width": 2048,
+   "height": 783
+  },
+  "card": null
+ },
+ {
+  "id": "1996438604856594549",
+  "url": "https://x.com/TheHackersNews/status/1996438604856594549",
+  "name": "The Hacker News",
+  "handle": "TheHackersNews",
+  "avatar": "https://pbs.twimg.com/profile_images/1597647879811657728/FLgHrLHy_200x200.jpg",
+  "verified": false,
+  "date": "2025-12-04T04:37:10.000Z",
+  "likes": 15,
+  "replies": 1,
+  "topic": "hacked",
+  "text": "React2shell doesn’t stop at React or Next.js.\n\nAny library bundling RSC—Vite, Parcel, RedwoodJS, Waku—is likely exposed.\n\nCloudflare added WAF protection for proxied apps, but self-hosted ones stay at risk.",
+  "range": [
+   0,
+   206
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1583009615167467520",
+  "url": "https://x.com/theo/status/1583009615167467520",
+  "name": "Theo - t3.gg",
+  "handle": "theo",
+  "avatar": "https://pbs.twimg.com/profile_images/2106484435382333440/vXOVE8EX_200x200.jpg",
+  "verified": true,
+  "date": "2022-10-20T08:17:57.000Z",
+  "likes": 125,
+  "replies": 16,
+  "topic": "complexity",
+  "text": "Do you really need Kubernetes? https://t.co/9EP8HHKNCR https://t.co/YtU35vDVZM",
+  "range": [
+   0,
+   54
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/9EP8HHKNCR",
+    "href": "https://youtu.be/H5sPGruv2yc",
+    "shown": "youtu.be/H5sPGruv2yc",
+    "at": [
+     31,
+     54
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/YtU35vDVZM",
+    "at": [
+     55,
+     78
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/Fff6w2zVQAAXsDA.jpg",
+   "width": 1920,
+   "height": 1080
+  },
+  "card": null
+ },
+ {
+  "id": "2033546675063554213",
+  "url": "https://x.com/levelsio/status/2033546675063554213",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-03-16T14:11:23.000Z",
+  "likes": 4829,
+  "replies": 223,
+  "topic": "hacked",
+  "text": "When I set up a new Hetzner VPS first thing I do install Tailscale and once I'm in via Tailscale lock down the firewall to only accept web traffic on HTTPS 443 for Cloudflare IPs and SSH 22 for Tailscale IP\n\nThat way nobody can get in\n\nI know I keep repeating this but it should",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1830329731692294255",
+  "url": "https://x.com/dhh/status/1830329731692294255",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2024-09-01T19:39:48.000Z",
+  "likes": 1169,
+  "replies": 52,
+  "topic": "vps",
+  "text": "Running your own servers won't get you 100% uptime, but it will give you agency to act when something does go wrong. Rather than just wait around until the cloud gods get it together. We learned that painful lesson during the GCP network outages of 2019.",
+  "range": [
+   0,
+   254
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1980406035543388259",
+  "url": "https://x.com/dhh/status/1980406035543388259",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2025-10-20T22:49:27.000Z",
+  "likes": 6397,
+  "replies": 141,
+  "topic": "vps",
+  "text": "I swear we didn't plan this, but just today, we finally NUKED our entire AWS account at the 37signals company meetup! This followed moving out compute+dbs in 2023, then S3 this summer, and now finally the entire account is GONE 🎉 https://t.co/qcku127XMP",
+  "range": [
+   0,
+   230
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/qcku127XMP",
+    "at": [
+     230,
+     253
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/amplify_video_thumb/1980405626116145152/img/67CD_tffCvqon_3r.jpg",
+   "width": 1080,
+   "height": 1920
+  },
+  "card": null
+ },
+ {
+  "id": "2045455574620340332",
+  "url": "https://x.com/levelsio/status/2045455574620340332",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-18T10:53:06.000Z",
+  "likes": 4906,
+  "replies": 247,
+  "topic": "vps",
+  "text": "I get 4,150,000,000 (4 billion) requests and 300,000,000 (300 million) visitors per year\n\nThat'd cost me $338,913 if I wasn't on a VPS like @brian_lovin below\n\nInstead I pay $2,932/year or 115x less because I host my sites on my own VPS\n\nMy VPS servers are way too big and usually https://t.co/6yOnqZBu1T",
+  "range": [
+   0,
+   280
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [
+   {
+    "handle": "brian_lovin",
+    "at": [
+     140,
+     152
+    ]
+   }
+  ],
+  "media": [
+   {
+    "url": "https://t.co/6yOnqZBu1T",
+    "at": [
+     281,
+     304
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/HGLppmzXEAAMkZT.jpg",
+   "width": 1280,
+   "height": 857
+  },
+  "card": null
+ },
+ {
+  "id": "2008142179550838997",
+  "url": "https://x.com/levelsio/status/2008142179550838997",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-01-05T11:42:59.000Z",
+  "likes": 1091,
+  "replies": 117,
+  "topic": "vps",
+  "text": "Stack Overflow could easily run on a $5 VPS now and I'm not even kidding https://t.co/YCr1TwS64W",
+  "range": [
+   0,
+   72
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/YCr1TwS64W",
+    "at": [
+     73,
+     96
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/G95alChWwAAL9cS.jpg",
+   "width": 1842,
+   "height": 1064
+  },
+  "card": null
+ },
+ {
+  "id": "1963242368024354923",
+  "url": "https://x.com/levelsio/status/1963242368024354923",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2025-09-03T14:07:10.000Z",
+  "likes": 1463,
+  "replies": 105,
+  "topic": "vps",
+  "text": "I'd say savings from AWS to Hetzner are about 5-10x (like EC2 to VPS)\n\nSavings from Vercel to Hetzner are about 1000x depending mostly on your traffic\n\nLow traffic Vercel is cheap, high traffic it gets very expensive fast\n\nLow traffic VPS is cheap, high traffic it's still cheap",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1628031576113045505",
+  "url": "https://x.com/dhh/status/1628031576113045505",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2023-02-21T13:59:09.000Z",
+  "likes": 358,
+  "replies": 30,
+  "topic": "vps",
+  "text": "\"Any mid-sized+ SaaS business that does not benchmark their rental bill for servers in the cloud against buying their own boxes is committing financial malpractice at this point. I suggest you call @Dell, then call @ThisIsDeft.\" https://t.co/afsHvC7Q7c",
+  "range": [
+   0,
+   252
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/afsHvC7Q7c",
+    "href": "https://world.hey.com/dhh/we-stand-to-save-7m-over-five-years-from-our-cloud-exit-53996caa",
+    "shown": "world.hey.com/dhh/we-stand-t…",
+    "at": [
+     229,
+     252
+    ]
+   }
+  ],
+  "mentions": [
+   {
+    "handle": "Dell",
+    "at": [
+     198,
+     203
+    ]
+   }
+  ],
+  "media": [],
+  "photo": null,
+  "card": {
+   "title": "We stand to save $7m over five years from our cloud exit",
+   "description": "Since declaring our intention to leave the cloud in October, we've been busy at work making it so. After a brief detour down a blind alley with an enterprise Kubernetes provider, we found our stride...",
+   "domain": "world.hey.com",
+   "href": "https://world.hey.com/dhh/we-stand-to-save-7m-over-five-years-from-our-cloud-exit-53996caa",
+   "image": "https://pbs.twimg.com/card_img/2123883576223846400/5DhRzHxB?format=jpg&name=420x420_2"
+  }
+ },
+ {
+  "id": "1541892021312430083",
+  "url": "https://x.com/GergelyOrosz/status/1541892021312430083",
+  "name": "Gergely Orosz",
+  "handle": "GergelyOrosz",
+  "avatar": "https://pbs.twimg.com/profile_images/673095429748350976/ei5eeouV_200x200.png",
+  "verified": true,
+  "date": "2022-06-28T21:11:19.000Z",
+  "likes": 3985,
+  "replies": 257,
+  "topic": "vps",
+  "text": "Can we acknowledge how ridiculous it is that startups and even individuals can bankrupt themselves...\n\n... with an AWS bill?\n\nI cannot fathom why Amazon does not do anything meaningful to allow setting e.g. limits on accounts. Why do we need to hear stories like this on repeat? https://t.co/B7EMYPXA0j",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/B7EMYPXA0j",
+    "at": [
+     279,
+     302
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/FWXmg5pXgAQHyiv.jpg",
+   "width": 980,
+   "height": 1156
+  },
+  "card": null
+ },
+ {
+  "id": "1495282091608608771",
+  "url": "https://x.com/nixcraft/status/1495282091608608771",
+  "name": "nixCraft 🐧",
+  "handle": "nixcraft",
+  "avatar": "https://pbs.twimg.com/profile_images/1209802752819261440/jvir-xNm_200x200.jpg",
+  "verified": false,
+  "date": "2022-02-20T06:20:06.000Z",
+  "likes": 1706,
+  "replies": 22,
+  "topic": "backups",
+  "text": "Remember, RAID is not a backup. Also /backups/ directory on the same bare metal server is not backup. Your verified backup must be offsite with a 3-2-1 policy. Do you know how much time it takes to restore your data? If not, find out. DR is a serious business. \n\n#Daily #Reminder https://t.co/p83GGEW8ch",
+  "range": [
+   0,
+   279
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/p83GGEW8ch",
+    "at": [
+     280,
+     303
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/FMBO_56UYAEYJbQ.jpg",
+   "width": 460,
+   "height": 412
+  },
+  "card": null
+ },
+ {
+  "id": "1406175068804190208",
+  "url": "https://x.com/nixcraft/status/1406175068804190208",
+  "name": "nixCraft 🐧",
+  "handle": "nixcraft",
+  "avatar": "https://pbs.twimg.com/profile_images/1209802752819261440/jvir-xNm_200x200.jpg",
+  "verified": false,
+  "date": "2021-06-19T09:00:36.000Z",
+  "likes": 304,
+  "replies": 5,
+  "topic": "backups",
+  "text": "Schrödinger’s backup rule: The condition of any backup is unknown until a restore is attempted. Schrödinger's cat cross stitch pattern explains it better tho https://t.co/JxPMa2DpQT hah https://t.co/qfrPeJ6aZF",
+  "range": [
+   0,
+   185
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/JxPMa2DpQT",
+    "href": "https://kookycrossstitch.com/products/schrodingers-cat-pdf-only-cross-stitch-pattern-available-in-single-and-multiple-page-format",
+    "shown": "kookycrossstitch.com/products/schro…",
+    "at": [
+     158,
+     181
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/qfrPeJ6aZF",
+    "at": [
+     186,
+     209
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/E4O8mUuXwAMBK7b.jpg",
+   "width": 3464,
+   "height": 3464
+  },
+  "card": null
+ },
+ {
+  "id": "1418233593504092161",
+  "url": "https://x.com/iamdevloper/status/1418233593504092161",
+  "name": "I Am Devloper",
+  "handle": "iamdevloper",
+  "avatar": "https://pbs.twimg.com/profile_images/1178631635606151168/yIlrcg4o_200x200.jpg",
+  "verified": true,
+  "date": "2021-07-22T15:36:52.000Z",
+  "likes": 868,
+  "replies": 13,
+  "topic": "backups",
+  "text": "me: and this is the backup procedure I have in place for the system\n\nauditor: have you tested you can restore the system from these backups?\n\nme: https://t.co/U2infjt8U6",
+  "range": [
+   0,
+   145
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/U2infjt8U6",
+    "at": [
+     146,
+     169
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/tweet_video_thumb/E66TmbvWEAIXSqP.jpg",
+   "width": 240,
+   "height": 172
+  },
+  "card": null
+ },
+ {
+  "id": "826591961444384768",
+  "url": "https://x.com/gitlabstatus/status/826591961444384768",
+  "name": "GitLab.com Status",
+  "handle": "gitlabstatus",
+  "avatar": "https://pbs.twimg.com/profile_images/1519350424519819264/dNHlMw0E_200x200.jpg",
+  "verified": false,
+  "date": "2017-02-01T00:44:15.000Z",
+  "likes": 2300,
+  "replies": 354,
+  "topic": "backups",
+  "text": "We accidentally deleted production data and might have to restore from backup. Google Doc with live notes https://t.co/EVRbHzYlk8",
+  "range": [
+   0,
+   129
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/EVRbHzYlk8",
+    "href": "https://docs.google.com/document/d/1GCK53YDcBWQveod9kfzW-VCxIABGiryG7_z_6jHdVik/pub",
+    "shown": "docs.google.com/document/d/1GC…",
+    "at": [
+     106,
+     129
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1879934945902411820",
+  "url": "https://x.com/iximiuz/status/1879934945902411820",
+  "name": "Ivan Velichko",
+  "handle": "iximiuz",
+  "avatar": "https://pbs.twimg.com/profile_images/1417581014273122314/2CBEkT0b_200x200.jpg",
+  "verified": true,
+  "date": "2025-01-16T16:53:13.000Z",
+  "likes": 952,
+  "replies": 19,
+  "topic": "hacked",
+  "text": "docker run -p 8080:80 nginx:alpine\n\n...is the same as\n\ndocker run -p 0.0.0.0:8080:80 nginx:alpine\n\nThe command opens port 8080 on all server interfaces, including the public ones (if any).\n\nWhy is it bad? If you close all ports by default using something like ufw, Docker's",
+  "range": [
+   0,
+   273
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1808089314707784167",
+  "url": "https://x.com/cyb3rops/status/1808089314707784167",
+  "name": "Florian Roth ⚡️",
+  "handle": "cyb3rops",
+  "avatar": "https://pbs.twimg.com/profile_images/2112872660900126720/DRb9x1-S_200x200.jpg",
+  "verified": true,
+  "date": "2024-07-02T10:44:19.000Z",
+  "likes": 382,
+  "replies": 11,
+  "topic": "hacked",
+  "text": "I always recommend the use of Fail2ban for everything, including web services\n\nThe good news is that it comes with a default config for sshd, which prevents the exploitation of CVE-2024-6387 &amp; brute force attacks in general\n\n@digitalocean has a tutorial\nhttps://t.co/PeA8ynroxV",
+  "range": [
+   0,
+   281
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/PeA8ynroxV",
+    "href": "https://www.digitalocean.com/community/tutorials/how-to-protect-ssh-with-fail2ban-on-ubuntu-20-04",
+    "shown": "digitalocean.com/community/tuto…",
+    "at": [
+     258,
+     281
+    ]
+   }
+  ],
+  "mentions": [
+   {
+    "handle": "digitalocean",
+    "at": [
+     229,
+     242
+    ]
+   }
+  ],
+  "media": [],
+  "photo": null,
+  "card": {
+   "title": "Protect SSH with Fail2ban on Ubuntu: Tutorial | DigitalOcean",
+   "description": "Secure your Ubuntu 20.04 server from brute-force attacks using Fail2ban. Step-by-step guide to configure SSH protection and custom jail rules.",
+   "domain": "www.digitalocean.com",
+   "href": "https://www.digitalocean.com/community/tutorials/how-to-protect-ssh-with-fail2ban-on-ubuntu-20-04",
+   "image": "https://pbs.twimg.com/card_img/2123341980491251712/dHBs5XdZ?format=jpg&name=800x320_1"
+  }
+ },
+ {
+  "id": "1828870212416106732",
+  "url": "https://x.com/dhh/status/1828870212416106732",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2024-08-28T19:00:12.000Z",
+  "likes": 1784,
+  "replies": 109,
+  "topic": "vps",
+  "text": "Just rented a new hobby box with an AMD EPYC 9454P (48 cores!!!) / 256GB RAM / 2TB dedicated server from Hetzner for ~$220/month (+ $80 setup fee). It was ready in just a couple of minutes. An absurd amount of performance for the money.",
+  "range": [
+   0,
+   236
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2045979746681684007",
+  "url": "https://x.com/mschoening/status/2045979746681684007",
+  "name": "Max Schoening",
+  "handle": "mschoening",
+  "avatar": "https://pbs.twimg.com/profile_images/1566878390174359552/Dv_62DGL_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-19T21:35:58.000Z",
+  "likes": 170,
+  "replies": 14,
+  "topic": "hacked",
+  "text": "You should just run everything on your own VPS, guys! Not knowing whether you got hacked is as good as not getting hacked.",
+  "range": [
+   0,
+   122
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2019821067553108379",
+  "url": "https://x.com/KaiLentit/status/2019821067553108379",
+  "name": "Kai Lentit (e/xcel)",
+  "handle": "KaiLentit",
+  "avatar": "https://pbs.twimg.com/profile_images/1713593323724648448/-8FoGqbh_200x200.jpg",
+  "verified": true,
+  "date": "2026-02-06T17:10:43.000Z",
+  "likes": 6235,
+  "replies": 123,
+  "topic": "complexity",
+  "text": "'Just use a VPS' bro. \n\nIt's just a 1-click, 2222-step install. https://t.co/YSzJpHawCC",
+  "range": [
+   0,
+   63
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/YSzJpHawCC",
+    "at": [
+     64,
+     87
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/amplify_video_thumb/2019819673001287680/img/KsJVsu6thd97547x.jpg",
+   "width": 720,
+   "height": 1280
+  },
+  "card": null
+ },
+ {
+  "id": "2044449391931494480",
+  "url": "https://x.com/SimonHoiberg/status/2044449391931494480",
+  "name": "Simon Høiberg",
+  "handle": "SimonHoiberg",
+  "avatar": "https://pbs.twimg.com/profile_images/2048770896114876416/Ale2aou-_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-15T16:14:53.000Z",
+  "likes": 38,
+  "replies": 2,
+  "topic": "vps",
+  "text": "My spending isn't anything like this, but relative reductions are roughly the same for me. From ~$96,000/year with AWS to &lt;$10,000/year with bare metal servers. And still have a few more reductions to go.",
+  "range": [
+   0,
+   207
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1997293892090183772",
+  "url": "https://x.com/duborges/status/1997293892090183772",
+  "name": "Eduardo Borges",
+  "handle": "duborges",
+  "avatar": "https://pbs.twimg.com/profile_images/1841183953199235073/vu43psbH_200x200.jpg",
+  "verified": true,
+  "date": "2025-12-06T13:15:46.000Z",
+  "likes": 4960,
+  "replies": 260,
+  "topic": "hacked",
+  "text": "i've been hacked\n\nand traced the malware's wallet to see how much money they actually made from this new exploit\n\n(if you use Next.js/React, READ THIS!)\n\nI woke up to a terrifying email from Hetzner: \"Netscan Detected.\"\n\nmy server was blocked and a botnet was using my IP to https://t.co/CbyjNB93at",
+  "range": [
+   0,
+   274
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/CbyjNB93at",
+    "at": [
+     275,
+     298
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/G7fP6drXsAAQlVW.jpg",
+   "width": 1542,
+   "height": 925
+  },
+  "card": null
+ },
+ {
+  "id": "1997633936818684301",
+  "url": "https://x.com/duborges/status/1997633936818684301",
+  "name": "Eduardo Borges",
+  "handle": "duborges",
+  "avatar": "https://pbs.twimg.com/profile_images/1841183953199235073/vu43psbH_200x200.jpg",
+  "verified": true,
+  "date": "2025-12-07T11:46:59.000Z",
+  "likes": 105,
+  "replies": 11,
+  "topic": "hacked",
+  "text": "this exploit has the potential to build the most powerful botnet in history\n\nin my hacked server, it was just a crypto miner. easy to detect because 361% cpu usage is obvious\n\nbut imagine the thousands of other cloud servers infected and dormant?\n\nyou can patch your next/react,",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2024129029733753259",
+  "url": "https://x.com/it_unprofession/status/2024129029733753259",
+  "name": "IT Unprofessional",
+  "handle": "it_unprofession",
+  "avatar": "https://pbs.twimg.com/profile_images/1960350375954862081/bCNsGfw4_200x200.jpg",
+  "verified": true,
+  "date": "2026-02-18T14:29:01.000Z",
+  "likes": 10388,
+  "replies": 401,
+  "topic": "complexity",
+  "text": "Our intern just asked me why we don't use Kubernetes.\n\nI said because we don't need Kubernetes.\n\nHe said everyone uses Kubernetes.\n\nI said everyone TALKS about using Kubernetes. Most companies are running Docker containers on three servers and calling it a day.\n\nWe have 40",
+  "range": [
+   0,
+   273
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2034268862233923643",
+  "url": "https://x.com/brankopetric00/status/2034268862233923643",
+  "name": "Branko",
+  "handle": "brankopetric00",
+  "avatar": "https://pbs.twimg.com/profile_images/1836534038149955584/2dxKOQuW_200x200.jpg",
+  "verified": true,
+  "date": "2026-03-18T14:01:06.000Z",
+  "likes": 488,
+  "replies": 26,
+  "topic": "complexity",
+  "text": "You don't need Kubernetes. You have 3 services and 200 users. A single EC2 instance and a cron job would outperform your \"cloud-native architecture\" and cost 98% less.",
+  "range": [
+   0,
+   167
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2043329309679538538",
+  "url": "https://x.com/brankopetric00/status/2043329309679538538",
+  "name": "Branko",
+  "handle": "brankopetric00",
+  "avatar": "https://pbs.twimg.com/profile_images/1836534038149955584/2dxKOQuW_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-12T14:04:05.000Z",
+  "likes": 46,
+  "replies": 11,
+  "topic": "backups",
+  "text": "Your database backup strategy is excellent until you need to restore it. Has anyone ever successfully restored on the first try?",
+  "range": [
+   0,
+   128
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1917860369021940154",
+  "url": "https://x.com/catalinmpit/status/1917860369021940154",
+  "name": "Catalin",
+  "handle": "catalinmpit",
+  "avatar": "https://pbs.twimg.com/profile_images/2053185524135845889/ACrc9TSx_200x200.jpg",
+  "verified": true,
+  "date": "2025-05-01T08:35:18.000Z",
+  "likes": 229,
+  "replies": 45,
+  "topic": "complexity",
+  "text": "Kubernetes is overkill for 80% of startups.\n\n- Steep learning curve\n- $ for managed clusters\n- Most apps don’t need 99.999% uptime\n\nUnless you’re at scale, Docker on VPS &gt; k8s",
+  "range": [
+   0,
+   178
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1909305535352258701",
+  "url": "https://x.com/catalinmpit/status/1909305535352258701",
+  "name": "Catalin",
+  "handle": "catalinmpit",
+  "avatar": "https://pbs.twimg.com/profile_images/2053185524135845889/ACrc9TSx_200x200.jpg",
+  "verified": true,
+  "date": "2025-04-07T18:01:27.000Z",
+  "likes": 66,
+  "replies": 53,
+  "topic": "complexity",
+  "text": "I got stubborn on self-hosting everything.\n\nAnd the hard way, with Kubernetes on my VPS (as a K8s beginner).\n\nBut I realized that I spend too much time on infrastructure stuff instead of shipping. It's not a luxury I can have with a full-time job.\n\nI need all the time to make my",
+  "range": [
+   0,
+   279
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2017167811429433694",
+  "url": "https://x.com/func25/status/2017167811429433694",
+  "name": "Phuong Le",
+  "handle": "func25",
+  "avatar": "https://pbs.twimg.com/profile_images/2116072756286758912/rgVYD4xb_200x200.jpg",
+  "verified": true,
+  "date": "2026-01-30T09:27:38.000Z",
+  "likes": 105,
+  "replies": 5,
+  "topic": "complexity",
+  "text": "99.9% of the time, you don't need Kubernetes for your workload. \n\nStart simple, you can always migrate later. Almost nobody regrets delaying Kubernetes but a lot of people regret adopting it too early.\n\nPremature Kubernetes is the new premature microservices.\n\nFor like 99.9 https://t.co/iSGvVMk3Nu",
+  "range": [
+   0,
+   274
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/iSGvVMk3Nu",
+    "at": [
+     275,
+     298
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/G_5rOJGbwAAlNLZ.jpg",
+   "width": 914,
+   "height": 885
+  },
+  "card": null
+ },
+ {
+  "id": "1989165202340983102",
+  "url": "https://x.com/techyoutbe/status/1989165202340983102",
+  "name": "Tech Fusionist | Kushal Gangil",
+  "handle": "techyoutbe",
+  "avatar": "https://pbs.twimg.com/profile_images/2094856911078539264/ooIqOuph_200x200.jpg",
+  "verified": true,
+  "date": "2025-11-14T02:55:15.000Z",
+  "likes": 56,
+  "replies": 2,
+  "topic": "complexity",
+  "text": "Big Tech engineers are slowly moving away from Kubernetes.\n\nNot because it’s bad -\nbut because it’s too heavy, too complex, too slow, and too painful to maintain at scale (if not desgined with proper planning).\n\nAfter managing multiple production clusters myself, I get it.\n\nHere",
+  "range": [
+   0,
+   279
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1818686138090950714",
+  "url": "https://x.com/TechnoTimLive/status/1818686138090950714",
+  "name": "Techno Tim",
+  "handle": "TechnoTimLive",
+  "avatar": "https://pbs.twimg.com/profile_images/1286144221217316864/qIAsKOpB_200x200.jpg",
+  "verified": true,
+  "date": "2024-07-31T16:32:19.000Z",
+  "likes": 89,
+  "replies": 47,
+  "topic": "complexity",
+  "text": "After switching back to Docker Compose for my \"Home Production\" things have been remarkably stable compared to k3s, however it's definitely not as easy to manage as I would like it to be.  Remoting  in and configuring YAML and then restarting services just feels icky compared to",
+  "range": [
+   0,
+   279
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2042932042376319445",
+  "url": "https://x.com/livingdevops/status/2042932042376319445",
+  "name": "Akhilesh Mishra",
+  "handle": "livingdevops",
+  "avatar": "https://pbs.twimg.com/profile_images/2106049164689948672/N5cef00J_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-11T11:45:29.000Z",
+  "likes": 308,
+  "replies": 10,
+  "topic": "complexity",
+  "text": "The Kubernetes ecosystem is beautiful. Every tool exists to solve a problem that Kubernetes couldn't solve.\n\nYou run everything with kubectl. Get pods, describe, logs, exec, delete, apply, 50 times a day across 5 namespaces.  It works, but it is slow and painful, specially -n",
+  "range": [
+   0,
+   276
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1946751481849553309",
+  "url": "https://x.com/hunvreus/status/1946751481849553309",
+  "name": "Ronan Berder (SF + SG)",
+  "handle": "hunvreus",
+  "avatar": "https://pbs.twimg.com/profile_images/1838400224152424449/5RXoNu6a_200x200.jpg",
+  "verified": true,
+  "date": "2025-07-20T01:58:16.000Z",
+  "likes": 2,
+  "replies": 0,
+  "topic": "complexity",
+  "text": "Working on moving from Docker Compose to K3s for /dev/push. Is that me or the Kubernetes ecosystem seem is super fragmented: I need multiple tools to do what I could with just docker-compose...",
+  "range": [
+   0,
+   193
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2088917810151829616",
+  "url": "https://x.com/msnmongare/status/2088917810151829616",
+  "name": "Sospeter Mong'are",
+  "handle": "msnmongare",
+  "avatar": "https://pbs.twimg.com/profile_images/1510140532903018499/UM1BLXBL_200x200.jpg",
+  "verified": false,
+  "date": "2026-08-16T09:16:30.000Z",
+  "likes": 186,
+  "replies": 20,
+  "topic": "hacked",
+  "text": "A fresh VPS is not a secure VPS.\n\nProvisioned a fresh VPS yesterday, and before deploying any applications, I started hardening the server.\n\nWithin hours, the SSH logs were already showing automated brute-force attempts:\n\nInvalid user admin from 195.178.110.227\n\nSo before https://t.co/9ctXZ0efpj",
+  "range": [
+   0,
+   272
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/9ctXZ0efpj",
+    "at": [
+     273,
+     296
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/HP1QIJeXAAIXyZv.jpg",
+   "width": 1241,
+   "height": 168
+  },
+  "card": null
+ },
+ {
+  "id": "2109715178052784272",
+  "url": "https://x.com/andilosing/status/2109715178052784272",
+  "name": "Andi",
+  "handle": "andilosing",
+  "avatar": "https://pbs.twimg.com/profile_images/1962033530046693376/yR-YA87e_200x200.jpg",
+  "verified": true,
+  "date": "2026-10-12T18:37:49.000Z",
+  "likes": 23,
+  "replies": 6,
+  "topic": "backups",
+  "text": "always set up automatic database backups\n\nmake sure they’re stored on a different server and actually test if you can restore them\n\na backup is useless if it doesn’t work when you need it\n\nhope for the best, prepare for the worst :)",
+  "range": [
+   0,
+   232
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2120763583323611506",
+  "url": "https://x.com/senodev_/status/2120763583323611506",
+  "name": "Nipun",
+  "handle": "senodev_",
+  "avatar": "https://pbs.twimg.com/profile_images/2110393638924726272/Qn7Ytd1t_200x200.jpg",
+  "verified": false,
+  "date": "2026-11-12T06:20:14.000Z",
+  "likes": 1,
+  "replies": 0,
+  "topic": "backups",
+  "text": "GitLab’s 2017 outage exposed a brutal truth.\n\nHaving backup mechanisms doesn’t guarantee recoverability.\n\nAfter the production database was accidentally removed, recovery became a major engineering challenge.\n\nSome data was permanently lost.\n\nThe expensive lesson?\n\nDon’t",
+  "range": [
+   0,
+   271
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1992799886777921954",
+  "url": "https://x.com/arpit_bhayani/status/1992799886777921954",
+  "name": "Arpit Bhayani",
+  "handle": "arpit_bhayani",
+  "avatar": "https://pbs.twimg.com/profile_images/1982781754093043712/PHVp_-hB_200x200.jpg",
+  "verified": true,
+  "date": "2025-11-24T03:38:12.000Z",
+  "likes": 931,
+  "replies": 30,
+  "topic": "backups",
+  "text": "Back in 2015-16, I once accidentally deleted the \"entire production\" at Practo.\n\nSlight exaggeration, but here's what happened...\n\nThere was one EC2 server running the whole stack for one of the acquired companies. On a Sunday afternoon, while cleaning up unused servers from an",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1009718178744762369",
+  "url": "https://x.com/GFritchey/status/1009718178744762369",
+  "name": "Grant Fritchey",
+  "handle": "GFritchey",
+  "avatar": "https://pbs.twimg.com/profile_images/2059341311728041984/plgf7Dua_200x200.jpg",
+  "verified": true,
+  "date": "2018-06-21T08:42:28.000Z",
+  "likes": 23,
+  "replies": 8,
+  "topic": "backups",
+  "text": "Please, right now, go check your backups.\n\nJust heard about a business that has been operating for three years with no sort of backup of any kind.\n\n&lt;sigh&gt;",
+  "range": [
+   0,
+   160
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2046167519438733711",
+  "url": "https://x.com/joshuamschultz/status/2046167519438733711",
+  "name": "Josh Schultz",
+  "handle": "joshuamschultz",
+  "avatar": "https://pbs.twimg.com/profile_images/1985306013193351168/r83v5u-X_200x200.jpg",
+  "verified": true,
+  "date": "2026-04-20T10:02:07.000Z",
+  "likes": 710,
+  "replies": 49,
+  "topic": "vps",
+  "text": "Someone just migrated from DigitalOcean to Hetzner.\n\nSame production workload. 30 MySQL databases. 248GB of data. Hundreds of thousands of users.\n\nBill went from $1,432/month to $233/month.\n\nNew machine is MORE powerful. 96 CPUs. 256GB DDR5. NVMe RAID.\n\n$14,388 saved per year.",
+  "range": [
+   0,
+   277
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2090748730886558188",
+  "url": "https://x.com/venelinkochev/status/2090748730886558188",
+  "name": "Venelin K.",
+  "handle": "venelinkochev",
+  "avatar": "https://pbs.twimg.com/profile_images/1854135042152247311/9u2s6TX__200x200.jpg",
+  "verified": true,
+  "date": "2026-08-21T10:31:56.000Z",
+  "likes": 278,
+  "replies": 36,
+  "topic": "vps",
+  "text": "Directify is now hosting 400+ directory websites and serving ~45M requests/month\n\nmy boring setup:\n- Hetzner VPS ~$35/month\n- Cloudflare R2 - $1/month\n- Cloudflare for SaaS - $28/month\n- DNS Hosting - $14/month\n\ntotal infra cost: ~$80/month\n\ndon't overcomplicate your setup https://t.co/bLRrqq7Ab7",
+  "range": [
+   0,
+   273
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/bLRrqq7Ab7",
+    "at": [
+     274,
+     297
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/HQPUqHgWYAA8ROt.jpg",
+   "width": 803,
+   "height": 1084
+  },
+  "card": null
+ },
+ {
+  "id": "1937619475513098341",
+  "url": "https://x.com/iximiuz/status/1937619475513098341",
+  "name": "Ivan Velichko",
+  "handle": "iximiuz",
+  "avatar": "https://pbs.twimg.com/profile_images/1417581014273122314/2CBEkT0b_200x200.jpg",
+  "verified": true,
+  "date": "2025-06-24T21:10:56.000Z",
+  "likes": 48,
+  "replies": 3,
+  "topic": "vps",
+  "text": "What is nuts is that I can put 10 such containers on a $30/mo Hetzner server.",
+  "range": [
+   0,
+   77
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1276197189832921089",
+  "url": "https://x.com/DRtheNerd/status/1276197189832921089",
+  "name": "David Redekop",
+  "handle": "DRtheNerd",
+  "avatar": "https://pbs.twimg.com/profile_images/1062725255343464448/0nkCSe4R_200x200.jpg",
+  "verified": true,
+  "date": "2020-06-25T16:54:55.000Z",
+  "likes": 3,
+  "replies": 5,
+  "topic": "hacked",
+  "text": "I've never intentionally run a honeypot, but after 19 days of having a lab device SSH publicly exposed, is this normal amount of ssh brute force attacks? https://t.co/hSChN2IzeA",
+  "range": [
+   0,
+   153
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/hSChN2IzeA",
+    "at": [
+     154,
+     177
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/EbX2b4IWsAAEkXt.jpg",
+   "width": 2690,
+   "height": 1884
+  },
+  "card": null
+ }
+]
