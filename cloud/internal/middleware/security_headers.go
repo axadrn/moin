@@ -28,7 +28,8 @@ func SecurityHeaders(cfg *config.Config) func(http.Handler) http.Handler {
 
 // contentSecurityPolicy says what a page may load and run. Scripts need the
 // nonce, and nothing may frame the page. The Umami server may send its
-// script and take the page views.
+// script and take the page views. A form may only post here, and lead on
+// to Stripe's checkout and portal: Subscribe answers with a redirect there.
 func contentSecurityPolicy(cfg *config.Config, nonce string) string {
 	umami := ""
 	if cfg.UmamiHost != "" {
@@ -43,6 +44,6 @@ func contentSecurityPolicy(cfg *config.Config, nonce string) string {
 		"connect-src 'self'" + umami,
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
-		"form-action 'self'",
+		"form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
 	}, "; ")
 }
