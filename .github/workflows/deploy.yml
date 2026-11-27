@@ -95,7 +95,7 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # The binaries of the box, the ones under /download, and SHA256SUMS
+      # The binaries the box built, in /app/downloads, and SHA256SUMS
       # signed with the release key. SHA256SUMS also names the box by its
       # digest, so the signature covers the exact image too. moin update
       # sends these to a server and checks the signature first.

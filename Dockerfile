@@ -16,10 +16,10 @@ WORKDIR /app/cloud
 # Go files from the .templ files.
 RUN go tool templ generate
 
-# The moin binaries that cli.sh downloads from /download, built from the
-# same commit, with SHA256SUMS for checking a download by hand. For a tag,
-# the Deploy workflow signs these files and puts them on the GitHub
-# release. They are the same in every image, so they come before anything
+# The moin binaries of a release, built from the same commit, with
+# SHA256SUMS for checking a download by hand. For a tag, the Deploy
+# workflow takes them from the image, signs them and puts them on the
+# GitHub release, where cli.sh and moin update download them. They are the same in every image, so they come before anything
 # of the target and are built once.
 ARG VERSION=dev
 RUN mkdir -p downloads && \

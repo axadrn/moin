@@ -11,7 +11,7 @@
 # Generated files
 *_templ.go
 
-# The moin binaries the image serves at /download
+# The moin binaries the image builds for a release
 /downloads/
 
 # Local leftovers: tmp/, and data/ from when the hub had a database

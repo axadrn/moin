@@ -58,10 +58,9 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /compare", handler.CompareIndex)
 	mux.HandleFunc("GET /compare/{name}", handler.Compare)
 	mux.HandleFunc("GET /legal/{page}", handler.Legal(texts))
-	// The script that installs moin, and the binaries it downloads: the
-	// image builds them into downloads/.
+	// The script that installs moin. The binary comes from the newest
+	// release on GitHub, like every download of moin.
 	mux.HandleFunc("GET /cli.sh", handler.CLIScript(cfg.AppURL))
-	mux.Handle("GET /download/", http.StripPrefix("/download/", http.FileServer(http.Dir("downloads"))))
 
 	// moin cloud: sign-in, the workspace, billing, `moin cloud` in the
 	// CLI, and the reports of servers.
