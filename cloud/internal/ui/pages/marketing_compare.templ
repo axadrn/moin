@@ -88,7 +88,7 @@ templ compareCard(name, note, href string) {
 // compareLine is the words of a row: unlike an Item's Name and Note they
 // wrap, so a sentence is never cut on a phone.
 templ compareLine(name, note string) {
-	<div class="moin-stack moin-fill" style="--gap:2px">
+	<div class="moin-stack moin-fill" data-gap="1">
 		<span class="moin-strong">{ name }</span>
 		<span class="moin-text moin-muted">{ note }</span>
 	</div>
@@ -139,13 +139,13 @@ templ Compare(competitor compare.Competitor) {
 // in line with the rows. A phone has no columns to name, and every answer
 // says whose it is; the score over the table is there for it.
 templ compareHeader(name string, score compare.Score) {
-	<div aria-hidden="true" class="moin-hidden-phone">
-		@components.List(templ.Attributes{"style": "--item-edge:var(--pad)"}) {
+	<div aria-hidden="true" class="moin-hidden-phone moin-compare-head">
+		@components.List() {
 			@components.Item(components.ItemProps{}) {
 				<div class="moin-grid moin-fill moin-text moin-muted" data-cols="2-3-3">
 					<span></span>
-					<span class="moin-stack" style="--gap:0"><span class="moin-strong">{ brand.Name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Ours, score.Facts) }</span></span>
-					<span class="moin-stack" style="--gap:0"><span class="moin-strong">{ name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Theirs, score.Facts) }</span></span>
+					<span class="moin-stack" data-gap="1"><span class="moin-strong">{ brand.Name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Ours, score.Facts) }</span></span>
+					<span class="moin-stack" data-gap="1"><span class="moin-strong">{ name }</span><span class="moin-digits">{ fmt.Sprintf("%d of %d", score.Theirs, score.Facts) }</span></span>
 				</div>
 			}
 		}
@@ -167,7 +167,7 @@ templ compareFact(row compare.Row, name string, cell compare.Cell) {
 templ compareAnswer(whose string, cell compare.Cell, ours bool) {
 	<div class="moin-row moin-answer" data-gap="3" data-top data-ours?={ ours }>
 		@compareMarkIcon(cell.Mark)
-		<div class="moin-stack moin-text" style="--gap:2px">
+		<div class="moin-stack moin-text" data-gap="1">
 			<span><span class="moin-muted moin-only-phone">{ whose }: </span><span class="moin-strong">{ cell.Short }</span></span>
 			if cell.Detail != "" {
 				<span class="moin-small moin-muted">{ cell.Detail }</span>

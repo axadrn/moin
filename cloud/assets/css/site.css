@@ -2096,3 +2096,7 @@
 /* "Open source." in the hero: the one word that stands out, a quiet link
    to the code. */
 .moin-hero-open { font-weight: 600; }
+
+/* The names over a comparison stand outside a card, in line with the rows
+   inside the cards under them. */
+.moin-compare-head > .moin-list { --item-edge: var(--pad); }
