@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"slices"
@@ -135,6 +136,8 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 		fmt.Fprintln(stdout, style.Warning.Render("!")+" No new SSH session over Tailscale came through. Within 2 minutes "+server+" opens port 22 again by itself.")
 		return errors.Join(failed, err)
 	}
+	// The name checked above, not the one of a second answer.
+	now.Tailnet.Name = tailnet.Name
 	printSecurity(stdout, server, public, viaTailnet, change, now)
 	if !viaTailnet && now.SSHOnTailscale {
 		pointAlias(stdout, server, reach)
@@ -187,7 +190,7 @@ func joinTailnet(ctx context.Context, server string, stdin io.Reader, stdout io.
 		return tailnet, err
 	}
 	if tailnet.IP != "" {
-		return tailnet, nil
+		return checkTailnet(server, tailnet)
 	}
 	key := ""
 	if isTerminal(stdin) {
@@ -200,8 +203,45 @@ func joinTailnet(ctx context.Context, server string, stdin io.Reader, stdout io.
 		fmt.Fprintln(stdout)
 	}
 	step(stdout, "putting %s in your tailnet", server)
-	err := sshJSON(ctx, server, []string{"tailnet", "up"}, strings.NewReader(key), &tailnet)
-	return tailnet, err
+	if err := sshJSON(ctx, server, []string{"tailnet", "up"}, strings.NewReader(key), &tailnet); err != nil {
+		return tailnet, err
+	}
+	return checkTailnet(server, tailnet)
+}
+
+// Tailscale gives its machines addresses from these ranges.
+var (
+	tailnetIPv4 = netip.MustParsePrefix("100.64.0.0/10")
+	tailnetIPv6 = netip.MustParsePrefix("fd7a:115c:a1e0::/48")
+)
+
+// checkTailnet checks what the server answered before ssh dials it and
+// the terminal shows it: the address must be one of Tailscale's, the name
+// only letters, digits, dots and dashes. A name that is not one is
+// dropped, so ssh dials the address.
+func checkTailnet(server string, tailnet daemon.Tailnet) (daemon.Tailnet, error) {
+	ip, err := netip.ParseAddr(tailnet.IP)
+	if err != nil || !(tailnetIPv4.Contains(ip) || tailnetIPv6.Contains(ip)) {
+		return daemon.Tailnet{}, fmt.Errorf("%s answered a tailnet address that is not one. Public SSH stays open", server)
+	}
+	if !plainHostname(tailnet.Name) {
+		tailnet.Name = ""
+	}
+	return tailnet, nil
+}
+
+// plainHostname reports whether name is only letters, digits, dots and
+// dashes, and does not start with a dash.
+func plainHostname(name string) bool {
+	if name == "" || name[0] == '-' {
+		return false
+	}
+	for _, r := range name {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // tailnetWait is how long moin tries to reach a server over Tailscale.

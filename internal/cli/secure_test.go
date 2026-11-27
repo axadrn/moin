@@ -56,3 +56,31 @@ func TestPrintSecuritySaysClosedOnlyWhenClosed(t *testing.T) {
 		}
 	}
 }
+
+// What a server answers about its tailnet reaches ssh and the terminal
+// only when it is a Tailscale address and a plain name.
+func TestCheckTailnet(t *testing.T) {
+	cases := []struct {
+		tailnet daemon.Tailnet
+		name    string
+		refused bool
+	}{
+		{daemon.Tailnet{IP: "100.64.0.7", Name: "web-1.tail0000.ts.net"}, "web-1.tail0000.ts.net", false},
+		{daemon.Tailnet{IP: "fd7a:115c:a1e0::7", Name: "web-1"}, "web-1", false},
+		{daemon.Tailnet{IP: "100.64.0.7", Name: "x$(id)"}, "", false},
+		{daemon.Tailnet{IP: "100.64.0.7", Name: "web-1\x1b[2J"}, "", false},
+		{daemon.Tailnet{IP: "100.64.0.7", Name: "-oProxyCommand=id"}, "", false},
+		{daemon.Tailnet{IP: "203.0.113.7", Name: "web-1"}, "", true},
+		{daemon.Tailnet{IP: "100.64.0.7$(id)", Name: "web-1"}, "", true},
+	}
+	for _, c := range cases {
+		got, err := checkTailnet("web-1", c.tailnet)
+		if (err != nil) != c.refused {
+			t.Errorf("%+v: err = %v, refused should be %v", c.tailnet, err, c.refused)
+			continue
+		}
+		if err == nil && got.Name != c.name {
+			t.Errorf("%+v: name = %q, want %q", c.tailnet, got.Name, c.name)
+		}
+	}
+}
