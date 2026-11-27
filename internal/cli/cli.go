@@ -68,6 +68,12 @@ Servers
   update                   Update this CLI to the newest release
   update <server>          Put this CLI's version of moin on a server: update prod
 
+Cloud
+  cloud                    Your moin cloud: plan, billing, servers [--json]
+  cloud login              Sign this laptop in, through the browser
+  cloud connect            The server reports to moin cloud: cloud connect prod
+  cloud disconnect         It no longer does: cloud disconnect prod [-y]
+
 Watcher
   watcher run              Run a watcher, on another machine than your servers
   watcher token            On the watcher: the line that connects a server: watcher token prod [--url https://watcher.example.com]

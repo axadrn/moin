@@ -234,8 +234,10 @@ type cloudWorkspace struct {
 	Plan      string     `json:"plan"`
 	TrialEnds *time.Time `json:"trial_ends,omitempty"`
 	PaidUntil *time.Time `json:"paid_until,omitempty"`
-	NeedsYou  []string   `json:"needs_you"`
-	Servers   []struct {
+	// Billing is where to subscribe, or Stripe's portal once it knows you.
+	Billing  string   `json:"billing"`
+	NeedsYou []string `json:"needs_you"`
+	Servers  []struct {
 		Name    string `json:"name"`
 		OK      bool   `json:"ok"`
 		State   string `json:"state"`
@@ -265,6 +267,9 @@ func cloudStatus(ctx context.Context, args []string, stdout io.Writer) error {
 		return printJSON(stdout, space)
 	}
 	fmt.Fprintln(stdout, style.Bold.Render(space.Mail)+"  "+style.Muted.Render(space.Plan))
+	if space.Billing != "" {
+		fmt.Fprintln(stdout, style.Muted.Render("Billing: "+space.Billing))
+	}
 	if len(space.Servers) == 0 {
 		fmt.Fprintln(stdout, style.Muted.Render("No servers yet."))
 		hint(stdout, "Have one report here:", build.Name+" cloud connect prod")
