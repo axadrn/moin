@@ -90,7 +90,7 @@ var Rows = []Row{
 	{"Every day", "Deploy from", yes("GitHub, image, catalog", "A GitHub push, a CI image or an app from the catalog.", "")},
 	{"Every day", "Ways in", yes("All five", "Web, CLI, terminal UI, API and MCP.", "")},
 	{"Every day", "Activity", yes("Yes", "Who did what, when, in every workspace.", "")},
-	{"Price", "Host it yourself, free", yes("Yes", "Every feature, no license key. Open source. AGPL-3.0.", "https://github.com/axadrn/moin/blob/main/LICENSE")},
+	{"Price", "Host it yourself, free", yes("Yes", "Every feature, no license key. Open source.", "https://github.com/axadrn/moin/blob/main/LICENSE")},
 	{"Price", "You pay", plain("$7 a month per workspace", "Or $49 a year. Unlimited servers, apps and team. The tenth server costs the same as the first. Every feature is in.", "")},
 }
 
