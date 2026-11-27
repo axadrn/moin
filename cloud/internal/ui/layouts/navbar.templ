@@ -5,12 +5,12 @@ import (
 
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
-	"github.com/axadrn/moin/cloud/internal/githubstars"
+	"github.com/axadrn/moin/cloud/internal/githubrepo"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 )
 
 // GitHubURL is the open source repository of moin.
-const GitHubURL = "https://github.com/" + githubstars.Repo
+const GitHubURL = "https://github.com/" + githubrepo.Repo
 
 // XHandle is moin's account on X, without the @.
 const XHandle = "usemoin"
@@ -54,7 +54,7 @@ templ Navbar() {
 			}
 		</span>
 		<span class="moin-hidden-phone">
-			if stars := githubstars.Stars(); stars != "" {
+			if stars := githubrepo.Stars(); stars != "" {
 				@components.Button(components.ButtonProps{Href: GitHubURL, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
 					<i class="moin-icon moin-icon-git-hub"></i>
 					{ stars }

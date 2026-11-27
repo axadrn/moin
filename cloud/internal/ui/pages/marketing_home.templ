@@ -3,7 +3,7 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
-	"github.com/axadrn/moin/cloud/internal/githubstars"
+	"github.com/axadrn/moin/cloud/internal/githubrepo"
 	"github.com/axadrn/moin/cloud/internal/tweets"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
@@ -77,7 +77,7 @@ templ HomeHero() {
 					@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
 						<i class="moin-icon moin-icon-git-hub"></i>
 						GitHub
-						if stars := githubstars.Stars(); stars != "" {
+						if stars := githubrepo.Stars(); stars != "" {
 							<span class="moin-muted moin-digits">{ stars }</span>
 						}
 					}

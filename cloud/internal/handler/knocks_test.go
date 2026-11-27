@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/db"
@@ -93,32 +92,11 @@ func TestProductionNeverShowsSampleKnocks(t *testing.T) {
 	}
 }
 
-// TestInstallsAreCounted: every request for the install script adds one
-// install to the counts, and the script still comes.
-func TestInstallsAreCounted(t *testing.T) {
-	cloud, _ := knocksCloud(t, nil)
-	script := cloud.CountInstall(CLIScript("http://site.test"))
-	for range 3 {
-		w := httptest.NewRecorder()
-		script(w, httptest.NewRequest("GET", "/cli.sh", nil))
-		if w.Code != 200 || !strings.Contains(w.Body.String(), "site.test") {
-			t.Fatalf("the install script did not come: %d", w.Code)
-		}
-	}
-	totals, err := cloud.watchers.Counts().Totals(time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if totals.Installs.Total != 3 || totals.Installs.Month != 3 {
-		t.Errorf("installs = %+v, want 3", totals.Installs)
-	}
-}
-
 // TestProductionNeverShowsSampleNumbers: before anything is counted,
 // production shows no counts; development shows marked sample numbers.
 func TestProductionNeverShowsSampleNumbers(t *testing.T) {
 	cloud, _ := knocksCloud(t, nil)
-	if numbers := cloud.SiteNumbers(false)(); numbers.Sample || numbers.Totals.Installs.Total != 0 {
+	if numbers := cloud.SiteNumbers(false)(); numbers.Sample || numbers.Totals != (counts.Totals{}) {
 		t.Errorf("production numbers = %+v, want none", numbers)
 	}
 	if numbers := cloud.SiteNumbers(true)(); !numbers.Sample {

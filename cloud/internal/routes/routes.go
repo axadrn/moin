@@ -38,9 +38,9 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /robots.txt", seo.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seo.Sitemap)
 	mux.HandleFunc("GET /llms.txt", seo.LLMs)
-	mux.HandleFunc("GET /{$}", handler.Home(texts,
-		cloud.SiteKnocks(cfg.KnocksWorkspace, cfg.KnocksServer, cfg.Development),
-		cloud.SiteNumbers(cfg.Development)))
+	siteKnocks := cloud.SiteKnocks(cfg.KnocksWorkspace, cfg.KnocksServer, cfg.Development)
+	mux.HandleFunc("GET /{$}", handler.Home(texts, siteKnocks, cloud.SiteNumbers(cfg.Development)))
+	mux.HandleFunc("GET /knocks", handler.KnocksPage(siteKnocks))
 	mux.HandleFunc("GET /docs", handler.Docs(docs))
 	mux.HandleFunc("GET /docs.md", handler.Docs(docs))
 	mux.HandleFunc("GET /docs/", handler.Docs(docs))
@@ -59,7 +59,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /legal/{page}", handler.Legal(texts))
 	// The script that installs moin, and the binaries it downloads: the
 	// image builds them into downloads/.
-	mux.HandleFunc("GET /cli.sh", cloud.CountInstall(handler.CLIScript(cfg.AppURL)))
+	mux.HandleFunc("GET /cli.sh", handler.CLIScript(cfg.AppURL))
 	mux.Handle("GET /download/", http.StripPrefix("/download/", http.FileServer(http.Dir("downloads"))))
 
 	// moin cloud: sign-in, the workspace, billing, `moin cloud` in the

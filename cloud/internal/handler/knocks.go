@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/counts"
-	"github.com/axadrn/moin/cloud/internal/githubstars"
+	"github.com/axadrn/moin/cloud/internal/githubrepo"
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 	"github.com/axadrn/moin/internal/report"
 )
@@ -58,40 +58,39 @@ func (c *Cloud) knocksOf(workspaceID, server string) *report.Knocks {
 	return nil
 }
 
-// sampleTotals stand in for the counts of moin cloud in development. The
-// page marks them as sample data.
+// sampleDownloads and sampleTotals stand in for the downloads on GitHub
+// and the counts of moin cloud in development. The page marks them as
+// sample data.
+const sampleDownloads = 4212
+
 var sampleTotals = counts.Totals{
-	Deploys:  counts.Period{Month: 412, Year: 3180, Total: 3180},
-	Knocks:   counts.Period{Month: 1_204_311, Year: 9_877_120, Total: 9_877_120},
-	Installs: counts.Period{Month: 238, Year: 1912, Total: 1912},
-	Servers:  57,
-	Apps:     143,
+	Deploys: counts.Period{Month: 412, Year: 3180, Total: 3180},
+	Knocks:  counts.Period{Month: 1_204_311, Year: 9_877_120, Total: 9_877_120},
+	Servers: 57,
+	Apps:    143,
 }
 
-// SiteNumbers are the numbers of the landing page: the stars on GitHub,
-// and what moin cloud counted. Development shows sample numbers, so every
+// SiteNumbers are the numbers of the landing page: the stars and the
+// downloads on GitHub, and what moin cloud counted. Development shows sample numbers, so every
 // number can be seen before it is counted.
 func (c *Cloud) SiteNumbers(development bool) func() pages.HomeNumbers {
 	return func() pages.HomeNumbers {
 		if development {
-			return pages.HomeNumbers{Stars: githubstars.Stars(), Totals: sampleTotals, Sample: true}
+			return pages.HomeNumbers{Stars: githubrepo.Stars(), Downloads: sampleDownloads, Totals: sampleTotals, Sample: true}
 		}
 		totals, err := c.watchers.Counts().Totals(time.Now())
 		if err != nil {
 			slog.Warn("home: counts", "error", err)
 			totals = counts.Totals{}
 		}
-		return pages.HomeNumbers{Stars: githubstars.Stars(), Totals: totals}
+		return pages.HomeNumbers{Stars: githubrepo.Stars(), Downloads: githubrepo.Now().Downloads, Totals: totals}
 	}
 }
 
-// CountInstall counts each request for the install script as one
-// install: one number a day, no address, no browser.
-func (c *Cloud) CountInstall(next http.HandlerFunc) http.HandlerFunc {
+// KnocksPage is /knocks: the count of the site's own server on one
+// screen, to share.
+func KnocksPage(knocks func() *pages.HomeKnocks) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := c.watchers.Counts().Add(time.Now(), counts.Installs, 1); err != nil {
-			slog.Warn("count an install", "error", err)
-		}
-		next(w, r)
+		render(w, r, pages.Knocks(knocks(), time.Now()))
 	}
 }

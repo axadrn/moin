@@ -10,12 +10,14 @@ import (
 )
 
 // HomeNumbers are the numbers of the landing page: the stars on GitHub
-// (githubstars.Stars, "" while unknown), and what moin cloud counted.
+// (githubrepo.Stars, "" while unknown), the downloads of its releases
+// (0 while unknown), and what moin cloud counted.
 // Sample marks made-up numbers, which only development shows.
 type HomeNumbers struct {
-	Stars  string
-	Totals counts.Totals
-	Sample bool
+	Stars     string
+	Downloads int64
+	Totals    counts.Totals
+	Sample    bool
 }
 
 // numberRow is one line of counts: a name, and its month, year and all.
@@ -31,7 +33,6 @@ func numberRows(t counts.Totals) []numberRow {
 	for _, row := range []numberRow{
 		{"Deploys", t.Deploys},
 		{"Knocks dropped", t.Knocks},
-		{brand.Name + " installs", t.Installs},
 	} {
 		if row.Period.Total > 0 {
 			rows = append(rows, row)
@@ -51,10 +52,13 @@ templ homeNumbers(n HomeNumbers) {
 				@components.Chip("Sample data · development only")
 			</div>
 		}
-		<div class="moin-grid" data-cols="2">
+		<div class="moin-grid" data-cols="3">
 			@numberCard("0 bytes", "Sent to us by the free software. Read the source.", layouts.GitHubURL)
 			if n.Stars != "" {
 				@numberCard(n.Stars+" stars", "On GitHub.", layouts.GitHubURL)
+			}
+			if n.Downloads > 0 {
+				@numberCard(human.Count(n.Downloads)+" downloads", "Of the files of every release, on GitHub.", layouts.GitHubURL+"/releases")
 			}
 		</div>
 		if n.Totals.Servers > 0 {

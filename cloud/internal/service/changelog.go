@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/moin/cloud/internal/githubstars"
+	"github.com/axadrn/moin/cloud/internal/githubrepo"
 	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
@@ -66,7 +66,7 @@ func ChangelogReleases(files fs.FS) ([]Release, error) {
 		return nil, fmt.Errorf("read changelog: %w", err)
 	}
 	for i := range notes {
-		notes[i] = issueAtEnd.ReplaceAll(notes[i], []byte("$1 ([#$2](https://github.com/"+githubstars.Repo+"/issues/$2))"))
+		notes[i] = issueAtEnd.ReplaceAll(notes[i], []byte("$1 ([#$2](https://github.com/"+githubrepo.Repo+"/issues/$2))"))
 	}
 	html, err := markdown.NewParser().ParseParts(notes)
 	if err != nil {

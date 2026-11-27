@@ -4,12 +4,14 @@ import (
 	"cmp"
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/report"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // HomeKnocks are the knocks of the site's own server: what its firewall
@@ -84,21 +86,78 @@ templ homeKnocks(k HomeKnocks) {
 			}
 		</div>
 		if len(rows) > 0 {
-			@components.Card(components.CardProps{}) {
-				<span class="moin-fact-name">Most tried today</span>
-				<ol class="moin-knocks">
-					for _, row := range rows {
-						<li>
-							<span>{ row.Label } <span class="moin-muted">{ row.Ports }</span></span>
-							<span class="moin-digits">{ human.Count(row.Count) }</span>
-							<span class="moin-knocks-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + strconv.FormatInt(row.Share, 10) + "%") }></span></span>
-						</li>
-					}
-				</ol>
-			}
+			@knockList(rows)
 		}
 		<p class="moin-text moin-muted moin-center">
 			Every { brand.Name } server counts its knocks. See yours: <code class="moin-mono moin-foreground">{ brand.Name } knocks</code>
 		</p>
+		@homeMore("/knocks", "The live count, to share")
 	</section>
+}
+
+// knockList is the card of the ports bots tried most today: the name and
+// its ports, the count, and a thin bar as wide as its share.
+templ knockList(rows []knockRow) {
+	@components.Card(components.CardProps{}) {
+		<span class="moin-fact-name">Most tried today</span>
+		<ol class="moin-knocks">
+			for _, row := range rows {
+				<li>
+					<span>{ row.Label } <span class="moin-muted">{ row.Ports }</span></span>
+					<span class="moin-digits">{ human.Count(row.Count) }</span>
+					<span class="moin-knocks-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + strconv.FormatInt(row.Share, 10) + "%") }></span></span>
+				</li>
+			}
+		</ol>
+	}
+}
+
+// ---------------------------------------------------------------- /knocks
+// Knocks is /knocks: the same count as the landing page, on one phone
+// screen to share, with the time it was read. Without a count it says
+// so, never a made-up number. now is when the page is made.
+templ Knocks(k *HomeKnocks, now time.Time) {
+	@layouts.Base(layouts.SEOProps{
+		Title:       knocksTitle(k),
+		Description: "The firewall of the server of " + siteHost(brand.Site) + ", counted live. Every knock on a closed port, dropped.",
+		Path:        "/knocks",
+	}) {
+		<main class="moin-page moin-knocks-page">
+			<a href="/" aria-label={ brand.Name + " home" }>
+				@components.Wordmark(components.WordmarkProps{})
+			</a>
+			if k != nil && k.Sample {
+				<div>
+					@components.Chip("Sample data · development only")
+				</div>
+			}
+			<div class="moin-stack" data-gap="1">
+				<h1 class="moin-statement">{ siteHost(brand.Site) }, right now.</h1>
+				<p class="moin-text moin-muted">{ now.UTC().Format("January 2, 2006 · 15:04") } UTC</p>
+			</div>
+			if k == nil {
+				<p class="moin-lead">No knocks counted yet.</p>
+			} else {
+				<div class="moin-stack" data-gap="1">
+					<span class="moin-display moin-digits">{ human.Count(k.Today) }</span>
+					<p class="moin-lead">knocks today. All dropped. Nothing answered.</p>
+					<p class="moin-text moin-muted moin-digits">{ human.Count(k.Year) } this year · { human.Count(k.Total) } since the first count</p>
+				</div>
+				if rows := knockRows(k.Knocks); len(rows) > 0 {
+					@knockList(rows[:min(5, len(rows))])
+				}
+			}
+			<p class="moin-text moin-muted">
+				Every { brand.Name } server counts its knocks. <a href="/" class="moin-link moin-foreground">{ siteHost(brand.Site) }</a>
+			</p>
+		</main>
+	}
+}
+
+// knocksTitle is the title a shared link shows.
+func knocksTitle(k *HomeKnocks) string {
+	if k == nil {
+		return siteHost(brand.Site) + ", right now"
+	}
+	return siteHost(brand.Site) + " got " + human.Count(k.Today) + " knocks today. All dropped."
 }
