@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
+	"math"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -226,7 +227,7 @@ FROM knocks GROUP BY name`,
 		if err := rows.Scan(&count.Name, &count.Hour, &count.Today, &count.Week, &count.Year, &count.Total, &lastTen, &first); err != nil {
 			return knocks, err
 		}
-		count.PerMinute = float64(lastTen) / 10
+		count.PerMinute = math.Round(float64(lastTen)) / 10
 		since := time.Unix(first*60, 0).UTC()
 		if knocks.Since.IsZero() || since.Before(knocks.Since) {
 			knocks.Since = since
@@ -234,7 +235,7 @@ FROM knocks GROUP BY name`,
 		knocks.Names = append(knocks.Names, count)
 		all := &knocks.All
 		all.Hour, all.Today, all.Week, all.Year, all.Total = all.Hour+count.Hour, all.Today+count.Today, all.Week+count.Week, all.Year+count.Year, all.Total+count.Total
-		all.PerMinute += count.PerMinute
+		all.PerMinute = math.Round((all.PerMinute+count.PerMinute)*10) / 10
 	}
 	slices.SortFunc(knocks.Names, func(a, b KnockCount) int {
 		return cmp.Or(cmp.Compare(b.Total, a.Total), cmp.Compare(a.Name, b.Name))
