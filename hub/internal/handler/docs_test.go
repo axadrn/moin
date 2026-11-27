@@ -125,7 +125,7 @@ func serveDocs(t *testing.T, docs *service.DocsService, path string) *httptest.R
 	t.Helper()
 	request := httptest.NewRequest(http.MethodGet, path, nil)
 	ctx := ctxkeys.WithRenderConfig(request.Context(), config.RenderConfig{
-		AppURL:       "https://example.com",
+		AppURL: "https://example.com",
 	})
 	ctx = ctxkeys.WithURLPath(ctx, request.URL.Path)
 	request = request.WithContext(ctx)

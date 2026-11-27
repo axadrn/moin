@@ -326,42 +326,6 @@
     padding-block: var(--space-6) 5rem;
   }
 
-  /* A page outside the app: a head, one narrow column in the middle, a foot. */
-  .moin-centered {
-    display: flex;
-    flex-direction: column;
-    min-height: 100svh;
-  }
-  .moin-centered > :is(header, footer) {
-    display: flex;
-    flex: none;
-    height: 4rem;
-    align-items: center;
-  }
-  .moin-centered > footer {
-    justify-content: center;
-    gap: var(--space-6);
-    color: var(--muted-foreground);
-    font-size: 0.875rem;
-  }
-  .moin-centered > footer > a:hover { color: var(--foreground); }
-  .moin-centered > div {
-    display: flex;
-    flex: 1;
-    justify-content: center;
-    padding: 2.5rem var(--space-4) 4rem;
-  }
-  @media (min-width: 40rem) {
-    .moin-centered > div { padding-top: 6rem; }
-  }
-  .moin-centered > div > * {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-8);
-    width: 100%;
-    max-width: 24rem;
-  }
-
   /* A block of a page: a quiet title, an action at its end. */
   .moin-section {
     display: flex;
@@ -393,8 +357,6 @@
   @media (min-width: 40rem) {
     .moin-grid[data-cols="2-3-3"] { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 3fr); }
   }
-  /* The sentence under the title of a page in the middle belongs to it. */
-  .moin-centered > div > * > .moin-title + p { margin-block-start: calc(var(--space-4) * -1); }
 
   /* The first screen of a landing page: under a floating bar, words in the
      middle, and what shows them below. */
@@ -469,26 +431,11 @@
 
   /* Out to the edge of its card, past the card's padding. */
   .moin-bleed { margin-inline: calc(-1 * var(--pad)); }
-  /* Back in by the card's padding, for what sits in a moin-bleed. */
-  .moin-inset { padding-inline: var(--pad); }
-  /* A part of a row with its own width (--width) from a tablet up, the whole
-     line on a phone. */
-  .moin-width { flex: none; width: 100%; min-width: 0; }
-  @media (min-width: 40rem) {
-    .moin-width { width: var(--width); }
-  }
   /* The whole width of a grid. */
   .moin-grid > [data-wide] { grid-column: 1 / -1; }
-  /* What is empty takes no room. */
-  .moin-hide-empty:empty { display: none; }
 
   /* A link to a place on the page stops under the floating bar, or --jump. */
   :target { scroll-margin-block-start: var(--jump, 6rem); }
-
-  /* A box that only holds an id: what is in it counts as being in its place. */
-  .moin-contents { display: contents; }
-  /* A moin-width that keeps its width on a phone too. */
-  .moin-width[data-fixed] { width: var(--width); }
 
   /* A form with two ways. Inside data-either, the radio marked data-other
      shows the parts marked data-way="other" in place of those marked
@@ -533,11 +480,7 @@
     height: 1rem;
   }
   .moin-icon-check { --i: url("../icons/check.svg"); }
-  .moin-icon-chevron-down { --i: url("../icons/chevron-down.svg"); }
-  .moin-icon-chevron-left { --i: url("../icons/chevron-left.svg"); }
-  .moin-icon-chevron-right { --i: url("../icons/chevron-right.svg"); }
   .moin-icon-copy { --i: url("../icons/copy.svg"); }
-  .moin-icon-external { --i: url("../icons/external.svg"); }
   .moin-icon-search { --i: url("../icons/search.svg"); }
   .moin-icon-theme { --i: url("../icons/theme.svg"); }
   .moin-icon-x { --i: url("../icons/x.svg"); }
@@ -548,10 +491,7 @@
 @layer moin-components {
   /* Whatever scrolls at the edge of a round box. A scrollbar sits inside the
      border, so a see-through border keeps it and its corner in the curve. */
-  .moin-textarea,
   .moin-code > pre,
-  .moin-select > [popover],
-  .moin-menu,
   .moin-palette-list {
     border: var(--scroll-edge) solid transparent;
   }
@@ -559,10 +499,6 @@
   /* The focus ring of everything you can press. */
   .moin-button:focus-visible,
   .moin-input:focus-visible,
-  .moin-textarea:focus-visible,
-  .moin-switch > input:focus-visible,
-  .moin-check > input:focus-visible,
-  .moin-radio > input:focus-visible,
   .moin-tab:focus-visible,
   .moin-back:focus-visible,
   .moin-copy:focus-visible,
@@ -580,14 +516,6 @@
     font-weight: var(--weight-title);
     letter-spacing: var(--tracking-title);
     text-wrap: balance;
-  }
-  .moin-number {
-    font-size: 1.5rem;
-    line-height: 2rem;
-    font-family: var(--font-heading);
-    font-weight: var(--weight-title);
-    letter-spacing: var(--tracking-title);
-    font-variant-numeric: tabular-nums;
   }
   .moin-heading {
     font-family: var(--font-heading);
@@ -641,9 +569,6 @@
   }
   /* The plain text color inside a quiet line, and the colors of a state. */
   .moin-foreground { color: var(--foreground); }
-  .moin-live { color: var(--live-text); }
-  .moin-running { color: var(--running); }
-  .moin-failed { color: var(--failed-text); }
   /* Long words break instead of pushing the box wider. */
   .moin-break { overflow-wrap: anywhere; }
   .moin-truncate {
@@ -792,24 +717,10 @@
     font-size: 1rem;
     outline: none;
   }
-  .moin-textarea {
-    display: block;
-    width: 100%;
-    min-height: 10rem;
-    padding: calc(var(--space-4) - var(--scroll-edge)) calc(var(--space-5) - var(--scroll-edge));
-    border-radius: var(--radius-md);
-    background: var(--muted);
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    outline: none;
-    resize: vertical;
-  }
   @media (min-width: 40rem) {
-    .moin-input,
-    .moin-textarea { font-size: 0.875rem; }
+    .moin-input { font-size: 0.875rem; }
   }
-  .moin-input::placeholder,
-  .moin-textarea::placeholder { color: var(--muted-foreground); }
+  .moin-input::placeholder { color: var(--muted-foreground); }
   .moin-input:disabled { opacity: 0.4; }
   /* A field without a box until you press it, for a cell of a table. */
   .moin-input[data-bare] {
@@ -848,55 +759,6 @@
   }
   .moin-input-icon > .moin-input { padding-inline-start: 3rem; }
 
-  /* A field with fixed text in front of it or after it. The box looks like
-     the field, and the input in it goes see-through. */
-  .moin-input-text {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    min-width: 0;
-    height: var(--press);
-    padding-inline: var(--space-5);
-    border-radius: var(--radius-md);
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-size: 1rem;
-  }
-  .moin-input-text:has(:focus-visible) { box-shadow: var(--focus); }
-  .moin-input-text > .moin-input {
-    flex: 1;
-    width: auto;
-    height: 100%;
-    padding: 0;
-    border-radius: 0;
-    background: none;
-    color: var(--foreground);
-    box-shadow: none;
-  }
-  @media (min-width: 40rem) {
-    .moin-input-text { font-size: 0.875rem; }
-  }
-
-  .moin-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    min-width: 0;
-  }
-  .moin-field > :is(label, span) {
-    padding-inline: var(--space-5);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    font-weight: 500;
-  }
-  .moin-hint {
-    min-height: 1.25rem;
-    padding-inline: var(--space-5);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: var(--muted-foreground);
-  }
-  .moin-hint[data-invalid] { color: var(--failed-text); }
 }
 
 @layer moin-components {
@@ -986,69 +848,7 @@
 }
 
 @layer moin-components {
-  /* Select: a button and a native popover of radios under it. */
-  .moin-select { position: relative; width: 100%; min-width: 0; }
-  .moin-select > button {
-    display: flex;
-    width: 100%;
-    height: var(--press);
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    padding-inline: var(--space-5);
-    border-radius: var(--radius-md);
-    background: var(--muted);
-    font-size: 0.875rem;
-    text-align: left;
-    outline: none;
-  }
-  .moin-select > button:focus-visible { box-shadow: var(--focus); }
-  .moin-select > button::after {
-    content: "";
-    flex: none;
-    width: 1rem;
-    height: 1rem;
-    background: var(--muted-foreground);
-    -webkit-mask: url("../icons/chevron-down.svg") center / contain no-repeat;
-    mask: url("../icons/chevron-down.svg") center / contain no-repeat;
-  }
-  .moin-select > [popover],
-  .moin-menu {
-    inset: auto;
-    top: anchor(bottom);
-    left: anchor(left);
-    width: anchor-size(width);
-    min-width: 12rem;
-    max-height: 18rem;
-    margin: var(--space-2) 0 0;
-    padding: calc(var(--menu-gap) - var(--scroll-edge));
-    border-radius: var(--radius-lg);
-    background: var(--menu);
-    color: var(--menu-foreground);
-    backdrop-filter: var(--menu-blur);
-    -webkit-backdrop-filter: var(--menu-blur);
-    box-shadow: var(--shadow-float);
-    overflow-y: auto;
-  }
-  /* As wide as its button, wider only for an option that needs it. */
   /* As wide as its longest option, within the screen. */
-  .moin-select > [popover] {
-    width: max-content;
-    min-width: max(12rem, anchor-size(width));
-    max-width: calc(100vw - 2rem);
-  }
-  .moin-menu {
-    right: anchor(right);
-    left: auto;
-    width: auto;
-  }
-  .moin-select > [popover]:popover-open,
-  .moin-menu:popover-open {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .moin-select input { position: absolute; opacity: 0; pointer-events: none; }
   [data-select-label] > .moin-icon {
     margin-inline-end: var(--space-2);
     vertical-align: text-bottom;
@@ -1139,7 +939,6 @@
     --lit: max(0px, calc(var(--radius-lg) - 2 * var(--inset)));
   }
   .moin-item[data-control] { flex-wrap: wrap; }
-  .moin-item[data-control] > .moin-select { flex: none; width: var(--select-width, 9rem); }
   :is(a, button, label).moin-item { cursor: pointer; }
   :is(a, button, label).moin-item:is(:hover, :focus-visible)::after,
   a.moin-item[aria-current]::after,
@@ -1179,13 +978,6 @@
     white-space: nowrap;
   }
   /* A hint says what the item is about, in a sentence that wraps. */
-  .moin-item-hint {
-    display: block;
-    margin-top: var(--space-1);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: var(--muted-foreground);
-  }
   .moin-item-value {
     flex: none;
     max-width: 50%;
@@ -1199,7 +991,6 @@
     white-space: nowrap;
   }
   .moin-chevron,
-  .moin-item-check,
   .moin-out {
     flex: none;
     width: 1rem;
@@ -1212,13 +1003,6 @@
     -webkit-mask-image: url("../icons/external.svg");
     mask-image: url("../icons/external.svg");
   }
-  .moin-item-check {
-    visibility: hidden;
-    background: var(--foreground);
-    -webkit-mask-image: url("../icons/check.svg");
-    mask-image: url("../icons/check.svg");
-  }
-  label.moin-item:has(:checked) .moin-item-check { visibility: visible; }
 
   .moin-item > [data-lead] { display: flex; flex: none; }
 }
@@ -1306,7 +1090,6 @@
   .moin-card[data-gap="6"] { gap: var(--space-6); }
   .moin-card[data-gap="8"] { gap: var(--space-8); }
   .moin-card[data-flush] { padding-inline: 0; }
-  .moin-card[data-flush] > :is(.moin-card-head, .moin-card-foot) { padding-inline: var(--pad); }
   .moin-card-head {
     display: flex;
     flex-wrap: wrap;
@@ -1314,12 +1097,6 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
-  }
-  .moin-card-foot {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: var(--space-2);
   }
 }
 
@@ -1392,45 +1169,6 @@
     mask: url("../icons/check.svg") center / contain no-repeat;
   }
 
-  .moin-status {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    font-weight: 500;
-  }
-  /* The dot's own place, wide enough for the ring of a live one. */
-  .moin-status > .moin-dot { margin-inline: var(--space-1); }
-  .moin-status[data-state="failed"] { color: var(--failed-text); }
-  .moin-status:is([data-state="idle"], [data-state="done"]) { color: var(--muted-foreground); }
-
-  .moin-chip {
-    --tint: var(--idle);
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: var(--space-2);
-    height: 1.75rem;
-    padding-inline: 0.625rem var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  .moin-chip:is([data-state="live"], [data-state="running"], [data-state="waiting"], [data-state="failed"]) {
-    background: color-mix(in oklab, var(--tint) 16%, transparent);
-    color: color-mix(in oklab, var(--tint), var(--foreground) 40%);
-  }
-  .moin-chip[data-state="live"] { --tint: var(--live); }
-  .moin-chip:is([data-state="running"], [data-state="waiting"]) { --tint: var(--running); }
-  .moin-chip[data-state="failed"] { --tint: var(--failed); }
-
-  /* A dot alone, in the room of a chip: the mark at the end of an item. */
-  .moin-status[data-alone] { width: 2rem; justify-content: center; }
 }
 
 @layer moin-components {
@@ -1481,30 +1219,7 @@
 
 @layer moin-components {
   /* Overlays float one step lighter than what they cover, with no border. */
-  .moin-dialog {
-    --muted: var(--muted-raised);
-    width: min(28rem, calc(100% - 2rem));
-    margin: auto;
-    padding: var(--space-6);
-    border: 0;
-    border-radius: var(--radius-lg);
-    background: var(--popover);
-    color: var(--popover-foreground);
-    box-shadow: var(--shadow-float);
-  }
-  .moin-dialog::backdrop,
   .moin-palette::backdrop { background: var(--dim); }
-  .moin-dialog-buttons {
-    display: flex;
-    flex-direction: column-reverse;
-    gap: var(--space-2);
-  }
-  @media (min-width: 40rem) {
-    .moin-dialog-buttons {
-      flex-direction: row;
-      justify-content: flex-end;
-    }
-  }
 
   .moin-palette {
     width: 100%;
@@ -1550,14 +1265,6 @@
   }
   .moin-palette-list:empty { display: none; }
 
-  /* The name of a group of options, starting where their text starts. */
-  .moin-palette-group {
-    padding: var(--space-3) calc(var(--space-5) - var(--menu-gap)) var(--space-1);
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 500;
-  }
 }
 
 @layer moin-components {
@@ -1615,26 +1322,14 @@
     gap: var(--space-2);
   }
   /* A chip or a status is a word, not a button: it keeps its own width. */
-  .moin-header-actions > :is(.moin-chip, .moin-status) { justify-self: start; }
-  .moin-header-line {
-    display: flex;
-    flex-wrap: wrap;
-    width: 100%;
-    align-items: center;
-    gap: var(--space-1) var(--space-2);
-    font-weight: 500;
-  }
   @media (min-width: 40rem) {
     .moin-header-actions {
       display: flex;
       width: auto;
       margin-inline-start: auto;
     }
-    .moin-header-line { order: 9; }
   }
 
-  /* A quiet line says no more than a line of text. */
-  .moin-header-line > .moin-muted { font-weight: 400; }
 }
 
 @layer moin-components {
@@ -1804,38 +1499,7 @@
 }
 
 @layer moin-components {
-  /* A face: initials, or a picture. */
-  .moin-avatar {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    overflow: hidden;
-    border-radius: var(--radius-full);
-    background: var(--muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    user-select: none;
-  }
-  .moin-avatar[data-size] {
-    width: 4rem;
-    height: 4rem;
-    font-size: 1.25rem;
-  }
-  /* A picture in place of the initials. */
-  .moin-avatar > img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
 
-  /* Several people in little space. Each overlaps the one before it. */
-  .moin-avatar-group { display: inline-flex; }
-  .moin-avatar-group > .moin-avatar { box-shadow: 0 0 0 2px var(--background); }
-  .moin-card .moin-avatar-group > .moin-avatar { box-shadow: 0 0 0 2px var(--card); }
-  .moin-avatar-group > .moin-avatar + .moin-avatar { margin-inline-start: calc(-1 * var(--space-2)); }
 }
 
 @layer moin-components {
@@ -2018,7 +1682,6 @@
 @layer moin-components {
   @media (prefers-reduced-motion: reduce) {
     .moin-dot,
-    .moin-skeleton,
     .moin-bar { animation: none; }
   }
 }
