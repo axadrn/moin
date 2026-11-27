@@ -136,7 +136,7 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 		return errors.Join(failed, err)
 	}
 	printSecurity(stdout, server, public, viaTailnet, change, now)
-	if !viaTailnet && !now.PublicSSH {
+	if !viaTailnet && now.SSHOnTailscale {
 		pointAlias(stdout, server, reach)
 	}
 	return failed
@@ -150,7 +150,7 @@ func printSecurity(stdout io.Writer, server, public string, viaTailnet bool, cha
 	case now.PublicSSH:
 	case !viaTailnet && portAnswers(public, "22"):
 		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+public+" still answers on port 22 from here. Check it with `"+build.Name+"`.")
-	default:
+	case now.SSHOnTailscale:
 		done(stdout, "Public port 22 is closed. %s answers SSH only over Tailscale", server)
 	}
 	apps := slices.DeleteFunc(slices.Clone(now.Published), func(port string) bool { return port == "80/tcp" || port == "443/tcp" })
@@ -170,7 +170,7 @@ func printSecurity(stdout io.Writer, server, public string, viaTailnet bool, cha
 	if now.Tunnel {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("In the tunnel's Public Hostnames, send each domain to http://"+build.Name+"-traefik:8080."))
 	}
-	if now.PublicSSH {
+	if !now.SSHOnTailscale {
 		return
 	}
 	if !now.Tailnet.KeyExpiry.IsZero() {

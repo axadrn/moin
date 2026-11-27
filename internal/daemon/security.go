@@ -101,8 +101,12 @@ func (s *security) registryLogin(host string) string {
 type Security struct {
 	// PublicSSH: port 22 is open to the internet.
 	PublicSSH bool `json:"public_ssh"`
-	Firewall  bool `json:"firewall"`
-	Tunnel    bool `json:"tunnel"`
+	// SSHOnTailscale: moin closed port 22, SSH goes only through the
+	// tailnet. Without sshd on port 22 it is not open, but not closed by
+	// moin either.
+	SSHOnTailscale bool `json:"ssh_on_tailscale"`
+	Firewall       bool `json:"firewall"`
+	Tunnel         bool `json:"tunnel"`
 	// OpenPorts are the ports the firewall lets in from everywhere.
 	// Without the firewall every port is open.
 	OpenPorts []string `json:"open_ports"`
@@ -117,12 +121,13 @@ type Security struct {
 // rules are really loaded.
 func (s *security) now(ctx context.Context) Security {
 	now := Security{
-		PublicSSH: publicSSH(ctx, s.file),
-		Firewall:  s.file.Firewall && tableLoaded(ctx),
-		Tunnel:    s.file.TunnelToken != "",
-		OpenPorts: []string{},
-		Published: publishedPorts(ctx),
-		Tailnet:   TailnetHere(ctx),
+		PublicSSH:      publicSSH(ctx, s.file),
+		SSHOnTailscale: s.file.SSHOnTailscale && tableLoaded(ctx),
+		Firewall:       s.file.Firewall && tableLoaded(ctx),
+		Tunnel:         s.file.TunnelToken != "",
+		OpenPorts:      []string{},
+		Published:      publishedPorts(ctx),
+		Tailnet:        TailnetHere(ctx),
 	}
 	if now.Firewall {
 		now.OpenPorts = openPorts(s.file)
