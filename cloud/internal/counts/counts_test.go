@@ -67,21 +67,14 @@ func TestReportAndTotals(t *testing.T) {
 	if err := c.Report("w1", "prod", second, now); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Add(now, Installs, 4); err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Add(now, Installs, 0); err != nil {
-		t.Fatal(err)
-	}
 	totals, err := c.Totals(now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Totals{
-		Deploys:  Period{Month: 3, Year: 3, Total: 4},
-		Knocks:   Period{Month: 30, Year: 30, Total: 130},
-		Installs: Period{Month: 4, Year: 4, Total: 4},
-		Servers:  1, Apps: 2,
+		Deploys: Period{Month: 3, Year: 3, Total: 4},
+		Knocks:  Period{Month: 30, Year: 30, Total: 130},
+		Servers: 1, Apps: 2,
 	}
 	if totals != want {
 		t.Errorf("totals = %+v, want %+v", totals, want)

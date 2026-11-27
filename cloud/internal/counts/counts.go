@@ -13,9 +13,8 @@ import (
 
 // The names of the counts.
 const (
-	Deploys  = "deploys"
-	Knocks   = "knocks"
-	Installs = "installs"
+	Deploys = "deploys"
+	Knocks  = "knocks"
 )
 
 // liveFor is how long a server counts as running after its last report.
@@ -36,19 +35,12 @@ func dayOf(t time.Time) string {
 	return t.UTC().Format(time.DateOnly)
 }
 
-// Add adds n to the count name on the day of day.
-func (c *Counts) Add(day time.Time, name string, n int64) error {
-	return add(c.db, day, name, n)
-}
-
-// add adds n to a count, in a transaction or not.
-func add(db interface {
-	Exec(string, ...any) (sql.Result, error)
-}, day time.Time, name string, n int64) error {
+// add adds n to the count name on the day of day.
+func add(tx *sql.Tx, day time.Time, name string, n int64) error {
 	if n <= 0 {
 		return nil
 	}
-	_, err := db.Exec(`INSERT INTO counts (day, name, n) VALUES (?, ?, ?)
+	_, err := tx.Exec(`INSERT INTO counts (day, name, n) VALUES (?, ?, ?)
 		ON CONFLICT (day, name) DO UPDATE SET n = n + excluded.n`, dayOf(day), name, n)
 	return err
 }
@@ -68,12 +60,11 @@ type Period struct {
 	Total int64 `json:"total"`
 }
 
-// Totals are the numbers of the landing page: deploys, knocks and
-// installs over time, and the servers and apps that run now.
+// Totals are the numbers of the landing page: deploys and knocks over
+// time, and the servers and apps that run now.
 type Totals struct {
-	Deploys  Period `json:"deploys"`
-	Knocks   Period `json:"knocks"`
-	Installs Period `json:"installs"`
+	Deploys Period `json:"deploys"`
+	Knocks  Period `json:"knocks"`
 	// Servers reported in the last 10 minutes; Apps are their apps.
 	Servers int64 `json:"servers"`
 	Apps    int64 `json:"apps"`
@@ -88,7 +79,7 @@ func (c *Counts) Totals(now time.Time) (Totals, error) {
 	for _, count := range []struct {
 		name   string
 		period *Period
-	}{{Deploys, &t.Deploys}, {Knocks, &t.Knocks}, {Installs, &t.Installs}} {
+	}{{Deploys, &t.Deploys}, {Knocks, &t.Knocks}} {
 		var err error
 		if count.period.Month, err = c.Sum(count.name, month, now); err != nil {
 			return t, err
