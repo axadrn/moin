@@ -23,7 +23,7 @@ func TestBackupNeeds(t *testing.T) {
 	proven := protocol.NewCopyID(time.Date(2026, 11, 26, 3, 0, 0, 0, time.UTC))
 	failed := map[string][]protocol.DatabaseBackup{"shop": {{Database: "data/app.db", CheckError: "no such table: users", CheckedCopy: proven}}}
 	needs = backupNeeds(withBucket, failed)
-	if len(needs) != 1 || needs[0].Text != "shop: today's backup did not restore. Last proven copy: Nov 26 03:00 UTC." || needs[0].Command != "moin backups shop" {
+	if len(needs) != 1 || needs[0].Text != "shop: today's backup is not proven. Last proven copy: Nov 26 03:00 UTC." || needs[0].Command != "moin backups shop" {
 		t.Fatalf("a failed check: %+v", needs)
 	}
 	failed["shop"][0].CheckedCopy = ""

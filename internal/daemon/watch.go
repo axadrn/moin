@@ -277,7 +277,7 @@ func (w *watch) problems(config Config, containers map[string]appContainers, sta
 				add("backup/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the backup of %s fails", app, status.Database), status.Error)
 			}
 			if status.CheckError != "" {
-				add("check/"+app+"/"+status.Database, app, fmt.Sprintf("%s: a backup of %s did not restore", app, status.Database), status.CheckError)
+				add("check/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the restore check of %s failed", app, status.Database), status.CheckError)
 			}
 			if status.CheckedAt != nil && config.Bucket != nil && time.Since(*status.CheckedAt) > checkLate {
 				add("check-late/"+app+"/"+status.Database, app, fmt.Sprintf("%s: the restore check of %s is late", app, status.Database), "The last one ran "+status.CheckedAt.UTC().Format("Jan 2 15:04 UTC")+". One should run every day.")

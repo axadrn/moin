@@ -283,13 +283,13 @@ func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, err
 func (e *sqliteEngine) Check(ctx context.Context, from source) error {
 	dir, err := e.tempDir("check", from.size)
 	if err != nil {
-		return err
+		return notChecked{err}
 	}
 	defer os.RemoveAll(dir)
 	file := filepath.Join(dir, "check.db")
 	out, err := os.Create(file)
 	if err != nil {
-		return err
+		return notChecked{err}
 	}
 	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		return err

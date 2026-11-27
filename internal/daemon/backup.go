@@ -301,12 +301,21 @@ var errNoTaker = errors.New("no bucket, and no watcher that takes copies")
 // uploaded. Why is in the state of its database (noteCheck).
 var errNotRestored = errors.New("the copy did not restore, so it was not uploaded")
 
+// notChecked is a check that could not run: no room for it, or the
+// database is not reachable. It says nothing about the copy.
+type notChecked struct{ err error }
+
+func (e notChecked) Error() string { return e.err.Error() }
+func (e notChecked) Unwrap() error { return e.err }
+
 // copyTo takes a copy of a database as id. It is written to a file on
 // the server first, encrypted (encrypt), so its size is known. From there
 // it goes into the bucket, when the server has one. A scheduled copy also
 // goes to the watchers that take copies (toCloud), and when a check is due
-// (checkDue) it is restored from the file first: only a copy that restores
-// is uploaded, and exactly the bytes that did. Nothing is copied for
+// (checkDue) it is restored from the file first: a copy that does not
+// restore is not uploaded, and one that does goes up with exactly those
+// bytes. A check that could not run (notChecked) holds no copy back: it
+// goes up unproven, and the database's state says why. Nothing is copied for
 // nobody: the watchers are asked before the copy is made. A server
 // without a bucket has its copy when one watcher took it.
 func (b *backups) copyTo(ctx context.Context, app string, database protocol.Database, id string, scheduled bool) (string, error) {
@@ -337,7 +346,10 @@ func (b *backups) copyTo(ctx context.Context, app string, database protocol.Data
 				return "", ctx.Err()
 			}
 			b.noteCheck(app, database, id, false, err)
-			return "", fmt.Errorf("copy %s: %w", database.Path, errNotRestored)
+			if !errors.As(err, new(notChecked)) {
+				return "", fmt.Errorf("copy %s: %w", database.Path, errNotRestored)
+			}
+			check = false
 		}
 	}
 	if config.Bucket != nil {
@@ -863,6 +875,8 @@ func (b *backups) noteCheck(app string, database protocol.Database, id string, c
 		return
 	case cut:
 		s.CheckError = "could not read the copy " + id + ": " + shortS3(err)
+	case errors.As(err, new(notChecked)):
+		s.CheckError = "could not check the copy " + id + ": " + err.Error()
 	default:
 		s.CheckError = "the copy " + id + " did not restore: " + err.Error()
 	}

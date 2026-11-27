@@ -317,12 +317,12 @@ func (e *postgresEngine) waitForPostgres(ctx context.Context) (pgTarget, error) 
 func (e *postgresEngine) Check(ctx context.Context, from source) error {
 	t, err := e.target(ctx)
 	if err != nil {
-		return err
+		return notChecked{err}
 	}
 	check := t
 	check.database = moinName("check", t.database)
 	if err := pgRoom(ctx, t, from.size); err != nil {
-		return err
+		return notChecked{err}
 	}
 	defer admin(context.WithoutCancel(ctx), t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": check.database})
 	if err := load(ctx, t, check.database, from.copy); err != nil {

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -280,6 +281,25 @@ func TestNoCopyWithoutBucketAndWatcher(t *testing.T) {
 // A copy that does not restore goes nowhere, not into the bucket and not
 // to moin cloud, and is the problem every surface alerts. The next copy
 // waits, is restored first again, and proves the backup.
+// A check that has no folder to unpack in could not run: that is not a
+// copy that did not restore.
+func TestACheckThatCouldNotRunIsNotABrokenCopy(t *testing.T) {
+	journal(t)
+	b, database := shopWithSQLite(t)
+	if err := os.WriteFile(b.apps.tempDir(), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := b.engine("shop", database).Check(context.Background(), source{})
+	if !errors.As(err, new(notChecked)) {
+		t.Fatalf("the check said: %v", err)
+	}
+	b.noteCheck("shop", database, "01COPY", false, err)
+	status := b.status(context.Background(), "shop", database, false)
+	if !strings.HasPrefix(status.CheckError, "could not check the copy 01COPY: ") || status.CheckedCopy != "" {
+		t.Errorf("status: %+v", status)
+	}
+}
+
 func TestACopyThatDoesNotRestoreIsNotUploaded(t *testing.T) {
 	journal(t)
 	b, database := shopWithSQLite(t)
@@ -297,7 +317,7 @@ func TestACopyThatDoesNotRestoreIsNotUploaded(t *testing.T) {
 		t.Fatalf("status: %+v", status)
 	}
 	needs := backupNeeds(b.config(), map[string][]protocol.DatabaseBackup{"shop": {status}})
-	if len(needs) != 1 || needs[0].Text != "shop: today's backup did not restore. Last proven copy: none yet." {
+	if len(needs) != 1 || needs[0].Text != "shop: today's backup is not proven. Last proven copy: none yet." {
 		t.Errorf("needs: %+v", needs)
 	}
 	problems := newWatch(b.apps).problems(b.config(), nil, map[string][]protocol.DatabaseBackup{"shop": {status}})

@@ -85,8 +85,8 @@ func backupKeyNeeds(config Config) []Need {
 
 // backupNeeds says what the backups of the apps need: an app with a
 // database on a server without a bucket has no copy at all, unless a
-// watcher took one, and a copy that did not restore in its check may not
-// come back either. They come from what the daemon wrote down, by app.
+// watcher took one, and a copy no check has proven may not come back
+// either. They come from what the daemon wrote down, by app.
 func backupNeeds(config Config, statuses map[string][]protocol.DatabaseBackup) []Need {
 	var needs []Need
 	for _, app := range slices.Sorted(maps.Keys(statuses)) {
@@ -111,7 +111,7 @@ func backupNeeds(config Config, statuses map[string][]protocol.DatabaseBackup) [
 			if at, ok := protocol.CopyTime(database.CheckedCopy); ok {
 				proven = "Last proven copy: " + at.UTC().Format("Jan 2 15:04 UTC") + "."
 			}
-			needs = append(needs, Need{Text: app + ": " + what + " did not restore. " + proven, Command: build.Name + " backups " + app})
+			needs = append(needs, Need{Text: app + ": " + what + " is not proven. " + proven, Command: build.Name + " backups " + app})
 		}
 	}
 	return needs
