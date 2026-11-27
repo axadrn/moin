@@ -9,7 +9,7 @@ moin puts your app on your own server. It backs up its database, and every day i
 
 You need two things:
 
-- A Linux server you can reach with `ssh prod`, as root. Any provider.
+- A Linux server you can reach with `ssh prod`, as root or with `sudo`. 64-bit, Intel or ARM. Any provider.
 - Your app in a git repository on your laptop.
 
 That is all. No account. No Docker on your laptop.
@@ -19,10 +19,10 @@ That is all. No account. No Docker on your laptop.
 On your Mac or Linux laptop:
 
 ```bash
-curl -fsSL https://moin.example.com/cli.sh | sh
+curl -fsSL https://moin.run/cli.sh | sh
 ```
 
-Later, `moin update` updates it.
+It puts `moin` in `/usr/local/bin`, or in `~/.local/bin` when that is not writable. Later, `moin update` updates it.
 
 ## 2. Deploy
 
@@ -37,12 +37,17 @@ moin deploy prod
 
 ```text
 shop · 3f2a9c1 → prod
-Set up moin on prod and deploy shop? [y/N] y
+? Set up moin on prod and deploy shop? [y/N] y
+→ installing moin v1.2.3
+→ starting the daemon: backups, restore checks, reports
+→ building
+→ starting
+→ v1 is live
 ✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
-  Postgres found. No bucket yet: moin bucket set prod
+  Postgres found. See its backups: moin backups shop
 ```
 
-Your app is live, with HTTPS. On a fresh server this takes about two minutes. Most of it is installing Docker.
+Your app is live, with HTTPS. On a fresh server this takes about two minutes. Most of it is installing Docker. What Docker and the build print shows dimmed, between the steps.
 
 ## What happened
 
@@ -54,15 +59,13 @@ Your app is live, with HTTPS. On a fresh server this takes about two minutes. Mo
 
 The app is named after the folder: `shop`. From now on, `moin deploy` in the folder is enough.
 
-## 3. Close public SSH
+## 3. See it
 
-Right after the first deploy, moin asks:
-
-```text
-Close public SSH, only Tailscale from now on? [Y/n]
+```bash
+moin
 ```
 
-Press Enter. From now on, nobody on the internet can reach port 22. You still reach the server, over Tailscale. [Security](/docs/security#ssh-only-over-tailscale)
+On a terminal, this opens the terminal UI: every server and every app, live. Pick an app and press Enter for its logs and backups. `q` quits. [The terminal UI](/docs/cli#the-terminal-ui)
 
 ## 4. Back it up
 
@@ -72,9 +75,19 @@ moin finds SQLite and Postgres by itself. It needs a place to put the copies: a 
 moin bucket set prod
 ```
 
-moin asks for the endpoint, the bucket's name, the access key and the secret key. The secret never lands in your shell history. From then on it copies every database on a schedule, and checks one copy every day. [Backups](/docs/backups)
+moin asks for the endpoint, the bucket's name, the access key and the secret key. The secret never lands in your shell history. The server tries the bucket first, and keeps it only when that works.
 
-## 5. Add your domain
+```text
+✓ prod backs up to backups. The first copies come within a minute
+```
+
+From then on it copies every database every hour, and every day it restores the newest copy and reads it. [Backups](/docs/backups)
+
+## 5. Watch it
+
+A dead server can't tell you it's dead. A watcher on another machine notices. Set one up in four commands. [Watcher](/docs/watcher#set-one-up)
+
+## 6. Add your domain
 
 ```bash
 moin domains add shop shop.example.com
@@ -82,10 +95,21 @@ moin domains add shop shop.example.com
 
 Where you bought the domain, add an A record: `shop.example.com` to your server's IP. HTTPS comes by itself once the DNS points at the server. [Deploy](/docs/deploy#domains)
 
+## Coming: close public SSH
+
+Right after the first deploy, moin will ask:
+
+```text
+Close public SSH, only Tailscale from now on? [Y/n]
+```
+
+Press Enter. From then on, nobody on the internet can reach port 22. You still reach the server, over Tailscale. [Security](/docs/security#ssh-only-over-tailscale)
+
 ## If something breaks
 
 - **`ssh prod` does not work.** Fix that first. moin goes the same way.
-- **The build fails.** moin shows why. The live deploy keeps running.
+- **You log in as a user, not as root.** moin runs `sudo` for you. It needs sudo without a password.
+- **The build fails.** moin shows why. The live release keeps running.
 - **The new deploy does not start.** moin says why, and the deploy before it runs again.
 - **The first deploy fails halfway.** Run `moin deploy prod` again. What is installed already stays.
 

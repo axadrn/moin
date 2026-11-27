@@ -2,7 +2,7 @@
 title: "FAQ"
 description: "Short answers: what moin is, what it needs, where your data is, who can reach your server, and the license."
 group: "Reference"
-order: 2
+order: 3
 ---
 
 ## What is moin?
@@ -11,7 +11,7 @@ Deploy anything. Lose nothing. Like `ssh prod` and `./deploy.sh`, in one command
 
 ## Is there a dashboard?
 
-No. The CLI is the interface, with `--json` for scripts and AI agents. A terminal UI is coming. A watcher has one small page that only shows.
+No. The CLI is the interface, with `--json` for scripts and AI agents. `moin` alone opens a terminal UI. A watcher has one small page that only shows. [CLI](/docs/cli)
 
 ## Do I need an account?
 
@@ -23,7 +23,7 @@ Not on your laptop. moin installs Docker on the server. Only `moin deploy --imag
 
 ## Which servers work?
 
-Any Linux server you can reach with SSH as root. Any provider.
+Any 64-bit Linux server, Intel or ARM, you can reach with SSH. As root, or as a user with sudo without a password. Any provider.
 
 ## Does moin build on its own servers?
 
@@ -43,7 +43,7 @@ No. moin backs up databases: SQLite and Postgres. [Backups](/docs/backups)
 
 ## Can my team deploy?
 
-Everyone with an SSH key on the server can. `moin keys add prod anna.pub`. [The team](/docs/security#the-team)
+Everyone whose SSH key may log in as root can. `moin keys add prod anna.pub`. [The team](/docs/security#the-team)
 
 ## Can an AI agent use it?
 

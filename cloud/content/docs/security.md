@@ -14,7 +14,7 @@ moin keeps the doors shut. And no service holds a key to your server: only you d
 Whoever can SSH to it as root. Nobody else.
 
 - Not a watcher, not moin cloud, not us. They only receive reports.
-- Every SSH user who may run moin is as strong as root on that server. A user who is not root runs moin with `sudo`.
+- Every SSH user who may run moin is as strong as root on that server. For a user who is not root, moin runs `sudo` by itself. That needs sudo without a password.
 - Coming: `moin follow`. Then whoever can push to the branch it follows can deploy too.
 
 ## The team
@@ -24,18 +24,19 @@ Your team is the SSH keys on the server. Whoever has a key there is on the team.
 ```bash
 moin keys prod
 moin keys add prod anna.pub
-moin keys rm prod anna
+moin keys rm prod anna@laptop
 ```
 
-- `moin keys prod` lists the keys, by name.
-- `moin keys add` adds a public key. Its name is the file's name: `anna`.
-- `moin keys rm` takes one away. Anna can't log in from then on.
+- `moin keys prod` lists the keys that may log in as root, by name and fingerprint. They are the lines of `/root/.ssh/authorized_keys`.
+- `moin keys add` adds a public key, from its `.pub` file. A private key never leaves your laptop: moin refuses one.
+- A key's name is the comment at its end, like `anna@laptop`. `moin keys rm` takes it by that name, or by its fingerprint. Anna can't log in from then on.
+- `moin keys rm` never takes out the key you are logged in with, so you can't lock yourself out.
 
 With Tailscale, your tailnet's rules decide too: who may reach the server at all. There are no moin accounts.
 
 ## SSH only over Tailscale
 
-A fresh server only answers SSH on public port 22. So the first deploy goes that way. Right after it, moin asks:
+Coming. A fresh server only answers SSH on public port 22. So the first deploy goes that way. Right after it, moin asks:
 
 ```text
 Close public SSH, only Tailscale from now on? [Y/n]
@@ -64,6 +65,8 @@ Without it, whoever controls your Tailscale account could add a device to your t
 
 ## Cloudflare Tunnel and the firewall
 
+Coming.
+
 ```bash
 moin secure prod
 ```
@@ -82,7 +85,7 @@ After it, no public TCP port is left on the server.
 
 ## The way back in
 
-Lost your laptop, or your tailnet? Use your provider's web console. It is a screen and a keyboard on the server, in your browser.
+Coming, with `moin secure`. Lost your laptop, or your tailnet? Use your provider's web console. It is a screen and a keyboard on the server, in your browser.
 
 Log in there as root and run:
 
@@ -102,8 +105,9 @@ moin update prod
 ```
 
 - `moin update` updates the CLI on your laptop.
-- `moin update prod` sends that same version to the server, over SSH. Your apps keep running.
-- A watcher tells you when a new version is out. You decide when.
+- `moin update prod` puts that same version on the server, over SSH. Your apps keep running.
+- Once a day the CLI asks GitHub for the newest release, and says so when one is out. You decide when.
+- `moin deploy` says so when the server runs another version than your CLI. The watcher's page shows the version of each server.
 
 Each release is signed. moin checks the signature before it installs anything. The signing key never leaves a protected place in GitHub: only a release tag reaches it, and only after a maintainer approves.
 

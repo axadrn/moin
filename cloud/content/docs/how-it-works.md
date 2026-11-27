@@ -31,7 +31,7 @@ There is one program, `moin`. The same file runs in three places.
 | Where | What it does |
 | --- | --- |
 | your laptop | `moin deploy prod` and every other command. It logs in to the server over SSH and runs `moin` there. |
-| the server | `moin daemon` runs the timers: backups, the daily restore check, reports to the watchers, alerts. It takes no commands. |
+| the server | `moin daemon` runs the timers: backups, the daily restore check, a report to the watchers every minute, alerts, and a daily cleanup of old images. It takes no commands. Its systemd service is `moin-daemon`. |
 | another server | `moin watcher run`, if you run your own. [Watcher](/docs/watcher) |
 
 ## Commands go in
@@ -39,12 +39,13 @@ There is one program, `moin`. The same file runs in three places.
 `moin deploy prod` is `ssh prod`, then the work on the server. There is no service in between.
 
 - Who can command your server: whoever can SSH to it as root. Nobody else.
-- moin opens no port for itself. After the first deploy, public SSH closes too. [Security](/docs/security)
+- moin opens no port for itself. Coming: after the first deploy, public SSH closes too. [Security](/docs/security)
+- moin runs as root on the server. For a user who is not root, it runs `sudo` by itself.
 - Your laptop keeps a list of the servers you deployed to, in `~/.config/moin/servers`. `moin` alone shows them. On a new laptop, `moin servers add prod` puts one back.
 
 ## Reports go out
 
-The daemon tells each watcher what it sees: the apps, their domains, the backups and the last restore check. The watcher answers with a status code, and the daemon acts on nothing in it.
+Every minute the daemon tells each watcher what it sees: the apps, their domains, the backups and the last restore check. The watcher answers with a status code, and the daemon acts on nothing in it.
 
 - The daemon alerts what it sees while it lives: a backup that failed, a check that failed, an app that crashes, a full disk.
 - A watcher alerts what a dead server can't: that it went silent, or that a domain is down from outside.
@@ -68,8 +69,8 @@ No registry, no build on your laptop, no CI needed.
 | Path | What |
 | --- | --- |
 | `/usr/local/bin/moin` | the program |
-| `/etc/moin/config.yml` | the bucket, the alerts and the watchers. Root only. |
-| `/var/lib/moin/apps/<app>/` | each app: its deploys, its env, its data |
+| `/etc/moin/config.yml` | the server's name, the bucket, the alerts, the watchers and the backup schedule. Root only. [Server config](/docs/config) |
+| `/var/lib/moin/apps/<app>/` | each app: its releases, its env, its data |
 | `/var/lib/moin/apps/<app>/app.env` | the app's env vars. Root only. |
 | `/var/lib/moin/apps/<app>/volumes/` | the data of folders like `./data` in your compose file |
 

@@ -2,7 +2,7 @@
 title: "How moin ships"
 description: "From a change to your server: pull requests, deploys of the site, signed releases, and updates you run yourself."
 group: "Reference"
-order: 3
+order: 4
 ---
 
 This page is the one place that says how a change gets from the code to your server. When that changes, this page changes in the same pull request.
@@ -50,10 +50,10 @@ So nobody sees a new version before its signed release is complete.
 Nothing updates by itself. Not the CLI, not a server, not a watcher.
 
 - `moin update` updates the CLI on your laptop.
-- `moin update prod` sends that same version to the server, over SSH, and checks its signature. Your apps keep running.
-- A watcher tells you when a new version is out.
+- `moin update prod` puts that same version on the server, over SSH. The server downloads it, checks its signature, and restarts the daemon. Your apps keep running.
+- Once a day the CLI says when a new version is out.
 
-A release that needs a step before or after the update, like stopping apps, does it in `moin update <server>`. You never do a step by hand. [Updates](/docs/security#updates)
+What a release needs from you, if anything, is in its notes, under Upgrade. [Updates](/docs/security#updates)
 
 ## Your version
 

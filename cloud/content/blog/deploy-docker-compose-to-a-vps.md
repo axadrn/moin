@@ -100,6 +100,6 @@ This is a real deploy, and many apps run like this for years. But it leaves a fe
 
 ## How moin does it
 
-[moin](/) takes the same `compose.yml` and does the rest with one command, `moin deploy prod`: HTTPS from the first deploy, backups of SQLite and Postgres with a check every day that a copy restores, a watcher that tells you when the server is gone, and rollback to an earlier deploy. After the first deploy, public SSH closes.
+[moin](/) takes the same `compose.yml` and does the rest with one command, `moin deploy prod`: HTTPS from the first deploy, backups of SQLite and Postgres with a check every day that a copy restores, a watcher that tells you when the server is gone, and rollback to an earlier deploy.
 
 [Get started](/docs/getting-started) takes a fresh server to a live app in about two minutes.

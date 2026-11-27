@@ -79,6 +79,6 @@ Or don't publish at all. Containers in one compose file reach each other by name
 
 ## How moin does it
 
-[moin](/) does these steps for you. After the first deploy it closes public SSH, so you reach the server only over Tailscale. `moin secure prod` adds the Cloudflare Tunnel and the firewall. moin itself needs no open port: it comes in over your SSH, and reports go out.
+moin itself needs no open port: it comes in over your SSH, and reports go out. Soon [moin](/) does these steps for you too. After the first deploy it will close public SSH, so you reach the server only over Tailscale. `moin secure prod` will add the Cloudflare Tunnel and the firewall.
 
 [Security](/docs/security) has the whole picture.
