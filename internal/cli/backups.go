@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"filippo.io/age"
 
 	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/internal/build"
@@ -42,7 +45,8 @@ const shownCopies = 10
 // backups is `moin backups [app]`: the copies of the app's databases,
 // the last daily check and the copy it proved.
 func backups(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("backups", "backups [app] [-s server] [--json]").withServer().withJSON()
+	flags := newFlags("backups", "backups [app] [--from <server>] [-s server] [--json]").withServer().withJSON()
+	from := flags.String("from", "", "see the copies another server left in the bucket, like one that is gone")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -51,7 +55,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
-		databases, err := appBackups(ctx, server, app, os.Stderr)
+		databases, err := backupsFrom(ctx, server, app, *from, os.Stderr)
 		if err != nil {
 			return err
 		}
@@ -72,8 +76,14 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 // appBackups is how the databases of app are backed up: the copies, the
 // undos and the last check of each.
 func appBackups(ctx context.Context, server, app string, stderr io.Writer) ([]protocol.DatabaseBackup, error) {
+	return backupsFrom(ctx, server, app, "", stderr)
+}
+
+// backupsFrom is appBackups with the copies another server left in the
+// bucket, like one that is gone; "" is this server.
+func backupsFrom(ctx context.Context, server, app, from string, stderr io.Writer) ([]protocol.DatabaseBackup, error) {
 	var databases []protocol.DatabaseBackup
-	err := sshAnswer(ctx, server, []string{"backups", app}, nil, stderr, &databases)
+	err := sshAnswer(ctx, server, []string{"backups", app, "--from", from}, nil, stderr, &databases)
 	return databases, err
 }
 
@@ -90,7 +100,11 @@ func printBackup(stdout io.Writer, app string, database protocol.DatabaseBackup,
 			rows = append(rows, []string{style.Muted.Render(fmt.Sprintf("and %d older, see --json", len(database.Copies)-shownCopies)), "", ""})
 			break
 		}
-		rows = append(rows, []string{copy.ID, human.Ago(copy.At, now), human.Size(float64(copy.Size))})
+		size := human.Size(float64(copy.Size))
+		if copy.Plain {
+			size += ", not encrypted"
+		}
+		rows = append(rows, []string{copy.ID, human.Ago(copy.At, now), size})
 	}
 	for _, undo := range database.Undos {
 		rows = append(rows, []string{"undo-" + undo.ID, human.Ago(undo.At, now), "before a restore"})
@@ -107,8 +121,10 @@ func checkLine(database protocol.DatabaseBackup, now time.Time) string {
 	switch {
 	case database.CheckedAt == nil:
 		return style.Muted.Render("No restore check yet. The newest copy is restored and read once a day.")
+	case database.CheckError != "" && database.CheckedCopy != "":
+		return style.Danger.Render("✗") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError + ". The last copy that restored fine: " + database.CheckedCopy
 	case database.CheckError != "":
-		return style.Danger.Render("✗") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError
+		return style.Danger.Render("✗") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError + ". No copy restored fine yet"
 	}
 	return style.Success.Render("✓") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": the copy " + database.CheckedCopy + " restored and read fine"
 }
@@ -142,10 +158,15 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 // what it was before stays as an undo. On a terminal it shows the copies
 // and asks which one; a script names it with --to. What it asks goes to
 // stderr, so stdout holds only the answer of --json.
+//
+// When a server is gone, its copies come back on a new one with your
+// backup key: `moin restore shop -s new --from prod --to <copy> --key`.
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("restore", "restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>] [--database <name>] [-s server] [-y] [--json]").withServer().withYes().withJSON()
+	flags := newFlags("restore", "restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>] [--database <name>] [--from <server>] [--key] [-s server] [-y] [--json]").withServer().withYes().withJSON()
 	to := flags.String("to", "", "a copy, a time in UTC, or an undo: see `"+build.Name+" backups`")
 	database := flags.String("database", "", "the database, when the app has several")
+	from := flags.String("from", "", "restore a copy another server left in the bucket, like one that is gone")
+	withKey := flags.Bool("key", false, "open the copy with your backup key, which "+build.Name+" asks for: for a copy another server made")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -155,7 +176,7 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	}
 	return onApp(ctx, flags, app, func(server string) error {
 		if *to == "" {
-			*database, *to, err = pickCopy(ctx, server, app, *database, stdin, os.Stderr)
+			*database, *to, err = pickCopy(ctx, server, app, *database, *from, stdin, os.Stderr)
 			if err != nil {
 				return err
 			}
@@ -164,8 +185,19 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err := confirm(stdin, os.Stderr, flags.yes(), question); err != nil {
 			return err
 		}
+		line := []string{"restore", app, "--to", *to, "--database", *database, "--from", *from}
+		// Your key goes to the server on stdin, never on a command line. The
+		// server opens the copy with it and writes it nowhere.
+		var key io.Reader
+		if *withKey {
+			secret, err := askBackupKey(stdin, os.Stderr, "Your backup key:")
+			if err != nil {
+				return err
+			}
+			line, key = append(line, "--key-stdin"), strings.NewReader(secret.String()+"\n")
+		}
 		var restored daemon.Restored
-		if err := sshJSON(ctx, server, []string{"restore", app, "--to", *to, "--database", *database}, nil, &restored); err != nil {
+		if err := sshJSON(ctx, server, line, key, &restored); err != nil {
 			return err
 		}
 		if flags.json() {
@@ -177,14 +209,34 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	})
 }
 
+// askBackupKey reads your backup key: typed or pasted on a terminal,
+// without showing it, or one line from a pipe.
+func askBackupKey(stdin io.Reader, stdout io.Writer, question string) (*age.X25519Identity, error) {
+	if isTerminal(stdin) {
+		fmt.Fprint(stdout, style.Warning.Render("?")+" "+question+" ")
+	}
+	secret, err := readSecret(stdin)
+	if isTerminal(stdin) {
+		fmt.Fprintln(stdout)
+	}
+	if err != nil {
+		return nil, err
+	}
+	key, err := age.ParseX25519Identity(strings.TrimSpace(secret))
+	if err != nil {
+		return nil, errors.New("that is not a backup key: one starts with AGE-SECRET-KEY-1")
+	}
+	return key, nil
+}
+
 // pickCopy shows the copies and undos of the app's database and asks
 // which one to go back to. Enter takes the newest copy. An app with
 // several databases is asked which one first.
-func pickCopy(ctx context.Context, server, app, name string, stdin io.Reader, stdout io.Writer) (database, to string, err error) {
+func pickCopy(ctx context.Context, server, app, name, from string, stdin io.Reader, stdout io.Writer) (database, to string, err error) {
 	if !isTerminal(stdin) {
 		return "", "", fmt.Errorf("say what to go back to with --to. See the copies with `%s backups %s`", build.Name, app)
 	}
-	databases, err := appBackups(ctx, server, app, os.Stderr)
+	databases, err := backupsFrom(ctx, server, app, from, os.Stderr)
 	if err != nil {
 		return "", "", err
 	}
@@ -241,10 +293,20 @@ func ask(stdin io.Reader, stdout io.Writer, question, suggested string) (string,
 	return answer, nil
 }
 
-// bucket is `moin bucket <server>` and `moin bucket set <server> …`.
+// bucket is `moin bucket <server>`, and `moin bucket set|key|confirm
+// <server>`.
 func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) > 0 && args[0] == "set" {
+	verb := ""
+	if len(args) > 0 {
+		verb = args[0]
+	}
+	switch verb {
+	case "set":
 		return setBucket(ctx, args[1:], stdin, stdout)
+	case "key":
+		return bucketKey(ctx, args[1:], stdin, stdout)
+	case "confirm":
+		return bucketConfirm(ctx, args[1:], stdin, stdout)
 	}
 	flags := newFlags("bucket", "bucket <server> [--json]").withJSON()
 	if err := flags.parse(args); err != nil {
@@ -258,8 +320,15 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err := sshJSON(ctx, server, []string{"bucket"}, nil, &bucket); err != nil {
 		return err
 	}
+	key, err := backupKey(ctx, server)
+	if err != nil {
+		return err
+	}
 	if flags.json() {
-		return printJSON(stdout, bucket)
+		return printJSON(stdout, struct {
+			*daemon.Bucket
+			BackupKey *daemon.BackupKey `json:"backup_key"`
+		}{bucket, key})
 	}
 	if bucket == nil {
 		fmt.Fprintln(stdout, server+" has no bucket yet, so nothing is backed up.")
@@ -267,12 +336,219 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return nil
 	}
 	table(stdout, []string{"BUCKET", "ENDPOINT", "REGION", "PATH", "ACCESS KEY"}, [][]string{{bucket.Bucket, bucket.Endpoint, bucket.Region, bucket.Path, bucket.AccessKey}})
+	switch {
+	case key == nil:
+		fmt.Fprintln(stdout, style.Danger.Render("✗")+" No backup key of yours: when "+server+" is gone, nobody can read its copies.")
+		hint(stdout, "Make one with", build.Name+" bucket key "+server)
+	case !key.Confirmed:
+		fmt.Fprintln(stdout, style.Danger.Render("✗")+" You did not confirm your backup key yet: "+key.Public)
+		hint(stdout, "Confirm it with", build.Name+" bucket confirm "+server)
+	default:
+		fmt.Fprintln(stdout, style.Success.Render("✓")+" Every copy is encrypted for your backup key, which you confirmed: "+key.Public)
+	}
 	return nil
+}
+
+// backupKey asks server for the public half of your backup key, nil when
+// it has none.
+func backupKey(ctx context.Context, server string) (*daemon.BackupKey, error) {
+	var key *daemon.BackupKey
+	err := sshJSON(ctx, server, []string{"bucket", "key"}, nil, &key)
+	return key, err
+}
+
+// bucketKey is `moin bucket key <server>`: a new backup key of yours for
+// the server, made here on your laptop and shown once. The server gets
+// only its public half. --public takes a key you already have, like the
+// one of another server, instead of making one.
+func bucketKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("bucket key", "bucket key <server> [--public <age1…>] [-y]").withYes()
+	public := flags.String("public", "", "the public half of a backup key you already have, instead of a new one")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	has, err := backupKey(ctx, server)
+	if err != nil {
+		return err
+	}
+	if has != nil {
+		question := fmt.Sprintf("%s has a backup key of yours. Take another from now on? The copies made so far only open with the old one.", server)
+		if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+			return err
+		}
+	}
+	return newBackupKey(ctx, server, *public, stdin, stdout)
+}
+
+// newBackupKey gives server a backup key of yours: public, or a new one
+// that is shown once. On a terminal you confirm it right away.
+func newBackupKey(ctx context.Context, server, public string, stdin io.Reader, stdout io.Writer) error {
+	if public == "" {
+		key, err := age.GenerateX25519Identity()
+		if err != nil {
+			return err
+		}
+		public = key.Recipient().String()
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, style.Bold.Render("Your backup key for "+server+". It is shown once."))
+		fmt.Fprintln(stdout, "Every copy is encrypted before it leaves the server. When the server is gone,")
+		fmt.Fprintln(stdout, "only this key reads the copies. Keep it in your password manager.")
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "  "+key.String())
+		fmt.Fprintln(stdout)
+	}
+	if err := sendJSON(ctx, server, daemon.BackupKey{Public: public}, "bucket", "key", "set"); err != nil {
+		return err
+	}
+	if !isTerminal(stdin) {
+		hint(stdout, "Confirm that you have it with", build.Name+" bucket confirm "+server)
+		return nil
+	}
+	return confirmBackupKey(ctx, server, stdin, stdout)
+}
+
+// bucketConfirm is `moin bucket confirm <server>`: you paste your backup
+// key, and moin opens a fresh copy from the bucket with it, here on your
+// laptop. Until that worked, `moin` shows the server in red.
+func bucketConfirm(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("bucket confirm", "bucket confirm <server>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, err := flags.server()
+	if err != nil {
+		return err
+	}
+	return confirmBackupKey(ctx, server, stdin, stdout)
+}
+
+// confirmBackupKey asks for your backup key and proves it: the server
+// takes a copy of its smallest database now, moin fetches it as it lies
+// in the bucket, and opens and reads it here with your key. Then the
+// server writes down that the key is confirmed.
+func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdout io.Writer) error {
+	has, err := backupKey(ctx, server)
+	if err != nil {
+		return err
+	}
+	if has == nil {
+		return fmt.Errorf("%s has no backup key of yours yet: make one with `%s bucket key %s`", server, build.Name, server)
+	}
+	key, err := askBackupKey(stdin, stdout, "Paste your backup key, to confirm that you have it:")
+	if err != nil {
+		return err
+	}
+	if key.Recipient().String() != has.Public {
+		return fmt.Errorf("this is not the backup key of %s. Its public half is %s", server, has.Public)
+	}
+	var copy *daemon.KeyCopy
+	if err := sshJSON(ctx, server, []string{"bucket", "key", "copy"}, nil, &copy); err != nil {
+		return err
+	}
+	if copy != nil {
+		if err := fetchAndOpen(ctx, server, *copy, key); err != nil {
+			return fmt.Errorf("your key did not open the copy %s of %s: %w", copy.Copy, copy.Database, err)
+		}
+	}
+	if err := sendJSON(ctx, server, daemon.BackupKey{Public: has.Public}, "bucket", "key", "confirm"); err != nil {
+		return err
+	}
+	if copy == nil {
+		done(stdout, "This is the backup key of %s. It has no database to copy yet", server)
+		return nil
+	}
+	done(stdout, "Your key opens the copies of %s: it read the copy %s of %s from the bucket to the end", server, copy.Copy, copy.Database)
+	return nil
+}
+
+// fetchAndOpen fetches a copy from the server as it lies in the bucket,
+// and opens it here with key.
+func fetchAndOpen(ctx context.Context, server string, copy daemon.KeyCopy, key age.Identity) error {
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	go func() {
+		line := hereLine("bucket", "key", "send", copy.App, "--database", copy.Database, "--copy", copy.Copy)
+		writer.CloseWithError(sshRun(ctx, server, line, nil, writer, os.Stderr))
+	}()
+	return openCopy(reader, copy.Postgres, key)
+}
+
+// The first bytes of what a copy holds: a SQLite file, or a pg_dump in
+// its custom format.
+const (
+	sqliteStart   = "SQLite format 3\x00"
+	postgresStart = "PGDMP"
+)
+
+// openCopy decrypts a copy with key and reads it to its end: a gzipped
+// SQLite file, or a dump of Postgres. Every part of it is checked on the
+// way, so a copy that is cut short or changed does not pass.
+func openCopy(encrypted io.Reader, postgres bool, key age.Identity) error {
+	plain, err := daemon.DecryptCopy(encrypted, key)
+	if err != nil {
+		return err
+	}
+	start := postgresStart
+	if !postgres {
+		start = sqliteStart
+		if plain, err = gzip.NewReader(plain); err != nil {
+			return fmt.Errorf("what it holds is not a database: %w", err)
+		}
+	}
+	first := make([]byte, len(start))
+	if _, err := io.ReadFull(plain, first); err != nil || string(first) != start {
+		return errors.New("what it holds is not a database")
+	}
+	_, err = io.Copy(io.Discard, plain)
+	return err
+}
+
+// hereBucketKey is `moin here bucket key …`, the server's side of your
+// backup key: `key` answers its public half, `key set` and `key confirm`
+// read one from stdin, `key copy` takes the copy that proves it, and
+// `key send` writes that copy to stdout as it lies in the bucket.
+func hereBucketKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	verb := ""
+	if len(args) > 0 {
+		verb = args[0]
+	}
+	switch verb {
+	case "":
+		key, err := daemon.BackupKeyHere()
+		return respond(stdout, key, err)
+	case "set", "confirm":
+		var key daemon.BackupKey
+		if err := json.NewDecoder(stdin).Decode(&key); err != nil {
+			return fmt.Errorf("read the key: %w", err)
+		}
+		if verb == "confirm" {
+			return daemon.ConfirmBackupKeyHere(key.Public)
+		}
+		return daemon.SetBackupKeyHere(key.Public)
+	case "copy":
+		copy, err := daemon.KeyCopyHere(ctx, daemon.StateDir(), os.Stderr)
+		return respond(stdout, copy, err)
+	case "send":
+		flags := newFlags("here bucket key send", "here bucket key send <app> --database <name> --copy <id>")
+		database := flags.String("database", "", "the database")
+		copy := flags.String("copy", "", "the copy")
+		app, err := hereApp(flags, args[1:])
+		if err != nil {
+			return err
+		}
+		return daemon.SendCopyHere(ctx, daemon.StateDir(), daemon.KeyCopy{App: app, Database: *database, Copy: *copy}, stdout)
+	}
+	return errors.New("usage: here bucket key [set|confirm|copy|send]")
 }
 
 // setBucket is `moin bucket set <server>`. On a terminal it asks for what
 // no flag gave, and always for the secret key, which a script pipes in.
-// The server keeps the bucket only when a test file went in and out.
+// The server keeps the bucket only when a test file went in and out. A
+// server without a backup key of yours gets one, shown once (newBackupKey).
 func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("bucket set", "bucket set <server> [--bucket <name>] [--access-key <key>] [--endpoint <url>] [--region <region>] [--path <folder>]")
 	var bucket daemon.Bucket
@@ -304,7 +580,13 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	}
 	done(stdout, "%s backs up to %s. The first copies come within a minute", server, bucket.Bucket)
 	hint(stdout, "See them with", build.Name+" backups <app>")
-	return nil
+	// Every copy is encrypted: a server that has no backup key of yours
+	// gets one now.
+	has, err := backupKey(ctx, server)
+	if err != nil || has != nil {
+		return err
+	}
+	return newBackupKey(ctx, server, "", stdin, stdout)
 }
 
 // askBucket asks on a terminal for what the flags left empty, and for the

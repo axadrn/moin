@@ -20,7 +20,8 @@ import (
 // folder to the server, which builds and starts it. The first deploy to a
 // server sets moin up there; later ones go to where the app runs.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [server] [--image <local image> | --catalog <name>] [--app <name>] [-y] [--json]").withServer().withYes().withJSON()
+	flags := newFlags("deploy", "deploy [server] [--image <local image> | --catalog <name>] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
+	noCopy := flags.Bool("no-copy", false, "deploy without the copy of the databases just before it, when that copy fails")
 	image := flags.String("image", "", "send this local image, like shop:dev, instead of building on the server")
 	catalogApp := flags.String("catalog", "", "deploy an app of the catalog, like umami, without a repo")
 	appName := flags.String("app", "", "the app's name; default this folder's name, or the catalog app's")
@@ -61,7 +62,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 			return err
 		}
 	}
-	result, err := runDeploy(ctx, server, app, *image, *catalogApp, log)
+	result, err := runDeploy(ctx, server, app, *image, *catalogApp, *noCopy, log)
 	if err != nil {
 		return err
 	}
@@ -138,8 +139,11 @@ func deploySource(ctx context.Context, image, catalogApp string, stdout io.Write
 }
 
 // runDeploy runs the deploy on the server and shows its log as it comes.
-func runDeploy(ctx context.Context, server, app, image, catalogApp string, stdout io.Writer) (daemon.Result, error) {
+func runDeploy(ctx context.Context, server, app, image, catalogApp string, noCopy bool, stdout io.Writer) (daemon.Result, error) {
 	args := []string{"deploy", app}
+	if noCopy {
+		args = append(args, "--no-copy")
+	}
 	if image != "" {
 		args = append(args, "--image", image)
 	}

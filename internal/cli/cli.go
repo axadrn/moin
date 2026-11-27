@@ -26,7 +26,7 @@ Usage
   moin <command>           Run one command
 
 Apps
-  deploy                   Deploy this folder: deploy prod the first time, then deploy [--image shop:dev] [--catalog umami] [--app shop]
+  deploy                   Deploy this folder: deploy prod the first time, then deploy [--image shop:dev] [--catalog umami] [--app shop] [--no-copy]
   apps                     Every app on every server [--json]
   rollback                 Go back to an older release, picked on a terminal: rollback [app] [--to v3]
   restart                  Start the app again, with its env and domains as they are now: restart [app]
@@ -43,9 +43,10 @@ Apps
   catalog                  Open source apps to deploy with deploy --catalog [--json]
 
 Backups
-  backups                  The copies of the app's databases and the last restore check: backups [app] [--json]
+  backups                  The copies of the app's databases and the last restore check: backups [app] [--from <server>] [--json]
   backup                   A copy now: backup [app]
   restore                  Go back to a copy, picked on a terminal; can be undone: restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>]
+                           The server is gone: on a new one, with your backup key: restore shop --from prod --to <copy> --key
 
 Servers
   servers                  Your servers and their watchers [--json]
@@ -55,7 +56,9 @@ Servers
   keys add                 Let one more key in: keys add prod anna.pub
   keys rm                  Take a key out; never the one you are logged in with: keys rm prod anna@laptop
   bucket                   Where the backups go: bucket prod [--json]
-  bucket set               Set it; asks for each value: bucket set prod
+  bucket set               Set it; asks for each value, and shows your backup key once: bucket set prod
+  bucket key               A new backup key of yours, or one you have: bucket key prod [--public age1…]
+  bucket confirm           Paste your backup key; it opens a fresh copy on your laptop: bucket confirm prod
   alerts                   Where alerts go: alerts prod [--json]
   alerts add               Add one: alerts add prod telegram --token … --chat-id …, or slack|discord|webhook --url …
   alerts rm                Remove one: alerts rm prod 2

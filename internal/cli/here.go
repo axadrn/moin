@@ -27,6 +27,8 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	// When you press Ctrl-C on your laptop, ssh goes and so do stdout and
 	// stderr. A deploy goes on to its end instead of dying on a write.
 	signal.Ignore(syscall.SIGPIPE)
+	// The server's log of this command goes to its journal, not to you.
+	daemon.LogToJournal()
 	dir := daemon.StateDir()
 	log := os.Stderr
 	verb, args := args[0], args[1:]
@@ -97,11 +99,13 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		return daemon.SetUpHere(ctx, server)
 	case "backups":
-		app, err := name()
+		flags := newFlags("here backups", "here backups <app> [--from <server>]")
+		from := flags.String("from", "", "another server's copies")
+		app, err := hereApp(flags, args)
 		if err != nil {
 			return err
 		}
-		value, err := daemon.BackupsHere(ctx, dir, app)
+		value, err := daemon.BackupsHere(ctx, dir, app, *from)
 		return respond(stdout, value, err)
 	case "backup":
 		app, err := name()
@@ -111,14 +115,22 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		value, err := daemon.BackupHere(ctx, dir, app, log)
 		return respond(stdout, value, err)
 	case "restore":
-		flags := newFlags("here restore", "here restore <app> --to <copy|time|undo-…> [--database <name>]")
+		flags := newFlags("here restore", "here restore <app> --to <copy|time|undo-…> [--database <name>] [--from <server>] [--key-stdin]")
 		to := flags.String("to", "", "what to go back to")
 		database := flags.String("database", "", "the database")
+		from := flags.String("from", "", "another server's copies")
+		keyOnStdin := flags.Bool("key-stdin", false, "your backup key comes on stdin")
 		app, err := hereApp(flags, args)
 		if err != nil {
 			return err
 		}
-		value, err := daemon.RestoreHere(ctx, dir, app, *to, *database, log)
+		restore := daemon.Restore{App: app, To: *to, Database: *database, From: *from}
+		if *keyOnStdin {
+			if restore.Key, err = readLine(stdin); err != nil {
+				return err
+			}
+		}
+		value, err := daemon.RestoreHere(ctx, dir, restore, log)
 		return respond(stdout, value, err)
 	case "bucket":
 		return hereBucket(ctx, args, stdin, stdout)
@@ -142,14 +154,15 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 // hereDeploy reads the source of a deploy from stdin, unless it is an app
 // of the catalog.
 func hereDeploy(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("here deploy", "here deploy <app> [--image <image>] [--catalog <name>]")
+	flags := newFlags("here deploy", "here deploy <app> [--image <image>] [--catalog <name>] [--no-copy]")
+	noCopy := flags.Bool("no-copy", false, "no copy of the databases before it")
 	image := flags.String("image", "", "a loaded image")
 	catalogApp := flags.String("catalog", "", "an app of the catalog")
 	app, err := hereApp(flags, args)
 	if err != nil {
 		return err
 	}
-	deploy := daemon.Deploy{App: app, Image: *image, Catalog: *catalogApp}
+	deploy := daemon.Deploy{App: app, Image: *image, Catalog: *catalogApp, NoCopy: *noCopy}
 	if *catalogApp == "" {
 		deploy.Source = stdin
 	}
@@ -281,6 +294,9 @@ func hereBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.W
 	if len(args) == 0 {
 		bucket, err := daemon.BucketHere()
 		return respond(stdout, bucket, err)
+	}
+	if args[0] == "key" {
+		return hereBucketKey(ctx, args[1:], stdin, stdout)
 	}
 	if len(args) != 1 || args[0] != "set" {
 		return errors.New("usage: here bucket [set]")

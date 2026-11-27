@@ -237,10 +237,12 @@ func overview(ctx context.Context, name string, args []string, stdout io.Writer)
 // watches, an app that does not run.
 func printNeeds(stdout io.Writer, rows []serverRow) {
 	var needs, open, knocked []string
+	var urgent []daemon.Need
 	for _, row := range rows {
 		if row.err != nil {
 			continue
 		}
+		urgent = append(urgent, row.status.Needs...)
 		if row.status.PublicSSH {
 			open = append(open, row.server)
 		}
@@ -256,7 +258,7 @@ func printNeeds(stdout io.Writer, rows []serverRow) {
 			}
 		}
 	}
-	if len(needs)+len(open)+len(knocked) > 0 {
+	if len(needs)+len(open)+len(knocked)+len(urgent) > 0 {
 		fmt.Fprintln(stdout)
 	}
 	for _, line := range knocked {
@@ -264,6 +266,9 @@ func printNeeds(stdout io.Writer, rows []serverRow) {
 	}
 	for _, server := range open {
 		fmt.Fprintln(stdout, style.Danger.Render(server+": port 22 open to the internet")+"  "+style.Muted.Render("Close it:")+" "+command(stdout, build.Name+" secure "+server))
+	}
+	for _, need := range urgent {
+		fmt.Fprintln(stdout, style.Danger.Render(need.Text)+"  "+command(stdout, need.Command))
 	}
 	for _, need := range needs {
 		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+commands(stdout, need))
