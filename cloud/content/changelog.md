@@ -54,15 +54,17 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **moin UI and moin next**: `/ui` and `/next` are gone.
 
 ### Upgrade
-Read all steps first. moin carries nothing over from the hub.
+Read all steps first. Your apps and their data stay. What lived in the hub does not: domains, the bucket, alerts.
 
 1. Install the new CLI on every laptop: `curl -fsSL https://moin.run/cli.sh | sh`.
-2. On each server from before, once: `ssh -t prod moin daemon uninstall`. The apps keep running, with their data. TODO(check): the new moin takes over these apps on the next deploy.
-3. In each app's folder: `moin deploy prod`. It sets moin up again and deploys.
-4. Set the bucket and the alerts again, they lived in the hub: `moin bucket set prod`, then `moin alerts add prod …`.
-5. Hosted accounts: sign in to moin cloud with the same mail, `moin cloud login`, then `moin cloud connect prod`. Early backers get their discount at the checkout.
-6. CI that deployed through the hub: remove that step, then `moin follow shop --branch main`.
-7. Self-hosted hub: turn it off, in `/opt/moin`: `docker compose down`. TODO(check)
+2. On each server from before, once: `ssh -t prod moin daemon uninstall`. The apps keep running, with their data.
+3. In each app's folder: `moin deploy prod`. It sets moin up and takes the app over, with its data and env. The folder needs the app's name, or add `--app <name>`. A catalog app: `moin deploy prod --catalog umami`. The web pauses for a few seconds.
+4. Add your domains again: `moin domains add shop shop.example.com`. Until then the app answers on its instant address.
+5. An app behind moin's password is public after step 3. Give it a login of its own first.
+6. Set the bucket and the alerts again: `moin bucket set prod`, then `moin alerts add prod …`. The old copies stay in the bucket, but moin no longer lists them. They are plain `.db.gz` and `.dump` files in a folder named by a long ID. Delete it once the new copies cover you.
+7. Hosted accounts: sign in to moin cloud with the same mail, `moin cloud login`, then `moin cloud connect prod`. Early backers get their discount at the checkout.
+8. CI that deployed through the hub: remove that step, then `moin follow shop --branch main`.
+9. Self-hosted hub: in `/opt/moin`, `docker compose down --rmi all`. Then `rm -rf /opt/moin /var/lib/moin-hub /etc/moin-hub /etc/moin/rules`. Nothing reads them anymore.
 
 ## v1.0.0-beta.37
 
