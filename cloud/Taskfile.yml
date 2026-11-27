@@ -18,8 +18,8 @@ tasks:
     cmds:
       - git ls-files --cached --others --exclude-standard "*.go" | grep -v _templ.go | xargs gofmt -w
       # Twice: the first pass can leave what only the second settles.
-      - go tool templ fmt hub
-      - go tool templ fmt hub
+      - go tool templ fmt cloud
+      - go tool templ fmt cloud
 
   dev:
     desc: Start the site with hot reload

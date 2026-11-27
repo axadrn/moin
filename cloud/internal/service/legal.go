@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
 // LegalPage is the terms or the privacy policy, from legal/<slug>.md.

@@ -13,7 +13,7 @@ import (
 var files embed.FS
 
 // FS is the texts: from disk in development, so an edit shows on reload, else
-// from the binary. The hub runs in hub/.
+// from the binary. The site runs in cloud/.
 func FS(development bool) fs.FS {
 	if development {
 		return os.DirFS("content")

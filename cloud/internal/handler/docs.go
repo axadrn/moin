@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/model"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // Docs is the docs: /docs the topics with every page, /docs/<slug> one

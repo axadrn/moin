@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/axadrn/moin/hub/internal/compare"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/compare"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // CompareIndex lists every tool at /compare.

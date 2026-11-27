@@ -3,7 +3,7 @@ package markdown
 import (
 	"bytes"
 
-	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/cloud/internal/model"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"

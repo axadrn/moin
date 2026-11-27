@@ -3,11 +3,11 @@ package pages
 import (
 	"encoding/json"
 
-	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/model"
-	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/components"
-	"github.com/axadrn/moin/hub/internal/ui/layouts"
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/model"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 )
 
 // jsonLD is data for search engines, as a script tag. json.Marshal escapes

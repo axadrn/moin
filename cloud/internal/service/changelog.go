@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/githubstars"
-	"github.com/axadrn/moin/hub/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/githubstars"
+	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
 // issueAtEnd is a "(#N)" that ends a list item of the changelog. The GitHub

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/compare"
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/compare"
 )
 
 // compareIndexDescription names the first tools and counts the rest, for

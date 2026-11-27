@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/internal/build"
 )
 

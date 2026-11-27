@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // Changelog shows what shipped, newest first. It reads the file on every

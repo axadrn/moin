@@ -10,7 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/cloud/internal/service"
 )
 
 // roadmapContent is a docs/roadmap.md as the site reads it.

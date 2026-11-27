@@ -11,7 +11,7 @@ RUN go mod download
 
 COPY . .
 
-WORKDIR /app/hub
+WORKDIR /app/cloud
 
 # Go files from the .templ files.
 RUN go tool templ generate
@@ -41,8 +41,8 @@ FROM alpine:3.24
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
 ENV APP_ENV=production
-COPY --from=build /app/hub/site .
-COPY --from=build /app/hub/downloads ./downloads
+COPY --from=build /app/cloud/site .
+COPY --from=build /app/cloud/downloads ./downloads
 EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 CMD wget -qO- http://127.0.0.1:8090/healthz >/dev/null || exit 1
 CMD ["./site"]

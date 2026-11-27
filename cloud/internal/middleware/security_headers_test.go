@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/moin/hub/internal/config"
+	"github.com/axadrn/moin/cloud/internal/config"
 )
 
 // Only scripts with the nonce of the page run, and nothing frames it.

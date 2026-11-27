@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // Blog lists the posts, newest first. Like the changelog it reads the files

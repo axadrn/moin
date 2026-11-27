@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
-	"github.com/axadrn/moin/hub/internal/config"
+	"github.com/axadrn/moin/cloud/internal/config"
 )
 
 // SecurityHeaders adds the security headers to every response. Each

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/axadrn/moin/hub/internal/catalog"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/catalog"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // CatalogHandler shows the apps of the catalog, read once at start.

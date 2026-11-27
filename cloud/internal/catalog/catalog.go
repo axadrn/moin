@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	catalogfiles "github.com/axadrn/moin/catalog"
-	"github.com/axadrn/moin/hub/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
 // Entry is one app of the catalog.

@@ -4,8 +4,8 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // Legal shows the terms or the privacy policy at /legal/{page}.

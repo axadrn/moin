@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
 // BlogPost is one article of the blog: a Markdown file in blog/, named

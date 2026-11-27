@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/compare"
-	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/compare"
+	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/ctxkeys"
 )
 
 func serveCompare(path string) *httptest.ResponseRecorder {

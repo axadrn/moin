@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/cloud/internal/service"
 )
 
 // HomeOpen is what the changelog says about how moin ships: how many

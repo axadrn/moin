@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/moin/hub/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
 // TestTheBinaryHoldsTheTexts: everything the site reads is in the binary, the

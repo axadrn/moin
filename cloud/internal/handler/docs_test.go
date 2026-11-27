@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/moin/hub/internal/catalog"
-	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
-	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/cloud/internal/catalog"
+	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/service"
 )
 
 func TestDocsHomeListsEveryPageUnderItsTopic(t *testing.T) {

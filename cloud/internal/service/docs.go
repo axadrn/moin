@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/markdown"
-	"github.com/axadrn/moin/hub/internal/model"
+	"github.com/axadrn/moin/cloud/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/model"
 )
 
 // docsGroups are the topics of the docs home, in their order. A page names

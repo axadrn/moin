@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/ctxkeys"
 )
 
 // Every page carries the page counter when Umami is set.

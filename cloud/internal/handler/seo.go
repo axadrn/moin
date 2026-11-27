@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/brand"
-	"github.com/axadrn/moin/hub/internal/catalog"
-	"github.com/axadrn/moin/hub/internal/compare"
-	"github.com/axadrn/moin/hub/internal/service"
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/catalog"
+	"github.com/axadrn/moin/cloud/internal/compare"
+	"github.com/axadrn/moin/cloud/internal/service"
 )
 
 // SEOHandler answers what search engines and AI tools read: robots.txt,

@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Generate templ files
-        working-directory: hub
+        working-directory: cloud
         run: go tool templ generate
 
       - name: Check module declarations

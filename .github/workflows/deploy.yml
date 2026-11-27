@@ -6,7 +6,7 @@ name: Deploy
 #   2. box: build the image of the site, ghcr.io/axadrn/moin, with the
 #      moin binaries cli.sh downloads. For a tag only as a candidate.
 #   3. release: for a tag, after a maintainer approves, the GitHub release
-#      with its notes from hub/content/changelog.md, the signed binaries
+#      with its notes from cloud/content/changelog.md, the signed binaries
 #      and the signed digest of the image; then the image gets its
 #      version, stable and latest.
 #   4. deploy: through Tailscale, the server of the site gets the deploy
@@ -57,7 +57,7 @@ jobs:
       # stable and latest only once its signed release is complete
       # (release, below), so nothing pulls a build nobody approved. A deploy
       # by hand is main-<commit> alone. image is the name the release and
-      # the deploy use. hub/content/docs/shipping.md
+      # the deploy use. cloud/content/docs/shipping.md
       - name: Tags
         id: tags
         run: |
@@ -124,9 +124,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          awk -v tag="## $TAG" '$0 == tag { on = 1; next } on && /^## / { exit } on' hub/content/changelog.md | sed '1,3d' > notes.md
+          awk -v tag="## $TAG" '$0 == tag { on = 1; next } on && /^## / { exit } on' cloud/content/changelog.md | sed '1,3d' > notes.md
           if [ ! -s notes.md ]; then
-            echo "hub/content/changelog.md has no section $TAG" >&2
+            echo "cloud/content/changelog.md has no section $TAG" >&2
             exit 1
           fi
           # A draft until every file is there: nobody sees a release
@@ -180,7 +180,7 @@ jobs:
         run: |
           tailscale ssh "root@$HOST" "mkdir -p /opt/moin"
           for file in update.sh compose.yml compose.tunnel.yml; do
-            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "hub/deploy/$file"
+            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "cloud/deploy/$file"
           done
           # The settings come from 1Password. The token in
           # /etc/moin-hub/op-token fills the op:// references of .env.tpl

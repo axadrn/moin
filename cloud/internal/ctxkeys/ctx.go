@@ -4,7 +4,7 @@ package ctxkeys
 import (
 	"context"
 
-	"github.com/axadrn/moin/hub/internal/config"
+	"github.com/axadrn/moin/cloud/internal/config"
 )
 
 type contextKey string

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"

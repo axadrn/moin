@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/catalog"
-	"github.com/axadrn/moin/hub/internal/service"
-	"github.com/axadrn/moin/hub/internal/ui/pages"
+	"github.com/axadrn/moin/cloud/internal/catalog"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
 // siteHits is how many answers the search of the site shows at most.

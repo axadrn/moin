@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/ctxkeys"
 )
 
 // RenderContext puts what templates may know into every request: the

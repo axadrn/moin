@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/axadrn/moin/hub/internal/markdown"
+	"github.com/axadrn/moin/cloud/internal/markdown"
 )
 
 // roadmapEntry is a list item of the roadmap: "**Name**: the rest".

@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axadrn/moin/hub/internal/config"
-	"github.com/axadrn/moin/hub/internal/routes"
+	"github.com/axadrn/moin/cloud/internal/config"
+	"github.com/axadrn/moin/cloud/internal/routes"
 )
 
 func main() {

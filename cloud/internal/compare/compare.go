@@ -3,7 +3,7 @@ package compare
 import (
 	"fmt"
 
-	"github.com/axadrn/moin/hub/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/brand"
 )
 
 // Mark is how a cell reads at a glance. The answer is judged by
