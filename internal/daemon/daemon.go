@@ -7,7 +7,6 @@ package daemon
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
@@ -44,28 +43,9 @@ func Run(ctx context.Context, dir string) error {
 	a.recoverDeploys(ctx)
 	go a.backups.loop(ctx)
 	go a.cleanups(ctx)
-	go keepSecurity(ctx, newSecurity(dir, a))
+	go keepSecurity(ctx, dir, a)
+	go newFollower(a, dir).loop(ctx)
+	go countKnocks(ctx, dir)
 	newWatch(a).loop(ctx)
 	return nil
-}
-
-// keepSecurity checks the server's security now and every securityEvery,
-// and puts back what drifted.
-func keepSecurity(ctx context.Context, s *security) {
-	ticker := time.NewTicker(securityEvery)
-	defer ticker.Stop()
-	for {
-		result := s.keep(ctx)
-		for _, fixed := range result.Fixed {
-			slog.Warn("security: put back", "what", fixed)
-		}
-		for _, problem := range result.Problems {
-			slog.Error("security", "problem", problem)
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
 }

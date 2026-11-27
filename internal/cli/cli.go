@@ -39,6 +39,7 @@ Apps
   domains                  The app's domains: domains [app] [--json]
   domains add              Add one; the certificate follows by itself: domains add [app] shop.example.com
   domains rm               Remove one: domains rm [app] shop.example.com [-y]
+  follow                   Deploy each new commit of a branch, read with a deploy key: follow [app] [--branch main] [--off]
   catalog                  Open source apps to deploy with deploy --catalog [--json]
 
 Backups
@@ -59,6 +60,8 @@ Servers
   alerts add               Add one: alerts add prod telegram --token … --chat-id …, or slack|discord|webhook --url …
   alerts rm                Remove one: alerts rm prod 2
   alerts test              Send a test alert: alerts test prod
+  secure                   SSH only over Tailscale, the web through a Cloudflare Tunnel, a firewall for the rest: secure prod
+  knocks                   What the firewall dropped, by port: knocks [server] [--json]
   update                   Update this CLI to the newest release
   update <server>          Put this CLI's version of moin on a server: update prod
 
@@ -69,6 +72,7 @@ Watcher
   watcher disconnect       It no longer does: watcher disconnect prod <url>
 
 On the server
+  unlock                   Open port 22 to the internet again, from your provider's web console
   daemon uninstall         Remove moin from this server; the apps keep running: daemon uninstall [--apps] [-y]
 
   version                  Show the version
@@ -169,7 +173,7 @@ func checksUpdates(args []string) bool {
 		return true
 	}
 	switch args[0] {
-	case "here", "daemon", "version", "--version", "update":
+	case "here", "daemon", "unlock", "version", "--version", "update":
 		return false
 	case "watcher":
 		return len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
@@ -225,6 +229,14 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return bucket(ctx, rest, stdin, stdout)
 	case "alerts":
 		return alerts(ctx, rest, stdin, stdout)
+	case "secure":
+		return secure(ctx, rest, stdin, stdout)
+	case "unlock":
+		return unlock(ctx, rest, stdout)
+	case "follow":
+		return follow(ctx, rest, stdin, stdout)
+	case "knocks":
+		return knocks(ctx, rest, stdout)
 	case "cloud":
 		return cloud(ctx, rest, stdin, stdout)
 	case "watcher":

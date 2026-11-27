@@ -126,6 +126,15 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		return hereAlerts(ctx, args, stdin, stdout)
 	case "watchers":
 		return hereWatchers(args, stdin, stdout)
+	case "tailnet":
+		return hereTailnet(ctx, args, stdin, stdout)
+	case "secure":
+		return hereSecure(ctx, stdin, stdout)
+	case "follow":
+		return hereFollow(ctx, args, stdin, stdout)
+	case "knocks":
+		value, err := daemon.KnocksHere(dir)
+		return respond(stdout, value, err)
 	}
 	return fmt.Errorf("%s on this server does not know `here %s`: put the CLI's version here with `%s update <server>`", build.Name, verb, build.Name)
 }

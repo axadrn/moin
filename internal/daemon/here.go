@@ -46,11 +46,11 @@ type Result struct {
 	Databases []string `json:"databases,omitempty"`
 }
 
-// hereApps is the daemon's apps without a daemon: direct proxy, no
-// registry logins.
+// hereApps is the daemon's apps without a daemon, with no registry
+// logins. The proxy runs in the mode server.json sets: behind a tunnel
+// once `moin secure` set one.
 func hereApps(dir string) *apps {
 	a := newApps(dir)
-	a.proxyMode = func() string { return "direct" }
 	a.registryLogin = func(string) string { return "" }
 	return a
 }

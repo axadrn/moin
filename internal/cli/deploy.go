@@ -70,6 +70,9 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return printJSON(stdout, result)
 	}
 	printLive(stdout, result)
+	if result.Release == 1 {
+		return offerClose(ctx, server, stdin, stdout)
+	}
 	return nil
 }
 

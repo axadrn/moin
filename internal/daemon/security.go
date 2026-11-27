@@ -1,51 +1,83 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/axadrn/moin/protocol"
+	"github.com/axadrn/moin/internal/build"
 )
 
-// How a server is reached and locked down. `moin secure` decides, the
-// daemon keeps it: the config is in server.json, and every few minutes
-// the daemon puts back what drifted.
+// How a server is closed to the internet. Two switches in server.json,
+// turned on only from your laptop:
 //
-//	direct  Traefik takes 80 and 443 and gets certificates itself.
-//	tunnel  cloudflared carries all app traffic from Cloudflare to Traefik's
-//	        tunnel entrypoint; no port is open. Cloudflare terminates HTTPS.
+//	ssh_on_tailscale  Public port 22 is closed. SSH works only through the
+//	                  tailnet. The question after the first deploy turns it on.
+//	firewall          Every other port is closed too, but 80 and 443 for the
+//	                  web, or none of them behind a Cloudflare Tunnel.
+//	                  `moin secure` turns it on.
+//
+// Only `moin unlock`, typed on the server, opens port 22 again. No port
+// ever opens by itself: the daemon puts the rules back when they are
+// gone, and a boot unit loads them before the network comes up.
 const (
 	serverConfigFile = "server.json"
 	tunnelImage      = "cloudflare/cloudflared:2026.9.3"
 	tunnelEntrypoint = "tunnel"
 	tunnelPort       = "8080"
 	tailscalePort    = "41641"
+	// tailnetInterface is the network card Tailscale makes. SSH that
+	// comes in on it comes from the tailnet.
+	tailnetInterface = "tailscale0"
 )
 
-// serverFile is server.json, 0600: the config `moin secure` set, and the
-// secrets of the server, which only the daemon keeps (protocol.SecretSet).
-// The hub forwards a secret once and knows only its name.
+// The rules live in a file too, and a small unit loads it at boot.
+var (
+	firewallFile     = "/etc/" + build.Name + "/firewall.nft"
+	firewallUnitFile = "/etc/systemd/system/" + build.Name + "-firewall.service"
+)
+
+var firewallUnit = `[Unit]
+Description=` + build.Name + ` firewall, before the network comes up
+DefaultDependencies=no
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f ` + firewallFile + `
+
+[Install]
+WantedBy=sysinit.target
+`
+
+// serverFile is server.json, 0600: what is closed on this server.
 type serverFile struct {
-	protocol.ServerConfig
-	// TunnelToken runs cloudflared, the tunnel is on while there is one.
+	// SSHOnTailscale: public port 22 is closed.
+	SSHOnTailscale bool `json:"ssh_on_tailscale,omitempty"`
+	// Firewall: every port is closed but the ones the server needs.
+	Firewall bool `json:"firewall,omitempty"`
+	// TunnelToken runs cloudflared. The web comes through it while
+	// there is one.
 	TunnelToken string `json:"tunnel_token,omitempty"`
-	// TailscaleKey joins the server to a tailnet.
-	TailscaleKey string `json:"tailscale_key,omitempty"`
 	// Registries are the registry logins by host, as <username>:<password>.
 	Registries map[string]string `json:"registries,omitempty"`
 }
 
-// loadServerFile reads server.json from dir; ok is false when there is none.
+// loadServerFile reads server.json from dir. ok is false when there is
+// none.
 func loadServerFile(dir string) (file serverFile, ok bool) {
 	body, err := os.ReadFile(filepath.Join(dir, serverConfigFile))
 	if err != nil {
@@ -54,15 +86,11 @@ func loadServerFile(dir string) (file serverFile, ok bool) {
 	return file, json.Unmarshal(body, &file) == nil
 }
 
-// security applies the server config and keeps it: after each start and
-// every securityEvery it puts back what drifted.
+// security is what is closed on this server, and the apps it closes
+// around.
 type security struct {
 	dir  string
 	apps *apps
-	// applying lets one apply or check run at a time.
-	applying sync.Mutex
-
-	mu   sync.Mutex
 	file serverFile
 }
 
@@ -71,24 +99,14 @@ func newSecurity(dir string, a *apps) *security {
 	return &security{dir: dir, apps: a, file: file}
 }
 
-func (s *security) current() serverFile {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.file
-}
-
-// known is whether a config was ever set, which always names SSH:
-// without one there is nothing to keep, only what is to report.
-func (f serverFile) known() bool { return f.SSH != "" }
-
-// save writes server.json whole, 0600. The caller holds mu.
+// save writes server.json whole, 0600.
 func (s *security) save() error {
 	return writeState(filepath.Join(s.dir, serverConfigFile), s.file)
 }
 
-// proxyMode is the mode the proxy runs in now.
+// proxyMode is "tunnel" while a tunnel token is set, else "direct".
 func (s *security) proxyMode() string {
-	if s.current().TunnelToken != "" {
+	if s.file.TunnelToken != "" {
 		return "tunnel"
 	}
 	return "direct"
@@ -97,217 +115,301 @@ func (s *security) proxyMode() string {
 // registryLogin is the server's login for a registry host, as
 // <username>:<password>, "" for none.
 func (s *security) registryLogin(host string) string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.file.Registries[host]
 }
 
-// setSecret keeps a secret under its name, or removes it when value is
-// empty (SecretSet). The tunnel and the tailnet take a new one with the
-// next server config, which the hub sends after it.
-func (s *security) setSecret(name, value string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	kind, of := protocol.SecretOf(name)
-	switch {
-	case name == protocol.SecretTunnel:
-		s.file.TunnelToken = value
-	case name == protocol.SecretTailscale:
-		s.file.TailscaleKey = value
-	case kind == "registry" && of != "":
-		s.file.Registries = setOrRemove(s.file.Registries, of, value)
-	default:
-		return fmt.Errorf("this daemon keeps no secret %q: update it", name)
-	}
-	return s.save()
+// Security is what is closed on this server, for the CLI.
+type Security struct {
+	// PublicSSH: port 22 is open to the internet.
+	PublicSSH bool `json:"public_ssh"`
+	Firewall  bool `json:"firewall"`
+	Tunnel    bool `json:"tunnel"`
+	// OpenPorts are the ports the firewall lets in from everywhere.
+	// Without the firewall every port is open.
+	OpenPorts []string `json:"open_ports"`
 }
 
-func setOrRemove(values map[string]string, key, value string) map[string]string {
-	if value == "" {
-		delete(values, key)
-		return values
+// securityNow says what is closed now: what server.json asks for and
+// whether the rules are really loaded.
+func (s *security) now(ctx context.Context) Security {
+	loaded := tableLoaded(ctx)
+	now := Security{
+		PublicSSH: listening(22) && !(s.file.SSHOnTailscale && loaded),
+		Firewall:  s.file.Firewall && loaded,
+		Tunnel:    s.file.TunnelToken != "",
+		OpenPorts: []string{},
 	}
-	if values == nil {
-		values = map[string]string{}
+	if now.Firewall {
+		now.OpenPorts = openPorts(s.file)
 	}
-	values[key] = value
-	return values
-}
-
-// apply sets up what config asks for. SSH that was off starts again when
-// it no longer is.
-func (s *security) apply(ctx context.Context, config protocol.ServerConfig) protocol.ServerConfigResult {
-	s.applying.Lock()
-	defer s.applying.Unlock()
-	s.mu.Lock()
-	before := s.file
-	if config.SSH == "" {
-		config.SSH = config.WantSSH()
-	}
-	s.file.ServerConfig = config
-	err := s.save()
-	file := s.file
-	s.mu.Unlock()
-	var problems []string
-	if err != nil {
-		problems = append(problems, "keep the config: "+err.Error())
-	}
-	if before.known() && before.WantSSH() == protocol.SSHOff && config.WantSSH() != protocol.SSHOff {
-		if err := startSSHD(ctx); err != nil {
-			problems = append(problems, "SSH: "+err.Error())
-		}
-	}
-	result := s.set(ctx, file)
-	result.Problems = append(problems, result.Problems...)
-	return result
-}
-
-// keep checks that the server still has what was set and puts back
-// what drifted: the tunnel, the tailnet, sshd off, the firewall. It never
-// starts sshd. Without a config it only looks.
-func (s *security) keep(ctx context.Context) protocol.ServerConfigResult {
-	s.applying.Lock()
-	defer s.applying.Unlock()
-	file := s.current()
-	if !file.known() {
-		after := look(ctx, s.apps)
-		return protocol.ServerConfigResult{Proxy: s.proxyMode(), TailscaleIP: after.tailnet, SSH: sshNow(after.sshd, false, false), OpenPorts: []string{}}
-	}
-	before := look(ctx, s.apps)
-	result := s.set(ctx, file)
-	fixed := drifted(file.ServerConfig, before, look(ctx, s.apps))
-	result.Fixed = fixed
-	return result
-}
-
-// seen is what a look at the server finds.
-type seen struct {
-	tunnel  bool
-	table   string
-	sshd    bool
-	tailnet string
-}
-
-// look sees what is on the server now: cloudflared, the daemon's
-// firewall table, sshd on port 22 and the tailnet address.
-func look(ctx context.Context, a *apps) seen {
-	var now seen
-	running, err := a.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", tunnelName)
-	now.tunnel = err == nil && strings.TrimSpace(running) == "true"
-	table, err := exec.CommandContext(ctx, "nft", "list", "table", "inet", firewallTable).Output()
-	if err == nil {
-		now.table = string(table)
-	}
-	now.sshd = listening(22)
-	now.tailnet = tailnetIP(ctx)
 	return now
 }
 
-// drifted names what a check put back, for the activity.
-func drifted(config protocol.ServerConfig, before, after seen) []string {
-	var fixed []string
-	if !before.tunnel && after.tunnel {
-		fixed = append(fixed, "the Cloudflare Tunnel")
-	}
-	if before.tailnet == "" && after.tailnet != "" {
-		fixed = append(fixed, "the tailnet")
-	}
-	if before.sshd && !after.sshd {
-		fixed = append(fixed, "SSH off")
-	}
-	if before.table != after.table {
-		switch {
-		case config.Firewall:
-			fixed = append(fixed, "the firewall")
-		case config.WantSSH() == protocol.SSHTailscale:
-			fixed = append(fixed, "SSH only through Tailscale")
-		default:
-			fixed = append(fixed, "the firewall off")
-		}
-	}
-	return fixed
+// PublicSSHHere says whether port 22 of this server is open to the
+// internet, for the red line in `moin`.
+func PublicSSHHere(ctx context.Context, dir string) bool {
+	return newSecurity(dir, nil).now(ctx).PublicSSH
 }
 
-// set sets up the proxy, the tunnel, Tailscale, sshd and the firewall. A
-// part that fails is reported and the rest still applies; SSH only closes
-// to everyone else when the server is in a tailnet.
-func (s *security) set(ctx context.Context, file serverFile) protocol.ServerConfigResult {
-	config := file.ServerConfig
-	result := protocol.ServerConfigResult{Proxy: s.proxyMode(), OpenPorts: []string{}}
-	problem := func(format string, args ...any) {
-		result.Problems = append(result.Problems, fmt.Sprintf(format, args...))
-	}
-	noLog := func(string, ...any) {}
-
-	err := s.apps.ensureProxy(ctx, noLog)
-	if err != nil {
-		problem("proxy: %s", err)
-	}
-	err = s.ensureTunnel(ctx, file.TunnelToken)
-	if err != nil {
-		problem("Cloudflare Tunnel: %s", err)
-	}
-
-	// A tailnet joined by hand counts: the key only joins one.
-	ssh := config.WantSSH()
-	result.TailscaleIP = tailnetIP(ctx)
-	if ssh == protocol.SSHTailscale && file.TailscaleKey != "" && result.TailscaleIP == "" {
-		result.TailscaleIP, err = joinTailnet(ctx, file.TailscaleKey)
-		if err != nil {
-			problem("Tailscale: %s", err)
-		}
-	}
-	sshOnTailscale := ssh == protocol.SSHTailscale && result.TailscaleIP != ""
-	if ssh == protocol.SSHTailscale && !sshOnTailscale {
-		problem("SSH stays open to everyone: the server is in no tailnet")
-	}
-	if ssh == protocol.SSHOff {
-		err = stopSSHD(ctx)
-		if err != nil {
-			problem("SSH: %s", err)
-		}
-	}
-	sshOpen := ssh == protocol.SSHEveryone || (ssh == protocol.SSHTailscale && !sshOnTailscale)
-
-	tailscaleOnly := false
-	switch {
-	case config.Firewall:
-		ports := openPorts(result.Proxy, sshOpen, result.TailscaleIP != "")
-		err = applyFirewall(ctx, firewallRules(ports, sshOnTailscale))
-		if err != nil {
-			problem("firewall: %s", err)
-			sshOpen = true
-		} else {
-			result.Firewall = true
-			result.OpenPorts = ports
-			tailscaleOnly = sshOnTailscale
-		}
-	case sshOnTailscale:
-		err = applyFirewall(ctx, sshOnTailscaleRules())
-		if err != nil {
-			problem("SSH stays open to everyone: %s", err)
-			sshOpen = true
-		} else {
-			tailscaleOnly = true
-		}
-	default:
-		_ = removeFirewall(ctx)
-		sshOpen = true
-	}
-	result.SSH = sshNow(listening(22), tailscaleOnly, !sshOpen && !tailscaleOnly)
-	return result
+// Secure is what the CLI closes. It only ever closes: CloseSSH shuts
+// public port 22, Firewall every other port, and a TunnelToken brings
+// the web through a Cloudflare Tunnel.
+type Secure struct {
+	CloseSSH    bool   `json:"close_ssh,omitempty"`
+	Firewall    bool   `json:"firewall,omitempty"`
+	TunnelToken string `json:"tunnel_token,omitempty"`
 }
 
-// sshNow is who reaches SSH: nobody when sshd does not listen or the
-// firewall drops port 22, Tailscale when only it passes, else everyone.
-func sshNow(sshd, tailscaleOnly, closed bool) string {
-	switch {
-	case !sshd || closed:
-		return protocol.SSHOff
-	case tailscaleOnly:
-		return protocol.SSHTailscale
+// SecureHere closes what change asks for. SSH closes only when the
+// server is in a tailnet, so you never lock yourself out.
+func SecureHere(ctx context.Context, dir string, change Secure, out io.Writer) (Security, error) {
+	if change.CloseSSH && TailnetHere(ctx).IP == "" {
+		return Security{}, errors.New("this server is in no tailnet, so public SSH stays open")
 	}
-	return protocol.SSHEveryone
+	if change.TunnelToken != "" && !validTunnelToken(change.TunnelToken) {
+		return Security{}, errors.New("that is not a Cloudflare Tunnel token. Copy it from the tunnel's install command: the long text after --token")
+	}
+	if err := installNft(ctx, out); err != nil {
+		return Security{}, err
+	}
+	s := newSecurity(dir, newApps(dir))
+	s.file.SSHOnTailscale = s.file.SSHOnTailscale || change.CloseSSH
+	s.file.Firewall = s.file.Firewall || change.Firewall
+	if change.TunnelToken != "" {
+		s.file.TunnelToken = change.TunnelToken
+	}
+	if err := s.save(); err != nil {
+		return Security{}, err
+	}
+	s.apps.proxyMode = s.proxyMode
+	err := s.apply(ctx)
+	return s.now(ctx), err
+}
+
+// UnlockHere opens public port 22 again, and starts sshd if it is off.
+// It is the way back in, typed in your provider's web console.
+func UnlockHere(ctx context.Context, dir string) error {
+	if os.Geteuid() != 0 {
+		return errors.New("run it as root: sudo " + build.Name + " unlock")
+	}
+	s := newSecurity(dir, newApps(dir))
+	s.file.SSHOnTailscale = false
+	if err := s.save(); err != nil {
+		return err
+	}
+	if err := setFirewall(ctx, firewallRules(s.file)); err != nil {
+		return err
+	}
+	return startSSHD(ctx)
+}
+
+// keepSecurity puts back what is closed, now and every securityEvery:
+// after a reboot, or when someone removed the rules. A server that never
+// closed anything is left alone.
+func keepSecurity(ctx context.Context, dir string, a *apps) {
+	ticker := time.NewTicker(securityEvery)
+	defer ticker.Stop()
+	for {
+		if _, ok := loadServerFile(dir); ok {
+			s := newSecurity(dir, a)
+			if err := s.apply(ctx); err != nil {
+				slog.Error("security", "problem", err)
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// apply makes the server match server.json: the proxy in its mode, the
+// tunnel, and the firewall rules, now and at boot. A part that fails
+// does not stop the others.
+func (s *security) apply(ctx context.Context) error {
+	return errors.Join(
+		s.apps.ensureProxy(ctx, func(string, ...any) {}),
+		s.ensureTunnel(ctx, s.file.TunnelToken),
+		setFirewall(ctx, firewallRules(s.file)),
+	)
+}
+
+// openPorts are the ports the firewall lets in from everywhere.
+func openPorts(file serverFile) []string {
+	ports := []string{}
+	if !file.SSHOnTailscale {
+		ports = append(ports, "22/tcp")
+	}
+	if file.TunnelToken == "" {
+		ports = append(ports, "80/tcp", "443/tcp")
+	}
+	// Tailscale's direct connections. Closed, it still works, through
+	// its relays.
+	return append(ports, tailscalePort+"/udp")
+}
+
+// firewallRules is moin's nftables table for file, "" when nothing is
+// closed. Each knock it drops on a well-known port counts under that
+// port's name (knockPorts). Containers are not filtered here: the ports
+// an app publishes go through Docker's own chains.
+func firewallRules(file serverFile) string {
+	if !file.SSHOnTailscale && !file.Firewall {
+		return ""
+	}
+	var rules strings.Builder
+	fmt.Fprintf(&rules, "table inet %s {\n", firewallTable)
+	for _, knock := range knockNames() {
+		fmt.Fprintf(&rules, "\tcounter %s {\n\t}\n", knockCounter(knock))
+	}
+	rules.WriteString("\tchain input {\n")
+	rule := func(text string) { rules.WriteString("\t\t" + text + "\n") }
+	if !file.Firewall {
+		// Only SSH closes. Everything else comes in as before.
+		rule("type filter hook input priority filter; policy accept;")
+		rule("ct state established,related accept")
+		rule("iif lo accept")
+		rule(fmt.Sprintf("iifname != %q tcp dport 22 counter name %s drop", tailnetInterface, knockCounter("ssh")))
+		rules.WriteString("\t}\n}\n")
+		return rules.String()
+	}
+	rule("type filter hook input priority filter; policy drop;")
+	rule("ct state established,related accept")
+	rule("ct state invalid drop")
+	rule("iif lo accept")
+	rule("ip protocol icmp accept")
+	rule("ip6 nexthdr icmpv6 accept")
+	// The answer of the provider's DHCP server, for the address.
+	rule("udp sport 67 udp dport 68 accept")
+	if file.SSHOnTailscale {
+		rule(fmt.Sprintf("iifname %q tcp dport 22 accept", tailnetInterface))
+	}
+	for _, port := range openPorts(file) {
+		number, protocol, _ := strings.Cut(port, "/")
+		rule(fmt.Sprintf("%s dport %s accept", protocol, number))
+	}
+	open := openPorts(file)
+	for _, knock := range knockPorts {
+		closed := slices.DeleteFunc(slices.Clone(knock.ports), func(port int) bool { return slices.Contains(open, fmt.Sprintf("%d/tcp", port)) })
+		if len(closed) > 0 {
+			rule(fmt.Sprintf("tcp dport %s counter name %s drop", portSet(closed), knockCounter(knock.name)))
+		}
+	}
+	rule(fmt.Sprintf("meta l4proto tcp counter name %s drop", knockCounter(knockOther)))
+	rules.WriteString("\t}\n}\n")
+	return rules.String()
+}
+
+// portSet writes ports for nftables: 22, or { 23, 2323 }.
+func portSet(ports []int) string {
+	if len(ports) == 1 {
+		return fmt.Sprint(ports[0])
+	}
+	words := make([]string, len(ports))
+	for i, port := range ports {
+		words[i] = fmt.Sprint(port)
+	}
+	return "{ " + strings.Join(words, ", ") + " }"
+}
+
+// errNoNft is the firewall's problem on a server without nftables.
+var errNoNft = errors.New("nftables is not installed. Install the package nftables")
+
+// installNft installs nftables on a server that lacks it, with apt.
+func installNft(ctx context.Context, out io.Writer) error {
+	if _, err := exec.LookPath("nft"); err == nil {
+		return nil
+	}
+	if _, err := exec.LookPath("apt-get"); err != nil {
+		return errNoNft
+	}
+	fmt.Fprintln(out, "installing nftables, the firewall of Linux")
+	command := exec.CommandContext(ctx, "apt-get", "install", "-y", "-q", "nftables")
+	command.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	if output, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("install nftables: %s", lastLine(string(output)))
+	}
+	return nil
+}
+
+// setFirewall loads rules, or takes moin's table away when rules is "".
+// The rules go into firewallFile too, which the boot unit loads. A table
+// that is loaded already with the same rules stays: a reload would set
+// the knock counters back to zero.
+func setFirewall(ctx context.Context, rules string) error {
+	if rules == "" {
+		return removeFirewall(ctx)
+	}
+	if _, err := exec.LookPath("nft"); err != nil {
+		return errNoNft
+	}
+	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" + rules
+	if body, _ := os.ReadFile(firewallFile); string(body) == script && tableLoaded(ctx) {
+		return nil
+	}
+	command := exec.CommandContext(ctx, "nft", "-f", "-")
+	command.Stdin = strings.NewReader(script)
+	if output, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("firewall: %s", strings.TrimSpace(string(output)))
+	}
+	if err := writeWhole(firewallFile, []byte(script)); err != nil {
+		return err
+	}
+	return installFirewallUnit(ctx)
+}
+
+// installFirewallUnit writes the boot unit once and enables it.
+func installFirewallUnit(ctx context.Context) error {
+	if body, _ := os.ReadFile(firewallUnitFile); string(body) == firewallUnit {
+		return nil
+	}
+	if err := writeWhole(firewallUnitFile, []byte(firewallUnit)); err != nil {
+		return err
+	}
+	if err := os.Chmod(firewallUnitFile, 0o644); err != nil {
+		return err
+	}
+	unit := filepath.Base(firewallUnitFile)
+	for _, args := range [][]string{{"daemon-reload"}, {"enable", unit}} {
+		if output, err := exec.CommandContext(ctx, "systemctl", args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("systemctl %s: %s", strings.Join(args, " "), strings.TrimSpace(string(output)))
+		}
+	}
+	return nil
+}
+
+// removeFirewall takes moin's table away, and the boot unit with it.
+func removeFirewall(ctx context.Context) error {
+	if _, err := os.Stat(firewallUnitFile); err == nil {
+		_ = exec.CommandContext(ctx, "systemctl", "disable", filepath.Base(firewallUnitFile)).Run()
+		_ = os.Remove(firewallUnitFile)
+		_ = exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
+	}
+	_ = os.Remove(firewallFile)
+	if !tableLoaded(ctx) {
+		return nil
+	}
+	if output, err := exec.CommandContext(ctx, "nft", "delete", "table", "inet", firewallTable).CombinedOutput(); err != nil {
+		return fmt.Errorf("firewall: %s", strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+// tableLoaded says whether moin's nftables table is loaded now.
+func tableLoaded(ctx context.Context) bool {
+	return exec.CommandContext(ctx, "nft", "list", "table", "inet", firewallTable).Run() == nil
+}
+
+// resetNetwork takes down the firewall and the tunnel, for an uninstall
+// with the apps, and forgets what was closed.
+func resetNetwork(ctx context.Context, dir string) {
+	if err := removeFirewall(ctx); err != nil {
+		slog.Error("remove the firewall", "error", err)
+	}
+	if _, err := exec.LookPath("docker"); err == nil {
+		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName).Run()
+	}
+	_ = os.Remove(filepath.Join(dir, serverConfigFile))
 }
 
 // listening says whether something listens on the TCP port, IPv4 or IPv6,
@@ -330,26 +432,7 @@ func listening(port int) bool {
 	return false
 }
 
-// sshUnits are the names sshd runs under: ssh on Debian and Ubuntu, which
-// may start it from a socket, sshd elsewhere.
-var sshUnits = []string{"ssh.socket", "ssh.service", "sshd.service", "sshd.socket"}
-
-// stopSSHD stops sshd and keeps it from starting at boot. A unit the
-// server does not have is skipped.
-func stopSSHD(ctx context.Context) error {
-	if !listening(22) {
-		return nil
-	}
-	for _, unit := range sshUnits {
-		_ = exec.CommandContext(ctx, "systemctl", "disable", "--now", unit).Run()
-	}
-	if listening(22) {
-		return errors.New("sshd still listens on port 22; stop it on the server")
-	}
-	return nil
-}
-
-// startSSHD starts sshd again and at boot, once SSH is no longer off.
+// startSSHD starts sshd, now and at boot, when it does not listen.
 func startSSHD(ctx context.Context) error {
 	if listening(22) {
 		return nil
@@ -359,7 +442,7 @@ func startSSHD(ctx context.Context) error {
 			return nil
 		}
 	}
-	return errors.New("sshd did not start; start it on the server")
+	return errors.New("sshd did not start: start it with systemctl start ssh")
 }
 
 // ensureTunnel runs cloudflared with the token, or removes it without one.
@@ -382,7 +465,10 @@ func (s *security) ensureTunnel(ctx context.Context, token string) error {
 		"--label", labelToken+"="+tokenLabel(token),
 		"-e", "TUNNEL_TOKEN",
 		tunnelImage, "tunnel", "--no-autoupdate", "run")
-	return err
+	if err != nil {
+		return fmt.Errorf("Cloudflare Tunnel: %w", err)
+	}
+	return nil
 }
 
 // tokenLabel tells tunnel tokens apart without storing them in a label.
@@ -393,163 +479,105 @@ func tokenLabel(token string) string {
 	return token[len(token)-8:]
 }
 
-// tailnetIP is the server's address in a tailnet, empty when Tailscale is
-// missing or down.
-func tailnetIP(ctx context.Context) string {
+// validTunnelToken says whether token looks like a Cloudflare Tunnel
+// token: base64 of JSON that names the tunnel in "t".
+func validTunnelToken(token string) bool {
+	body, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		body, err = base64.RawStdEncoding.DecodeString(token)
+	}
+	var fields struct {
+		Tunnel string `json:"t"`
+	}
+	return err == nil && json.Unmarshal(body, &fields) == nil && fields.Tunnel != ""
+}
+
+// Tailnet is this server in a tailnet: its address and its name there.
+// Both are empty when it is in none.
+type Tailnet struct {
+	IP   string `json:"ip"`
+	Name string `json:"name"`
+}
+
+// TailnetHere asks Tailscale where this server is in the tailnet.
+func TailnetHere(ctx context.Context) Tailnet {
 	if _, err := exec.LookPath("tailscale"); err != nil {
-		return ""
+		return Tailnet{}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	ip, err := exec.CommandContext(ctx, "tailscale", "ip", "-4").Output()
+	body, err := exec.CommandContext(ctx, "tailscale", "status", "--json").Output()
 	if err != nil {
-		return ""
+		return Tailnet{}
 	}
-	return strings.TrimSpace(string(ip))
-}
-
-// joinTailnet installs Tailscale when it is missing, brings it up with
-// the auth key and returns the server's tailnet IP.
-func joinTailnet(ctx context.Context, authKey string) (string, error) {
-	_, err := exec.LookPath("tailscale")
-	if err != nil {
-		install := exec.CommandContext(ctx, "sh", "-c", "curl -fsSL https://tailscale.com/install.sh | sh")
-		output, err := install.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("install: %s", lastLine(string(output)))
+	var status struct {
+		BackendState string
+		Self         struct {
+			DNSName      string
+			TailscaleIPs []string
 		}
 	}
-	ip, err := exec.CommandContext(ctx, "tailscale", "ip", "-4").Output()
-	if err == nil && strings.TrimSpace(string(ip)) != "" {
-		return strings.TrimSpace(string(ip)), nil
+	if json.Unmarshal(body, &status) != nil || status.BackendState != "Running" {
+		return Tailnet{}
 	}
-	hostname, _ := os.Hostname()
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	tailnet := Tailnet{Name: strings.TrimSuffix(status.Self.DNSName, ".")}
+	for _, ip := range status.Self.TailscaleIPs {
+		if !strings.Contains(ip, ":") {
+			tailnet.IP = ip
+			break
+		}
+	}
+	return tailnet
+}
+
+// JoinTailnetHere installs Tailscale when it is missing and brings it up,
+// with authKey when there is one. Without one, Tailscale writes a link to
+// log in to out and waits for it.
+func JoinTailnetHere(ctx context.Context, authKey string, out io.Writer) (Tailnet, error) {
+	if tailnet := TailnetHere(ctx); tailnet.IP != "" {
+		return tailnet, nil
+	}
+	if _, err := exec.LookPath("tailscale"); err != nil {
+		fmt.Fprintln(out, "installing Tailscale")
+		install := exec.CommandContext(ctx, "sh", "-c", "curl -fsSL https://tailscale.com/install.sh | sh")
+		if output, err := install.CombinedOutput(); err != nil {
+			return Tailnet{}, fmt.Errorf("install Tailscale: %s", lastLine(string(output)))
+		}
+	}
+	args := []string{"up", "--timeout=5m"}
+	if config, err := LoadConfig(); err == nil && config.Name != "" {
+		args = append(args, "--hostname="+config.Name)
+	}
+	if authKey != "" {
+		// Tailscale reads the key from a file with "file:", so the key
+		// never shows on a command line in ps. Only root reads the file.
+		keyFile, err := os.CreateTemp("", tempName("tailscale-key-*"))
+		if err != nil {
+			return Tailnet{}, err
+		}
+		defer os.Remove(keyFile.Name())
+		_, err = keyFile.WriteString(authKey)
+		if err = errors.Join(err, keyFile.Close()); err != nil {
+			return Tailnet{}, err
+		}
+		args = append(args, "--auth-key=file:"+keyFile.Name())
+	}
+	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
-	// tailscale reads the key from a file with "file:", so the key never
-	// shows on a command line in ps. Only root can read the file.
-	keyFile, err := os.CreateTemp("", tempName("tailscale-key-*"))
-	if err != nil {
-		return "", err
+	var said bytes.Buffer
+	up := exec.CommandContext(ctx, "tailscale", args...)
+	up.Stdout, up.Stderr = io.MultiWriter(out, &said), io.MultiWriter(out, &said)
+	if err := up.Run(); err != nil {
+		return Tailnet{}, fmt.Errorf("tailscale up: %s", lastLine(said.String()))
 	}
-	defer os.Remove(keyFile.Name())
-	_, err = keyFile.WriteString(authKey)
-	if closeErr := keyFile.Close(); err == nil {
-		err = closeErr
+	tailnet := TailnetHere(ctx)
+	if tailnet.IP == "" {
+		return Tailnet{}, errors.New("Tailscale is up, but the server has no tailnet address")
 	}
-	if err != nil {
-		return "", err
-	}
-	output, err := exec.CommandContext(ctx, "tailscale", "up", "--auth-key=file:"+keyFile.Name(), "--hostname="+hostname).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("up: %s", lastLine(string(output)))
-	}
-	ip, err = exec.CommandContext(ctx, "tailscale", "ip", "-4").Output()
-	if err != nil {
-		return "", errors.New("no tailnet address after tailscale up")
-	}
-	return strings.TrimSpace(string(ip)), nil
+	return tailnet, nil
 }
 
 func lastLine(text string) string {
 	lines := strings.Split(strings.TrimSpace(text), "\n")
 	return lines[len(lines)-1]
-}
-
-// openPorts are the ports the firewall lets in from everywhere.
-func openPorts(proxy string, ssh, tailscale bool) []string {
-	ports := []string{}
-	if ssh {
-		ports = append(ports, "22/tcp")
-	}
-	if proxy == "direct" {
-		ports = append(ports, "80/tcp", "443/tcp")
-	}
-	if tailscale {
-		ports = append(ports, tailscalePort+"/udp")
-	}
-	return ports
-}
-
-// firewallRules is the nftables table the daemon owns: inbound only what the
-// server needs, answers to its own connections, loopback and ping.
-// Containers are not filtered here: Docker publishes their ports on its
-// own chains, and in tunnel mode nothing is published.
-func firewallRules(ports []string, sshOnTailscale bool) string {
-	var rules strings.Builder
-	fmt.Fprintf(&rules, "table inet %s {\n", firewallTable)
-	rules.WriteString("\tchain input {\n")
-	rules.WriteString("\t\ttype filter hook input priority filter; policy drop;\n")
-	rules.WriteString("\t\tct state established,related accept\n")
-	rules.WriteString("\t\tct state invalid drop\n")
-	rules.WriteString("\t\tiif lo accept\n")
-	rules.WriteString("\t\tip protocol icmp accept\n")
-	rules.WriteString("\t\tip6 nexthdr icmpv6 accept\n")
-	if sshOnTailscale {
-		rules.WriteString("\t\tiifname \"tailscale0\" tcp dport 22 accept\n")
-	}
-	for _, port := range ports {
-		number, protocol, _ := strings.Cut(port, "/")
-		fmt.Fprintf(&rules, "\t\t%s dport %s accept\n", protocol, number)
-	}
-	rules.WriteString("\t}\n}\n")
-	return rules.String()
-}
-
-// sshOnTailscaleRules is the daemon's table without the firewall: it only
-// keeps SSH off every network but the tailnet and lets the rest in.
-func sshOnTailscaleRules() string {
-	var rules strings.Builder
-	fmt.Fprintf(&rules, "table inet %s {\n", firewallTable)
-	rules.WriteString("\tchain input {\n")
-	rules.WriteString("\t\ttype filter hook input priority filter; policy accept;\n")
-	rules.WriteString("\t\tct state established,related accept\n")
-	rules.WriteString("\t\tiif lo accept\n")
-	rules.WriteString("\t\tiifname != \"tailscale0\" tcp dport 22 drop\n")
-	rules.WriteString("\t}\n}\n")
-	return rules.String()
-}
-
-// errNoNft is the firewall's problem on a server without nftables.
-var errNoNft = errors.New("nftables is not installed. Install the package nftables, and moin turns the firewall on by itself")
-
-// applyFirewall replaces the daemon's table in one transaction: delete and
-// add run together, so the server is never without rules in between.
-func applyFirewall(ctx context.Context, rules string) error {
-	if _, err := exec.LookPath("nft"); err != nil {
-		return errNoNft
-	}
-	script := "table inet " + firewallTable + "\ndelete table inet " + firewallTable + "\n" + rules
-	command := exec.CommandContext(ctx, "nft", "-f", "-")
-	command.Stdin = strings.NewReader(script)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s", strings.TrimSpace(string(output)))
-	}
-	return nil
-}
-
-// resetNetwork takes down the firewall and the tunnel an earlier server
-// entry set up, when the daemon registers again, and forgets its secrets.
-// The new entry starts with both off; the hub sends its config on connect
-// when it has more.
-func resetNetwork(ctx context.Context, dir string) {
-	if err := removeFirewall(ctx); err != nil {
-		slog.Warn("remove the firewall of the earlier server entry", "error", err)
-	}
-	if _, err := exec.LookPath("docker"); err == nil {
-		_ = exec.CommandContext(ctx, "docker", "rm", "-f", tunnelName).Run()
-	}
-	_ = os.Remove(filepath.Join(dir, serverConfigFile))
-}
-
-func removeFirewall(ctx context.Context) error {
-	output, err := exec.CommandContext(ctx, "nft", "list", "tables").Output()
-	if err != nil {
-		return nil
-	}
-	if !slices.Contains(strings.Fields(string(output)), firewallTable) {
-		return nil
-	}
-	return exec.CommandContext(ctx, "nft", "delete", "table", "inet", firewallTable).Run()
 }

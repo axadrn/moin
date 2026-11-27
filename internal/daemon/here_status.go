@@ -13,6 +13,8 @@ type Status struct {
 	Version  string      `json:"version"`
 	Apps     []AppStatus `json:"apps"`
 	Watchers []string    `json:"watchers"`
+	// PublicSSH: port 22 is open to the internet.
+	PublicSSH bool `json:"public_ssh"`
 }
 
 // AppStatus is one app: its live release, whether its containers run, and
@@ -31,6 +33,7 @@ func StatusHere(ctx context.Context, dir string) Status {
 	if watchers, err := WatchersHere(); err == nil && watchers != nil {
 		status.Watchers = watchers
 	}
+	status.PublicSSH = PublicSSHHere(ctx, dir)
 	for _, app := range a.names() {
 		release := a.current(app)
 		if release == 0 {
