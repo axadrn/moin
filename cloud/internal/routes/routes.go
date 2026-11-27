@@ -14,13 +14,14 @@ import (
 	"github.com/axadrn/moin/cloud/internal/middleware"
 	"github.com/axadrn/moin/cloud/internal/service"
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/report"
 
 	catalogfiles "github.com/axadrn/moin/catalog"
 )
 
 // New is the whole site: every route, wrapped in the middleware every
-// request goes through.
-func New(cfg *config.Config) (http.Handler, error) {
+// request goes through. cloud answers the pages and the API of moin cloud.
+func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	// content/ is read from disk in development, so an edit shows on reload.
 	texts := content.FS(cfg.Development)
 	entries, err := catalog.Load(catalogfiles.Files)
@@ -58,6 +59,26 @@ func New(cfg *config.Config) (http.Handler, error) {
 	// image builds them into downloads/.
 	mux.HandleFunc("GET /cli.sh", handler.CLIScript(cfg.AppURL))
 	mux.Handle("GET /download/", http.StripPrefix("/download/", http.FileServer(http.Dir("downloads"))))
+
+	// moin cloud: sign-in, the workspace, `moin cloud` in the CLI, and
+	// the reports of servers.
+	mux.HandleFunc("GET /login", cloud.Login)
+	mux.HandleFunc("POST /login", cloud.SendLink)
+	mux.HandleFunc("GET /login/link", cloud.LinkPage)
+	mux.HandleFunc("POST /login/link", cloud.UseLink)
+	mux.HandleFunc("GET /auth/github", cloud.GitHubStart)
+	mux.HandleFunc("GET /auth/github/callback", cloud.GitHubBack)
+	mux.HandleFunc("POST /logout", cloud.SignOut)
+	mux.HandleFunc("GET /cloud", cloud.WorkspacePage)
+	mux.HandleFunc("GET /cli", cloud.CLIPage)
+	mux.HandleFunc("POST /cli", cloud.AllowCLI)
+	mux.HandleFunc("POST /api/cli/login", cloud.StartCLILogin)
+	mux.HandleFunc("POST /api/cli/login/finish", cloud.FinishCLILogin)
+	mux.HandleFunc("GET /api/cloud", cloud.CLIWorkspace)
+	mux.HandleFunc("POST /api/cloud/servers", cloud.ConnectServer)
+	mux.HandleFunc("DELETE /api/cloud/servers/{name}", cloud.DisconnectServer)
+	mux.HandleFunc("POST "+report.Path, cloud.Report)
+
 	mux.HandleFunc("/", handler.NotFound)
 
 	return middleware.Chain(

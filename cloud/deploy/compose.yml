@@ -11,3 +11,6 @@ services:
     # the internet, with HTTPS on DOMAIN.
     ports:
       - "127.0.0.1:8090:8090"
+    # The database of moin cloud, data/cloud.db, outlives the container.
+    volumes:
+      - ./data:/app/data

@@ -7,11 +7,12 @@ type Kind string
 const Primary Kind = "primary"
 
 // ButtonProps is a Button. With Href it is a link that looks like a button.
-// Icon is a round button with only an icon, and then Attrs needs an
+// Type is "button" unless set, like "submit" in a form. Icon is a round button with only an icon, and then Attrs needs an
 // aria-label. Quiet has no background until the pointer is on it.
 type ButtonProps struct {
 	Kind  Kind
 	Href  string
+	Type  string
 	Icon  bool
 	Quiet bool
 	Attrs templ.Attributes
@@ -33,7 +34,7 @@ templ Button(p ButtonProps) {
 		</a>
 	} else {
 		<button
-			type="button"
+			type={ buttonType(p.Type) }
 			class="moin-button"
 			if p.Kind != "" {
 				data-kind={ string(p.Kind) }
@@ -45,4 +46,12 @@ templ Button(p ButtonProps) {
 			{ children... }
 		</button>
 	}
+}
+
+// buttonType is the type of a button: "button" unless set.
+func buttonType(kind string) string {
+	if kind == "" {
+		return "button"
+	}
+	return kind
 }

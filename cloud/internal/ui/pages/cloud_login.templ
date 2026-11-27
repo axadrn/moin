@@ -1,0 +1,131 @@
+package pages
+
+import (
+	"net/url"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// cloudPage is the frame of every page of moin cloud: narrow, never in a
+// search engine.
+templ cloudPage(title string) {
+	@layouts.Home(layouts.SEOProps{Title: title, Description: brand.Name + " cloud watches your servers.", Path: "/cloud", NoIndex: true}) {
+		<main class="moin-page moin-narrow moin-content">
+			{ children... }
+		</main>
+	}
+}
+
+// CloudLoginProps is the sign-in page: where it goes after, whether GitHub
+// signs in, and what was typed and went wrong.
+type CloudLoginProps struct {
+	Next    string
+	GitHub  bool
+	Mail    string
+	Problem string
+}
+
+// CloudLogin signs in with GitHub or a link by mail. Both land in the
+// workspace of the mail.
+templ CloudLogin(p CloudLoginProps) {
+	@cloudPage("Sign in") {
+		@components.Header(components.HeaderProps{Title: "Sign in to " + brand.Name + " cloud"})
+		<p class="moin-text moin-muted">Your email is your workspace. The first sign-in makes it.</p>
+		if p.GitHub {
+			<div>
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth/github?" + url.Values{"next": {p.Next}}.Encode()}) {
+					Continue with GitHub
+				}
+			</div>
+			<p class="moin-small moin-muted">Or get a link by mail.</p>
+		}
+		<form method="post" action="/login" class="moin-stack" data-gap="3">
+			<input type="hidden" name="next" value={ p.Next }/>
+			<label for="mail" class="moin-small">Email</label>
+			@components.Input(components.InputProps{ID: "mail", Name: "mail", Type: "email", Value: p.Mail, Placeholder: "ada@example.com", Attrs: templ.Attributes{"required": true, "autocomplete": "email"}})
+			if p.Problem != "" {
+				<p class="moin-message" data-state="failed" role="alert">{ p.Problem }</p>
+			}
+			<div>
+				@components.Button(components.ButtonProps{Type: "submit", Kind: loginKind(p.GitHub)}) {
+					Mail me a link
+				}
+			</div>
+		</form>
+	}
+}
+
+// loginKind is the mail button's kind: the one that stands out when there
+// is no GitHub button.
+func loginKind(github bool) components.Kind {
+	if github {
+		return ""
+	}
+	return components.Primary
+}
+
+// CloudLinkSent says the link is on its way.
+templ CloudLinkSent(mail string) {
+	@cloudPage("Check your mail") {
+		@components.Header(components.HeaderProps{Title: "Check your mail"})
+		<p class="moin-text">A sign-in link is on its way to <strong>{ mail }</strong>.</p>
+		<p class="moin-text moin-muted">It works once, for 15 minutes. You can close this page.</p>
+	}
+}
+
+// CloudLink is where a sign-in link opens: one button signs in, so a mail
+// scanner that opens the link does not use it up.
+templ CloudLink(token, next string) {
+	@cloudPage("Sign in") {
+		@components.Header(components.HeaderProps{Title: "Sign in to " + brand.Name + " cloud"})
+		<form method="post" action="/login/link" class="moin-stack" data-gap="3">
+			<input type="hidden" name="token" value={ token }/>
+			<input type="hidden" name="next" value={ next }/>
+			<div>
+				@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary}) {
+					Sign in
+				}
+			</div>
+		</form>
+	}
+}
+
+// CloudLoginFailed says why a sign-in did not work, and the way back.
+templ CloudLoginFailed(reason string) {
+	@cloudPage("Not signed in") {
+		@components.Header(components.HeaderProps{Title: "Not signed in"})
+		<p class="moin-text moin-muted">{ reason }</p>
+		<div>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/login"}) {
+				Sign in again
+			}
+		</div>
+	}
+}
+
+// CloudCLI shows the code of a `moin cloud login`, to compare with the
+// terminal before allowing it.
+templ CloudCLI(code, mail string) {
+	@cloudPage("Allow the CLI") {
+		@components.Header(components.HeaderProps{Title: "Allow " + brand.Name + " cloud login"})
+		<p class="moin-text">Your terminal shows this code:</p>
+		<p class="moin-title moin-mono">{ code }</p>
+		<p class="moin-text moin-muted">Allow it only when you just ran { brand.Name } cloud login and the codes match. The CLI then acts as { mail }.</p>
+		<form method="post" action="/cli">
+			<input type="hidden" name="code" value={ code }/>
+			@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary}) {
+				Allow
+			}
+		</form>
+	}
+}
+
+// CloudCLIAllowed says the CLI is signed in.
+templ CloudCLIAllowed() {
+	@cloudPage("CLI signed in") {
+		@components.Header(components.HeaderProps{Title: "The CLI is signed in"})
+		<p class="moin-text moin-muted">Go back to your terminal. You can close this page.</p>
+	}
+}

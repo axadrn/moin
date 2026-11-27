@@ -25,7 +25,7 @@ var (
 // indexed. A new page that misses one of these fails here.
 func TestSitemapPagesAreReadyForSearch(t *testing.T) {
 	const appURL = "https://example.com"
-	site, err := New(&config.Config{RenderConfig: config.RenderConfig{AppURL: appURL}})
+	site, err := New(&config.Config{RenderConfig: config.RenderConfig{AppURL: appURL}}, testCloud(t, appURL, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

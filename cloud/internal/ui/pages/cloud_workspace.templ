@@ -1,0 +1,127 @@
+package pages
+
+import (
+	"slices"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/watcher"
+)
+
+// CloudWorkspaceProps is the workspace page: who, what plan, and what the
+// watcher sees.
+type CloudWorkspaceProps struct {
+	Mail string
+	Plan string
+	View watcher.View
+}
+
+// CloudWorkspace is /cloud. It only reads: nothing on it changes a server.
+templ CloudWorkspace(p CloudWorkspaceProps) {
+	@cloudPage(brand.Name + " cloud") {
+		@components.Header(components.HeaderProps{Title: brand.Name + " cloud"}) {
+			<form method="post" action="/logout">
+				@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
+					Sign out
+				}
+			</form>
+		}
+		<p class="moin-text moin-muted">{ p.Mail }. { p.Plan }.</p>
+		if len(p.View.Servers) == 0 {
+			@components.Card(components.CardProps{Title: "No servers yet"}) {
+				<p class="moin-text moin-muted">Connect one from your laptop. It reports here every minute, and you get a mail when it goes silent.</p>
+				@components.Command(components.CommandProps{Text: brand.Name + " cloud connect prod"})
+			}
+		} else {
+			if len(p.View.NeedsYou) > 0 {
+				@components.Card(components.CardProps{Title: "Needs you"}) {
+					@components.List() {
+						for _, problem := range p.View.NeedsYou {
+							@components.Item(components.ItemProps{Name: problem, Lead: components.Dot(components.DotProps{State: components.StateFailed})})
+						}
+					}
+				}
+			} else {
+				<p class="moin-text">
+					@components.Dot(components.DotProps{State: components.StateLive})
+					Everything is fine.
+				</p>
+			}
+			for _, server := range p.View.Servers {
+				@components.Card(components.CardProps{Title: server.Name}) {
+					<p class="moin-small moin-muted">
+						{ server.State }
+						if server.Version != "" {
+							, { server.Version }
+						}
+					</p>
+					if len(server.Apps) > 0 {
+						@components.List() {
+							for _, app := range server.Apps {
+								@components.Item(components.ItemProps{Name: app.Name, Note: appNote(app), Lead: components.Dot(components.DotProps{State: okState(app.OK)})})
+							}
+						}
+					} else {
+						<p class="moin-small moin-muted">No apps.</p>
+					}
+				}
+			}
+			@components.Card(components.CardProps{Title: "Last proven restores"}) {
+				if len(p.View.Checks) == 0 {
+					<p class="moin-small moin-muted">None yet. A server checks a copy of every database each day.</p>
+				} else {
+					@components.List() {
+						for _, check := range p.View.Checks[:min(len(p.View.Checks), 10)] {
+							@components.Item(components.ItemProps{Name: check.What, Note: check.At + ": " + check.Result, Lead: components.Dot(components.DotProps{State: okState(check.OK)})})
+						}
+					}
+				}
+			}
+			@components.Card(components.CardProps{Title: "Outages"}) {
+				if len(p.View.Outages) == 0 {
+					<p class="moin-small moin-muted">None.</p>
+				} else {
+					@components.List() {
+						for _, outage := range p.View.Outages[:min(len(p.View.Outages), 20)] {
+							@components.Item(components.ItemProps{Name: outage.What, Note: outageNote(outage), Lead: components.Dot(components.DotProps{State: outageState(outage.Open)})})
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// okState is the dot of something fine or red.
+func okState(ok bool) components.State {
+	if ok {
+		return components.StateLive
+	}
+	return components.StateFailed
+}
+
+// outageState is the dot of an outage: red while it lasts.
+func outageState(open bool) components.State {
+	if open {
+		return components.StateFailed
+	}
+	return components.StateIdle
+}
+
+// appNote is an app's state with its domains and databases in one line.
+func appNote(app watcher.AppView) string {
+	note := app.State
+	for _, line := range slices.Concat(app.Domains, app.Databases) {
+		note += ". " + line.Name + ": " + line.State
+	}
+	return note
+}
+
+// outageNote says when an outage began, how long it lasted, and why.
+func outageNote(o watcher.OutageView) string {
+	note := o.From + ", " + o.Lasted
+	if o.Reason != "" {
+		note += ": " + o.Reason
+	}
+	return note
+}

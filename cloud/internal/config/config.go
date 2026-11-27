@@ -20,6 +20,22 @@ type Config struct {
 	// OldURLs are addresses the site had before APP_URL, such as
 	// https://old.example.com. A request on one goes on to APP_URL.
 	OldURLs []string
+
+	// Database is the SQLite file of moin cloud: DATABASE_FILE.
+	Database string
+	// EmailFrom sends the sign-in links and alerts, through Cloudflare
+	// Email Sending with CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.
+	// Without them every mail goes to the log.
+	EmailFrom           string
+	CloudflareAccountID string
+	CloudflareAPIToken  string
+	CloudflareAPIURL    string
+	// The GitHub App signs people in with GitHub: GITHUB_APP_CLIENT_ID and
+	// GITHUB_APP_CLIENT_SECRET. Without them only the mail link signs in.
+	GitHubClientID     string
+	GitHubClientSecret string
+	GitHubURL          string
+	GitHubAPIURL       string
 }
 
 // RenderConfig is what templates may know of the settings: nothing secret.
@@ -38,7 +54,16 @@ func Load() (*Config, error) {
 			UmamiWebsiteID: env("UMAMI_WEBSITE_ID", ""),
 			UmamiHost:      env("UMAMI_HOST", ""),
 		},
-		Port: env("PORT", "8090"),
+		Port:                env("PORT", "8090"),
+		Database:            env("DATABASE_FILE", "data/cloud.db"),
+		EmailFrom:           env("EMAIL_FROM", "noreply@example.com"),
+		CloudflareAccountID: env("CLOUDFLARE_ACCOUNT_ID", ""),
+		CloudflareAPIToken:  env("CLOUDFLARE_API_TOKEN", ""),
+		CloudflareAPIURL:    env("CLOUDFLARE_API_URL", "https://api.cloudflare.com/client/v4"),
+		GitHubClientID:      env("GITHUB_APP_CLIENT_ID", ""),
+		GitHubClientSecret:  env("GITHUB_APP_CLIENT_SECRET", ""),
+		GitHubURL:           env("GITHUB_URL", "https://github.com"),
+		GitHubAPIURL:        env("GITHUB_API_URL", "https://api.github.com"),
 	}
 	var errs []error
 	switch env("APP_ENV", "") {
@@ -60,6 +85,12 @@ func Load() (*Config, error) {
 			errs = append(errs, fmt.Errorf("OLD_URLS: %q is no absolute HTTP or HTTPS URL", old))
 		}
 		cfg.OldURLs = append(cfg.OldURLs, old)
+	}
+	if (cfg.CloudflareAccountID == "") != (cfg.CloudflareAPIToken == "") {
+		errs = append(errs, errors.New("mail needs both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, or neither for mail in the log"))
+	}
+	if (cfg.GitHubClientID == "") != (cfg.GitHubClientSecret == "") {
+		errs = append(errs, errors.New("GitHub sign-in needs both GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET, or neither"))
 	}
 	if port, err := strconv.Atoi(cfg.Port); err != nil || port < 1 || port > 65535 {
 		errs = append(errs, errors.New("PORT must be a number between 1 and 65535"))

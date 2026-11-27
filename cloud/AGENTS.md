@@ -1,9 +1,11 @@
 # AGENTS.md
 
 This is the website at moin.run: the landing page, the docs, the blog, the
-changelog, the catalog, the comparisons and the legal pages. It has no
-database, no sign-in and no API. How moin works is in `content/docs`, the
-only source of truth.
+changelog, the catalog, the comparisons and the legal pages. It is moin
+cloud too: sign-in by GitHub or a mail link, one workspace per mail, a
+watcher per workspace that servers report to, and the API of
+`moin cloud` in the CLI. How moin works is in `content/docs`, the only
+source of truth.
 
 ## Rules
 
@@ -21,11 +23,21 @@ only source of truth.
 ## Code map
 
 - `cmd/server`: the site's `main`.
+- `cmd/import`: brings the paying workspaces of the old hub into moin
+  cloud, once.
 - `internal/routes`: which handler answers which address, and the
   middleware around all of them.
 - `internal/handler`: reads the request, renders the page.
 - `internal/service`: reads the texts of `content/`: docs, blog,
   changelog, roadmap, legal pages, sitemap.
+- `internal/db`: opens the SQLite file of moin cloud and runs the
+  migrations in `internal/db/migrations`.
+- `internal/workspace`: workspaces, sessions, logins and servers in the
+  database.
+- `internal/watchers`: one watcher of `internal/watcher` per workspace,
+  fed by `POST /report`; alerts go out by mail.
+- `internal/mailer`: mail through Cloudflare Email Sending, or to the log.
+- `internal/github`: sign-in with the GitHub App.
 - `internal/catalog`: reads the apps of `catalog/` at the root of the repo.
 - `internal/compare`: the comparisons with other tools.
 - `internal/ui`: `components/` (the parts every page is built from),
