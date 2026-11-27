@@ -596,6 +596,7 @@ func (b *backups) copyDue(ctx context.Context, app string, database protocol.Dat
 	if err != nil {
 		return err
 	}
+	b.toCloud(ctx, app, database, id)
 	return b.prune(ctx, app, database, append([]protocol.Copy{{ID: id, At: at}}, copies...))
 }
 
