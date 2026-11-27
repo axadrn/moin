@@ -326,21 +326,6 @@ func (e *sqliteEngine) Drop(ctx context.Context, id string) error {
 	return nil
 }
 
-// sweepTemp removes what older versions of moin left next to the database
-// live in root: copies, checks and the folder they kept for Litestream.
-func sweepTemp(root *os.Root, live string) {
-	dir := filepath.Dir(live)
-	_ = root.RemoveAll(filepath.Join(dir, "."+filepath.Base(live)+"-litestream"))
-	for _, what := range []string{"copy", "check"} {
-		left, _ := filepath.Glob(filepath.Join(root.Name(), dir, "."+tempName(what+"-*")))
-		for _, path := range left {
-			if name, err := filepath.Rel(root.Name(), path); err == nil {
-				_ = root.RemoveAll(name)
-			}
-		}
-	}
-}
-
 // matchOwnerOf gives the database name in root and its -wal and -shm files
 // the owner in info.
 func matchOwnerOf(root *os.Root, name string, info os.FileInfo) {
