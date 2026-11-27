@@ -24,24 +24,24 @@ func TestFirewallRules(t *testing.T) {
 			name: "ssh only",
 			file: serverFile{SSHOnTailscale: true},
 			want: []string{"policy accept", "ct state established,related accept", "iif lo accept",
-				`iifname != "tailscale0" tcp dport 22 counter name "knock-ssh" drop`},
-			unwants: []string{"policy drop", "dport 80", "dport 443", `name "knock-other" drop`},
+				`iifname != "tailscale0" tcp dport 22 counter name knock_ssh drop`},
+			unwants: []string{"policy drop", "dport 80", "dport 443", `name knock_other drop`},
 		},
 		{
 			name: "firewall web direct ssh public",
 			file: serverFile{Firewall: true},
 			want: []string{"policy drop", "ct state established,related accept", "tcp dport 22 accept",
 				"tcp dport 80 accept", "tcp dport 443 accept", "udp dport 41641 accept",
-				`tcp dport { 23, 2323 } counter name "knock-telnet" drop`,
-				`tcp dport 5432 counter name "knock-postgres" drop`,
-				`meta l4proto tcp counter name "knock-other" drop`},
-			unwants: []string{"tailscale0", `"knock-ssh" drop`},
+				`tcp dport { 23, 2323 } counter name knock_telnet drop`,
+				`tcp dport 5432 counter name knock_postgres drop`,
+				`meta l4proto tcp counter name knock_other drop`},
+			unwants: []string{"tailscale0", `knock_ssh drop`},
 		},
 		{
 			name: "firewall tunnel ssh on tailscale",
 			file: serverFile{Firewall: true, SSHOnTailscale: true, TunnelToken: "token"},
 			want: []string{"policy drop", `iifname "tailscale0" tcp dport 22 accept`, "udp dport 41641 accept",
-				`tcp dport 22 counter name "knock-ssh" drop`},
+				`tcp dport 22 counter name knock_ssh drop`},
 			unwants: []string{"tcp dport 80 accept", "tcp dport 443 accept", "\t\ttcp dport 22 accept"},
 		},
 	}
@@ -60,7 +60,7 @@ func TestFirewallRules(t *testing.T) {
 		// A counter for every knock name, so reading them is the same in
 		// each mode.
 		for _, name := range knockNames() {
-			if !strings.Contains(rules, "counter "+knockCounter(name)+" {") {
+			if !strings.Contains(rules, "\tcounter "+knockCounter(name)+" {") {
 				t.Errorf("%s: no counter for %s", c.name, name)
 			}
 		}

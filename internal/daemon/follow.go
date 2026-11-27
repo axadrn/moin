@@ -288,7 +288,9 @@ func (fw *follower) git(ctx context.Context, f Follow, args ...string) (string, 
 		return "", errors.New("git is not installed on the server: apt-get install git")
 	}
 	if err != nil {
-		return "", fmt.Errorf("git %s: %s", args[0], lastLine(cmp.Or(stderr.String(), err.Error())))
+		// git says why in a few lines, like "Permission denied
+		// (publickey)" and then what to check: all of them, on one.
+		return "", fmt.Errorf("git: %s", strings.Join(strings.Fields(cmp.Or(stderr.String(), err.Error())), " "))
 	}
 	return strings.TrimSpace(string(out)), nil
 }

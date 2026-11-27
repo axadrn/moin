@@ -68,9 +68,9 @@ func TestKnocksPerWindow(t *testing.T) {
 }
 
 func TestParseCounters(t *testing.T) {
-	out := `{"nftables": [{"metainfo": {"version": "1.0.9"}}, {"counter": {"family": "inet", "name": "knock-ssh", "table": "moin", "handle": 1, "packets": 42, "bytes": 2520}}, {"counter": {"family": "inet", "name": "knock-node-red", "table": "moin", "handle": 2, "packets": 0, "bytes": 0}}]}`
+	out := `{"nftables": [{"metainfo": {"version": "1.0.9"}}, {"counter": {"family": "inet", "name": "knock_ssh", "table": "moin", "handle": 1, "packets": 42, "bytes": 2520}}, {"counter": {"family": "inet", "name": "knock_node_red", "table": "moin", "handle": 2, "packets": 0, "bytes": 0}}]}`
 	counters, err := parseCounters([]byte(out))
-	if err != nil || counters["ssh"] != 42 || len(counters) != 2 {
+	if err != nil || counters["ssh"] != 42 || counters["node-red"] != 0 || len(counters) != 2 {
 		t.Fatalf("counters = %v, %v", counters, err)
 	}
 }

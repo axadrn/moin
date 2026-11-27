@@ -89,7 +89,11 @@ func startFollow(ctx context.Context, server, app, repo, branch string, stdin io
 	}
 	err := sshJSON(ctx, server, []string{"follow", "check", app}, nil, &check)
 	if err != nil {
-		printError(stdout, err)
+		// The server said why already, unless ssh failed.
+		var said exitCode
+		if !errors.As(err, &said) {
+			printError(stdout, err)
+		}
 		hint(stdout, server+" tries again every minute, and alerts once while it cannot read it. Stop with", build.Name+" follow "+app+" --off")
 		return errReported
 	}

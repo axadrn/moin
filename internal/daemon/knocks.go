@@ -37,8 +37,9 @@ func knockNames() []string {
 	return append(names, knockOther)
 }
 
-// knockCounter is the name of the firewall's counter for a knock name.
-func knockCounter(name string) string { return `"knock-` + name + `"` }
+// knockCounter is the name of the firewall's counter for a knock name:
+// knock_node_red for node-red. nftables takes no quotes there.
+func knockCounter(name string) string { return "knock_" + strings.ReplaceAll(name, "-", "_") }
 
 const knocksFile = "knocks.db"
 
@@ -94,8 +95,8 @@ func parseCounters(out []byte) (map[string]int64, error) {
 		if item.Counter == nil {
 			continue
 		}
-		if name, ok := strings.CutPrefix(item.Counter.Name, "knock-"); ok {
-			counters[name] = item.Counter.Packets
+		if name, ok := strings.CutPrefix(item.Counter.Name, "knock_"); ok {
+			counters[strings.ReplaceAll(name, "_", "-")] = item.Counter.Packets
 		}
 	}
 	return counters, nil
