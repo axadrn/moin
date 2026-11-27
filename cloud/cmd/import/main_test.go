@@ -47,7 +47,9 @@ INSERT INTO subscriptions (id, workspace_id, plan_id, status, provider_customer_
 	('s4', 'w-free', 'free', 'active', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO offers (email, trial_days, coupon_id, created_at, claimed_at, claimed_workspace_id) VALUES
 	('bob@example.com', 30, 'EARLY', '2026-03-01 00:00:00', '2026-03-02 03:04:05', 'w-backer'),
-	('eve@example.com', 30, 'EARLY', '2026-03-01 00:00:00', NULL, NULL);`
+	('eve@example.com', 30, 'EARLY', '2026-03-01 00:00:00', NULL, NULL);
+INSERT INTO offers (email, trial_days, coupon_id, created_at, expires_at) VALUES
+	('gone@example.com', 30, 'EARLY', '2026-03-01 00:00:00', '2026-04-01 00:00:00');`
 	if _, err := database.Exec(string(schema) + rows); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +64,7 @@ func TestImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != (result{imported: 3, sameMail: 1, unclaimed: 1}) {
+	if got != (result{imported: 3, sameMail: 1, offers: 1}) {
 		t.Errorf("result = %+v", got)
 	}
 
@@ -91,17 +93,21 @@ func TestImport(t *testing.T) {
 		if err := rows.Scan(&r.id, &r.mail, &r.status, &r.customer, &r.subscription, &r.coupon, &r.paidUntil); err != nil {
 			t.Fatal(err)
 		}
+		if r.mail == "eve@example.com" {
+			// A new id: nobody had a workspace for the offer.
+			want[r.id] = row{r.id, "eve@example.com", "trial", "", "", "EARLY", 0}
+		}
 		if r != want[r.id] {
 			t.Errorf("%s = %+v, want %+v", r.id, r, want[r.id])
 		}
 		seen++
 	}
-	if seen != len(want) {
-		t.Errorf("%d workspaces, want %d", seen, len(want))
+	if seen != 4 {
+		t.Errorf("%d workspaces, want 4", seen)
 	}
 
 	// Twice adds nothing, and the old file never changes.
-	if again, err := importOld(t.Context(), oldPath, newPath); err != nil || again.imported != 0 {
+	if again, err := importOld(t.Context(), oldPath, newPath); err != nil || again.imported != 0 || again.offers != 0 {
 		t.Errorf("again = %+v, %v", again, err)
 	}
 	if after, _ := os.ReadFile(oldPath); string(after) != string(before) {

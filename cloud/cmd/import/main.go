@@ -6,7 +6,10 @@
 // It opens the old database read-only and takes only the workspaces that
 // have a Stripe customer, a subscription, a coupon or an offer. Each keeps
 // its old id, so the workspace_id in Stripe's metadata still matches, and
-// gets the mail of its owner. Running it twice adds nothing twice.
+// gets the mail of its owner. An offer nobody claimed yet, the early
+// backers' deal, becomes a workspace of its mail with the coupon, so the
+// discount is there at the first sign-in. Running it twice adds nothing
+// twice.
 package main
 
 import (
@@ -27,13 +30,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "import:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("%d workspaces imported, %d already in moin cloud by id or mail, %d offers never claimed and not imported.\n",
-		result.imported, result.sameMail, result.unclaimed)
+	fmt.Printf("%d workspaces imported, %d already in moin cloud by id or mail, %d offers never claimed imported as workspaces of their mail.\n",
+		result.imported, result.sameMail, result.offers)
 }
 
 // result counts what the import did.
 type result struct {
-	imported, sameMail, unclaimed int
+	imported, sameMail, offers int
 }
 
 // seconds is SQL that turns a time of the old service into Unix seconds. It
@@ -108,10 +111,19 @@ ON CONFLICT DO NOTHING`)
 	n, _ := inserted.RowsAffected()
 	r.imported = int(n)
 	r.sameMail = candidates - r.imported
-	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM old.offers o WHERE o.claimed_at IS NULL
-		AND lower(trim(o.email)) NOT IN (SELECT mail FROM workspaces)`).Scan(&r.unclaimed)
+	// The offers nobody claimed yet and that still hold, as the old
+	// service let them be claimed.
+	offers, err := tx.ExecContext(ctx, `
+INSERT INTO workspaces (id, mail, coupon, created)
+SELECT lower(hex(randomblob(16))), lower(trim(o.email)), o.coupon_id, coalesce(`+seconds("o.created_at")+`, unixepoch())
+FROM old.offers o
+WHERE o.claimed_at IS NULL AND (o.expires_at IS NULL OR `+seconds("o.expires_at")+` > unixepoch())
+ORDER BY o.created_at, o.email
+ON CONFLICT DO NOTHING`)
 	if err != nil {
 		return r, err
 	}
+	n, _ = offers.RowsAffected()
+	r.offers = int(n)
 	return r, tx.Commit()
 }
