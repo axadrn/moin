@@ -60,7 +60,11 @@ Without servers, or without a terminal, `moin` prints the table instead. So does
 | `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A first deploy adds it too |
 | `moin servers rm <server>` | take a server off your list. Nothing changes on it |
 
-Under the table, `moin` says what needs you: a server no watcher watches, an app that does not run.
+Under the table, `moin` says what needs you, each with the command that settles it:
+
+- In red: port 22 open to the internet, an app with no backup yet, a backup that did not restore, a backup key you have not made or confirmed, Tailscale that does not run, a Tailscale key that expires within two weeks.
+- In yellow: a server no watcher watches, an app that does not run.
+- Muted: the knocks of the day. [Knocks](/docs/security#knocks)
 
 ## Deploy
 
@@ -71,12 +75,14 @@ Under the table, `moin` says what needs you: a server no watcher watches, an app
 | `moin deploy prod --image shop:dev` | send an image from your laptop instead of the source |
 | `moin deploy prod --catalog umami` | an app from the [catalog](/docs/catalog) |
 | `moin deploy --app shop` | another name for the app. Without it, the app is named after the folder |
+| `moin deploy --no-copy` | deploy even when the copy of the databases just before it fails |
 | `moin rollback [app]` | pick an older release to run again. `--to v3` names it. Without a terminal, the one before |
 | `moin restart [app]` | start the live release again, with its env and domains as they are now |
 | `moin stop [app]` | stop the app. It stays stopped after a reboot, until `moin start`. Its data stays |
 | `moin start [app]` | start a stopped app |
-| `moin logs [app]` | the last 200 lines. `-f` follows them, `--tail 1000` shows more |
+| `moin logs [app]` | the last 200 lines. `-f` follows them, `--tail 1000` shows more. `--json` prints them as a list of time, container and line |
 | `moin exec [app] -- <command>` | run one command in the app's container. `--service db` picks another service |
+| `moin follow [app] --branch main` | the server deploys each new commit of the branch, read with a deploy key. `--off` stops it. [Deploy from CI](/docs/deploy#deploy-from-ci) |
 | `moin catalog` | the apps of the catalog |
 
 The first deploy to a server asks first: `Set up moin on prod and deploy shop? [y/N]`. In a script, add `-y`. [Deploy](/docs/deploy)
@@ -99,12 +105,16 @@ The first deploy to a server asks first: `Set up moin on prod and deploy shop? [
 | `moin backup [app]` | a copy now |
 | `moin restore [app]` | pick a copy to go back to, or the undo of the last restore |
 | `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, or `undo-…` |
-| `moin bucket <server>` | the bucket of the server, never its secret |
-| `moin bucket set <server>` | set the bucket. moin asks for each value |
+| `moin backups [app] --from <server>` | the copies another server left in the bucket, like one that is gone |
+| `moin restore [app] --from <server> --key` | restore one of them. moin asks for your backup key |
+| `moin bucket <server>` | the bucket of the server, never its secret, and whether your backup key is confirmed |
+| `moin bucket set <server>` | set the bucket. moin asks for each value, then shows your backup key once |
+| `moin bucket key <server>` | a new backup key of yours. `--public age1…` takes one you have |
+| `moin bucket confirm <server>` | paste your backup key. moin opens a fresh copy with it, on your laptop |
 
 An app with several databases: `moin restore` asks which one, `--database <name>` names it.
 
-In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`, and reads the secret key from stdin. `--region` and `--path` are optional. [Backups](/docs/backups#the-bucket)
+In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`, and reads the secret key from stdin. `--region` and `--path` are optional. Then confirm the key with `moin bucket confirm`. [Backups](/docs/backups#the-bucket)
 
 ## The team and alerts
 
@@ -120,6 +130,19 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin alerts test <server>` | send a test alert to each |
 
 `moin alerts add` sends a test alert first, and keeps it only when that went out. [Security](/docs/security#the-team)
+
+## moin cloud
+
+| Command | What it does |
+| --- | --- |
+| `moin cloud` | your workspace: plan, billing, servers, how much the copies take, what needs you |
+| `moin cloud login` | sign this laptop in, through the browser |
+| `moin cloud connect <server>` | the server reports to moin cloud |
+| `moin cloud disconnect <server>` | it no longer does. It asks first |
+| `moin cloud copies <server> [app]` | the copies the server sent, which it can't delete |
+| `moin cloud restore [app]` | pick a copy from any server of the workspace. moin asks for your backup key. `--to <copy>` names it |
+
+[moin cloud](/docs/cloud)
 
 ## Watcher
 
@@ -140,7 +163,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin update <server>` | put the version of your CLI on the server |
 | `moin daemon uninstall` | on the server: remove moin. The apps keep running |
 | `moin daemon uninstall --apps` | on the server: remove moin and every app, with its data |
-| `moin version` | the version |
+| `moin version` | the version. `--json` prints it as JSON |
 | `moin help` | every command |
 
 ## Security
@@ -151,7 +174,6 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin secure <server> --tunnel off` | the web on ports 80 and 443 again, not through the tunnel |
 | `moin unlock` | on the server, in your provider's web console: open port 22 again |
 | `moin knocks [server]` | the connection attempts the firewall dropped, by port |
-| `moin follow [app] --branch main` | the server deploys each new commit of the branch. `--off` stops it |
 
 [Security](/docs/security)
 
@@ -194,7 +216,9 @@ moin --json
 moin backups shop --json
 ```
 
-`moin deploy`, `moin rollback`, `moin backup` and `moin restore` take it too. Then the log goes to stderr, and stdout holds only the JSON.
+`moin deploy`, `moin rollback`, `moin backup`, `moin restore` and `moin cloud restore` take it too. Then the log goes to stderr, and stdout holds only the JSON.
+
+`moin logs --json` prints the lines there are. It takes no `-f`.
 
 A command that fails exits with a code other than 0, and says why. `moin exec` exits with the code of the command it ran.
 
