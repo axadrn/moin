@@ -103,11 +103,11 @@ The first deploy to a server asks first: `Set up moin on prod and deploy shop? [
 
 | Command | What it does |
 | --- | --- |
-| `moin backups [app]` | the copies, the last restore check, and which copy it proved |
+| `moin backups [app]` | the copies in your bucket and in moin cloud, one table with WHERE. The last restore check, and which copy it proved |
 | `moin backup [app]` | a copy now |
-| `moin restore [app]` | pick a copy to go back to, or the undo of the last restore |
+| `moin restore [app]` | pick a copy to go back to, from the bucket or moin cloud, or the undo of the last restore. A copy in moin cloud asks for your backup key |
 | `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, or `undo-…` |
-| `moin backups [app] --from <server>` | the copies another server left in the bucket, like one that is gone |
+| `moin backups [app] --from <server>` | the copies another server made, like one that is gone |
 | `moin restore [app] --from <server> --key` | restore one of them. moin asks for your backup key |
 | `moin bucket <server>` | the bucket of the server, never its secret, and whether your backup key is confirmed |
 | `moin bucket set <server>` | set the bucket. moin asks for each value, then shows your backup key once |
@@ -136,27 +136,18 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 
 `moin alerts add` sends a test alert first, and keeps it only when that went out. [Security](/docs/security#the-team)
 
-## moin cloud
-
-| Command | What it does |
-| --- | --- |
-| `moin cloud` | your workspace: plan, billing, servers, how much the copies take, what needs you |
-| `moin cloud login` | sign this laptop in, through the browser |
-| `moin cloud connect <server>` | the server reports to moin cloud |
-| `moin cloud disconnect <server>` | it no longer does. It asks first |
-| `moin cloud copies <server> [app]` | the copies the server sent, which it can't delete |
-| `moin cloud restore [app]` | pick a copy from any server of the workspace. moin asks for your backup key. `--to <copy>` names it |
-
-[moin cloud](/docs/cloud)
-
 ## Watcher
 
 | Command | What it does |
 | --- | --- |
+| `moin watcher` | each server's watchers. For moin cloud also your plan, the trial days left and the billing link |
+| `moin watcher connect <server>` | the server reports to moin cloud. The first time, the browser signs this laptop in |
+| `moin watcher connect <server> <url> <token>` | the server reports to a watcher you run |
+| `moin watcher disconnect <server> [url]` | the server stops reporting there. Without an address: moin cloud. It asks first |
 | `moin watcher run` | run a watcher, on another machine than your servers |
 | `moin watcher token <server>` | on the watcher: a token for a server, and the exact line to paste on your laptop |
-| `moin watcher connect <server> <url> <token>` | on your laptop: the server reports to that watcher |
-| `moin watcher disconnect <server> <url>` | the server stops reporting there |
+
+[Watcher](/docs/watcher), [moin cloud](/docs/cloud)
 
 [Watcher](/docs/watcher)
 
@@ -221,7 +212,7 @@ moin --json
 moin backups shop --json
 ```
 
-`moin deploy`, `moin rollback`, `moin backup`, `moin restore` and `moin cloud restore` take it too. Then the log goes to stderr, and stdout holds only the JSON.
+`moin deploy`, `moin rollback`, `moin backup` and `moin restore` take it too. Then the log goes to stderr, and stdout holds only the JSON.
 
 `moin logs --json` prints the lines there are. It takes no `-f`.
 

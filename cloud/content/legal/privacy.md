@@ -54,7 +54,7 @@ Only if you use moin cloud. Your account is your mail address: we store it, and 
 - **A link by mail.** We send a link that works once, for 15 minutes. To stop floods of mails, we count the links asked for per mail address and per IP address, in memory, for 15 minutes.
 - **GitHub.** We ask GitHub for the verified primary mail address of your GitHub account and sign you in with it. We do not keep anything else from GitHub.
 
-`moin cloud login` on a computer shows a code that you allow in the browser. A session in the browser lasts 30 days, one of the CLI a year. Sessions and sign-in links are stored only as cryptographic hashes.
+`moin watcher connect <server>` on a computer that is not signed in yet shows a code that you allow in the browser. A session in the browser lasts 30 days, one of the CLI a year. Sessions and sign-in links are stored only as cryptographic hashes.
 
 We send only mails that belong to the service: sign-in links, alerts about your servers and apps, the end of a subscription, and important changes to moin cloud. No newsletters or marketing mails.
 

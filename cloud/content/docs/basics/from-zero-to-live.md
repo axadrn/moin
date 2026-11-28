@@ -143,9 +143,10 @@ moin restore shop
 A dead server can't tell you it's dead. Let moin cloud watch it:
 
 ```bash
-moin cloud login
-moin cloud connect prod
+moin watcher connect prod
 ```
+
+The first time, the browser signs your laptop in.
 
 ```text
 ✓ prod reports to moin cloud every minute

@@ -115,7 +115,7 @@ You defend and hold us harmless from claims by others, and the costs that come w
 
 You can stop using moin at any time. Your apps keep running on your servers; moin on them stays until you remove it.
 
-To leave moin cloud, cancel your subscription in the billing portal and disconnect your servers with `moin cloud disconnect <server>`. A disconnected server no longer reports and sends no copies. You can delete your account at any time in moin cloud's Settings. Copies younger than 14 days stay locked until they are 14 days old, then they expire by themselves.
+To leave moin cloud, cancel your subscription in the billing portal and disconnect your servers with `moin watcher disconnect <server>`. A disconnected server no longer reports and sends no copies. You can delete your account at any time in moin cloud's Settings. Copies younger than 14 days stay locked until they are 14 days old, then they expire by themselves.
 
 If we ever end moin cloud, we tell you by mail in good time, keep your copies long enough for you to restore them, and refund the unused part of any prepaid period.
 

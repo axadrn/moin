@@ -9,20 +9,19 @@ moin cloud is a [watcher](/docs/watcher) we run for you, on our servers. Your ap
 
 ## Start
 
-Sign in on your laptop, then connect a server:
+Connect a server, on your laptop:
 
 ```bash
-moin cloud login
-moin cloud connect prod
+moin watcher connect prod
 ```
 
-`moin cloud login` opens the browser. Sign in with GitHub or a link we send to your mail. No password. The page shows a code; allow it when it is the one in your terminal.
+The first time, it opens the browser. Sign in with GitHub or a link we send to your mail. No password. The page shows a code. Allow it when it is the one in your terminal.
 
-`moin cloud connect prod` gives prod a token. From then on prod reports to moin cloud. Connect every server the same way.
+Then prod gets a token. From then on prod reports to moin cloud. Connect every server the same way.
 
 ```bash
-moin cloud                     # your plan, billing, servers, copies, what needs you
-moin cloud disconnect prod     # prod no longer reports
+moin watcher                       # each server's watchers, your plan, trial days left, billing
+moin watcher disconnect prod       # prod no longer reports
 ```
 
 The same is on [moin.run/cloud](/cloud) in the browser. It only shows. Nothing on it changes a server.
@@ -46,7 +45,7 @@ $7 a month, or $49 a year, for the whole workspace. Every server, every app.
 - Subscribe on [moin.run/cloud](/cloud). The checkout is Stripe's.
 - For businesses only.
 - Stripe sells it to you, as the seller of record, and handles the tax. The invoice comes from Stripe.
-- `moin cloud` and the page link Billing: your invoices, your card, cancel.
+- `moin watcher` and the page link Billing: your invoices, your card, cancel.
 - Cancel there any time. Alerts stay on until the paid time ends. Then you get a mail, and alerts are off.
 
 Early backers sign in with the mail they paid with. Their discount is applied at the checkout by itself.
@@ -74,14 +73,13 @@ So moin cloud keeps a copy, for paying workspaces and during the trial:
 - Each copy stays 14 days, then goes. The newest copy of a database always stays.
 
 ```bash
-moin cloud copies prod          # the copies prod sent
-moin cloud copies prod shop     # only those of shop
-moin cloud restore shop         # put shop back to one
+moin backups shop               # the copies of shop, in your bucket and in moin cloud
+moin restore shop               # put shop back to one
 ```
 
-`moin cloud restore shop` shows the copies of shop, from every server in the workspace, and asks which one. Enter takes the newest. Then it asks for your backup key. In a script, name the copy with `--to <copy>` and pass `-y`.
+`moin backups shop` shows every copy in one table. WHERE says where it is: `bucket` or `moin cloud`. `moin restore shop` asks which one. Enter takes the newest. A copy in moin cloud asks for your backup key. In a script, name the copy with `--to <copy>` and pass `-y`.
 
-It works for a server that is gone, too. Set up a new one, deploy shop there, then `moin cloud restore shop -s new`. Like every restore, it keeps the data from before as an undo: `moin restore shop --to undo-…`.
+It works for a server that is gone, too. Set up a new one, deploy shop there, then `moin restore shop -s new --from prod`. Like every restore, it keeps the data from before as an undo: `moin restore shop --to undo-…`.
 
 ### How it works
 
@@ -102,7 +100,7 @@ The copies lie in a Cloudflare R2 bucket with a 14-day lock. Inside it nobody de
 moin cloud is open source, in `cloud/` of the repo. To point the CLI at another one, like one on your laptop, set `MOIN_CLOUD_URL`:
 
 ```bash
-MOIN_CLOUD_URL=http://localhost:8090 moin cloud login
+MOIN_CLOUD_URL=http://localhost:8090 moin watcher connect prod
 ```
 
 Without it the CLI talks to https://moin.run.

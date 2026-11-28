@@ -12,8 +12,7 @@ You rarely write it by hand. The commands write it for you:
 | Command | Writes |
 | --- | --- |
 | the first `moin deploy` | `name` |
-| `moin watcher connect`, `moin watcher disconnect` | `watchers` |
-| `moin cloud connect`, `moin cloud disconnect` | `watchers`: moin cloud is one |
+| `moin watcher connect`, `moin watcher disconnect` | `watchers`: moin cloud is one |
 | `moin alerts add`, `moin alerts rm` | `alerts` |
 | `moin bucket set` | `bucket` |
 | `moin bucket key`, `moin bucket confirm` | `backup_key` |

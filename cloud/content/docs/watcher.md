@@ -63,7 +63,7 @@ Never on the server it watches. When that server dies, the watcher dies with it,
 
 - **A small second server.** The cheapest one your provider has is enough.
 - **Two servers that watch each other.** Best at two different providers.
-- **moin cloud.** We run one for you. [moin cloud](/docs/cloud)
+- **moin cloud.** We run one for you: `moin watcher connect prod`. [moin cloud](/docs/cloud)
 
 A server can report to several watchers.
 
@@ -214,10 +214,14 @@ It shows what needs you first, then each server with its apps, their domains as 
 ## See and change where a server reports
 
 ```bash
-moin servers
+moin watcher                                                    # each server's watchers
 moin watcher connect prod https://watcher.example.com <token>
 moin watcher disconnect prod https://watcher.example.com
+moin watcher connect prod                                       # moin cloud
+moin watcher disconnect prod                                    # moin cloud
 ```
+
+Without an address, it is moin cloud. The first time, the browser signs your laptop in. `moin watcher` shows your plan of moin cloud too, the days left of the trial, and where to pay.
 
 `moin watcher disconnect` asks first, because that watcher will then say the server is silent. In a script, add `-y`.
 

@@ -49,7 +49,7 @@ Without a bucket and without [moin cloud](#copies-to-moin-cloud), moin copies no
 No bucket of your own? With a paid [moin cloud](/docs/cloud#a-copy-your-server-cant-delete) workspace, the copies go there. With a bucket, they go to both.
 
 ```bash
-moin cloud connect prod
+moin watcher connect prod
 moin bucket key prod
 ```
 
@@ -57,7 +57,7 @@ moin bucket key prod
 - **Encrypted with your key**: on the server, for the server's key and [your backup key](#your-backup-key). moin cloud can't read a copy. A restore from moin cloud needs your key, so make it first: `moin bucket key prod`.
 - **Proven first**: the first copy of each day is restored and read on your server before it leaves. A copy that does not restore is not uploaded. [The daily check](#the-daily-check)
 - **Out of reach**: your server can add a copy there. It can never read, list or delete one. Each stays 14 days.
-- **Restore**: `moin cloud copies prod` lists them. `moin cloud restore shop` puts one back, also on a new server. [Restore from moin cloud](/docs/cloud#a-copy-your-server-cant-delete)
+- **Restore**: `moin backups shop` lists them beside the copies in your bucket, WHERE says `moin cloud`. `moin restore shop` puts one back, also on a new server. [Restore from moin cloud](/docs/cloud#a-copy-your-server-cant-delete)
 
 Without a bucket there is no copy before a deploy. `moin backup`, `moin backups` and `moin restore` work on your bucket only.
 
@@ -212,11 +212,11 @@ moin restore shop -s new --from prod --key
 ```
 
 - `moin bucket set new` takes the same bucket. Give it your old key with `moin bucket key new --public age1…`, or take a new one.
-- `--from prod` reads the copies the server `prod` left in the bucket, under its name.
+- `--from prod` reads the copies the server `prod` made, under its name: in the bucket, and in moin cloud.
 - `--key` asks for your backup key. The new server's own key can't open the old copies.
 - In a script, name the copy with `--to <copy>`, pipe the key in, and add `-y`.
 
-With [moin cloud](/docs/cloud#a-copy-your-server-cant-delete), `moin cloud restore shop -s new` works the same, from the copy your server could not delete.
+With [moin cloud](/docs/cloud#a-copy-your-server-cant-delete), the same commands show and restore the copy your server could not delete. Its WHERE is `moin cloud`, and it always asks for your backup key.
 
 ## Your copies without moin
 

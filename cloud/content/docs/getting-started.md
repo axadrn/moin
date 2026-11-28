@@ -103,7 +103,7 @@ From then on it copies every database every hour, and every day it restores the 
 
 ## 6. Watch it
 
-A dead server can't tell you it's dead. A watcher on another machine notices. Set one up in four commands, or let us run one: `moin cloud login`, then `moin cloud connect prod`. [Watcher](/docs/watcher#set-one-up)
+A dead server can't tell you it's dead. A watcher on another machine notices. Set one up in four commands, or let us run one: `moin watcher connect prod`. [Watcher](/docs/watcher#set-one-up)
 
 ## 7. Add your domain
 
