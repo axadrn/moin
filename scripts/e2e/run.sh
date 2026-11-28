@@ -392,7 +392,7 @@ cd "$work/$reg_app" || exit 1
 ref=$registry/e2e/whoami:main
 expect "moin deploy prod --image $ref" "$reg_app v[0-9]+ is live" moin deploy prod --image "$ref" -y
 eventually 120 "the app from the private registry answers" "Hostname:" get "$reg_url/"
-running() { ssh prod "docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1)"; }
+running() { ssh prod "docker image inspect --format '{{.Id}}' \$(docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1))"; }
 expect "the app runs the image of the registry" "$id1" running
 expect "moin follow $reg_app --image $ref" "$reg_app follows $ref" moin follow $reg_app --image "$ref"
 id2=$(push_tag main v1.10.3) || fail "push a new image under the same tag" "$id2"
