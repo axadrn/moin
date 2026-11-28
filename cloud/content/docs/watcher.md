@@ -87,7 +87,7 @@ Never on the server it watches. When that server dies, the watcher dies with it,
 - **Two servers that watch each other.** Best at two different providers.
 - **moin cloud.** We run one for you: `moin watcher connect my-server`. [moin cloud](/docs/cloud)
 
-A server can report to several watchers.
+One watcher watches all your servers. A server can also report to two watchers, for safety.
 
 ## Set one up
 
