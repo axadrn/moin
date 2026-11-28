@@ -1807,6 +1807,22 @@
   background: var(--card);
   color: var(--card-foreground);
 }
+/* The chat's avatar, and its messages at the bottom, the newest last, as
+   Telegram shows them. */
+.moin-chat-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; }
+.moin-chat-messages { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-2); }
+.moin-chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 28rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.moin-chat-message time { float: right; margin: 0.25rem 0 0 var(--space-3); font-size: 0.75rem; }
 .moin-roads { display: block; width: 100%; height: auto; color: var(--foreground); }
 .moin-roads-muted { fill: var(--muted-foreground); }
 .moin-roads-ink { fill: var(--foreground); }
@@ -1869,6 +1885,7 @@
   font-variant-ligatures: none;
 }
 .moin-terminal-line { white-space: pre; color: color-mix(in oklab, var(--terminal-foreground) 62%, transparent); }
+.moin-terminal[data-wrap] .moin-terminal-line { white-space: pre-wrap; overflow-wrap: anywhere; }
 .moin-terminal-line[data-kind="prompt"] { color: var(--terminal-foreground); font-weight: 600; }
 .moin-terminal-line[data-kind="done"] { color: var(--terminal-foreground); font-weight: 600; }
 .moin-terminal-line[data-kind="done"]::first-letter { color: var(--live); }
@@ -1900,7 +1917,6 @@
 .moin-band-head { align-items: center; text-align: center; margin-block-end: var(--space-6); }
 .moin-band-head > .moin-lead { max-width: 60ch; text-wrap: balance; }
 .moin-stack[data-fill] > :first-child { flex: 1; }
-.moin-chat { justify-content: center; }
 .moin-card-end { margin-block-start: auto; display: flex; }
 .moin-card-end > * { flex: 1; }
 .moin-table td { text-align: center; font-size: 1rem; }
@@ -1914,7 +1930,6 @@
 .moin-table tbody th { width: auto; white-space: nowrap; }
 .moin-table { min-width: 40rem; }
 .moin-table td:nth-child(2), .moin-table thead th:nth-child(2) { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
-@media (min-width: 56rem) { .moin-grid[data-cols="3-2"] { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
 /* A fact of zero trust: a title a step bigger than text. */
 .moin-fact-name { font-family: var(--font-heading); font-size: 1.25rem; font-weight: var(--weight-title); letter-spacing: var(--tracking-title); line-height: 1.3; }
 

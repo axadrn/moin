@@ -45,12 +45,14 @@ type TerminalProps struct {
 	Title string
 	Lines []TerminalLine
 	Play  bool
+	// Wrap breaks a line wider than the window, as a narrow terminal does.
+	Wrap bool
 }
 
 // Terminal shows real CLI output in a terminal window, for the landing
 // page.
 templ Terminal(p TerminalProps) {
-	<figure class="moin-terminal" data-play?={ p.Play } aria-label={ p.Title }>
+	<figure class="moin-terminal" data-play?={ p.Play } data-wrap?={ p.Wrap } aria-label={ p.Title }>
 		<div class="moin-terminal-bar" aria-hidden="true">
 			<i></i><i></i><i></i>
 			<span>{ p.Title }</span>

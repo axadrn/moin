@@ -113,47 +113,66 @@ var homeDeploy = []components.TerminalLine{
 }
 
 // ---------------------------------------------------------------- lose nothing
-// HomeLoseNothing shows the promise as moin keeps it: a backup that came
-// back this morning, and a watcher that noticed a server go quiet.
+// HomeLoseNothing shows the promise as moin keeps it: the backups of an
+// app, proven this morning, and the watcher's chat with the alerts it
+// sent.
 templ HomeLoseNothing() {
 	<section id="backups" class="moin-band">
 		@homeHead("Lose nothing.", "Every day, moin restores a backup. And proves it.")
-		<div class="moin-grid" data-cols="3-2">
+		<div class="moin-grid" data-fit style="--min: 24rem">
 			<div class="moin-stack" data-gap="3" data-fill>
-				@components.Terminal(components.TerminalProps{Title: "~ — moin backups shop", Lines: homeBackups})
-				<p class="moin-small moin-muted">SQLite and Postgres. Your own bucket. A copy before every deploy.</p>
+				@components.Terminal(components.TerminalProps{Title: "~ — moin backups shop", Lines: homeBackups, Wrap: true})
+				<p class="moin-small moin-muted">SQLite and Postgres. A copy before every deploy.</p>
 			</div>
 			<div class="moin-stack" data-gap="3" data-fill>
-				@homeAlert("prod stopped reporting", "No report since 2026-11-27 03:12 UTC. The server, its network or moin on it is down.\nApps on it: shop, blog.\nLook: ssh prod, or the console of your provider.")
-				<p class="moin-small moin-muted">A dead server can't tell you it's dead. A watcher can.</p>
+				@homeChat()
+				<p class="moin-small moin-muted">A dead server can't tell you. A watcher can.</p>
 			</div>
 		</div>
 		@homeMore("/docs/backups", "How backups work")
 	</section>
 }
 
-// homeBackups is `moin backups shop`, as the CLI prints it.
+// homeBackups is `moin backups shop`, as the CLI prints it, for an app
+// with two copies so far.
 var homeBackups = []components.TerminalLine{
 	{Kind: "prompt", Text: "$ moin backups shop"},
-	{Kind: "prompt", Text: "postgres"},
-	{Kind: "done", Text: "✓ Restore check 4h ago: the copy 20261127T030000Z-482913 restored and read fine"},
-	{Text: "COPY                      TAKEN    SIZE"},
-	{Text: "20261127T070000Z-118204   12m ago  41 MB"},
-	{Text: "20261127T060000Z-730551   1h ago   41 MB"},
-	{Text: "20261127T030000Z-482913   4h ago   40 MB"},
-	{Kind: "hint", Text: "Go back to one with moin restore shop --to <copy>"},
+	{Kind: "prompt", Text: "postgres-db"},
+	{Kind: "done", Text: "  ✓ Restore check 1h ago: the copy 20261127T060000Z-730551 restored and read fine"},
+	{Text: "COPY                      TAKEN     SIZE"},
+	{Text: "20261127T070000Z-118204   12m ago   41 MB"},
+	{Text: "20261127T060000Z-730551   1h ago    41 MB"},
+	{Kind: "hint", Text: "  Go back to one with moin restore shop --to <copy>"},
 }
 
-// homeAlert is a message the watcher sends, as a chat app shows it.
-templ homeAlert(title, text string) {
-	<figure class="moin-chat" aria-label="An alert from the watcher">
-		<figcaption class="moin-row moin-small moin-muted" data-gap="2">
-			@components.Dot(components.DotProps{State: components.StateFailed})
-			moin watcher · Telegram
+// homeChat is the watcher's chat in Telegram: two alerts, as the watcher
+// and a daemon send them, the newest at the bottom.
+templ homeChat() {
+	<figure class="moin-chat" aria-label="Alerts from the watcher in Telegram">
+		<figcaption class="moin-row" data-gap="3">
+			<img class="moin-chat-avatar" src={ components.AssetURL("/assets/img/favicon.svg") } alt=""/>
+			<span class="moin-stack" data-gap="1">
+				<span class="moin-strong">{ brand.Name } watcher</span>
+				<span class="moin-small moin-muted">bot · Telegram</span>
+			</span>
 		</figcaption>
-		<p class="moin-strong">{ title }</p>
-		<p class="moin-text moin-muted moin-pre">{ text }</p>
+		<div class="moin-chat-messages">
+			@homeAlert("shop: the restore check of postgres-db failed", "the copy 20261127T000000Z-904417 did not restore: pg_restore: pg_restore: error: could not read from input file: end of file\nprod · shop", "00:04")
+			@homeAlert("prod stopped reporting", "No report since 2026-11-27 03:12 UTC. The server, its network or moin on it is down.\nApps on it: shop.\nLook: ssh prod, or the console of your provider.\nprod", "03:16")
+		</div>
 	</figure>
+}
+
+// homeAlert is one alert in the chat: its title, its lines and when it
+// came. The red dot is the alert's 🔴.
+templ homeAlert(title, text, at string) {
+	<div class="moin-chat-message">
+		<p class="moin-strong">
+			@components.Dot(components.DotProps{State: components.StateFailed})
+			{ " " + title }
+		</p>
+		<p class="moin-pre">{ text }<time class="moin-muted">{ at }</time></p>
+	</div>
 }
 
 // ---------------------------------------------------------------- nobody gets in
