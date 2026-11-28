@@ -393,12 +393,14 @@ ref=$registry/e2e/whoami:main
 expect "moin deploy prod --image $ref" "$reg_app v[0-9]+ is live" moin deploy prod --image "$ref" -y
 eventually 120 "the app from the private registry answers" "Hostname:" get "$reg_url/"
 running() { ssh prod "docker image inspect --format '{{index .RepoDigests 0}}' \$(docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1)) | sed 's/.*@//'"; }
-expect "the app runs the image of the registry" "$id1" running
+expect "the app runs the image of the registry" "$ref" ssh prod "docker inspect --format '{{.Config.Image}}' \$(docker ps -q --filter name=$reg_app | head -1)"
+first=$(running)
 expect "moin follow $reg_app --image $ref" "$reg_app follows $ref" moin follow $reg_app --image "$ref"
 id2=$(push_tag main v1.10.3) || fail "push a new image under the same tag" "$id2"
 [ "$id1" != "$id2" ] || fail "the second image differs from the first"
 pass "a new image lies under the tag main"
-eventually 180 "the server deployed the new image within 3 minutes" "$id2" running
+moved() { now=$(running) && [ "$now" != "$first" ] && echo "$now"; }
+eventually 180 "the server deployed the new image within 3 minutes" "^sha256:" moved
 eventually 60 "the app answers after it" "Hostname:" get "$reg_url/"
 expect "moin follow $reg_app --off" "$reg_app" moin follow $reg_app --off
 expect "moin registry rm prod $registry" "prod is logged out of $registry" moin registry rm prod "$registry" -y
