@@ -1,6 +1,6 @@
 ---
 title: "Deploy"
-description: "Deploy from your folder or from CI or from a registry. Every deploy and its log. Roll back. Restart. Remove. Env vars. Domains. Logs. One-off commands. Run it elsewhere."
+description: "Deploy from your folder, from CI or from a registry. Every deploy and its log. Roll back. Env vars. Domains. Logs. One-off commands. Run it elsewhere."
 group: "Apps"
 order: 1
 ---

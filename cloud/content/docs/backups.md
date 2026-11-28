@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
+description: "SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis. Encrypted, in your bucket or moin cloud. Every day one copy is restored and read."
 group: "Servers and data"
 order: 1
 ---
@@ -389,6 +389,12 @@ age -d -i key.txt 20261127T140000Z-118204.rdb.gz.age | gunzip > dump.rdb
 ```
 
 A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. A MySQL or MariaDB copy, `.sql.gz.age`, is plain SQL: `mysql` or `mariadb` loads it. A MongoDB copy, `.archive.gz.age`, is an archive of `mongodump`: `mongorestore --archive=my-app.archive.gz --gzip` loads it. A ClickHouse copy, `.zip.age`, is a zip of `BACKUP`: put it in the `backups` folder of a ClickHouse and run `RESTORE ALL FROM File('my-app.zip')`. A Redis copy, `.rdb.gz.age`, is a `dump.rdb`: a Redis without an append only file loads it from its data folder when it starts. You need no moin for any of them.
+
+## Limits
+
+- **MongoDB copies are not one point in time across collections.** MongoDB dumps one collection after the other. A write during the copy can land in one collection and miss another. For most apps that is fine.
+- **ClickHouse clusters with replicated tables are not supported yet.** A single ClickHouse server is.
+- **A Redis password that is only in a config file is not found.** Put it in the `command` of the service, as `--requirepass`, or set `REDISCLI_AUTH` in its `environment`.
 
 ## If it breaks
 

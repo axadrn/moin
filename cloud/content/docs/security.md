@@ -121,6 +121,14 @@ Connection attempts, all dropped. Counted since March 2, 2026.
 - Until public SSH is closed, nothing is counted.
 - Every report tells your watchers the knocks of the day.
 
+## A second wall
+
+moin's firewall closes every port on the server and counts the knocks. For defense in depth, put your provider's firewall in front of it too.
+
+- Let in Tailscale, UDP port 41641, and ping.
+- With a Cloudflare Tunnel, let in nothing else. Without one, also TCP ports 80 and 443 for the web.
+- The trade: a knock your provider drops never reaches the server, so moin cannot count it.
+
 ## The way back in
 
 Lost your laptop, or your tailnet? Use your provider's web console. It is a screen and a keyboard on the server, in your browser.
