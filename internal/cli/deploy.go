@@ -60,7 +60,10 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return err
 	}
 	if *image != "" {
-		if err := sendImage(ctx, server, *image, log); err != nil {
+		err := task(log, "sending image "+*image, func() error {
+			return sendImage(ctx, server, *image)
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -216,14 +219,7 @@ func printLive(stdout io.Writer, result daemon.Result, server string, bucket boo
 
 // sendImage puts a local image on the server: docker save here, docker
 // load there.
-func sendImage(ctx context.Context, server, image string, stdout io.Writer) error {
-	return task(stdout, "sending image "+image, func() error {
-		return saveAndLoad(ctx, server, image)
-	})
-}
-
-// saveAndLoad pipes docker save here into docker load on the server.
-func saveAndLoad(ctx context.Context, server, image string) error {
+func sendImage(ctx context.Context, server, image string) error {
 	save := exec.CommandContext(ctx, "docker", "save", "--", image)
 	save.Stderr = os.Stderr
 	pipe, err := save.StdoutPipe()
