@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -165,7 +166,7 @@ func (a *apps) newStart(app string) protocol.DeployStart {
 		DeployID: newDeployID(),
 		App:      app,
 		Source:   "apply",
-		Domains:  &protocol.Domains{Domains: a.domains(app), Instant: "sslip.io", InstantIP: firstIPv4()},
+		Domains:  a.routing(app),
 	}
 }
 
@@ -197,11 +198,15 @@ func (a *apps) addresses(detected protocol.Detected) []string {
 	return list
 }
 
-// reachable are the domains of an app the internet reaches: its own, then
-// its instant address. Behind a Cloudflare Tunnel ports 80 and 443 are
-// closed, so the instant address answers nobody: it is left out.
+// reachable are the domains of an app the internet reaches: its own, its
+// other services' by service, then its instant address. Behind a
+// Cloudflare Tunnel ports 80 and 443 are closed, so the instant address
+// answers nobody: it is left out.
 func (a *apps) reachable(detected protocol.Detected) []string {
 	list := slices.Clone(detected.Domains)
+	for _, service := range slices.Sorted(maps.Keys(detected.ServiceDomains)) {
+		list = append(list, detected.ServiceDomains[service]...)
+	}
 	tunnel := a.proxyMode != nil && a.proxyMode() == "tunnel"
 	if detected.Instant != "" && !tunnel {
 		list = append(list, detected.Instant)

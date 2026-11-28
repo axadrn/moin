@@ -42,7 +42,7 @@ Apps
   env push [app] [file|-]      Replace them with a .env file. Shows the names first
   env set [app] <NAME>         Set one. The value is asked or read from stdin
   domains [app]                The app's domains
-  domains add [app] <domain>   Add one. The certificate follows by itself
+  domains add [app] <domain>   Add one. The certificate follows by itself. --service api for another service
   domains rm [app] <domain>    Remove one
   password [app]               Ask every visitor for a password. off ends it
   sql [app] "<query>"          Ask its database. --tables lists its tables

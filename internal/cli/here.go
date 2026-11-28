@@ -262,11 +262,15 @@ func hereEnv(ctx context.Context, dir string, args []string, stdin io.Reader, st
 	return respond(stdout, value, err)
 }
 
-// hereDomains is `here domains <app>` and `here domains add|rm <app>
-// <domain>`.
+// hereDomains is `here domains <app>`, `here domains add <app> <domain>
+// [service]` and `here domains rm <app> <domain>`.
 func hereDomains(ctx context.Context, dir string, args []string, stdout io.Writer) error {
-	if len(args) == 3 && args[0] == "add" {
-		value, err := daemon.AddDomainHere(ctx, dir, args[1], args[2], os.Stderr)
+	if (len(args) == 3 || len(args) == 4) && args[0] == "add" {
+		service := ""
+		if len(args) == 4 {
+			service = args[3]
+		}
+		value, err := daemon.AddDomainHere(ctx, dir, args[1], args[2], service, os.Stderr)
 		return respond(stdout, value, err)
 	}
 	if len(args) == 3 && args[0] == "rm" {
@@ -274,7 +278,7 @@ func hereDomains(ctx context.Context, dir string, args []string, stdout io.Write
 		return respond(stdout, value, err)
 	}
 	if len(args) != 1 {
-		return errors.New("usage: here domains <app> | add <app> <domain> | rm <app> <domain>")
+		return errors.New("usage: here domains <app> | add <app> <domain> [service] | rm <app> <domain>")
 	}
 	value, err := daemon.DomainsHere(dir, args[0])
 	return respond(stdout, value, err)

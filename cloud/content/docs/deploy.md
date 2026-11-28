@@ -327,6 +327,16 @@ moin domains rm my-app www.my-app.example.com
 
 Add `example.com` and `www.example.com` both, and www redirects to `example.com` for good. The path and the query stay. `example.com` serves the app.
 
+### Another service
+
+A domain reaches the main service: the one moin found in your compose file. Another service can get one too, like an API next to the web app:
+
+```bash
+moin domains add my-app api.my-app.example.com --service api
+```
+
+The domain goes to that service, on its own port: the first of its `ports` or `expose`, else its env `PORT`, else 8080. `moin domains` shows which service each domain reaches. `moin domains rm` takes it off like any other.
+
 ## Password
 
 Keep visitors out of an app, like a staging site or an admin tool without a login of its own:

@@ -24,23 +24,41 @@ var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+
 
 // route settles the domains of a deploy from the app's settings on the
 // server, the only place they are set. Domains are the main service's;
-// Instant its instant address.
+// ServiceDomains the other services', by service; Instant its instant
+// address.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {
 		domains = &protocol.Domains{}
 	}
 	detected.Domains = slices.Clone(domains.Domains)
-	if err := cleanDomains(detected.Domains); err != nil {
+	detected.ServiceDomains = nil
+	for service, list := range domains.Services {
+		if service == detected.Service {
+			detected.Domains = append(detected.Domains, list...)
+			continue
+		}
+		if detected.ServiceDomains == nil {
+			detected.ServiceDomains = map[string][]string{}
+		}
+		detected.ServiceDomains[service] = slices.Clone(list)
+	}
+	// A domain reaches one service.
+	seen := map[string]bool{}
+	if err := cleanDomains(detected.Domains, seen); err != nil {
 		return detected, err
+	}
+	for _, list := range detected.ServiceDomains {
+		if err := cleanDomains(list, seen); err != nil {
+			return detected, err
+		}
 	}
 	detected.Instant = protocol.InstantHost(app, domains.InstantIP, domains.Instant)
 	return detected, nil
 }
 
-// cleanDomains checks every domain of a deploy and writes it in lower
-// case, in place.
-func cleanDomains(list []string) error {
-	seen := map[string]bool{}
+// cleanDomains checks the domains of a list and writes them in lower case,
+// in place. seen holds the domains so far.
+func cleanDomains(list []string, seen map[string]bool) error {
 	for index, domain := range list {
 		domain = strings.ToLower(strings.TrimSpace(domain))
 		if !domainPattern.MatchString(domain) {

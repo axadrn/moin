@@ -44,6 +44,8 @@ type DeployStart struct {
 // the server, the only place they are set.
 type Domains struct {
 	Domains []string `json:"domains,omitempty"`
+	// Services are the domains of the app's other services, by service.
+	Services map[string][]string `json:"services,omitempty"`
 	// Instant is the provider of the app's instant address, such as
 	// sslip.io, "" for none; InstantIP the server's public IPv4 it names.
 	Instant   string `json:"instant,omitempty"`

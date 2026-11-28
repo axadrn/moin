@@ -129,7 +129,7 @@ The first deploy to a server asks first: `Set up moin on my-server and deploy my
 | `moin env set [app] <NAME>` | set one. The value is asked without showing it, or read from stdin. Never an argument |
 | `moin env push [app] [file\|-]` | replace the env with a `.env` file, or stdin with `-`. Lists the names that change and asks first |
 | `moin domains [app]` | the app's domains |
-| `moin domains add [app] <domain>` | add a domain, with HTTPS |
+| `moin domains add [app] <domain>` | add a domain, with HTTPS. `--service api` sends it to another service than the main one |
 | `moin domains rm [app] <domain>` | remove one. It asks first |
 | `moin password [app]` | every visitor needs a user and a password. The password is asked without showing it, or read from stdin. `--user <name>` names the user. [Password](/docs/deploy#password) |
 | `moin password off [app]` | everyone gets in again |

@@ -1,6 +1,11 @@
 package daemon
 
 import (
+	"context"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -116,5 +121,70 @@ func TestWwwRedirectsToTheApex(t *testing.T) {
 		if strings.Contains(key, "-www") {
 			t.Errorf("www alone redirects: %s", key)
 		}
+	}
+}
+
+// TestServiceDomains: a line "domain service" in the domains file sends
+// the domain to another service than the main one, on a router of its own
+// and the service's own port.
+func TestServiceDomains(t *testing.T) {
+	dir := t.TempDir()
+	a := newApps(dir)
+	os.MkdirAll(a.releaseDir("shop", 1), 0o700)
+	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
+	os.WriteFile(a.domainsFile("shop"), []byte("shop.example.com\napi.example.com api\n"), 0o600)
+	routing := a.routing("shop")
+	routing.InstantIP = ""
+	if strings.Join(routing.Domains, " ") != "shop.example.com" || strings.Join(routing.Services["api"], " ") != "api.example.com" {
+		t.Fatalf("routing = %+v", routing)
+	}
+	detected, err := route("shop", protocol.Detected{Service: "web"}, routing)
+	if err != nil || strings.Join(detected.ServiceDomains["api"], " ") != "api.example.com" {
+		t.Fatalf("route: %+v, %v", detected, err)
+	}
+	if got := strings.Join(a.reachable(detected), " "); got != "shop.example.com api.example.com" {
+		t.Errorf("reachable = %q", got)
+	}
+	// A domain reaches one service.
+	if _, err := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Domains: []string{"api.example.com"}, Services: routing.Services}); err == nil {
+		t.Error("one domain for two services")
+	}
+	// A line that names the main service is one of its domains.
+	main, _ := route("shop", protocol.Detected{Service: "web"}, &protocol.Domains{Services: map[string][]string{"web": {"www.example.com"}}})
+	if strings.Join(main.Domains, " ") != "www.example.com" || main.ServiceDomains != nil {
+		t.Errorf("main by name: %+v", main)
+	}
+
+	config := map[string]any{"services": map[string]any{
+		"web": map[string]any{"image": "shop:1"},
+		"api": map[string]any{"image": "shop-api:1", "expose": []any{"4000"}},
+	}}
+	file := filepath.Join(a.releaseDir("shop", 1), "compose.json")
+	if err := finish(&release{start: protocol.DeployStart{App: "shop", Number: 1}, config: config, detected: detected, composeJSON: file}); err != nil {
+		t.Fatal(err)
+	}
+	var written struct {
+		Services map[string]struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"services"`
+	}
+	body, _ := os.ReadFile(file)
+	json.Unmarshal(body, &written)
+	api := written.Services["api"].Labels
+	if api["traefik.http.routers.moin-shop-svc-api.rule"] != "Host(`api.example.com`)" || api["traefik.http.services.moin-shop-svc-api.loadbalancer.server.port"] != "4000" {
+		t.Errorf("api labels: %v", api)
+	}
+	if written.Services["web"].Labels["traefik.http.routers.moin-shop.rule"] != "Host(`shop.example.com`)" {
+		t.Errorf("web labels: %v", written.Services["web"].Labels)
+	}
+
+	// Adding a domain checks the service is in the compose file.
+	if _, err := AddDomainHere(context.Background(), dir, "shop", "admin.example.com", "admin", io.Discard); err == nil || !strings.Contains(err.Error(), "api, web") {
+		t.Errorf("an unknown service: %v", err)
+	}
+	// A deploy fails when the service is gone, with the way out.
+	gone := map[string]any{"services": map[string]any{"web": map[string]any{"image": "shop:2"}}}
+	if err := finish(&release{start: protocol.DeployStart{App: "shop", Number: 2}, config: gone, detected: detected, composeJSON: file}); err == nil || !strings.Contains(err.Error(), "domains rm shop api.example.com") {
+		t.Errorf("a gone service: %v", err)
 	}
 }
