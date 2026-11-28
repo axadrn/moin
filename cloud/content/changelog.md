@@ -5,7 +5,7 @@ description: What shipped in moin, newest first.
 
 ## v1.0.0-beta.39
 
-Unreleased
+November 29, 2026
 
 **In short:** www redirects to your domain again.
 
