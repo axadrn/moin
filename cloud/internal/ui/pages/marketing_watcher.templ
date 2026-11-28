@@ -41,7 +41,7 @@ var homeWatcherColumns = []components.CompareColumn{
 // prices: no watcher, your own, and moin cloud.
 templ HomePricing() {
 	<section id="pricing" class="moin-band">
-		@homeHead("Free. Or free of worries.", "Deploys, backups and alerts work alone. A watcher adds the rest.")
+		@components.BandHead(components.BandHeadProps{Title: "Free. Or free of worries.", Line: "Deploys, backups and alerts work alone. A watcher adds the rest."})
 		@components.Compare(components.CompareProps{Rows: homeWatcherRows, Columns: homeWatcherColumns, Reverse: true})
 		<div class="moin-stack" data-gap="2" data-center>
 			@components.PillLink(components.PillLinkProps{Href: homeFreeYear}) {

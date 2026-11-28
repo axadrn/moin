@@ -130,7 +130,7 @@ var homeDeploy = []components.TerminalLine{
 // sent.
 templ HomeLoseNothing() {
 	<section id="backups" class="moin-band">
-		@homeHead("Lose nothing.", "Every day, moin restores a backup. And proves it.")
+		@components.BandHead(components.BandHeadProps{Title: "Lose nothing.", Line: "Every day, moin restores a backup. And proves it."})
 		<div class="moin-grid" data-fit style="--min: 24rem">
 			<div class="moin-stack" data-gap="3" data-fill>
 				@components.Terminal(components.TerminalProps{Title: "~ — moin backups my-app", Lines: homeBackups, Wrap: true})
@@ -139,7 +139,7 @@ templ HomeLoseNothing() {
 				@homeChat()
 			</div>
 		</div>
-		@homeMore("/docs/backups", "How backups work")
+		@components.More(components.MoreProps{Href: "/docs/backups", Text: "How backups work"})
 	</section>
 }
 
@@ -190,7 +190,7 @@ templ homeAlert(title, text, at string) {
 // go out, and nothing comes back the other way.
 templ HomeNobodyGetsIn() {
 	<section id="security" class="moin-band">
-		@homeHead("Zero trust deploys.", "No dashboard holds a key to your server. Not even ours.")
+		@components.BandHead(components.BandHeadProps{Title: "Zero trust deploys.", Line: "No dashboard holds a key to your server. Not even ours."})
 		@components.Card(components.CardProps{}) {
 			@homeRoads()
 			@homeRoadsTall()
@@ -203,23 +203,8 @@ templ HomeNobodyGetsIn() {
 			@components.Feature(components.FeatureProps{Icon: "refresh", Title: "No surprise updates", Note: "Your server updates when you say so."})
 			@components.Feature(components.FeatureProps{Icon: "eye", Title: "A hacked watcher is harmless", Note: "It can read. It can't command."})
 		}
-		@homeMore("/docs/security", "Security in detail")
+		@components.More(components.MoreProps{Href: "/docs/security", Text: "Security in detail"})
 	</section>
-}
-
-// homeHead is the top of a section: a statement and one short line.
-templ homeHead(statement, line string) {
-	<div class="moin-stack moin-band-head" data-gap="3">
-		<h2 class="moin-statement">{ statement }</h2>
-		<p class="moin-lead">{ line }</p>
-	</div>
-}
-
-// homeMore is the link under a section to the docs about it.
-templ homeMore(href, text string) {
-	<p class="moin-center">
-		<a href={ templ.SafeURL(href) } class="moin-link moin-foreground">{ text }</a>
-	</p>
 }
 
 // homeRoads draws the two one-way roads: laptop to server over SSH, server
@@ -290,9 +275,9 @@ templ homeRoadsTall() {
 // homeBlog is the newest posts of the blog, as the list /blog shows.
 templ homeBlog(posts []service.BlogPost) {
 	<section id="blog" class="moin-band">
-		@homeHead("From the blog.", "Short posts on running your own apps.")
+		@components.BandHead(components.BandHeadProps{Title: "From the blog.", Line: "Short posts on running your own apps."})
 		@blogList(posts)
-		@homeMore("/blog", "All posts")
+		@components.More(components.MoreProps{Href: "/blog", Text: "All posts"})
 	</section>
 }
 

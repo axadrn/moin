@@ -1,6 +1,9 @@
 package pages
 
-import "github.com/axadrn/moin/cloud/internal/tweets"
+import (
+	"github.com/axadrn/moin/cloud/internal/tweets"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+)
 
 // Posts from X say the problem; moin is the answer. Nobody in them talks
 // about moin, and the page never says they do.
@@ -11,7 +14,7 @@ import "github.com/axadrn/moin/cloud/internal/tweets"
 templ HomeVoices(posts []tweets.Tweet) {
 	<section class="moin-band" aria-label="Posts from X">
 		<div class="moin-page moin-stack">
-			@homeHead("Everyone is moving to a VPS.", "Not everyone closes the door.")
+			@components.BandHead(components.BandHeadProps{Title: "Everyone is moving to a VPS.", Line: "Not everyone closes the door."})
 		</div>
 		// site.js moves the row and lets a hand drag it.
 		<div class="moin-page">

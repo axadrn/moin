@@ -45,7 +45,7 @@ func numberRows(t counts.Totals) []numberRow {
 templ homeNumbers(n HomeNumbers) {
 	{{ rows := numberRows(n.Totals) }}
 	<section id="numbers" class="moin-band">
-		@homeHead("Counted. Not guessed.", "No telemetry. These are all the numbers we have.")
+		@components.BandHead(components.BandHeadProps{Title: "Counted. Not guessed.", Line: "No telemetry. These are all the numbers we have."})
 		if n.Sample {
 			<div class="moin-row" data-center>
 				@components.Chip("Sample data · development only")
@@ -73,6 +73,6 @@ templ homeNumbers(n HomeNumbers) {
 				}
 			}
 		}
-		@homeMore(layouts.GitHubURL, "Star on GitHub")
+		@components.More(components.MoreProps{Href: layouts.GitHubURL, Text: "Star on GitHub"})
 	</section>
 }
