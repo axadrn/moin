@@ -182,22 +182,5 @@ templ compareAnswer(whose string, cell compare.Cell, ours bool) {
 // compareMarkIcon is a mark in the ink of the page: a filled check, a
 // dash, a cross, a question mark, or a blank that keeps the words in line.
 templ compareMarkIcon(mark compare.Mark) {
-	switch mark {
-		case compare.Yes:
-			<span role="img" aria-label="Yes" class="moin-mark" data-kind="yes">
-				@components.Icon("check")
-			</span>
-		case compare.Part:
-			<span role="img" aria-label="Partly" class="moin-mark" data-kind="part">
-				<svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
-			</span>
-		case compare.No:
-			<span role="img" aria-label="No" class="moin-mark" data-kind="no">
-				@components.Icon("x")
-			</span>
-		case compare.Unknown:
-			<span role="img" aria-label="Not documented" class="moin-mark" data-kind="no">?</span>
-		default:
-			<span aria-hidden="true" class="moin-mark"></span>
-	}
+	@components.Mark(components.MarkProps{Kind: string(mark)})
 }

@@ -9,6 +9,23 @@ A dead server can't tell you it's dead. Someone else has to notice. That is the 
 
 Your server sends it a short report every minute. When the reports stop, the watcher alerts you. It also visits your domains from outside, like a visitor.
 
+## Alone, or with a watcher
+
+moin works alone. It deploys, backs up, checks the backups and alerts you while your server lives. But a server that is gone can't call for help. A watcher can.
+
+| | No watcher | Your own watcher | moin cloud |
+| --- | --- | --- | --- |
+| Alerts while your server lives | yes | yes | yes |
+| An alert when your server is gone | no | yes | yes |
+| Your domains, checked from outside | no | yes | yes |
+| A page with it all, on your phone too | no | yes | yes |
+| A copy of each backup nobody can delete, locked for you | no | no | yes |
+| Alerts by mail too, next to Telegram, Slack and the rest | no | no | yes |
+| No second server to run | yes | no | yes |
+| Nothing to set up | yes | no | yes |
+
+Your own watcher is free and open source: run it on a small second server. moin cloud runs one for you, from $7 a month: `moin watcher connect prod` and it is on.
+
 ## What it knows
 
 Whatever the daemons report. Nothing to set up.

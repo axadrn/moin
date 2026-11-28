@@ -65,3 +65,32 @@ templ Meter(p MeterProps) {
 		<span style={ templ.SafeCSS("width:" + strconv.Itoa(max(0, min(100, p.Percent))) + "%") }></span>
 	</span>
 }
+
+// MarkProps is a Mark: yes, part, no, unknown, or "" for a blank that
+// keeps the words in line.
+type MarkProps struct {
+	Kind string
+}
+
+// Mark is a round answer as high as a line: a check, a dash, a cross or
+// a question mark.
+templ Mark(p MarkProps) {
+	switch p.Kind {
+		case "yes":
+			<span role="img" aria-label="Yes" class="moin-mark" data-kind="yes">
+				@Icon("check")
+			</span>
+		case "part":
+			<span role="img" aria-label="Partly" class="moin-mark" data-kind="part">
+				<svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+			</span>
+		case "no":
+			<span role="img" aria-label="No" class="moin-mark" data-kind="no">
+				@Icon("x")
+			</span>
+		case "unknown":
+			<span role="img" aria-label="Not documented" class="moin-mark" data-kind="no">?</span>
+		default:
+			<span aria-hidden="true" class="moin-mark"></span>
+	}
+}

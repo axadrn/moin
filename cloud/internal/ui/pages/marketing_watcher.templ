@@ -1,0 +1,65 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+)
+
+// homeWatcherRow is one line of the watcher table: what, and whether you
+// get it with no watcher, your own, and moin cloud.
+type homeWatcherRow struct {
+	What              string
+	Alone, Own, Cloud string
+}
+
+// homeWatcherRows are the lines of the watcher table, the same as on top
+// of the watcher docs.
+var homeWatcherRows = []homeWatcherRow{
+	{"Alerts while your server lives", "yes", "yes", "yes"},
+	{"An alert when your server is gone", "no", "yes", "yes"},
+	{"Your domains, checked from outside", "no", "yes", "yes"},
+	{"A page with it all, on your phone too", "no", "yes", "yes"},
+	{"A copy of each backup nobody can delete", "no", "no", "yes"},
+	{"Alerts by mail too, next to Telegram and Slack", "no", "no", "yes"},
+	{"No second server to run", "yes", "no", "yes"},
+	{"Nothing to set up", "yes", "no", "yes"},
+}
+
+// homeWatcherColumns name the three ways, in the table's order.
+var homeWatcherColumns = []string{"No watcher", "Your own watcher", brand.Name + " cloud"}
+
+// HomeWatcher says what moin does alone, what only a watcher sees, and
+// the three ways side by side.
+templ HomeWatcher() {
+	<section id="watcher" class="moin-band">
+		@homeHead("Works alone. Better with a watcher.", "A server that is gone can't call for help. A watcher can.")
+		<div class="moin-grid" data-cols="2">
+			@components.Card(components.CardProps{}) {
+				<span class="moin-fact-name">{ brand.Name } alone</span>
+				@homePlanRows("Deploys, rollbacks and logs", "Backups to your bucket, restored every day", "Alerts while your server lives", "A server closed to the internet")
+			}
+			@components.Card(components.CardProps{}) {
+				<span class="moin-fact-name">Only a watcher sees</span>
+				@homePlanRows("A dead server. It can't tell you itself", "A domain that is down from outside", "The history, on your phone", "A copy no attacker can delete")
+			}
+		</div>
+		@components.Card(components.CardProps{}) {
+			@components.Rows(components.RowsProps{Head: append([]string{""}, homeWatcherColumns...)}) {
+				for _, row := range homeWatcherRows {
+					@components.Row(components.RowProps{}) {
+						@components.Cell() {
+							{ row.What }
+						}
+						for i, mark := range []string{row.Alone, row.Own, row.Cloud} {
+							@components.Cell() {
+								@components.Mark(components.MarkProps{Kind: mark})
+								<span class="moin-only-phone">{ homeWatcherColumns[i] }</span>
+							}
+						}
+					}
+				}
+			}
+		}
+		@homeMore("/docs/watcher", "How the watcher works")
+	</section>
+}
