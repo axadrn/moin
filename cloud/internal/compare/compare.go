@@ -82,9 +82,9 @@ var Groups = []string{"Security", "Your data", "Every day"}
 // Rows are the facts every competitor answers. A row whose answers carry no
 // mark is a fact to know, not a point: it counts for nobody.
 var Rows = []Row{
-	{"Security", "Who can command your server", yes("Who has SSH", "Your key, over SSH. The watcher and "+brand.Name+" cloud cannot.", "/docs/security#who-can-command-your-server")},
-	{"Security", "Open to the internet", yes("80 and 443", "Public SSH closes after the first deploy: SSH goes over Tailscale. Nothing of "+brand.Name+" listens. With a Cloudflare Tunnel, no port at all.", "/docs/security#ssh-only-over-tailscale")},
-	{"Security", "What one break-in reaches", yes("That one server", "There is no dashboard. A server holds no key to another server.", "/docs/security#if-a-server-is-hacked")},
+	{"Security", "Only you can command your server", yes("You, over SSH", "Your key, over SSH. The watcher and "+brand.Name+" cloud cannot.", "/docs/security#who-can-command-your-server")},
+	{"Security", "Closed to the internet", yes("Only 80 and 443. None with a tunnel.", "Public SSH closes after the first deploy: SSH goes over Tailscale. Nothing of "+brand.Name+" listens. With a Cloudflare Tunnel, no port at all.", "/docs/security#ssh-only-over-tailscale")},
+	{"Security", "A break-in stays on one server", yes("That one server", "There is no dashboard. A server holds no key to another server.", "/docs/security#if-a-server-is-hacked")},
 	{"Security", "Where app secrets live", plain("On the server, root only", "One file per app. They pass only through your SSH connection.", "/docs/security#where-your-secrets-live")},
 	{"Security", "Backups encrypted", yes("Always", "With age, on the server, before a copy leaves. For the server's key and for yours.", "/docs/backups#encryption")},
 	{"Security", "Signed releases, checked", yes("Yes", "cli.sh and "+brand.Name+" update check the signature before they install, on your laptop and on the server.", "/docs/security#updates")},

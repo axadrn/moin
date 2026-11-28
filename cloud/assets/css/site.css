@@ -2367,12 +2367,9 @@
      surface from head to foot. */
   .moin-compare {
     display: grid;
-    grid-template-columns: minmax(14rem, 1.5fr) repeat(var(--cols), minmax(0, 1fr));
+    grid-template-columns: minmax(12rem, 1.5fr) repeat(var(--cols), minmax(0, 1fr));
     column-gap: var(--space-2);
-    padding: var(--pad) var(--pad);
-    border-radius: var(--radius-lg);
-    background: var(--card);
-    color: var(--card-foreground);
+    padding-block-start: var(--space-4);
     font-size: 0.875rem;
     line-height: 1.25rem;
   }
@@ -2403,7 +2400,7 @@
   }
   .moin-compare-cell { min-height: 4.5rem; border-top: 1px solid var(--border); }
   .moin-compare-labels .moin-compare-cell { align-items: flex-start; font-weight: 500; text-align: start; padding-inline-start: 0; }
-  .moin-compare-head { gap: 2px; padding-block: var(--space-5) var(--space-4); }
+  .moin-compare-head { gap: 2px; padding-block: var(--space-6) var(--space-4); }
   .moin-compare-name { font-size: 1.125rem; line-height: 1.5rem; font-weight: 500; }
   .moin-compare-head .moin-small { font-size: 0.875rem; line-height: 1.25rem; color: var(--foreground); }
   .moin-compare-foot { justify-content: flex-start; padding-block: var(--space-5) var(--space-2); }
@@ -2420,15 +2417,19 @@
      surface with a quiet ink edge and a soft shadow. */
   .moin-compare-col[data-featured] {
     position: relative;
-    margin-block: calc(-1 * (var(--pad) + var(--space-3)));
-    padding-block: calc(var(--pad) + var(--space-3));
+    isolation: isolate;
     border-radius: var(--radius-lg);
-    background: color-mix(in oklab, var(--foreground) 4%, var(--card));
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 24%, transparent), 0 8px 24px -12px rgb(0 0 0 / 30%);
+  }
+  .moin-compare-col[data-featured]::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 calc(-1 * var(--space-3));
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px light-dark(rgb(0 0 0 / 14%), rgb(255 255 255 / 28%));
   }
   .moin-compare-col[data-featured] .moin-compare-name { font-weight: 600; }
-  .moin-compare-col[data-featured] .moin-compare-cell { border-top-color: color-mix(in oklab, var(--border) 50%, transparent); }
-  .moin-compare-col[data-featured] .moin-compare-cell:nth-child(2) { border-top-color: transparent; }
   .moin-compare-badge {
     position: absolute;
     inset-block-start: 0;
@@ -2446,7 +2447,7 @@
     white-space: nowrap;
   }
   /* On a phone: one card for each choice, the featured one first. */
-  @media (max-width: 39.99rem) {
+  @media (max-width: 47.99rem) {
     .moin-compare { display: flex; flex-direction: column; gap: var(--space-6); padding: 0; background: none; }
     .moin-compare[data-reverse] { flex-direction: column-reverse; }
     .moin-compare-labels { display: none; }
@@ -2461,7 +2462,8 @@
     .moin-compare[data-cols="5"] > .moin-compare-col,
     .moin-compare[data-cols="6"] > .moin-compare-col,
     .moin-compare[data-cols="7"] > .moin-compare-col { padding-block: var(--space-4); }
-    .moin-compare-col[data-featured] { margin-block: var(--space-3) 0; padding-block: var(--pad); }
+    .moin-compare-col[data-featured]::before { inset: 0; }
+    .moin-compare > .moin-compare-col[data-featured]:has(.moin-compare-badge) { margin-block-start: var(--space-4); padding-block-start: calc(var(--pad) + var(--space-2)); }
     .moin-compare-head { align-items: flex-start; padding: 0 0 var(--space-3); text-align: start; }
     .moin-compare-cell {
       flex-direction: row;
