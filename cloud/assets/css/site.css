@@ -2401,6 +2401,8 @@
   .moin-compare-cell { min-height: 4.5rem; border-top: 1px solid var(--border); }
   .moin-compare-labels .moin-compare-cell { align-items: flex-start; font-weight: 500; text-align: start; padding-inline-start: 0; }
   .moin-compare-head { gap: 2px; padding-block: var(--space-6) var(--space-4); }
+  .moin-compare-name.moin-link { text-decoration: none; }
+  .moin-compare-name.moin-link:hover { text-decoration: underline; }
   .moin-compare-name { font-size: 1.125rem; line-height: 1.5rem; font-weight: 500; }
   .moin-compare-head .moin-small { font-size: 0.875rem; line-height: 1.25rem; color: var(--foreground); }
   .moin-compare-foot { justify-content: flex-start; padding-block: var(--space-5) var(--space-2); }
