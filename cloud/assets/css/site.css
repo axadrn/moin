@@ -1977,7 +1977,7 @@
   .moin-rows-cell:first-child { font-weight: 500; }
   .moin-rows-cell:first-child .moin-muted { font-weight: 400; }
   /* Cells of a few lines start at the top, a mark on their first line. */
-  .moin-rows[data-top] :is(.moin-rows-head, .moin-rows-row) { align-items: start; }
+  .moin-rows[data-top] .moin-rows-row { align-items: start; }
   .moin-rows[data-top] .moin-rows-row { padding-block: var(--space-4); }
   .moin-rows[data-top] .moin-rows-cell { flex-wrap: nowrap; align-items: start; gap: var(--space-3); }
   .moin-rows-more {
@@ -2017,6 +2017,7 @@
      head, the first row has no line over it. */
   .moin-card > .moin-rows:first-child { margin-block-start: calc(-1 * var(--pad)); }
   .moin-card > .moin-rows:first-child > .moin-rows-head { min-height: var(--press); }
+  .moin-card > .moin-rows[data-top]:first-child > .moin-rows-head { padding-block-start: var(--space-4); min-height: 0; padding-block-end: var(--space-2); }
   @media (max-width: 39.99rem) {
     .moin-card > .moin-rows:first-child > .moin-rows-head + * { border-top: 0; }
   }

@@ -18,12 +18,14 @@ Your server watches itself while it lives. A watcher tells you when it doesn't.
 | Deploys | yes | yes | yes |
 | Backups, restored every day | yes | yes | yes |
 | Alerts while your server lives | yes | yes | yes |
-| Alerts by email | yes | yes | yes |
+| Alerts by email | yes, your SMTP | yes, your SMTP | yes |
 | You hear when your server dies | no | yes | yes |
 | Your domains, visited from outside | no | yes | yes |
 | What happened, on your phone | no | yes | yes |
-| A copy a hacked server can't delete | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes |
-| No second machine | yes | no | yes |
+| A copy a hacked server can't delete | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes, built in |
+| Off-site copies, no bucket to set up | no | no | yes |
+| Email alerts, no mail server to set up | no | no | yes |
+| Nothing to run, update or watch | yes | no | yes |
 
 Your own watcher is free and open source: run it on a small second server. moin cloud runs one for you, from $7 a month: `moin watcher connect my-server` and it is on.
 

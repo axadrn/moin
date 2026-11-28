@@ -20,12 +20,14 @@ var homeWatcherRows = []homeWatcherRow{
 	{What: "Deploys", Marks: [3]string{"yes", "yes", "yes"}},
 	{What: "Backups, restored every day", Marks: [3]string{"yes", "yes", "yes"}},
 	{What: "Alerts while your server lives", Marks: [3]string{"yes", "yes", "yes"}},
-	{What: "Alerts by email", Marks: [3]string{"yes", "yes", "yes"}},
+	{What: "Alerts by email", Marks: [3]string{"yes", "yes", "yes"}, Notes: [3]string{"Your SMTP", "Your SMTP", ""}},
 	{What: "You hear when your server dies", Marks: [3]string{"no", "yes", "yes"}},
 	{What: "Your domains, visited from outside", Marks: [3]string{"no", "yes", "yes"}},
 	{What: "What happened, on your phone", Marks: [3]string{"no", "yes", "yes"}},
-	{What: "A copy a hacked server can't delete", Marks: [3]string{"yes", "yes", "yes"}, Notes: [3]string{"Lock your bucket", "Lock your bucket", ""}},
-	{What: "No second machine", Marks: [3]string{"yes", "no", "yes"}},
+	{What: "A copy a hacked server can't delete", Marks: [3]string{"yes", "yes", "yes"}, Notes: [3]string{"Lock your bucket", "Lock your bucket", "Built in"}},
+	{What: "Off-site copies, no bucket to set up", Marks: [3]string{"no", "no", "yes"}},
+	{What: "Email alerts, no mail server to set up", Marks: [3]string{"no", "no", "yes"}},
+	{What: "Nothing to run, update or watch", Marks: [3]string{"yes", "no", "yes"}},
 }
 
 // homeWatcherColumns name the three ways, in the table's order.
