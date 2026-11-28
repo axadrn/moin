@@ -106,6 +106,10 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 	if !strings.Contains(text, "postgres://app:${DB_PASSWORD}@db/app") || !strings.HasPrefix(text, "name: my-app\nservices:\n") {
 		t.Errorf("the compose file lost ${DB_PASSWORD} or its order:\n%s", text)
 	}
+	// compose reads $$ as $: the www redirect keeps it, as compose.json does.
+	if !strings.Contains(text, "replacement: https://$${1}$${3}") {
+		t.Errorf("the www redirect lost its $$:\n%s", text)
+	}
 	again, _ := a.composeFile("my-app", 2)
 	if again != text {
 		t.Errorf("the same release gave another file:\n%s", again)

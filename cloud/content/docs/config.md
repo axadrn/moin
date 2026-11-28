@@ -44,6 +44,9 @@ alerts:
     chat_id: <chat id>
   - kind: slack          # slack, discord or webhook: each takes a url
     url: https://hooks.slack.com/services/<your hook>
+  - kind: webhook
+    url: https://hooks.example.com/moin
+    secret: <made by moin alerts add>   # signs every post
   - kind: email          # through your SMTP server, with STARTTLS
     to: ada@example.com
     smtp: smtp.example.com:587
@@ -69,6 +72,7 @@ backup_key:
   confirmed: true
 
 # How often each database is copied, and how long a copy is kept.
+# `moin backups my-app --every 15m --keep 30d` writes it.
 backups:
   every: 1h        # default 1h, at least 5m
   keep: 7d         # default 7d, at least 1d
@@ -101,6 +105,8 @@ A time is a number and a unit: `m` minutes, `h` hours, `d` days. Like `15m`, `1h
 - `every`: how often a copy is taken. Default `1h`. Less than `5m` is an error.
 - `keep`: how long a copy stays in the bucket, counted from the newest copy. Default `7d`. Less than `1d` is an error. The three newest copies always stay, and so does the copy the last check restored.
 - `apps`: a schedule for one app. What it leaves out comes from the server's.
+
+`moin backups my-app --every 15m --keep 30d` sets an app's schedule, `moin backups -s my-server --every 6h` the server's. [How often](/docs/backups#how-often)
 
 The undo a restore leaves behind is kept just as long as the copies.
 

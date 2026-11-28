@@ -220,6 +220,8 @@ func answers(t *testing.T, app string) {
 	}
 	request, _ := http.NewRequest(http.MethodGet, "http://"+strings.TrimSpace(string(out))+":"+tunnelPort+"/", nil)
 	request.Host = app + ".example.net"
+	// As cloudflared sends it: the visitor came over https.
+	request.Header.Set("X-Forwarded-Proto", "https")
 	// The proxy takes a moment to see the new containers.
 	deadline := time.Now().Add(30 * time.Second)
 	for {

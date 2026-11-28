@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,31 +44,52 @@ func sendJSON(ctx context.Context, server string, value any, args ...string) err
 // shownCopies is how many copies of a database `moin backups` lists.
 const shownCopies = 10
 
-// backups is `moin backups [app]`: the copies of the app's databases, in
-// the bucket and at the watchers that take copies (restore.go), the last
-// daily check and the copy it proved.
+// backups is `moin backups [app]`: how often the app is copied, the
+// copies of its databases, in the bucket and at the watchers that take
+// copies (restore.go), the last daily check and the copy it proved.
+// --every and --keep change how often and how long; with -s and no app,
+// for the server, which every app without its own takes.
 func backups(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("backups", "backups [app] [--from <server>] [-s server] [--json]").withServer().withJSON()
+	flags := newFlags("backups", "backups [app] [--every 1h] [--keep 30d] [--from <server>] [-s server] [--json]").withServer().withJSON()
 	from := flags.String("from", "", "see the copies another server made, like one that is gone")
+	var set daemon.Schedule
+	flags.StringVar(&set.Every, "every", "", "take a copy this often, like 15m, 1h or 1d")
+	flags.StringVar(&set.Keep, "keep", "", "keep each copy this long, like 7d or 30d")
 	if err := flags.parse(args); err != nil {
 		return err
+	}
+	changes := set != (daemon.Schedule{})
+	if changes && flags.NArg() == 0 && flags.serverNamed() != "" {
+		return printSchedule(ctx, flags, flags.serverNamed(), "", set, stdout)
 	}
 	app, _, err := appArgs(flags, 0)
 	if err != nil {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
+		if changes {
+			return printSchedule(ctx, flags, server, app, set, stdout)
+		}
+		schedule, err := backupSchedule(ctx, server, app, daemon.Schedule{})
+		if err != nil {
+			return err
+		}
 		databases, err := listBackups(ctx, server, app, *from, os.Stderr)
 		if err != nil {
 			return err
 		}
 		if flags.json() {
-			return printJSON(stdout, databases)
+			return printJSON(stdout, struct {
+				Schedule  daemon.BackupSchedule `json:"schedule"`
+				Databases []databaseBackups     `json:"databases"`
+			}{schedule, databases})
 		}
 		if len(databases) == 0 {
-			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres service.")
+			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB, MongoDB, ClickHouse or Redis service.")
 			return nil
 		}
+		fmt.Fprintln(stdout, scheduleLine(schedule))
+		fmt.Fprintln(stdout)
 		copies := false
 		for _, database := range databases {
 			printBackup(stdout, database, time.Now())
@@ -80,10 +102,51 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 	})
 }
 
+// backupSchedule is how often app is copied on server and how long each
+// copy is kept, "" for the server's own. What set names changes first.
+func backupSchedule(ctx context.Context, server, app string, set daemon.Schedule) (daemon.BackupSchedule, error) {
+	var schedule daemon.BackupSchedule
+	args := []string{"schedule", "--every", set.Every, "--keep", set.Keep}
+	if app != "" {
+		args = append(args, app)
+	}
+	err := sshJSON(ctx, server, args, nil, &schedule)
+	return schedule, err
+}
+
+// printSchedule changes the schedule of app on server, or the server's
+// for "", and shows it.
+func printSchedule(ctx context.Context, flags *flagSet, server, app string, set daemon.Schedule, stdout io.Writer) error {
+	schedule, err := backupSchedule(ctx, server, app, set)
+	if err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, schedule)
+	}
+	if app == "" {
+		done(stdout, "%s takes a copy every %s and keeps each %s. Apps with their own schedule keep it", server, schedule.Every, schedule.Keep)
+		return nil
+	}
+	done(stdout, "%s: a copy every %s, each kept %s. It counts within a minute", app, schedule.Every, schedule.Keep)
+	return nil
+}
+
+// scheduleLine says how often an app is copied, and whose schedule it is.
+func scheduleLine(schedule daemon.BackupSchedule) string {
+	whose := "The server's schedule."
+	if schedule.Own {
+		whose = "Its own schedule."
+	}
+	return "A copy every " + schedule.Every + ", each kept " + schedule.Keep + ". " + style.Muted.Render(whose)
+}
+
 // appBackups is how the databases of app are backed up: the copies, the
 // undos and the last check of each.
 func appBackups(ctx context.Context, server, app string, stderr io.Writer) ([]protocol.DatabaseBackup, error) {
-	return backupsFrom(ctx, server, app, "", stderr)
+	databases, err := backupsFrom(ctx, server, app, "", stderr)
+	// A cache is listed with a note only: it is no database to pick.
+	return slices.DeleteFunc(databases, func(database protocol.DatabaseBackup) bool { return database.Note != "" }), err
 }
 
 // backupsFrom is appBackups with the copies another server left in the
@@ -98,6 +161,11 @@ func backupsFrom(ctx context.Context, server, app, from string, stderr io.Writer
 // the copies, where each is, the one the check restored marked.
 func printBackup(stdout io.Writer, database databaseBackups, now time.Time) {
 	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
+	if database.Note != "" {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(database.Note))
+		fmt.Fprintln(stdout)
+		return
+	}
 	if database.Error != "" {
 		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" "+commands(stdout, sentence(database.Error)))
 	}
@@ -371,8 +439,8 @@ func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdou
 	if key.Recipient().String() != has.Public {
 		return fmt.Errorf("this is not the backup key of %s. Its public half is %s", server, has.Public)
 	}
-	var copy *daemon.KeyCopy
-	if err := sshJSON(ctx, server, []string{"bucket", "key", "copy"}, nil, &copy); err != nil {
+	copy, err := keyCopy(ctx, server)
+	if err != nil {
 		return err
 	}
 	if copy != nil {
@@ -395,6 +463,23 @@ func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdou
 	return nil
 }
 
+// keyCopy asks the server for the copy that proves your key, nil for a
+// server without a database. A server with an older version names no
+// kind of database, so the copy could not be read: it says to update.
+func keyCopy(ctx context.Context, server string) (*daemon.KeyCopy, error) {
+	var answer *struct {
+		daemon.KeyCopy
+		Postgres *bool `json:"postgres"`
+	}
+	if err := sshJSON(ctx, server, []string{"bucket", "key", "copy"}, nil, &answer); err != nil || answer == nil {
+		return nil, err
+	}
+	if answer.Postgres != nil {
+		return nil, fmt.Errorf("%s runs an older %s than this one. Put this version there with `%s update %s`, then confirm the key again", server, build.Name, build.Name, server)
+	}
+	return &answer.KeyCopy, nil
+}
+
 // fetchAndOpen fetches a copy from the server as it lies in the bucket,
 // or a fresh one from a server without a bucket, and opens it here with
 // key.
@@ -405,36 +490,51 @@ func fetchAndOpen(ctx context.Context, server string, copy daemon.KeyCopy, key a
 		line := hereLine("bucket", "key", "send", copy.App, "--database", copy.Database, "--copy", copy.Copy)
 		writer.CloseWithError(sshRun(ctx, server, line, nil, writer, os.Stderr))
 	}()
-	return openCopy(reader, copy.Postgres, key)
+	return openCopy(reader, copy.Kind, key)
 }
 
-// The first bytes of what a copy holds: a SQLite file, or a pg_dump in
-// its custom format.
+// The first bytes of a SQLite file and of a pg_dump in its custom format.
 const (
 	sqliteStart   = "SQLite format 3\x00"
 	postgresStart = "PGDMP"
 )
 
-// openCopy decrypts a copy with key and reads it to its end: a gzipped
-// SQLite file, or a dump of Postgres. Every part of it is checked on the
-// way, so a copy that is cut short or changed does not pass.
-func openCopy(encrypted io.Reader, postgres bool, key age.Identity) error {
+// copyStarts are the first bytes of what a copy of each kind holds, once
+// it is decrypted and unzipped: a SQLite file, a pg_dump, a dump of MySQL
+// or MariaDB, which starts with a comment, an archive of mongodump, a zip
+// of ClickHouse, or a dump of Redis or Valkey. notGzipped are the kinds
+// whose copies are not gzipped on top.
+var copyStarts = map[string][]string{
+	"":                          {sqliteStart},
+	protocol.DatabasePostgres:   {postgresStart},
+	protocol.DatabaseMySQL:      {"-- ", "/*"},
+	protocol.DatabaseMongo:      {"\x6d\xe2\x99\x81"},
+	protocol.DatabaseClickHouse: {"PK\x03\x04"},
+	protocol.DatabaseRedis:      {"REDIS", "VALKEY"},
+}
+
+var notGzipped = []string{protocol.DatabasePostgres, protocol.DatabaseClickHouse}
+
+// openCopy decrypts a copy of a database of kind with key and reads it to
+// its end. Every part of it is checked on the way, so a copy that is cut
+// short or changed does not pass.
+func openCopy(encrypted io.Reader, kind string, key age.Identity) error {
 	plain, err := daemon.DecryptCopy(encrypted, key)
 	if err != nil {
 		return err
 	}
-	start := postgresStart
-	if !postgres {
-		start = sqliteStart
+	if !slices.Contains(notGzipped, kind) {
 		if plain, err = gzip.NewReader(plain); err != nil {
 			return fmt.Errorf("what it holds is not a database: %w", err)
 		}
 	}
-	first := make([]byte, len(start))
-	if _, err := io.ReadFull(plain, first); err != nil {
+	first := make([]byte, 16)
+	read, err := io.ReadFull(plain, first)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return fmt.Errorf("it ends before a database starts: %w", err)
 	}
-	if string(first) != start {
+	starts := func(start string) bool { return strings.HasPrefix(string(first[:read]), start) }
+	if !slices.ContainsFunc(copyStarts[kind], starts) {
 		return errors.New("what it holds is not a database")
 	}
 	_, err = io.Copy(io.Discard, plain)
@@ -619,7 +719,8 @@ func alerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 // password of
 // an email is asked without showing it, or read from stdin: never a
 // flag, which would stay in your shell's history. The server sends a test
-// alert first and keeps the destination only when that went out.
+// alert first and keeps the destination only when that went out. A
+// webhook gets a secret that signs every post, shown here once.
 func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("alerts add", "alerts add <server> telegram [--token <bot-token>] [--chat-id <id>], or slack|discord|webhook [--url <url>], or email [--to <address>] [--smtp <host:port>] [--user <user>] [--from <address>], the password is asked or read from stdin")
 	var destination alert.Destination
@@ -655,10 +756,17 @@ func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		destination.Password = password
 	}
+	if destination.Kind == "webhook" {
+		destination.Secret = rand.Text()
+	}
 	if err := sendJSON(ctx, server, destination, "alerts", "add"); err != nil {
 		return err
 	}
 	done(stdout, "A test alert went out. %s alerts %s from now on", server, destination.Kind)
+	if destination.Secret != "" {
+		fmt.Fprintln(stdout, "Its signing secret, shown only now: "+destination.Secret)
+		fmt.Fprintln(stdout, "Every post carries "+alert.SignatureHeader+": sha256= and the hex HMAC-SHA256 of the body with it.")
+	}
 	return nil
 }
 

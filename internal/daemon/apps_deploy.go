@@ -55,6 +55,7 @@ func (a *apps) recoverDeploys(ctx context.Context) {
 // starts again, as after any failed deploy.
 func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) {
 	current := a.current(app)
+	a.stopped(app, note.Number, current == note.Number)
 	if current == note.Number {
 		return
 	}
@@ -88,8 +89,12 @@ type release struct {
 	// the values in it when the deploy started.
 	envFile string
 	env     map[string]string
+	// passwordFile is the app's password file, there when it has one.
+	passwordFile string
 	// logf writes a line to the deploy log.
 	logf func(string, ...any)
+	// record is the deploy's log and record.
+	record *recorder
 }
 
 // hasSource reports whether a deploy brings source code to build.
@@ -103,7 +108,9 @@ func hasSource(start protocol.DeployStart) bool {
 // gets the next one here, once it holds the app's lock: two deploys at
 // once, like one from your laptop and one of a branch the server follows,
 // never take the same number, and neither wipes the other's release.
-func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
+// Every line goes to logf and to the release's deploy log, and the
+// release's record says how it ended (startRecord).
+func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf func(string, ...any)) (_ protocol.Detected, err error) {
 	if !protocol.ValidAppName(deploy.App) || deploy.Number < 0 {
 		return protocol.Detected{}, errors.New("invalid app name or deploy number")
 	}
@@ -117,7 +124,12 @@ func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf
 		return protocol.Detected{}, fmt.Errorf("write the deploy down: %w", err)
 	}
 	defer os.Remove(note)
-	release, err := a.newRelease(start, logf)
+	record, err := a.startRecord(start, logf)
+	if err != nil {
+		return protocol.Detected{}, fmt.Errorf("start the deploy log: %w", err)
+	}
+	defer func() { record.end(err) }()
+	release, err := a.newRelease(start, record)
 	if err != nil {
 		return protocol.Detected{}, err
 	}
@@ -136,22 +148,18 @@ func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf
 		return release.detected, err
 	}
 	a.afterStart(ctx, release)
+	release.logf("v%d is live", start.Number)
 	return release.detected, nil
 }
 
-// newRelease makes an empty folder for the release, with its kind for
-// prune.
-func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any)) (*release, error) {
+// newRelease fills the release's folder, which startRecord made, with
+// its kind for prune.
+func (a *apps) newRelease(start protocol.DeployStart, record *recorder) (*release, error) {
 	server, err := LoadConfig()
 	if err != nil {
 		return nil, err
 	}
 	dir := a.releaseDir(start.App, start.Number)
-	_ = os.RemoveAll(dir)
-	err = os.MkdirAll(dir, 0o700)
-	if err != nil {
-		return nil, err
-	}
 	kind := releaseApply
 	if hasSource(start) || start.Image != "" {
 		kind = releaseBuild
@@ -168,7 +176,7 @@ func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any))
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
+	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, passwordFile: a.passwordFile(start.App), logf: record.logf, record: record}, nil
 }
 
 // rollBack runs an older release again: its compose file and images, with
@@ -332,7 +340,7 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 	if !needsProxy(release.detected) {
 		return nil
 	}
-	err = a.ensureProxy(ctx, release.logf)
+	err = a.serveWeb(ctx, release.logf)
 	if err != nil {
 		return fmt.Errorf("proxy: %w", err)
 	}
@@ -341,7 +349,7 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 
 // needsProxy reports whether the app has an address the proxy must serve.
 func needsProxy(detected protocol.Detected) bool {
-	return len(detected.Domains) > 0 || detected.Instant != ""
+	return len(detected.Domains) > 0 || len(detected.ServiceDomains) > 0 || detected.Instant != ""
 }
 
 // build pulls the image built elsewhere, then builds the services that
@@ -350,6 +358,13 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	start := release.start
 	detected := release.detected
 	logf := release.logf
+	if start.Pull {
+		logf("pulling the newest images")
+		err := a.run(ctx, logf, nil, a.composeArgs(start.App, release.composeJSON, "--progress", "plain", "pull")...)
+		if err != nil {
+			return fmt.Errorf("pull: %w", err)
+		}
+	}
 	if pull {
 		logf("pulling %s", start.Image)
 		err := a.pull(ctx, release)
@@ -395,6 +410,8 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 		return err
 	}
 	release.logf("starting")
+	// A deploy starts an app that was stopped on purpose.
+	_ = os.Remove(a.stoppedFile(start.App))
 	err = a.start(ctx, start.App, release.composeJSON, release.detected, restart, release.logf)
 	if err != nil {
 		return a.startPreviousAgain(ctx, release, previous, err)
@@ -415,6 +432,7 @@ func (a *apps) copyDataBefore(ctx context.Context, release *release) error {
 	case err != nil:
 		return fmt.Errorf("the copy before this deploy failed: %w. Deploy anyway: %s deploy … --no-copy", err, build.Name)
 	case len(copies) > 0:
+		release.record.Copies = copies
 		release.logf("copied the data before v%d: %s", start.Number, strings.Join(copies, ", "))
 	}
 	return nil
@@ -445,10 +463,11 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 // afterStart notes the databases the running release has, which the
 // daemon copies from its next minute on, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, release *release) {
-	databases, noBackup, err := a.scanDatabases(ctx, release.composeJSON)
+	databases, noBackup, caches, err := a.scanDatabases(ctx, release.composeJSON)
 	if err == nil {
 		release.detected.Databases = databases
 		release.detected.NoBackup = noBackup
+		release.detected.Caches = caches
 		writeErr := writeState(filepath.Join(release.dir, "detected.json"), release.detected)
 		if writeErr != nil {
 			release.logf("write down the databases: %s", writeErr)
@@ -462,14 +481,17 @@ func (a *apps) afterStart(ctx context.Context, release *release) {
 // logDatabases tells the deploy log what moin backs up and what it cannot.
 func logDatabases(detected protocol.Detected, logf func(string, ...any)) {
 	for _, database := range detected.Databases {
-		if database.Postgres() {
-			logf("database %s (Postgres, service %s)", database.Path, database.Service)
+		if database.Service != "" {
+			logf("database %s (%s, service %s)", database.Path, database.Engine(), database.Service)
 			continue
 		}
 		logf("database %s (%s)", database.Path, database.HostPath)
 	}
 	for _, database := range detected.NoBackup {
 		logf("database %s: %s", database.Path, noBackupText)
+	}
+	for _, cache := range detected.Caches {
+		logf("%s: %s", cache.Path, cacheText)
 	}
 }
 
@@ -619,7 +641,10 @@ func (a *apps) prune(ctx context.Context, app string) {
 		}
 		kind, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "kind"))
 		if string(kind) == releaseFailed && number != current {
-			_ = os.RemoveAll(a.releaseDir(app, number))
+			// A failed deploy keeps only its log and its record, as long as
+			// a release without a build would stay.
+			a.keepRecordOnly(app, number)
+			releases = append(releases, protocol.Release{Number: number})
 			continue
 		}
 		build := string(kind) == releaseBuild

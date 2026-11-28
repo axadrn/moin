@@ -1,0 +1,101 @@
+package pages
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// Kill is the page that adds up the tools you pay for, on a receipt, and
+// shows the command that puts the open source app for each on your own
+// server. The prices come from content/prices.json; apps is how many the
+// catalog has. site.js adds it up again on every tick.
+templ Kill(swaps []KillSwap, apps int) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Kill your subscriptions",
+		Description: "Tick the tools you pay for, like Slack, Notion, Zapier and Sentry. See what you stop paying. Run the open source app on your own server. One command each.",
+		Path:        "/kill-your-subscriptions",
+	}) {
+		<main class="moin-page" data-kill>
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Kill your subscriptions.", Line: "Tick what you pay for. Run the open source app on your own server."})
+				@components.Receipt() {
+					<div class="moin-row" data-between data-wrap>
+						<h2 class="moin-heading">Your monthly bills</h2>
+						<div class="moin-row" data-gap="2">
+							<span class="moin-text moin-muted" aria-hidden="true">People</span>
+							@components.Choice(components.ChoiceProps{Name: "seats", Label: "People on your team", Options: killSeatOptions(), Checked: strconv.Itoa(killTeam)})
+						</div>
+					</div>
+					<div class="moin-stack" data-gap="1" data-kill-bills>
+						for _, s := range swaps {
+							@components.Tick(components.TickProps{
+								ID: "bill-" + s.ID, Name: s.Tool, Note: s.Plan, Value: killMoney(killCost(s)), Checked: s.Ticked,
+								Attrs: templ.Attributes{"data-bill": s.ID, "data-cents": strconv.FormatInt(s.Cents(), 10), "data-per-seat": s.PerSeat},
+							})
+						}
+					</div>
+					<div class="moin-stack" data-gap="2" aria-live="polite" data-kill-sum>
+						<p class="moin-text moin-muted">You stop paying</p>
+						<p class="moin-receipt-total moin-digits"><span data-kill-total>{ killMoney(killTotal(swaps)) }</span> <small>a month</small></p>
+						<p class="moin-muted"><span data-kill-year>{ killMoney(killTotal(swaps) * 12) }</span> a year.</p>
+					</div>
+					<div class="moin-stack" data-gap="2">
+						<p class="moin-row" data-between>
+							<span class="moin-strong">{ brand.Name } cloud</span>
+							<span class="moin-strong moin-digits">{ killMoney(killCloud) }</span>
+						</p>
+						<p class="moin-text moin-muted">Deploys and backups proven every day come free with { brand.Name }. { brand.Name } cloud adds uptime checks every minute, alerts and a copy a hacked server can't delete. Your server is extra.</p>
+						<p class="moin-text moin-muted moin-center">Prices checked { killChecked(swaps) }</p>
+					</div>
+				}
+			</section>
+			<section id="swaps" class="moin-band">
+				@components.BandHead(components.BandHeadProps{Title: "One command each.", Line: "Every backup proven every day."})
+				@components.Card(components.CardProps{}) {
+					<div class="moin-swaps">
+						for _, s := range swaps {
+							<div id={ "swap-" + s.ID } class="moin-swap" data-command={ s.Command } hidden?={ !s.Ticked }>
+								<div class="moin-stack" data-gap="1">
+									<p class="moin-strong">
+										<span class="moin-muted">{ s.Tool } →</span>
+										if s.Href != "" {
+											<a href={ templ.SafeURL(s.Href) } class="moin-link" data-quiet>{ s.Name }</a>
+										} else {
+											{ s.Name }
+										}
+									</p>
+									<p class="moin-text moin-muted">
+										{ s.What }
+										<span data-year-back>{ killYearBack(s) }</span>
+										<a href={ templ.SafeURL(s.Source) } class="moin-link" target="_blank" rel="noopener">Source</a>
+									</p>
+								</div>
+								@components.Command(components.CommandProps{Text: s.Command, Terminal: true})
+							</div>
+						}
+					</div>
+					<div class="moin-row" data-between data-wrap>
+						<p class="moin-text moin-muted" data-kill-count>{ killCount(swaps) }</p>
+						@components.Button(components.ButtonProps{Attrs: templ.Attributes{"data-kill-all": true, "data-copy": strings.Join(killCommands(swaps), "\n"), "disabled": len(killCommands(swaps)) == 0}}) {
+							Copy all
+						}
+					</div>
+				}
+				@components.More(components.MoreProps{Href: "/catalog", Text: "All " + strconv.Itoa(apps) + " apps in the catalog"})
+			</section>
+			@HomeEnd()
+		</main>
+		// On a long receipt the total is far down: this keeps it in view
+		// while you tick. site.js shows it.
+		<div class="moin-kill-dock" data-kill-dock>
+			<span class="moin-text"><span class="moin-muted">You stop paying</span> <span class="moin-strong moin-digits" data-kill-total>{ killMoney(killTotal(swaps)) }</span></span>
+			@components.Button(components.ButtonProps{Href: "#swaps"}) {
+				See the swap
+			}
+		</div>
+	}
+}

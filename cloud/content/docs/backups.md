@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite and Postgres. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
+description: "SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis. Encrypted, in your bucket or moin cloud. Every day one copy is restored and read."
 group: "Servers and data"
 order: 1
 ---
@@ -13,8 +13,12 @@ Databases, not files.
 
 - **SQLite**: every database file in a folder the app mounts, like `./data`.
 - **Postgres**: every database in a service that runs a Postgres image. No password, no change to your `compose.yml`.
+- **MySQL and MariaDB**: the database `MYSQL_DATABASE` or `MARIADB_DATABASE` names, in a service that runs the official `mysql` or `mariadb` image. No change to your `compose.yml`.
+- **MongoDB**: every database in a service that runs the official `mongo` image. No change to your `compose.yml`.
+- **ClickHouse**: every database in a service that runs the `clickhouse/clickhouse-server` or `clickhouse` image. No change to your `compose.yml`.
+- **Redis and Valkey**: a service that runs the official `redis` or `valkey/valkey` image and mounts a volume at `/data`. That volume says it keeps data. Without it the Redis is a cache: it is empty after every deploy anyway, so moin does not back it up. `moin backups my-app` lists it as `cache, not backed up`.
 
-moin finds them by itself, also a database your app makes long after the deploy. MySQL and MongoDB run, but moin can't back them up yet. `moin backups my-app` says so.
+moin finds them by itself, also a database your app makes long after the deploy.
 
 ## The bucket
 
@@ -177,13 +181,26 @@ COPY                      WHERE    TAKEN    SIZE
   Go back to one with moin restore my-app --to <copy>
 ```
 
-A SQLite database is named by its path in the container. A Postgres database by its service, like `postgres-db`.
+A SQLite database is named by its path in the container. Every other database by its service, like `postgres-db`, `mysql-db`, `mongo-db`, `clickhouse-events` or `redis-queue`.
 
 It lists the newest 10 copies. `--json` lists them all. A copy from before every copy was encrypted says `not encrypted` next to its size, until it expires.
 
 ## How often
 
-A copy every hour, each kept for 7 days. The three newest copies always stay, and so does the copy the last check restored. Set another schedule for the server, or for one app, in its [config](/docs/config#backups):
+A copy every hour, each kept for 7 days. The three newest copies always stay, and so does the copy the last check restored. `moin backups my-app` shows the schedule on its first line. Set another one for one app, or for the server:
+
+```bash
+moin backups my-app --every 15m --keep 30d
+moin backups -s my-server --every 6h
+```
+
+- `--every` takes a copy that often: 5 minutes at least, like `15m`, `1h` or `1d`.
+- `--keep` keeps each copy that long: 1 day at least, like `7d` or `30d`.
+- Give one of them, and the other stays as it is.
+- With `-s` and no app, it is the server's schedule. Every app without its own takes it.
+- It counts within a minute. Nothing restarts.
+
+Both land in the server's [config](/docs/config#backups), next to the comments you wrote there:
 
 ```yaml
 backups:
@@ -200,13 +217,21 @@ backups:
 ```text
 SQLite:   VACUUM INTO a temp file ─▶ gzip ─▶ age ─▶ a file on the server
 Postgres: pg_dump ─▶ age ─▶ a file on the server
+MySQL:    mysqldump or mariadb-dump ─▶ gzip ─▶ age ─▶ a file on the server
+MongoDB:  mongodump, gzipped ─▶ age ─▶ a file on the server
+ClickHouse: BACKUP into a zip ─▶ age ─▶ a file on the server
+Redis:    redis-cli --rdb ─▶ gzip ─▶ age ─▶ a file on the server
 Then:     the first copy of the day is restored and read ─▶ your bucket, moin cloud
 ```
 
-Both make a clean copy while your app keeps running.
+Each makes a clean copy while your app keeps running.
 
 - **SQLite** needs room on the disk for one copy, for a moment. moin looks first.
 - **Postgres** copies run inside your Postgres container, so no password leaves it. Every database in it gets its own copies.
+- **MySQL and MariaDB** copies run inside your database container too, with the dump tool of your own image. One consistent state, with routines, triggers and events. moin logs in as root with the `MYSQL_ROOT_PASSWORD` or `MARIADB_ROOT_PASSWORD` of the service. It reads the password inside the container, so it never leaves it.
+- **MongoDB** copies run inside your MongoDB container, with the `mongodump` of your own image. One copy holds every database of the service. moin logs in with the `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD` of the service, if it has them. The password never leaves the container. MongoDB dumps one collection after the other, so writes during a copy can land in one collection and miss another.
+- **ClickHouse** copies are made by ClickHouse's own `BACKUP`. One copy holds every database of the service. ClickHouse writes the zip into the `backups` folder of its data first, so its disk needs room for one copy, for a moment. moin reads the zip out and removes it. The official image allows that folder as it comes. A config of your own that sets `backups` must keep `<allowed_path>backups</allowed_path>`. moin logs in with the `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD` of the service, if it has them. Tables that only point somewhere else, like Kafka or MySQL tables, come back as tables without data. Replicated tables need their Keeper, so their check fails.
+- **Redis and Valkey** copies are the dump Redis sends a replica, fetched with the `redis-cli` of your own image. It works with dumps, with an append only file and with both. The dump lies in `/data` for a moment, so that volume needs room for one copy. A Redis with a password: moin reads it from `--requirepass` in the `command` of the service. A password in a config file it cannot see, so set `REDISCLI_AUTH` in the `environment` of the service then.
 
 A copy on the spot, before something risky:
 
@@ -224,6 +249,8 @@ Every deploy takes one too, just before the new release touches the data. If tha
 ## The daily check
 
 The first copy of each day is checked before it leaves the server. moin opens it with the server's key and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it. Only then does the copy go up, the very bytes that were read.
+
+For MySQL, MariaDB, MongoDB, ClickHouse and Redis the throwaway database runs in a container of its own, from the same image as yours, without a network. The check never touches your live database. moin removes the container when it is done.
 
 So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while.
 
@@ -251,6 +278,10 @@ A restore never changes your data in place:
 2. It stops the app for one quick switch, and starts it again.
 3. It keeps the database from before, as the undo.
 
+MySQL, MariaDB, MongoDB, ClickHouse and Redis cannot switch a database in one step. So there moin stops the app, keeps the live database as the undo, a dump on the server, and loads the copy. If the load fails, the undo goes back in and your data is as it was.
+
+A MongoDB restore replaces every database of the service but `admin` and `config`. So the users of your MongoDB stay as they are. A ClickHouse restore replaces every database of the service but ClickHouse's own. A Redis restore starts a second Redis with the copy next to yours and has yours take all its data, as a replica does. Your Redis keeps running and writes its own files.
+
 A restore replaces live data, so moin asks first. Scripts pass `-y`.
 
 ```text
@@ -269,6 +300,46 @@ moin restore my-app
 Every restore keeps the data from right before it. `moin backups my-app` lists it as `undo-…`, `before a restore`, with WHERE `server`. In a script it is `--to undo-…`. Going back to it is a restore too, so you can undo the undo.
 
 An undo stays as long as the copies do: 7 days, unless the [config](/docs/config#backups) says otherwise.
+
+## Look at your data
+
+```bash
+moin sql my-app --tables
+moin sql my-app "SELECT id, email FROM users ORDER BY id DESC"
+```
+
+```text
+id   email
+42   ada@example.com
+41   NULL
+```
+
+- It asks the database your app runs on: SQLite, Postgres, MySQL or MariaDB. Nothing to install, no port to open. moin reads a SQLite file itself. Postgres and MySQL are asked by the client in their own container.
+- It only reads. A statement that would change something fails, and says so.
+- 200 rows come back at most. `--limit 1000` takes more. A long value is cut in the table. `--json` prints all of it.
+- An app with several databases: moin asks which one, or `--db <name>` names it, as `moin backups my-app` lists them.
+
+To change data, add `--write`:
+
+```bash
+moin sql my-app "UPDATE users SET plan = 'pro' WHERE id = 42" --write
+```
+
+```text
+  UPDATE users SET plan = 'pro' WHERE id = 42
+? Run this on my-app? moin takes a copy of the database first. [y/N] y
+copying postgres-db
+running the statement
+✓ 1 row changed in postgres-db of my-app
+  Undo it with moin restore my-app --to before-sql
+```
+
+1. moin shows the statement and asks. Scripts pass `-y`.
+2. It takes a copy of the database into your bucket, like `moin backup`.
+3. It runs the statement in one transaction. If it fails, nothing changed. One exception: MySQL and MariaDB keep a `CREATE`, `ALTER` or `DROP` right away.
+4. `moin restore my-app --to before-sql` goes back to the copy from before your last write. It is a restore: what the app wrote since goes too.
+
+A server without a bucket has no place for the copy. Set one, or write without a copy: `--no-copy`.
 
 ## When the server is gone
 
@@ -289,6 +360,21 @@ moin restore my-app -s new --from my-server --key
 
 With [moin cloud](/docs/cloud#a-copy-your-server-cant-delete), the same commands show and restore the copy your server could not delete. Its WHERE is `moin cloud`, and it always asks for your backup key.
 
+## Download a copy
+
+```bash
+moin backup download my-app
+```
+
+The newest copy of the app's database comes to your laptop as a file you can open: `my-app-20261127T140000Z-118204.db`.
+
+- The server sends the copy as it lies in the bucket, encrypted, over SSH. Your backup key opens it on your laptop. It never goes to the server, and no link is made.
+- What you get: a SQLite file, a Postgres dump (`.dump`, for `pg_restore`), a gzipped MySQL dump (`.sql.gz`), or a gzipped MongoDB archive (`.archive.gz`).
+- `--to <copy>` takes another copy from `moin backups`. `--database <name>` picks one when the app has several.
+- `-o file` names the file. `-o -` writes it to stdout.
+- moin asks for your backup key and does not show it. `--key-file key.txt` reads it from a file. A script pipes it in.
+- A server without a bucket sends a fresh copy instead.
+
 ## Your copies without moin
 
 The copies of a database are in `<path>/<server>/<app>/<database>/copies/` in your bucket. Each is an [age](https://age-encryption.org) file. Put your backup key in a file, `key.txt`, and open a copy with the `age` tool:
@@ -296,9 +382,19 @@ The copies of a database are in `<path>/<server>/<app>/<database>/copies/` in yo
 ```bash
 age -d -i key.txt 20261127T140000Z-118204.db.gz.age | gunzip > my-app.db
 age -d -i key.txt 20261127T140000Z-118204.dump.age > my-app.dump
+age -d -i key.txt 20261127T140000Z-118204.sql.gz.age | gunzip > my-app.sql
+age -d -i key.txt 20261127T140000Z-118204.archive.gz.age > my-app.archive.gz
+age -d -i key.txt 20261127T140000Z-118204.zip.age > my-app.zip
+age -d -i key.txt 20261127T140000Z-118204.rdb.gz.age | gunzip > dump.rdb
 ```
 
-A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. You need no moin for either.
+A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. A MySQL or MariaDB copy, `.sql.gz.age`, is plain SQL: `mysql` or `mariadb` loads it. A MongoDB copy, `.archive.gz.age`, is an archive of `mongodump`: `mongorestore --archive=my-app.archive.gz --gzip` loads it. A ClickHouse copy, `.zip.age`, is a zip of `BACKUP`: put it in the `backups` folder of a ClickHouse and run `RESTORE ALL FROM File('my-app.zip')`. A Redis copy, `.rdb.gz.age`, is a `dump.rdb`: a Redis without an append only file loads it from its data folder when it starts. You need no moin for any of them.
+
+## Limits
+
+- **MongoDB copies are not one point in time across collections.** MongoDB dumps one collection after the other. A write during the copy can land in one collection and miss another. For most apps that is fine.
+- **ClickHouse clusters with replicated tables are not supported yet.** A single ClickHouse server is.
+- **A Redis password that is only in a config file is not found.** Put it in the `command` of the service, as `--requirepass`, or set `REDISCLI_AUTH` in its `environment`.
 
 ## If it breaks
 

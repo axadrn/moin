@@ -100,6 +100,8 @@ templ overviewStats(s summary) {
 					<span>none yet</span>
 				case s.Stopped > 0:
 					@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(s.Stopped) + " stopped"})
+				case s.StoppedOnPurpose > 0:
+					@components.Status(components.StatusProps{State: components.StateIdle, Text: strconv.Itoa(s.StoppedOnPurpose) + " stopped on purpose"})
 				default:
 					@components.Status(components.StatusProps{State: components.StateLive, Text: "all running"})
 			}
@@ -129,7 +131,7 @@ templ serverCard(server watcher.ServerView) {
 			<div class="moin-stack" data-gap="1">
 				<div class="moin-row" data-wrap data-gap="3">
 					<span class="moin-heading">{ server.Name }</span>
-					if n := len(problemsOf(server)); n > 0 {
+					if n := len(server.NeedsYou()); n > 0 {
 						@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(n) + " needs you"})
 					}
 				</div>
@@ -145,7 +147,7 @@ templ serverCard(server watcher.ServerView) {
 		if len(server.Apps) > 0 {
 			<div class="moin-row" data-wrap data-gap="2">
 				for _, app := range server.Apps {
-					@components.Status(components.StatusProps{State: okState(app.OK), Text: app.Name, Note: app.State, Pill: true})
+					@components.Status(components.StatusProps{State: appState(app), Text: app.Name, Note: app.State, Pill: true})
 				}
 			</div>
 		}

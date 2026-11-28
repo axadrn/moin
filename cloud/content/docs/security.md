@@ -95,6 +95,10 @@ After it, no public TCP port is left on the server.
 - In the tunnel's Public Hostnames, send each domain to `http://moin-traefik:8080`.
 - `moin secure my-server --tunnel off` takes the web out of the tunnel. It comes on ports 80 and 443 again.
 
+### A server without apps
+
+A server can run moin with no app, only for the firewall, the knocks and the reports. `moin servers add my-server` sets it up. It starts no proxy, so nothing listens on 80 and 443. `moin secure my-server` then closes public SSH and every other port, and asks for no tunnel. The first deploy starts the proxy and opens 80 and 443.
+
 ## Knocks
 
 Bots try every new server within minutes: SSH, databases, admin pages. Each connection attempt is a knock. Once public SSH is closed, moin's firewall drops them, and counts each one under the name of its port.
@@ -116,6 +120,14 @@ Connection attempts, all dropped. Counted since March 2, 2026.
 - Ports 80 and 443 are not counted: who comes there is a visitor.
 - Until public SSH is closed, nothing is counted.
 - Every report tells your watchers the knocks of the day.
+
+## A second wall
+
+moin's firewall closes every port on the server and counts the knocks. For defense in depth, put your provider's firewall in front of it too.
+
+- Let in Tailscale, UDP port 41641, and ping.
+- With a Cloudflare Tunnel, let in nothing else. Without one, also TCP ports 80 and 443 for the web.
+- The trade: a knock your provider drops never reaches the server, so moin cannot count it.
 
 ## The way back in
 

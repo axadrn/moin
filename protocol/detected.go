@@ -7,24 +7,31 @@ type Detected struct {
 	// brought, and for railpack that moin built it with Railpack. Builder
 	// says what Railpack found, like "Node 24.22.1, start: npm start".
 	// Image is the image of the main service when it came from CI.
-	// Domains are the domains the main service answers on; Instant its
-	// instant address, "" when it has none.
-	Kind      string     `json:"kind"`
-	Builder   string     `json:"builder,omitempty"`
-	Image     string     `json:"image,omitempty"`
-	Domains   []string   `json:"domains,omitempty"`
-	Instant   string     `json:"instant,omitempty"`
-	Service   string     `json:"service"`
-	Port      int        `json:"port"`
-	Databases []Database `json:"databases"`
+	// Domains are the domains the main service answers on; ServiceDomains
+	// those of the other services, by service; Instant its instant
+	// address, "" when it has none.
+	Kind           string              `json:"kind"`
+	Builder        string              `json:"builder,omitempty"`
+	Image          string              `json:"image,omitempty"`
+	Domains        []string            `json:"domains,omitempty"`
+	ServiceDomains map[string][]string `json:"service_domains,omitempty"`
+	Instant        string              `json:"instant,omitempty"`
+	Service        string              `json:"service"`
+	Port           int                 `json:"port"`
+	Databases      []Database          `json:"databases"`
 	// NoBackup is what looks like a database but moin cannot back up.
 	NoBackup []Database `json:"no_backup,omitempty"`
+	// Caches are the Redis and Valkey services that keep no data: moin
+	// backs up none of them, and says so.
+	Caches []Database `json:"caches,omitempty"`
 }
 
 // Database is a database of an app: a SQLite file the daemon found on one
-// of the app's mounts, or, with Kind "postgres", a compose service that runs
-// Postgres. Path names a SQLite file in the container; for Postgres it is
-// postgres-<service>, and HostPath is empty. Older daemons send no Kind.
+// of the app's mounts, or, with another Kind, a compose service that runs
+// Postgres, MySQL or MariaDB, MongoDB, ClickHouse, or Redis or Valkey.
+// Path names a SQLite file in the container; for a service it is
+// <kind>-<service>, like postgres-db, and HostPath is empty. Older
+// daemons send no Kind.
 // Name is a database of a Postgres service besides the one POSTGRES_DB
 // names, which backups copy too; its Path is postgres-<service>/<name>.
 type Database struct {
@@ -48,3 +55,42 @@ func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 // PostgresKey is the name of a Postgres service's database in moin: in the
 // bucket, the API and on every surface.
 func PostgresKey(service string) string { return "postgres-" + service }
+
+// DatabaseMySQL is the Kind of a MySQL or MariaDB service.
+const DatabaseMySQL = "mysql"
+
+// MySQL reports whether the database is a MySQL or MariaDB service.
+func (d Database) MySQL() bool { return d.Kind == DatabaseMySQL }
+
+// MySQLKey is the name of a MySQL or MariaDB service's database in moin.
+func MySQLKey(service string) string { return "mysql-" + service }
+
+// The Kind of a MongoDB service, of a ClickHouse service, and of a Redis
+// or Valkey service that keeps its data.
+const (
+	DatabaseMongo      = "mongo"
+	DatabaseClickHouse = "clickhouse"
+	DatabaseRedis      = "redis"
+)
+
+// ServiceKey is the name of the database of a service in moin, for one of
+// the three kinds above: mongo-<service>, clickhouse-<service>,
+// redis-<service>.
+func ServiceKey(kind, service string) string { return kind + "-" + service }
+
+// Engine is what runs the database, as moin says it to people.
+func (d Database) Engine() string {
+	switch d.Kind {
+	case DatabasePostgres:
+		return "Postgres"
+	case DatabaseMySQL:
+		return "MySQL"
+	case DatabaseMongo:
+		return "MongoDB"
+	case DatabaseClickHouse:
+		return "ClickHouse"
+	case DatabaseRedis:
+		return "Redis"
+	}
+	return "SQLite"
+}

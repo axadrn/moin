@@ -171,7 +171,7 @@ func TestSelectionSurvivesARefreshWithoutTheApp(t *testing.T) {
 }
 
 func TestTheSideShowsTheFactsOfTheSelectedApp(t *testing.T) {
-	m := start(t, &fake{releases: []daemon.Release{{Number: 3, Live: true, At: time.Now().Add(-4 * time.Minute)}, {Number: 2, Before: true}}})
+	m := start(t, &fake{releases: []daemon.Release{{DeployRecord: daemon.DeployRecord{Number: 3, Live: true, At: time.Now().Add(-4 * time.Minute)}}, {DeployRecord: daemon.DeployRecord{Number: 2}, Before: true}}})
 	view := m.View().Content
 	for _, want := range []string{"https://shop.example.com", "deployed 4m ago", "1 older", "checked 2h ago"} {
 		if !strings.Contains(view, want) {
@@ -250,7 +250,7 @@ func TestOneActionAtATime(t *testing.T) {
 }
 
 func TestRollbackPicksTheReleaseBefore(t *testing.T) {
-	f := &fake{releases: []daemon.Release{{Number: 3, Live: true}, {Number: 2, Before: true}, {Number: 1}}}
+	f := &fake{releases: []daemon.Release{{DeployRecord: daemon.DeployRecord{Number: 3, Live: true}}, {DeployRecord: daemon.DeployRecord{Number: 2}, Before: true}, {DeployRecord: daemon.DeployRecord{Number: 1}}}}
 	m := start(t, f)
 	run(m, press(m, "b"))
 	if m.picker == nil || m.picker.cursor != 1 {
@@ -271,7 +271,7 @@ func TestRollbackPicksTheReleaseBefore(t *testing.T) {
 }
 
 func TestRollbackWithoutAnOlderRelease(t *testing.T) {
-	m := start(t, &fake{releases: []daemon.Release{{Number: 1, Live: true}}})
+	m := start(t, &fake{releases: []daemon.Release{{DeployRecord: daemon.DeployRecord{Number: 1, Live: true}}}})
 	run(m, press(m, "b"))
 	if m.picker != nil || !strings.Contains(m.message, "no older deploy") {
 		t.Errorf("picker %v, message %q", m.picker, m.message)
@@ -279,7 +279,7 @@ func TestRollbackWithoutAnOlderRelease(t *testing.T) {
 }
 
 func TestEscClosesThePicker(t *testing.T) {
-	f := &fake{releases: []daemon.Release{{Number: 2, Live: true}, {Number: 1, Before: true}}}
+	f := &fake{releases: []daemon.Release{{DeployRecord: daemon.DeployRecord{Number: 2, Live: true}}, {DeployRecord: daemon.DeployRecord{Number: 1}, Before: true}}}
 	m := start(t, f)
 	run(m, press(m, "b"))
 	press(m, "esc")

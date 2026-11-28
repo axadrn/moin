@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -224,6 +225,7 @@ func TestWatcherConnectReadsTheToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
 	args := []string{"my-server", "https://watcher.example.com"}
 	if err := watcherConnect(context.Background(), args, strings.NewReader("secret-token\n"), io.Discard); err != nil {
 		t.Fatal(err)
@@ -235,5 +237,8 @@ func TestWatcherConnectReadsTheToken(t *testing.T) {
 	}
 	if ran, _ := os.ReadFile(runs); strings.Contains(string(ran), "secret-token") {
 		t.Errorf("ssh ran with %q", ran)
+	}
+	if servers, _ := loadServers(); !slices.Contains(servers, "my-server") {
+		t.Errorf("the laptop knows %q, not my-server", servers)
 	}
 }

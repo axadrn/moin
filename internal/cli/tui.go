@@ -33,6 +33,10 @@ func openTUI(ctx context.Context, stdout io.Writer) error {
 		Restore: func(ctx context.Context, server, app, database, to string, said io.Writer) (daemon.Restored, error) {
 			return restoreCopy(ctx, server, app, database, to, "", nil, said)
 		},
+		Compose: func(ctx context.Context, server, app string, said io.Writer) (string, error) {
+			file, err := appCompose(ctx, server, app, said)
+			return file.Compose, err
+		},
 		Explain: explain,
 	})
 }

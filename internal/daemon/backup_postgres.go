@@ -5,11 +5,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,6 +36,16 @@ func (e *postgresEngine) target(ctx context.Context) (pgTarget, error) {
 	return t, err
 }
 
+// maintenanceDatabases are Postgres's own, never an app's, unless
+// POSTGRES_DB names one (then it is the app's main database).
+var maintenanceDatabases = []string{"postgres", "template0", "template1"}
+
+// extraDatabase says a database of a Postgres service is one more of the
+// app: not its main one, not moin's own, not Postgres's.
+func extraDatabase(name, main string) bool {
+	return name != "" && name != main && !strings.HasPrefix(name, "moin_") && !slices.Contains(maintenanceDatabases, name)
+}
+
 // databases are the databases of an app's live deploy, with every database
 // of each Postgres service: postgres-db for the one POSTGRES_DB names,
 // postgres-db/<name> for each other, but the templates and moin's own
@@ -57,7 +66,7 @@ func (b *backups) databases(ctx context.Context, app string) []protocol.Database
 			continue
 		}
 		for _, name := range strings.Split(out, "\n") {
-			if name != "" && name != t.database && !strings.HasPrefix(name, "moin_") {
+			if extraDatabase(name, t.database) {
 				all = append(all, protocol.Database{Path: database.Path + "/" + name, Kind: database.Kind, Service: database.Service, Name: name})
 			}
 		}
@@ -204,7 +213,7 @@ func (e *postgresEngine) Restore(ctx context.Context, from source, keepAs string
 	}
 	// An app that is only its database has no other service to stop.
 	start := func() error { return nil }
-	if others := e.others(); len(others) > 0 {
+	if others := e.b.otherServices(e.app, e.database.Service); len(others) > 0 {
 		start, err = e.b.apps.stopServices(ctx, e.app, others...)
 		if err != nil {
 			return err
@@ -257,22 +266,6 @@ func (e *postgresEngine) switchIn(ctx context.Context, t pgTarget, live, aside, 
 		return nil
 	}
 	return fmt.Errorf("switch: %w; nothing changed", err)
-}
-
-// others are the app's services but the database, which keeps running.
-func (e *postgresEngine) others() []string {
-	var config struct {
-		Services map[string]json.RawMessage `json:"services"`
-	}
-	body, _ := os.ReadFile(e.b.apps.composeJSON(e.app))
-	_ = json.Unmarshal(body, &config)
-	others := []string{}
-	for name := range config.Services {
-		if name != e.database.Service {
-			others = append(others, name)
-		}
-	}
-	return others
 }
 
 // Recover tells from the undo, once the Postgres answers, up to two

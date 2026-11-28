@@ -28,7 +28,10 @@ Start
 Apps
   deploy                       Deploy this folder again where it runs
   apps                         Every app on every server
+  apps rm <app>                Remove an app. Its volumes stay
   logs [app]                   The app's logs. -f follows them
+  deploys [app]                Its deploys: from where, what, how they ended
+  deploys [app] v12            What deploy v12 printed
   rollback [app]               Go back to an older deploy
   restart [app]                Start the app again with its env and domains as now
   stop [app]                   Stop the app until you start it
@@ -36,20 +39,27 @@ Apps
   exec [app] -- <command>      Run a command in the app's container
   env [app]                    The names of its env vars, never a value
   env edit [app]               Change them in $EDITOR. The app restarts with them
+  env push [app] [file|-]      Replace them with a .env file. Shows the names first
+  env set [app] <NAME>         Set one. The value is asked or read from stdin
   domains [app]                The app's domains
-  domains add [app] <domain>   Add one. The certificate follows by itself
+  domains add [app] <domain>   Add one. The certificate follows by itself. --service api for another service
   domains rm [app] <domain>    Remove one
+  password [app]               Ask every visitor for a password. off ends it
+  sql [app] "<query>"          Ask its database. --tables lists its tables
   follow [app]                 Deploy each new commit of a branch or image of a tag
+  compose [app]                The compose file moin runs, to run it elsewhere
   catalog                      Open source apps to deploy with --catalog
 
 Backups
   backups [app]                The copies of its databases and the last check
+  backups [app] --every 1h     How often a copy. --keep 30d how long. -s alone: the server's
   backup [app]                 A copy now
+  backup download [app]        One copy, opened with your backup key, as a file
   restore [app]                Go back to a copy. It can be undone
 
 Servers
   servers                      Your servers and their watchers
-  servers add <server>         Add one you deployed to before. As on a new laptop
+  servers add <server>         Add one you deployed to before. Sets moin up on a new one, with no app
   servers rm <server>          Forget one. Nothing changes on it
   keys <server>                The SSH keys that may log in as root
   keys add <server> <file>     Let one more key in
@@ -68,12 +78,14 @@ Servers
   secure <server>              SSH only over Tailscale. A firewall for the rest
   knocks [server]              What the firewall dropped, by port
   update [server]              Update this CLI, or a server to this CLI's version
+  update <app>                 A catalog app to its newest images. --version 2.15.1 picks one
 
 Watcher
   watcher                      Each server's watchers. Your plan of moin cloud
   watcher connect <server>     The server reports to moin cloud. Signs you in
   watcher connect <server> <url> <token>  Or to a watcher you run
   watcher disconnect <server> [url]  It no longer does
+  watcher logout               Sign this laptop out of moin cloud
   watcher run                  Run a watcher on another machine than your servers
   watcher token <server>       On the watcher: the line that connects a server
 
@@ -211,7 +223,11 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "deploy":
 		return deploy(ctx, rest, stdin, stdout)
 	case "apps":
-		return apps(ctx, rest, stdout)
+		return apps(ctx, rest, stdin, stdout)
+	case "compose":
+		return compose(ctx, rest, stdout)
+	case "deploys":
+		return deploys(ctx, rest, stdout)
 	case "rollback":
 		return rollback(ctx, rest, stdin, stdout)
 	case "restart", "start", "stop":
@@ -224,6 +240,10 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return env(ctx, rest, stdin, stdout)
 	case "domains":
 		return domains(ctx, rest, stdin, stdout)
+	case "password":
+		return password(ctx, rest, stdin, stdout)
+	case "sql":
+		return sqlCommand(ctx, rest, stdin, stdout)
 	case "keys":
 		return keys(ctx, rest, stdin, stdout)
 	case "catalog":
@@ -231,6 +251,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "backups":
 		return backups(ctx, rest, stdout)
 	case "backup":
+		if len(rest) > 0 && rest[0] == "download" {
+			return backupDownload(ctx, rest[1:], stdin, stdout)
+		}
 		return backUp(ctx, rest, stdout)
 	case "restore":
 		return restore(ctx, rest, stdin, stdout)

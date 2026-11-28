@@ -76,8 +76,16 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	default:
 		return fmt.Errorf("--tunnel takes only off: %s", flags.usage)
 	}
-	token, err := askTunnelToken(stdin, stdout)
+	// A server without apps serves no web, so there is no tunnel to ask
+	// for: 80 and 443 stay closed until its first deploy.
+	status, err := serverStatus(ctx, server)
 	if err != nil {
+		return err
+	}
+	token := ""
+	if len(status.Apps) == 0 {
+		fmt.Fprintln(stdout, style.Muted.Render(server+" has no apps yet, so ports 80 and 443 stay closed. Its first deploy opens them."))
+	} else if token, err = askTunnelToken(stdin, stdout); err != nil {
 		return err
 	}
 	return lockDown(ctx, server, daemon.Secure{CloseSSH: true, Firewall: true, TunnelToken: token}, stdin, stdout)

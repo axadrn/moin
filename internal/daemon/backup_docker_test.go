@@ -132,7 +132,7 @@ func (test *backupTest) running() bool {
 func (test *backupTest) putBroken() {
 	test.t.Helper()
 	_, folder, _ := test.b.where(test.app, test.database)
-	key := folder + "/" + protocol.CopyFile(protocol.NewCopyID(time.Now().Add(time.Minute)), test.database.Postgres(), false)
+	key := folder + "/" + protocol.CopyFile(protocol.NewCopyID(time.Now().Add(time.Minute)), test.database.Kind, false)
 	var body bytes.Buffer
 	encrypted, err := test.b.encrypt(&body)
 	if err != nil {
@@ -231,7 +231,7 @@ func TestBackupSQLite(t *testing.T) {
 	// before copies were encrypted too, but never the newest ones.
 	_, folder, _ := test.b.where(app, test.database)
 	old := time.Now().Add(-3 * day).UTC().Format(protocol.CopyIDLayout)
-	s3Client(test.bucket).PutObject(test.ctx, &s3.PutObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(folder + "/" + protocol.CopyFile(old, false, true)), Body: strings.NewReader("old")})
+	s3Client(test.bucket).PutObject(test.ctx, &s3.PutObjectInput{Bucket: aws.String("moin-test"), Key: aws.String(folder + "/" + protocol.CopyFile(old, "", true)), Body: strings.NewReader("old")})
 	if listed := test.copies(); listed[len(listed)-1].ID != old || !listed[len(listed)-1].Plain {
 		t.Fatalf("a plain copy from before is not listed: %+v", listed)
 	}
@@ -487,7 +487,7 @@ func testBackupPostgres(t *testing.T, image string) {
 	for _, database := range test.b.databases(test.ctx, app) {
 		paths = append(paths, database.Path)
 	}
-	if strings.Join(paths, ",") != "postgres-db,postgres-db/analytics,postgres-db/postgres" {
+	if strings.Join(paths, ",") != "postgres-db,postgres-db/analytics" {
 		t.Fatalf("the databases of the service: %v", paths)
 	}
 	shop := test.database
@@ -499,7 +499,7 @@ func testBackupPostgres(t *testing.T, image string) {
 	if copies := test.copies(); len(copies) != 1 {
 		t.Fatalf("the first copy of analytics: %+v", copies)
 	}
-	if listed, err := test.listed(); err != nil || len(listed) != 3 || listed[1].Database != "postgres-db/analytics" {
+	if listed, err := test.listed(); err != nil || len(listed) != 2 || listed[1].Database != "postgres-db/analytics" {
 		t.Fatalf("the list: %+v %v", listed, err)
 	}
 	firstVisit := test.copies()[0]
@@ -650,8 +650,7 @@ func (test *backupTest) killedDuringPostgresRestore(copy string, switched bool) 
 	if err := load(test.ctx, target, built, from.copy); err != nil {
 		test.t.Fatal(err)
 	}
-	engine := &postgresEngine{b: test.b, app: test.app, database: test.database}
-	if _, err := test.b.apps.stopServices(test.ctx, test.app, engine.others()...); err != nil {
+	if _, err := test.b.apps.stopServices(test.ctx, test.app, test.b.otherServices(test.app, test.database.Service)...); err != nil {
 		test.t.Fatal(err)
 	}
 	mark := test.killed()

@@ -131,13 +131,13 @@ func (w *watch) look(ctx context.Context) {
 	w.apps.recoverDeploys(ctx)
 	containers := w.apps.containers(ctx)
 	statuses := w.apps.backups.statuses(ctx)
-	w.report(ctx, config, containers, statuses)
 	problems := w.problems(config, containers, statuses)
 	if mistake != nil {
 		slog.Error("the config has a mistake: the last good one keeps working", "error", mistake)
 		problems["config"] = alert.Message{Server: config.Name, Title: "the config has a mistake", Text: mistake.Error() + ". Nothing changed: the last good config keeps working."}
 	}
 	maps.Copy(problems, tailnetAlerts(ctx, filepath.Dir(w.apps.dir), config.Name))
+	w.report(ctx, config, containers, statuses, problems)
 	w.alert(ctx, config, problems)
 	w.save()
 }
@@ -185,9 +185,9 @@ func (a *apps) containers(ctx context.Context) map[string]appContainers {
 	return found
 }
 
-// report tells every watcher how the server stands, and counts the
-// rounds in which none of them took it.
-func (w *watch) report(ctx context.Context, config Config, containers map[string]appContainers, statuses map[string][]protocol.DatabaseBackup) {
+// report tells every watcher how the server stands, its problems too,
+// and counts the rounds in which none of them took it.
+func (w *watch) report(ctx context.Context, config Config, containers map[string]appContainers, statuses map[string][]protocol.DatabaseBackup, problems map[string]alert.Message) {
 	if len(config.Watchers) == 0 {
 		w.missed = 0
 		return
@@ -196,6 +196,7 @@ func (w *watch) report(ctx context.Context, config Config, containers map[string
 	r.Knocks = knocksReport(filepath.Dir(w.apps.dir))
 	// The watchers alert where the server does, when it no longer can.
 	r.Alerts = config.Alerts
+	r.Problems = reportProblems(problems)
 	for _, app := range w.apps.names() {
 		if w.apps.current(app) == 0 {
 			continue
@@ -221,15 +222,36 @@ func (w *watch) report(ctx context.Context, config Config, containers map[string
 // reportApp is one app in a report.
 func (w *watch) reportApp(app string, containers appContainers, statuses []protocol.DatabaseBackup) report.App {
 	detected, _ := w.apps.live(app)
-	domains := slices.Clone(detected.Domains)
-	if detected.Instant != "" {
-		domains = append(domains, detected.Instant)
-	}
-	a := report.App{Name: app, Release: w.apps.current(app), Running: containers.running, Domains: domains, Databases: []report.Database{}}
+	a := report.App{Name: app, Release: w.apps.current(app), Running: containers.running, Domains: w.apps.reachable(detected), Databases: []report.Database{}}
+	a.Stopped = !a.Running && w.apps.stoppedOnPurpose(app)
 	for _, status := range statuses {
 		a.Databases = append(a.Databases, reportDatabase(status))
 	}
 	return a
+}
+
+// shownByDatabase are the kinds of problems a report shows on the line of
+// a database already, and that no watcher is reachable, which a report
+// that arrives ends.
+var shownByDatabase = []string{"backup", "bucket", "check", "cloud-copy", "watchers"}
+
+// reportProblems are the titles of the problems a watcher shows as the
+// server's own, sorted.
+func reportProblems(problems map[string]alert.Message) []string {
+	var titles []string
+	for key, message := range problems {
+		if !slices.Contains(shownByDatabase, event(key)) {
+			titles = append(titles, message.Title)
+		}
+	}
+	slices.Sort(titles)
+	return titles
+}
+
+// event is the kind of a problem, the start of its key: "disk", "crash".
+func event(key string) string {
+	kind, _, _ := strings.Cut(key, "/")
+	return kind
 }
 
 // reportDatabase is one database in a report.
@@ -280,6 +302,11 @@ func (w *watch) problems(config Config, containers map[string]appContainers, sta
 		}
 	}
 	for app, state := range containers {
+		// An app stopped on purpose crashes no more.
+		if w.apps.stoppedOnPurpose(app) {
+			delete(w.restarts, app)
+			continue
+		}
 		if w.crashing(app, state.restarts) {
 			add("crash/"+app, app, app+" keeps crashing", fmt.Sprintf("Its containers restarted %d times. See why: %s logs %s", state.restarts, build.Name, app))
 		}
@@ -335,6 +362,7 @@ func (w *watch) alert(ctx context.Context, config Config, problems map[string]al
 		if _, open := w.open[key]; open {
 			continue
 		}
+		message.Event = event(key)
 		slog.Warn("alert", "title", message.Title, "text", message.Text)
 		if sendAlert(ctx, config, message) {
 			w.open[key] = message
@@ -344,7 +372,7 @@ func (w *watch) alert(ctx context.Context, config Config, problems map[string]al
 		if _, still := problems[key]; still {
 			continue
 		}
-		message.OK, message.Title, message.Text = true, "over: "+message.Title, ""
+		message.OK, message.Title, message.Text, message.Event = true, "over: "+message.Title, "", event(key)
 		slog.Info("alert", "title", message.Title)
 		if sendAlert(ctx, config, message) {
 			delete(w.open, key)

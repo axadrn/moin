@@ -19,9 +19,9 @@ import (
 	"github.com/axadrn/moin/internal/watcher"
 )
 
-// watcherCommand is `moin watcher`, `watcher connect` and `watcher
-// disconnect`, on your laptop, and `moin watcher run` and `moin watcher
-// token`, on the machine that runs a watcher.
+// watcherCommand is `moin watcher`, `watcher connect`, `watcher
+// disconnect` and `watcher logout`, on your laptop, and `moin watcher
+// run` and `moin watcher token`, on the machine that runs a watcher.
 func watcherCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	verb := ""
 	if len(args) > 0 {
@@ -36,6 +36,15 @@ func watcherCommand(ctx context.Context, args []string, stdin io.Reader, stdout 
 		return watcherConnect(ctx, args[1:], stdin, stdout)
 	case "disconnect":
 		return watcherDisconnect(ctx, args[1:], stdin, stdout)
+	case "logout":
+		flags := newFlags("watcher logout", "watcher logout")
+		if err := flags.parse(args[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() > 0 {
+			return flags.wrong()
+		}
+		return cloudLogout(ctx, stdout)
 	}
 	return watcherList(ctx, args, stdout)
 }
@@ -52,12 +61,12 @@ type serverWatchers struct {
 // and for moin cloud the plan, the days left of the trial and where to
 // pay.
 func watcherList(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("watcher", "watcher [--json], or watcher connect|disconnect|run|token").withJSON()
+	flags := newFlags("watcher", "watcher [--json], or watcher connect|disconnect|logout|run|token").withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() > 0 {
-		return fmt.Errorf("unknown command %q. `%s watcher` takes connect, disconnect, run or token", flags.Arg(0), build.Name)
+		return fmt.Errorf("unknown command %q. `%s watcher` takes connect, disconnect, logout, run or token", flags.Arg(0), build.Name)
 	}
 	list, err := loadServers()
 	if err != nil {
@@ -172,6 +181,10 @@ func watcherConnect(ctx context.Context, args []string, stdin io.Reader, stdout 
 		return err
 	}
 	if err := sendJSON(ctx, server, to, "watchers", "connect"); err != nil {
+		return err
+	}
+	// In the list of this laptop, as after a deploy.
+	if err := addServer(server); err != nil {
 		return err
 	}
 	done(stdout, "%s reports to %s every minute", server, to.URL)

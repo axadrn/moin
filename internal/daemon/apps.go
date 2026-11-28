@@ -22,7 +22,10 @@ import (
 //	releases/<n>/compose.json  the compose project moin runs, 0600
 //	releases/<n>/.env          a copy of the source's .env, when it has one
 //	releases/<n>/kind          build, apply or failed, for prune
+//	releases/<n>/deploy.log    what the deploy printed (deploys.go)
+//	releases/<n>/deploy.json   its record: from where, what, how it ended
 //	current                    the number of the running release
+//	stopped                    there while the app is stopped on purpose
 //	volumes/                   bind mounts that are not part of the repo
 //
 // compose.json is the user's compose.yml after `docker compose config`, with
@@ -141,8 +144,13 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
 	// Its containers are gone; volumes.json stays with the volumes.
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
-	// Its env goes with it: nothing runs that reads it.
+	// Its env, its domains and its password go with it: nothing runs that
+	// reads them, and a domain is free for another app.
 	_ = os.Remove(a.envFile(app))
+	_ = os.Remove(a.domainsFile(app))
+	_ = os.Remove(a.passwordFile(app))
+	_ = os.Remove(a.beforeSQLFile(app))
+	_ = os.Remove(a.stoppedFile(app))
 	// And the branch or image it follows, with its deploy key: no push brings the
 	// app back.
 	_ = os.RemoveAll(followDir(filepath.Dir(a.dir), app))
@@ -160,8 +168,21 @@ func (a *apps) stop(ctx context.Context, app string) error {
 	if current == 0 {
 		return errors.New("the app has no release on this server")
 	}
-	_, err := a.output(ctx, "docker", a.composeArgs(app, a.composeJSON(app), "stop")...)
-	return err
+	if _, err := a.output(ctx, "docker", a.composeArgs(app, a.composeJSON(app), "stop")...); err != nil {
+		return err
+	}
+	// Stopped on purpose: the watchers show it as stopped, not as a
+	// problem, until a deploy starts it again.
+	return os.WriteFile(a.stoppedFile(app), nil, 0o600)
+}
+
+// stoppedFile is there while the app is stopped on purpose.
+func (a *apps) stoppedFile(app string) string { return filepath.Join(a.appDir(app), "stopped") }
+
+// stoppedOnPurpose says whether `moin stop` stopped the app.
+func (a *apps) stoppedOnPurpose(app string) bool {
+	_, err := os.Stat(a.stoppedFile(app))
+	return err == nil
 }
 
 // composeJSON is the compose.json moin runs for the app's live deploy.

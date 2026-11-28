@@ -68,6 +68,7 @@ func TestAppRoom(t *testing.T) {
 		{"build from the source", service(map[string]any{"build": map[string]any{
 			"context": src, "dockerfile": "../railpack-plan.json", "args": map[string]any{"A": "1"},
 		}}), ""},
+		{"own log rotation", service(map[string]any{"logging": map[string]any{"driver": "local", "options": map[string]any{"max-size": "50m"}}}), ""},
 		{"secret from env", map[string]any{"services": map[string]any{"web": map[string]any{"image": "nginx"}},
 			"secrets": map[string]any{"token": map[string]any{"environment": "TOKEN"}}}, ""},
 
@@ -83,6 +84,7 @@ func TestAppRoom(t *testing.T) {
 		{"seccomp off", service(map[string]any{"security_opt": []any{"seccomp=unconfined"}}), "security_opt seccomp=unconfined"},
 		{"kernel sysctl", service(map[string]any{"sysctls": map[string]any{"kernel.core_pattern": "x"}}), "sysctl kernel.core_pattern"},
 		{"gpu", service(map[string]any{"deploy": map[string]any{"resources": map[string]any{"reservations": map[string]any{"devices": []any{map[string]any{}}}}}}), "devices of the server"},
+		{"logs off the server", service(map[string]any{"logging": map[string]any{"driver": "syslog", "options": map[string]any{"syslog-address": "udp://203.0.113.7:514"}}}), "logging driver syslog is not allowed"},
 		{"unknown top key", map[string]any{"include": []any{"x"}}, "include is not allowed"},
 
 		// Refused: mounts out of the room.

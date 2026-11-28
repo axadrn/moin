@@ -36,7 +36,7 @@ templ CloudServer(p CloudServerProps) {
 				{ p.Server.State }
 			</span>
 		</div>
-		if problems := problemsOf(p.Server); len(problems) > 0 {
+		if problems := p.Server.NeedsYou(); len(problems) > 0 {
 			@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "Needs you", Lines: problems})
 		}
 		@components.Card(components.CardProps{Title: "Apps"}) {
@@ -47,7 +47,7 @@ templ CloudServer(p CloudServerProps) {
 					for _, app := range p.Server.Apps {
 						@components.Row(components.RowProps{}) {
 							@components.Cell() {
-								@components.Status(components.StatusProps{State: okState(app.OK), Text: app.Name})
+								@components.Status(components.StatusProps{State: appState(app), Text: app.Name})
 							}
 							@components.Cell() {
 								{ app.State }

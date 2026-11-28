@@ -54,6 +54,7 @@ Pick an app and press Enter: its logs, following. `esc` goes back.
 | `c` | a copy of the app's databases now |
 | `R` | put a database back to a copy: pick one, then say `y` |
 | `o` | open the app's address in your browser |
+| `C` | the compose file moin runs, in your `$PAGER` |
 | `?` | the keys. Any key closes them |
 | `q` | quit |
 
@@ -67,8 +68,9 @@ Before your first deploy, `moin` shows three steps: `cd my-app`, `moin deploy <s
 | --- | --- |
 | `moin` | the terminal UI, or a table of every server and app, and what needs you |
 | `moin apps` | the table: every app on every server, its release, its state and its address |
+| `moin apps rm <app>` | remove the app: its containers, images, env and domains. Its volumes and copies stay. It asks first. [Remove an app](/docs/deploy#remove-an-app) |
 | `moin servers` | your servers, the moin version on each, and the watchers each one reports to |
-| `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A first deploy adds it too |
+| `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A server without moin gets it, after a yes, with no app: [a server without apps](/docs/security#a-server-without-apps). A first deploy adds it too |
 | `moin servers rm <server>` | take a server off your list. Nothing changes on it |
 
 Under the table, `moin` says what needs you. Each thing is one line with a `!`, and under it the command that settles it:
@@ -100,9 +102,11 @@ In the terminal UI the same lines show on the Servers tab.
 | `moin deploy` | deploy again, to the server the app runs on |
 | `moin deploy my-server --image ghcr.io/you/my-app:1.4` | the server pulls this image from its registry instead of building. [Deploy an image](/docs/deploy#deploy-an-image-from-your-registry) |
 | `moin deploy my-server --image my-app:dev` | an image only your laptop has is sent over SSH |
-| `moin deploy my-server --catalog umami` | an app from the [catalog](/docs/catalog) |
+| `moin deploy my-server --catalog umami` | an app from the [catalog](/docs/catalog). `--domain stats.example.com` gives it its domain before it starts |
 | `moin deploy --app my-app` | another name for the app. Without it, the app is named after the folder |
 | `moin deploy --no-copy` | deploy even when the copy of the databases just before it fails |
+| `moin deploys [app]` | every deploy of the app: from where, what it runs, how it ended, how long it took. [Every deploy](/docs/deploy#every-deploy) |
+| `moin deploys [app] v7` | what deploy v7 printed |
 | `moin rollback [app]` | pick an older release to run again. `--to v3` names it. Without a terminal, the one before |
 | `moin restart [app]` | start the live release again, with its env and domains as they are now |
 | `moin stop [app]` | stop the app. It stays stopped after a reboot, until `moin start`. Its data stays |
@@ -112,6 +116,7 @@ In the terminal UI the same lines show on the Servers tab.
 | `moin follow [app] --branch main` | the server deploys each new commit of the branch, read with a deploy key. `--off` stops it. [Deploy from CI](/docs/deploy#deploy-from-ci) |
 | `moin follow [app] --image ghcr.io/you/my-app:main` | the server deploys each new image your CI pushes under the tag. `--off` stops it. [Deploy after your tests pass](/docs/deploy#deploy-after-your-tests-pass) |
 | `moin catalog` | the apps of the catalog |
+| `moin compose [app]` | the compose file moin runs, without a value of the env: `moin compose my-app > compose.yml`. [Run it elsewhere](/docs/deploy#run-it-elsewhere) |
 
 The first deploy to a server asks first: `Set up moin on my-server and deploy my-app? [y/N]`. In a script, add `-y`. [Deploy](/docs/deploy)
 
@@ -121,20 +126,29 @@ The first deploy to a server asks first: `Set up moin on my-server and deploy my
 | --- | --- |
 | `moin env [app]` | the names of the env vars, never the values |
 | `moin env edit [app]` | open `$EDITOR` with the values. The app restarts with them |
+| `moin env set [app] <NAME>` | set one. The value is asked without showing it, or read from stdin. Never an argument |
+| `moin env push [app] [file\|-]` | replace the env with a `.env` file, or stdin with `-`. Lists the names that change and asks first |
 | `moin domains [app]` | the app's domains |
-| `moin domains add [app] <domain>` | add a domain, with HTTPS |
+| `moin domains add [app] <domain>` | add a domain, with HTTPS. `--service api` sends it to another service than the main one |
 | `moin domains rm [app] <domain>` | remove one. It asks first |
+| `moin password [app]` | every visitor needs a user and a password. The password is asked without showing it, or read from stdin. `--user <name>` names the user. [Password](/docs/deploy#password) |
+| `moin password off [app]` | everyone gets in again |
 
 ## Backups
 
 | Command | What it does |
 | --- | --- |
 | `moin backups [app]` | the copies in your bucket and in moin cloud, one table with WHERE. The last restore check, and which copy it proved |
+| `moin backups [app] --every 1h --keep 30d` | how often the app is copied, and how long each copy stays. Give one or both. With `-s <server>` and no app: the server's schedule. [How often](/docs/backups#how-often) |
 | `moin backup [app]` | a copy now |
+| `moin backup download [app]` | the newest copy as a file on your laptop, opened with your backup key, which moin asks for. `--to <copy>` another, `-o file` where, `--key-file` the key from a file. [Download a copy](/docs/backups#download-a-copy) |
 | `moin restore [app]` | pick a copy to go back to, from the bucket or moin cloud, or the undo of the last restore. A copy in moin cloud asks for your backup key |
-| `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, or `undo-…` |
+| `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, `undo-…`, or `before-sql` |
 | `moin backups [app] --from <server>` | the copies another server made, like one that is gone |
 | `moin restore [app] --from <server> --key` | restore one of them. moin asks for your backup key |
+| `moin sql [app] "<query>"` | the rows of a query on the app's database. It only reads. `--limit 200` rows at most, `--db <name>` when the app has several. [Look at your data](/docs/backups#look-at-your-data) |
+| `moin sql [app] --tables` | the tables of the database |
+| `moin sql [app] "<statement>" --write` | change the data. moin shows the statement, asks, takes a copy, then runs it in one transaction. Undo it with `moin restore [app] --to before-sql` |
 | `moin bucket <server>` | the bucket of the server, never its secret, and whether your backup key is confirmed |
 | `moin bucket set <server>` | set the bucket. moin asks for each value, then shows your backup key once |
 | `moin bucket key <server>` | a new backup key of yours. `--public age1…` takes one you have |
@@ -156,7 +170,8 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin registry rm <server> <registry>` | log the server out |
 | `moin alerts <server>` | where the server sends its alerts, numbered |
 | `moin alerts add <server> telegram --token … --chat-id …` | alerts to Telegram |
-| `moin alerts add <server> slack --url …` | alerts to Slack. `discord` and `webhook` take `--url` too |
+| `moin alerts add <server> slack --url …` | alerts to Slack. `discord` takes `--url` too |
+| `moin alerts add <server> webhook --url …` | alerts as JSON to your own URL, signed. Prints the signing secret once. [Webhooks](/docs/watcher#webhooks) |
 | `moin alerts add <server> email --to … --smtp host:port --user …` | alerts by email, through your SMTP server (STARTTLS, or TLS on port 465). The password is asked, or read from stdin. `--from` when the user is not an address |
 | `moin alerts rm <server> <n>` | remove one, by its number in `moin alerts` |
 | `moin alerts test <server>` | send a test alert to each |
@@ -171,6 +186,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin watcher connect <server>` | the server reports to moin cloud. The first time, the browser signs this laptop in |
 | `moin watcher connect <server> <url> <token>` | the server reports to a watcher you run |
 | `moin watcher disconnect <server> [url]` | the server stops reporting there. Without an address: moin cloud. It asks first |
+| `moin watcher logout` | sign this laptop out of moin cloud. The servers keep reporting. [Sessions](/docs/cloud#sessions) |
 | `moin watcher run` | run a watcher, on another machine than your servers |
 | `moin watcher token <server>` | on the watcher: a token for a server, and the exact line to paste on your laptop |
 
@@ -184,6 +200,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | --- | --- |
 | `moin update` | update the CLI on your laptop to the newest release |
 | `moin update <server>` | put the version of your CLI on the server |
+| `moin update <app>` | a [catalog](/docs/catalog#update-one) app to the newest images of its version, after a copy of its databases. `--version 2.15.1` picks one |
 | `moin daemon uninstall` | on the server: remove moin. The apps keep running |
 | `moin daemon uninstall --apps` | on the server: remove moin and every app, with its data |
 | `moin version` | the version. `--json` prints it as JSON |
@@ -228,7 +245,7 @@ Then, on your laptop: `moin watcher disconnect my-server <url>` for each watcher
 
 ## Asking first
 
-A command that deletes or replaces something asks first, like a restore, `moin keys rm`, `moin registry rm` or `moin domains rm`. On a terminal you answer `y`. In a script it needs `-y`, or it stops.
+A command that deletes or replaces something asks first, like a restore, `moin sql --write`, `moin keys rm`, `moin registry rm` or `moin domains rm`. On a terminal you answer `y`. In a script it needs `-y`, or it stops.
 
 ## For scripts: --json
 

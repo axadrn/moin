@@ -29,7 +29,10 @@ type DatabaseBackup struct {
 	// CheckedCopy is the copy the last check that worked restored.
 	CheckedCopy string `json:"checked_copy,omitempty"`
 	Error       string `json:"error,omitempty"`
-	BucketDown  bool   `json:"bucket_down,omitempty"`
+	// Note says why a service that looks like a database has no backup
+	// and needs none: a Redis that is only a cache. Nothing else is set.
+	Note       string `json:"note,omitempty"`
+	BucketDown bool   `json:"bucket_down,omitempty"`
 
 	CloudError        string     `json:"cloud_error,omitempty"`
 	CloudFailingSince *time.Time `json:"cloud_failing_since,omitempty"`
@@ -62,13 +65,24 @@ type BackupRestore struct {
 // Encrypted ends the name of every copy in the bucket: an age file.
 const Encrypted = ".age"
 
-// CopyFile is the copy id in its database's folder: a gzipped SQLite
-// file, or a pg_dump in its custom format, encrypted with age. plain names
-// a copy from before every copy was encrypted.
-func CopyFile(id string, postgres, plain bool) string {
+// CopyFile is the copy id in the folder of a database of kind: a gzipped
+// SQLite file, a pg_dump in its custom format, a gzipped dump of MySQL or
+// MariaDB, a gzipped archive of mongodump, a zip of ClickHouse's BACKUP,
+// or a gzipped dump of Redis, encrypted with age. plain names a copy from
+// before every copy was encrypted.
+func CopyFile(id, kind string, plain bool) string {
 	name := "copies/" + id + ".db.gz"
-	if postgres {
+	switch kind {
+	case DatabasePostgres:
 		name = "copies/" + id + ".dump"
+	case DatabaseMySQL:
+		name = "copies/" + id + ".sql.gz"
+	case DatabaseMongo:
+		name = "copies/" + id + ".archive.gz"
+	case DatabaseClickHouse:
+		name = "copies/" + id + ".zip"
+	case DatabaseRedis:
+		name = "copies/" + id + ".rdb.gz"
 	}
 	if plain {
 		return name

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -18,20 +19,26 @@ import (
 // noBackupText is what moin says about a database it cannot back up.
 const noBackupText = "moin cannot back up this database"
 
-// scanDatabases finds what a release keeps its data in. The first list is
-// what moin backs up: every SQLite file on a mounted folder and every
-// Postgres service. The second is what looks like a database but moin
-// cannot back up.
-func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protocol.Database, []protocol.Database, error) {
+// cacheText is what moin says about a Redis that keeps no data.
+const cacheText = "cache, not backed up"
+
+// scanDatabases finds what a release keeps its data in. databases is
+// what moin backs up: every SQLite file on a mounted folder, every
+// Postgres, MySQL, MariaDB, MongoDB and ClickHouse service, and every
+// Redis and Valkey service with a volume for its data. noBackup is what
+// looks like a database but moin cannot back up. caches are the Redis
+// and Valkey services without such a volume: they lose what they hold
+// with every deploy, so there is nothing to back up.
+func (a *apps) scanDatabases(ctx context.Context, composeJSON string) (databases, noBackup, caches []protocol.Database, err error) {
 	body, err := os.ReadFile(composeJSON)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	var config composeConfig
 	if err := json.Unmarshal(body, &config); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	databases, noBackup := []protocol.Database{}, []protocol.Database{}
+	databases, noBackup = []protocol.Database{}, []protocol.Database{}
 	names := slices.Sorted(maps.Keys(config.Services))
 	for _, name := range names {
 		for _, mount := range config.Services[name].Volumes {
@@ -47,12 +54,30 @@ func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protoco
 			databases = append(databases, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
 			continue
 		}
-		kind := a.otherDatabase(ctx, config, service)
-		if kind != "" {
-			noBackup = append(noBackup, protocol.Database{Path: kind + "-" + name, Kind: kind, Service: name})
+		if mysqlImage(service.Image) {
+			databases = append(databases, protocol.Database{Path: protocol.MySQLKey(name), Kind: protocol.DatabaseMySQL, Service: name})
+			continue
+		}
+		if kind := serviceDatabase(service); kind != "" {
+			database := protocol.Database{Path: protocol.ServiceKey(kind, name), Kind: kind, Service: name}
+			if kind == protocol.DatabaseRedis && !mountsRedisData(service) {
+				caches = append(caches, database)
+				continue
+			}
+			databases = append(databases, database)
+			continue
+		}
+		if a.unknownPostgres(ctx, config, service) {
+			noBackup = append(noBackup, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
 		}
 	}
-	return databases, noBackup, nil
+	return databases, noBackup, caches, nil
+}
+
+// mountsRedisData says a Redis or Valkey service has a volume at /data,
+// where the official images keep their data.
+func mountsRedisData(service composeService) bool {
+	return slices.ContainsFunc(service.Volumes, func(mount composeMount) bool { return path.Clean(mount.Target) == "/data" })
 }
 
 // mountFolder is the folder on the server behind a mount, "" when there
@@ -89,22 +114,15 @@ func addSQLiteFiles(databases []protocol.Database, folder, target string) []prot
 	return databases
 }
 
-// otherDatabase names the kind of database a service runs when moin
-// cannot back it up, "" when it runs none of those: a known image, or a
+// unknownPostgres says a service runs a Postgres moin cannot back up: a
 // Postgres data folder in a mount of an image moin does not know.
-func (a *apps) otherDatabase(ctx context.Context, config composeConfig, service composeService) string {
-	switch plainImage(service.Image) {
-	case "mysql", "mariadb":
-		return "mysql"
-	case "mongo":
-		return "mongo"
-	}
+func (a *apps) unknownPostgres(ctx context.Context, config composeConfig, service composeService) bool {
 	for _, mount := range service.Volumes {
 		if hasPostgresData(a.mountFolder(ctx, config, mount)) {
-			return "postgres"
+			return true
 		}
 	}
-	return ""
+	return false
 }
 
 // hasPostgresData says a Postgres keeps its data in folder, at most two
@@ -145,6 +163,28 @@ func postgresImage(image string) bool {
 		return true
 	}
 	return strings.HasPrefix(name, "timescale/timescaledb")
+}
+
+// mysqlImage reports whether an image runs MySQL or MariaDB: the official
+// ones from Docker Hub, with any tag or digest.
+func mysqlImage(image string) bool {
+	name := plainImage(image)
+	return name == "mysql" || name == "mariadb"
+}
+
+// serviceDatabase is the kind of database a service runs, for the kinds
+// besides Postgres and MySQL, "" when it runs none: the official image
+// from Docker Hub, with any tag or digest.
+func serviceDatabase(service composeService) string {
+	switch plainImage(service.Image) {
+	case "mongo":
+		return protocol.DatabaseMongo
+	case "clickhouse", "clickhouse/clickhouse-server":
+		return protocol.DatabaseClickHouse
+	case "redis", "valkey/valkey":
+		return protocol.DatabaseRedis
+	}
+	return ""
 }
 
 // sqliteFiles returns the files under dir, three levels deep, that are
@@ -207,12 +247,12 @@ func (a *apps) findNewDatabases(ctx context.Context, app string) (protocol.Detec
 	if file == "" {
 		return detected, false
 	}
-	databases, noBackup, err := a.scanDatabases(ctx, a.composeJSON(app))
+	databases, noBackup, caches, err := a.scanDatabases(ctx, a.composeJSON(app))
 	if err != nil {
 		return detected, false
 	}
-	changed := !slices.Equal(detected.NoBackup, noBackup)
-	detected.NoBackup = noBackup
+	changed := !slices.Equal(detected.NoBackup, noBackup) || !slices.Equal(detected.Caches, caches)
+	detected.NoBackup, detected.Caches = noBackup, caches
 	for _, database := range databases {
 		if !slices.Contains(detected.Databases, database) {
 			detected.Databases = append(detected.Databases, database)

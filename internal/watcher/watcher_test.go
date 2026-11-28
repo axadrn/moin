@@ -89,7 +89,7 @@ func TestAlertsOnce(t *testing.T) {
 
 	at := t0.Add(4 * time.Minute)
 	got := s.alerts(started, at)
-	if len(got) != 1 || got[0].Title != "prod stopped reporting" || got[0].OK {
+	if len(got) != 1 || got[0].Title != "prod stopped reporting" || got[0].OK || got[0].Event != "silent" {
 		t.Fatalf("alerts when silent = %+v", got)
 	}
 	if got := s.alerts(started, at.Add(time.Minute)); len(got) != 0 {
@@ -109,7 +109,7 @@ func TestAlertsOnce(t *testing.T) {
 	back := t0.Add(10 * time.Minute)
 	s.receive("prod", testReport(shop), back)
 	got = s.alerts(started, back)
-	if len(got) != 2 || got[0].Title != "prod reports again" || !got[0].OK || got[1].Title != "shop.example.com is down" {
+	if len(got) != 2 || got[0].Title != "prod reports again" || !got[0].OK || got[0].Event != "silent" || got[1].Title != "shop.example.com is down" || got[1].Event != "down" {
 		t.Fatalf("alerts when back = %+v", got)
 	}
 	if got := s.alerts(started, back); len(got) != 0 {
@@ -385,6 +385,15 @@ func TestReportLimits(t *testing.T) {
 	if got := r.Apps[0].Databases[0].Error; len(got) > maxError+len("…") || !utf8.ValidString(got) {
 		t.Errorf("error not cut: %d bytes", len(got))
 	}
+	r = testReport()
+	r.Problems = make([]string, maxProblems+1)
+	if err := checkReport(&r); err == nil {
+		t.Error("took too many problems")
+	}
+	r.Problems = []string{strings.Repeat("ü", 300)}
+	if err := checkReport(&r); err != nil || len(r.Problems[0]) > maxError+len("…") {
+		t.Errorf("problem not cut: %v, %d bytes", err, len(r.Problems[0]))
+	}
 }
 
 // An alert a destination did not take is sent again on the next check.
@@ -550,6 +559,50 @@ func TestVisitorAtOnce(t *testing.T) {
 }
 
 // SetServers watches a new server and forgets one that is gone.
+// What a server says is wrong itself needs you, until it is silent: then
+// the silence says more. An app stopped on purpose is grey, not red, and
+// its domains are not visited.
+func TestServerProblemsAndStopped(t *testing.T) {
+	w, err := New([]string{"prod"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blog := report.App{Name: "blog", Release: 2, Stopped: true, Domains: []string{"blog.example.com"}}
+	r := testReport(shop, blog)
+	r.Problems = []string{"the disk is 93% full"}
+	if err := w.Receive("prod", r); err != nil {
+		t.Fatal(err)
+	}
+	view := w.View()
+	if strings.Join(view.NeedsYou, " | ") != "prod: the disk is 93% full." {
+		t.Errorf("needs you = %q", view.NeedsYou)
+	}
+	server := view.Servers[0]
+	if server.OK || server.Problem != "" {
+		t.Errorf("server = %+v", server)
+	}
+	stopped := server.Apps[1]
+	if !stopped.Stopped || !stopped.OK || stopped.Problem != "" || stopped.State != "v2 stopped on purpose" {
+		t.Errorf("stopped app = %+v", stopped)
+	}
+	if _, visited := w.state.Domains["blog.example.com"]; visited {
+		t.Error("the domain of a stopped app is visited")
+	}
+	// Stopped by itself is a problem.
+	blog.Stopped = false
+	if err := w.Receive("prod", testReport(shop, blog)); err != nil {
+		t.Fatal(err)
+	}
+	if view := w.View(); strings.Join(view.NeedsYou, " | ") != "blog on prod is stopped." || !view.Servers[0].Apps[0].OK {
+		t.Errorf("needs you = %q", view.NeedsYou)
+	}
+	w.state.Servers["prod"].Silent = true
+	w.state.Servers["prod"].Report.Problems = []string{"the disk is 93% full"}
+	if view := w.View(); len(view.Servers[0].Problems) != 0 {
+		t.Errorf("a silent server's problems = %q", view.Servers[0].Problems)
+	}
+}
+
 func TestSetServers(t *testing.T) {
 	w, err := New([]string{"prod"}, nil, nil)
 	if err != nil {

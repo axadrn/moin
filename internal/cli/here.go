@@ -51,6 +51,8 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		value, err := daemon.RollbackHere(ctx, dir, app, *to, log)
 		return respond(stdout, value, err)
+	case "deploys":
+		return hereDeploys(dir, args, stdout)
 	case "releases":
 		app, err := name()
 		if err != nil {
@@ -71,6 +73,19 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			return err
 		}
 		return daemon.StopHere(ctx, dir, app)
+	case "rm":
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		return daemon.RemoveHere(ctx, dir, app)
+	case "compose":
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		value, err := daemon.ComposeHere(dir, app)
+		return respond(stdout, value, err)
 	case "logs":
 		flags := newFlags("here logs", "here logs <app> [--tail 200] [--follow]")
 		tail := flags.Int("tail", 200, "lines")
@@ -94,6 +109,15 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			return err
 		}
 		return daemon.UpdateHere(ctx, version)
+	case "update-app":
+		flags := newFlags("here update-app", "here update-app <app> [--version <version>]")
+		version := flags.String("version", "", "the version, like 2.15.1")
+		app, err := hereApp(flags, args)
+		if err != nil {
+			return err
+		}
+		value, err := daemon.UpdateAppHere(ctx, dir, app, *version, log)
+		return respond(stdout, value, err)
 	case "setup":
 		server, err := name()
 		if err != nil {
@@ -115,6 +139,16 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			return err
 		}
 		value, err := daemon.BackupHere(ctx, dir, app, log)
+		return respond(stdout, value, err)
+	case "schedule":
+		flags := newFlags("here schedule", "here schedule [app] [--every 1h] [--keep 7d]")
+		var set daemon.Schedule
+		flags.StringVar(&set.Every, "every", "", "a copy this often")
+		flags.StringVar(&set.Keep, "keep", "", "each kept this long")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		value, err := daemon.ScheduleHere(flags.Arg(0), set)
 		return respond(stdout, value, err)
 	case "restore":
 		flags := newFlags("here restore", "here restore <app> --to <copy|time|undo-…> [--database <name>] [--from <server>] [--key-stdin]")
@@ -150,6 +184,10 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		return hereFollow(ctx, args, stdin, stdout)
 	case "registry":
 		return hereRegistry(ctx, args, stdin, stdout)
+	case "password":
+		return herePassword(ctx, dir, args, stdin, stdout)
+	case "sql":
+		return hereSQL(ctx, dir, args, stdin, stdout)
 	case "knocks":
 		value, err := daemon.KnocksHere(dir)
 		return respond(stdout, value, err)
@@ -160,15 +198,16 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 // hereDeploy reads the source of a deploy from stdin, unless it is an app
 // of the catalog.
 func hereDeploy(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("here deploy", "here deploy <app> [--image <image>] [--catalog <name>] [--no-copy]")
+	flags := newFlags("here deploy", "here deploy <app> [--image <image>] [--catalog <name> [--domain <domain>]] [--no-copy]")
 	noCopy := flags.Bool("no-copy", false, "no copy of the databases before it")
 	image := flags.String("image", "", "a loaded image")
 	catalogApp := flags.String("catalog", "", "an app of the catalog")
+	domain := flags.String("domain", "", "the catalog app's domain")
 	app, err := hereApp(flags, args)
 	if err != nil {
 		return err
 	}
-	deploy := daemon.Deploy{App: app, Image: *image, Catalog: *catalogApp, NoCopy: *noCopy}
+	deploy := daemon.Deploy{App: app, Image: *image, Catalog: *catalogApp, Domain: *domain, NoCopy: *noCopy}
 	if *catalogApp == "" {
 		deploy.Source = stdin
 	}
@@ -199,8 +238,17 @@ func hereExec(ctx context.Context, dir string, args []string, stdin io.Reader, s
 }
 
 // hereEnv is `here env <app>`, the names, `here env get <app>`, the .env
-// text, and `here env set <app>`, a new .env text from stdin.
+// text, `here env set <app>`, a new .env text from stdin, and `here env
+// set <app> <NAME>`, the value of one from stdin.
 func hereEnv(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) == 3 && args[0] == "set" {
+		value, err := io.ReadAll(io.LimitReader(stdin, 1<<20))
+		if err != nil {
+			return err
+		}
+		saved, err := daemon.SetEnvVarHere(dir, args[1], args[2], string(value))
+		return respond(stdout, saved, err)
+	}
 	if len(args) == 2 && args[0] == "get" {
 		text, err := daemon.EnvFileHere(dir, args[1])
 		if err != nil {
@@ -218,17 +266,21 @@ func hereEnv(ctx context.Context, dir string, args []string, stdin io.Reader, st
 		return respond(stdout, value, err)
 	}
 	if len(args) != 1 {
-		return errors.New("usage: here env <app> | get <app> | set <app>")
+		return errors.New("usage: here env <app> | get <app> | set <app> [<NAME>]")
 	}
 	value, err := daemon.EnvNamesHere(dir, args[0])
 	return respond(stdout, value, err)
 }
 
-// hereDomains is `here domains <app>` and `here domains add|rm <app>
-// <domain>`.
+// hereDomains is `here domains <app>`, `here domains add <app> <domain>
+// [service]` and `here domains rm <app> <domain>`.
 func hereDomains(ctx context.Context, dir string, args []string, stdout io.Writer) error {
-	if len(args) == 3 && args[0] == "add" {
-		value, err := daemon.AddDomainHere(ctx, dir, args[1], args[2], os.Stderr)
+	if (len(args) == 3 || len(args) == 4) && args[0] == "add" {
+		service := ""
+		if len(args) == 4 {
+			service = args[3]
+		}
+		value, err := daemon.AddDomainHere(ctx, dir, args[1], args[2], service, os.Stderr)
 		return respond(stdout, value, err)
 	}
 	if len(args) == 3 && args[0] == "rm" {
@@ -236,7 +288,7 @@ func hereDomains(ctx context.Context, dir string, args []string, stdout io.Write
 		return respond(stdout, value, err)
 	}
 	if len(args) != 1 {
-		return errors.New("usage: here domains <app> | add <app> <domain> | rm <app> <domain>")
+		return errors.New("usage: here domains <app> | add <app> <domain> [service] | rm <app> <domain>")
 	}
 	value, err := daemon.DomainsHere(dir, args[0])
 	return respond(stdout, value, err)

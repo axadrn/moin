@@ -70,6 +70,8 @@ func (m *model) actionKey(key string) tea.Cmd {
 		return m.askBackup()
 	case "R":
 		return m.askRestore()
+	case "C":
+		return m.askCompose()
 	}
 	return nil
 }

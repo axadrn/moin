@@ -53,6 +53,11 @@ templ Navbar() {
 				Docs
 			}
 		</span>
+		if ctxkeys.SignedIn(ctx) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/cloud"}) {
+				{ brand.Name } cloud
+			}
+		}
 		<span class="moin-hidden-phone">
 			if stars := githubrepo.Stars(ctxkeys.RenderConfig(ctx).Development); stars != "" {
 				@components.Button(components.ButtonProps{Href: GitHubURL, Quiet: true, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener", "aria-label": "GitHub"}}) {
@@ -65,10 +70,15 @@ templ Navbar() {
 				}
 			}
 		</span>
-		<span class="moin-hidden-phone">
-			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs/getting-started"}) {
-				Get started
+		if !ctxkeys.SignedIn(ctx) {
+			@components.Button(components.ButtonProps{Quiet: true, Href: "/login"}) {
+				Sign in
 			}
-		</span>
+			<span class="moin-hidden-phone">
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs/getting-started"}) {
+					Get started
+				}
+			</span>
+		}
 	}
 }

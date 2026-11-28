@@ -35,6 +35,8 @@ Whatever the daemons report. Nothing to set up.
 - their apps, and the release that runs
 - the domains of each app
 - the backups, and the last restore check
+- what the server sees wrong itself: a disk almost full, an app that keeps crashing, a restore check that is late
+- an app you stopped with `moin stop`: grey, not a problem
 - the knocks of the day: connection attempts the firewall dropped
 
 It has one small page that shows it all: what is fine, what needs you, the outages. Nothing on it changes a server.
@@ -58,7 +60,7 @@ my-app.example.com is up again
 ```
 
 - **Silent**: three reports in a row are missing. With a report every minute, that is three minutes.
-- **Down**: three visits in a row fail, one a minute. A visit fails on a 5xx, a timeout, a refused connection or a bad certificate. Any other answer, a redirect too, is up.
+- **Down**: three visits in a row fail, one a minute. A visit fails on a 5xx, a timeout, a refused connection or a bad certificate. Any other answer is up: a redirect too, and the 401 of an app with a [password](/docs/deploy#password).
 - A domain of a silent server does not alert on its own. The silence says more.
 
 Alerts go to Telegram, Slack, Discord, a webhook or an email. Set them once per server, and they go everywhere:
@@ -78,6 +80,53 @@ An email goes through your own SMTP server. moin asks for the password and does 
 - A webhook or an SMTP server inside your tailnet? Put it in the watcher's own [config](#its-config). What you wrote there goes anywhere.
 
 [CLI](/docs/cli#the-team-and-alerts)
+
+## Webhooks
+
+A webhook gets each alert as a JSON `POST`:
+
+```json
+{
+  "event": "disk",
+  "server": "my-server",
+  "app": "",
+  "title": "the disk is 93% full",
+  "text": "Backups and deploys stop when it is full.",
+  "ok": false
+}
+```
+
+`event` says what it is about. It stays the same when the problem is over: then `ok` is `true` and the title starts with `over:`.
+
+| Event | What |
+| --- | --- |
+| `silent` | the server stopped reporting, or reports again. From the watcher |
+| `down` | a domain is down from outside, or up again. From the watcher |
+| `disk` | the disk is 90% full |
+| `crash` | an app keeps crashing |
+| `backup` | the backup of a database fails |
+| `bucket` | the bucket takes no backups |
+| `check` | a copy did not restore |
+| `check-late` | the restore check is late |
+| `cloud-copy` | moin cloud took no copy for a day |
+| `deploy` | a deploy of a followed branch or image failed |
+| `config` | the config has a mistake |
+| `tailnet` | Tailscale does not run, or its key expires soon |
+| `watchers` | no watcher is reachable |
+| `test` | `moin alerts add` or `moin alerts test` |
+
+A new webhook comes with a signing secret, shown once. Every post carries `X-Moin-Signature: sha256=` and the hex HMAC-SHA256 of the body. Check it before you trust a post:
+
+```go
+func signed(r *http.Request, secret string) ([]byte, bool) {
+	body, _ := io.ReadAll(r.Body)
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	return body, hmac.Equal([]byte(r.Header.Get("X-Moin-Signature")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil))))
+}
+```
+
+Answer with any `2xx`. moin follows no redirects. Lost the secret? `moin alerts rm` the webhook and add it again. The secret is `secret:` in the server's [config](/docs/config), so the watchers sign with it too.
 
 ## Where it runs
 
@@ -213,6 +262,9 @@ alerts:
     chat_id: <chat id>
   - kind: discord        # slack, discord or webhook: each takes a url
     url: https://discord.com/api/webhooks/<your hook>
+  - kind: webhook
+    url: https://hooks.example.com/moin
+    secret: <a long random string>   # optional: signs every post
   - kind: email
     to: ada@example.com
     smtp: smtp.example.com:587
@@ -251,6 +303,8 @@ Open the watcher's URL in a browser. It asks for a password: any user name, and 
 
 It shows what needs you first, then each server with its apps, their domains as seen from outside, and their databases. It loads itself again every minute.
 
+What needs you: a silent server, what a server sees wrong itself, an app that stopped, a domain that is down, a backup that fails. An app you stopped with `moin stop` is grey, not red, and its domains are not visited. `moin start` or a deploy brings it back.
+
 ## See and change where a server reports
 
 ```bash
@@ -277,7 +331,7 @@ A server with no watcher is yellow in `moin` too. Without a plan to pay, the tri
 
 ## If it is hacked
 
-Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They get your alert channels, so they can post to them, and send mail as your SMTP user. Make a new bot token, webhook or SMTP password, and `moin alerts add` it. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
+Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They get your alert channels, so they can post to them, and send mail as your SMTP user. A webhook's secret too, so they can sign a post. Make a new bot token, webhook or SMTP password, and `moin alerts add` it. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
 
 ## If it breaks
 

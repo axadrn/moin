@@ -1,5 +1,7 @@
 package components
 
+import "strings"
+
 // CodeProps is a block of code with a copy button.
 type CodeProps struct {
 	ID   string
@@ -16,15 +18,29 @@ templ Code(p CodeProps) {
 	</div>
 }
 
-// CommandProps is a Command.
+// CommandProps is a Command. Terminal draws it as a terminal does, in the
+// terminal colors, for a command among other words; too long for its
+// place, it breaks between words.
 type CommandProps struct {
-	Text string
+	Text     string
+	Terminal bool
 }
 
 // Command is one terminal command to copy.
 templ Command(p CommandProps) {
-	<div class="moin-command">
-		<code>{ p.Text }</code>
+	<div class="moin-command" data-terminal?={ p.Terminal }>
+		if p.Terminal {
+			<code>
+				for i, word := range strings.Fields(p.Text) {
+					if i > 0 {
+						{ " " }
+					}
+					<span>{ word }</span>
+				}
+			</code>
+		} else {
+			<code>{ p.Text }</code>
+		}
 		<button type="button" class="moin-copy" data-copy={ p.Text } aria-label="Copy the command">
 			<i class="moin-icon moin-icon-copy"></i>
 		</button>

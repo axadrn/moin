@@ -20,16 +20,20 @@ import (
 // folder to the server, which builds and starts it. The first deploy to a
 // server sets moin up there; later ones go to where the app runs.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [server] [--image <image> | --catalog <name>] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
+	flags := newFlags("deploy", "deploy [server] [--image <image> | --catalog <name> [--domain <domain>]] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
 	noCopy := flags.Bool("no-copy", false, "deploy without the copy of the databases just before it, when that copy fails")
 	image := flags.String("image", "", "run this image instead of building: the server pulls it, like ghcr.io/you/my-app:1.4, or one only this computer has, like my-app:dev, is sent")
 	catalogApp := flags.String("catalog", "", "deploy an app of the catalog, like umami, without a repo")
+	domain := flags.String("domain", "", "the catalog app's domain, set before it starts, like analytics.example.com")
 	appName := flags.String("app", "", "the app's name; default this folder's name, or the catalog app's")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if *image != "" && *catalogApp != "" {
 		return errors.New("deploy takes --image or --catalog, not both")
+	}
+	if *domain != "" && *catalogApp == "" {
+		return fmt.Errorf("--domain goes with --catalog. Give your own app a domain with `%s domains add`", build.Name)
 	}
 	app, err := deployedApp(*appName, *catalogApp)
 	if err != nil {
@@ -73,7 +77,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 			return err
 		}
 	}
-	result, err := runDeploy(ctx, server, app, *image, *catalogApp, *noCopy, log)
+	result, err := runDeploy(ctx, server, app, *image, *catalogApp, *domain, *noCopy, log)
 	if err != nil {
 		return err
 	}
@@ -86,6 +90,11 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	printLive(stdout, result, server, len(result.Databases) == 0 || hasBucket(ctx, server))
 	if result.Release == 1 {
+		if status, err := quietStatus(ctx, server); err == nil && len(status.Watchers) == 0 {
+			fmt.Fprintln(stdout)
+			fmt.Fprintln(stdout, "  "+style.Muted.Render("Nobody watches "+server+" yet. If it dies at 3 a.m., your users tell you first."))
+			fmt.Fprintln(stdout, "  "+command(stdout, build.Name+" watcher connect "+server)+"   "+style.Muted.Render("30 days free. No card."))
+		}
 		return offerClose(ctx, server, stdin, stdout)
 	}
 	return nil
@@ -113,27 +122,7 @@ func deployServer(ctx context.Context, flags *flagSet, app string, stdin io.Read
 	if flags.NArg() == 1 {
 		return flags.Arg(0), nil
 	}
-	if named := flags.serverNamed(); named != "" {
-		return named, nil
-	}
-	servers := knownServers(app)
-	if len(servers) != 1 {
-		found, _, err := findServers(ctx, app)
-		if err != nil {
-			return "", err
-		}
-		servers = found
-	}
-	switch len(servers) {
-	case 0:
-		if known, err := loadServers(); err == nil && len(known) > 0 && isTerminal(stdin) {
-			return pickServer(stdin, terminal(os.Stderr), known)
-		}
-		return "", fmt.Errorf("where to? The first deploy of %s names the server: `%s deploy <server>`, a name from your ssh config or user@host", app, build.Name)
-	case 1:
-		return servers[0], nil
-	}
-	return "", twoServers(app, servers)
+	return appServer(ctx, flags, app, stdin, fmt.Errorf("where to? The first deploy of %s names the server: `%s deploy <server>`, a name from your ssh config or user@host", app, build.Name))
 }
 
 // deploySource says what the deploy sends, like "3f2a9c1" or "catalog
@@ -172,7 +161,7 @@ func onRemote(ctx context.Context) (remote string, ok bool) {
 }
 
 // runDeploy runs the deploy on the server and shows its log as it comes.
-func runDeploy(ctx context.Context, server, app, image, catalogApp string, noCopy bool, stdout io.Writer) (daemon.Result, error) {
+func runDeploy(ctx context.Context, server, app, image, catalogApp, domain string, noCopy bool, stdout io.Writer) (daemon.Result, error) {
 	args := []string{"deploy", app}
 	if noCopy {
 		args = append(args, "--no-copy")
@@ -182,6 +171,9 @@ func runDeploy(ctx context.Context, server, app, image, catalogApp string, noCop
 	}
 	if catalogApp != "" {
 		args = append(args, "--catalog", catalogApp)
+	}
+	if domain != "" {
+		args = append(args, "--domain", domain)
 	}
 	var source io.Reader
 	if catalogApp == "" {
@@ -311,8 +303,9 @@ func goArch(machine string) string {
 	return ""
 }
 
-// setUp installs Docker and moin on a server that lacks them, after a yes.
-// A server with another version of moin gets a hint, never an update.
+// setUp installs Docker and moin on a server that lacks them, after a yes,
+// for the first deploy of app, or for no app. A server with another
+// version of moin gets a hint, never an update.
 func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, stdout io.Writer) error {
 	info, err := probe(ctx, server)
 	if err != nil {
@@ -332,6 +325,9 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 		return fmt.Errorf("the server calls itself %q for its backups and watchers, and that cannot be a name. Give it one in your ssh config, like Host my-server, and deploy to my-server", serverName(server))
 	}
 	question := fmt.Sprintf("Set up %s on %s and deploy %s?", build.Name, server, app)
+	if app == "" {
+		question = fmt.Sprintf("Set up %s on %s?", build.Name, server)
+	}
 	if err := confirm(stdin, stdout, yes, question); err != nil {
 		return err
 	}

@@ -263,6 +263,8 @@ func pickCopy(ctx context.Context, server, app, name, from, to string, stdin io.
 // pickDatabase is the database named name, the app's only one, or the
 // one you pick.
 func pickDatabase(app, name string, databases []databaseBackups, stdin io.Reader, stdout io.Writer) (databaseBackups, error) {
+	// A cache is listed with a note only: it is no database to pick.
+	databases = slices.DeleteFunc(slices.Clone(databases), func(database databaseBackups) bool { return database.Note != "" })
 	if len(databases) == 0 {
 		return databaseBackups{}, fmt.Errorf("%s has no database %s can copy", app, build.Name)
 	}

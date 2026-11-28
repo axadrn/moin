@@ -1,0 +1,25 @@
+services:
+  web:
+    image: lukevella/rallly:${VERSION}
+    expose: ["3000"]
+    environment:
+      NEXT_PUBLIC_BASE_URL: ${APP_URL}
+      SECRET_PASSWORD: ${SECRET_PASSWORD}
+      SUPPORT_EMAIL: support@${APP_DOMAIN}
+      DATABASE_URL: postgres://rallly:${DB_PASSWORD}@db:5432/rallly
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rallly -d rallly"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: rallly
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: rallly
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

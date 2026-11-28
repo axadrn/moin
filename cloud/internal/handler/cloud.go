@@ -59,6 +59,12 @@ func (c *Cloud) signedIn(r *http.Request) (workspace.Workspace, bool) {
 	return space, err == nil
 }
 
+// HasSession says whether the request carries a valid session.
+func (c *Cloud) HasSession(r *http.Request) bool {
+	_, ok := c.signedIn(r)
+	return ok
+}
+
 // startSession signs the browser in to a workspace and sends it to next.
 func (c *Cloud) startSession(w http.ResponseWriter, r *http.Request, mail, next string) {
 	space, err := c.store.SignIn(mail)

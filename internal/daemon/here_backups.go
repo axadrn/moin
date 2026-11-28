@@ -45,7 +45,8 @@ func BackupsHere(ctx context.Context, dir, app, from string) ([]protocol.Databas
 	for _, database := range b.databases(ctx, app) {
 		statuses = append(statuses, b.status(ctx, app, database, true))
 	}
-	return append(statuses, b.cannotBackUp(app)...), nil
+	statuses = append(statuses, b.cannotBackUp(app)...)
+	return append(statuses, b.caches(app)...), nil
 }
 
 // Copied is one copy BackupHere took.
@@ -95,9 +96,10 @@ func (b *backups) copyNow(ctx context.Context, app string, database protocol.Dat
 }
 
 // Restore is one restore the CLI asks for. To is a copy by its ID, the
-// newest copy at or before a time like 2026-11-27T14:07 (UTC), or
-// undo-<id>, the state before an earlier restore. Database names the
-// database, "" for an app that has one.
+// newest copy at or before a time like 2026-11-27T14:07 (UTC),
+// undo-<id>, the state before an earlier restore, or before-sql, the copy
+// before the last `moin sql --write`. Database names the database, "" for
+// an app that has one.
 //
 // From and Key are for the day a server is gone: From names that server,
 // whose copies in the bucket are restored here, and Key is your backup
@@ -127,6 +129,13 @@ func RestoreHere(ctx context.Context, dir string, r Restore, out io.Writer) (Res
 func restoreHere(ctx context.Context, a *apps, r Restore, out io.Writer) (Restored, error) {
 	if err := a.mustHave(r.App); err != nil {
 		return Restored{}, err
+	}
+	if r.To == BeforeSQL {
+		// The copy before the last `moin sql --write`, and its database.
+		var err error
+		if r.Database, r.To, err = a.beforeSQLCopy(r.App); err != nil {
+			return Restored{}, err
+		}
 	}
 	b := a.backups
 	b.other = r.From
@@ -306,7 +315,7 @@ func ConfirmBackupKeyHere(public string) error {
 type KeyCopy struct {
 	App      string `json:"app"`
 	Database string `json:"database"`
-	Postgres bool   `json:"postgres"`
+	Kind     string `json:"kind"`
 	Copy     string `json:"copy"`
 }
 
@@ -324,7 +333,7 @@ func KeyCopyHere(ctx context.Context, dir string, out io.Writer) (*KeyCopy, erro
 		for _, database := range databases {
 			size, err := b.engine(app, database).Size(ctx)
 			if err == nil && (smallest == nil || size < smallestSize) {
-				smallest, smallestDatabase, smallestSize = &KeyCopy{App: app, Database: database.Path, Postgres: database.Postgres()}, database, size
+				smallest, smallestDatabase, smallestSize = &KeyCopy{App: app, Database: database.Path, Kind: database.Kind}, database, size
 			}
 		}
 	}
@@ -434,7 +443,7 @@ func SendTestAlertHere(ctx context.Context) error {
 
 // testAlert is the alert that shows a destination works.
 func testAlert(config Config) alert.Message {
-	return alert.Message{Server: config.Name, Title: "a test alert from " + config.Name, Text: "Alerts from this server reach you here.", OK: true}
+	return alert.Message{Event: "test", Server: config.Name, Title: "a test alert from " + config.Name, Text: "Alerts from this server reach you here.", OK: true}
 }
 
 // WatchersHere lists the addresses of the watchers the server reports to.

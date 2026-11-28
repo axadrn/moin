@@ -3,6 +3,55 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.39
+
+November 28, 2026
+
+**In short:** Every database a catalog app needs is backed up now (MySQL, MariaDB, MongoDB, ClickHouse, Redis), a new page adds up the subscriptions you can cancel, and what beta.38 lost is back: env before the first deploy, `moin compose`, the app password, `moin sql`, deploy logs and more.
+
+### New
+- **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
+- **MySQL and MariaDB backups**: moin finds a `mysql` or `mariadb` service in your `compose.yml` and backs it up like Postgres: encrypted copies, the daily restore check, restore and undo.
+- **MongoDB backups**: moin finds a `mongo` service in your `compose.yml` and backs up every database in it, with the same check, restore and undo.
+- **ClickHouse backups**: moin finds a `clickhouse` service in your `compose.yml`, like the one of Plausible, and backs up every database in it. No disk to set up.
+- **Redis and Valkey backups**: A `redis` or `valkey` service with a volume at `/data` keeps data, so moin backs it up. One without is a cache, and `moin backups` says `cache, not backed up`.
+- **New catalog apps**: Rallly, Chatwoot, GlitchTip, DocuSeal and Infisical start with one command, with their databases backed up.
+- **A password for an app**: `moin password my-app` makes every visitor type a user and a password, on every address of the app. `moin password off my-app` lets everyone in again. (#180)
+- **Look at your data**: `moin sql my-app "SELECT …"` shows the rows of the app's SQLite, Postgres, MySQL or MariaDB database, and `--tables` its tables. It only reads. (#180)
+- **Change your data with a way back**: `moin sql my-app "UPDATE …" --write` shows the statement, asks, takes a copy and runs it in one transaction. `moin restore my-app --to before-sql` undoes it. (#180)
+- **Env before the first deploy**: `moin env set my-app DATABASE_URL -s my-server` works before the app ever ran, so its first deploy starts with it. (#180)
+- **Env from scripts**: `moin env set my-app API_KEY` reads the value from a hidden prompt or stdin, never the command line. `moin env push my-app prod.env` lists the names that change and asks first. (#180)
+- **See the compose file**: `moin compose my-app > compose.yml` saves the file moin runs, without your env values, to run the app anywhere. `C` in the terminal UI shows it. (#180)
+- **Every deploy and its log**: `moin deploys my-app` lists each deploy: from where, which commit or image, failed or not, how long it took. `moin deploys my-app v12` prints its log, also of a deploy nobody watched. A failed automatic deploy's alert names that command, and `moin rollback` shows the commit of each release. (#180)
+- **Download a backup**: `moin backup download my-app` brings the newest copy to your laptop as a plain database file. Your backup key opens it there. No link is made. (#180)
+- **Backup schedule from the CLI**: `moin backups my-app --every 15m --keep 30d` sets how often an app is copied and how long each copy stays. `-s my-server` without an app sets the server's. `moin backups my-app` shows it. (#180)
+- **Sessions in moin cloud**: Settings lists every browser and CLI signed in to your account, with when each was last used. Sign out one, or all. `moin watcher logout` signs this laptop out. (#180)
+- **Domains for other services**: `moin domains add my-app api.example.com --service api` sends a domain to another service of your `compose.yml`, on its own port. `moin domains` shows which service each one reaches. (#180)
+- **A catalog app with its domain**: `moin deploy my-server --catalog umami --domain stats.example.com` starts the app with its domain, so it knows its own address. A domain added later becomes its address too. (#180)
+- **Update a catalog app**: `moin update umami` takes a copy, then starts the newest images of its version. `--version 2.15.1` picks one. `moin apps` shows the version. (#180)
+- **Signed webhooks**: `moin alerts add my-server webhook --url …` prints a secret. Every post carries `X-Moin-Signature`, and an `event` field says what it is about. A webhook added before stays unsigned: remove it and add it again. (#180)
+- **The server's own problems on the watcher**: A disk almost full or an app that keeps crashing shows under "Needs you" on your watcher and on moin cloud, not only in the alert. (#180)
+- **Remove an app**: `moin apps rm my-app` removes it after you say yes. Its volumes and copies stay. (#180)
+- **A server without apps**: `moin servers add my-server` sets moin up on a server with no app, for the firewall, the knocks and the reports. `moin secure my-server` there closes every port and asks for no tunnel.
+
+### Changed
+- **The proxy starts again once**: The first deploy or restart on a server after the update starts its proxy again, so it can read app passwords. Its apps do not answer for a few seconds. (#180)
+- **80 and 443 wait for an app**: A server without apps starts no proxy, and moin's firewall keeps ports 80 and 443 closed. The first deploy opens them.
+
+### Fixed
+- **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.
+- **Stopped on purpose**: An app you stopped with `moin stop` shows grey on the watcher and on moin cloud, not as a problem. (#180)
+- **Logs fill no disk**: Each service keeps three log files of 10 MB at most, from its next deploy or restart. (#180)
+- **http to https behind a Cloudflare Tunnel**: A visitor on `http://` goes to `https://`, with the path and the query. (#180)
+- **No false alarms behind a tunnel**: A server behind a Cloudflare Tunnel no longer reports the instant addresses of its apps, which nobody can reach there. So the watcher stops mailing that they are down.
+- **Back to moin cloud**: The header of the site shows `Sign in` next to `Get started`. Signed in, it shows `moin cloud` instead, a link to your workspace.
+- **No bucket warning with moin cloud**: A server whose copies go to moin cloud no longer says "no bucket yet", and never asks for one. (#180)
+- **No maintenance databases**: Postgres's own `postgres`, `template0` and `template1` are not backed up as a second database of the app. (#180)
+- **Connect adds the server**: `moin watcher connect my-server` on a laptop that never deployed there adds the server, so `moin watcher` shows it. (#180)
+
+### Upgrade
+`moin update my-server`. The proxy restarts once, for a few seconds. Then `moin restart my-app` for an app with both domains.
+
 ## v1.0.0-beta.38
 
 November 28, 2026

@@ -258,6 +258,9 @@ func (m *model) sideLines() []string {
 		}
 		lines = append(lines, fact(label, address))
 	}
+	if app.Password {
+		lines = append(lines, fact("Password", "on"))
+	}
 	lines = append(lines, fact("Deploys", m.releasesLine(known)))
 	switch {
 	case known == nil || !known.loaded:
@@ -620,6 +623,7 @@ func helpLines() []string {
 		{"b", "go back to an older deploy"},
 		{"c", "copy the app's databases now"},
 		{"R", "put a database back to a copy"},
+		{"C", "the compose file moin runs, in your pager"},
 		{"o", "open the app's domain in your browser"},
 		{"q", "quit"},
 	}

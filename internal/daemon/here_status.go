@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
@@ -40,6 +41,12 @@ type AppStatus struct {
 	Release   int      `json:"release"`
 	Running   bool     `json:"running"`
 	Addresses []string `json:"addresses"`
+	// Password: the app asks every visitor for its password.
+	Password bool `json:"password,omitempty"`
+	// Catalog is the catalog app it runs, "" for your own; Version its
+	// VERSION, like latest or 2.15.1.
+	Catalog string `json:"catalog,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
 // StatusHere looks at every app on this server.
@@ -63,12 +70,19 @@ func StatusHere(ctx context.Context, dir string) Status {
 			continue
 		}
 		detected, _ := a.live(app)
-		status.Apps = append(status.Apps, AppStatus{
+		entry := AppStatus{
 			Name:      app,
 			Release:   release,
 			Running:   a.running(ctx, app),
-			Addresses: addresses(detected),
-		})
+			Addresses: a.addresses(detected),
+			Password:  a.hasPassword(app),
+			Catalog:   a.record(app, release).Catalog,
+		}
+		if entry.Catalog != "" {
+			env, _ := a.env(app)
+			entry.Version = env[catalog.VersionVar]
+		}
+		status.Apps = append(status.Apps, entry)
 	}
 	return status
 }

@@ -135,6 +135,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.gotStep(msg)
 	case doneMsg:
 		return m, m.gotDone(msg)
+	case composeMsg:
+		return m, m.gotCompose(msg)
 	}
 	return m, nil
 }

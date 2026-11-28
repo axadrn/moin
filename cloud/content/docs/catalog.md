@@ -23,6 +23,14 @@ moin deploy my-server --catalog umami
 
 You need no folder and no code. The app is called `umami`. For a second one, or another name, add `--app stats`.
 
+Give it its domain right away:
+
+```bash
+moin deploy my-server --catalog umami --domain stats.example.com
+```
+
+The app knows its own address from the first start: in `APP_URL` and `APP_DOMAIN`. Without a domain that is its instant address. Add one later with `moin domains add`, and the address follows it, unless you set it yourself.
+
 - The server makes every secret the app needs, like its database password. They never leave the server.
 - Some apps have a first sign-in, such as an admin password. The app's page in the catalog says how.
 - Its compose file comes with moin itself, so it is signed with each release.
@@ -35,6 +43,17 @@ A catalog app is an ordinary app. Logs, env vars, domains, rollback, backups and
 moin domains add umami stats.example.com
 moin logs umami
 ```
+
+## Update one
+
+A catalog app runs the version in its env var `VERSION`, `latest` at first. `moin apps` shows it.
+
+```bash
+moin update umami
+moin update umami --version 2.15.1
+```
+
+`moin update umami` fetches the newest images of that version and starts them, after a copy of the databases. `--version` sets a new one first. If the update fails, the version stays as it was and the old release runs again. Only you update it: moin never does it by itself.
 
 ## Add an app
 

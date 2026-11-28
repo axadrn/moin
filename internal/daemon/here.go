@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,8 +35,13 @@ type Deploy struct {
 	Source  io.Reader
 	Image   string
 	Catalog string
+	// Domain is one more domain for a catalog app, set before it starts,
+	// so it knows its own address from the first start.
+	Domain string
 	// NoCopy deploys without the copy of the databases just before it.
 	NoCopy bool
+	// Pull fetches the newest images of every service first.
+	Pull bool
 }
 
 // Result is what a deploy ends with: the release that runs and its
@@ -55,16 +62,23 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 	}
 	a := newApps(dir)
 	start := a.newStart(d.App)
-	start.NoCopy = d.NoCopy
+	start.NoCopy, start.Pull = d.NoCopy, d.Pull
 	switch {
 	case d.Catalog != "":
 		if _, ok := catalog.Compose(d.Catalog); !ok {
 			return Result{}, fmt.Errorf("the catalog has no %s: see them with `%s catalog`", d.Catalog, build.Name)
 		}
+		if d.Domain != "" {
+			if err := a.addDomainLine(d.App, d.Domain); err != nil {
+				return Result{}, err
+			}
+			start.Domains = a.routing(d.App)
+		}
 		if err := a.catalogEnv(d.App, start.Domains); err != nil {
 			return Result{}, err
 		}
 		start.Catalog = d.Catalog
+		start.Source = "catalog"
 	default:
 		file, err := a.receiveSource(d.Source)
 		if err != nil {
@@ -72,13 +86,14 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 		}
 		defer os.Remove(file)
 		start.SourceFile = file
+		start.Source = "laptop"
 	}
 	if d.Image != "" {
 		image, err := a.pinImage(ctx, d.App, d.Image)
 		if err != nil {
 			return Result{}, err
 		}
-		start.Image = image
+		start.Image, start.ImageName = image, d.Image
 	}
 	return a.deployHere(ctx, start, out)
 }
@@ -102,6 +117,17 @@ func StopHere(ctx context.Context, dir, app string) error {
 		return err
 	}
 	return a.stop(ctx, app)
+}
+
+// RemoveHere removes the app from this server: its containers, images,
+// releases, env, domains and what it follows. Its volumes stay, and so
+// do its copies in the bucket.
+func RemoveHere(ctx context.Context, dir, app string) error {
+	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return err
+	}
+	return a.remove(ctx, app)
 }
 
 // LogsHere writes the last tail lines of the app's containers to out and,
@@ -144,32 +170,30 @@ func ExecHere(ctx context.Context, dir, app, service string, tty bool, argv []st
 	return runTo(ctx, stdout, stderr, stdin, "docker", args...)
 }
 
-// newStart is a deploy of app with its domains. It gets its number when
-// it has the app's lock (runDeploy).
+// newStart is a deploy of app with its domains, an apply until the caller
+// says where it comes from. It gets its number when it has the app's
+// lock (runDeploy).
 func (a *apps) newStart(app string) protocol.DeployStart {
 	return protocol.DeployStart{
 		DeployID: newDeployID(),
 		App:      app,
-		Domains:  &protocol.Domains{Domains: a.domains(app), Instant: "sslip.io", InstantIP: firstIPv4()},
+		Source:   "apply",
+		Domains:  a.routing(app),
 	}
 }
 
-// deployHere runs one deploy and says what runs after it.
+// deployHere runs one deploy and says what runs after it. A deploy that
+// failed says its number too, when it got one: its log tells why.
 func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out io.Writer) (Result, error) {
 	logf := func(format string, args ...any) { fmt.Fprintf(out, format+"\n", args...) }
 	detected, err := a.runDeploy(ctx, &start, logf)
 	if err != nil {
 		a.markFailed(start.App, start.Number)
-		return Result{}, err
+		return Result{App: start.App, Release: start.Number}, err
 	}
-	logf("v%d is live", start.Number)
-	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: addresses(detected)}
+	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: a.addresses(detected)}
 	for _, database := range detected.Databases {
-		if database.Postgres() {
-			result.Databases = append(result.Databases, "Postgres")
-		} else {
-			result.Databases = append(result.Databases, "SQLite")
-		}
+		result.Databases = append(result.Databases, database.Engine())
 	}
 	slices.Sort(result.Databases)
 	result.Databases = slices.Compact(result.Databases)
@@ -178,13 +202,26 @@ func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out i
 
 // addresses are the app's https addresses: its domains, then its instant
 // address.
-func addresses(detected protocol.Detected) []string {
+func (a *apps) addresses(detected protocol.Detected) []string {
 	list := []string{}
-	for _, domain := range detected.Domains {
+	for _, domain := range a.reachable(detected) {
 		list = append(list, "https://"+domain)
 	}
-	if detected.Instant != "" {
-		list = append(list, "https://"+detected.Instant)
+	return list
+}
+
+// reachable are the domains of an app the internet reaches: its own, its
+// other services' by service, then its instant address. Behind a
+// Cloudflare Tunnel ports 80 and 443 are closed, so the instant address
+// answers nobody: it is left out.
+func (a *apps) reachable(detected protocol.Detected) []string {
+	list := slices.Clone(detected.Domains)
+	for _, service := range slices.Sorted(maps.Keys(detected.ServiceDomains)) {
+		list = append(list, detected.ServiceDomains[service]...)
+	}
+	tunnel := a.proxyMode != nil && a.proxyMode() == "tunnel"
+	if detected.Instant != "" && !tunnel {
+		list = append(list, detected.Instant)
 	}
 	return list
 }
@@ -233,12 +270,15 @@ func (a *apps) pinImage(ctx context.Context, app, image string) (string, error) 
 
 // catalogEnv gives a catalog app what its compose file needs and its env
 // lacks: VERSION, latest unless set, and its own address in APP_URL and
-// APP_DOMAIN, its first domain or else its instant address.
+// APP_DOMAIN, its first domain or else its instant address. An address
+// that is still the instant address follows the first domain once there
+// is one. One you set yourself stays.
 func (a *apps) catalogEnv(app string, domains *protocol.Domains) error {
 	if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
 		return err
 	}
-	host := protocol.InstantHost(app, domains.InstantIP, domains.Instant)
+	instant := protocol.InstantHost(app, domains.InstantIP, domains.Instant)
+	host := instant
 	if len(domains.Domains) > 0 {
 		host = domains.Domains[0]
 	}
@@ -251,14 +291,46 @@ func (a *apps) catalogEnv(app string, domains *protocol.Domains) error {
 	if _, ok := env[catalog.VersionVar]; !ok {
 		env[catalog.VersionVar] = "latest"
 	}
-	if _, ok := env[catalog.URLVar]; !ok && host != "" {
+	if url, ok := env[catalog.URLVar]; (!ok || instant != "" && url == "https://"+instant) && host != "" {
 		env[catalog.URLVar] = "https://" + host
 	}
-	if _, ok := env[catalog.DomainVar]; !ok && host != "" {
+	if domain, ok := env[catalog.DomainVar]; (!ok || instant != "" && domain == instant) && host != "" {
 		env[catalog.DomainVar] = host
 	}
 	return writeEnv(a.envFile(app), env)
 }
+
+// UpdateAppHere deploys a catalog app again with the newest images of its
+// version: version when given, else the VERSION it has. Like every
+// deploy it takes a copy of the databases first. When it fails, VERSION
+// stays as it was.
+func UpdateAppHere(ctx context.Context, dir, app, version string, out io.Writer) (Result, error) {
+	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return Result{}, err
+	}
+	name := a.record(app, a.current(app)).Catalog
+	if name == "" {
+		return Result{}, fmt.Errorf("%s is not an app of the catalog. Deploy its new version with `%s deploy`", app, build.Name)
+	}
+	if version != "" && !versionPattern.MatchString(version) {
+		return Result{}, fmt.Errorf("%q is not a version, like 2.15.1 or latest", version)
+	}
+	old, _ := os.ReadFile(a.envFile(app))
+	if version != "" {
+		if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{catalog.VersionVar: version}}); err != nil {
+			return Result{}, err
+		}
+	}
+	result, err := DeployHere(ctx, dir, Deploy{App: app, Catalog: name, Pull: true}, out)
+	if err != nil && version != "" {
+		_ = writeWhole(a.envFile(app), old)
+	}
+	return result, err
+}
+
+// versionPattern is what an image tag may be.
+var versionPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
 
 // runTo runs a program with its output going straight to stdout and
 // stderr, for logs and exec that stream.
@@ -279,11 +351,19 @@ func ValidServerName(name string) bool { return serverName.MatchString(name) }
 
 // mustHave fails when app has no release on this server.
 func (a *apps) mustHave(app string) error {
-	if !protocol.ValidAppName(app) {
-		return fmt.Errorf("%q is not a valid app name: lowercase letters, digits and dashes", app)
+	if err := checkAppName(app); err != nil {
+		return err
 	}
 	if a.current(app) == 0 {
 		return fmt.Errorf("%w: %s", ErrNoApp, app)
+	}
+	return nil
+}
+
+// checkAppName fails for a name that cannot be an app.
+func checkAppName(app string) error {
+	if !protocol.ValidAppName(app) {
+		return fmt.Errorf("%q is not a valid app name: lowercase letters, digits and dashes", app)
 	}
 	return nil
 }
@@ -305,6 +385,17 @@ func (a *apps) releases(app string) []int {
 	}
 	slices.Sort(numbers)
 	return numbers
+}
+
+// hasApps reports whether an app on this server has a release, even one
+// that still starts.
+func (a *apps) hasApps() bool {
+	for _, app := range a.names() {
+		if len(a.releases(app)) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func newDeployID() string {

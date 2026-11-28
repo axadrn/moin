@@ -31,8 +31,10 @@ const (
 	// maxAlertField how long all of one may be, its URL or token.
 	maxAlerts     = 10
 	maxAlertField = 2000
-	// maxError is how much of a backup error the watcher keeps.
-	maxError = 200
+	// maxError is how much of a backup error or a problem the watcher
+	// keeps, and maxProblems how many problems of a server.
+	maxError    = 200
+	maxProblems = 50
 )
 
 // Watcher is one watcher: the servers it watches, where its alerts go,
@@ -256,8 +258,14 @@ func checkReport(r *report.Report) error {
 	if len(r.Alerts) > maxAlerts {
 		return fmt.Errorf("more than %d alerts", maxAlerts)
 	}
+	if len(r.Problems) > maxProblems {
+		return fmt.Errorf("more than %d problems", maxProblems)
+	}
+	for i, problem := range r.Problems {
+		r.Problems[i] = clip(problem, maxError)
+	}
 	for _, d := range r.Alerts {
-		if len(d.Kind)+len(d.URL)+len(d.Token)+len(d.ChatID)+len(d.To)+len(d.SMTP)+len(d.User)+len(d.Password)+len(d.From) > maxAlertField {
+		if len(d.Kind)+len(d.URL)+len(d.Token)+len(d.ChatID)+len(d.To)+len(d.SMTP)+len(d.User)+len(d.Password)+len(d.From)+len(d.Secret) > maxAlertField {
 			return errors.New("an alert is too long")
 		}
 	}

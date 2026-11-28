@@ -32,12 +32,23 @@ type DeployStart struct {
 	// NoCopy deploys without the copy of the databases just before the new
 	// release starts: the way on when that copy fails.
 	NoCopy bool `json:"no_copy,omitempty"`
+	// Pull fetches the newest images of every service before the start,
+	// for `moin update <app>`.
+	Pull bool `json:"pull,omitempty"`
+	// Source is where the deploy comes from, for its record: laptop,
+	// follow, catalog, rollback or apply.
+	Source string `json:"-"`
+	// ImageName is the image as you named it, like ghcr.io/you/my-app:1.4,
+	// for the record. Image is the copy of it moin pinned for the release.
+	ImageName string `json:"-"`
 }
 
 // Domains is how visitors reach the app, as `moin domains` set them on
 // the server, the only place they are set.
 type Domains struct {
 	Domains []string `json:"domains,omitempty"`
+	// Services are the domains of the app's other services, by service.
+	Services map[string][]string `json:"services,omitempty"`
 	// Instant is the provider of the app's instant address, such as
 	// sslip.io, "" for none; InstantIP the server's public IPv4 it names.
 	Instant   string `json:"instant,omitempty"`

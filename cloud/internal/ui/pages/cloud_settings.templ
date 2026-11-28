@@ -1,16 +1,22 @@
 package pages
 
-import "github.com/axadrn/moin/cloud/internal/ui/components"
+import (
+	"time"
 
-// CloudSettingsProps is the settings page: the account, and what went
-// wrong when deleting it.
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/workspace"
+)
+
+// CloudSettingsProps is the settings page: the account, the browsers and
+// CLIs signed in to it, and what went wrong when deleting it.
 type CloudSettingsProps struct {
-	Cloud   Cloud
-	Problem string
+	Cloud    Cloud
+	Sessions []workspace.Session
+	Problem  string
 }
 
-// CloudSettings shows the account, signs out, and deletes the account
-// after typing its mail.
+// CloudSettings shows the account and its sessions, signs one or all of
+// them out, and deletes the account after typing its mail.
 templ CloudSettings(p CloudSettingsProps) {
 	@cloudApp(p.Cloud, "Settings", "Settings") {
 		@components.Header(components.HeaderProps{Title: "Settings"})
@@ -18,11 +24,35 @@ templ CloudSettings(p CloudSettingsProps) {
 			<p class="moin-text">{ p.Cloud.Mail }</p>
 			<p class="moin-small moin-muted">Your mail is your account. GitHub and the link by mail both sign in to it, when the mail is the same.</p>
 		}
-		@components.Card(components.CardProps{Title: "Sign out"}) {
-			<p class="moin-text moin-muted">Ends the session in this browser. The CLI stays signed in.</p>
-			<form method="post" action="/logout">
+		@components.Card(components.CardProps{Title: "Sessions"}) {
+			<p class="moin-text moin-muted">Every browser and every CLI signed in to your account. Lost a laptop? Sign it out here.</p>
+			@components.Rows(components.RowsProps{Head: []string{"Session", "Signed in", "Last used", ""}}) {
+				for _, session := range p.Sessions {
+					@components.Row(components.RowProps{}) {
+						@components.Cell() {
+							{ sessionName(session) }
+						}
+						@components.Cell() {
+							{ knownDay(session.Created) }
+						}
+						@components.Cell() {
+							{ knownDay(session.LastUsed) }
+						}
+						@components.Cell() {
+							<form method="post" action="/cloud/sessions/end">
+								<input type="hidden" name="session" value={ session.ID }/>
+								@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
+									Sign out
+								}
+							</form>
+						}
+					}
+				}
+			}
+			<form method="post" action="/cloud/sessions/end">
+				<input type="hidden" name="session" value="all"/>
 				@components.Button(components.ButtonProps{Type: "submit"}) {
-					Sign out
+					Sign out everywhere
 				}
 			</form>
 		}
@@ -53,4 +83,24 @@ templ CloudDeleted() {
 			Back to home
 		}
 	}
+}
+
+// sessionName names a session: this browser, a browser, or the CLI.
+func sessionName(session workspace.Session) string {
+	switch {
+	case session.This:
+		return "This browser"
+	case session.Kind == "cli":
+		return "CLI"
+	}
+	return "Browser"
+}
+
+// knownDay is a time of a session as a person says it, or a dash for one
+// from before moin cloud wrote it down.
+func knownDay(t time.Time) string {
+	if t.IsZero() {
+		return "–"
+	}
+	return day(t)
 }

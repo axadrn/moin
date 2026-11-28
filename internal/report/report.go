@@ -37,6 +37,11 @@ type Report struct {
 	// there when the server no longer can. They are secrets. A daemon
 	// before this field, or a server without alerts, sends none.
 	Alerts []Alert `json:"alerts,omitempty"`
+	// Problems are what the server itself sees wrong now, like a disk
+	// that is almost full or an app that keeps crashing: the titles of
+	// its alerts, no secrets. A database's problem is on its own line.
+	// A daemon before this field sends none.
+	Problems []string `json:"problems,omitempty"`
 }
 
 // Alert is one destination for alerts. Kind is "telegram", "slack",
@@ -54,6 +59,9 @@ type Alert struct {
 	User     string `yaml:"user,omitempty" json:"user,omitempty"`
 	Password string `yaml:"password,omitempty" json:"password,omitempty"`
 	From     string `yaml:"from,omitempty" json:"from,omitempty"`
+	// Secret signs every post of a webhook: X-Moin-Signature carries
+	// sha256= and the hex HMAC-SHA256 of the body. "" sends unsigned.
+	Secret string `yaml:"secret,omitempty" json:"secret,omitempty"`
 }
 
 // Knocks are the knocks a server's firewall dropped: today and this
@@ -71,6 +79,7 @@ type App struct {
 	Name      string     `json:"name"`
 	Release   int        `json:"release"`
 	Running   bool       `json:"running"`
+	Stopped   bool       `json:"stopped,omitempty"` // stopped on purpose, by `moin stop`: not a problem
 	Domains   []string   `json:"domains"`
 	Databases []Database `json:"databases"`
 }
@@ -78,7 +87,7 @@ type App struct {
 // Database is one database of an app and its backups.
 type Database struct {
 	Name        string    `json:"name"`                  // as the daemon names it today
-	Kind        string    `json:"kind"`                  // "sqlite" or "postgres"
+	Kind        string    `json:"kind"`                  // "sqlite", "postgres", "mysql", "mongo", "clickhouse" or "redis"
 	LastCopy    time.Time `json:"last_copy,omitzero"`    // zero: never
 	LastCheck   time.Time `json:"last_check,omitzero"`   // the last restore check that ran
 	CheckOK     bool      `json:"check_ok"`              // whether that check restored the copy

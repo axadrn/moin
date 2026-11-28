@@ -18,7 +18,7 @@ addresses, personal details.
 - The license is explained once, in the FAQ of the docs. `LICENSE` is the text; everywhere else says "open source" without a license name.
 - The product name lives only in `internal/build.Name`. One exception: the site's CSS and JS in `cloud/assets/`, whose `moin-` classes have no Go to ask.
 - Words: one thing, one word, in every layer: server, app, deploy, backup, bucket, check, daemon, watcher, moin cloud. Not "hub", "node", "host", "control plane", or "agent" for the daemon.
-- Standard library first. Current dependencies of the binary: Bubble Tea v2, Lip Gloss v2, `colorprofile`, `x/term`, the AWS S3 SDK for the bucket, `filippo.io/age` to encrypt the copies, `modernc.org/sqlite` for backups and data, and `yaml.v3`, with which the daemon reads a compose file before Docker does. The site adds templ and goldmark. Add one only when the standard library does not solve it well.
+- Standard library first. Current dependencies of the binary: Bubble Tea v2, Lip Gloss v2, `colorprofile`, `x/term`, `x/crypto` for the bcrypt hash of an app's password, the AWS S3 SDK for the bucket, `filippo.io/age` to encrypt the copies, `modernc.org/sqlite` for backups and data, and `yaml.v3`, with which the daemon reads a compose file before Docker does. The site adds templ and goldmark. Add one only when the standard library does not solve it well.
 - Keep it small and direct. No interfaces with one implementation, no frameworks.
 - Formatted (`cd cloud && task fmt`, a test checks it), `go vet ./...` clean.
 - How a change ships, from the pull request to the release, is in `cloud/content/docs/shipping.md`, the one source for it. Change how moin ships and change that page in the same pull request.

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -415,17 +416,27 @@ func imagesOfRelease(dir string) map[string]string {
 // finish writes compose.json for a release: built services get an image tag
 // per deploy, or keep their running image when there is no source; the main
 // service runs start.Image when set; the app's services read the env file;
-// the main service gets the router labels; every service restarts unless
-// stopped.
+// the main service gets the router labels, with the app's password when
+// it has one; every service restarts unless stopped and keeps its logs
+// small, unless it says otherwise.
 // release.config stays as it is.
 func finish(release *release) error {
 	config, err := copyConfig(release.config)
 	if err != nil {
 		return err
 	}
+	usersFile, err := releasePassword(release)
+	if err != nil {
+		return err
+	}
 	detected := release.detected
 	env := release.env
 	services, _ := config["services"].(map[string]any)
+	for name, domains := range detected.ServiceDomains {
+		if services[name] == nil {
+			return fmt.Errorf("%s is for the service %s, which the compose file no longer has: %s domains rm %s %s", domains[0], name, build.Name, release.start.App, domains[0])
+		}
+	}
 	for name, item := range services {
 		service, _ := item.(map[string]any)
 		isMain := name == detected.Service
@@ -441,13 +452,23 @@ func finish(release *release) error {
 		if service["restart"] == nil {
 			service["restart"] = "unless-stopped"
 		}
-		routeService(release, config, name, service)
+		if service["logging"] == nil {
+			service["logging"] = logRotation()
+		}
+		routeService(release, config, name, service, usersFile)
 	}
 	body, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(release.composeJSON, body, 0o600)
+}
+
+// logRotation keeps the logs of a service at 30 MB: Docker's json-file
+// keeps three files of 10 MB and drops the oldest. Without it they grow
+// until the disk is full.
+func logRotation() map[string]any {
+	return map[string]any{"driver": "json-file", "options": map[string]any{"max-size": "10m", "max-file": "3"}}
 }
 
 // copyConfig makes a copy of a compose file that shares nothing with it.
@@ -493,20 +514,33 @@ func addEnv(service map[string]any, file string, env map[string]string) {
 	service["env_file"] = append(files, file)
 }
 
-// routeService puts the main service on the proxy when it has an address.
-func routeService(release *release, config map[string]any, name string, service map[string]any) {
+// routeService puts a service on the proxy when it has an address: the
+// main service with its domains and instant address, another one with its
+// own domains, on a router of its own and its own port. usersFile is where
+// the proxy reads the app's password, "" for none.
+func routeService(release *release, config map[string]any, name string, service map[string]any, usersFile string) {
 	detected := release.detected
-	if name != detected.Service || (len(detected.Domains) == 0 && detected.Instant == "") {
+	app := release.start.App
+	if name == detected.Service && (len(detected.Domains) > 0 || detected.Instant != "") {
+		addRouters(config, service, routes{
+			app:       app,
+			router:    project(app),
+			domains:   detected.Domains,
+			port:      detected.Port,
+			instant:   detected.Instant,
+			usersFile: usersFile,
+		})
 		return
 	}
-	app := release.start.App
-	addRouters(config, service, routes{
-		app:     app,
-		router:  project(app),
-		domains: detected.Domains,
-		port:    detected.Port,
-		instant: detected.Instant,
-	})
+	if domains := detected.ServiceDomains[name]; len(domains) > 0 {
+		addRouters(config, service, routes{
+			app:       app,
+			router:    project(app) + "-svc-" + name,
+			domains:   domains,
+			port:      servicePort("", service),
+			usersFile: usersFile,
+		})
+	}
 }
 
 // escape keeps compose from interpolating a value.

@@ -3,8 +3,11 @@ package tui
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -194,15 +197,19 @@ func (m *model) askRollback() tea.Cmd {
 	p := &picker{title: "Go back to which deploy of " + key.app + "?", cursor: -1}
 	now := time.Now()
 	for index, release := range known.releases {
-		note := ""
+		// The code it runs, then live or the one before.
+		notes := []string{}
+		if what := release.What(); what != "" {
+			notes = append(notes, style.Muted.Render(what))
+		}
 		switch {
 		case release.Live:
-			note = style.Success.Render(style.SymbolLive + " live")
+			notes = append(notes, style.Success.Render(style.SymbolLive+" live"))
 		case release.Before:
-			note = style.Muted.Render("the one before")
+			notes = append(notes, style.Muted.Render("the one before"))
 			p.cursor = index
 		}
-		p.rows = append(p.rows, pickerRow{name: releaseName(release.Number), when: human.Ago(release.At, now), note: note})
+		p.rows = append(p.rows, pickerRow{name: releaseName(release.Number), when: human.Ago(release.At, now), note: strings.Join(notes, "  ")})
 	}
 	if p.cursor < 0 {
 		m.message = failed(key.app + " has no older deploy to go back to")
@@ -328,6 +335,50 @@ func (m *model) openAddress() tea.Cmd {
 		}
 		return doneMsg{done: "Opened " + address}
 	}
+}
+
+// composeMsg is the compose file of an app, or why there is none.
+type composeMsg struct {
+	app  string
+	file string
+	err  error
+}
+
+// askCompose asks the app's server for its compose file.
+func (m *model) askCompose() tea.Cmd {
+	key, ok := m.current()
+	if !ok {
+		return nil
+	}
+	m.message = style.Muted.Render("Asking " + key.server + " for the compose file of " + key.app + ".")
+	compose, ctx := m.cli.Compose, m.ctx
+	return func() tea.Msg {
+		var said bytes.Buffer
+		file, err := compose(ctx, key.server, key.app, &said)
+		if err != nil {
+			err = errors.New(m.why(err, said.String()))
+		}
+		return composeMsg{app: key.app, file: file, err: err}
+	}
+}
+
+// gotCompose shows the compose file in $PAGER, else less. The screen
+// comes back when you quit it.
+func (m *model) gotCompose(msg composeMsg) tea.Cmd {
+	if msg.err != nil {
+		m.message = failed(msg.err.Error())
+		return nil
+	}
+	m.message = ""
+	pager := strings.Fields(os.Getenv("PAGER"))
+	if len(pager) == 0 {
+		pager = []string{"less"}
+	}
+	cmd := exec.Command(pager[0], pager[1:]...)
+	cmd.Stdin = strings.NewReader(msg.file)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return doneMsg{done: "Save it with " + build.Name + " compose " + msg.app + " > compose.yml", err: err}
+	})
 }
 
 func succeeded(text string) string {

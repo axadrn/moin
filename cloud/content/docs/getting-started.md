@@ -53,6 +53,8 @@ my-app · 3f2a9c1 → my-server
 ✓ database /data/my-app.db (/var/lib/moin/apps/my-app/volumes/data/my-app.db)
 ✓ my-app v1 is live: https://my-app.203-0-113-7.sslip.io
   SQLite found. No backup yet: moin bucket set my-server
+  Nobody watches my-server yet. If it dies at 3 a.m., your users tell you first.
+  moin watcher connect my-server   30 days free. No card.
 ```
 
 Your app is live, with HTTPS. On a fresh server this takes about two minutes. Most of it is installing Docker. Each step shows a spinner while it runs, then a tick and how long it took. What Docker and the build print shows dimmed under the step, and stays only when a step fails.
@@ -91,7 +93,7 @@ Before your first deploy, `moin` shows three steps instead: `cd my-app`, `moin d
 
 ## 5. Back it up
 
-moin finds SQLite and Postgres by itself. It needs a place to put the copies: a bucket, at any S3-compatible provider.
+moin finds SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis by itself. It needs a place to put the copies: a bucket, at any S3-compatible provider.
 
 ```bash
 moin bucket set my-server

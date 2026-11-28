@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -26,5 +28,35 @@ func TestPrintNeedsShowsWhatTheServerSaid(t *testing.T) {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("printNeeds wrote\n%s\nwant %q", out.String(), want)
 		}
+	}
+}
+
+// A catalog app shows which app of the catalog it runs, at which version.
+func TestPrintAppsShowsTheCatalogVersion(t *testing.T) {
+	var out strings.Builder
+	printApps(&out, []serverRow{{server: "prod", status: daemon.Status{Apps: []daemon.AppStatus{
+		{Name: "stats", Release: 3, Running: true, Catalog: "umami", Version: "latest"},
+		{Name: "shop", Release: 7, Running: true},
+	}}}})
+	if !strings.Contains(out.String(), "umami latest") || strings.Count(out.String(), "latest") != 1 {
+		t.Errorf("apps:\n%s", out.String())
+	}
+}
+
+// moin servers add sets up a server without moin, after a yes, with no
+// app: in a script that needs --yes, and nothing is installed or added.
+func TestServersAddSetsUp(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	runs := fakeSSH(t, "x86_64\n")
+	err := servers(t.Context(), []string{"add", "prod"}, strings.NewReader(""), io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "Set up moin on prod? Answer it on a terminal, or add --yes") {
+		t.Fatalf("err = %v", err)
+	}
+	body, _ := os.ReadFile(runs)
+	if strings.Count(string(body), "\n") != 1 {
+		t.Errorf("ssh ran more than the probe:\n%s", body)
+	}
+	if list, _ := loadServers(); len(list) != 0 {
+		t.Errorf("servers = %v", list)
 	}
 }

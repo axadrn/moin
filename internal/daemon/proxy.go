@@ -24,23 +24,41 @@ var domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+
 
 // route settles the domains of a deploy from the app's settings on the
 // server, the only place they are set. Domains are the main service's;
-// Instant its instant address.
+// ServiceDomains the other services', by service; Instant its instant
+// address.
 func route(app string, detected protocol.Detected, domains *protocol.Domains) (protocol.Detected, error) {
 	if domains == nil {
 		domains = &protocol.Domains{}
 	}
 	detected.Domains = slices.Clone(domains.Domains)
-	if err := cleanDomains(detected.Domains); err != nil {
+	detected.ServiceDomains = nil
+	for service, list := range domains.Services {
+		if service == detected.Service {
+			detected.Domains = append(detected.Domains, list...)
+			continue
+		}
+		if detected.ServiceDomains == nil {
+			detected.ServiceDomains = map[string][]string{}
+		}
+		detected.ServiceDomains[service] = slices.Clone(list)
+	}
+	// A domain reaches one service.
+	seen := map[string]bool{}
+	if err := cleanDomains(detected.Domains, seen); err != nil {
 		return detected, err
+	}
+	for _, list := range detected.ServiceDomains {
+		if err := cleanDomains(list, seen); err != nil {
+			return detected, err
+		}
 	}
 	detected.Instant = protocol.InstantHost(app, domains.InstantIP, domains.Instant)
 	return detected, nil
 }
 
-// cleanDomains checks every domain of a deploy and writes it in lower
-// case, in place.
-func cleanDomains(list []string) error {
-	seen := map[string]bool{}
+// cleanDomains checks the domains of a list and writes them in lower case,
+// in place. seen holds the domains so far.
+func cleanDomains(list []string, seen map[string]bool) error {
 	for index, domain := range list {
 		domain = strings.ToLower(strings.TrimSpace(domain))
 		if !domainPattern.MatchString(domain) {
@@ -64,6 +82,9 @@ type routes struct {
 	port    int
 	// instant is the instant address, "" for none, on a router of its own.
 	instant string
+	// usersFile is where the proxy reads the app's password, "" for none.
+	// Every router of the app asks for it.
+	usersFile string
 }
 
 // addRouters puts a service of an app on the proxy network and labels its
@@ -73,6 +94,9 @@ func addRouters(config, service map[string]any, routes routes) {
 		"traefik.enable":         "true",
 		"traefik.docker.network": proxyNetwork,
 		"traefik.http.services." + routes.router + ".loadbalancer.server.port": fmt.Sprint(routes.port),
+	}
+	if routes.usersFile != "" {
+		labels["traefik.http.middlewares."+routes.router+"-auth.basicauth.usersfile"] = routes.usersFile
 	}
 	if len(routes.domains) > 0 {
 		addDomainLabels(labels, routes)
@@ -84,7 +108,9 @@ func addRouters(config, service map[string]any, routes routes) {
 	joinProxyNetwork(config, service, routes.app)
 }
 
-// addDomainLabels labels every domain over HTTPS.
+// addDomainLabels labels every domain over HTTPS. When the app has both
+// example.com and www.example.com, www redirects to example.com. An app
+// with a password asks for it after that redirect.
 func addDomainLabels(labels map[string]any, routes routes) {
 	name := routes.router
 	hosts := make([]string, 0, len(routes.domains))
@@ -100,6 +126,38 @@ func addDomainLabels(labels map[string]any, routes routes) {
 	labels["traefik.http.routers."+name+"-tunnel.rule"] = rule
 	labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
 	labels["traefik.http.routers."+name+"-tunnel.service"] = name
+	// Cloudflare says in X-Forwarded-Proto how the visitor came. One who
+	// came over http goes to https, path and query kept.
+	labels["traefik.http.middlewares."+name+"-https.redirectscheme.scheme"] = "https"
+	labels["traefik.http.middlewares."+name+"-https.redirectscheme.permanent"] = "true"
+	middlewares := []string{}
+	if apexes := wwwApexes(routes.domains); len(apexes) > 0 {
+		middleware := "traefik.http.middlewares." + name + "-www.redirectregex."
+		labels[middleware+"regex"] = escape(`^https?://www\.(` + strings.Join(apexes, "|") + `)(:[0-9]+)?(/.*)?$`)
+		labels[middleware+"replacement"] = escape("https://${1}${3}")
+		// Permanent: 301, and 308 for a method other than GET.
+		labels[middleware+"permanent"] = "true"
+		middlewares = append(middlewares, name+"-www")
+	}
+	if routes.usersFile != "" {
+		middlewares = append(middlewares, name+"-auth")
+	}
+	if len(middlewares) > 0 {
+		labels["traefik.http.routers."+name+".middlewares"] = strings.Join(middlewares, ",")
+	}
+	labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(append([]string{name + "-https"}, middlewares...), ",")
+}
+
+// wwwApexes are the domains whose www. domain is in the list too, quoted
+// for a regular expression.
+func wwwApexes(domains []string) []string {
+	apexes := []string{}
+	for _, domain := range domains {
+		if slices.Contains(domains, "www."+domain) {
+			apexes = append(apexes, regexp.QuoteMeta(domain))
+		}
+	}
+	return apexes
 }
 
 // addInstantLabels labels the instant address, on a router of its own.
@@ -108,6 +166,9 @@ func addInstantLabels(labels map[string]any, routes routes) {
 	labels["traefik.http.routers."+router+".rule"] = "Host(`" + routes.instant + "`)"
 	labels["traefik.http.routers."+router+".entrypoints"] = "websecure"
 	labels["traefik.http.routers."+router+".service"] = routes.router
+	if routes.usersFile != "" {
+		labels["traefik.http.routers."+router+".middlewares"] = routes.router + "-auth"
+	}
 }
 
 // mergeLabels adds labels to the ones a service already has.
@@ -155,9 +216,11 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 		}
 	}
 	data := filepath.Join(filepath.Dir(a.dir), "traefik")
+	// It reads the apps' passwords from the apps folder (releasePassword).
 	mounts := []string{
 		"-v", "/var/run/docker.sock:/var/run/docker.sock:ro",
 		"-v", data + ":/data",
+		"-v", a.dir + ":" + proxyApps + ":ro",
 	}
 	// A proxy on an older image or with other mounts or flags is replaced,
 	// so proxy updates reach every server. A label holds a hash of them.
@@ -192,6 +255,20 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	return err
 }
 
+// serveWeb starts the proxy for a deploy and, behind moin's firewall,
+// opens ports 80 and 443: the first app of a server opens them.
+func (a *apps) serveWeb(ctx context.Context, logf func(string, ...any)) error {
+	if err := a.ensureProxy(ctx, logf); err != nil {
+		return err
+	}
+	state := filepath.Dir(a.dir)
+	if _, ok := loadServerFile(state); !ok {
+		return nil
+	}
+	s := newSecurity(state, a)
+	return setFirewall(ctx, firewallRules(s.file, s.web()))
+}
+
 // proxyFlags configures Traefik for the mode. In direct mode the HTTPS
 // entrypoint gets its certificates from Let's Encrypt. In tunnel mode
 // Cloudflare serves HTTPS and no port is open, so Let's Encrypt could never
@@ -202,6 +279,10 @@ func proxyFlags(mode string) []string {
 		"--providers.docker.exposedbydefault=false",
 		"--providers.docker.network=" + proxyNetwork,
 		"--entrypoints." + tunnelEntrypoint + ".address=:" + tunnelPort,
+		// Only cloudflared and the apps on this server reach the tunnel
+		// entrypoint. Its X-Forwarded-Proto is kept, so the -https
+		// middleware sees how the visitor came.
+		"--entrypoints." + tunnelEntrypoint + ".forwardedheaders.insecure=true",
 		"--entrypoints.web.address=:80",
 		"--entrypoints.web.http.redirections.entrypoint.to=websecure",
 		"--entrypoints.web.http.redirections.entrypoint.scheme=https",

@@ -54,6 +54,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
+	mux.HandleFunc("GET /kill-your-subscriptions", handler.Kill(texts, entries))
 	mux.HandleFunc("GET /compare", handler.CompareIndex)
 	mux.HandleFunc("GET /compare/{name}", handler.Compare)
 	mux.HandleFunc("GET /brand", handler.Brand)
@@ -79,6 +80,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /cloud/connect", cloud.ConnectPage)
 	mux.HandleFunc("GET /cloud/settings", cloud.Settings)
 	mux.HandleFunc("POST /cloud/delete", cloud.DeleteAccount)
+	mux.HandleFunc("POST /cloud/sessions/end", cloud.EndSessions)
 	mux.HandleFunc("POST /cloud/subscribe", cloud.Subscribe)
 	mux.HandleFunc("GET /cloud/billing", cloud.Billing)
 	// Stripe's webhook keeps the old service's address, so its endpoint in
@@ -88,6 +90,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("POST /cli", cloud.AllowCLI)
 	mux.HandleFunc("POST /api/cli/login", cloud.StartCLILogin)
 	mux.HandleFunc("POST /api/cli/login/finish", cloud.FinishCLILogin)
+	mux.HandleFunc("POST /api/cli/logout", cloud.CLILogout)
 	mux.HandleFunc("GET /api/cloud", cloud.CLIWorkspace)
 	mux.HandleFunc("POST /api/cloud/servers", cloud.ConnectServer)
 	mux.HandleFunc("DELETE /api/cloud/servers/{name}", cloud.DisconnectServer)
@@ -104,7 +107,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 		middleware.RequestLogging,
 		middleware.OldDomain(cfg.OldURLs, cfg.AppURL),
 		middleware.SecurityHeaders(cfg),
-		middleware.RenderContext(cfg.RenderConfig),
+		middleware.RenderContext(cfg.RenderConfig, cloud.HasSession),
 	), nil
 }
 

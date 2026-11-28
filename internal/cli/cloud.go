@@ -265,6 +265,9 @@ func cloudConnect(ctx context.Context, server string, stdout io.Writer) error {
 	if err := sendJSON(ctx, server, watcher, "watchers", "connect"); err != nil {
 		return fmt.Errorf("%s waits for %s, but the server did not take the watcher: %w. Run it again", cloudName, server, err)
 	}
+	if err := addServer(server); err != nil {
+		return err
+	}
 	done(stdout, "%s reports to %s every minute", server, cloudName)
 	hint(stdout, "See it with", build.Name+" watcher")
 	return nil
@@ -285,5 +288,33 @@ func cloudDisconnect(ctx context.Context, server string, yes bool, stdin io.Read
 		return fmt.Errorf("%s no longer watches %s, but the server still has it as a watcher, its reports get no answer: %w", cloudName, server, err)
 	}
 	done(stdout, "%s no longer reports to %s", server, cloudName)
+	return nil
+}
+
+// cloudLogout signs this laptop out of moin cloud: moin cloud ends its
+// session, and the CLI deletes it here. When moin cloud does not answer,
+// the session goes here anyway; /cloud/settings signs it out there.
+func cloudLogout(ctx context.Context, stdout io.Writer) error {
+	session, err := loadCloudSession()
+	if errors.Is(err, errNotSignedIn) {
+		fmt.Fprintln(stdout, "This laptop is not signed in to "+cloudName+".")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, ended := session.call(ctx, http.MethodPost, "/api/cli/logout", nil, nil)
+	file, err := cloudSessionFile()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(file); err != nil {
+		return err
+	}
+	done(stdout, "This laptop is signed out of %s. Your servers keep reporting", cloudName)
+	if ended != nil && !errors.Is(ended, errSessionEnded) {
+		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+sentence(ended.Error()))
+		hint(stdout, "Sign the session out there on", session.URL+"/cloud/settings")
+	}
 	return nil
 }

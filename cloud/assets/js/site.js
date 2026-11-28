@@ -94,3 +94,49 @@ document.addEventListener("click", (event) => {
   delete row.dataset.dragged;
 }, true);
 document.addEventListener("dragstart", (event) => event.target.closest?.("[data-marquee]") && event.preventDefault());
+
+// Kill your subscriptions: a tick or the team size adds the bills up
+// again, the way the page first wrote them, and shows the command of each
+// ticked bill. The dock keeps the sum in view while the bills are on
+// screen and the sum is not.
+const killPage = document.querySelector("[data-kill]");
+const killMoney = (cents) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+document.addEventListener("change", (event) => {
+  if (!killPage || !event.target.closest("[data-kill]")) return;
+  const seats = Number(killPage.querySelector("[name=seats]:checked")?.value || 1);
+  let total = 0;
+  const commands = [];
+  let bills = 0;
+  for (const bill of killPage.querySelectorAll("[data-bill]")) {
+    const cents = Number(bill.dataset.cents) * (bill.hasAttribute("data-per-seat") ? seats : 1);
+    bill.closest(".moin-tick").lastElementChild.textContent = killMoney(cents);
+    const swap = document.getElementById("swap-" + bill.dataset.bill);
+    swap.hidden = !bill.checked;
+    swap.querySelector("[data-year-back]").textContent = killMoney(cents * 12).replace(/\.00$/, "") + " a year back.";
+    if (!bill.checked) continue;
+    bills++;
+    total += cents;
+    if (!commands.includes(swap.dataset.command)) commands.push(swap.dataset.command);
+  }
+  for (const el of document.querySelectorAll("[data-kill-total]")) el.textContent = killMoney(total);
+  killPage.querySelector("[data-kill-year]").textContent = killMoney(total * 12);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  killPage.querySelector("[data-kill-count]").textContent = bills
+    ? `${plural(bills, "bill")}. ${plural(commands.length, "command")}.`
+    : "Tick a bill to see its command.";
+  const all = killPage.querySelector("[data-kill-all]");
+  all.dataset.copy = commands.join("\n");
+  all.disabled = commands.length === 0;
+});
+const killDock = document.querySelector("[data-kill-dock]");
+if (killPage && killDock && "IntersectionObserver" in window) {
+  const seen = { bills: false, total: false, swaps: false };
+  const watch = (el, name, options) =>
+    new IntersectionObserver(([entry]) => {
+      seen[name] = entry.isIntersecting;
+      killDock.toggleAttribute("data-show", seen.bills && !seen.total && !seen.swaps);
+    }, options).observe(el);
+  watch(killPage.querySelector("[data-kill-bills]"), "bills", { rootMargin: "0px 0px -35% 0px" });
+  watch(killPage.querySelector("[data-kill-sum]"), "total");
+  watch(document.getElementById("swaps"), "swaps");
+}

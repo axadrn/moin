@@ -45,7 +45,9 @@ import (
 //	                      the live one kept as the undo
 //
 // backup_sqlite.go copies with VACUUM INTO, backup_postgres.go with
-// pg_dump.
+// pg_dump, backup_mysql.go with mysqldump or mariadb-dump,
+// backup_mongo.go with mongodump, backup_clickhouse.go with BACKUP,
+// backup_redis.go with redis-cli --rdb.
 type engine interface {
 	// Copy writes a full copy of the live database to w.
 	Copy(ctx context.Context, w io.Writer) error
@@ -186,17 +188,43 @@ func (b *backups) saveStates() {
 }
 
 func (b *backups) engine(app string, database protocol.Database) engine {
-	if database.Postgres() {
+	switch database.Kind {
+	case protocol.DatabasePostgres:
 		return &postgresEngine{b: b, app: app, database: database}
+	case protocol.DatabaseMySQL:
+		return &mysqlEngine{b: b, app: app, database: database}
+	case protocol.DatabaseMongo:
+		return newMongoEngine(b, app, database)
+	case protocol.DatabaseClickHouse:
+		return newClickhouseEngine(b, app, database)
+	case protocol.DatabaseRedis:
+		return newRedisEngine(b, app, database)
 	}
 	return &sqliteEngine{b: b, app: app, database: database}
+}
+
+// otherServices are the app's services but service, a database that keeps
+// running through its restore.
+func (b *backups) otherServices(app, service string) []string {
+	var config struct {
+		Services map[string]json.RawMessage `json:"services"`
+	}
+	body, _ := os.ReadFile(b.apps.composeJSON(app))
+	_ = json.Unmarshal(body, &config)
+	others := []string{}
+	for name := range config.Services {
+		if name != service {
+			others = append(others, name)
+		}
+	}
+	return others
 }
 
 // state is the state of a database, by its file or its app and service.
 // The caller holds the lock.
 func (b *backups) state(app string, database protocol.Database) *state {
 	k := database.HostPath
-	if database.Postgres() {
+	if database.Service != "" {
 		k = app + "/" + database.Service + "/" + database.Name
 	}
 	if b.states[k] == nil {
@@ -241,14 +269,14 @@ func databaseKey(config Config, app, database string) string {
 
 // copyKey is where a copy lives in its bucket.
 func copyKey(folder string, copy protocol.Copy, database protocol.Database) *string {
-	return aws.String(folder + "/" + protocol.CopyFile(copy.ID, database.Postgres(), copy.Plain))
+	return aws.String(folder + "/" + protocol.CopyFile(copy.ID, database.Kind, copy.Plain))
 }
 
 // copyOf is the copy a key in the bucket holds: its ID, and whether it is
 // a plain one, from before copies were encrypted.
 func copyOf(key string, database protocol.Database) protocol.Copy {
 	name := path.Base(key)
-	plain := path.Base(protocol.CopyFile("", database.Postgres(), true))
+	plain := path.Base(protocol.CopyFile("", database.Kind, true))
 	if id, ok := strings.CutSuffix(name, plain+protocol.Encrypted); ok {
 		return protocol.Copy{ID: id}
 	}
@@ -802,6 +830,18 @@ func (b *backups) cannotBackUp(app string) []protocol.DatabaseBackup {
 	return statuses
 }
 
+// caches are the Redis and Valkey services of the app that are only a
+// cache, each with a note that says so. They are no problem, so only
+// `moin backups` shows them.
+func (b *backups) caches(app string) []protocol.DatabaseBackup {
+	statuses := []protocol.DatabaseBackup{}
+	detected, _ := b.apps.live(app)
+	for _, cache := range detected.Caches {
+		statuses = append(statuses, protocol.DatabaseBackup{Database: cache.Path, Kind: cache.Kind, Note: cacheText})
+	}
+	return statuses
+}
+
 // failGrace is how long copies may fail before it is a problem: a bucket
 // that is away for a moment is none.
 const failGrace = 10 * time.Minute
@@ -823,8 +863,9 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		status.CloudError, status.CloudFailingSince = s.CloudError, &s.CloudFailingSince
 	}
 	switch {
-	// A server without a bucket may still have its copies at a watcher.
-	case !b.on() && s.LastCopy.IsZero() && s.CopyError == "":
+	// A server without a bucket may still have its copies at a watcher:
+	// until a copy was due and none took it (CloudTried), it is no need.
+	case !b.on() && s.LastCopy.IsZero() && s.CopyError == "" && (len(b.config().Watchers) == 0 || !s.CloudTried.IsZero()):
 		status.Error = errNoBucket.Error()
 	case s.CopyError != "" && time.Since(s.FailingSince) > failGrace:
 		status.Error, status.BucketDown = s.CopyError, s.BucketDown
