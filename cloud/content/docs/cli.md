@@ -10,17 +10,17 @@ order: 1
 ## One pattern
 
 1. **Words without dashes are the command.** A list is a plural noun: `moin domains`. A change is a noun and a verb: `moin domains add`. An action is a verb: `moin deploy`.
-2. **Then what it acts on**: the app, the server, the domain. `moin domains add shop shop.example.com`.
+2. **Then what it acts on**: the app, the server, the domain. `moin domains add my-app my-app.example.com`.
 3. **Everything with `--` is optional.** Leave it out and the sensible thing happens. Only three have a short form: `-s` (`--server`), `-f` (`--follow`), `-y` (`--yes`).
 
-Flags may come before or after the words: `moin logs shop -f` is `moin logs -f shop`.
+Flags may come before or after the words: `moin logs my-app -f` is `moin logs -f my-app`.
 
 ## Name the app, from any folder
 
-You name the app: `moin logs shop`. moin finds the server it runs on. In the app's folder you may leave the name out: `moin logs`.
+You name the app: `moin logs my-app`. moin finds the server it runs on. In the app's folder you may leave the name out: `moin logs`.
 
-- The same app on two servers, like staging and prod? moin asks for `-s prod`. It never guesses.
-- A server is a name from your SSH config, like `prod`, or `user@host`. If `ssh prod` works, moin works.
+- The same app on two servers, like staging and production? moin asks for `-s production`. It never guesses.
+- A server is a name from your SSH config, like `my-server`, or `user@host`. If `ssh my-server` works, moin works.
 - moin keeps your servers in `~/.config/moin/servers`, one per line, and which app runs where in `~/.config/moin/apps.json`. On a miss, it asks every server.
 
 When something is missing and you are on a terminal, moin asks: a list to pick from, or a question. In a script it stops and names the flag to pass.
@@ -72,15 +72,15 @@ Before your first deploy, `moin` shows three steps: `cd my-app`, `moin deploy <s
 Under the table, `moin` says what needs you. Each thing is one line with a `!`, and under it the command that settles it:
 
 ```text
-SERVER     APP    DEPLOY   STATE       DOMAIN
-prod       shop   v4       ● running   https://shop.203-0-113-7.sslip.io
+SERVER      APP      DEPLOY   STATE       DOMAIN
+my-server   my-app   v4       ● running   https://my-app.203-0-113-7.sslip.io
 
-! shop: no backup yet.
-  moin bucket set prod
-! prod: port 22 is open to the internet.
-  moin secure prod
-! prod reports to no watcher. Nobody notices when it is gone.
-  moin watcher connect prod <url> <token>
+! my-app: no backup yet.
+  moin bucket set my-server
+! my-server: port 22 is open to the internet.
+  moin secure my-server
+! my-server reports to no watcher. Nobody notices when it is gone.
+  moin watcher connect my-server <url> <token>
 ```
 
 - An app that does not run, an app with no backup yet, a daily check that did not prove today's copy, a backup key you have not made or confirmed.
@@ -94,12 +94,12 @@ In the terminal UI the same lines show on the Servers tab.
 
 | Command | What it does |
 | --- | --- |
-| `moin deploy prod` | the first deploy of the app in this folder, to `prod`. Sets up moin there first |
+| `moin deploy my-server` | the first deploy of the app in this folder, to `my-server`. Sets up moin there first |
 | `moin deploy` | deploy again, to the server the app runs on |
-| `moin deploy prod --image ghcr.io/you/shop:1.4` | the server pulls this image from its registry instead of building. [Deploy an image](/docs/deploy#deploy-an-image-from-your-registry) |
-| `moin deploy prod --image shop:dev` | an image only your laptop has is sent over SSH |
-| `moin deploy prod --catalog umami` | an app from the [catalog](/docs/catalog) |
-| `moin deploy --app shop` | another name for the app. Without it, the app is named after the folder |
+| `moin deploy my-server --image ghcr.io/you/my-app:1.4` | the server pulls this image from its registry instead of building. [Deploy an image](/docs/deploy#deploy-an-image-from-your-registry) |
+| `moin deploy my-server --image my-app:dev` | an image only your laptop has is sent over SSH |
+| `moin deploy my-server --catalog umami` | an app from the [catalog](/docs/catalog) |
+| `moin deploy --app my-app` | another name for the app. Without it, the app is named after the folder |
 | `moin deploy --no-copy` | deploy even when the copy of the databases just before it fails |
 | `moin rollback [app]` | pick an older release to run again. `--to v3` names it. Without a terminal, the one before |
 | `moin restart [app]` | start the live release again, with its env and domains as they are now |
@@ -108,10 +108,10 @@ In the terminal UI the same lines show on the Servers tab.
 | `moin logs [app]` | the last 200 lines. `-f` follows them, `--tail 1000` shows more. `--json` prints them as a list of time, container and line |
 | `moin exec [app] -- <command>` | run one command in the app's container. `--service db` picks another service |
 | `moin follow [app] --branch main` | the server deploys each new commit of the branch, read with a deploy key. `--off` stops it. [Deploy from CI](/docs/deploy#deploy-from-ci) |
-| `moin follow [app] --image ghcr.io/you/shop:main` | the server deploys each new image your CI pushes under the tag. `--off` stops it. [Deploy after your tests pass](/docs/deploy#deploy-after-your-tests-pass) |
+| `moin follow [app] --image ghcr.io/you/my-app:main` | the server deploys each new image your CI pushes under the tag. `--off` stops it. [Deploy after your tests pass](/docs/deploy#deploy-after-your-tests-pass) |
 | `moin catalog` | the apps of the catalog |
 
-The first deploy to a server asks first: `Set up moin on prod and deploy shop? [y/N]`. In a script, add `-y`. [Deploy](/docs/deploy)
+The first deploy to a server asks first: `Set up moin on my-server and deploy my-app? [y/N]`. In a script, add `-y`. [Deploy](/docs/deploy)
 
 ## Env vars and domains
 
@@ -155,7 +155,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin alerts <server>` | where the server sends its alerts, numbered |
 | `moin alerts add <server> telegram --token … --chat-id …` | alerts to Telegram |
 | `moin alerts add <server> slack --url …` | alerts to Slack. `discord` and `webhook` take `--url` too |
-| `moin alerts add <server> email --to … --smtp host:port --user …` | alerts by email, through your SMTP server. The password is asked, or read from stdin. `--from` when the user is not an address |
+| `moin alerts add <server> email --to … --smtp host:port --user …` | alerts by email, through your SMTP server (STARTTLS, or TLS on port 465). The password is asked, or read from stdin. `--from` when the user is not an address |
 | `moin alerts rm <server> <n>` | remove one, by its number in `moin alerts` |
 | `moin alerts test <server>` | send a test alert to each |
 
@@ -203,7 +203,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 Log in to the server, and run it there as root:
 
 ```bash
-ssh -t prod
+ssh -t my-server
 moin daemon uninstall
 ```
 
@@ -212,7 +212,7 @@ moin daemon uninstall
 → stopping the moin-daemon service
 → removing /usr/local/bin/moin
 ✓ moin is removed from this server
-  Still here: the apps shop with their data in /var/lib/moin/apps; the proxy container moin-traefik, and the tunnel when it was on; the config in /etc/moin/config.yml, which holds the keys of the bucket, and the server's backup key next to it; Docker.
+  Still here: the apps my-app with their data in /var/lib/moin/apps; the proxy container moin-traefik, and the tunnel when it was on; the config in /etc/moin/config.yml, which holds the keys of the bucket, and the server's backup key next to it; Docker.
   Remove the apps and their data too, as root, with moin daemon uninstall --apps
 ```
 
@@ -222,7 +222,7 @@ moin daemon uninstall
 - Docker stays either way.
 - In a script, add `-y`.
 
-Then, on your laptop: `moin watcher disconnect prod <url>` for each watcher, or it says the server went silent. And `moin servers rm prod`.
+Then, on your laptop: `moin watcher disconnect my-server <url>` for each watcher, or it says the server went silent. And `moin servers rm my-server`.
 
 ## Asking first
 
@@ -234,7 +234,7 @@ Every command that reads takes `--json`, and prints JSON instead of a table:
 
 ```bash
 moin --json
-moin backups shop --json
+moin backups my-app --json
 ```
 
 `moin deploy`, `moin rollback`, `moin backup` and `moin restore` take it too. Then the log goes to stderr, and stdout holds only the JSON.
@@ -258,5 +258,5 @@ There is no MCP server, and none is needed. AI coding agents like Claude Code, C
 Put this in your project's `AGENTS.md` or `CLAUDE.md`:
 
 ```markdown
-Deploy with `moin deploy prod`. Check with `moin --json`.
+Deploy with `moin deploy my-server`. Check with `moin --json`.
 ```

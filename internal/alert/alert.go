@@ -30,11 +30,11 @@ type Destination = report.Alert
 
 // Message is one alert. A webhook gets it as JSON.
 type Message struct {
-	Server string `json:"server"` // "prod"
+	Server string `json:"server"` // "my-server"
 	App    string `json:"app"`    // "" for the whole server
-	Title  string `json:"title"`  // one line: "shop: the backup of today did not restore"
+	Title  string `json:"title"`  // one line: "my-app: the backup of today did not restore"
 	Text   string `json:"text"`   // a few lines more, may be ""
-	OK     bool   `json:"ok"`     // true when something came back, like "shop is up again"
+	OK     bool   `json:"ok"`     // true when something came back, like "my-app is up again"
 }
 
 // telegramAPI is the Bot API; tests point it at a fake.

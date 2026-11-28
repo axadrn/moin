@@ -59,9 +59,13 @@ func emailFrom(d Destination) string {
 	return d.User
 }
 
+// implicitTLSPort is the SMTP port that speaks TLS from the first byte. Any
+// other port must turn to TLS with STARTTLS.
+var implicitTLSPort = "465"
+
 // sendEmail sends m as one mail through the SMTP server of d. The server
-// must turn the connection to TLS with STARTTLS before the password goes
-// over it: without TLS nothing is sent.
+// must speak TLS from the start (port 465) or turn to it with STARTTLS
+// before the password goes over it: without TLS nothing is sent.
 func (s *Sender) sendEmail(ctx context.Context, d Destination, m Message) error {
 	ctx, cancel := context.WithTimeout(ctx, emailTimeout)
 	defer cancel()
@@ -73,16 +77,23 @@ func (s *Sender) sendEmail(ctx context.Context, d Destination, m Message) error 
 	deadline, _ := ctx.Deadline()
 	_ = connection.SetDeadline(deadline)
 
-	host, _, _ := net.SplitHostPort(d.SMTP)
+	host, port, _ := net.SplitHostPort(d.SMTP)
+	config := &tls.Config{ServerName: host, RootCAs: emailRoots}
+	if port == implicitTLSPort {
+		// Port 465: TLS from the first byte.
+		connection = tls.Client(connection, config)
+	}
 	client, err := smtp.NewClient(connection, host)
 	if err != nil {
 		return err
 	}
-	if ok, _ := client.Extension("STARTTLS"); !ok {
-		return errors.New("the SMTP server offers no STARTTLS, so nothing was sent: the password would travel in the clear. Most servers take it on port 587")
-	}
-	if err := client.StartTLS(&tls.Config{ServerName: host, RootCAs: emailRoots}); err != nil {
-		return err
+	if port != implicitTLSPort {
+		if ok, _ := client.Extension("STARTTLS"); !ok {
+			return errors.New("the SMTP server offers no STARTTLS, so nothing was sent: the password would travel in the clear. Most servers take it on port 587, or TLS from the start on port 465")
+		}
+		if err := client.StartTLS(config); err != nil {
+			return err
+		}
 	}
 	if err := client.Auth(smtp.PlainAuth("", d.User, d.Password, host)); err != nil {
 		return err

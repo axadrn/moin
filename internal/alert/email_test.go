@@ -22,7 +22,9 @@ import (
 type mailbox struct {
 	address string
 	// startTLS is whether it offers STARTTLS.
-	startTLS    bool
+	startTLS bool
+	// implicit is whether it speaks TLS from the first byte.
+	implicit    bool
 	certificate tls.Certificate
 
 	mu   sync.Mutex
@@ -60,9 +62,13 @@ func newMailbox(t *testing.T, startTLS bool) *mailbox {
 // talk answers one client until it says QUIT.
 func (b *mailbox) talk(connection net.Conn) {
 	defer connection.Close()
+	encrypted := false
+	if b.implicit {
+		connection = tls.Server(connection, &tls.Config{Certificates: []tls.Certificate{b.certificate}})
+		encrypted = true
+	}
 	text := textproto.NewConn(connection)
 	_ = text.PrintfLine("220 mailbox")
-	encrypted := false
 	for {
 		line, err := text.ReadLine()
 		if err != nil {
@@ -150,6 +156,22 @@ func TestSendEmail(t *testing.T) {
 	}
 	if !strings.HasPrefix(other.line("MAIL FROM:"), "<alerts@example.com>") {
 		t.Errorf("mail from %q", other.line("MAIL FROM:"))
+	}
+}
+
+// On the TLS port the connection is encrypted from the first byte.
+func TestSendEmailImplicitTLS(t *testing.T) {
+	box := newMailbox(t, false)
+	box.implicit = true
+	_, port, _ := net.SplitHostPort(box.address)
+	implicitTLSPort = port
+	t.Cleanup(func() { implicitTLSPort = "465" })
+	d := Destination{Kind: "email", To: "ada@example.com", SMTP: box.address, User: "alerts@example.com", Password: "secret-password"}
+	if err := Send(context.Background(), d, down); err != nil {
+		t.Fatal(err)
+	}
+	if box.line("RCPT TO:") != "<ada@example.com>" {
+		t.Errorf("mail to %q", box.line("RCPT TO:"))
 	}
 }
 

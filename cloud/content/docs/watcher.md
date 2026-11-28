@@ -25,7 +25,7 @@ Your server watches itself while it lives. A watcher tells you when it doesn't.
 | A copy a hacked server can't delete | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes |
 | No second machine | yes | no | yes |
 
-Your own watcher is free and open source: run it on a small second server. moin cloud runs one for you, from $7 a month: `moin watcher connect prod` and it is on.
+Your own watcher is free and open source: run it on a small second server. moin cloud runs one for you, from $7 a month: `moin watcher connect my-server` and it is on.
 
 ## What it knows
 
@@ -51,10 +51,10 @@ Two kinds of alerts, from two places. Each problem alerts once when it starts, a
 The watcher's alerts read like this:
 
 ```text
-prod stopped reporting
-prod reports again
-shop.example.com is down
-shop.example.com is up again
+my-server stopped reporting
+my-server reports again
+my-app.example.com is down
+my-app.example.com is up again
 ```
 
 - **Silent**: three reports in a row are missing. With a report every minute, that is three minutes.
@@ -64,14 +64,14 @@ shop.example.com is up again
 Alerts go to Telegram, Slack, Discord, a webhook or an email. Set them once per server, and they go everywhere:
 
 ```bash
-moin alerts add prod telegram --token <bot token> --chat-id <chat id>
-moin alerts add prod email --to ada@example.com --smtp smtp.example.com:587 --user alerts@example.com
+moin alerts add my-server telegram --token <bot token> --chat-id <chat id>
+moin alerts add my-server email --to ada@example.com --smtp smtp.example.com:587 --user alerts@example.com
 ```
 
-An email goes through your own SMTP server. moin asks for the password and does not show it. In a script, pipe it in. The SMTP server must offer STARTTLS, most do on port 587. Without it nothing is sent, so the password never travels in the clear. Is the user not an address? Add `--from alerts@example.com`.
+An email goes through your own SMTP server. moin asks for the password and does not show it. In a script, pipe it in. The SMTP server must offer STARTTLS, most do on port 587, or speak TLS from the start, as on port 465. Without TLS nothing is sent, so the password never travels in the clear. Is the user not an address? Add `--from alerts@example.com`.
 
-- The daemon on prod alerts there while it lives.
-- Each report carries them to prod's watchers. So a watcher alerts there too, when prod goes silent or a domain is down.
+- The daemon on my-server alerts there while it lives.
+- Each report carries them to my-server's watchers. So a watcher alerts there too, when my-server goes silent or a domain is down.
 - Your own watcher and moin cloud do the same. moin cloud also sends a mail to your account.
 - A report only goes over HTTPS, or inside your tailnet. So the tokens never travel in the clear.
 - A watcher sends a server's alerts only to public addresses: a webhook over `https://`, an email through a public SMTP server. It follows no redirect. So a hacked server can't make it knock on its own network.
@@ -85,7 +85,7 @@ Never on the server it watches. When that server dies, the watcher dies with it,
 
 - **A small second server.** The cheapest one your provider has is enough.
 - **Two servers that watch each other.** Best at two different providers.
-- **moin cloud.** We run one for you: `moin watcher connect prod`. [moin cloud](/docs/cloud)
+- **moin cloud.** We run one for you: `moin watcher connect my-server`. [moin cloud](/docs/cloud)
 
 A server can report to several watchers.
 
@@ -99,10 +99,10 @@ Four steps. The first three on the watcher's machine, the last on your laptop.
 curl -fsSL https://moin.run/cli.sh | sh
 ```
 
-**2. Make a token** for the server it watches. Name the server as you deploy to it, like `prod`. `--url` is where your servers reach this watcher. Leave it out, and moin asks.
+**2. Make a token** for the server it watches. Name the server as you deploy to it, like `my-server`. `--url` is where your servers reach this watcher. Leave it out, and moin asks.
 
 ```bash
-moin watcher token prod --url https://watcher.example.com
+moin watcher token my-server --url https://watcher.example.com
 ```
 
 The first time, there is no config yet. It prints one, and the line for your laptop:
@@ -112,18 +112,18 @@ The first time, there is no config yet. It prints one, and the line for your lap
 
 password: <a new password for the page>
 servers:
-  prod: <a new token>
+  my-server: <a new token>
 
-2. On your laptop, point prod at this watcher:
+2. On your laptop, point my-server at this watcher:
 
-  moin watcher connect prod https://watcher.example.com <a new token>
+  moin watcher connect my-server https://watcher.example.com <a new token>
 
 3. Alerts go where you send them, on your laptop:
 
-  moin alerts add prod telegram
+  moin alerts add my-server telegram
 ```
 
-Do what it says: save the file, then `chmod 600`. The alerts come from prod itself: `moin alerts add prod …`.
+Do what it says: save the file, then `chmod 600`. The alerts come from my-server itself: `moin alerts add my-server …`.
 
 **3. Start the watcher:**
 
@@ -151,18 +151,18 @@ Then `systemctl enable --now moin-watcher`.
 **4. On your laptop**, paste the line from step 2:
 
 ```bash
-moin watcher connect prod https://watcher.example.com <token>
+moin watcher connect my-server https://watcher.example.com <token>
 ```
 
 ```text
-✓ prod reports to https://watcher.example.com every minute
+✓ my-server reports to https://watcher.example.com every minute
 ```
 
 That's it. `moin servers` shows it in the column `WATCHERS`, and `moin watcher` too:
 
 ```text
-SERVER   WATCHERS
-prod     https://watcher.example.com
+SERVER      WATCHERS
+my-server   https://watcher.example.com
 ```
 
 ## One more server
@@ -170,7 +170,7 @@ prod     https://watcher.example.com
 On the watcher, make a token for it:
 
 ```bash
-moin watcher token web-1 --url https://watcher.example.com
+moin watcher token staging --url https://watcher.example.com
 ```
 
 The config is there now, so it prints one line for it:
@@ -178,15 +178,15 @@ The config is there now, so it prints one line for it:
 ```text
 1. Put this line under servers: in /etc/moin/watcher.yml, then restart the watcher:
 
-  web-1: <a new token>
+  staging: <a new token>
 
-2. On your laptop, point web-1 at this watcher:
+2. On your laptop, point staging at this watcher:
 
-  moin watcher connect web-1 https://watcher.example.com <a new token>
+  moin watcher connect staging https://watcher.example.com <a new token>
 
 3. Alerts go where you send them, on your laptop:
 
-  moin alerts add web-1 telegram
+  moin alerts add staging telegram
 ```
 
 The watcher reads its config when it starts. So restart it after a change: `systemctl restart moin-watcher`.
@@ -202,8 +202,8 @@ password: <a long password>
 # Each server it watches, and the token that server reports with.
 # moin watcher token makes one. At least 16 characters, each its own.
 servers:
-  prod: <token>
-  web-1: <token>
+  production: <token>
+  staging: <token>
 
 # Optional: the watcher's own alerts. They get every alert too.
 # For a server that set no alerts, or runs an older moin, they are all there is.
@@ -255,18 +255,18 @@ It shows what needs you first, then each server with its apps, their domains as 
 
 ```bash
 moin watcher                                                    # each server's watchers
-moin watcher connect prod https://watcher.example.com <token>
-moin watcher disconnect prod https://watcher.example.com
-moin watcher connect prod                                       # moin cloud
-moin watcher disconnect prod                                    # moin cloud
+moin watcher connect my-server https://watcher.example.com <token>
+moin watcher disconnect my-server https://watcher.example.com
+moin watcher connect my-server                                  # moin cloud
+moin watcher disconnect my-server                               # moin cloud
 ```
 
 Without an address, it is moin cloud. The first time, the browser signs your laptop in. `moin watcher` shows your plan of moin cloud too, under the table:
 
 ```text
-SERVER   WATCHERS
-prod     moin cloud
-web-1    none: nobody notices when it is gone
+SERVER       WATCHERS
+production   moin cloud
+staging      none: nobody notices when it is gone
 
 moin cloud  ada@example.com  Trial, 12 days left
 ```
