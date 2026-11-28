@@ -584,6 +584,7 @@ func TestReportAlerts(t *testing.T) {
 		sent[m.Server] = append(sent[m.Server], to)
 		return nil
 	}
+	w.SendReported = w.Send
 	withAlerts := testReport()
 	withAlerts.Alerts = []report.Alert{chat, own}
 	if err := w.Receive("prod", withAlerts); err != nil {
@@ -628,5 +629,46 @@ func TestReportAlerts(t *testing.T) {
 	many.Alerts = make([]report.Alert, maxAlerts+1)
 	if err := w.Receive("prod", many); err == nil {
 		t.Error("took a report with too many alerts")
+	}
+}
+
+// A destination from a report goes out the public door only: it never
+// reaches an address on the watcher's own network. The same address in
+// the watcher's own list, written by its owner, still gets the alert.
+func TestReportedGoesPublicOnly(t *testing.T) {
+	calls := 0
+	inside := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
+	defer inside.Close()
+	hook := alert.Destination{Kind: "webhook", URL: inside.URL + "/hook"}
+	down := unsent{To: hook, Message: alert.Message{Server: "prod", Title: "prod stopped reporting"}}
+
+	reported, err := New([]string{"prod"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reported.state.Unsent = []unsent{down}
+	reported.Tick(t.Context())
+	if calls != 0 || len(reported.state.Unsent) != 1 {
+		t.Errorf("a reported destination inside: %d calls, %d unsent", calls, len(reported.state.Unsent))
+	}
+
+	own, err := New([]string{"prod"}, []alert.Destination{hook}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	own.state.Unsent = []unsent{down}
+	own.Tick(t.Context())
+	if calls != 1 || len(own.state.Unsent) != 0 {
+		t.Errorf("the watcher's own destination: %d calls, %d unsent", calls, len(own.state.Unsent))
+	}
+
+	// A report cannot name it at all: without https it is left out.
+	named := testReport()
+	named.Alerts = []report.Alert{hook}
+	if err := reported.Receive("prod", named); err != nil {
+		t.Fatal(err)
+	}
+	if got := reported.state.Servers["prod"].Report.Alerts; len(got) != 0 {
+		t.Errorf("kept the alerts %+v", got)
 	}
 }

@@ -200,7 +200,8 @@ A watcher only listens. If someone takes it over:
 What a watcher holds:
 
 - **Your own watcher** keeps the channels in its state file, `/var/lib/moin/watcher/state.json`. Only its owner may read it.
-- **moin cloud** keeps them encrypted at rest, with AES-GCM. The key is not in the database. It sends alerts only to public `https://` addresses and follows no redirect.
+- **moin cloud** keeps them encrypted at rest, with AES-GCM. The key is not in the database.
+- **Both** send a server's alerts only to public `https://` addresses, and follow no redirect. A report can't make a watcher knock on its own network.
 - **On the way**, a report goes only over HTTPS, or inside your tailnet.
 
 ## If a server is hacked

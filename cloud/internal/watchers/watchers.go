@@ -13,8 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -53,9 +51,6 @@ type Watchers struct {
 	appURL  string
 	// sealer encrypts what a watcher knows before it is saved: AES-GCM.
 	sealer cipher.AEAD
-	// public sends the alerts to Telegram, Slack, Discord and webhooks:
-	// to public addresses only, no redirects followed.
-	public *http.Client
 
 	mu sync.Mutex
 	// byWorkspace are the watchers by workspace id, made when first needed.
@@ -70,17 +65,12 @@ func New(store *workspace.Store, counts *counts.Counts, mailer mailer.Mailer, ap
 	block, _ := aes.NewCipher(key[:])
 	sealer, _ := cipher.NewGCM(block)
 	return &Watchers{
-		store:   store,
-		counts:  counts,
-		mailer:  mailer,
-		visitor: watcher.NewVisitor(visitsAtOnce),
-		appURL:  strings.TrimRight(appURL, "/"),
-		sealer:  sealer,
-		public: &http.Client{
-			Timeout:       10 * time.Second,
-			Transport:     &http.Transport{DialContext: (&net.Dialer{Timeout: 5 * time.Second, Control: watcher.RefusePrivate}).DialContext},
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		},
+		store:       store,
+		counts:      counts,
+		mailer:      mailer,
+		visitor:     watcher.NewVisitor(visitsAtOnce),
+		appURL:      strings.TrimRight(appURL, "/"),
+		sealer:      sealer,
 		byWorkspace: map[string]*watcher.Watcher{},
 	}
 }
@@ -160,31 +150,18 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("workspace %s: %w", id, err)
 	}
-	w.Send = ws.sender(id, space.Mail)
+	w.Send = ws.mail(id, space.Mail)
+	w.SendReported = ws.reported(id)
 	w.Connect = func(server string) string { return build.Name + " watcher connect " + server }
 	ws.byWorkspace[id] = w
 	return w, nil
 }
 
-// sender sends an alert: as a mail to the workspace, or to a destination
-// a server's report named, which must be https at a public address.
-// After the trial, unpaid, no alert goes out: it is dropped, not kept
-// for later.
-func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destination, alert.Message) error {
-	return func(ctx context.Context, d alert.Destination, m alert.Message) error {
-		space, err := ws.store.Workspace(id)
-		if err != nil {
-			return err
-		}
-		if !space.AlertsOn(time.Now()) {
-			slog.Info("alert not sent, the trial is over", "workspace", id, "title", m.Title)
+// mail sends an alert as a mail to the workspace.
+func (ws *Watchers) mail(id, to string) func(context.Context, alert.Destination, alert.Message) error {
+	return func(ctx context.Context, _ alert.Destination, m alert.Message) error {
+		if !ws.alertsOn(id, m) {
 			return nil
-		}
-		if d.Kind != mailKind {
-			if d.URL != "" && !strings.HasPrefix(d.URL, "https://") {
-				return errors.New("the alert url must start with https://")
-			}
-			return alert.SendWith(ctx, ws.public, d, m)
 		}
 		text := m.Text
 		if text != "" {
@@ -192,6 +169,32 @@ func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destinatio
 		}
 		return ws.mailer.Send(ctx, mailer.Message{To: to, Subject: m.Title, Text: text + ws.appURL + "/cloud"})
 	}
+}
+
+// reported sends an alert to a destination a server's report named, as
+// every watcher does: over https, to a public address.
+func (ws *Watchers) reported(id string) func(context.Context, alert.Destination, alert.Message) error {
+	return func(ctx context.Context, d alert.Destination, m alert.Message) error {
+		if !ws.alertsOn(id, m) {
+			return nil
+		}
+		return watcher.SendPublic(ctx, d, m)
+	}
+}
+
+// alertsOn says whether the alerts of a workspace go out. After the
+// trial, unpaid, none does: it is dropped, not kept for later.
+func (ws *Watchers) alertsOn(id string, m alert.Message) bool {
+	space, err := ws.store.Workspace(id)
+	if err != nil {
+		slog.Error("alert not sent", "workspace", id, "title", m.Title, "error", err)
+		return false
+	}
+	if !space.AlertsOn(time.Now()) {
+		slog.Info("alert not sent, the trial is over", "workspace", id, "title", m.Title)
+		return false
+	}
+	return true
 }
 
 // Receive takes the report of the server whose token it carries. The

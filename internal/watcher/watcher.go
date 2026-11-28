@@ -39,9 +39,12 @@ const (
 // report says, and to the watcher's own destinations. `moin watcher run` keeps one; moin cloud
 // keeps one per workspace. It is safe to use from many goroutines.
 type Watcher struct {
-	// Send sends one alert to one destination. New sets it to alert.Send;
-	// moin cloud puts its own in front, which also sends mail.
+	// Send sends one alert to one of the watcher's own destinations. New
+	// sets it to alert.Send; moin cloud's sends a mail.
 	Send func(context.Context, alert.Destination, alert.Message) error
+	// SendReported sends one alert to a destination a server's report
+	// named. New sets it to SendPublic; moin cloud puts its trial in front.
+	SendReported func(context.Context, alert.Destination, alert.Message) error
 	// Connect is the command that connects a server to this watcher, for
 	// the page of a server that has not reported yet. moin cloud says
 	// its own.
@@ -76,7 +79,7 @@ func newAt(servers []string, alerts []alert.Destination, saved []byte, now time.
 		return nil, fmt.Errorf("the saved state is not what a watcher saves: %w", err)
 	}
 	s.forget(servers, alerts, now)
-	return &Watcher{Send: alert.Send, Connect: connectLine, servers: slices.Sorted(slices.Values(servers)), alerts: slices.Clone(alerts), started: now, state: s}, nil
+	return &Watcher{Send: alert.Send, SendReported: SendPublic, Connect: connectLine, servers: slices.Sorted(slices.Values(servers)), alerts: slices.Clone(alerts), started: now, state: s}, nil
 }
 
 // connectLine is how a server is connected to a watcher you run.
@@ -148,13 +151,36 @@ func (w *Watcher) sendAll(ctx context.Context, todo []unsent) []unsent {
 			failed = append(failed, u)
 			continue
 		}
-		if err := w.Send(ctx, u.To, u.Message); err != nil {
+		if err := w.send(ctx, u); err != nil {
 			slog.Error("alert not sent, trying again soon", "kind", u.To.Kind, "title", u.Message.Title, "error", err)
 			down[u.To] = true
 			failed = append(failed, u)
 		}
 	}
 	return failed
+}
+
+// send sends one alert through one of two doors. A destination of the
+// watcher's own list was written by its owner, so it may be anywhere. Any
+// other came from a report, and a report cannot make the watcher knock on
+// its own network.
+func (w *Watcher) send(ctx context.Context, u unsent) error {
+	if slices.Contains(w.alerts, u.To) {
+		return w.Send(ctx, u.To, u.Message)
+	}
+	return w.SendReported(ctx, u.To, u.Message)
+}
+
+// public sends to public addresses only, and follows no redirects.
+var public = alert.NewSender(RefusePrivate)
+
+// SendPublic sends one alert to a destination a server's report named:
+// over https only, and never to a private address.
+func SendPublic(ctx context.Context, d alert.Destination, m alert.Message) error {
+	if d.URL != "" && !strings.HasPrefix(d.URL, "https://") {
+		return errors.New("the alert url must start with https://")
+	}
+	return public.Send(ctx, d, m)
 }
 
 // Visit visits every domain of the running apps with visitor, all at
@@ -222,8 +248,11 @@ func checkReport(r *report.Report) error {
 		}
 	}
 	// A destination this watcher cannot send to, like a kind of a newer
-	// moin, is left out: it would fail again every few seconds.
-	r.Alerts = slices.DeleteFunc(r.Alerts, func(d report.Alert) bool { return alert.Check(d) != nil })
+	// moin or a url without https, is left out: it would fail again
+	// every few seconds.
+	r.Alerts = slices.DeleteFunc(r.Alerts, func(d report.Alert) bool {
+		return alert.Check(d) != nil || d.URL != "" && !strings.HasPrefix(d.URL, "https://")
+	})
 	for i := range r.Apps {
 		app := &r.Apps[i]
 		if !serverName.MatchString(app.Name) {

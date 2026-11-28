@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/axadrn/moin/internal/build"
@@ -37,10 +39,25 @@ type Message struct {
 // telegramAPI is the Bot API; tests point it at a fake.
 var telegramAPI = "https://api.telegram.org"
 
-// client follows no redirects: a destination that moved answers wrong.
-var client = &http.Client{
-	Timeout:       10 * time.Second,
-	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+// Sender sends alerts over connections it dials itself.
+type Sender struct {
+	client *http.Client
+}
+
+// plain is the sender of Send: it connects anywhere.
+var plain = &Sender{client: &http.Client{Timeout: 10 * time.Second, CheckRedirect: noRedirects}}
+
+// noRedirects follows no redirects: a destination that moved answers wrong.
+func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+// NewSender is a sender whose every connection passes control first, the
+// Control of a net.Dialer. A watcher brings one that refuses private
+// addresses, for the destinations a report named. It uses no proxy: a
+// proxy would connect in its place, past control.
+func NewSender(control func(network, address string, conn syscall.RawConn) error) *Sender {
+	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: control}
+	transport := &http.Transport{DialContext: dialer.DialContext, TLSHandshakeTimeout: 5 * time.Second}
+	return &Sender{client: &http.Client{Timeout: 10 * time.Second, Transport: transport, CheckRedirect: noRedirects}}
 }
 
 // Check says whether d can work: a known kind with what that kind needs.
@@ -73,26 +90,25 @@ func checkURL(address string) error {
 // Send sends m to d. The error never holds the token or URL of d: both
 // are secrets.
 func Send(ctx context.Context, d Destination, m Message) error {
-	return SendWith(ctx, client, d, m)
+	return plain.Send(ctx, d, m)
 }
 
-// SendWith is Send through the client of the caller: moin cloud brings
-// one that connects to public addresses only. It must follow no redirects.
-func SendWith(ctx context.Context, client *http.Client, d Destination, m Message) error {
+// Send sends m to d over the connections of s.
+func (s *Sender) Send(ctx context.Context, d Destination, m Message) error {
 	if err := Check(d); err != nil {
 		return err
 	}
 	switch d.Kind {
 	case "telegram":
 		body := map[string]any{"chat_id": d.ChatID, "text": telegramText(m), "parse_mode": "HTML", "disable_web_page_preview": true}
-		return post(ctx, client, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token)
+		return post(ctx, s.client, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token)
 	case "slack":
-		return post(ctx, client, d.URL, map[string]any{"text": slackText(m)}, d.URL)
+		return post(ctx, s.client, d.URL, map[string]any{"text": slackText(m)}, d.URL)
 	case "discord":
 		body := map[string]any{"content": discordText(m), "allowed_mentions": map[string]any{"parse": []string{}}}
-		return post(ctx, client, d.URL, body, d.URL)
+		return post(ctx, s.client, d.URL, body, d.URL)
 	}
-	return post(ctx, client, d.URL, m, d.URL)
+	return post(ctx, s.client, d.URL, m, d.URL)
 }
 
 // post sends body as JSON to address and wants a 2xx back. The secret

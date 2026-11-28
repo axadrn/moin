@@ -50,7 +50,7 @@ func TestReceiveAndMail(t *testing.T) {
 		t.Error("the first report did not start the trial")
 	}
 
-	send := ws.sender(space.ID, "ada@example.com")
+	send := ws.mail(space.ID, "ada@example.com")
 	if err := send(t.Context(), alert.Destination{Kind: mailKind}, alert.Message{Title: "prod stopped reporting", Text: "No report since 10:00."}); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestTrialOver(t *testing.T) {
 	if len(*mails) != 2 || !strings.Contains((*mails)[1].Subject, "Alerts are off") {
 		t.Fatalf("mails = %+v", *mails)
 	}
-	send := ws.sender(space.ID, "ada@example.com")
+	send := ws.mail(space.ID, "ada@example.com")
 	if err := send(t.Context(), alert.Destination{Kind: mailKind}, alert.Message{Title: "prod stopped reporting"}); err != nil {
 		t.Fatal(err)
 	}
@@ -189,8 +189,7 @@ func TestPrivateWebhookRefused(t *testing.T) {
 	called := false
 	inside := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
 	defer inside.Close()
-	ws.public.Transport.(*http.Transport).TLSClientConfig = inside.Client().Transport.(*http.Transport).TLSClientConfig
-	send := ws.sender(space.ID, "ada@example.com")
+	send := ws.reported(space.ID)
 	for _, address := range []string{inside.URL + "/hook", "https://10.0.0.5/hook", "https://[::1]/hook", "http://example.com/hook"} {
 		for _, kind := range []string{"webhook", "slack", "discord"} {
 			if err := send(t.Context(), alert.Destination{Kind: kind, URL: address}, alert.Message{Title: "prod stopped reporting"}); err == nil {

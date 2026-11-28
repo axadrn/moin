@@ -70,7 +70,8 @@ moin alerts add prod telegram --token <bot token> --chat-id <chat id>
 - Each report carries them to prod's watchers. So a watcher alerts there too, when prod goes silent or a domain is down.
 - Your own watcher and moin cloud do the same. moin cloud also sends a mail to your account.
 - A report only goes over HTTPS, or inside your tailnet. So the tokens never travel in the clear.
-- moin cloud sends only to public `https://` addresses and follows no redirect.
+- A watcher sends a server's alerts only to public `https://` addresses, and follows no redirect. So a hacked server can't make it knock on its own network.
+- A webhook inside your tailnet? Put it in the watcher's own [config](#its-config). What you wrote there goes anywhere.
 
 [CLI](/docs/cli#the-team-and-alerts)
 
