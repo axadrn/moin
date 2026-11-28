@@ -18,8 +18,7 @@ import (
 
 // The screen, top to bottom:
 //
-//	 moin   1 server · 2 apps                      ● all running
-//	 Apps   Servers   Backups
+//	 moin   Apps 2 · Servers 1 · Backups 2           ✓ all good
 //	╭─ Apps ──────────────╮ ╭─ shop ───────────────────────────╮
 //	│ server-1            │ │ ● running   v3, deployed 4m ago   │
 //	│ ▌ shop   ● running  │ │                                   │
@@ -30,23 +29,23 @@ import (
 
 // View draws the screen.
 func (m *model) View() tea.View {
-	rows := max(m.height-4, 5)
+	rows := max(m.height-3, 5)
 	body := m.body(rows)
-	screen := strings.Join(append([]string{m.header(), m.tabs()}, body...), "\n")
+	screen := strings.Join(append([]string{m.header()}, body...), "\n")
 	if overlay := m.overlay(); overlay != "" {
 		// The overlay floats in the middle of the body.
 		x := max((m.width-lipgloss.Width(overlay))/2, 0)
-		y := 2 + max((rows-lipgloss.Height(overlay))/2, 0)
+		y := 1 + max((rows-lipgloss.Height(overlay))/2, 0)
 		screen = lipgloss.NewCompositor(
 			lipgloss.NewLayer(screen),
 			lipgloss.NewLayer(overlay).X(x).Y(y).Z(1),
 		).Render()
 	}
 	lines := strings.Split(screen, "\n")
-	for len(lines) < rows+2 {
+	for len(lines) < rows+1 {
 		lines = append(lines, "")
 	}
-	lines = append(lines[:rows+2], m.statusLine(), m.keys())
+	lines = append(lines[:rows+1], m.statusLine(), m.keys())
 	for index, line := range lines {
 		lines[index] = fit(line, m.width)
 	}
@@ -55,11 +54,11 @@ func (m *model) View() tea.View {
 	return view
 }
 
-// header is the mark of moin, how many servers and apps, and how they
-// are, all in one chip at the right.
+// header is one line: the mark of moin, the tabs with their counts, and
+// at the right how everything is, flush with the panes below.
 func (m *model) header() string {
-	left := style.Mark.Render(build.Name) + "  " + style.Muted.Render(count(len(m.servers), "server")+" · "+count(len(m.apps()), "app"))
-	right := m.summary() + " "
+	left := style.Mark.Render(build.Name) + "   " + m.tabs()
+	right := m.summary()
 	return left + strings.Repeat(" ", max(m.width-lipgloss.Width(left)-lipgloss.Width(right), 1)) + right
 }
 
@@ -86,22 +85,23 @@ func (m *model) summary() string {
 	case asking > 0:
 		return style.Warning.Render(m.spinner() + " asking " + count(asking, "server"))
 	}
-	return style.Success.Render(style.SymbolLive + " all good")
+	return style.Success.Render(style.SymbolDone + " all good")
 }
 
-// tabs are the names of the three lists, the open one underlined.
+// tabs are the names of the three lists with their counts, the open
+// one bold and underlined.
 func (m *model) tabs() string {
 	counts := []int{len(m.apps()), len(m.servers), len(m.apps())}
 	parts := []string{}
 	for index, name := range tabNames {
-		label := name + " " + strconv.Itoa(counts[index])
+		number := style.Muted.Render(" " + strconv.Itoa(counts[index]))
 		if tab(index) == m.tab && m.app == nil {
-			parts = append(parts, lipgloss.NewStyle().Bold(true).Underline(true).Render(name)+style.Muted.Render(" "+strconv.Itoa(counts[index])))
+			parts = append(parts, lipgloss.NewStyle().Bold(true).Underline(true).Render(name)+number)
 			continue
 		}
-		parts = append(parts, style.Muted.Render(label))
+		parts = append(parts, style.Muted.Render(name)+number)
 	}
-	return " " + strings.Join(parts, "    ")
+	return strings.Join(parts, style.Dim.Render("  ·  "))
 }
 
 // body is the list and the side, or the logs of the open app.
