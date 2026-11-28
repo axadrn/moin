@@ -3,6 +3,18 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.39
+
+Unreleased
+
+**In short:** www redirects to your domain again.
+
+### Fixed
+- **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.
+
+### Upgrade
+`moin update my-server`, then `moin restart my-app` for an app with both domains.
+
 ## v1.0.0-beta.38
 
 November 28, 2026

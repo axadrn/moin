@@ -269,6 +269,8 @@ moin domains rm my-app www.my-app.example.com
 
 `moin domains my-app` lists them. `moin domains rm` asks first, because visitors there get no answer. In a script, add `-y`.
 
+Add `example.com` and `www.example.com` both, and www redirects to `example.com` for good. The path and the query stay. `example.com` serves the app.
+
 ## Logs
 
 ```bash

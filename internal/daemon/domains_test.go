@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -60,5 +61,57 @@ func TestDomainsByService(t *testing.T) {
 	}
 	if port := servicePort("", map[string]any{"expose": []any{"9000"}}); port != 9000 {
 		t.Errorf("service port from expose: %d", port)
+	}
+}
+
+// TestWwwRedirectsToTheApex: an app with example.com and www.example.com
+// sends www to example.com, path and query kept, on the HTTPS router and
+// on the tunnel's. A www domain without its apex is served as it is.
+func TestWwwRedirectsToTheApex(t *testing.T) {
+	web := map[string]any{}
+	addRouters(map[string]any{}, web, routes{app: "shop", router: project("shop"), domains: []string{"example.com", "www.example.com", "www.other.example.net", "shop.example.org"}, port: 3000, instant: "shop.203-0-113-7.sslip.io"})
+	labels := web["labels"].(map[string]any)
+	for _, router := range []string{"moin-shop", "moin-shop-tunnel"} {
+		if got := labels["traefik.http.routers."+router+".middlewares"]; got != "moin-shop-www" {
+			t.Errorf("%s middlewares = %v", router, got)
+		}
+	}
+	if got := labels["traefik.http.routers.moin-shop-instant.middlewares"]; got != nil {
+		t.Errorf("the instant address redirects: %v", got)
+	}
+	if labels["traefik.http.middlewares.moin-shop-www.redirectregex.permanent"] != "true" {
+		t.Errorf("the redirect is not permanent: %v", labels)
+	}
+	// compose reads $$ as $; Traefik matches with Go's regexp.
+	unescape := func(key string) string {
+		return strings.ReplaceAll(labels["traefik.http.middlewares.moin-shop-www.redirectregex."+key].(string), "$$", "$")
+	}
+	pattern := regexp.MustCompile(unescape("regex"))
+	for from, want := range map[string]string{
+		"https://www.example.com/cart?id=7":     "https://example.com/cart?id=7",
+		"http://www.example.com:8080/":          "https://example.com/",
+		"https://example.com/cart":              "https://example.com/cart",
+		"https://www.other.example.net/":        "https://www.other.example.net/",
+		"https://www.example.com.evil.test/":    "https://www.example.com.evil.test/",
+		"https://shop.example.org/":             "https://shop.example.org/",
+		"https://www.example.com":               "https://example.com",
+		"https://wwwxexample.com/":              "https://wwwxexample.com/",
+		"https://www.example.com/www.example.c": "https://example.com/www.example.c",
+	} {
+		got := from
+		if pattern.MatchString(from) {
+			got = pattern.ReplaceAllString(from, unescape("replacement"))
+		}
+		if got != want {
+			t.Errorf("%s goes to %s, want %s", from, got, want)
+		}
+	}
+	// Without the pair, no redirect.
+	one := map[string]any{}
+	addRouters(map[string]any{}, one, routes{app: "blog", router: project("blog"), domains: []string{"www.example.com"}, port: 3000})
+	for key := range one["labels"].(map[string]any) {
+		if strings.Contains(key, "middlewares") {
+			t.Errorf("www alone redirects: %s", key)
+		}
 	}
 }

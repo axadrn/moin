@@ -84,7 +84,8 @@ func addRouters(config, service map[string]any, routes routes) {
 	joinProxyNetwork(config, service, routes.app)
 }
 
-// addDomainLabels labels every domain over HTTPS.
+// addDomainLabels labels every domain over HTTPS. When the app has both
+// example.com and www.example.com, www redirects to example.com.
 func addDomainLabels(labels map[string]any, routes routes) {
 	name := routes.router
 	hosts := make([]string, 0, len(routes.domains))
@@ -100,6 +101,27 @@ func addDomainLabels(labels map[string]any, routes routes) {
 	labels["traefik.http.routers."+name+"-tunnel.rule"] = rule
 	labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
 	labels["traefik.http.routers."+name+"-tunnel.service"] = name
+	if apexes := wwwApexes(routes.domains); len(apexes) > 0 {
+		middleware := "traefik.http.middlewares." + name + "-www.redirectregex."
+		labels[middleware+"regex"] = escape(`^https?://www\.(` + strings.Join(apexes, "|") + `)(:[0-9]+)?(/.*)?$`)
+		labels[middleware+"replacement"] = escape("https://${1}${3}")
+		// Permanent: 301, and 308 for a method other than GET.
+		labels[middleware+"permanent"] = "true"
+		labels["traefik.http.routers."+name+".middlewares"] = name + "-www"
+		labels["traefik.http.routers."+name+"-tunnel.middlewares"] = name + "-www"
+	}
+}
+
+// wwwApexes are the domains whose www. domain is in the list too, quoted
+// for a regular expression.
+func wwwApexes(domains []string) []string {
+	apexes := []string{}
+	for _, domain := range domains {
+		if slices.Contains(domains, "www."+domain) {
+			apexes = append(apexes, regexp.QuoteMeta(domain))
+		}
+	}
+	return apexes
 }
 
 // addInstantLabels labels the instant address, on a router of its own.
