@@ -95,7 +95,7 @@ document.addEventListener("click", (event) => {
 }, true);
 document.addEventListener("dragstart", (event) => event.target.closest?.("[data-marquee]") && event.preventDefault());
 
-// Kill your subscriptions: a tick or the team size adds the bills up
+// Kill your SaaS subscriptions: a tick or the team size adds the bills up
 // again, the way the page first wrote them, and shows the command of each
 // ticked bill. The dock keeps the sum in view while the bills are on
 // screen and the sum is not.

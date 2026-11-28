@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Price is one bill of /kill-your-subscriptions, from prices.json, the one
+// Price is one bill of /kill-your-saas-subscriptions, from prices.json, the one
 // place the prices live: a tool's plan, in US dollars a month, from the
 // tool's own pricing page, and the open source app that replaces it.
 type Price struct {

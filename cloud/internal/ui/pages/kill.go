@@ -10,7 +10,7 @@ import (
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 )
 
-// KillSwap is one bill of /kill-your-subscriptions and what replaces it.
+// KillSwap is one bill of /kill-your-saas-subscriptions and what replaces it.
 type KillSwap struct {
 	service.Price
 	// ID names the bill in the page, from its tool: ghost-pro.
