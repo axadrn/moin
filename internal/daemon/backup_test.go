@@ -559,3 +559,43 @@ func TestFirstDataLimit(t *testing.T) {
 		t.Errorf("100 GB: %s", got)
 	}
 }
+
+// A server whose copies go to a watcher has no need for a bucket, until a
+// copy was due and no watcher took it.
+func TestStatusNoBucketNeedWaitsForWatchers(t *testing.T) {
+	database := protocol.Database{HostPath: "/data/app.db", Kind: "sqlite"}
+	for _, test := range []struct {
+		name     string
+		watchers []Watcher
+		tried    bool
+		need     bool
+	}{
+		{"no watcher", nil, false, true},
+		{"watcher, no copy due yet", []Watcher{{URL: "https://watcher.example.com"}}, false, false},
+		{"watcher, none took the copy", []Watcher{{URL: "https://watcher.example.com"}}, true, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			b := newBackups(newApps(t.TempDir()))
+			b.configure(Config{Name: "prod", Watchers: test.watchers})
+			if test.tried {
+				b.state("app", database).CloudTried = time.Now()
+			}
+			got := b.status(t.Context(), "app", database, false).Error == errNoBucket.Error()
+			if got != test.need {
+				t.Errorf("need = %v, want %v", got, test.need)
+			}
+		})
+	}
+}
+
+func TestExtraDatabase(t *testing.T) {
+	for name, want := range map[string]bool{"analytics": true, "postgres": false, "template0": false, "template1": false, "moin_x": false, "app": false, "": false} {
+		if got := extraDatabase(name, "app"); got != want {
+			t.Errorf("extraDatabase(%q) = %v, want %v", name, got, want)
+		}
+	}
+	// POSTGRES_DB=postgres: it is the main one, already in the list.
+	if extraDatabase("postgres", "postgres") {
+		t.Error("the main database is no extra one")
+	}
+}
