@@ -14,19 +14,21 @@ templ HomeVoices(posts []tweets.Tweet) {
 			@homeHead("Everyone is moving to a VPS.", "Not everyone closes the door.")
 		</div>
 		// site.js moves the row and lets a hand drag it.
-		<div class="moin-marquee" data-marquee>
-			<div class="moin-marquee-row">
-				<div class="moin-marquee-track">
-					for _, post := range posts {
-						@tweetCard(post)
-					}
-				</div>
-				// The second copy makes the loop seamless; screen readers and
-				// the keyboard skip it.
-				<div class="moin-marquee-track" aria-hidden="true" inert>
-					for _, post := range posts {
-						@tweetCard(post)
-					}
+		<div class="moin-page">
+			<div class="moin-marquee" data-marquee>
+				<div class="moin-marquee-row">
+					<div class="moin-marquee-track">
+						for _, post := range posts {
+							@tweetCard(post)
+						}
+					</div>
+					// The second copy makes the loop seamless; screen readers and
+					// the keyboard skip it.
+					<div class="moin-marquee-track" aria-hidden="true" inert>
+						for _, post := range posts {
+							@tweetCard(post)
+						}
+					</div>
 				</div>
 			</div>
 		</div>

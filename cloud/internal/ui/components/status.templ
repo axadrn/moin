@@ -30,6 +30,20 @@ templ Chip(text string) {
 	<span class="moin-chip">{ text }</span>
 }
 
+// PillLinkProps is a PillLink: where it goes and its words.
+type PillLinkProps struct {
+	Href string
+}
+
+// PillLink is a link on a quiet pill, with an arrow after its words, for
+// the one thing a section wants you to do next. Children are the words.
+templ PillLink(p PillLinkProps) {
+	<a href={ templ.SafeURL(p.Href) } class="moin-pill">
+		{ children... }
+		<span aria-hidden="true">→</span>
+	</a>
+}
+
 // StatusProps is a Status: the state, the word that names it, and a quiet
 // note after it, like a version. Pill puts it on a small pill of its own,
 // for a row of them.

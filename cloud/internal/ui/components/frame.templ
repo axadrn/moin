@@ -1,6 +1,10 @@
 package components
 
-import "github.com/axadrn/moin/cloud/internal/brand"
+import (
+	"strconv"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+)
 
 // AppFootProps is an AppFoot: its quiet links.
 type AppFootProps struct {
@@ -31,7 +35,7 @@ templ Auth(p AuthProps) {
 	<div class="moin-auth">
 		<header class="moin-page moin-row">
 			<a href="/" class="moin-row" aria-label={ brand.Name + " home" }>
-				@Wordmark(WordmarkProps{})
+				@Wordmark(WordmarkProps{Mark: true})
 			</a>
 		</header>
 		<main class="moin-auth-main">
@@ -48,15 +52,24 @@ type BarRow struct {
 	Share              int64
 }
 
-// BarsProps is Bars.
+// BarsProps is Bars. Columns 2 sets them in two columns on a wide screen,
+// the first half of the rows down the first column, the rest down the
+// second; in a Card they line up with the columns of Stats above.
 type BarsProps struct {
-	Rows []BarRow
+	Rows    []BarRow
+	Columns int
 }
 
 // Bars are a few counts, the biggest first, each with a thin bar as wide
 // as its share.
 templ Bars(p BarsProps) {
-	<ol class="moin-bars">
+	<ol
+		class="moin-bars"
+		if p.Columns == 2 {
+			data-cols="2"
+			style={ templ.SafeCSS("--bars-rows:" + strconv.Itoa((len(p.Rows)+1)/2)) }
+		}
+	>
 		for _, row := range p.Rows {
 			<li>
 				<span>

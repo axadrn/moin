@@ -4,6 +4,7 @@ import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 	"strconv"
 )
@@ -58,39 +59,20 @@ templ homeNumbers(n HomeNumbers) {
 			}
 			if n.Downloads > 0 {
 				@components.Stat(components.StatProps{Label: "Downloads", Value: human.Count(n.Downloads)}) {
-					Of every release, on GitHub.
+					Of every release.
 				}
 			}
 			if n.Totals.Servers > 0 {
 				@components.Stat(components.StatProps{Label: "Servers", Value: strconv.FormatInt(n.Totals.Servers, 10)}) {
-					On { brand.Name } cloud right now, with { strconv.FormatInt(n.Totals.Apps, 10) } apps.
+					On { brand.Name } cloud, with { strconv.FormatInt(n.Totals.Apps, 10) } apps.
+				}
+			}
+			for _, row := range rows {
+				@components.Stat(components.StatProps{Label: row.Name, Value: human.Count(row.Period.Total)}) {
+					{ human.Count(row.Period.Month) } this month.
 				}
 			}
 		}
-		if len(rows) > 0 {
-			@components.Card(components.CardProps{}) {
-				@components.Rows(components.RowsProps{Head: []string{"On " + brand.Name + " cloud", "This month", "This year", "Total"}}) {
-					for _, row := range rows {
-						@components.Row(components.RowProps{}) {
-							@components.Cell() {
-								{ row.Name }
-							}
-							@components.Cell() {
-								<span class="moin-digits">{ human.Count(row.Period.Month) }<span class="moin-only-phone">{ " this month" }</span></span>
-							}
-							@components.Cell() {
-								<span class="moin-digits">{ human.Count(row.Period.Year) }<span class="moin-only-phone">{ " this year" }</span></span>
-							}
-							@components.Cell() {
-								<span class="moin-digits">{ human.Count(row.Period.Total) }<span class="moin-only-phone">{ " in total" }</span></span>
-							}
-						}
-					}
-				}
-			}
-		}
-		<div class="moin-row" data-center>
-			@homeStar()
-		</div>
+		@homeMore(layouts.GitHubURL, "Star on GitHub")
 	</section>
 }

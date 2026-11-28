@@ -101,7 +101,7 @@ templ homeKnocks(k HomeKnocks) {
 				}
 			}
 			if len(rows) > 0 {
-				@components.Bars(components.BarsProps{Rows: knockBars(rows)})
+				@components.Bars(components.BarsProps{Rows: knockBars(rows), Columns: 2})
 			}
 		}
 	</section>

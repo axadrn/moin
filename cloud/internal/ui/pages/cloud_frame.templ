@@ -24,7 +24,7 @@ templ cloudApp(c Cloud, title, tab string) {
 	@layouts.Base(layouts.SEOProps{Title: title, Description: brand.Name + " cloud watches your servers.", Path: "/cloud", NoIndex: true}) {
 		@components.AppBar(components.AppBarProps{Tabs: cloudTabs(tab)}) {
 			<a href="/cloud" class="moin-row" aria-label={ brand.Name + " cloud" }>
-				@components.Wordmark(components.WordmarkProps{})
+				@components.Wordmark(components.WordmarkProps{Mark: true})
 			</a>
 			<span class="moin-muted" aria-hidden="true">/</span>
 			<span class="moin-text moin-strong moin-truncate">{ c.Mail }</span>

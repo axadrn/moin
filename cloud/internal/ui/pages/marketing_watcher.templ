@@ -31,7 +31,7 @@ var homeWatcherColumns = []components.CompareColumn{
 		ActionHref: "/docs/watcher#set-one-up", ActionText: "Run your own",
 	},
 	{
-		Name: brand.Name + " cloud", Caption: "$7 a month or $49 a year", Badge: "Recommended", Featured: true,
+		Name: brand.Name + " cloud", Caption: "$7 a month or $49 a year. The launch price stays yours.", Badge: "Recommended", Featured: true,
 		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes", Note: "Built in"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}},
 		ActionHref: "/login", ActionText: "Start free", ActionNote: homeTrial,
 	},
@@ -43,7 +43,12 @@ templ HomePricing() {
 	<section id="pricing" class="moin-band">
 		@homeHead("Free. Or free of worries.", "Deploys, backups and alerts work alone. A watcher adds the rest.")
 		@components.Compare(components.CompareProps{Rows: homeWatcherRows, Columns: homeWatcherColumns, Reverse: true})
-		@homeMore(homeFreeYear, "Or get a year free")
+		<div class="moin-stack" data-gap="2" data-center>
+			@components.PillLink(components.PillLinkProps{Href: homeFreeYear}) {
+				Get a year free
+			}
+			<p class="moin-small moin-muted">Report a bug or an idea. If it gets in, the year is yours.</p>
+		</div>
 	</section>
 }
 
