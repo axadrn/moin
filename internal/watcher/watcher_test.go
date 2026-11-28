@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -277,7 +278,6 @@ func TestLoadConfig(t *testing.T) {
 	for _, bad := range []string{
 		"alerts:\n  - kind: webhook\n    url: https://example.com/hook\n",
 		"password: short\nalerts:\n  - kind: webhook\n    url: https://example.com/hook\n",
-		"password: a-long-test-password\n",
 		"password: a-long-test-password\nalerts:\n  - kind: mail\n",
 		"password: a-long-test-password\nalerts:\n  - kind: webhook\n    url: http://example.com/hook\n",
 		good + "servers:\n  prod: short\n",
@@ -288,6 +288,10 @@ func TestLoadConfig(t *testing.T) {
 		if _, err := LoadConfig(write(bad)); err == nil {
 			t.Errorf("LoadConfig(%q) = nil, want an error", bad)
 		}
+	}
+	// The watcher's own alerts are optional: the servers bring theirs.
+	if _, err := LoadConfig(write("password: a-long-test-password\n")); err != nil {
+		t.Errorf("a config without alerts: %v", err)
 	}
 	write(good)
 	if err := os.Chmod(path, 0o644); err != nil {
@@ -345,12 +349,12 @@ func TestReportDomains(t *testing.T) {
 		t.Error(err)
 	}
 	for _, address := range []string{"127.0.0.1:443", "10.0.0.5:443", "192.168.1.1:80", "100.100.1.1:443", "169.254.169.254:80", "0.0.0.0:80", "[::1]:443", "[fe80::1]:443"} {
-		if err := refusePrivate("tcp", address, nil); err == nil {
-			t.Errorf("refusePrivate let %s through", address)
+		if err := RefusePrivate("tcp", address, nil); err == nil {
+			t.Errorf("RefusePrivate let %s through", address)
 		}
 	}
-	if err := refusePrivate("tcp", "203.0.113.7:443", nil); err != nil {
-		t.Errorf("refusePrivate stopped a public address: %v", err)
+	if err := RefusePrivate("tcp", "203.0.113.7:443", nil); err != nil {
+		t.Errorf("RefusePrivate stopped a public address: %v", err)
 	}
 	local := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer local.Close()
@@ -562,5 +566,57 @@ func TestSetServers(t *testing.T) {
 	}
 	if err := w.Receive("prod", testReport(shop)); err == nil {
 		t.Error("took a report of a server it no longer watches")
+	}
+}
+
+// An alert about a server goes where its last report says and to the
+// watcher's own destinations, each once. A server whose report names
+// none, like one with an older moin, has the watcher's own only.
+func TestReportAlerts(t *testing.T) {
+	own := alert.Destination{Kind: "webhook", URL: "https://own.example.com/hook"}
+	chat := alert.Destination{Kind: "telegram", Token: "123:test", ChatID: "42"}
+	w, err := newAt([]string{"prod", "web-1"}, []alert.Destination{own}, nil, t0.Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent := map[string][]alert.Destination{}
+	w.Send = func(_ context.Context, to alert.Destination, m alert.Message) error {
+		sent[m.Server] = append(sent[m.Server], to)
+		return nil
+	}
+	withAlerts := testReport()
+	withAlerts.Alerts = []report.Alert{chat, own}
+	if err := w.Receive("prod", withAlerts); err != nil {
+		t.Fatal(err)
+	}
+	old := testReport()
+	old.Server = "web-1"
+	if err := w.Receive("web-1", old); err != nil {
+		t.Fatal(err)
+	}
+	for _, srv := range w.state.Servers {
+		srv.Received = time.Now().Add(-10 * time.Minute)
+	}
+	w.Tick(t.Context())
+	if !slices.Equal(sent["prod"], []alert.Destination{chat, own}) {
+		t.Errorf("prod alerted to %+v", sent["prod"])
+	}
+	if !slices.Equal(sent["web-1"], []alert.Destination{own}) {
+		t.Errorf("web-1 alerted to %+v", sent["web-1"])
+	}
+
+	// An unsent alert to a destination the server removed is dropped.
+	w.state.Unsent = []unsent{{To: chat}, {To: own}}
+	if err := w.Receive("prod", testReport()); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.state.Unsent) != 1 || w.state.Unsent[0].To != own {
+		t.Errorf("unsent = %+v", w.state.Unsent)
+	}
+
+	many := testReport()
+	many.Alerts = make([]report.Alert, maxAlerts+1)
+	if err := w.Receive("prod", many); err == nil {
+		t.Error("took a report with too many alerts")
 	}
 }

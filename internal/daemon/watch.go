@@ -194,6 +194,8 @@ func (w *watch) report(ctx context.Context, config Config, containers map[string
 	}
 	r := report.Report{Server: config.Name, Version: build.Version, EverySeconds: int(watchEvery.Seconds()), Apps: []report.App{}}
 	r.Knocks = knocksReport(filepath.Dir(w.apps.dir))
+	// The watchers alert where the server does, when it no longer can.
+	r.Alerts = config.Alerts
 	for _, app := range w.apps.names() {
 		if w.apps.current(app) == 0 {
 			continue

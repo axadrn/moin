@@ -224,10 +224,14 @@ func TestReport(t *testing.T) {
 	statuses := map[string][]protocol.DatabaseBackup{"shop": {{Database: "/data/app.db", CopiedAt: &copied, CheckedAt: &copied, CheckedCopy: "20261127T140000Z-000001"}}}
 
 	w := newWatch(a)
-	config := Config{Name: "prod", Watchers: []Watcher{{URL: watcher.URL, Token: "t1"}}}
+	chat := alert.Destination{Kind: "telegram", Token: "123:test", ChatID: "42"}
+	config := Config{Name: "prod", Watchers: []Watcher{{URL: watcher.URL, Token: "t1"}}, Alerts: []alert.Destination{chat}}
 	w.report(context.Background(), config, map[string]appContainers{"shop": {running: true}}, statuses)
 	if token != "Bearer t1" || got.Server != "prod" || len(got.Apps) != 1 || w.missed != 0 {
 		t.Fatalf("report = %+v, token %q, missed %d", got, token, w.missed)
+	}
+	if len(got.Alerts) != 1 || got.Alerts[0] != chat {
+		t.Fatalf("the report's alerts = %+v", got.Alerts)
 	}
 	app := got.Apps[0]
 	if app.Name != "shop" || app.Release != 2 || !app.Running || strings.Join(app.Domains, ",") != "shop.example.com,shop.203-0-113-7.sslip.io" {

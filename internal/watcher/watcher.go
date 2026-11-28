@@ -3,6 +3,7 @@ package watcher
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -25,12 +26,17 @@ const (
 	maxApps      = 100
 	maxDomains   = 50
 	maxDatabases = 20
+	// maxAlerts is how many alert destinations a report may hold, and
+	// maxAlertField how long a URL or token in one may be.
+	maxAlerts     = 10
+	maxAlertField = 2000
 	// maxError is how much of a backup error the watcher keeps.
 	maxError = 200
 )
 
 // Watcher is one watcher: the servers it watches, where its alerts go,
-// and all it knows about them. `moin watcher run` keeps one; moin cloud
+// and all it knows about them. The alerts of a server go where its last
+// report says, and to the watcher's own destinations. `moin watcher run` keeps one; moin cloud
 // keeps one per workspace. It is safe to use from many goroutines.
 type Watcher struct {
 	// Send sends one alert to one destination. New sets it to alert.Send;
@@ -43,7 +49,9 @@ type Watcher struct {
 
 	// servers are the names of the servers it watches, sorted.
 	servers []string
-	alerts  []alert.Destination
+	// alerts are the watcher's own destinations: all there is for a
+	// server whose report names none.
+	alerts []alert.Destination
 	// started is when this watcher began to watch: silence before it does
 	// not count.
 	started time.Time
@@ -101,6 +109,7 @@ func (w *Watcher) Receive(server string, r report.Report) error {
 		return fmt.Errorf("this watcher does not watch %s", server)
 	}
 	w.state.receive(server, r, time.Now())
+	w.state.forgetUnsent(w.alerts)
 	w.dirty = true
 	return nil
 }
@@ -111,7 +120,7 @@ func (w *Watcher) Tick(ctx context.Context) {
 	w.mu.Lock()
 	for _, m := range w.state.alerts(w.started, time.Now()) {
 		slog.Info("alert", "server", m.Server, "app", m.App, "title", m.Title)
-		for _, d := range w.alerts {
+		for _, d := range w.state.destinations(m.Server, w.alerts) {
 			w.state.Unsent = append(w.state.Unsent, unsent{To: d, Message: m})
 		}
 	}
@@ -202,6 +211,14 @@ var hostname = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0
 func checkReport(r *report.Report) error {
 	if len(r.Apps) > maxApps {
 		return fmt.Errorf("more than %d apps", maxApps)
+	}
+	if len(r.Alerts) > maxAlerts {
+		return fmt.Errorf("more than %d alerts", maxAlerts)
+	}
+	for _, d := range r.Alerts {
+		if len(d.Kind)+len(d.URL)+len(d.Token)+len(d.ChatID) > maxAlertField {
+			return errors.New("an alert is too long")
+		}
 	}
 	for i := range r.Apps {
 		app := &r.Apps[i]

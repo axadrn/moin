@@ -64,7 +64,7 @@ func (v *Visitor) Visit(ctx context.Context, domain string) string {
 // redirects followed (a redirect is an answer), and only public addresses,
 // so a report cannot make the watcher knock on its own network.
 func visitClient() *http.Client {
-	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: refusePrivate}
+	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: RefusePrivate}
 	return &http.Client{
 		Timeout: visitTimeout,
 		Transport: &http.Transport{
@@ -83,10 +83,10 @@ var errPrivate = errors.New("the domain points at a private address")
 // sharedNetwork is 100.64.0.0/10: carrier networks and Tailscale.
 var sharedNetwork = netip.MustParsePrefix("100.64.0.0/10")
 
-// refusePrivate stops a connection to loopback, private, link-local,
-// shared or unspecified addresses. It runs after DNS, so a name that
-// points inside cannot slip past it.
-func refusePrivate(network, address string, _ syscall.RawConn) error {
+// RefusePrivate stops a connection to loopback, private, link-local,
+// shared or unspecified addresses. It is the Control of a net.Dialer: it
+// runs after DNS, so a name that points inside cannot slip past it.
+func RefusePrivate(network, address string, _ syscall.RawConn) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return err

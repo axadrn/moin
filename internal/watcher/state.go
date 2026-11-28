@@ -121,14 +121,45 @@ func parseState(saved []byte) (*state, error) {
 
 // forget drops what the watcher no longer watches: servers with their
 // domains, and unsent alerts to a destination that is gone.
-func (s *state) forget(servers []string, alerts []alert.Destination, now time.Time) {
+func (s *state) forget(servers []string, own []alert.Destination, now time.Time) {
 	for name := range s.Servers {
 		if !slices.Contains(servers, name) {
 			delete(s.Servers, name)
 		}
 	}
 	s.syncDomains(now)
-	s.Unsent = slices.DeleteFunc(s.Unsent, func(u unsent) bool { return !slices.Contains(alerts, u.To) })
+	s.forgetUnsent(own)
+}
+
+// forgetUnsent drops the unsent alerts to a destination that is gone:
+// neither one of the watcher's own nor in the last report of a server.
+func (s *state) forgetUnsent(own []alert.Destination) {
+	s.Unsent = slices.DeleteFunc(s.Unsent, func(u unsent) bool {
+		if slices.Contains(own, u.To) {
+			return false
+		}
+		for _, srv := range s.Servers {
+			if slices.Contains(srv.Report.Alerts, u.To) {
+				return false
+			}
+		}
+		return true
+	})
+}
+
+// destinations are where an alert about server goes: where its last
+// report says, and the watcher's own, each once.
+func (s *state) destinations(server string, own []alert.Destination) []alert.Destination {
+	var out []alert.Destination
+	if srv := s.Servers[server]; srv != nil {
+		out = append(out, srv.Report.Alerts...)
+	}
+	for _, d := range own {
+		if !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // receive keeps a report of server name, received at now: its restore

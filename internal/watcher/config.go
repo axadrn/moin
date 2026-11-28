@@ -7,7 +7,6 @@ package watcher
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -25,10 +24,14 @@ const DefaultConfig = "/etc/" + build.Name + "/watcher.yml"
 //	password: …          # the page asks for it
 //	servers:
 //	  prod: <token>      # a server and the token it reports with
-//	alerts:
+//	alerts:              # optional: the watcher's own destinations
 //	  - kind: telegram
 //	    token: …
 //	    chat_id: …
+//
+// Alerts go where each server's report says (`moin alerts add`). The
+// alerts here get every alert too, and are all there is for a server
+// that set none or runs an older moin.
 type Config struct {
 	Password string              `yaml:"password"`
 	Servers  map[string]string   `yaml:"servers"`
@@ -71,9 +74,6 @@ func LoadConfig(path string) (Config, error) {
 func (c Config) check() error {
 	if len(c.Password) < minPassword {
 		return fmt.Errorf("the password needs at least %d characters, the page asks for it", minPassword)
-	}
-	if len(c.Alerts) == 0 {
-		return errors.New("add at least one alert, or nobody hears what the watcher sees")
 	}
 	for _, d := range c.Alerts {
 		if err := alert.Check(d); err != nil {

@@ -20,14 +20,10 @@ import (
 	"github.com/axadrn/moin/internal/report"
 )
 
-// Destination is where alerts go. Kind is "telegram", "slack", "discord" or "webhook".
-// Mail is not a kind: only moin cloud sends mail, later.
-type Destination struct {
-	Kind   string `yaml:"kind" json:"kind"`
-	URL    string `yaml:"url,omitempty" json:"url,omitempty"`         // slack, discord, webhook
-	Token  string `yaml:"token,omitempty" json:"token,omitempty"`     // telegram bot token
-	ChatID string `yaml:"chat_id,omitempty" json:"chat_id,omitempty"` // telegram
-}
+// Destination is where alerts go: the same thing a report carries to the
+// watchers. Kind is "telegram", "slack", "discord" or "webhook". Mail is
+// not a kind: only moin cloud sends mail.
+type Destination = report.Alert
 
 // Message is one alert. A webhook gets it as JSON.
 type Message struct {
@@ -77,25 +73,31 @@ func checkURL(address string) error {
 // Send sends m to d. The error never holds the token or URL of d: both
 // are secrets.
 func Send(ctx context.Context, d Destination, m Message) error {
+	return SendWith(ctx, client, d, m)
+}
+
+// SendWith is Send through the client of the caller: moin cloud brings
+// one that connects to public addresses only. It must follow no redirects.
+func SendWith(ctx context.Context, client *http.Client, d Destination, m Message) error {
 	if err := Check(d); err != nil {
 		return err
 	}
 	switch d.Kind {
 	case "telegram":
 		body := map[string]any{"chat_id": d.ChatID, "text": telegramText(m), "parse_mode": "HTML", "disable_web_page_preview": true}
-		return post(ctx, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token)
+		return post(ctx, client, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token)
 	case "slack":
-		return post(ctx, d.URL, map[string]any{"text": slackText(m)}, d.URL)
+		return post(ctx, client, d.URL, map[string]any{"text": slackText(m)}, d.URL)
 	case "discord":
 		body := map[string]any{"content": discordText(m), "allowed_mentions": map[string]any{"parse": []string{}}}
-		return post(ctx, d.URL, body, d.URL)
+		return post(ctx, client, d.URL, body, d.URL)
 	}
-	return post(ctx, d.URL, m, d.URL)
+	return post(ctx, client, d.URL, m, d.URL)
 }
 
 // post sends body as JSON to address and wants a 2xx back. The secret
 // never shows in the error.
-func post(ctx context.Context, address string, body any, secret string) error {
+func post(ctx context.Context, client *http.Client, address string, body any, secret string) error {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)

@@ -33,6 +33,19 @@ type Report struct {
 	// Knocks are the connections the server's firewall dropped; nil
 	// while it counted none.
 	Knocks *Knocks `json:"knocks,omitempty"`
+	// Alerts are where the server's alerts go, so a watcher can alert
+	// there when the server no longer can. They are secrets. A daemon
+	// before this field, or a server without alerts, sends none.
+	Alerts []Alert `json:"alerts,omitempty"`
+}
+
+// Alert is one destination for alerts. Kind is "telegram", "slack",
+// "discord" or "webhook". Package alert sends to it.
+type Alert struct {
+	Kind   string `yaml:"kind" json:"kind"`
+	URL    string `yaml:"url,omitempty" json:"url,omitempty"`         // slack, discord, webhook
+	Token  string `yaml:"token,omitempty" json:"token,omitempty"`     // telegram bot token
+	ChatID string `yaml:"chat_id,omitempty" json:"chat_id,omitempty"` // telegram
 }
 
 // Knocks are the knocks a server's firewall dropped: today and this
@@ -104,7 +117,7 @@ func Send(ctx context.Context, url, token string, r Report) error {
 }
 
 // checkURL wants https, or http to this machine or a tailnet only: the
-// token must not travel in the clear.
+// token and the alert destinations must not travel in the clear.
 func checkURL(address string) error {
 	parsed, err := neturl.Parse(address)
 	if err != nil || parsed.Host == "" {

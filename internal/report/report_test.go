@@ -37,6 +37,27 @@ func TestSend(t *testing.T) {
 	}
 }
 
+// A report of a daemon before the alerts reads as one without, and a
+// report without alerts sends no such field.
+func TestAlertsOptional(t *testing.T) {
+	var old Report
+	if err := json.Unmarshal([]byte(`{"server":"prod","version":"v1.0.0","every_seconds":60,"apps":[]}`), &old); err != nil {
+		t.Fatal(err)
+	}
+	if old.Server != "prod" || old.Alerts != nil {
+		t.Errorf("old report = %+v", old)
+	}
+	body, _ := json.Marshal(Report{Server: "prod"})
+	if strings.Contains(string(body), "alerts") {
+		t.Errorf("a report without alerts says %s", body)
+	}
+	body, _ = json.Marshal(Report{Server: "prod", Alerts: []Alert{{Kind: "telegram", Token: "123:test", ChatID: "42"}}})
+	var got Report
+	if err := json.Unmarshal(body, &got); err != nil || len(got.Alerts) != 1 || got.Alerts[0].ChatID != "42" {
+		t.Errorf("got %+v, %v from %s", got, err, body)
+	}
+}
+
 func TestSendNotOK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown token", http.StatusUnauthorized)
