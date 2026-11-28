@@ -7,7 +7,7 @@ One command puts your app on your own server. Your backups are restored and chec
 ```bash
 curl -fsSL https://moin.run/cli.sh | sh
 cd shop
-moin deploy prod     # ✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
+moin deploy prod     # ✓ shop v1 is live: https://shop.203-0-113-7.sslip.io
 moin                 # every server, every app, what needs you
 moin backups shop    # the copies, and the last restore check
 ```

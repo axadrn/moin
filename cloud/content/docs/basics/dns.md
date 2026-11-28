@@ -60,7 +60,7 @@ It prints the address. Nothing? The record is not there yet.
 DNS homework is no fun before you know the app runs. So moin gives every app an address that needs no DNS at all, right after the first deploy:
 
 ```text
-✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
+✓ shop v1 is live: https://shop.203-0-113-7.sslip.io
 ```
 
 [sslip.io](https://sslip.io) is a public DNS service. A name with an IP in it answers with that IP. `shop.203-0-113-7.sslip.io` is at `203.0.113.7`. No record to add. HTTPS works on it too.
