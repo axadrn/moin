@@ -18,32 +18,32 @@ templ Catalog(entries []catalog.Entry) {
 		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server with one command. Their databases backed up.",
 		Path:        "/catalog",
 	}) {
-		<main class="moin-page moin-content">
-			@components.Header(components.HeaderProps{Title: "Catalog"})
-			for _, category := range catalog.Categories {
-				{{ apps := inCategory(entries, category) }}
-				if len(apps) > 0 {
-					<section class="moin-section">
-						<div class="moin-section-head">
-							<h2>{ category }</h2>
-						</div>
-						@components.Card(components.CardProps{}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Catalog", Line: "Open source apps for your own server. One command each. Their databases backed up."})
+				for _, category := range catalog.Categories {
+					{{ apps := inCategory(entries, category) }}
+					if len(apps) > 0 {
+						@components.Card(components.CardProps{Title: category}) {
 							@components.List() {
 								for _, app := range apps {
 									@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: catalogIcon(app, false), Name: app.Name, Note: app.Pitch})
 								}
 							}
 						}
-					</section>
+					}
 				}
-			}
+				@components.More(components.MoreProps{Href: "/docs/catalog", Text: "How the catalog works"})
+			</section>
+			@HomeEnd()
 		</main>
 	}
 }
 
-// CatalogApp is the public page of one catalog app: what it is, the
-// command that deploys it, what moin backs up, its compose.yml, its links
-// and the apps like it. All of it comes from its folder in the catalog.
+// CatalogApp is the public page of one catalog app: what it is and the
+// command that deploys it; its compose.yml with what moin backs up and its
+// links; the apps like it; the way in. All of it comes from its folder in
+// the catalog.
 templ CatalogApp(entry catalog.Entry, similar []catalog.Entry, appURL string) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Self-host " + entry.Name + " with Docker Compose",
@@ -51,62 +51,42 @@ templ CatalogApp(entry catalog.Entry, similar []catalog.Entry, appURL string) {
 		Path:        "/catalog/" + entry.Slug,
 	}) {
 		@templ.Raw(catalogJSONLD(entry, appURL+"/catalog/"+entry.Slug))
-		<main class="moin-page moin-content">
-			<div class="moin-stack" data-gap="2">
-				@components.Header(components.HeaderProps{Back: components.Back{Label: "Catalog", Href: "/catalog"}, Icon: catalogIcon(entry, true), Title: entry.Name})
-				<p class="moin-small moin-muted">{ entry.Pitch }</p>
-			</div>
-			if entry.Body != "" {
-				@components.Prose(components.ProseProps{HTML: string(entry.Body)})
-			}
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>Deploy</h2>
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Icon: catalogIcon(entry, true), Title: entry.Name, Line: entry.Pitch})
+				<div class="moin-row" data-center>
+					@components.Command(components.CommandProps{Text: brand.Name + " deploy my-server --catalog " + entry.Slug})
 				</div>
-				@components.Code(components.CodeProps{ID: "catalog-command", Text: brand.Name + " deploy my-server --catalog " + entry.Slug})
-			</section>
-			if entry.Database != "" {
-				<section class="moin-section">
-					<div class="moin-section-head">
-						<h2>Backups</h2>
-					</div>
-					<p class="moin-text">{ catalogBackup(entry) }</p>
-				</section>
-			}
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>compose.yml</h2>
-				</div>
-				<p class="moin-text moin-muted">What { brand.Name } deploys. It fills in every <code>{ "${…}" }</code>: the version, and new secrets.</p>
-				@components.Code(components.CodeProps{ID: "catalog-compose", Text: string(entry.Compose)})
-			</section>
-			<section class="moin-section">
-				<div class="moin-section-head">
-					<h2>Links</h2>
-				</div>
-				@components.Card(components.CardProps{}) {
-					@components.List() {
-						@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
-						if entry.Source != "" {
-							@catalogLink("Source", entry.License, "https://"+entry.Source, false)
-						}
-						@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
-					}
+				if entry.Body != "" {
+					<article class="moin-narrow">
+						@components.Prose(components.ProseProps{HTML: string(entry.Body)})
+					</article>
 				}
 			</section>
-			if entry.Login != "" {
-				<section class="moin-section">
-					<div class="moin-section-head">
-						<h2>First sign-in</h2>
-					</div>
-					<p class="moin-text">{ entry.Login }</p>
-				</section>
-			}
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Title: "What " + brand.Name + " deploys.", Line: "Its compose.yml. " + brand.Name + " fills in the version and new secrets."})
+				<div class="moin-narrow moin-stack">
+					@components.Code(components.CodeProps{ID: "catalog-compose", Text: string(entry.Compose)})
+					@components.Card(components.CardProps{}) {
+						@components.List(templ.Attributes{"data-wrap": true}) {
+							if entry.Database != "" {
+								@components.Item(components.ItemProps{Name: "Backups", Note: catalogBackup(entry)})
+							}
+							if entry.Login != "" {
+								@components.Item(components.ItemProps{Name: "First sign-in", Note: entry.Login})
+							}
+							@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
+							if entry.Source != "" {
+								@catalogLink("Source", entry.License, "https://"+entry.Source, false)
+							}
+							@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
+						}
+					}
+				</div>
+			</section>
 			if len(similar) > 0 {
-				<section class="moin-section">
-					<div class="moin-section-head">
-						<h2>More { entry.Category }</h2>
-					</div>
+				<section class="moin-band">
+					@components.BandHead(components.BandHeadProps{Title: "More " + entry.Category + "."})
 					@components.Card(components.CardProps{}) {
 						@components.List() {
 							for _, app := range similar {
@@ -114,8 +94,10 @@ templ CatalogApp(entry catalog.Entry, similar []catalog.Entry, appURL string) {
 							}
 						}
 					}
+					@components.More(components.MoreProps{Href: "/catalog", Text: "The whole catalog"})
 				</section>
 			}
+			@HomeEnd()
 		</main>
 	}
 }

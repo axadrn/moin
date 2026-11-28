@@ -2054,6 +2054,7 @@
     .moin-card > .moin-rows:first-child > .moin-rows-head + * { border-top: 0; }
   }
   .moin-card-head + .moin-rows { margin-block-start: calc(-1 * var(--space-3)); }
+  .moin-card-head + .moin-list { margin-block-start: calc(-1 * var(--space-3)); }
   .moin-card-head + .moin-values { padding-block-start: 0; border-top: 0; }
 }
 
