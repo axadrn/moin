@@ -14,6 +14,8 @@ moin backups shop    # the copies, and the last restore check
 
 If `ssh prod` works, `moin deploy prod` works. No account, no dashboard, no Docker on your laptop.
 
+A watcher on another machine alerts you when a server goes silent. moin cloud is the watcher we run: `moin watcher connect prod`. It keeps a copy of every database that a hacked server can't delete.
+
 ## Documentation
 
 Everything else is in the docs: [moin.run/docs](https://moin.run/docs).
