@@ -73,8 +73,7 @@ func siteHost(site string) string {
 }
 
 // homeKnocks is the proof after zero trust: the site's own server, every
-// knock dropped. Four facts like the ones above, then the ports bots
-// tried most today.
+// knock dropped. Four numbers, then the ports bots tried most today.
 templ homeKnocks(k HomeKnocks) {
 	{{ rows := knockRows(k.Knocks) }}
 	<section id="knocks" class="moin-band">
@@ -84,14 +83,22 @@ templ homeKnocks(k HomeKnocks) {
 				@components.Chip("Sample data · development only")
 			</div>
 		}
-		<div class="moin-grid" data-cols="2">
-			@homeFact(human.Count(k.Today), "Today. All dropped.")
-			@homeFact(human.Count(k.Year), "This year. Nothing answered.")
-			@homeFact(human.Count(k.Total), "Since the first count.")
-			if len(rows) > 0 {
-				@homeFact(rows[0].Label, "Most tried: "+strconv.FormatInt(rows[0].Share, 10)+"% of today.")
+		@components.Stats() {
+			@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)}) {
+				All dropped.
 			}
-		</div>
+			@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)}) {
+				Nothing answered.
+			}
+			@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)}) {
+				Since the first count.
+			}
+			if len(rows) > 0 {
+				@components.Stat(components.StatProps{Label: "Most tried", Value: rows[0].Label}) {
+					{ strconv.FormatInt(rows[0].Share, 10) }% of today.
+				}
+			}
+		}
 		if len(rows) > 0 {
 			@knockList(rows)
 		}
@@ -104,8 +111,7 @@ templ homeKnocks(k HomeKnocks) {
 // knockList is the card of the ports bots tried most today: the name and
 // its ports, the count, and a thin bar as wide as its share.
 templ knockList(rows []knockRow) {
-	@components.Card(components.CardProps{}) {
-		<span class="moin-fact-name">Most tried today</span>
+	@components.Card(components.CardProps{Title: "Most tried today"}) {
 		@components.Bars(components.BarsProps{Rows: knockBars(rows)})
 	}
 }

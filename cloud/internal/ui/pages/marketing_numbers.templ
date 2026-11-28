@@ -52,42 +52,44 @@ templ homeNumbers(n HomeNumbers) {
 				@components.Chip("Sample data · development only")
 			</div>
 		}
-		<div class="moin-grid" data-cols="2">
+		@components.Stats() {
 			if n.Stars != "" {
-				@numberCard(n.Stars+" stars", "On GitHub.", layouts.GitHubURL)
+				@components.Stat(components.StatProps{Label: "Stars", Value: n.Stars}) {
+					<a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link">On GitHub.</a>
+				}
 			}
 			if n.Downloads > 0 {
-				@numberCard(human.Count(n.Downloads)+" downloads", "Of the files of every release, on GitHub.", layouts.GitHubURL+"/releases")
+				@components.Stat(components.StatProps{Label: "Downloads", Value: human.Count(n.Downloads)}) {
+					<a href={ templ.SafeURL(layouts.GitHubURL + "/releases") } class="moin-link">Of every release, on GitHub.</a>
+				}
 			}
 			if n.Totals.Servers > 0 {
-				@numberCard(strconv.FormatInt(n.Totals.Servers, 10)+" servers", "On "+brand.Name+" cloud right now, with "+strconv.FormatInt(n.Totals.Apps, 10)+" apps.", "")
+				@components.Stat(components.StatProps{Label: "Servers", Value: strconv.FormatInt(n.Totals.Servers, 10)}) {
+					On { brand.Name } cloud right now, with { strconv.FormatInt(n.Totals.Apps, 10) } apps.
+				}
 			}
-		</div>
+		}
 		if len(rows) > 0 {
 			@components.Card(components.CardProps{}) {
-				<div class="moin-numbers">
-					<div class="moin-numbers-row moin-small moin-muted">
-						<span>On { brand.Name } cloud</span>
-						<span>This month</span>
-						<span>This year</span>
-						<span>Total</span>
-					</div>
+				@components.Rows(components.RowsProps{Head: []string{"On " + brand.Name + " cloud", "This month", "This year", "Total"}}) {
 					for _, row := range rows {
-						<div class="moin-numbers-row">
-							<span class="moin-strong">{ row.Name }</span>
-							<span class="moin-digits">{ human.Count(row.Period.Month) }</span>
-							<span class="moin-digits">{ human.Count(row.Period.Year) }</span>
-							<span class="moin-digits">{ human.Count(row.Period.Total) }</span>
-						</div>
+						@components.Row(components.RowProps{}) {
+							@components.Cell() {
+								{ row.Name }
+							}
+							@components.Cell() {
+								<span class="moin-digits">{ human.Count(row.Period.Month) }<span class="moin-only-phone">{ " this month" }</span></span>
+							}
+							@components.Cell() {
+								<span class="moin-digits">{ human.Count(row.Period.Year) }<span class="moin-only-phone">{ " this year" }</span></span>
+							}
+							@components.Cell() {
+								<span class="moin-digits">{ human.Count(row.Period.Total) }<span class="moin-only-phone">{ " in total" }</span></span>
+							}
+						}
 					}
-				</div>
+				}
 			}
 		}
 	</section>
-}
-
-// numberCard is one number in a card like the facts above, and a short
-// line under it. With href the whole card is a link.
-templ numberCard(number, note, href string) {
-	@components.Fact(components.FactProps{Name: number, Note: note, Href: href})
 }

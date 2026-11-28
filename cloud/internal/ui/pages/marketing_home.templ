@@ -187,10 +187,10 @@ templ HomeNobodyGetsIn() {
 			@homeRoadsTall()
 		}
 		<div class="moin-grid" data-cols="2">
-			@homeFact("No open ports.", "Nothing listens for moin. Public SSH closes after the first deploy. It counts every knock.")
-			@homeFact("Tailscale and Cloudflare, built in.", "SSH in your tailnet. Visitors through a tunnel.")
-			@homeFact("No surprise updates.", "Your server updates when you say so.")
-			@homeFact("A hacked watcher is harmless.", "It can read. It can't command.")
+			@components.Fact(components.FactProps{Name: "No open ports.", Note: "Nothing listens for moin. Public SSH closes after the first deploy. It counts every knock."})
+			@components.Fact(components.FactProps{Name: "Tailscale and Cloudflare, built in.", Note: "SSH in your tailnet. Visitors through a tunnel."})
+			@components.Fact(components.FactProps{Name: "No surprise updates.", Note: "Your server updates when you say so."})
+			@components.Fact(components.FactProps{Name: "A hacked watcher is harmless.", Note: "It can read. It can't command."})
 		</div>
 		@components.Fact(components.FactProps{Name: "0 bytes", Note: "Sent to us by the free software. Read the source.", Href: layouts.GitHubURL})
 		@homeMore("/docs/security", "Security in detail")
@@ -210,11 +210,6 @@ templ homeMore(href, text string) {
 	<p class="moin-center">
 		<a href={ templ.SafeURL(href) } class="moin-link moin-foreground">{ text }</a>
 	</p>
-}
-
-// homeFact is one short fact: a name, and a line under it.
-templ homeFact(name, note string) {
-	@components.Fact(components.FactProps{Name: name, Note: note})
 }
 
 // homeRoads draws the two one-way roads: laptop to server over SSH, server
@@ -332,23 +327,11 @@ templ homePlan(p homePlanProps) {
 			<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">{ p.Price }</span><span class="moin-small moin-muted">{ p.Per }</span></span>
 			<span class="moin-text moin-muted">{ p.Line }</span>
 		</div>
-		@homePlanRows(p.Rows...)
+		@components.Ticks(p.Rows...)
 		<div class="moin-card-end">
 			{ children... }
 		</div>
 	}
-}
-
-// homePlanRows are the lines of a plan, each with a check.
-templ homePlanRows(rows ...string) {
-	<ul class="moin-stack moin-text" data-gap="3">
-		for _, row := range rows {
-			<li class="moin-row" data-gap="3">
-				<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" class="moin-muted"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-				{ row }
-			</li>
-		}
-	</ul>
 }
 
 // homeBlog is the newest posts of the blog, as the list /blog shows.
