@@ -439,8 +439,8 @@ func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdou
 	if key.Recipient().String() != has.Public {
 		return fmt.Errorf("this is not the backup key of %s. Its public half is %s", server, has.Public)
 	}
-	var copy *daemon.KeyCopy
-	if err := sshJSON(ctx, server, []string{"bucket", "key", "copy"}, nil, &copy); err != nil {
+	copy, err := keyCopy(ctx, server)
+	if err != nil {
 		return err
 	}
 	if copy != nil {
@@ -461,6 +461,23 @@ func confirmBackupKey(ctx context.Context, server string, stdin io.Reader, stdou
 	}
 	done(stdout, "Your key opens the copies of %s: it read the copy %s of %s from the bucket to the end", server, copy.Copy, copy.Database)
 	return nil
+}
+
+// keyCopy asks the server for the copy that proves your key, nil for a
+// server without a database. A server with an older version names no
+// kind of database, so the copy could not be read: it says to update.
+func keyCopy(ctx context.Context, server string) (*daemon.KeyCopy, error) {
+	var answer *struct {
+		daemon.KeyCopy
+		Postgres *bool `json:"postgres"`
+	}
+	if err := sshJSON(ctx, server, []string{"bucket", "key", "copy"}, nil, &answer); err != nil || answer == nil {
+		return nil, err
+	}
+	if answer.Postgres != nil {
+		return nil, fmt.Errorf("%s runs an older %s than this one. Put this version there with `%s update %s`, then confirm the key again", server, build.Name, build.Name, server)
+	}
+	return &answer.KeyCopy, nil
 }
 
 // fetchAndOpen fetches a copy from the server as it lies in the bucket,

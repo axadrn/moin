@@ -179,3 +179,23 @@ func TestCacheIsListedNotPicked(t *testing.T) {
 		t.Errorf("picked %q, %v", picked.Database, err)
 	}
 }
+
+// TestKeyCopyFromAnOlderServer: a server before the kinds of databases
+// answers "postgres", not "kind". The CLI says to update it, and does not
+// read a Postgres copy as a SQLite file.
+func TestKeyCopyFromAnOlderServer(t *testing.T) {
+	fakeSSH(t, `{"app": "shop", "database": "postgres-db", "postgres": true, "copy": ""}`)
+	_, err := keyCopy(context.Background(), "prod")
+	if err == nil || !strings.Contains(err.Error(), "update prod") {
+		t.Fatalf("err = %v, want one that says to update prod", err)
+	}
+	fakeSSH(t, `{"app": "shop", "database": "postgres-db", "kind": "postgres", "copy": ""}`)
+	copy, err := keyCopy(context.Background(), "prod")
+	if err != nil || copy == nil || copy.Kind != protocol.DatabasePostgres {
+		t.Fatalf("copy = %+v, err = %v, want the Postgres copy", copy, err)
+	}
+	fakeSSH(t, `null`)
+	if copy, err := keyCopy(context.Background(), "prod"); err != nil || copy != nil {
+		t.Fatalf("copy = %+v, err = %v, want none", copy, err)
+	}
+}
