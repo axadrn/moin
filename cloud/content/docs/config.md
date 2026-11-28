@@ -46,7 +46,7 @@ alerts:
     url: https://hooks.slack.com/services/<your hook>
 
 # Where the copies go: any S3-compatible bucket.
-# `moin bucket set prod` writes it, after a test file went in and out.
+# `moin bucket set prod` writes it, after a test file went in.
 bucket:
   endpoint: https://s3.example.com   # leave it out for AWS S3
   region: auto                       # default us-east-1
@@ -54,6 +54,7 @@ bucket:
   path: moin                         # a folder in the bucket, optional
   access_key: <access key>           # needed
   secret_key: <secret key>           # needed
+  locked: true                       # the server writes it at each check
 
 # The public half of your backup key: every copy is encrypted for it.
 # `moin bucket key prod` writes it, `moin bucket confirm prod` sets
@@ -104,6 +105,7 @@ The undo a restore leaves behind is kept just as long as the copies.
 - `region`: the bucket's region. Default `us-east-1`. Cloudflare R2 takes `auto`.
 - `bucket`, `access_key`, `secret_key`: needed, all three.
 - `path`: a folder in the bucket. Then copies go to `<path>/<server>/<app>/<database>/copies/`.
+- `locked`: the bucket refused to delete a fresh file at the last check. The server writes it, at `moin bucket set` and `moin bucket prod`. [Lock your bucket](/docs/backups#lock-your-bucket)
 
 ## backup_key
 

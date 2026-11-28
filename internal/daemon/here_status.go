@@ -28,6 +28,9 @@ type Status struct {
 type Need struct {
 	Text    string `json:"text"`
 	Command string `json:"command"`
+	// Soft is a note, not a problem: nothing is broken, but it could be
+	// safer.
+	Soft bool `json:"soft,omitempty"`
 }
 
 // AppStatus is one app: its live release, whether its containers run, and
@@ -52,6 +55,7 @@ func StatusHere(ctx context.Context, dir string) Status {
 		statuses := a.backups.statuses(ctx)
 		status.Needs = append(backupKeyNeeds(config, statuses), backupNeeds(config, statuses)...)
 		status.Needs = append(status.Needs, tailnetStatusNeeds(ctx, dir, config.Name)...)
+		status.Needs = append(status.Needs, bucketNeeds(config)...)
 	}
 	for _, app := range a.names() {
 		release := a.current(app)
@@ -86,6 +90,15 @@ func backupKeyNeeds(config Config, statuses map[string][]protocol.DatabaseBackup
 		return []Need{{Text: config.Name + ": your backup key is not confirmed. Without it nobody can read the copies when the server is gone.", Command: build.Name + " bucket confirm " + config.Name}}
 	}
 	return nil
+}
+
+// bucketNeeds is a soft note for a bucket that is not locked, as the last
+// check found it: a hacked server could delete the copies in it.
+func bucketNeeds(config Config) []Need {
+	if config.Bucket == nil || config.Bucket.Locked {
+		return nil
+	}
+	return []Need{{Text: config.Name + ": the bucket is not locked. A hacked server could delete its copies.", Command: build.Name + " bucket " + config.Name, Soft: true}}
 }
 
 // backupNeeds says what the backups of the apps need: an app with a

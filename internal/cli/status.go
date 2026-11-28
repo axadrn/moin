@@ -264,6 +264,10 @@ func printNeeds(stdout io.Writer, rows []serverRow) {
 			}
 		}
 		for _, need := range row.status.Needs {
+			if need.Soft {
+				lines = append(lines, style.Muted.Render(need.Text)+"\n  "+command(stdout, need.Command))
+				continue
+			}
 			lines = append(lines, needLine(stdout, need.Text, need.Command))
 		}
 		if row.status.PublicSSH {

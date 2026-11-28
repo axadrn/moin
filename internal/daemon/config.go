@@ -91,6 +91,10 @@ type Bucket struct {
 	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
 	AccessKey string `yaml:"access_key" json:"access_key"`
 	SecretKey string `yaml:"secret_key" json:"secret_key,omitempty"`
+	// Locked says the bucket refused to delete a fresh object at the last
+	// check: a hacked server with these keys can't delete the copies
+	// either. The server writes it down, not you.
+	Locked bool `yaml:"locked,omitempty" json:"locked"`
 }
 
 // BackupKey is the public half of your backup key, which the CLI made on

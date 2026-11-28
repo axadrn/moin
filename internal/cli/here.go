@@ -295,7 +295,8 @@ func exitCodeOf(err error) int {
 }
 
 // hereBucket is `moin here bucket`, which answers the bucket without its
-// secret key, and `moin here bucket set`, which reads one from stdin.
+// secret key, `moin here bucket check`, which checks it first, and `moin
+// here bucket set`, which reads one from stdin.
 func hereBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) == 0 {
 		bucket, err := daemon.BucketHere()
@@ -304,14 +305,19 @@ func hereBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.W
 	if args[0] == "key" {
 		return hereBucketKey(ctx, args[1:], stdin, stdout)
 	}
+	if len(args) == 1 && args[0] == "check" {
+		check, err := daemon.CheckBucketHere(ctx)
+		return respond(stdout, check, err)
+	}
 	if len(args) != 1 || args[0] != "set" {
-		return errors.New("usage: here bucket [set]")
+		return errors.New("usage: here bucket [check|set]")
 	}
 	var bucket daemon.Bucket
 	if err := json.NewDecoder(stdin).Decode(&bucket); err != nil {
 		return fmt.Errorf("read the bucket: %w", err)
 	}
-	return daemon.SetBucketHere(ctx, bucket)
+	saved, err := daemon.SetBucketHere(ctx, bucket)
+	return respond(stdout, saved, err)
 }
 
 // hereAlerts is `moin here alerts`, and `alerts add` with the destination

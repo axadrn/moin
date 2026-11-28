@@ -218,20 +218,54 @@ func BucketHere() (*Bucket, error) {
 }
 
 // SetBucketHere makes bucket the server's bucket, once a test file went in
-// and out with its keys.
-func SetBucketHere(ctx context.Context, bucket Bucket) error {
+// with its keys, and answers it without its secret key. Whether the bucket
+// is locked is written down with it, and never stops the setup.
+func SetBucketHere(ctx context.Context, bucket Bucket) (*Bucket, error) {
 	config, err := readConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	config.Bucket = &bucket
 	if err := config.check(); err != nil {
-		return err
+		return nil, err
 	}
-	if err := testBucket(ctx, named(config)); err != nil {
-		return fmt.Errorf("moin could not write to the bucket with these keys: %s", shortS3(err))
+	if bucket.Locked, err = checkBucket(ctx, named(config)); err != nil {
+		return nil, fmt.Errorf("moin could not write to the bucket with these keys: %s", shortS3(err))
 	}
-	return SaveConfig(config)
+	if err := SaveConfig(config); err != nil {
+		return nil, err
+	}
+	return BucketHere()
+}
+
+// BucketCheck is the server's bucket without its secret key, checked
+// now. Error is why the server could not write to it, "" when it could.
+type BucketCheck struct {
+	*Bucket
+	Error string `json:"error,omitempty"`
+}
+
+// CheckBucketHere checks the server's bucket now: whether the server
+// can write to it, and whether it is locked, which it writes down.
+// Bucket is nil for none.
+func CheckBucketHere(ctx context.Context) (BucketCheck, error) {
+	config, err := readConfig()
+	if err != nil || config.Bucket == nil {
+		return BucketCheck{}, err
+	}
+	locked, err := checkBucket(ctx, named(config))
+	if err != nil {
+		bucket, _ := BucketHere()
+		return BucketCheck{Bucket: bucket, Error: shortS3(err)}, nil
+	}
+	if locked != config.Bucket.Locked {
+		config.Bucket.Locked = locked
+		if err := SaveConfig(config); err != nil {
+			return BucketCheck{}, err
+		}
+	}
+	bucket, err := BucketHere()
+	return BucketCheck{Bucket: bucket}, err
 }
 
 // BackupKeyHere is the public half of your backup key as the server has

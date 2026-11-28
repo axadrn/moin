@@ -235,8 +235,8 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
-	var bucket *daemon.Bucket
-	if err := sshJSON(ctx, server, []string{"bucket"}, nil, &bucket); err != nil {
+	var check daemon.BucketCheck
+	if err := sshJSON(ctx, server, []string{"bucket", "check"}, nil, &check); err != nil {
 		return err
 	}
 	key, err := backupKey(ctx, server)
@@ -245,16 +245,22 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	if flags.json() {
 		return printJSON(stdout, struct {
-			*daemon.Bucket
+			daemon.BucketCheck
 			BackupKey *daemon.BackupKey `json:"backup_key"`
-		}{bucket, key})
+		}{check, key})
 	}
+	bucket := check.Bucket
 	if bucket == nil {
 		fmt.Fprintln(stdout, server+" has no bucket yet, so nothing is backed up.")
 		hint(stdout, "Set one with", build.Name+" bucket set "+server)
 		return nil
 	}
 	table(stdout, []string{"BUCKET", "ENDPOINT", "REGION", "PATH", "ACCESS KEY"}, [][]string{{bucket.Bucket, bucket.Endpoint, bucket.Region, bucket.Path, bucket.AccessKey}})
+	if check.Error != "" {
+		fmt.Fprintln(stdout, style.Danger.Render(style.SymbolFailed)+" "+server+" could not write to the bucket just now: "+check.Error)
+	} else {
+		printLock(stdout, bucket.Locked)
+	}
 	switch {
 	case key == nil:
 		fmt.Fprintln(stdout, style.Danger.Render("✗")+" No backup key of yours: when "+server+" is gone, nobody can read its copies.")
@@ -504,11 +510,17 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	if bucket.Bucket == "" || bucket.AccessKey == "" || bucket.SecretKey == "" {
 		return errors.New("a bucket needs its name, an access key and a secret key: pass --bucket and --access-key, and pipe the secret key in")
 	}
-	if err := sendJSON(ctx, server, bucket, "bucket", "set"); err != nil {
+	body, err := json.Marshal(bucket)
+	if err != nil {
+		return err
+	}
+	var saved daemon.Bucket
+	if err := sshJSON(ctx, server, []string{"bucket", "set"}, bytes.NewReader(body), &saved); err != nil {
 		return err
 	}
 	done(stdout, "%s backs up to %s. The first copies come within a minute", server, bucket.Bucket)
 	hint(stdout, "See them with", build.Name+" backups <app>")
+	printLock(stdout, saved.Locked)
 	// Every copy is encrypted: a server that has no backup key of yours
 	// gets one now.
 	has, err := backupKey(ctx, server)
@@ -516,6 +528,18 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 		return err
 	}
 	return newBackupKey(ctx, server, "", stdin, stdout)
+}
+
+// printLock says whether the bucket refused to delete a fresh object: a
+// locked bucket keeps the copies, also from a hacked server. An unlocked
+// one is no failure, only less safe.
+func printLock(w io.Writer, locked bool) {
+	if locked {
+		fmt.Fprintln(w, style.Success.Render(style.SymbolDone)+" Locked: a hacked server can't delete your copies.")
+		return
+	}
+	fmt.Fprintln(w, style.Warning.Render("!")+" Not locked: a hacked server could delete your copies.")
+	fmt.Fprintln(w, "  "+style.Muted.Render("Turn on a lock: https://moin.run/docs/backups#lock-your-bucket"))
 }
 
 // askBucket asks on a terminal for what the flags left empty, and for the

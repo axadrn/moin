@@ -24,10 +24,11 @@ The copies go into a bucket you own, at any S3-compatible provider: Cloudflare R
 moin bucket set prod
 ```
 
-moin asks for the endpoint, the bucket's name, the access key and the secret key. The secret never lands in your shell history. The server writes a test file into the bucket and deletes it again. Only when that works does it keep the bucket.
+moin asks for the endpoint, the bucket's name, the access key and the secret key. The secret never lands in your shell history. The server writes a test file into the bucket. Only when that works does it keep the bucket. Then it tries to delete the file again, to see whether your bucket is [locked](#lock-your-bucket):
 
 ```text
 ✓ prod backs up to backups. The first copies come within a minute
+✓ Locked: a hacked server can't delete your copies.
 ```
 
 Right after, moin shows your backup key, once, and asks you to paste it back. [Your backup key](#your-backup-key)
@@ -40,9 +41,72 @@ Right after, moin shows your backup key, once, and asks you to paste it back. [Y
 
 - `--region` is the bucket's region, default `us-east-1`. `--path` is a folder in the bucket. Leave `--endpoint` out for AWS S3.
 - The key lives on the server, in `/etc/moin/config.yml`, readable only by root. [Server config](/docs/config#bucket)
-- `moin bucket prod` shows what is set, never the secret.
+- `moin bucket prod` shows what is set, never the secret. It checks the lock again, and `--json` says `"locked": true`.
 
 Without a bucket and without [moin cloud](#copies-to-moin-cloud), moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.` And `moin` shows a `!` line for each app with a database: `shop: no backup yet.`
+
+## Lock your bucket
+
+A hacker who takes your server has its keys to the bucket. With them, they could delete your copies too. A lock stops that. A locked bucket keeps every new file for some days, and nobody can delete it before. Not the server, not a hacker, not you.
+
+moin checks it for you. Without a lock, `moin bucket set` and `moin bucket prod` say:
+
+```text
+! Not locked: a hacked server could delete your copies.
+  Turn on a lock: https://moin.run/docs/backups#lock-your-bucket
+```
+
+That is a hint, not an error. Your backups work either way. `moin` shows it as a grey line: `prod: the bucket is not locked.`
+
+Lock for 7 days. That is how long moin keeps a copy. Keep copies longer in the [config](#how-often)? Lock for as long, not longer.
+
+Turn the lock on at your provider, below. Then run `moin bucket prod`. It checks again:
+
+```text
+✓ Locked: a hacked server can't delete your copies.
+```
+
+- The check leaves one small file in the bucket: `<path>/<server>/moin-lock-check`. Each check writes the same one. It goes away when its lock ends.
+- A lock means what it says. Nobody can delete a file before its days are up, also the provider's support. That is the point.
+
+### Cloudflare R2
+
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com), then R2 Object Storage.
+2. Click your bucket, then the Settings tab.
+3. Find Bucket lock rules and click Add rule.
+4. Name it `moin`. Leave the prefix empty. Retention: 7 days.
+5. Click Save changes.
+
+### AWS S3
+
+A lock needs a new bucket.
+
+1. Open the S3 console and click Create bucket.
+2. Give it a name. Under Bucket Versioning, pick Enable.
+3. Under Object Lock, pick Enable, and tick the box that you understand.
+4. Click Create bucket.
+5. Open the new bucket, then Properties. Under Object Lock, click Edit.
+6. Default retention: Enable. Mode: Compliance. 7 days. Save changes.
+7. Then Management, Create lifecycle rule. Apply it to all objects. Tick Permanently delete noncurrent versions of objects, after 1 day. Save. Without it, deleted copies stay hidden in the bucket and cost money.
+
+Then `moin bucket set prod` with the new bucket.
+
+### Backblaze B2
+
+1. Open Buckets and click Create a Bucket.
+2. Give it a name. Files: Private. Object Lock: Enable.
+3. Click Create a Bucket.
+4. On the new bucket, click Object Lock. Default retention: Compliance, 7 days. Update.
+5. Click Lifecycle Settings. Pick Keep prior versions for this number of days: 1. Update.
+
+### MinIO
+
+Make a new bucket with a lock, then give it 7 days, with MinIO's `mc` tool:
+
+```bash
+mc mb --with-lock local/backups
+mc retention set --default compliance 7d local/backups
+```
 
 ## Copies to moin cloud
 
