@@ -92,7 +92,7 @@ func billingSite(t *testing.T) (*httptest.Server, *http.Client, *outbox, *fakeSt
 	mails := &outbox{}
 	server := httptest.NewUnstartedServer(nil)
 	appURL := "http://" + server.Listener.Addr().String()
-	cloud := handler.NewCloud(store, watchers.New(store, counts.New(database), mails, appURL), mails, github.New("", "", "", ""), appURL, false)
+	cloud := handler.NewCloud(store, watchers.New(store, counts.New(database), mails, appURL, [32]byte{}), mails, github.New("", "", "", ""), appURL, false)
 	cloud.Stripe = stripe.New(stripe.Settings{
 		SecretKey: "sk_test", WebhookSecret: webhookSecret, API: stripeServer.URL,
 		Product: "prod_cloud", Monthly: "price_monthly", Yearly: "price_yearly",

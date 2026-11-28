@@ -29,7 +29,7 @@ func knocksCloud(t *testing.T, knocks *report.Knocks) (*Cloud, string) {
 	}
 	t.Cleanup(func() { database.Close() })
 	store := workspace.NewStore(database)
-	watching := watchers.New(store, counts.New(database), mailer.Log{}, "http://site.test")
+	watching := watchers.New(store, counts.New(database), mailer.Log{}, "http://site.test", [32]byte{})
 	space, err := store.SignIn("ada@example.com")
 	if err != nil {
 		t.Fatal(err)

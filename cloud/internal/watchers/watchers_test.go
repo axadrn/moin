@@ -3,6 +3,8 @@ package watchers
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,7 +33,7 @@ func TestReceiveAndMail(t *testing.T) {
 	defer database.Close()
 	store := workspace.NewStore(database)
 	mails := &outbox{}
-	ws := New(store, counts.New(database), mails, "https://cloud.example.com/")
+	ws := New(store, counts.New(database), mails, "https://cloud.example.com/", [32]byte{1})
 	space, _ := store.SignIn("ada@example.com")
 	token, _ := store.ConnectServer(space.ID, "prod")
 
@@ -46,10 +48,6 @@ func TestReceiveAndMail(t *testing.T) {
 	}
 	if got, _ := store.Workspace(space.ID); got.TrialEnds.IsZero() {
 		t.Error("the first report did not start the trial")
-	}
-	ws.save()
-	if saved, _ := store.WatcherState(space.ID); !strings.Contains(string(saved), `"prod"`) {
-		t.Errorf("saved = %s", saved)
 	}
 
 	send := ws.sender(space.ID, "ada@example.com")
@@ -75,7 +73,7 @@ func TestTrialOver(t *testing.T) {
 	defer database.Close()
 	store := workspace.NewStore(database)
 	mails := &outbox{}
-	ws := New(store, counts.New(database), mails, "https://cloud.example.com")
+	ws := New(store, counts.New(database), mails, "https://cloud.example.com", [32]byte{1})
 	space, _ := store.SignIn("ada@example.com")
 	if err := store.StartTrial(space.ID, time.Now().Add(-26*24*time.Hour)); err != nil {
 		t.Fatal(err)
@@ -99,5 +97,79 @@ func TestTrialOver(t *testing.T) {
 	}
 	if len(*mails) != 2 {
 		t.Errorf("an alert went out after the trial: %+v", (*mails)[2])
+	}
+}
+
+// What a watcher knows holds the alert destinations of its servers. It
+// is saved encrypted, opens with the same key only, and only as the
+// state of its own workspace.
+func TestStateEncrypted(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "cloud.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	store := workspace.NewStore(database)
+	ws := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{1})
+	space, _ := store.SignIn("ada@example.com")
+	token, _ := store.ConnectServer(space.ID, "prod")
+	chat := report.Alert{Kind: "telegram", Token: "123:secret-bot-token", ChatID: "42"}
+	if err := ws.Receive(token, report.Report{Server: "prod", EverySeconds: 60, Alerts: []report.Alert{chat}}); err != nil {
+		t.Fatal(err)
+	}
+	ws.save()
+	sealed, _ := store.WatcherState(space.ID)
+	for _, plain := range []string{"secret-bot-token", "telegram", "prod"} {
+		if len(sealed) == 0 || strings.Contains(string(sealed), plain) {
+			t.Fatalf("the saved state shows %q: %q", plain, sealed)
+		}
+	}
+	state, err := ws.open(space.ID, sealed)
+	if err != nil || !strings.Contains(string(state), "secret-bot-token") {
+		t.Fatalf("open = %s, %v", state, err)
+	}
+	if _, err := ws.open("another-workspace", sealed); err == nil {
+		t.Error("the state opened as another workspace's")
+	}
+
+	// After a restart with the same key the watcher knows its server.
+	again := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{1})
+	if view, err := again.View(space.ID); err != nil || len(view.Servers) != 1 || view.Servers[0].Name != "prod" {
+		t.Errorf("view = %+v, %v", view, err)
+	}
+	other := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{2})
+	if err := other.Load(); err == nil || !strings.Contains(err.Error(), "SECRETS_KEY") {
+		t.Errorf("another key: %v", err)
+	}
+}
+
+// An alert of a report goes to public https addresses only: a webhook at
+// a private address is refused before anything is sent, and so is http.
+func TestPrivateWebhookRefused(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "cloud.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	store := workspace.NewStore(database)
+	ws := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{1})
+	space, _ := store.SignIn("ada@example.com")
+	if err := store.StartTrial(space.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	inside := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+	defer inside.Close()
+	ws.public.Transport.(*http.Transport).TLSClientConfig = inside.Client().Transport.(*http.Transport).TLSClientConfig
+	send := ws.sender(space.ID, "ada@example.com")
+	for _, address := range []string{inside.URL + "/hook", "https://10.0.0.5/hook", "https://[::1]/hook", "http://example.com/hook"} {
+		for _, kind := range []string{"webhook", "slack", "discord"} {
+			if err := send(t.Context(), alert.Destination{Kind: kind, URL: address}, alert.Message{Title: "prod stopped reporting"}); err == nil {
+				t.Errorf("%s to %s went out", kind, address)
+			}
+		}
+	}
+	if called {
+		t.Error("a webhook at a private address was called")
 	}
 }

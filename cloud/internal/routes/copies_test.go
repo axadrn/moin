@@ -53,7 +53,7 @@ func TestCopyRoundTrip(t *testing.T) {
 	mails := &outbox{}
 	server := httptest.NewUnstartedServer(nil)
 	appURL := "http://" + server.Listener.Addr().String()
-	cloud := handler.NewCloud(store, watchers.New(store, counts.New(database), mails, appURL), mails, github.New("", "", "", ""), appURL, false)
+	cloud := handler.NewCloud(store, watchers.New(store, counts.New(database), mails, appURL, [32]byte{}), mails, github.New("", "", "", ""), appURL, false)
 	cloud.Copies = copies.New(store, copies.NewBucket(endpoint, "copies-test", "test", "test"), mails, appURL)
 	site, err := New(&config.Config{RenderConfig: config.RenderConfig{AppURL: appURL}}, cloud)
 	if err != nil {

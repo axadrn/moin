@@ -2,6 +2,8 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -58,6 +60,11 @@ type Config struct {
 	CopiesBucket    string
 	CopiesAccessKey string
 	CopiesSecretKey string
+	// SecretsKey locks what moin cloud keeps of each watcher, with the
+	// alert destinations of its servers: SECRETS_KEY, 32 random bytes in
+	// base64, from `openssl rand -base64 32`. Never change it: what it
+	// locked no longer opens. Development has a fixed test key.
+	SecretsKey [32]byte
 }
 
 // RenderConfig is what templates may know of the settings: nothing secret.
@@ -110,6 +117,14 @@ func Load() (*Config, error) {
 	default:
 		errs = append(errs, errors.New(`APP_ENV must be "development" or "production"`))
 	}
+	switch key, err := base64.StdEncoding.DecodeString(env("SECRETS_KEY", "")); {
+	case len(key) == 0 && err == nil && cfg.Development:
+		cfg.SecretsKey = sha256.Sum256([]byte("development"))
+	case err != nil || len(key) != len(cfg.SecretsKey):
+		errs = append(errs, errors.New("SECRETS_KEY must be 32 random bytes in base64: openssl rand -base64 32"))
+	default:
+		copy(cfg.SecretsKey[:], key)
+	}
 	if !absoluteURL(cfg.AppURL) {
 		errs = append(errs, errors.New("APP_URL must be an absolute HTTP or HTTPS URL"))
 	}
@@ -157,12 +172,13 @@ func Load() (*Config, error) {
 }
 
 // Needed are the settings moin.run itself needs: mail to people, GitHub
-// sign-in, billing and copies. A site on a laptop runs without them.
+// sign-in, billing, copies and the key for what it keeps of alerts. A site on a laptop runs without them.
 var Needed = []string{
 	"EMAIL_FROM", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN",
 	"GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET",
 	"STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRODUCT_ID_PRO", "STRIPE_PRICE_ID_PRO_MONTHLY", "STRIPE_PRICE_ID_PRO_YEARLY",
 	"COPIES_ENDPOINT", "COPIES_BUCKET", "COPIES_ACCESS_KEY", "COPIES_SECRET_KEY",
+	"SECRETS_KEY",
 }
 
 // Missing are the Needed settings that are empty.

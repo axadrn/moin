@@ -1,14 +1,20 @@
 // Package watchers is the watcher moin cloud runs: one watcher of
 // internal/watcher per workspace, all fed by POST /report, all visiting
 // domains through one Visitor with a cap. Alerts go to the workspace's
-// mail.
+// mail and where each server's report says. What a watcher knows holds
+// those destinations, so it is saved encrypted.
 package watchers
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +51,11 @@ type Watchers struct {
 	mailer  mailer.Mailer
 	visitor *watcher.Visitor
 	appURL  string
+	// sealer encrypts what a watcher knows before it is saved: AES-GCM.
+	sealer cipher.AEAD
+	// public sends the alerts to Telegram, Slack, Discord and webhooks:
+	// to public addresses only, no redirects followed.
+	public *http.Client
 
 	mu sync.Mutex
 	// byWorkspace are the watchers by workspace id, made when first needed.
@@ -52,16 +63,51 @@ type Watchers struct {
 }
 
 // New are the watchers of the workspaces in store. Each report adds to
-// counts. Alerts go out through mailer, with a link to appURL.
-func New(store *workspace.Store, counts *counts.Counts, mailer mailer.Mailer, appURL string) *Watchers {
+// counts. Alerts go out through mailer, with a link to appURL. What each
+// watcher knows is saved encrypted with key.
+func New(store *workspace.Store, counts *counts.Counts, mailer mailer.Mailer, appURL string, key [32]byte) *Watchers {
+	// A key of 32 bytes is always one AES and GCM take.
+	block, _ := aes.NewCipher(key[:])
+	sealer, _ := cipher.NewGCM(block)
 	return &Watchers{
-		store:       store,
-		counts:      counts,
-		mailer:      mailer,
-		visitor:     watcher.NewVisitor(visitsAtOnce),
-		appURL:      strings.TrimRight(appURL, "/"),
+		store:   store,
+		counts:  counts,
+		mailer:  mailer,
+		visitor: watcher.NewVisitor(visitsAtOnce),
+		appURL:  strings.TrimRight(appURL, "/"),
+		sealer:  sealer,
+		public: &http.Client{
+			Timeout:       10 * time.Second,
+			Transport:     &http.Transport{DialContext: (&net.Dialer{Timeout: 5 * time.Second, Control: watcher.RefusePrivate}).DialContext},
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
 		byWorkspace: map[string]*watcher.Watcher{},
 	}
+}
+
+// seal encrypts what the watcher of workspace id knows: a fresh nonce,
+// then the ciphertext. The id is sealed in, so one workspace's state
+// never opens as another's.
+func (ws *Watchers) seal(id string, state []byte) []byte {
+	nonce := make([]byte, ws.sealer.NonceSize())
+	rand.Read(nonce)
+	return ws.sealer.Seal(nonce, nonce, state, []byte(id))
+}
+
+// open decrypts what seal made. Nothing saved stays nothing.
+func (ws *Watchers) open(id string, sealed []byte) ([]byte, error) {
+	if len(sealed) == 0 {
+		return nil, nil
+	}
+	size := ws.sealer.NonceSize()
+	if len(sealed) < size {
+		return nil, errors.New("the saved watcher state is too short")
+	}
+	state, err := ws.sealer.Open(nil, sealed[:size], sealed[size:], []byte(id))
+	if err != nil {
+		return nil, errors.New("the saved watcher state does not open with SECRETS_KEY")
+	}
+	return state, nil
 }
 
 // Counts are the counts the reports add to, for the landing page.
@@ -100,9 +146,13 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	saved, err := ws.store.WatcherState(id)
+	sealed, err := ws.store.WatcherState(id)
 	if err != nil {
 		return nil, err
+	}
+	saved, err := ws.open(id, sealed)
+	if err != nil {
+		return nil, fmt.Errorf("workspace %s: %w", id, err)
 	}
 	w, err := watcher.New(servers, []alert.Destination{{Kind: mailKind}}, saved)
 	if err != nil {
@@ -114,10 +164,12 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	return w, nil
 }
 
-// sender mails an alert to the workspace. After the trial, unpaid, no
-// alert goes out: it is dropped, not kept for later.
+// sender sends an alert: as a mail to the workspace, or to a destination
+// a server's report named, which must be https at a public address.
+// After the trial, unpaid, no alert goes out: it is dropped, not kept
+// for later.
 func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destination, alert.Message) error {
-	return func(ctx context.Context, _ alert.Destination, m alert.Message) error {
+	return func(ctx context.Context, d alert.Destination, m alert.Message) error {
 		space, err := ws.store.Workspace(id)
 		if err != nil {
 			return err
@@ -125,6 +177,12 @@ func (ws *Watchers) sender(id, to string) func(context.Context, alert.Destinatio
 		if !space.AlertsOn(time.Now()) {
 			slog.Info("alert not sent, the trial is over", "workspace", id, "title", m.Title)
 			return nil
+		}
+		if d.Kind != mailKind {
+			if d.URL != "" && !strings.HasPrefix(d.URL, "https://") {
+				return errors.New("the alert url must start with https://")
+			}
+			return alert.SendWith(ctx, ws.public, d, m)
 		}
 		text := m.Text
 		if text != "" {
@@ -242,7 +300,7 @@ func (ws *Watchers) visit(ctx context.Context) {
 // save keeps what every watcher knows, when it changed.
 func (ws *Watchers) save() {
 	for id, w := range ws.all() {
-		err := w.Save(func(state []byte) error { return ws.store.SaveWatcherState(id, state) })
+		err := w.Save(func(state []byte) error { return ws.store.SaveWatcherState(id, ws.seal(id, state)) })
 		if err != nil {
 			slog.Error("save watcher state", "workspace", id, "error", err)
 		}

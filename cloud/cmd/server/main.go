@@ -69,7 +69,7 @@ func run() error {
 	if _, logs := mail.(mailer.Log); logs && !cfg.Development {
 		slog.Warn("no CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN: mails go to the log, not to people")
 	}
-	watching := watchers.New(store, counts.New(database), mail, cfg.AppURL)
+	watching := watchers.New(store, counts.New(database), mail, cfg.AppURL, cfg.SecretsKey)
 	if err := watching.Load(); err != nil {
 		return err
 	}
