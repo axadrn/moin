@@ -1,6 +1,6 @@
 ---
 name: Rocket.Chat
-pitch: Team chat with channels, threads and calls, like Slack.
+pitch: Team chat like Slack. Channels. Threads. Calls.
 category: Communication
 website: "https://www.rocket.chat"
 source: github.com/RocketChat/Rocket.Chat

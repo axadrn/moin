@@ -1,6 +1,6 @@
 ---
 name: Mealie
-pitch: Your recipes, meal plans and shopping lists in one place.
+pitch: Your recipes in one place. Meal plans and shopping lists too.
 category: Productivity
 website: "https://mealie.io"
 source: github.com/mealie-recipes/mealie

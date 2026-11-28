@@ -1,6 +1,6 @@
 ---
 name: Twenty
-pitch: The open CRM. Contacts, companies and deals, your way.
+pitch: The open CRM. Contacts. Companies. Deals. Your way.
 category: Marketing
 website: https://twenty.com
 source: github.com/twentyhq/twenty

@@ -1,6 +1,6 @@
 ---
 name: Actual Budget
-pitch: Envelope budgeting that is fast, private and yours.
+pitch: Envelope budgeting. Fast and private. Yours.
 category: Finance
 website: "https://actualbudget.org"
 source: github.com/actualbudget/actual

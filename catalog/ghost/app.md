@@ -1,6 +1,6 @@
 ---
 name: Ghost
-pitch: Publishing and newsletters, with paid members built in.
+pitch: Publishing and newsletters. Paid members built in.
 category: Websites
 website: "https://ghost.org"
 source: github.com/TryGhost/Ghost

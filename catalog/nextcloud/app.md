@@ -1,6 +1,6 @@
 ---
 name: Nextcloud
-pitch: Files, calendar and contacts, like Google Drive, on your server.
+pitch: Your files. Your calendar and contacts. Like Google Drive on your server.
 category: Documents
 website: "https://nextcloud.com"
 source: github.com/nextcloud/server

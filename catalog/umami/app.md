@@ -1,6 +1,6 @@
 ---
 name: Umami
-pitch: Website analytics without cookies. Simple, fast, yours.
+pitch: Website analytics without cookies. Simple. Fast. Yours.
 category: Analytics
 website: https://umami.is
 source: github.com/umami-software/umami

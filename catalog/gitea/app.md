@@ -1,6 +1,6 @@
 ---
 name: Gitea
-pitch: Git hosting, code review and CI. Like GitHub, on your server.
+pitch: Git hosting with code review and CI. Like GitHub on your server.
 category: Developer tools
 website: https://about.gitea.com
 source: github.com/go-gitea/gitea

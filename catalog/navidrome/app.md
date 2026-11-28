@@ -1,6 +1,6 @@
 ---
 name: Navidrome
-pitch: Your music collection, streamed anywhere.
+pitch: Your music collection. Streamed anywhere.
 category: Media
 website: "https://www.navidrome.org"
 source: github.com/navidrome/navidrome

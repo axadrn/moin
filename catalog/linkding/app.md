@@ -1,6 +1,6 @@
 ---
 name: linkding
-pitch: Bookmarks you keep. Tagged, searchable, yours.
+pitch: Bookmarks you keep. Tagged. Searchable. Yours.
 category: Productivity
 website: "https://linkding.link"
 source: github.com/sissbruecker/linkding

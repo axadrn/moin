@@ -1,6 +1,6 @@
 ---
 name: Vaultwarden
-pitch: Your own password manager, with every Bitwarden app.
+pitch: Your own password manager. Every Bitwarden app works.
 category: Security
 website: https://github.com/dani-garcia/vaultwarden
 source: github.com/dani-garcia/vaultwarden

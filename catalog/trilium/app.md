@@ -1,6 +1,6 @@
 ---
 name: Trilium
-pitch: Notes that grow into a knowledge base. Deep, fast, private.
+pitch: Notes that grow into a knowledge base. Deep. Fast. Private.
 category: Productivity
 website: https://triliumnotes.org
 source: github.com/TriliumNext/Trilium

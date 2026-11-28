@@ -1,6 +1,6 @@
 ---
 name: Grafana
-pitch: Dashboards for every metric, log and database you have.
+pitch: Dashboards for every metric. Every log. Every database you have.
 category: Analytics
 website: "https://grafana.com"
 source: github.com/grafana/grafana

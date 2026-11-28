@@ -1,6 +1,6 @@
 ---
 name: Seafile
-pitch: File sync and share. Dropbox, on your server.
+pitch: File sync and share. Dropbox on your server.
 category: Productivity
 website: https://www.seafile.com
 source: github.com/haiwen/seafile
