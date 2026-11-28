@@ -95,6 +95,10 @@ servers:
 2. On your laptop, point prod at this watcher:
 
   moin watcher connect prod https://watcher.example.com <a new token>
+
+3. Alerts go where you send them, on your laptop:
+
+  moin alerts add prod telegram
 ```
 
 Do what it says: save the file, then `chmod 600`. The alerts come from prod itself: `moin alerts add prod …`.
@@ -132,7 +136,12 @@ moin watcher connect prod https://watcher.example.com <token>
 ✓ prod reports to https://watcher.example.com every minute
 ```
 
-That's it. `moin servers` shows it in the column `WATCHERS`.
+That's it. `moin servers` shows it in the column `WATCHERS`, and `moin watcher` too:
+
+```text
+SERVER   WATCHERS
+prod     https://watcher.example.com
+```
 
 ## One more server
 
@@ -152,6 +161,10 @@ The config is there now, so it prints one line for it:
 2. On your laptop, point web-1 at this watcher:
 
   moin watcher connect web-1 https://watcher.example.com <a new token>
+
+3. Alerts go where you send them, on your laptop:
+
+  moin alerts add web-1 telegram
 ```
 
 The watcher reads its config when it starts. So restart it after a change: `systemctl restart moin-watcher`.
@@ -221,7 +234,17 @@ moin watcher connect prod                                       # moin cloud
 moin watcher disconnect prod                                    # moin cloud
 ```
 
-Without an address, it is moin cloud. The first time, the browser signs your laptop in. `moin watcher` shows your plan of moin cloud too, the days left of the trial, and where to pay.
+Without an address, it is moin cloud. The first time, the browser signs your laptop in. `moin watcher` shows your plan of moin cloud too, under the table:
+
+```text
+SERVER   WATCHERS
+prod     moin cloud
+web-1    none: nobody notices when it is gone
+
+moin cloud  ada@example.com  Trial, 12 days left
+```
+
+A server with no watcher is yellow in `moin` too. Without a plan to pay, the trial days left and the billing link show here.
 
 `moin watcher disconnect` asks first, because that watcher will then say the server is silent. In a script, add `-y`.
 

@@ -17,7 +17,16 @@ moin watcher connect prod
 
 The first time, it opens the browser. Sign in with GitHub or a link we send to your mail. No password. The page shows a code. Allow it when it is the one in your terminal.
 
+```text
+→ Sign in to moin cloud in the browser, and allow the code K7QF-92MD: https://moin.run/cli?code=K7QF-92MD
+✓ Signed in to moin cloud
+✓ prod reports to moin cloud every minute
+  See it with `moin watcher`
+```
+
 Then prod gets a token. From then on prod reports to moin cloud. Connect every server the same way.
+
+Alerts are set once, on the server: `moin alerts add prod telegram`. Each report carries them, so moin cloud alerts there too, and sends a mail. [Watcher](/docs/watcher#alerts)
 
 ```bash
 moin watcher                       # each server's watchers, your plan, trial days left, billing

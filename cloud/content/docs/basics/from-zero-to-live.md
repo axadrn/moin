@@ -56,13 +56,16 @@ moin deploy prod
 ```text
 shop · 3f2a9c1 → prod
 ? Set up moin on prod and deploy shop? [y/N] y
-→ installing Docker
-→ installing moin v1.2.3
-→ starting the daemon: backups, restore checks, reports
-→ building
-→ starting
-→ v1 is live
-✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
+✓ installing Docker  41s
+✓ installing moin v1.2.3  1s
+✓ starting the daemon: backups, checks, reports  1s
+✓ sending the source
+✓ starting the proxy on ports 80 and 443
+✓ detected compose, service web on port 3000
+✓ building  9s
+✓ starting  12s
+✓ database postgres-db (Postgres, service db)
+✓ shop v1 is live: https://shop.203-0-113-7.sslip.io
   Postgres found. No backup yet: moin bucket set prod
 ```
 
@@ -80,7 +83,7 @@ moin looks at your folder, and builds it like this:
 | `Gemfile` | Ruby and Rails, with Railpack |
 | `composer.json` or `index.php` | PHP, with Railpack |
 
-Railpack says what it found, like `→ Railpack: Node 24.11.1, start: npm run start`.
+Railpack says what it found, like `→ Railpack: Node 24.11.1, start: npm run start`, dimmed under the step.
 
 Without a compose file, your app listens on `PORT`, which is `8080`, on every address, not only `localhost`. A SQLite file goes in `DATA_DIR`, which is `/data`, so it is kept and backed up. Settings and secrets go in its env: `moin env edit shop`. [Docker and compose](/docs/basics/docker)
 
@@ -121,6 +124,9 @@ moin bucket set prod
 It asks for the endpoint, the bucket name, the access key and the secret key. Then it shows your backup key, once:
 
 ```text
+✓ prod backs up to backups. The first copies come within a minute
+  See them with `moin backups <app>`
+
 Your backup key for prod. It is shown once.
   AGE-SECRET-KEY-1…
 ? Paste your backup key, to confirm that you have it:
@@ -136,7 +142,7 @@ moin backups shop
 moin restore shop
 ```
 
-`moin backups` lists the copies, and the last daily restore check. `moin restore` lets you pick a copy, and keeps the data from before as an undo. Try it once now, on a quiet day. [Backups](/docs/backups#restore)
+`moin backups` lists the copies, and the last daily restore check. The copy that check proved says `✓ checked`. `moin restore` lets you pick a copy, and keeps the data from before as an undo. Try it once now, on a quiet day. [Backups](/docs/backups#restore)
 
 ## 10. Someone who notices
 
@@ -149,7 +155,10 @@ moin watcher connect prod
 The first time, the browser signs your laptop in.
 
 ```text
+→ Sign in to moin cloud in the browser, and allow the code K7QF-92MD: https://moin.run/cli?code=K7QF-92MD
+✓ Signed in to moin cloud
 ✓ prod reports to moin cloud every minute
+  See it with `moin watcher`
 ```
 
 Or run your own watcher, on another machine. [Watcher](/docs/watcher#set-one-up)
