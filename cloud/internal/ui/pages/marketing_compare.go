@@ -18,22 +18,19 @@ func compareIndexDescription() string {
 	return fmt.Sprintf("%s next to %s and %d more tools. Fact by fact, from each tool's own docs.", brand.Name, strings.Join(names, ", "), len(compare.Competitors)-len(names))
 }
 
+// homeCompareHead names the columns of the home table: the fact, this
+// tool, then the others.
+func homeCompareHead() []string {
+	head := []string{"", brand.Name}
+	for _, competitor := range compare.Competitors {
+		head = append(head, competitor.Name)
+	}
+	return head
+}
+
 // homeCompareRows are the facts the home page shows, by their place in
 // compare.Rows: who commands the server, what is open to the internet,
 // the daily check, and who notices a dead server.
 func homeCompareRows() []int {
 	return []int{0, 1, 3, 5}
-}
-
-// markSymbol is how a mark reads in the home table.
-func markSymbol(mark compare.Mark) string {
-	switch mark {
-	case compare.Yes:
-		return "✓"
-	case compare.Part:
-		return "◐"
-	case compare.No:
-		return "✗"
-	}
-	return "·"
 }

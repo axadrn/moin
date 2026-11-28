@@ -85,7 +85,7 @@ var Rows = []Row{
 	{"Your server", "Open to the internet", yes("80 and 443", "Public SSH closes after the first deploy. With a Cloudflare Tunnel, no port at all.", "")},
 	{"Your data", "Database backups", yes("SQLite and Postgres", "Found by themselves. On a schedule, into your bucket.", "")},
 	{"Your data", "Restored and checked every day", yes("Yes", "The newest copy is restored into a throwaway database and read.", "")},
-	{"Your data", "A copy a hacked server can't delete", plain("Coming, with "+brand.Name+" cloud", "The server can add copies there, never delete them. The server's key to your own bucket can delete, like everyone's.", "")},
+	{"Your data", "A copy a hacked server can't delete", plain("A lock on your bucket, or "+brand.Name+" cloud", "Lock your own bucket, and "+brand.Name+" checks the lock. Or "+brand.Name+" cloud keeps a copy the server can add to, never delete.", "/docs/backups#lock-your-bucket")},
 	{"Every day", "Notices when a server is gone", yes("The watcher", "On another server, or "+brand.Name+" cloud. It alerts when a server goes silent.", "")},
 	{"Every day", "What you write", yes("Nothing, or a compose file", "No Dockerfile needed. "+brand.Name+" builds without one.", "")},
 	{"Every day", "Where it builds", yes("On your server", "The source goes over SSH. No Docker on your laptop, no registry.", "")},
