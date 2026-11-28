@@ -345,7 +345,10 @@ func TestBackupSQLite(t *testing.T) {
 	// A copy from the future, after the clock jumped, does not stop the
 	// copies: the newest real one counts (the broken copy above is a
 	// minute ahead).
+	// The failed check above would hold the copy back for a while: it is
+	// not what this part tests.
 	test.b.mu.Lock()
+	test.b.state(app, test.database).CheckError = ""
 	test.b.state(app, test.database).LastCopy = time.Now().Add(time.Hour)
 	test.b.mu.Unlock()
 	test.b.tick(test.ctx)
