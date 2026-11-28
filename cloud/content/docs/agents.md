@@ -1,6 +1,6 @@
 ---
 title: "moin for agents"
-description: "Claude Code, Codex and Cursor drive moin through the CLI. --json to read, -y to delete, exit codes to know. No MCP server, because nothing on your server listens."
+description: "Claude Code, Codex and Cursor drive moin through the CLI. --json to read, -y to delete, exit codes to know. No MCP server: nothing on your server listens."
 group: "Reference"
 order: 4
 ---
