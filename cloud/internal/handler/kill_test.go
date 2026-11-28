@@ -16,7 +16,7 @@ import (
 	"github.com/axadrn/moin/cloud/internal/service"
 )
 
-// TestPricesHaveSources: every price of /kill-your-subscriptions says where
+// TestPricesHaveSources: every price of /kill-your-saas-subscriptions says where
 // it is from and when someone read it there, and its app is in the catalog.
 func TestPricesHaveSources(t *testing.T) {
 	prices, err := service.Prices(content.FS(false))
@@ -55,7 +55,7 @@ func TestKillCommandsWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := httptest.NewRecorder()
-	Kill(content.FS(false), entries)(w, httptest.NewRequest("GET", "/kill-your-subscriptions", nil))
+	Kill(content.FS(false), entries)(w, httptest.NewRequest("GET", "/kill-your-saas-subscriptions", nil))
 	data, _ := io.ReadAll(w.Result().Body)
 	body := string(data)
 	if w.Code != 200 {

@@ -14,7 +14,7 @@ import (
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 )
 
-// Kill is /kill-your-subscriptions: the prices of content/prices.json,
+// Kill is /kill-your-saas-subscriptions: the prices of content/prices.json,
 // read on every request, each with the catalog app that replaces it.
 func Kill(files fs.FS, entries []catalog.Entry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

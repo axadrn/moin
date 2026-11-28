@@ -2824,7 +2824,7 @@
 .moin-brand-glyphs { font-weight: 600; letter-spacing: -0.04em; }
 .moin-brand-wrong-font { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 3rem; line-height: 1; }
 
-/* Kill your subscriptions: each bill and the command that replaces it,
+/* Kill your SaaS subscriptions: each bill and the command that replaces it,
    and a dock that keeps the sum in view while you tick. */
 .moin-swaps { margin-block: calc(-1 * var(--pad)) calc(var(--pad) - var(--space-4)); }
 .moin-swaps:not(:has(> :not([hidden]))) { display: none; }

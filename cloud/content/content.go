@@ -1,5 +1,5 @@
 // Package content holds the texts of the site: the blog, docs, legal
-// pages, the changelog, llms.txt, the prices of /kill-your-subscriptions and
+// pages, the changelog, llms.txt, the prices of /kill-your-saas-subscriptions and
 // the posts from X. The catalog is its own package, catalog/ at the root,
 // which the daemon has built in too.
 package content
