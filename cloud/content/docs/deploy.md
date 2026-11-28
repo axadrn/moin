@@ -325,6 +325,38 @@ moin domains rm my-app www.my-app.example.com
 
 Add `example.com` and `www.example.com` both, and www redirects to `example.com` for good. The path and the query stay. `example.com` serves the app.
 
+## Password
+
+Keep visitors out of an app, like a staging site or an admin tool without a login of its own:
+
+```bash
+moin password my-app
+```
+
+```text
+? Password for my-app:
+? Once more:
+✓ starting my-app with its password  4s
+✓ my-app asks every visitor for a password now. The user is moin
+```
+
+- The browser asks for a user and the password, on every address of the app: its domains and its instant address.
+- The user is `moin`. `--user ada` names another.
+- moin asks for the password and does not show it. A script pipes it in: `echo "$PASSWORD" | moin password my-app`. It never goes on the command line.
+- The server keeps a bcrypt hash of it, in a file only root reads. Never the password.
+- Run it again for a new password. The app restarts, without a build.
+- `moin apps` shows `password on` next to the app.
+
+```bash
+moin password off my-app
+```
+
+Everyone gets in again.
+
+Webhooks and API clients of the app need the password too. They send it as HTTP basic auth, like `https://moin:<password>@my-app.example.com/hook`. One that cannot, like the webhook of a payment provider, gets a 401. So does a client that sends its own `Authorization` header, like a bearer token: that header holds the password now.
+
+A [watcher](/docs/watcher) counts the 401 as up: the app answered.
+
 ## Logs
 
 ```bash
@@ -380,6 +412,7 @@ What changed on the way out:
 - **Source**: the folder of the file is your repo, `.`. A service moin built has `build: .` again.
 - **Data**: the folders moin kept outside each release are where your `compose.yml` put them, like `./data`. Copy the data there first. Named volumes keep their names.
 - **Instant address**: it stays with moin. It names your server's IP, so the file routes only your domains.
+- **Password**: it stays with moin. Its file is on your server, so the file lets everyone in.
 - **Railpack apps**: their build plan is not in your repo. The file keeps the image moin built, which is only on your server. Run `railpack build .` in your repo there and put the image's name in the file, or push the image to a registry.
 
 ## If it breaks

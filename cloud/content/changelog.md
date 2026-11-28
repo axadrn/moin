@@ -17,6 +17,9 @@ November 29, 2026
 - **Env from scripts**: `moin env set my-app API_KEY` reads the value from a hidden prompt or stdin, never the command line. `moin env push my-app prod.env` lists the names that change and asks first. (#180)
 - **See the compose file**: `moin compose my-app > compose.yml` saves the file moin runs, without your env values, to run the app anywhere. `C` in the terminal UI shows it. (#180)
 - **Remove an app**: `moin apps rm my-app` removes it after you say yes. Its volumes and copies stay. (#180)
+- **A password for an app**: `moin password my-app` makes every visitor type a user and a password, on every address of the app. `moin password off my-app` lets everyone in again. (#180)
+- **Look at your data**: `moin sql my-app "SELECT …"` shows the rows of the app's SQLite, Postgres, MySQL or MariaDB database, and `--tables` its tables. It only reads. (#180)
+- **Change your data, with a way back**: `moin sql my-app "UPDATE …" --write` shows the statement, asks, takes a copy and runs it in one transaction. `moin restore my-app --to before-sql` undoes it. (#180)
 - **Every deploy and its log**: `moin deploys my-app` lists each deploy: from where, which commit or image, failed or not, how long it took. `moin deploys my-app v12` prints its log, also of a deploy nobody watched. A failed automatic deploy's alert names that command, and `moin rollback` shows the commit of each release. (#180)
 - **The server's own problems on the watcher**: A disk almost full or an app that keeps crashing shows under "Needs you" on your watcher and on moin cloud, not only in the alert. (#180)
 - **Signed webhooks**: `moin alerts add my-server webhook --url …` prints a secret. Every post carries `X-Moin-Signature`, and an `event` field says what it is about. A webhook added before stays unsigned: remove it and add it again. (#180)
@@ -24,6 +27,9 @@ November 29, 2026
 - **Backup schedule from the CLI**: `moin backups my-app --every 15m --keep 30d` sets how often an app is copied and how long each copy stays. `-s my-server` without an app sets the server's. `moin backups my-app` shows it. (#180)
 - **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
 - **Sessions in moin cloud**: Settings lists every browser and CLI signed in to your account, with when each was last used. Sign out one, or all. `moin watcher logout` signs this laptop out. (#180)
+
+### Changed
+- **The proxy starts again once**: The first deploy or restart on a server after the update starts its proxy again, so it can read app passwords. Its apps do not answer for a few seconds. (#180)
 
 ### Fixed
 - **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.

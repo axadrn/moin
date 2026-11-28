@@ -175,6 +175,10 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		return hereFollow(ctx, args, stdin, stdout)
 	case "registry":
 		return hereRegistry(ctx, args, stdin, stdout)
+	case "password":
+		return herePassword(ctx, dir, args, stdin, stdout)
+	case "sql":
+		return hereSQL(ctx, dir, args, stdin, stdout)
 	case "knocks":
 		value, err := daemon.KnocksHere(dir)
 		return respond(stdout, value, err)

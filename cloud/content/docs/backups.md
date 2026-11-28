@@ -298,6 +298,46 @@ Every restore keeps the data from right before it. `moin backups my-app` lists i
 
 An undo stays as long as the copies do: 7 days, unless the [config](/docs/config#backups) says otherwise.
 
+## Look at your data
+
+```bash
+moin sql my-app --tables
+moin sql my-app "SELECT id, email FROM users ORDER BY id DESC"
+```
+
+```text
+id   email
+42   ada@example.com
+41   NULL
+```
+
+- It asks the database your app runs on: SQLite, Postgres, MySQL or MariaDB. Nothing to install, no port to open. moin reads a SQLite file itself. Postgres and MySQL are asked by the client in their own container.
+- It only reads. A statement that would change something fails, and says so.
+- 200 rows come back at most. `--limit 1000` takes more. A long value is cut in the table. `--json` prints all of it.
+- An app with several databases: moin asks which one, or `--db <name>` names it, as `moin backups my-app` lists them.
+
+To change data, add `--write`:
+
+```bash
+moin sql my-app "UPDATE users SET plan = 'pro' WHERE id = 42" --write
+```
+
+```text
+  UPDATE users SET plan = 'pro' WHERE id = 42
+? Run this on my-app? moin takes a copy of the database first. [y/N] y
+copying postgres-db
+running the statement
+✓ 1 row changed in postgres-db of my-app
+  Undo it with moin restore my-app --to before-sql
+```
+
+1. moin shows the statement and asks. Scripts pass `-y`.
+2. It takes a copy of the database into your bucket, like `moin backup`.
+3. It runs the statement in one transaction. If it fails, nothing changed. One exception: MySQL and MariaDB keep a `CREATE`, `ALTER` or `DROP` right away.
+4. `moin restore my-app --to before-sql` goes back to the copy from before your last write. It is a restore: what the app wrote since goes too.
+
+A server without a bucket has no place for the copy. Set one, or write without a copy: `--no-copy`.
+
 ## When the server is gone
 
 Your copies are in your bucket, and your backup key opens them. Set up a new server, here `new`, and deploy the app there:

@@ -335,7 +335,11 @@ func printApps(stdout io.Writer, rows []serverRow) {
 			lines = append(lines, []string{style.Bold.Render(row.server), style.Muted.Render("no apps"), "", "", ""})
 		}
 		for _, app := range row.status.Apps {
-			lines = append(lines, []string{style.Bold.Render(row.server), app.Name, "v" + strconv.Itoa(app.Release), appState(stdout, app.Running), strings.Join(app.Addresses, " ")})
+			domain := strings.Join(app.Addresses, " ")
+			if app.Password {
+				domain += "  " + style.Muted.Render("password on")
+			}
+			lines = append(lines, []string{style.Bold.Render(row.server), app.Name, "v" + strconv.Itoa(app.Release), appState(stdout, app.Running), domain})
 		}
 	}
 	table(stdout, []string{"SERVER", "APP", "DEPLOY", "STATE", "DOMAIN"}, lines)

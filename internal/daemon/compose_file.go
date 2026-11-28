@@ -88,6 +88,7 @@ func (a *apps) composeFile(app string, number int) (string, error) {
 		// The env names railpackSecrets handed its build, which is gone.
 		delete(config, "secrets")
 	}
+	dropPassword(app, config)
 	dropInstant(app, config)
 	config = takeAlong(config, a.serverPaths(app)).(map[string]any)
 	takeEnvFile(services)

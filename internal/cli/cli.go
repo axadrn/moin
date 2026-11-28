@@ -44,6 +44,8 @@ Apps
   domains [app]                The app's domains
   domains add [app] <domain>   Add one. The certificate follows by itself
   domains rm [app] <domain>    Remove one
+  password [app]               Ask every visitor for a password. off ends it
+  sql [app] "<query>"          Ask its database. --tables lists its tables
   follow [app]                 Deploy each new commit of a branch or image of a tag
   compose [app]                The compose file moin runs, to run it elsewhere
   catalog                      Open source apps to deploy with --catalog
@@ -237,6 +239,10 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return env(ctx, rest, stdin, stdout)
 	case "domains":
 		return domains(ctx, rest, stdin, stdout)
+	case "password":
+		return password(ctx, rest, stdin, stdout)
+	case "sql":
+		return sqlCommand(ctx, rest, stdin, stdout)
 	case "keys":
 		return keys(ctx, rest, stdin, stdout)
 	case "catalog":

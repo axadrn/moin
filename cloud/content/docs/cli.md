@@ -131,6 +131,8 @@ The first deploy to a server asks first: `Set up moin on my-server and deploy my
 | `moin domains [app]` | the app's domains |
 | `moin domains add [app] <domain>` | add a domain, with HTTPS |
 | `moin domains rm [app] <domain>` | remove one. It asks first |
+| `moin password [app]` | every visitor needs a user and a password. The password is asked without showing it, or read from stdin. `--user <name>` names the user. [Password](/docs/deploy#password) |
+| `moin password off [app]` | everyone gets in again |
 
 ## Backups
 
@@ -141,9 +143,12 @@ The first deploy to a server asks first: `Set up moin on my-server and deploy my
 | `moin backup [app]` | a copy now |
 | `moin backup download [app]` | the newest copy as a file on your laptop, opened with your backup key, which moin asks for. `--to <copy>` another, `-o file` where, `--key-file` the key from a file. [Download a copy](/docs/backups#download-a-copy) |
 | `moin restore [app]` | pick a copy to go back to, from the bucket or moin cloud, or the undo of the last restore. A copy in moin cloud asks for your backup key |
-| `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, or `undo-…` |
+| `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, `undo-…`, or `before-sql` |
 | `moin backups [app] --from <server>` | the copies another server made, like one that is gone |
 | `moin restore [app] --from <server> --key` | restore one of them. moin asks for your backup key |
+| `moin sql [app] "<query>"` | the rows of a query on the app's database. It only reads. `--limit 200` rows at most, `--db <name>` when the app has several. [Look at your data](/docs/backups#look-at-your-data) |
+| `moin sql [app] --tables` | the tables of the database |
+| `moin sql [app] "<statement>" --write` | change the data. moin shows the statement, asks, takes a copy, then runs it in one transaction. Undo it with `moin restore [app] --to before-sql` |
 | `moin bucket <server>` | the bucket of the server, never its secret, and whether your backup key is confirmed |
 | `moin bucket set <server>` | set the bucket. moin asks for each value, then shows your backup key once |
 | `moin bucket key <server>` | a new backup key of yours. `--public age1…` takes one you have |
@@ -239,7 +244,7 @@ Then, on your laptop: `moin watcher disconnect my-server <url>` for each watcher
 
 ## Asking first
 
-A command that deletes or replaces something asks first, like a restore, `moin keys rm`, `moin registry rm` or `moin domains rm`. On a terminal you answer `y`. In a script it needs `-y`, or it stops.
+A command that deletes or replaces something asks first, like a restore, `moin sql --write`, `moin keys rm`, `moin registry rm` or `moin domains rm`. On a terminal you answer `y`. In a script it needs `-y`, or it stops.
 
 ## For scripts: --json
 

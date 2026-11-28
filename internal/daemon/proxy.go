@@ -64,6 +64,9 @@ type routes struct {
 	port    int
 	// instant is the instant address, "" for none, on a router of its own.
 	instant string
+	// usersFile is where the proxy reads the app's password, "" for none.
+	// Every router of the app asks for it.
+	usersFile string
 }
 
 // addRouters puts a service of an app on the proxy network and labels its
@@ -73,6 +76,9 @@ func addRouters(config, service map[string]any, routes routes) {
 		"traefik.enable":         "true",
 		"traefik.docker.network": proxyNetwork,
 		"traefik.http.services." + routes.router + ".loadbalancer.server.port": fmt.Sprint(routes.port),
+	}
+	if routes.usersFile != "" {
+		labels["traefik.http.middlewares."+routes.router+"-auth.basicauth.usersfile"] = routes.usersFile
 	}
 	if len(routes.domains) > 0 {
 		addDomainLabels(labels, routes)
@@ -85,7 +91,8 @@ func addRouters(config, service map[string]any, routes routes) {
 }
 
 // addDomainLabels labels every domain over HTTPS. When the app has both
-// example.com and www.example.com, www redirects to example.com.
+// example.com and www.example.com, www redirects to example.com. An app
+// with a password asks for it after that redirect.
 func addDomainLabels(labels map[string]any, routes routes) {
 	name := routes.router
 	hosts := make([]string, 0, len(routes.domains))
@@ -101,14 +108,21 @@ func addDomainLabels(labels map[string]any, routes routes) {
 	labels["traefik.http.routers."+name+"-tunnel.rule"] = rule
 	labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
 	labels["traefik.http.routers."+name+"-tunnel.service"] = name
+	middlewares := []string{}
 	if apexes := wwwApexes(routes.domains); len(apexes) > 0 {
 		middleware := "traefik.http.middlewares." + name + "-www.redirectregex."
 		labels[middleware+"regex"] = escape(`^https?://www\.(` + strings.Join(apexes, "|") + `)(:[0-9]+)?(/.*)?$`)
 		labels[middleware+"replacement"] = escape("https://${1}${3}")
 		// Permanent: 301, and 308 for a method other than GET.
 		labels[middleware+"permanent"] = "true"
-		labels["traefik.http.routers."+name+".middlewares"] = name + "-www"
-		labels["traefik.http.routers."+name+"-tunnel.middlewares"] = name + "-www"
+		middlewares = append(middlewares, name+"-www")
+	}
+	if routes.usersFile != "" {
+		middlewares = append(middlewares, name+"-auth")
+	}
+	if len(middlewares) > 0 {
+		labels["traefik.http.routers."+name+".middlewares"] = strings.Join(middlewares, ",")
+		labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(middlewares, ",")
 	}
 }
 
@@ -130,6 +144,9 @@ func addInstantLabels(labels map[string]any, routes routes) {
 	labels["traefik.http.routers."+router+".rule"] = "Host(`" + routes.instant + "`)"
 	labels["traefik.http.routers."+router+".entrypoints"] = "websecure"
 	labels["traefik.http.routers."+router+".service"] = routes.router
+	if routes.usersFile != "" {
+		labels["traefik.http.routers."+router+".middlewares"] = routes.router + "-auth"
+	}
 }
 
 // mergeLabels adds labels to the ones a service already has.
@@ -177,9 +194,11 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 		}
 	}
 	data := filepath.Join(filepath.Dir(a.dir), "traefik")
+	// It reads the apps' passwords from the apps folder (releasePassword).
 	mounts := []string{
 		"-v", "/var/run/docker.sock:/var/run/docker.sock:ro",
 		"-v", data + ":/data",
+		"-v", a.dir + ":" + proxyApps + ":ro",
 	}
 	// A proxy on an older image or with other mounts or flags is replaced,
 	// so proxy updates reach every server. A label holds a hash of them.

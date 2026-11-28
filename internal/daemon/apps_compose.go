@@ -415,11 +415,16 @@ func imagesOfRelease(dir string) map[string]string {
 // finish writes compose.json for a release: built services get an image tag
 // per deploy, or keep their running image when there is no source; the main
 // service runs start.Image when set; the app's services read the env file;
-// the main service gets the router labels; every service restarts unless
-// stopped and keeps its logs small, unless it says otherwise.
+// the main service gets the router labels, with the app's password when
+// it has one; every service restarts unless stopped and keeps its logs
+// small, unless it says otherwise.
 // release.config stays as it is.
 func finish(release *release) error {
 	config, err := copyConfig(release.config)
+	if err != nil {
+		return err
+	}
+	usersFile, err := releasePassword(release)
 	if err != nil {
 		return err
 	}
@@ -444,7 +449,7 @@ func finish(release *release) error {
 		if service["logging"] == nil {
 			service["logging"] = logRotation()
 		}
-		routeService(release, config, name, service)
+		routeService(release, config, name, service, usersFile)
 	}
 	body, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
@@ -504,18 +509,20 @@ func addEnv(service map[string]any, file string, env map[string]string) {
 }
 
 // routeService puts the main service on the proxy when it has an address.
-func routeService(release *release, config map[string]any, name string, service map[string]any) {
+// usersFile is where the proxy reads the app's password, "" for none.
+func routeService(release *release, config map[string]any, name string, service map[string]any, usersFile string) {
 	detected := release.detected
 	if name != detected.Service || (len(detected.Domains) == 0 && detected.Instant == "") {
 		return
 	}
 	app := release.start.App
 	addRouters(config, service, routes{
-		app:     app,
-		router:  project(app),
-		domains: detected.Domains,
-		port:    detected.Port,
-		instant: detected.Instant,
+		app:       app,
+		router:    project(app),
+		domains:   detected.Domains,
+		port:      detected.Port,
+		instant:   detected.Instant,
+		usersFile: usersFile,
 	})
 }
 

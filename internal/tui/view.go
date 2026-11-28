@@ -258,6 +258,9 @@ func (m *model) sideLines() []string {
 		}
 		lines = append(lines, fact(label, address))
 	}
+	if app.Password {
+		lines = append(lines, fact("Password", "on"))
+	}
 	lines = append(lines, fact("Deploys", m.releasesLine(known)))
 	switch {
 	case known == nil || !known.loaded:

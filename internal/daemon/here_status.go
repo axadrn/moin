@@ -40,6 +40,8 @@ type AppStatus struct {
 	Release   int      `json:"release"`
 	Running   bool     `json:"running"`
 	Addresses []string `json:"addresses"`
+	// Password: the app asks every visitor for its password.
+	Password bool `json:"password,omitempty"`
 }
 
 // StatusHere looks at every app on this server.
@@ -68,6 +70,7 @@ func StatusHere(ctx context.Context, dir string) Status {
 			Release:   release,
 			Running:   a.running(ctx, app),
 			Addresses: addresses(detected),
+			Password:  a.hasPassword(app),
 		})
 	}
 	return status

@@ -60,7 +60,7 @@ my-app.example.com is up again
 ```
 
 - **Silent**: three reports in a row are missing. With a report every minute, that is three minutes.
-- **Down**: three visits in a row fail, one a minute. A visit fails on a 5xx, a timeout, a refused connection or a bad certificate. Any other answer, a redirect too, is up.
+- **Down**: three visits in a row fail, one a minute. A visit fails on a 5xx, a timeout, a refused connection or a bad certificate. Any other answer is up: a redirect too, and the 401 of an app with a [password](/docs/deploy#password).
 - A domain of a silent server does not alert on its own. The silence says more.
 
 Alerts go to Telegram, Slack, Discord, a webhook or an email. Set them once per server, and they go everywhere:

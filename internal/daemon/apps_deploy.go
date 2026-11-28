@@ -89,6 +89,8 @@ type release struct {
 	// the values in it when the deploy started.
 	envFile string
 	env     map[string]string
+	// passwordFile is the app's password file, there when it has one.
+	passwordFile string
 	// logf writes a line to the deploy log.
 	logf func(string, ...any)
 	// record is the deploy's log and record.
@@ -174,7 +176,7 @@ func (a *apps) newRelease(start protocol.DeployStart, record *recorder) (*releas
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: record.logf, record: record}, nil
+	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, passwordFile: a.passwordFile(start.App), logf: record.logf, record: record}, nil
 }
 
 // rollBack runs an older release again: its compose file and images, with
