@@ -222,14 +222,15 @@ func TestAlertsOn(t *testing.T) {
 	}
 }
 
-// Copies are taken when paid and during a free year, not on a 30 day trial.
+// Copies are taken when paid or while the trial runs.
 func TestCopiesOn(t *testing.T) {
 	now := time.Now()
 	for _, c := range []struct {
 		w    Workspace
 		want bool
 	}{
-		{Workspace{Status: "trial", TrialDays: 30}, false},
+		{Workspace{Status: "trial", TrialDays: 30}, true},
+		{Workspace{Status: "trial", TrialDays: 30, TrialEnds: now.Add(-time.Hour)}, false},
 		{Workspace{Status: "trial", TrialDays: 365}, true},
 		{Workspace{Status: "trial", TrialDays: 365, TrialEnds: now.Add(time.Hour)}, true},
 		{Workspace{Status: "trial", TrialDays: 365, TrialEnds: now.Add(-time.Hour)}, false},

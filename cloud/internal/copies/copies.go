@@ -79,7 +79,7 @@ type Upload struct {
 }
 
 // Start gives the server of token an address to upload one copy to,
-// when its workspace pays or has a free year, has room for it, and did not send too many.
+// when its workspace pays or its trial runs, has room for it, and did not send too many.
 func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, error) {
 	space, server, err := c.server(token)
 	if err != nil {

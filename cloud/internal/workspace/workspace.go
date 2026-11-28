@@ -50,10 +50,10 @@ func (w Workspace) AlertsOn(now time.Time) bool {
 	return false
 }
 
-// CopiesOn says whether moin cloud takes copies at now: when paid, and
-// during a free year. A normal 30 day trial gets none.
+// CopiesOn says whether moin cloud takes copies at now: when paid, or
+// while the trial runs. The same rule as alerts.
 func (w Workspace) CopiesOn(now time.Time) bool {
-	return w.Status == "paid" || w.TrialDays > 30 && w.AlertsOn(now)
+	return w.AlertsOn(now)
 }
 
 // TrialOver says whether the trial ran out and nothing is paid.
