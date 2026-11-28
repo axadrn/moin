@@ -1,7 +1,7 @@
 ---
 title: "Why I deleted the hub"
 description: "moin had a hub that every server trusted. I deleted it. Now commands go one way over your own SSH. Reports go the other. Nothing in between holds a key."
-date: "2026-11-27"
+date: "2026-11-28"
 ---
 
 moin had a hub. I deleted it. This is why, and what you get instead.
