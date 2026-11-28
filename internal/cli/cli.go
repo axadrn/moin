@@ -263,7 +263,54 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "daemon":
 		return daemonCommand(ctx, rest, stdin, stdout)
 	}
+	if near := nearCommand(command); near != "" {
+		return fmt.Errorf("unknown command %q. Did you mean `%s %s`?", command, build.Name, near)
+	}
 	return fmt.Errorf("unknown command %q. Run `%s help` for all of them", command, build.Name)
+}
+
+// nearCommand is the command of the help that is one or two typos
+// away from typed, like deploy for deplyo, or "" when none is.
+func nearCommand(typed string) string {
+	best, bestDistance := "", 3
+	for line := range strings.Lines(usage) {
+		name, _, ok := usageEntry(strings.TrimRight(line, "\n"))
+		if !ok || name == build.Name {
+			continue
+		}
+		command, _, _ := strings.Cut(name, " ")
+		if distance := typos(typed, command); distance < bestDistance {
+			best, bestDistance = command, distance
+		}
+	}
+	return best
+}
+
+// typos is how many letters to add, remove, change or swap to turn a
+// into b.
+func typos(a, b string) int {
+	// row[j] is the distance of the a so far to b[:j].
+	before := make([]int, len(b)+1)
+	row := make([]int, len(b)+1)
+	for j := range row {
+		row[j] = j
+	}
+	var earlier []int
+	for i := 1; i <= len(a); i++ {
+		earlier, before, row = before, row, make([]int, len(b)+1)
+		row[0] = i
+		for j := 1; j <= len(b); j++ {
+			change := 1
+			if a[i-1] == b[j-1] {
+				change = 0
+			}
+			row[j] = min(before[j]+1, row[j-1]+1, before[j-1]+change)
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				row[j] = min(row[j], earlier[j-2]+1)
+			}
+		}
+	}
+	return row[len(b)]
 }
 
 // noArguments parses the flags of a command that takes none, so --help

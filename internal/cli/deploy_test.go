@@ -31,3 +31,11 @@ func TestPrintLiveWithoutADatabaseSaysNothingOfBackups(t *testing.T) {
 		t.Errorf("printLive wrote\n%s\nwant nothing about backups", out.String())
 	}
 }
+
+func TestNearCommand(t *testing.T) {
+	for typed, want := range map[string]string{"deplyo": "deploy", "lgos": "logs", "backpus": "backups", "restor": "restore", "zebra": ""} {
+		if got := nearCommand(typed); got != want {
+			t.Errorf("nearCommand(%q) = %q, want %q", typed, got, want)
+		}
+	}
+}
