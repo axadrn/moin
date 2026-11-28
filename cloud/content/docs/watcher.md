@@ -19,7 +19,7 @@ moin works alone. It deploys, backs up, checks the backups and alerts you while 
 | An alert when your server is gone | no | yes | yes |
 | Your domains, checked from outside | no | yes | yes |
 | A page with it all, on your phone too | no | yes | yes |
-| A copy of each backup nobody can delete, locked for you | no | no | yes |
+| A copy of each backup nobody can delete, locked for you | no | with [a lock on your own bucket](/docs/backups#lock-your-bucket) (moin checks it) | yes |
 | Alerts by mail too, next to Telegram, Slack and the rest | no | no | yes |
 | No second server to run | yes | no | yes |
 | Nothing to set up | yes | no | yes |

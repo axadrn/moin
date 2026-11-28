@@ -5,24 +5,26 @@ import (
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 )
 
-// homeWatcherRow is one line of the watcher table: what, and whether you
-// get it with no watcher, your own, and moin cloud.
+// homeWatcherRow is one line of the watcher table: what, whether you get
+// it with no watcher, your own, and moin cloud, and a few words after a
+// mark where it needs them.
 type homeWatcherRow struct {
-	What              string
-	Alone, Own, Cloud string
+	What  string
+	Marks [3]string
+	Notes [3]string
 }
 
 // homeWatcherRows are the lines of the watcher table, the same as on top
 // of the watcher docs.
 var homeWatcherRows = []homeWatcherRow{
-	{"Alerts while your server lives", "yes", "yes", "yes"},
-	{"An alert when your server is gone", "no", "yes", "yes"},
-	{"Your domains, checked from outside", "no", "yes", "yes"},
-	{"A page with it all, on your phone too", "no", "yes", "yes"},
-	{"A copy of each backup nobody can delete", "no", "no", "yes"},
-	{"Alerts by mail too, next to Telegram and Slack", "no", "no", "yes"},
-	{"No second server to run", "yes", "no", "yes"},
-	{"Nothing to set up", "yes", "no", "yes"},
+	{What: "Alerts while your server lives", Marks: [3]string{"yes", "yes", "yes"}},
+	{What: "An alert when your server is gone", Marks: [3]string{"no", "yes", "yes"}},
+	{What: "Your domains, checked from outside", Marks: [3]string{"no", "yes", "yes"}},
+	{What: "A page with it all, on your phone too", Marks: [3]string{"no", "yes", "yes"}},
+	{What: "A copy of each backup nobody can delete", Marks: [3]string{"no", "yes", "yes"}, Notes: [3]string{"", "With a lock on your own bucket. " + brand.Name + " checks it.", ""}},
+	{What: "Alerts by mail too, next to Telegram and Slack", Marks: [3]string{"no", "no", "yes"}},
+	{What: "No second server to run", Marks: [3]string{"yes", "no", "yes"}},
+	{What: "Nothing to set up", Marks: [3]string{"yes", "no", "yes"}},
 }
 
 // homeWatcherColumns name the three ways, in the table's order.
@@ -34,26 +36,29 @@ templ HomeWatcher() {
 	<section id="watcher" class="moin-band">
 		@homeHead("Works alone. Better with a watcher.", "A server that is gone can't call for help. A watcher can.")
 		<div class="moin-grid" data-cols="2">
-			@components.Card(components.CardProps{}) {
-				<span class="moin-fact-name">{ brand.Name } alone</span>
-				@homePlanRows("Deploys, rollbacks and logs", "Backups to your bucket, restored every day", "Alerts while your server lives", "A server closed to the internet")
+			@components.Card(components.CardProps{Title: brand.Name + " alone"}) {
+				@components.Ticks("Deploys, rollbacks and logs", "Backups to your bucket, restored every day", "Alerts while your server lives", "A server closed to the internet")
 			}
-			@components.Card(components.CardProps{}) {
-				<span class="moin-fact-name">Only a watcher sees</span>
-				@homePlanRows("A dead server. It can't tell you itself", "A domain that is down from outside", "The history, on your phone", "A copy no attacker can delete")
+			@components.Card(components.CardProps{Title: "Only a watcher sees"}) {
+				@components.Ticks("A dead server. It can't tell you itself", "A domain that is down from outside", "The history, on your phone", "A copy no attacker can delete")
 			}
 		</div>
 		@components.Card(components.CardProps{}) {
-			@components.Rows(components.RowsProps{Head: append([]string{""}, homeWatcherColumns...)}) {
+			@components.Rows(components.RowsProps{Head: append([]string{""}, homeWatcherColumns...), Top: true}) {
 				for _, row := range homeWatcherRows {
 					@components.Row(components.RowProps{}) {
 						@components.Cell() {
 							{ row.What }
 						}
-						for i, mark := range []string{row.Alone, row.Own, row.Cloud} {
+						for i, mark := range row.Marks {
 							@components.Cell() {
 								@components.Mark(components.MarkProps{Kind: mark})
-								<span class="moin-only-phone">{ homeWatcherColumns[i] }</span>
+								<span class="moin-stack" data-gap="1">
+									<span class="moin-only-phone">{ homeWatcherColumns[i] }</span>
+									if row.Notes[i] != "" {
+										<span class="moin-small moin-muted">{ row.Notes[i] }</span>
+									}
+								</span>
 							}
 						}
 					}
