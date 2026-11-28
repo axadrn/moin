@@ -57,7 +57,7 @@ If you see abuse or content that infringes your rights and it involves moin, wri
 
 moin cloud is for businesses only: you subscribe as a business, not as a consumer, and confirm it before you subscribe. moin cloud is a subscription per workspace, monthly or yearly, at the price shown at checkout.
 
-A new workspace gets a free trial of the watcher, without a payment method. The trial starts with the first report of a connected server and lasts 30 days. Copies of your backups come only with a subscription. After the trial, alerts are off until you subscribe.
+A new workspace gets a free trial of the watcher, without a payment method. The trial starts with the first report of a connected server and lasts 30 days. During the trial moin cloud also keeps copies of your backups, up to 5 GB. After the trial, alerts and new copies are off until you subscribe.
 
 Payments run through Stripe Managed Payments. Stripe is the seller of record: its checkout shows the price, tax and terms of the purchase, and Stripe handles invoices, receipts and refunds required by law. A subscription renews automatically until you cancel it. You can cancel at any time in the billing portal; your plan stays active until the end of the period you paid for. Payments already made are not refunded, except where the law requires it or these terms say so.
 
@@ -65,11 +65,11 @@ If a payment fails or is reversed, moin cloud stops after a short grace period, 
 
 ## moin cloud: storage
 
-A subscription includes storage for the copies of your backups, within fair use: the normal backups of the apps on your servers. Each copy is kept 14 days. If a workspace stores far more than its apps need, we tell you, and moin cloud may refuse new copies until it is back within fair use. It never deletes old copies for that.
+The trial includes 5 GB of storage for the copies of your backups. A subscription, and a free year, include 50 GB, within fair use: the normal backups of the apps on your servers. Each copy is kept 14 days. If a workspace stores far more than its apps need, we tell you, and moin cloud may refuse new copies until it is back within fair use. It never deletes old copies for that.
 
-## When a subscription ends
+## When a trial or a subscription ends
 
-When a subscription ends, by cancelling or because a payment failed for good, we tell you by mail. moin cloud takes no new copies. The copies you have stay 30 days, so you can restore them, and are then deleted. Subscribe again within those 30 days and they stay.
+When a subscription ends, by cancelling or because a payment failed for good, we tell you by mail. When a trial or a free year ends without a subscription, we tell you by mail too. moin cloud takes no new copies. The copies you have stay 30 days, so you can restore them, and are then deleted. Subscribe within those 30 days and they stay.
 
 ## Beta and changes to the service
 

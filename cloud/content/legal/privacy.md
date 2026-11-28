@@ -79,9 +79,9 @@ Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
 ## moin cloud: copies of your backups
 
-With a paid plan, your server sends moin cloud a copy of each backup. Each copy is encrypted on your server before it leaves, with a key that stays with you and your server. We never get that key, so we cannot read your copies. The copies are stored at Cloudflare R2. We keep the app, the database, the time and the size of each copy.
+During the trial and with a subscription, your server sends moin cloud a copy of each backup. Each copy is encrypted on your server before it leaves, with a key that stays with you and your server. We never get that key, so we cannot read your copies. The copies are stored at Cloudflare R2. We keep the app, the database, the time and the size of each copy.
 
-Each copy is kept 14 days. The bucket is locked so that nobody, not even we, can delete a copy inside those 14 days. After a subscription ends, the copies are deleted after the time the [Terms](/legal/terms) state.
+Each copy is kept 14 days. The bucket is locked so that nobody, not even we, can delete a copy inside those 14 days. After a trial or a subscription ends, the copies are deleted after the time the [Terms](/legal/terms) state.
 
 Legal basis: the contract with you (Art. 6(1)(b) GDPR).
 
@@ -124,7 +124,7 @@ Cloudflare, Stripe and GitHub are based in the USA. Where they handle personal d
 - **Sessions**: 30 days in a browser, a year for the CLI, or until you sign out.
 - **Account**: while it exists. You delete it in moin cloud's Settings. Deleting it deletes your workspace, its servers, their reports and the history.
 - **Reports**: only the newest one of each server. Disconnecting a server deletes its report.
-- **Copies of backups**: 14 days each. After a subscription ends, they are deleted after the time the [Terms](/legal/terms) state. A copy younger than 14 days stays locked until it is 14 days old, also when you delete your account, then it expires by itself.
+- **Copies of backups**: 14 days each. After a trial or a subscription ends, they are deleted after the time the [Terms](/legal/terms) state. A copy younger than 14 days stays locked until it is 14 days old, also when you delete your account, then it expires by itself.
 - **Mails**: as long as we need them to help you, then deleted. Ask and we delete them sooner.
 - **Payment records**: Stripe keeps them as long as tax law requires.
 

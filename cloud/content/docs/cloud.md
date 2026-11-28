@@ -45,7 +45,7 @@ Delete it under Settings, on [moin.run/cloud](/cloud): type your mail to confirm
 
 The first report of your first server starts 30 days free. No card. You get a mail five days before the end, and one at the end.
 
-After the trial your servers still report, and the page still shows them. But no alert goes out until you subscribe.
+After the trial your servers still report, and the page still shows them. But no alert goes out and no new copy goes in until you subscribe. The copies stay 30 days after the trial ends, then they go.
 
 ## Price
 
@@ -73,7 +73,7 @@ It sees what a report holds: names of servers and apps, domains, versions, times
 
 Your server holds the key to your own bucket. That key can delete copies, because old copies have to go. So someone who takes over your server can delete your backups too.
 
-So moin cloud keeps a copy, for paying workspaces and during the trial:
+So moin cloud keeps a copy, during the trial and with a subscription:
 
 - Each scheduled copy of every database goes to moin cloud. With your own bucket it goes there too, and moin cloud holds the second copy. Without one, moin cloud holds the only copy. [Copies to moin cloud](/docs/backups#copies-to-moin-cloud)
 - Encrypted on your server, for the server's key and [your backup key](/docs/backups#your-backup-key). moin cloud can't read it. Make your key with `moin bucket key prod`: a restore needs it.
@@ -102,7 +102,7 @@ The copies lie in a Cloudflare R2 bucket with a 14-day lock. Inside it nobody de
 
 - 5 GB of copies per workspace during the trial. 50 GB with a subscription or the free year, fair use. When it is full, no new copy goes in, and you get a mail. No old copy is deleted for it.
 - One copy an hour per database.
-- When a subscription ends, no new copy goes in. The copies stay 30 days, then they go.
+- When a trial or a subscription ends, no new copy goes in. The copies stay 30 days, then they go.
 
 ## Another moin cloud
 

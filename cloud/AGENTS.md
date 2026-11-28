@@ -45,8 +45,9 @@ source of truth.
   fed by `POST /report`. Alerts go out by mail, during the 30-day trial
   that the first report starts, and while the workspace pays.
 - `internal/copies`: the copies a server can't delete. An upload address
-  for 15 minutes, a Cloudflare R2 bucket with a 14-day lock, 50 GB per
-  workspace, only for a paid plan, gone 30 days after a subscription ends.
+  for 15 minutes, a Cloudflare R2 bucket with a 14-day lock, 5 GB per
+  workspace in the trial, 50 GB paid or in the free year, gone 30 days
+  after a trial or a subscription ends.
 - `internal/stripe`: the little of Stripe that billing needs: checkout,
   the customer portal, the subscription, the webhooks.
 - `internal/counts`: the sums over everyone the landing page shows. No
