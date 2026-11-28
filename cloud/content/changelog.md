@@ -5,7 +5,7 @@ description: What shipped in moin, newest first.
 
 ## v1.0.0-beta.38
 
-November 27, 2026
+November 28, 2026
 
 **In short:** moin runs without a hub now: you deploy over your own SSH, public SSH closes after the first deploy, and every backup is encrypted, checked every day and kept where a hacked server can't delete it.
 
