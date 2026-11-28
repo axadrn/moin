@@ -33,7 +33,7 @@ type mailbox struct {
 
 // newMailbox starts a mailbox on this machine, with the certificate of a
 // test web server, which the sender trusts until the test ends.
-func newMailbox(t *testing.T, startTLS bool) *mailbox {
+func newMailbox(t *testing.T, startTLS, implicit bool) *mailbox {
 	t.Helper()
 	web := httptest.NewTLSServer(nil)
 	t.Cleanup(web.Close)
@@ -46,7 +46,7 @@ func newMailbox(t *testing.T, startTLS bool) *mailbox {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { listener.Close() })
-	box := &mailbox{address: listener.Addr().String(), startTLS: startTLS, certificate: web.TLS.Certificates[0]}
+	box := &mailbox{address: listener.Addr().String(), startTLS: startTLS, implicit: implicit, certificate: web.TLS.Certificates[0]}
 	go func() {
 		for {
 			connection, err := listener.Accept()
@@ -122,7 +122,7 @@ func (b *mailbox) line(prefix string) string {
 // An email goes through the SMTP server of the destination: signed in
 // with the user and password after STARTTLS, from the user to the address.
 func TestSendEmail(t *testing.T) {
-	box := newMailbox(t, true)
+	box := newMailbox(t, true, false)
 	d := Destination{Kind: "email", To: "ada@example.com", SMTP: box.address, User: "alerts@example.com", Password: "secret-password"}
 	if err := Send(context.Background(), d, down); err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestSendEmail(t *testing.T) {
 	}
 
 	// From says who the mail is from, when the user is not an address.
-	other := newMailbox(t, true)
+	other := newMailbox(t, true, false)
 	d = Destination{Kind: "email", To: "ada@example.com", SMTP: other.address, User: "apikey", Password: "secret-password", From: "alerts@example.com"}
 	if err := Send(context.Background(), d, down); err != nil {
 		t.Fatal(err)
@@ -161,8 +161,7 @@ func TestSendEmail(t *testing.T) {
 
 // On the TLS port the connection is encrypted from the first byte.
 func TestSendEmailImplicitTLS(t *testing.T) {
-	box := newMailbox(t, false)
-	box.implicit = true
+	box := newMailbox(t, false, true)
 	_, port, _ := net.SplitHostPort(box.address)
 	implicitTLSPort = port
 	t.Cleanup(func() { implicitTLSPort = "465" })
@@ -178,7 +177,7 @@ func TestSendEmailImplicitTLS(t *testing.T) {
 // A server without STARTTLS gets no password and no mail: nothing may
 // travel in the clear.
 func TestSendEmailNeedsStartTLS(t *testing.T) {
-	box := newMailbox(t, false)
+	box := newMailbox(t, false, false)
 	d := Destination{Kind: "email", To: "ada@example.com", SMTP: box.address, User: "alerts@example.com", Password: "secret-password"}
 	err := Send(context.Background(), d, down)
 	if err == nil || !strings.Contains(err.Error(), "STARTTLS") {
@@ -196,7 +195,7 @@ func TestSendEmailNeedsStartTLS(t *testing.T) {
 // A sender with a control connects to an SMTP server only when the
 // control lets it: a watcher refuses private addresses this way.
 func TestSenderControlStopsEmail(t *testing.T) {
-	box := newMailbox(t, true)
+	box := newMailbox(t, true, false)
 	refuse := NewSender(func(string, string, syscall.RawConn) error { return errors.New("refused") })
 	d := Destination{Kind: "email", To: "ada@example.com", SMTP: box.address, User: "alerts@example.com", Password: "secret-password"}
 	if err := refuse.Send(context.Background(), d, down); err == nil {
