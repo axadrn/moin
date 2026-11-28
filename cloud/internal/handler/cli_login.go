@@ -103,3 +103,16 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
+
+// CLILogout signs out the CLI that asks, for `moin watcher logout`.
+func (c *Cloud) CLILogout(w http.ResponseWriter, r *http.Request) {
+	if _, ok := c.cliSession(w, r); !ok {
+		return
+	}
+	token, _ := bearer(r)
+	if err := c.store.EndSession(token); err != nil {
+		renderError(w, "sign the CLI out", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

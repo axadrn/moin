@@ -31,6 +31,7 @@ Alerts are set once, on the server: `moin alerts add my-server telegram`. Each r
 ```bash
 moin watcher                       # each server's watchers, your plan, trial days left, billing
 moin watcher disconnect my-server  # my-server no longer reports
+moin watcher logout                # this laptop signs out, the servers keep reporting
 ```
 
 The same is on [moin.run/cloud](/cloud) in the browser. It only shows. Nothing on it changes a server.
@@ -38,6 +39,18 @@ The same is on [moin.run/cloud](/cloud) in the browser. It only shows. Nothing o
 ## Your account
 
 Your mail is your account. One mail, one workspace, every server in it. GitHub and the mail link land in the same workspace when the mail is the same.
+
+### Sessions
+
+Each browser and each laptop that signs in has a session. A browser stays signed in for 30 days, a laptop for a year. Settings, on [moin.run/cloud](/cloud), lists them: browser or CLI, when it signed in, when it was last used.
+
+- **Sign out** ends one. Lost a laptop? Sign its CLI out there.
+- **Sign out everywhere** ends every session, this browser too.
+- `moin watcher logout` signs this laptop out: moin cloud ends its session, and the CLI deletes it from `~/.config/moin/cloud.json`.
+
+A session only signs in to moin cloud. None reaches a server: your servers keep reporting, and SSH stays as it is.
+
+### Delete your account
 
 Delete it under Settings, on [moin.run/cloud](/cloud): type your mail to confirm. That cancels your subscription first. Then the workspace, the tokens of its servers and every session are gone. Its copies go as soon as their 14-day lock lets them. Your servers keep running, and your own bucket keeps its copies.
 

@@ -3,19 +3,74 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/ui/pages"
 	"github.com/axadrn/moin/cloud/internal/workspace"
 )
 
-// Settings is /cloud/settings: the account, and the button that deletes it.
+// Settings is /cloud/settings: the account, its sessions, and the button
+// that deletes it.
 func (c *Cloud) Settings(w http.ResponseWriter, r *http.Request) {
-	_, frame, ok := c.page(w, r)
+	space, frame, ok := c.page(w, r)
 	if !ok {
 		return
 	}
-	render(w, r, pages.CloudSettings(pages.CloudSettingsProps{Cloud: frame}))
+	sessions, ok := c.sessions(w, r, space)
+	if !ok {
+		return
+	}
+	render(w, r, pages.CloudSettings(pages.CloudSettingsProps{Cloud: frame, Sessions: sessions}))
+}
+
+// sessions are the browsers and CLIs signed in to space, this browser
+// marked.
+func (c *Cloud) sessions(w http.ResponseWriter, r *http.Request, space workspace.Workspace) ([]workspace.Session, bool) {
+	current := ""
+	if cookie, err := r.Cookie(sessionCookie); err == nil {
+		current = cookie.Value
+	}
+	sessions, err := c.store.Sessions(space.ID, current)
+	if err != nil {
+		renderError(w, "list the sessions", err)
+		return nil, false
+	}
+	return sessions, true
+}
+
+// EndSessions signs out the session the form names, or with "all" every
+// browser and CLI of the workspace. Signing out this browser goes home.
+func (c *Cloud) EndSessions(w http.ResponseWriter, r *http.Request) {
+	space, ok := c.signedIn(r)
+	if !ok || !c.sameOrigin(r) {
+		http.Error(w, "sign in first", http.StatusForbidden)
+		return
+	}
+	sessions, ok := c.sessions(w, r, space)
+	if !ok {
+		return
+	}
+	id := r.PostFormValue("session")
+	this := id == "all"
+	var err error
+	if this {
+		err = c.store.EndSessions(space.ID)
+	} else {
+		this = slices.ContainsFunc(sessions, func(s workspace.Session) bool { return s.ID == id && s.This })
+		err = c.store.EndSessionOf(space.ID, id)
+	}
+	if err != nil {
+		renderError(w, "sign a session out", err)
+		return
+	}
+	slog.Info("sessions signed out", "workspace", space.ID, "all", id == "all")
+	if this {
+		http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: c.secure, SameSite: http.SameSiteLaxMode})
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/cloud/settings", http.StatusSeeOther)
 }
 
 // DeleteAccount deletes the workspace when the typed mail is its mail:

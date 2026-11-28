@@ -181,6 +181,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin watcher connect <server>` | the server reports to moin cloud. The first time, the browser signs this laptop in |
 | `moin watcher connect <server> <url> <token>` | the server reports to a watcher you run |
 | `moin watcher disconnect <server> [url]` | the server stops reporting there. Without an address: moin cloud. It asks first |
+| `moin watcher logout` | sign this laptop out of moin cloud. The servers keep reporting. [Sessions](/docs/cloud#sessions) |
 | `moin watcher run` | run a watcher, on another machine than your servers |
 | `moin watcher token <server>` | on the watcher: a token for a server, and the exact line to paste on your laptop |
 

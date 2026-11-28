@@ -287,3 +287,31 @@ func cloudDisconnect(ctx context.Context, server string, yes bool, stdin io.Read
 	done(stdout, "%s no longer reports to %s", server, cloudName)
 	return nil
 }
+
+// cloudLogout signs this laptop out of moin cloud: moin cloud ends its
+// session, and the CLI deletes it here. When moin cloud does not answer,
+// the session goes here anyway; /cloud/settings signs it out there.
+func cloudLogout(ctx context.Context, stdout io.Writer) error {
+	session, err := loadCloudSession()
+	if errors.Is(err, errNotSignedIn) {
+		fmt.Fprintln(stdout, "This laptop is not signed in to "+cloudName+".")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, ended := session.call(ctx, http.MethodPost, "/api/cli/logout", nil, nil)
+	file, err := cloudSessionFile()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(file); err != nil {
+		return err
+	}
+	done(stdout, "This laptop is signed out of %s. Your servers keep reporting", cloudName)
+	if ended != nil && !errors.Is(ended, errSessionEnded) {
+		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+sentence(ended.Error()))
+		hint(stdout, "Sign the session out there on", session.URL+"/cloud/settings")
+	}
+	return nil
+}

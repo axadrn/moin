@@ -84,6 +84,7 @@ Watcher
   watcher disconnect <server> [url]  It no longer does
   watcher run                  Run a watcher on another machine than your servers
   watcher token <server>       On the watcher: the line that connects a server
+  watcher logout               Sign this laptop out of moin cloud
 
 On the server
   unlock                       Open port 22 again from your provider's console
