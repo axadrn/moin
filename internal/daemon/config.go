@@ -23,7 +23,7 @@ import (
 // reads it, it holds the keys of the bucket. `moin daemon` reads it every
 // minute, so a change counts without a restart. MOIN_CONFIG overrides it.
 //
-//	name: prod
+//	name: my-server
 //	watchers:
 //	  - url: https://watcher.example.com
 //	    token: …
@@ -50,7 +50,7 @@ import (
 //	  every: 1h
 //	  keep: 7d
 //	  apps:
-//	    shop:
+//	    my-app:
 //	      every: 15m
 //	      keep: 30d
 const DefaultConfigFile = "/etc/" + build.Name + "/config.yml"

@@ -21,8 +21,8 @@ import (
 	"github.com/axadrn/moin/internal/style"
 )
 
-// moin cloud is the watcher we run. `moin watcher connect prod` without
-// an address has prod report there: the browser signs this laptop in the
+// moin cloud is the watcher we run. `moin watcher connect my-server` without
+// an address has my-server report there: the browser signs this laptop in the
 // first time. The CLI talks to moin cloud over HTTPS with its session; it
 // never gives moin cloud a way to a server.
 

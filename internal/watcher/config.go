@@ -21,10 +21,10 @@ const DefaultConfig = "/etc/" + build.Name + "/watcher.yml"
 
 // Config is the watcher's one file:
 //
-//	password: …          # the page asks for it
+//	password: …           # the page asks for it
 //	servers:
-//	  prod: <token>      # a server and the token it reports with
-//	alerts:              # optional: the watcher's own destinations
+//	  my-server: <token>  # a server and the token it reports with
+//	alerts:               # optional: the watcher's own destinations
 //	  - kind: telegram
 //	    token: …
 //	    chat_id: …

@@ -49,7 +49,7 @@ func (f *flagSet) withJSON() *flagSet {
 }
 
 // parse reads flags before, between and after the arguments, so
-// `logs prod -f` works like `logs -f prod`. After
+// `logs my-server -f` works like `logs -f my-server`. After
 // "--" everything is an argument.
 func (f *flagSet) parse(args []string) error {
 	return f.check(parseAnywhere(f.FlagSet, args), args)
@@ -86,7 +86,7 @@ func (f *flagSet) yes() bool { return f.yesFlag != nil && *f.yesFlag }
 func (f *flagSet) json() bool { return f.jsonFlag != nil && *f.jsonFlag }
 
 // server is the one argument of a command that takes one, like the
-// server of `keys prod` or the app of `moin here logs shop`.
+// server of `keys my-server` or the app of `moin here logs my-app`.
 func (f *flagSet) server() (string, error) {
 	if f.NArg() != 1 {
 		return "", f.wrong()
@@ -132,7 +132,7 @@ func (h helpError) print(w io.Writer) {
 }
 
 // parseAnywhere parses flags before and after the arguments, so
-// `logs prod --tail 5` works like `logs --tail 5 prod`. After
+// `logs my-server --tail 5` works like `logs --tail 5 my-server`. After
 // "--" everything is an argument.
 func parseAnywhere(flags *flag.FlagSet, args []string) error {
 	positional := []string{}

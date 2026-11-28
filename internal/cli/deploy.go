@@ -22,7 +22,7 @@ import (
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("deploy", "deploy [server] [--image <image> | --catalog <name>] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
 	noCopy := flags.Bool("no-copy", false, "deploy without the copy of the databases just before it, when that copy fails")
-	image := flags.String("image", "", "run this image instead of building: the server pulls it, like ghcr.io/you/shop:1.4, or one only this computer has, like shop:dev, is sent")
+	image := flags.String("image", "", "run this image instead of building: the server pulls it, like ghcr.io/you/my-app:1.4, or one only this computer has, like my-app:dev, is sent")
 	catalogApp := flags.String("catalog", "", "deploy an app of the catalog, like umami, without a repo")
 	appName := flags.String("app", "", "the app's name; default this folder's name, or the catalog app's")
 	if err := flags.parse(args); err != nil {
@@ -298,7 +298,7 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 		return fmt.Errorf("%s is not a 64-bit Intel or ARM server, which %s needs", server, build.Name)
 	}
 	if info.version == "" && !daemon.ValidServerName(serverName(server)) {
-		return fmt.Errorf("the server calls itself %q for its backups and watchers, and that cannot be a name. Give it one in your ssh config, like Host prod, and deploy to prod", serverName(server))
+		return fmt.Errorf("the server calls itself %q for its backups and watchers, and that cannot be a name. Give it one in your ssh config, like Host my-server, and deploy to my-server", serverName(server))
 	}
 	question := fmt.Sprintf("Set up %s on %s and deploy %s?", build.Name, server, app)
 	if err := confirm(stdin, stdout, yes, question); err != nil {
@@ -339,7 +339,7 @@ func oldDaemonError(server, version string) error {
 }
 
 // serverName is the name the server gets on its own, for its backups and
-// its watchers: prod for prod, the host for user@host.
+// its watchers: my-server for my-server, the host for user@host.
 func serverName(server string) string {
 	_, host, found := strings.Cut(server, "@")
 	if found {

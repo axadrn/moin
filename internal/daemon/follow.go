@@ -26,7 +26,7 @@ import (
 // the branch deploys.
 //
 // `moin follow --image` follows a tag in a registry instead, like
-// ghcr.io/ada/shop:main. Every minute the daemon asks the registry for the
+// ghcr.io/ada/my-app:main. Every minute the daemon asks the registry for the
 // digest of the tag, and pulls only when it changed. A new image under the tag
 // runs with the compose file of the release that runs. Whoever can push
 // to the tag deploys.
@@ -45,7 +45,7 @@ type Follow struct {
 	App    string `json:"app"`
 	Repo   string `json:"repo,omitempty"`
 	Branch string `json:"branch,omitempty"`
-	// Image is the image the app follows, like ghcr.io/ada/shop:main.
+	// Image is the image the app follows, like ghcr.io/ada/my-app:main.
 	Image string `json:"image,omitempty"`
 	// Commit is the newest commit moin tried, deployed or failed.
 	Commit string `json:"commit,omitempty"`

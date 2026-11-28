@@ -231,7 +231,7 @@ func folderApp() (string, error) {
 	}
 	name := strings.ToLower(filepath.Base(dir))
 	if checkApp(name) != nil {
-		return "", fmt.Errorf("name the app, like `%s logs shop`: this folder's name %q is not an app name", build.Name, name)
+		return "", fmt.Errorf("name the app, like `%s logs my-app`: this folder's name %q is not an app name", build.Name, name)
 	}
 	return name, nil
 }

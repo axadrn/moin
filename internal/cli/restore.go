@@ -119,7 +119,7 @@ func listBackups(ctx context.Context, server, app, from string, said io.Writer) 
 // --json.
 //
 // When a server is gone, its copies come back on a new one with your
-// backup key: `moin restore shop -s new --from prod --to <copy> --key`.
+// backup key: `moin restore my-app -s new --from my-server --to <copy> --key`.
 // A copy in moin cloud always asks for your backup key.
 func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("restore", "restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>] [--database <name>] [--from <server>] [--key] [-s server] [-y] [--json]").withServer().withYes().withJSON()

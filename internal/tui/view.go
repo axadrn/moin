@@ -18,13 +18,13 @@ import (
 
 // The screen, top to bottom:
 //
-//	 moin   Apps 2 · Servers 1 · Backups 2           ✓ all good
-//	╭─ Apps ──────────────╮ ╭─ shop ───────────────────────────╮
-//	│ server-1            │ │ ● running   v3, deployed 4m ago   │
-//	│ ▌ shop   ● running  │ │                                   │
-//	│   blog   ○ stopped  │ │ Address   https://shop.example.com│
-//	╰─────────────────────╯ ╰───────────────────────────────────╯
-//	 ◐ restarting shop · health check · 3s
+//	 moin   Apps 2 · Servers 1 · Backups 2              ✓ all good
+//	╭─ Apps ──────────────╮ ╭─ my-app ────────────────────────────╮
+//	│ my-server           │ │ ● running   v3, deployed 4m ago     │
+//	│ ▌ my-app  ● running │ │                                     │
+//	│   blog    ○ stopped │ │ Address   https://my-app.example.com│
+//	╰─────────────────────╯ ╰─────────────────────────────────────╯
+//	 ◐ restarting my-app · health check · 3s
 //	 ↑↓ select  enter logs  r restart  b rollback  ? help  q quit
 
 // View draws the screen.

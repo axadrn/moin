@@ -237,7 +237,7 @@ func welcome(w io.Writer) {
 	fmt.Fprintln(w)
 	steps := [][3]string{
 		{"1", "cd my-app", "the app's folder, a git repository"},
-		{"2", build.Name + " deploy <server>", "any server you can ssh to, like ssh prod"},
+		{"2", build.Name + " deploy <server>", "any server you can ssh to, like ssh my-server"},
 		{"3", build.Name, "your apps, live, with their backups"},
 	}
 	for _, step := range steps {

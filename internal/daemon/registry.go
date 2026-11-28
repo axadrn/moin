@@ -190,7 +190,7 @@ func remoteDigest(ctx context.Context, image string) string {
 
 // RepoDigests is the format for docker image inspect that lists the
 // digests an image has in registries, one per line, like
-// ghcr.io/ada/shop@sha256:3f2a….
+// ghcr.io/ada/my-app@sha256:3f2a….
 const RepoDigests = "{{range .RepoDigests}}{{println .}}{{end}}"
 
 // InDigests reports whether digest is one of the digests an image has, as

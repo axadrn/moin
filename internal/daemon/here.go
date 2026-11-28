@@ -213,7 +213,7 @@ func (a *apps) receiveSource(source io.Reader) (string, error) {
 	return file.Name(), nil
 }
 
-// pinImage tags a loaded image by its content, like moin-shop:3f2a9c1e0b4d,
+// pinImage tags a loaded image by its content, like moin-my-app:3f2a9c1e0b4d,
 // so each release keeps its own image and a rollback finds it again.
 func (a *apps) pinImage(ctx context.Context, app, image string) (string, error) {
 	id, err := a.output(ctx, "docker", "image", "inspect", "--format", "{{.Id}}", "--", image)

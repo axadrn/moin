@@ -83,7 +83,7 @@ type facts struct {
 	asked    time.Time
 }
 
-// action is a step on a server that runs now, like "restarting shop":
+// action is a step on a server that runs now, like "restarting my-app":
 // the app it runs on, the verb its row shows, and what the status line
 // says.
 type action struct {

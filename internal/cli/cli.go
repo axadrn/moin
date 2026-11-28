@@ -84,9 +84,9 @@ On the server
   version                      Show the version
   help                         Show this help
 
-A server is a name from your ssh config, like prod, or user@host. If
-ssh prod works, moin works. Leave the app out in its folder. When it
-runs on two servers, add -s prod. Every reading command takes --json.
+A server is a name from your ssh config, like my-server, or user@host. If
+ssh my-server works, moin works. Leave the app out in its folder. When it
+runs on two servers, add -s production. Every reading command takes --json.
 Every command shows its flags with --help.
 
 Docs: https://moin.run/docs

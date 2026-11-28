@@ -35,7 +35,7 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	log := os.Stderr
 	verb, args := args[0], args[1:]
 	// name is the one argument of a here command without flags, like the
-	// app of `here stop shop`.
+	// app of `here stop my-app`.
 	name := func() (string, error) { return hereApp(newFlags("here "+verb, "here "+verb+" <name>"), args) }
 	switch verb {
 	case "apps":

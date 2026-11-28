@@ -18,13 +18,13 @@ import (
 
 // follow is `moin follow [app] --branch main`: the server deploys each
 // new commit of the branch, read with a deploy key made on the server.
-// `moin follow [app] --image ghcr.io/you/shop:main` deploys each new
+// `moin follow [app] --image ghcr.io/you/my-app:main` deploys each new
 // image under that tag instead. `--off` stops it.
 func follow(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("follow", "follow [app] [--branch main] [--repo <git url>] [--image <image>] [--off] [-s server]").withServer()
 	branch := flags.String("branch", "", "the branch to deploy; default the branch of this folder")
 	repo := flags.String("repo", "", "the repo; default the origin of this folder")
-	image := flags.String("image", "", "deploy each new image under this tag, like ghcr.io/you/shop:main, instead of a branch")
+	image := flags.String("image", "", "deploy each new image under this tag, like ghcr.io/you/my-app:main, instead of a branch")
 	off := flags.Bool("off", false, "stop following, and remove the deploy key from the server")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -152,7 +152,7 @@ func unfollow(ctx context.Context, server, app string, stdout io.Writer) error {
 	return nil
 }
 
-// httpsRepo is a repo address over HTTPS, like https://github.com/you/shop.
+// httpsRepo is a repo address over HTTPS, like https://github.com/you/my-app.
 var httpsRepo = regexp.MustCompile(`^https://([^/@]+)/(.+?)(\.git)?/?$`)
 
 // sshRepo is the SSH address of a repo given over HTTPS: a deploy key

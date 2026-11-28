@@ -40,7 +40,7 @@ func AddDomainHere(ctx context.Context, dir, app, domain string, out io.Writer) 
 	}
 	domain = strings.ToLower(strings.TrimSpace(domain))
 	if !domainPattern.MatchString(domain) {
-		return Result{}, fmt.Errorf("%q is not a domain name, like shop.example.com", domain)
+		return Result{}, fmt.Errorf("%q is not a domain name, like my-app.example.com", domain)
 	}
 	if owner := a.domainOwner(domain); owner != "" {
 		return Result{}, fmt.Errorf("%s belongs to %s already", domain, owner)
