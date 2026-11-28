@@ -107,19 +107,23 @@ type Security struct {
 	Published []string `json:"published"`
 	// Tailnet is where the server is in the tailnet.
 	Tailnet Tailnet `json:"tailnet"`
+	// PublicAddresses are the server's own addresses on the internet,
+	// none behind NAT. The CLI knocks there to see that port 22 closed.
+	PublicAddresses []string `json:"public_addresses"`
 }
 
 // now says what is closed now: what server.json asks for and whether the
 // rules are really loaded.
 func (s *security) now(ctx context.Context) Security {
 	now := Security{
-		PublicSSH:      publicSSH(ctx, s.file),
-		SSHOnTailscale: s.file.SSHOnTailscale && tableLoaded(ctx),
-		Firewall:       s.file.Firewall && tableLoaded(ctx),
-		Tunnel:         s.file.TunnelToken != "",
-		OpenPorts:      []string{},
-		Published:      publishedPorts(ctx),
-		Tailnet:        TailnetHere(ctx),
+		PublicSSH:       publicSSH(ctx, s.file),
+		SSHOnTailscale:  s.file.SSHOnTailscale && tableLoaded(ctx),
+		Firewall:        s.file.Firewall && tableLoaded(ctx),
+		Tunnel:          s.file.TunnelToken != "",
+		OpenPorts:       []string{},
+		Published:       publishedPorts(ctx),
+		Tailnet:         TailnetHere(ctx),
+		PublicAddresses: publicAddresses(),
 	}
 	if now.Firewall {
 		now.OpenPorts = openPorts(s.file, s.web())

@@ -39,17 +39,39 @@ func TestSecureTunnelTakesOnlyOff(t *testing.T) {
 	}
 }
 
+// A name that resolves to the server's tailnet address, like MagicDNS's
+// short name, is the tailnet already: no knock on it, no alias to point.
+func TestReachesTailnet(t *testing.T) {
+	tailnet := daemon.Tailnet{IP: "127.0.0.1", Name: "my-server.tail0000.ts.net"}
+	for public, want := range map[string]bool{
+		"my-server.tail0000.ts.net": true,
+		"127.0.0.1":                 true,
+		"localhost":                 true,
+		"203.0.113.7":               false,
+	} {
+		if got := reachesTailnet(public, tailnet); got != want {
+			t.Errorf("reachesTailnet(%q) = %v, want %v", public, got, want)
+		}
+	}
+	if reachesTailnet("localhost", daemon.Tailnet{}) {
+		t.Error("a server in no tailnet is not reached through it")
+	}
+	if address := answersSSH(nil); address != "" {
+		t.Errorf("no public address known, yet %q answers", address)
+	}
+}
+
 // printSecurity says port 22 is closed only when moin closed it. A server
 // whose sshd listens elsewhere has nothing open on 22, but nothing closed.
 func TestPrintSecuritySaysClosedOnlyWhenClosed(t *testing.T) {
 	change := daemon.Secure{CloseSSH: true}
 	var out strings.Builder
-	printSecurity(&out, "web-1", "100.64.0.7", true, change, daemon.Security{})
+	printSecurity(&out, "web-1", change, daemon.Security{})
 	if strings.Contains(out.String(), "closed") || strings.Contains(out.String(), "Locked out") {
 		t.Errorf("sshd elsewhere, yet it says:\n%s", out.String())
 	}
 	out.Reset()
-	printSecurity(&out, "web-1", "100.64.0.7", true, change, daemon.Security{SSHOnTailscale: true})
+	printSecurity(&out, "web-1", change, daemon.Security{SSHOnTailscale: true})
 	for _, part := range []string{"Public port 22 is closed", "Locked out one day?"} {
 		if !strings.Contains(out.String(), part) {
 			t.Errorf("closed, but it misses %q:\n%s", part, out.String())

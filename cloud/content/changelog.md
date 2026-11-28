@@ -11,6 +11,7 @@ November 28, 2026
 
 ### Fixed
 - **Secure with Tailscale SSH**: `moin secure my-server` closes the ports on a server whose SSH only Tailscale SSH serves. What counts is that a new SSH session over Tailscale works.
+- **No false port 22 warning**: After `moin secure`, moin checks port 22 on the server's public address, not on the tailnet. A name that already goes over Tailscale gets no `~/.ssh/config` hint.
 - **Loopback ports**: An app published on `127.0.0.1` or `::1` no longer shows as open to the internet. Only the server itself reaches it.
 - **Short server names**: `moin update my-server` and every other command that takes a server find the saved `root@my-server`, when it is the only one with that name.
 
