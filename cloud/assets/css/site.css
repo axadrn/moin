@@ -2381,3 +2381,109 @@
    to the code. */
 .moin-hero-open { font-weight: 600; }
 
+@layer moin-components {
+  /* Compare: the choices side by side. One grid; each column spans every
+     row on the rows' own lines, so the rows line up and a column is one
+     surface from head to foot. */
+  .moin-compare {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) repeat(var(--cols), minmax(0, 1fr));
+    padding: var(--pad) var(--pad);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--card-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-compare[data-cols="2"] { --cols: 2; }
+  .moin-compare[data-cols="3"] { --cols: 3; }
+  .moin-compare[data-cols="4"] { --cols: 4; }
+  .moin-compare[data-cols="5"] { --cols: 5; }
+  .moin-compare[data-cols="6"] { --cols: 6; }
+  .moin-compare[data-cols="7"] { --cols: 7; }
+  .moin-compare-labels,
+  .moin-compare-col {
+    display: grid;
+    grid-row: 1 / span var(--compare-rows);
+    grid-template-rows: subgrid;
+    min-width: 0;
+  }
+  .moin-compare-cell,
+  .moin-compare-head,
+  .moin-compare-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    text-align: center;
+  }
+  .moin-compare-cell { min-height: 4.5rem; border-top: 1px solid var(--border); }
+  .moin-compare-labels .moin-compare-cell { align-items: flex-start; font-weight: 500; text-align: start; padding-inline-start: 0; }
+  .moin-compare-head { gap: 2px; padding-block: var(--space-5) var(--space-4); }
+  .moin-compare-name { font-size: 1rem; line-height: 1.5rem; font-weight: 500; }
+  .moin-compare-foot { justify-content: flex-start; padding-block: var(--space-5) var(--space-2); border-top: 1px solid var(--border); }
+  .moin-compare-foot .moin-button { width: 100%; }
+  .moin-compare-text { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .moin-compare-what { display: none; }
+  .moin-compare-cell > .moin-mark:empty { display: none; }
+  /* The featured column: raised past the top and bottom of the card, one
+     surface with a quiet ink edge and a soft shadow. */
+  .moin-compare-col[data-featured] {
+    position: relative;
+    margin-block: calc(-1 * var(--space-4));
+    padding-block: var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 16%, transparent), 0 12px 32px -8px rgb(0 0 0 / 18%);
+  }
+  .moin-compare-col[data-featured] .moin-compare-cell:nth-child(2) { border-top-color: transparent; }
+  .moin-compare-badge {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 50%;
+    translate: -50% -50%;
+    padding: 2px var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  /* On a phone: one card for each choice, the featured one first. */
+  @media (max-width: 39.99rem) {
+    .moin-compare { display: flex; flex-direction: column; gap: var(--space-6); padding: 0; background: none; }
+    .moin-compare[data-reverse] { flex-direction: column-reverse; }
+    .moin-compare-labels { display: none; }
+    .moin-compare-col {
+      display: flex;
+      flex-direction: column;
+      padding: var(--pad);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+    }
+    .moin-compare:not([data-reverse]) > .moin-compare-col[data-featured] { order: -1; }
+    .moin-compare-col[data-featured] { margin-block: var(--space-3) 0; padding-block: var(--pad); }
+    .moin-compare-head { align-items: flex-start; padding: 0 0 var(--space-3); text-align: start; }
+    .moin-compare-cell {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-start;
+      min-height: 0;
+      gap: var(--space-3);
+      padding: var(--space-2) 0;
+      border-top: 0;
+      text-align: start;
+    }
+    .moin-compare-cell > .moin-mark:empty { display: inline-flex; visibility: hidden; }
+    .moin-compare-text { align-items: flex-start; }
+    .moin-compare-what { display: inline; }
+    .moin-compare-foot { padding: var(--space-4) 0 0; border-top: 0; }
+  }
+}

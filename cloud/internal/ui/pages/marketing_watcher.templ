@@ -5,61 +5,44 @@ import (
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 )
 
-// homeWatcherRow is one line of the watcher table: what, whether you get
-// it with no watcher, your own, and moin cloud, and two words after a
-// mark where it needs them.
-type homeWatcherRow struct {
-	What  string
-	Marks [3]string
-	Notes [3]string
+// homeWatcherRows are what the watcher table compares, in order.
+var homeWatcherRows = []string{
+	"You hear when your server dies",
+	"Your domains, visited from outside",
+	"What happened, on your phone",
+	"A copy a hacked server can't delete",
+	"Off-site copies without a bucket to set up",
+	"Email alerts without your own mail server",
+	"Nothing to run, update or watch",
 }
 
-// homeWatcherRows are the lines of the watcher table, the same as on top
-// of the watcher docs.
-var homeWatcherRows = []homeWatcherRow{
-	{What: "Deploys", Marks: [3]string{"yes", "yes", "yes"}},
-	{What: "Backups, restored every day", Marks: [3]string{"yes", "yes", "yes"}},
-	{What: "Alerts while your server lives", Marks: [3]string{"yes", "yes", "yes"}},
-	{What: "Alerts by email", Marks: [3]string{"yes", "yes", "yes"}, Notes: [3]string{"Your SMTP", "Your SMTP", ""}},
-	{What: "You hear when your server dies", Marks: [3]string{"no", "yes", "yes"}},
-	{What: "Your domains, visited from outside", Marks: [3]string{"no", "yes", "yes"}},
-	{What: "What happened, on your phone", Marks: [3]string{"no", "yes", "yes"}},
-	{What: "A copy a hacked server can't delete", Marks: [3]string{"yes", "yes", "yes"}, Notes: [3]string{"Lock your bucket", "Lock your bucket", "Built in"}},
-	{What: "Off-site copies, no bucket to set up", Marks: [3]string{"no", "no", "yes"}},
-	{What: "Email alerts, no mail server to set up", Marks: [3]string{"no", "no", "yes"}},
-	{What: "Nothing to run, update or watch", Marks: [3]string{"yes", "no", "yes"}},
+// homeWatcherColumns are the three ways, with what each answers to the
+// rows above.
+var homeWatcherColumns = []components.CompareColumn{
+	{
+		Name: "No watcher", Caption: "Free",
+		Cells:      []components.CompareCell{{Mark: "no"}, {Mark: "no"}, {Mark: "no"}, {Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "yes"}},
+		ActionHref: "/docs/getting-started", ActionText: "Get started",
+	},
+	{
+		Name: "Self-hosted", Caption: "Free, your own machine",
+		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "no"}},
+		ActionHref: "/docs/watcher#set-one-up", ActionText: "Run your own",
+	},
+	{
+		Name: brand.Name + " cloud", Caption: "$7 a month", Badge: "Recommended", Featured: true,
+		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes", Note: "Built in"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}},
+		ActionHref: "/login", ActionText: "Start free", ActionNote: "30 days free. No card.",
+	},
 }
-
-// homeWatcherColumns name the three ways, in the table's order.
-var homeWatcherColumns = []string{"No watcher", "Self-hosted", brand.Name + " cloud"}
 
 // HomeWatcher is the three ways side by side: no watcher, your own, and
 // moin cloud.
 templ HomeWatcher() {
 	<section id="watcher" class="moin-band">
 		@homeHead("Works alone. Better with a watcher.", "Your server watches itself while it lives. A watcher tells you when it doesn't.")
-		@components.Card(components.CardProps{}) {
-			@components.Rows(components.RowsProps{Head: append([]string{""}, homeWatcherColumns...), Top: true}) {
-				for _, row := range homeWatcherRows {
-					@components.Row(components.RowProps{}) {
-						@components.Cell() {
-							{ row.What }
-						}
-						for i, mark := range row.Marks {
-							@components.Cell() {
-								@components.Mark(components.MarkProps{Kind: mark})
-								<span class="moin-stack" data-gap="1">
-									<span class="moin-only-phone">{ homeWatcherColumns[i] }</span>
-									if row.Notes[i] != "" {
-										<span class="moin-small moin-muted">{ row.Notes[i] }</span>
-									}
-								</span>
-							}
-						}
-					}
-				}
-			}
-		}
+		<p class="moin-center moin-muted">Every setup: deploys, backups restored every day, alerts while your server lives, email alerts through your own mail server.</p>
+		@components.Compare(components.CompareProps{Rows: homeWatcherRows, Columns: homeWatcherColumns, Reverse: true})
 		@homeMore("/docs/watcher", "How the watcher works")
 	</section>
 }
