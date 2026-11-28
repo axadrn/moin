@@ -158,17 +158,49 @@ func pullImage(ctx context.Context, image string) (string, error) {
 // every pull against a limit, and a pull every minute would reach it. Any
 // doubt says no, and the image is pulled.
 func haveRemoteDigest(ctx context.Context, image string) bool {
-	remote, err := registryDocker(ctx, nil, "buildx", "imagetools", "inspect", "--format", "{{.Manifest.Digest}}", "--", image)
-	remote = strings.TrimSpace(remote)
-	if err != nil || remote == "" {
-		return false
+	have, err := registryDocker(ctx, nil, "image", "inspect", "--format", RepoDigests, "--", image)
+	return err == nil && InDigests(have, remoteDigest(ctx, image))
+}
+
+// Digest is what the registry has under the tag of an image, like
+// sha256:3f2a…, or "" when it has nothing there.
+type Digest struct {
+	Image  string `json:"image"`
+	Digest string `json:"digest"`
+}
+
+// DigestHere asks the registry, with the server's login, for the digest
+// under the tag of image. It pulls nothing.
+func DigestHere(ctx context.Context, image string) (Digest, error) {
+	if !validImage(image) {
+		return Digest{}, fmt.Errorf("%q is not an image", image)
 	}
-	have, err := registryDocker(ctx, nil, "image", "inspect", "--format", "{{range .RepoDigests}}{{println .}}{{end}}", "--", image)
+	return Digest{Image: image, Digest: remoteDigest(ctx, image)}, nil
+}
+
+// remoteDigest is the digest the registry has under the tag of image, ""
+// when it has none or can't say.
+func remoteDigest(ctx context.Context, image string) string {
+	digest, err := registryDocker(ctx, nil, "buildx", "imagetools", "inspect", "--format", "{{.Manifest.Digest}}", "--", image)
 	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(digest)
+}
+
+// RepoDigests is the format for docker image inspect that lists the
+// digests an image has in registries, one per line, like
+// ghcr.io/ada/shop@sha256:3f2a….
+const RepoDigests = "{{range .RepoDigests}}{{println .}}{{end}}"
+
+// InDigests reports whether digest is one of the digests an image has, as
+// RepoDigests lists them. So the image is the very one the registry has.
+func InDigests(list, digest string) bool {
+	if digest == "" {
 		return false
 	}
-	for _, line := range strings.Fields(have) {
-		if strings.HasSuffix(line, "@"+remote) {
+	for _, line := range strings.Fields(list) {
+		if strings.HasSuffix(line, "@"+digest) {
 			return true
 		}
 	}

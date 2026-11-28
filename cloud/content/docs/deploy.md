@@ -128,7 +128,7 @@ moin deploy prod --image shop:dev
 
 moin sends the image you built on your laptop. The server builds nothing. This one needs Docker on your laptop.
 
-moin asks the registry first. Only an image no registry has is sent from your laptop. So if you built `ghcr.io/you/shop:1.4` again and did not push it, the server pulls the one in the registry. Push first, or give the local image a name of its own, like `shop:dev`.
+The image on your laptop is what gets deployed. The server pulls it only when the registry has the very same one. Built `ghcr.io/you/shop:1.4` again and did not push it? moin sends your new one.
 
 ## Deploy from CI
 

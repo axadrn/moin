@@ -110,28 +110,31 @@ func removeRegistry(ctx context.Context, args []string, stdin io.Reader, stdout 
 	return nil
 }
 
-// bringImage puts the image of a deploy on the server. The server pulls
-// it from its registry. An image no registry has, like shop:dev, is one
-// you built here: it is sent over SSH.
+// bringImage puts the image of a deploy on the server. An image on this
+// computer is the one that gets deployed: the server pulls it only when
+// its registry has the very same one. Else it is sent over SSH. An image
+// that is not here, the server pulls.
 func bringImage(ctx context.Context, server, image string, stdout io.Writer) error {
-	here := exec.CommandContext(ctx, "docker", "image", "inspect", "--", image).Run() == nil
-	if !here {
-		return task(stdout, "pulling image "+image+" on "+server, func() error {
-			why, err := pullImage(ctx, server, image)
-			if why != "" {
-				return fmt.Errorf("the image %s is in no registry %s can pull from, and not on this computer. Docker said: %s. A private registry needs a login: `%s registry set %s <registry> <user>`", image, server, why, build.Name, server)
-			}
-			return err
-		})
-	}
-	pulled := false
-	err := task(stdout, "asking the registry for image "+image, func() error {
+	pull := func() error {
 		why, err := pullImage(ctx, server, image)
-		pulled = why == "" && err == nil
+		if why != "" {
+			return fmt.Errorf("the image %s is in no registry %s can pull from, and not on this computer. Docker said: %s. A private registry needs a login: `%s registry set %s <registry> <user>`", image, server, why, build.Name, server)
+		}
 		return err
+	}
+	here, err := exec.CommandContext(ctx, "docker", "image", "inspect", "--format", daemon.RepoDigests, "--", image).Output()
+	if err != nil {
+		return task(stdout, "pulling image "+image+" on "+server, pull)
+	}
+	var remote daemon.Digest
+	err = task(stdout, "asking the registry for image "+image, func() error {
+		return sshJSON(ctx, server, []string{"registry", "digest", image}, nil, &remote)
 	})
-	if err != nil || pulled {
+	if err != nil {
 		return err
+	}
+	if daemon.InDigests(string(here), remote.Digest) {
+		return task(stdout, "pulling image "+image+" on "+server, pull)
 	}
 	return task(stdout, "sending image "+image, func() error {
 		return sendImage(ctx, server, image)
@@ -180,8 +183,8 @@ func startFollowImage(ctx context.Context, server, app, image string, stdout io.
 }
 
 // hereRegistry is `here registry`, `here registry set` with the login as
-// JSON on stdin, `here registry rm <registry>` and `here registry pull
-// <image>`.
+// JSON on stdin, `here registry rm <registry>`, `here registry pull
+// <image>` and `here registry digest <image>`.
 func hereRegistry(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	switch {
 	case len(args) == 0:
@@ -198,6 +201,9 @@ func hereRegistry(ctx context.Context, args []string, stdin io.Reader, stdout io
 	case len(args) == 2 && args[0] == "pull":
 		pulled, err := daemon.PullHere(ctx, args[1])
 		return respond(stdout, pulled, err)
+	case len(args) == 2 && args[0] == "digest":
+		digest, err := daemon.DigestHere(ctx, args[1])
+		return respond(stdout, digest, err)
 	}
-	return errors.New("usage: here registry [set | rm <registry> | pull <image>]")
+	return errors.New("usage: here registry [set | rm <registry> | pull <image> | digest <image>]")
 }
