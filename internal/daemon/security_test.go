@@ -182,6 +182,18 @@ func TestSecureNeedsATailnetToCloseSSH(t *testing.T) {
 	}
 }
 
+// SSH closes on a server in a tailnet, also when no sshd listens on port
+// 22: Tailscale SSH may answer it. The CLI's new session over Tailscale
+// is the test. Without nft, it stops at the firewall, past the SSH check.
+func TestSecureClosesSSHWithoutSSHD(t *testing.T) {
+	bin := fakeCommand(t, "tailscale", `echo '{"BackendState":"Running","Self":{"DNSName":"my-server.tail0000.ts.net.","TailscaleIPs":["100.64.0.7"]}}'`)
+	t.Setenv("PATH", bin)
+	_, err := SecureHere(t.Context(), t.TempDir(), Secure{CloseSSH: true}, new(strings.Builder))
+	if !errors.Is(err, errNoNft) {
+		t.Fatalf("err = %v, want errNoNft", err)
+	}
+}
+
 func TestValidTunnelToken(t *testing.T) {
 	good := base64.StdEncoding.EncodeToString([]byte(`{"a":"account","t":"tunnel-id","s":"secret"}`))
 	bad := base64.StdEncoding.EncodeToString([]byte(`{"a":"account"}`))

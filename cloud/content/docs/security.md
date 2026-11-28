@@ -60,7 +60,8 @@ Enter means yes. Each step shows as it runs: putting the server in your tailnet,
 From then on, `moin deploy` goes over Tailscale. To the rest of the internet, port 22 is gone.
 
 - It needs a Tailscale account. The free plan works.
-- sshd must listen on port 22. If it listens on another one, moin leaves public SSH open.
+- Over Tailscale, sshd or Tailscale SSH may answer. What counts is that a new SSH session over Tailscale works.
+- moin closes port 22. sshd on another port stays open to the internet, until `moin secure` closes every port.
 - Tailscale keeps `41641/udp` open, for direct connections. If it is closed, Tailscale still works, through its relays.
 - Said no? moin says `Port 22 stays open to the internet. Close it later with moin secure my-server`, and `moin` shows a `!` line until it is closed: `my-server: port 22 is open to the internet.`
 - A server's Tailscale key expires, and then SSH to it stops. Two weeks before, the server alerts and `moin` shows it. Better: turn key expiry off for the server. Tailscale admin console, Machines, the server, the ⋯ menu, Disable key expiry.
