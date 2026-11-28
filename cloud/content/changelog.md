@@ -3,6 +3,20 @@ title: Changelog
 description: What shipped in moin, newest first.
 ---
 
+## v1.0.0-beta.40
+
+November 28, 2026
+
+**In short:** `moin secure` works on servers that only Tailscale SSH serves, a port published on loopback no longer shows as open, and a short server name finds the saved `user@` one.
+
+### Fixed
+- **Secure with Tailscale SSH**: `moin secure my-server` closes the ports on a server whose SSH only Tailscale SSH serves. What counts is that a new SSH session over Tailscale works.
+- **Loopback ports**: An app published on `127.0.0.1` or `::1` no longer shows as open to the internet. Only the server itself reaches it.
+- **Short server names**: `moin update my-server` and every other command that takes a server find the saved `root@my-server`, when it is the only one with that name.
+
+### Upgrade
+`moin update my-server`.
+
 ## v1.0.0-beta.39
 
 November 28, 2026
