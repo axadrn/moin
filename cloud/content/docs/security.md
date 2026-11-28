@@ -20,7 +20,7 @@ Whoever can SSH to it as root. Nobody else.
 
 ## The team
 
-Your team is the SSH keys on the server. Whoever has a key there is on the team.
+Your team is the SSH keys on the server. Whoever has a key there is on the team. More in [Teams](/docs/teams).
 
 ```bash
 moin keys prod

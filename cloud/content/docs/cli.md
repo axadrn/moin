@@ -232,7 +232,7 @@ There is no MCP server, and none is needed. AI coding agents like Claude Code, C
 
 - They read with `--json`.
 - Anything that deletes needs `-y`, so it shows in the agent's transcript.
-- They run with your SSH key, so they can do what you can. Give an agent what you would give a colleague.
+- They run with your SSH key, so they can do what you can. Give an agent what you would give a colleague. [moin for agents](/docs/agents)
 
 Put this in your project's `AGENTS.md` or `CLAUDE.md`:
 
