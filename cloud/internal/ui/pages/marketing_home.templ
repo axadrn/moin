@@ -94,23 +94,23 @@ templ HomeHero() {
 			</div>
 		</div>
 		<div class="moin-page">
-			@components.Terminal(components.TerminalProps{Title: "~/shop — moin deploy prod", Lines: homeDeploy, Play: true})
+			@components.Terminal(components.TerminalProps{Title: "~/my-app — moin deploy my-server", Lines: homeDeploy, Play: true})
 		</div>
 	</section>
 }
 
 // homeDeploy is a first deploy, as the CLI prints it.
 var homeDeploy = []components.TerminalLine{
-	{Kind: "prompt", Text: "$ moin deploy prod"},
-	{Text: "shop · 3f2a9c1 → prod"},
-	{Kind: "ask", Text: "? Set up moin on prod and deploy shop? [y/N] y"},
+	{Kind: "prompt", Text: "$ moin deploy my-server"},
+	{Text: "my-app · 3f2a9c1 → my-server"},
+	{Kind: "ask", Text: "? Set up moin on my-server and deploy my-app? [y/N] y"},
 	{Kind: "step", Text: "→ installing Docker"},
 	{Kind: "step", Text: "→ installing moin"},
 	{Kind: "step", Text: "→ starting the daemon: backups, restore checks, reports"},
 	{Kind: "step", Text: "→ sending the source"},
 	{Kind: "step", Text: "→ building"},
-	{Kind: "done", Text: "✓ moin. shop is live: https://shop.203-0-113-7.sslip.io"},
-	{Kind: "hint", Text: "  Postgres found. No backup yet: moin bucket set prod"},
+	{Kind: "done", Text: "✓ moin. my-app is live: https://my-app.203-0-113-7.sslip.io"},
+	{Kind: "hint", Text: "  Postgres found. No backup yet: moin bucket set my-server"},
 }
 
 // ---------------------------------------------------------------- lose nothing
@@ -122,7 +122,7 @@ templ HomeLoseNothing() {
 		@homeHead("Lose nothing.", "Every day, moin restores a backup. And proves it.")
 		<div class="moin-grid" data-fit style="--min: 24rem">
 			<div class="moin-stack" data-gap="3" data-fill>
-				@components.Terminal(components.TerminalProps{Title: "~ — moin backups shop", Lines: homeBackups, Wrap: true})
+				@components.Terminal(components.TerminalProps{Title: "~ — moin backups my-app", Lines: homeBackups, Wrap: true})
 				<p class="moin-small moin-muted">SQLite and Postgres. A copy before every deploy.</p>
 			</div>
 			<div class="moin-stack" data-gap="3" data-fill>
@@ -134,16 +134,16 @@ templ HomeLoseNothing() {
 	</section>
 }
 
-// homeBackups is `moin backups shop`, as the CLI prints it, for an app
+// homeBackups is `moin backups my-app`, as the CLI prints it, for an app
 // with two copies so far.
 var homeBackups = []components.TerminalLine{
-	{Kind: "prompt", Text: "$ moin backups shop"},
+	{Kind: "prompt", Text: "$ moin backups my-app"},
 	{Kind: "prompt", Text: "postgres-db"},
 	{Kind: "done", Text: "  ✓ Restore check 1h ago: the copy 20261127T060000Z-730551 restored and read fine"},
 	{Text: "COPY                      TAKEN     SIZE"},
 	{Text: "20261127T070000Z-118204   12m ago   41 MB"},
 	{Text: "20261127T060000Z-730551   1h ago    41 MB"},
-	{Kind: "hint", Text: "  Go back to one with moin restore shop --to <copy>"},
+	{Kind: "hint", Text: "  Go back to one with moin restore my-app --to <copy>"},
 }
 
 // homeChat is the watcher's chat in Telegram: two alerts, as the watcher
@@ -158,8 +158,8 @@ templ homeChat() {
 			</span>
 		</figcaption>
 		<div class="moin-chat-messages">
-			@homeAlert("shop: the restore check of postgres-db failed", "the copy 20261127T000000Z-904417 did not restore: pg_restore: pg_restore: error: could not read from input file: end of file\nprod · shop", "00:04")
-			@homeAlert("prod stopped reporting", "No report since 2026-11-27 03:12 UTC. The server, its network or moin on it is down.\nApps on it: shop.\nLook: ssh prod, or the console of your provider.\nprod", "03:16")
+			@homeAlert("my-app: the restore check of postgres-db failed", "the copy 20261127T000000Z-904417 did not restore: pg_restore: pg_restore: error: could not read from input file: end of file\nprod · my-app", "00:04")
+			@homeAlert("my-server stopped reporting", "No report since 2026-11-27 03:12 UTC. The server, its network or moin on it is down.\nApps on it: my-app.\nLook: ssh my-server, or the console of your provider.\nprod", "03:16")
 		</div>
 	</figure>
 }
@@ -232,7 +232,7 @@ templ homeRoads() {
 		</g>
 		<g fill="currentColor" font-family="var(--font-sans)" text-anchor="middle">
 			<text x="105" y="106" font-size="20" font-weight="600">your laptop</text>
-			<text x="105" y="130" font-size="15" class="moin-roads-muted">moin deploy prod</text>
+			<text x="105" y="130" font-size="15" class="moin-roads-muted">moin deploy my-server</text>
 			<text x="480" y="106" font-size="20" font-weight="600" class="moin-roads-ink-text">your server</text>
 			<text x="480" y="130" font-size="15" class="moin-roads-ink-text">apps, backups, checks</text>
 			<text x="855" y="46" font-size="20" font-weight="600">watcher</text>
@@ -265,7 +265,7 @@ templ homeRoadsTall() {
 		</g>
 		<g fill="currentColor" font-family="var(--font-sans)" text-anchor="middle">
 			<text x="180" y="46" font-size="20" font-weight="600">your laptop</text>
-			<text x="180" y="70" font-size="15" class="moin-roads-muted">moin deploy prod</text>
+			<text x="180" y="70" font-size="15" class="moin-roads-muted">moin deploy my-server</text>
 			<text x="250" y="134" font-size="15" class="moin-roads-muted">ssh, your key</text>
 			<text x="180" y="211" font-size="20" font-weight="600" class="moin-roads-ink-text">your server</text>
 			<text x="180" y="235" font-size="15" class="moin-roads-ink-text">apps, backups, checks</text>

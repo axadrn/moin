@@ -73,7 +73,7 @@ templ alertsOff(plan Plan) {
 templ cloudFirstRun(plan Plan) {
 	@components.Card(components.CardProps{Title: "Connect your first server"}) {
 		<p class="moin-text moin-muted">Run this on your laptop, with the name of the server in your SSH config. It signs you in, and the server reports here every minute. When it goes silent, you get a mail.</p>
-		@components.Command(components.CommandProps{Text: connectCommand("prod")})
+		@components.Command(components.CommandProps{Text: connectCommand("my-server")})
 		@components.Status(components.StatusProps{State: components.StateRunning, Text: "Waiting for the first report"})
 		<p class="moin-small moin-muted">{ plan.Text }</p>
 	}

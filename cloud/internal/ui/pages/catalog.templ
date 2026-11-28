@@ -63,7 +63,7 @@ templ CatalogApp(entry catalog.Entry, similar []catalog.Entry, appURL string) {
 				<div class="moin-section-head">
 					<h2>Deploy</h2>
 				</div>
-				@components.Code(components.CodeProps{ID: "catalog-command", Text: brand.Name + " deploy prod --catalog " + entry.Slug})
+				@components.Code(components.CodeProps{ID: "catalog-command", Text: brand.Name + " deploy my-server --catalog " + entry.Slug})
 			</section>
 			if entry.Database != "" {
 				<section class="moin-section">

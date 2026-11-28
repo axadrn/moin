@@ -59,7 +59,7 @@ templ CloudCopies(p CloudCopiesProps) {
 		}
 		if len(p.Copies) == 0 {
 			@components.Card(components.CardProps{Title: "No copies yet"}) {
-				<p class="moin-text moin-muted">A server sends one after each backup, once it has a bucket and reports here. Set the bucket from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } bucket set prod</code></p>
+				<p class="moin-text moin-muted">A server sends one after each backup, once it has a bucket and reports here. Set the bucket from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } bucket set my-server</code></p>
 			}
 		} else {
 			@components.Card(components.CardProps{}) {
@@ -96,7 +96,7 @@ templ CloudCopies(p CloudCopiesProps) {
 				}
 			}
 		}
-		<p class="moin-small moin-muted">Your key opens them, moin cloud can't. Restore one from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } restore shop</code></p>
+		<p class="moin-small moin-muted">Your key opens them, moin cloud can't. Restore one from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } restore my-app</code></p>
 	}
 }
 
