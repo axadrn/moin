@@ -183,6 +183,10 @@ func watcherConnect(ctx context.Context, args []string, stdin io.Reader, stdout 
 	if err := sendJSON(ctx, server, to, "watchers", "connect"); err != nil {
 		return err
 	}
+	// In the list of this laptop, as after a deploy.
+	if err := addServer(server); err != nil {
+		return err
+	}
 	done(stdout, "%s reports to %s every minute", server, to.URL)
 	return nil
 }

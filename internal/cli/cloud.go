@@ -265,6 +265,9 @@ func cloudConnect(ctx context.Context, server string, stdout io.Writer) error {
 	if err := sendJSON(ctx, server, watcher, "watchers", "connect"); err != nil {
 		return fmt.Errorf("%s waits for %s, but the server did not take the watcher: %w. Run it again", cloudName, server, err)
 	}
+	if err := addServer(server); err != nil {
+		return err
+	}
 	done(stdout, "%s reports to %s every minute", server, cloudName)
 	hint(stdout, "See it with", build.Name+" watcher")
 	return nil
