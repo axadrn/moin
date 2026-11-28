@@ -1339,21 +1339,13 @@
     margin-inline-end: var(--space-2);
     padding-block: var(--space-1);
   }
+  /* The actions keep their own width at the end of the title's line, on a
+     phone too: a button, not a block. */
   .moin-header-actions {
-    display: grid;
-    grid-auto-columns: 1fr;
-    grid-auto-flow: column;
+    display: flex;
     align-items: center;
-    width: 100%;
     gap: var(--space-2);
-  }
-  /* A chip or a status is a word, not a button: it keeps its own width. */
-  @media (min-width: 40rem) {
-    .moin-header-actions {
-      display: flex;
-      width: auto;
-      margin-inline-start: auto;
-    }
+    margin-inline-start: auto;
   }
 
 }
@@ -2093,6 +2085,8 @@
     padding-block: var(--space-8) 4rem;
   }
   .moin-auth-main :is(.moin-button, .moin-input, .moin-command) { width: 100%; }
+  /* Signing in reads in the middle, like the head of every page. */
+  .moin-auth-main > :is(h1, p) { text-align: center; text-wrap: balance; }
 }
 
 @layer moin-components {

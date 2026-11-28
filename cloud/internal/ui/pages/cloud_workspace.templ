@@ -19,9 +19,13 @@ type CloudOverviewProps struct {
 // the last proven restores. It only reads: nothing on it changes a server.
 templ CloudOverview(p CloudOverviewProps) {
 	@cloudApp(p.Cloud, "Overview", "Overview") {
-		@components.Header(components.HeaderProps{Title: "Overview"}) {
-			@components.Button(components.ButtonProps{Href: "/cloud/connect"}) {
-				Connect a server
+		if len(p.View.Servers) == 0 {
+			@components.Header(components.HeaderProps{Title: "Overview"})
+		} else {
+			@components.Header(components.HeaderProps{Title: "Overview"}) {
+				@components.Button(components.ButtonProps{Href: "/cloud/connect"}) {
+					Connect a server
+				}
 			}
 		}
 		@alertsOff(p.Cloud.Plan)
