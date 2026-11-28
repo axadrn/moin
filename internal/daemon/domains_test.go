@@ -43,11 +43,14 @@ func TestDomainsByService(t *testing.T) {
 			t.Errorf("%s = %v, want %s", key, labels[key], want)
 		}
 	}
-	// No router has a middleware.
+	// Only the tunnel router has a middleware: it sends http to https.
 	for key := range labels {
-		if strings.Contains(key, "middlewares") {
+		if strings.Contains(key, "middlewares") && !strings.Contains(key, "-https") && !strings.Contains(key, "-tunnel.") {
 			t.Errorf("%s = %v", key, labels[key])
 		}
+	}
+	if labels["traefik.http.routers.moin-shop-tunnel.middlewares"] != "moin-shop-https" || labels["traefik.http.middlewares.moin-shop-https.redirectscheme.scheme"] != "https" {
+		t.Errorf("tunnel: %v", labels)
 	}
 	// An app with only its instant address has no router for domains.
 	only := map[string]any{}
@@ -71,9 +74,9 @@ func TestWwwRedirectsToTheApex(t *testing.T) {
 	web := map[string]any{}
 	addRouters(map[string]any{}, web, routes{app: "shop", router: project("shop"), domains: []string{"example.com", "www.example.com", "www.other.example.net", "shop.example.org"}, port: 3000, instant: "shop.203-0-113-7.sslip.io"})
 	labels := web["labels"].(map[string]any)
-	for _, router := range []string{"moin-shop", "moin-shop-tunnel"} {
-		if got := labels["traefik.http.routers."+router+".middlewares"]; got != "moin-shop-www" {
-			t.Errorf("%s middlewares = %v", router, got)
+	for router, want := range map[string]string{"moin-shop": "moin-shop-www", "moin-shop-tunnel": "moin-shop-https,moin-shop-www"} {
+		if got := labels["traefik.http.routers."+router+".middlewares"]; got != want {
+			t.Errorf("%s middlewares = %v, want %s", router, got, want)
 		}
 	}
 	if got := labels["traefik.http.routers.moin-shop-instant.middlewares"]; got != nil {
@@ -110,7 +113,7 @@ func TestWwwRedirectsToTheApex(t *testing.T) {
 	one := map[string]any{}
 	addRouters(map[string]any{}, one, routes{app: "blog", router: project("blog"), domains: []string{"www.example.com"}, port: 3000})
 	for key := range one["labels"].(map[string]any) {
-		if strings.Contains(key, "middlewares") {
+		if strings.Contains(key, "-www") {
 			t.Errorf("www alone redirects: %s", key)
 		}
 	}

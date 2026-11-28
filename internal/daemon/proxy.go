@@ -108,6 +108,10 @@ func addDomainLabels(labels map[string]any, routes routes) {
 	labels["traefik.http.routers."+name+"-tunnel.rule"] = rule
 	labels["traefik.http.routers."+name+"-tunnel.entrypoints"] = tunnelEntrypoint
 	labels["traefik.http.routers."+name+"-tunnel.service"] = name
+	// Cloudflare says in X-Forwarded-Proto how the visitor came. One who
+	// came over http goes to https, path and query kept.
+	labels["traefik.http.middlewares."+name+"-https.redirectscheme.scheme"] = "https"
+	labels["traefik.http.middlewares."+name+"-https.redirectscheme.permanent"] = "true"
 	middlewares := []string{}
 	if apexes := wwwApexes(routes.domains); len(apexes) > 0 {
 		middleware := "traefik.http.middlewares." + name + "-www.redirectregex."
@@ -122,8 +126,8 @@ func addDomainLabels(labels map[string]any, routes routes) {
 	}
 	if len(middlewares) > 0 {
 		labels["traefik.http.routers."+name+".middlewares"] = strings.Join(middlewares, ",")
-		labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(middlewares, ",")
 	}
+	labels["traefik.http.routers."+name+"-tunnel.middlewares"] = strings.Join(append([]string{name + "-https"}, middlewares...), ",")
 }
 
 // wwwApexes are the domains whose www. domain is in the list too, quoted
@@ -243,6 +247,10 @@ func proxyFlags(mode string) []string {
 		"--providers.docker.exposedbydefault=false",
 		"--providers.docker.network=" + proxyNetwork,
 		"--entrypoints." + tunnelEntrypoint + ".address=:" + tunnelPort,
+		// Only cloudflared and the apps on this server reach the tunnel
+		// entrypoint. Its X-Forwarded-Proto is kept, so the -https
+		// middleware sees how the visitor came.
+		"--entrypoints." + tunnelEntrypoint + ".forwardedheaders.insecure=true",
 		"--entrypoints.web.address=:80",
 		"--entrypoints.web.http.redirections.entrypoint.to=websecure",
 		"--entrypoints.web.http.redirections.entrypoint.scheme=https",

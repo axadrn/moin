@@ -57,7 +57,7 @@ func TestPasswordOnEveryRouter(t *testing.T) {
 	if got := labels["traefik.http.middlewares.moin-shop-auth.basicauth.usersfile"]; got != "/apps/shop/releases/3/htpasswd" {
 		t.Fatalf("the users file = %v", got)
 	}
-	for router, want := range map[string]string{"moin-shop": "moin-shop-www,moin-shop-auth", "moin-shop-tunnel": "moin-shop-www,moin-shop-auth", "moin-shop-instant": "moin-shop-auth"} {
+	for router, want := range map[string]string{"moin-shop": "moin-shop-www,moin-shop-auth", "moin-shop-tunnel": "moin-shop-https,moin-shop-www,moin-shop-auth", "moin-shop-instant": "moin-shop-auth"} {
 		if got := labels["traefik.http.routers."+router+".middlewares"]; got != want {
 			t.Errorf("%s: middlewares = %v, want %s", router, got, want)
 		}
@@ -66,7 +66,7 @@ func TestPasswordOnEveryRouter(t *testing.T) {
 	open := map[string]any{}
 	addRouters(map[string]any{}, open, routes{app: "shop", router: "moin-shop", port: 8080, domains: []string{"example.com"}, instant: "shop.203-0-113-7.sslip.io"})
 	for key := range open["labels"].(map[string]any) {
-		if strings.Contains(key, "auth") || strings.HasSuffix(key, ".middlewares") {
+		if strings.Contains(key, "auth") || strings.HasSuffix(key, ".middlewares") && !strings.Contains(key, "-tunnel.") {
 			t.Errorf("an app without a password has %s", key)
 		}
 	}

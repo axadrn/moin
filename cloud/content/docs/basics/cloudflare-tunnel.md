@@ -43,6 +43,8 @@ http://moin-traefik:8080
 
 That is moin's proxy on your server. It knows which app answers which domain.
 
+A visitor on `http://` goes to `https://`, path and query kept. moin does that on the server. Cloudflare can do it one step earlier: in the dashboard, your domain, SSL/TLS, Edge Certificates, Always Use HTTPS, on.
+
 After that, no public TCP port is left on the server. The firewall drops the rest. [Cloudflare Tunnel and the firewall](/docs/security#cloudflare-tunnel-and-the-firewall)
 
 The web comes into the tunnel only once it reaches Cloudflare. With a wrong token, it stays where it was. To take the web out again:
