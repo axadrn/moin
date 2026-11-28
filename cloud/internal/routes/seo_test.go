@@ -43,6 +43,9 @@ func TestSitemapPagesAreReadyForSearch(t *testing.T) {
 	if w := get("/docs/getting-started/?q=1"); w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/docs/getting-started?q=1" {
 		t.Errorf("/docs/getting-started/ = %d to %q, want 301 to /docs/getting-started?q=1", w.Code, w.Header().Get("Location"))
 	}
+	if w := get("/kill-your-subscriptions"); w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/kill-your-saas-subscriptions" {
+		t.Errorf("/kill-your-subscriptions = %d to %q, want 301 to /kill-your-saas-subscriptions", w.Code, w.Header().Get("Location"))
+	}
 	if w := get("/docs/getting-started.md"); w.Header().Get("X-Robots-Tag") != "noindex" {
 		t.Errorf("/docs/getting-started.md has X-Robots-Tag %q, want noindex", w.Header().Get("X-Robots-Tag"))
 	}
