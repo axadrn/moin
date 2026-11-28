@@ -69,19 +69,13 @@ Servers
   knocks [server]              What the firewall dropped, by port
   update [server]              Update this CLI, or a server to this CLI's version
 
-Cloud
-  cloud                        Your moin cloud: plan, billing, servers
-  cloud login                  Sign this laptop in, through the browser
-  cloud connect <server>       The server reports to moin cloud
-  cloud disconnect <server>    It no longer does
-  cloud copies <server> [app]  The copies a server sent, which it can't delete
-  cloud restore [app]          Put a database back to one, on any server
-
 Watcher
+  watcher                      Each server's watchers. Your plan of moin cloud
+  watcher connect <server>     The server reports to moin cloud. Signs you in
+  watcher connect <server> <url> <token>  Or to a watcher you run
+  watcher disconnect <server> [url]  It no longer does
   watcher run                  Run a watcher, on another machine than your servers
   watcher token <server>       On the watcher: the line that connects a server
-  watcher connect <server> <url> <token>  On your laptop: the server reports there
-  watcher disconnect <server> <url>  It no longer does
 
 On the server
   unlock                       Open port 22 again, from your provider's console
@@ -191,7 +185,7 @@ func checksUpdates(args []string) bool {
 	case "here", "daemon", "unlock", "version", "--version", "update":
 		return false
 	case "watcher":
-		return len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
+		return len(args) == 1 || args[1] != "run" && args[1] != "token"
 	}
 	return true
 }
@@ -254,8 +248,6 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return registry(ctx, rest, stdin, stdout)
 	case "knocks":
 		return knocks(ctx, rest, stdout)
-	case "cloud":
-		return cloud(ctx, rest, stdin, stdout)
 	case "watcher":
 		return watcherCommand(ctx, rest, stdin, stdout)
 	case "here":

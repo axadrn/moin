@@ -6,31 +6,193 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
+	"os"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/daemon"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/internal/watcher"
 )
 
-// watcherCommand is `moin watcher run` and `moin watcher token`, on the
-// machine that runs a watcher, and `watcher connect` and `watcher
-// disconnect`, on your laptop.
+// watcherCommand is `moin watcher`, `watcher connect` and `watcher
+// disconnect`, on your laptop, and `moin watcher run` and `moin watcher
+// token`, on the machine that runs a watcher.
 func watcherCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	verb := ""
 	if len(args) > 0 {
-		verb, args = args[0], args[1:]
+		verb = args[0]
 	}
 	switch verb {
 	case "run":
-		return watcherRun(ctx, args)
+		return watcherRun(ctx, args[1:])
 	case "token":
-		return watcherToken(args, stdin, stdout)
+		return watcherToken(args[1:], stdin, stdout)
 	case "connect":
-		return watcherConnect(ctx, args, stdout)
+		return watcherConnect(ctx, args[1:], stdout)
 	case "disconnect":
-		return watcherDisconnect(ctx, args, stdin, stdout)
+		return watcherDisconnect(ctx, args[1:], stdin, stdout)
 	}
-	return fmt.Errorf("usage: `%s watcher run`, `%s watcher token <server>`, `%s watcher connect <server> <url> <token>` or `%s watcher disconnect <server> <url>`", build.Name, build.Name, build.Name, build.Name)
+	return watcherList(ctx, args, stdout)
+}
+
+// serverWatchers is a server and the watchers it reports to, for
+// `moin watcher --json`.
+type serverWatchers struct {
+	Server   string   `json:"server"`
+	Watchers []string `json:"watchers"`
+	Error    string   `json:"error,omitempty"`
+}
+
+// watcherList is `moin watcher`: the watchers each server reports to,
+// and for moin cloud the plan, the days left of the trial and where to
+// pay.
+func watcherList(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("watcher", "watcher [--json], or watcher connect|disconnect|run|token").withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() > 0 {
+		return fmt.Errorf("unknown command %q. `%s watcher` takes connect, disconnect, run or token", flags.Arg(0), build.Name)
+	}
+	list, err := loadServers()
+	if err != nil {
+		return err
+	}
+	servers := []serverWatchers{}
+	toCloud := ""
+	for _, row := range askServers(ctx, list) {
+		server := serverWatchers{Server: row.server, Watchers: row.status.Watchers}
+		if row.err != nil {
+			server.Error = explain(row.err)
+		}
+		if slices.Contains(server.Watchers, cloudURL()) {
+			toCloud = row.server
+		}
+		servers = append(servers, server)
+	}
+	var space *cloudWorkspace
+	if session, err := loadCloudSession(); err == nil {
+		space = &cloudWorkspace{}
+		if _, err := session.call(ctx, http.MethodGet, "/api/cloud", nil, space); err != nil {
+			printError(os.Stderr, err)
+			space = nil
+		} else {
+			space.TrialDaysLeft = trialDaysLeft(*space, time.Now())
+		}
+	}
+	if flags.json() {
+		return printJSON(stdout, struct {
+			Servers []serverWatchers `json:"servers"`
+			Cloud   *cloudWorkspace  `json:"cloud"`
+		}{servers, space})
+	}
+	if len(servers) == 0 {
+		fmt.Fprintln(stdout, "No servers yet.")
+		hint(stdout, "Your first deploy adds one:", build.Name+" deploy <server>")
+	} else {
+		printWatchers(stdout, servers)
+	}
+	switch {
+	case space != nil:
+		fmt.Fprintln(stdout)
+		printCloud(stdout, *space)
+	case toCloud != "":
+		fmt.Fprintln(stdout)
+		hint(stdout, "Sign in to see your plan of "+cloudName+":", build.Name+" watcher connect "+toCloud)
+	}
+	return nil
+}
+
+// printWatchers writes the table of servers and their watchers.
+func printWatchers(stdout io.Writer, servers []serverWatchers) {
+	rows := [][]string{}
+	for _, server := range servers {
+		if server.Error != "" {
+			rows = append(rows, []string{style.Bold.Render(server.Server), style.Muted.Render(server.Error)})
+			continue
+		}
+		watchers := style.Warning.Render("none: nobody notices when it is gone")
+		if len(server.Watchers) > 0 {
+			names := []string{}
+			for _, address := range server.Watchers {
+				if address == cloudURL() {
+					address = cloudName
+				}
+				names = append(names, address)
+			}
+			watchers = strings.Join(names, ", ")
+		}
+		rows = append(rows, []string{style.Bold.Render(server.Server), watchers})
+	}
+	table(stdout, []string{"SERVER", "WATCHERS"}, rows)
+}
+
+// printCloud writes your workspace in moin cloud: the plan, and where to
+// pay.
+func printCloud(stdout io.Writer, space cloudWorkspace) {
+	plan := space.Plan
+	if space.TrialDaysLeft > 0 {
+		plan = fmt.Sprintf("Trial, %d days left", space.TrialDaysLeft)
+	}
+	fmt.Fprintln(stdout, style.Bold.Render(cloudName)+"  "+space.Mail+"  "+style.Muted.Render(plan))
+	if space.Status == "paid" || space.Storage > 0 {
+		fmt.Fprintln(stdout, style.Muted.Render("Copies: "+human.Size(float64(space.Storage))+" of "+human.Size(float64(space.StorageLimit))))
+	}
+	if space.Billing != "" {
+		fmt.Fprintln(stdout, style.Muted.Render("Billing: "+space.Billing))
+	}
+}
+
+// watcherConnect is `moin watcher connect <server> [<url> <token>]`: the
+// server reports to the watcher at url from now on. Without an address it
+// is moin cloud, and the browser signs this laptop in the first time.
+func watcherConnect(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("watcher connect", "watcher connect <server> [<url> <token>]")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() == 1 {
+		return cloudConnect(ctx, flags.Arg(0), stdout)
+	}
+	if flags.NArg() != 3 {
+		return flags.wrong()
+	}
+	server, to := flags.Arg(0), daemon.Watcher{URL: flags.Arg(1), Token: flags.Arg(2)}
+	if err := sendJSON(ctx, server, to, "watchers", "connect"); err != nil {
+		return err
+	}
+	done(stdout, "%s reports to %s every minute", server, to.URL)
+	return nil
+}
+
+// watcherDisconnect is `moin watcher disconnect <server> [url]`: the
+// server stops reporting there. Without an address it is moin cloud.
+func watcherDisconnect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("watcher disconnect", "watcher disconnect <server> [url] [-y]").withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() < 1 || flags.NArg() > 2 {
+		return flags.wrong()
+	}
+	server, address := flags.Arg(0), flags.Arg(1)
+	if address == "" || address == cloudURL() {
+		return cloudDisconnect(ctx, server, flags.yes(), stdin, stdout)
+	}
+	question := fmt.Sprintf("Stop the reports of %s to %s? That watcher will say the server is silent.", server, address)
+	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+		return err
+	}
+	if err := sshRun(ctx, server, hereLine("watchers", "disconnect", address), nil, io.Discard, os.Stderr); err != nil {
+		return err
+	}
+	done(stdout, "%s no longer reports to %s", server, address)
+	return nil
 }
 
 // watcherRun runs the watcher until it is stopped.
@@ -95,15 +257,11 @@ func watcherToken(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	token := watcher.NewToken()
 	if fresh {
-		fmt.Fprintf(stdout, `1. Save this as %s, fill in alerts:, then run: chmod 600 %s
+		fmt.Fprintf(stdout, `1. Save this as %s, then run: chmod 600 %s
 
 password: %s
 servers:
   %s: %s
-alerts:
-  - kind: telegram
-    token: <bot token>
-    chat_id: <chat id>
 
 `, *path, *path, watcher.NewToken(), name, token)
 	} else {
@@ -116,6 +274,10 @@ alerts:
 	fmt.Fprintf(stdout, `2. On your laptop, point %s at this watcher:
 
   %s watcher connect %s %s %s
-`, name, build.Name, name, *address, token)
+
+3. Alerts go where you send them, on your laptop:
+
+  %s alerts add %s telegram
+`, name, build.Name, name, *address, token, build.Name, name)
 	return nil
 }

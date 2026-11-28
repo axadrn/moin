@@ -42,11 +42,12 @@ func sendJSON(ctx context.Context, server string, value any, args ...string) err
 // shownCopies is how many copies of a database `moin backups` lists.
 const shownCopies = 10
 
-// backups is `moin backups [app]`: the copies of the app's databases,
-// the last daily check and the copy it proved.
+// backups is `moin backups [app]`: the copies of the app's databases, in
+// the bucket and at the watchers that take copies (restore.go), the last
+// daily check and the copy it proved.
 func backups(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := newFlags("backups", "backups [app] [--from <server>] [-s server] [--json]").withServer().withJSON()
-	from := flags.String("from", "", "see the copies another server left in the bucket, like one that is gone")
+	from := flags.String("from", "", "see the copies another server made, like one that is gone")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -55,7 +56,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
-		databases, err := backupsFrom(ctx, server, app, *from, os.Stderr)
+		databases, err := listBackups(ctx, server, app, *from, os.Stderr)
 		if err != nil {
 			return err
 		}
@@ -93,20 +94,20 @@ func backupsFrom(ctx context.Context, server, app, from string, stderr io.Writer
 }
 
 // printBackup shows how one database is backed up: the last check and
-// the copies, the one the check restored marked.
-func printBackup(stdout io.Writer, database protocol.DatabaseBackup, now time.Time) {
+// the copies, where each is, the one the check restored marked.
+func printBackup(stdout io.Writer, database databaseBackups, now time.Time) {
 	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
 	if database.Error != "" {
 		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" "+commands(stdout, sentence(database.Error)))
 	}
-	fmt.Fprintln(stdout, "  "+checkLine(database, now))
+	fmt.Fprintln(stdout, "  "+checkLine(database.DatabaseBackup, now))
 	if database.CloudError != "" {
 		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" No watcher took the last copy: "+database.CloudError)
 	}
 	rows := [][]string{}
 	for index, copy := range database.Copies {
 		if index == shownCopies {
-			rows = append(rows, []string{style.Muted.Render(fmt.Sprintf("and %d older, see --json", len(database.Copies)-shownCopies)), "", "", ""})
+			rows = append(rows, []string{style.Muted.Render(fmt.Sprintf("and %d older, see --json", len(database.Copies)-shownCopies)), "", "", "", ""})
 			break
 		}
 		size := human.Size(float64(copy.Size))
@@ -117,14 +118,14 @@ func printBackup(stdout io.Writer, database protocol.DatabaseBackup, now time.Ti
 		if copy.ID == database.CheckedCopy && database.CheckError == "" {
 			note = badge(stdout, style.Success.Render(style.SymbolDone+" checked"), "checked")
 		}
-		rows = append(rows, []string{copy.ID, human.Ago(copy.At, now), size, note})
+		rows = append(rows, []string{copy.ID, copy.Where, human.Ago(copy.At, now), size, note})
 	}
 	for _, undo := range database.Undos {
-		rows = append(rows, []string{"undo-" + undo.ID, human.Ago(undo.At, now), "", style.Muted.Render("before a restore")})
+		rows = append(rows, []string{"undo-" + undo.ID, "server", human.Ago(undo.At, now), "", style.Muted.Render("before a restore")})
 	}
 	if len(rows) > 0 {
 		fmt.Fprintln(stdout)
-		table(stdout, []string{"COPY", "TAKEN", "SIZE", ""}, rows)
+		table(stdout, []string{"COPY", "WHERE", "TAKEN", "SIZE", ""}, rows)
 	}
 	fmt.Fprintln(stdout)
 }
@@ -174,73 +175,6 @@ func backupNow(ctx context.Context, server, app string, said io.Writer) ([]daemo
 	return copied, err
 }
 
-// restore is `moin restore [app]`: a database goes back to a copy, and
-// what it was before stays as an undo. On a terminal it shows the copies
-// and asks which one; a script names it with --to. What it asks goes to
-// stderr, so stdout holds only the answer of --json.
-//
-// When a server is gone, its copies come back on a new one with your
-// backup key: `moin restore shop -s new --from prod --to <copy> --key`.
-func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("restore", "restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>] [--database <name>] [--from <server>] [--key] [-s server] [-y] [--json]").withServer().withYes().withJSON()
-	to := flags.String("to", "", "a copy, a time in UTC, or an undo: see `"+build.Name+" backups`")
-	database := flags.String("database", "", "the database, when the app has several")
-	from := flags.String("from", "", "restore a copy another server left in the bucket, like one that is gone")
-	withKey := flags.Bool("key", false, "open the copy with your backup key, which "+build.Name+" asks for: for a copy another server made")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	app, _, err := appArgs(flags, 0)
-	if err != nil {
-		return err
-	}
-	prompts := terminal(os.Stderr)
-	return onApp(ctx, flags, app, func(server string) error {
-		if *to == "" {
-			*database, *to, err = pickCopy(ctx, server, app, *database, *from, stdin, prompts)
-			if err != nil {
-				return err
-			}
-		}
-		question := fmt.Sprintf("Put the data of %s back to %s? The app stops for a moment.", app, *to)
-		if err := confirm(stdin, prompts, flags.yes(), question); err != nil {
-			return err
-		}
-		var key io.Reader
-		if *withKey {
-			secret, err := askBackupKey(stdin, prompts, "Your backup key:")
-			if err != nil {
-				return err
-			}
-			key = strings.NewReader(secret.String() + "\n")
-		}
-		restored, err := restoreCopy(ctx, server, app, *database, *to, *from, key, os.Stderr)
-		if err != nil {
-			return err
-		}
-		if flags.json() {
-			return printJSON(stdout, restored)
-		}
-		done(stdout, "%s of %s is back at %s", restored.Database, app, restored.To)
-		hint(stdout, "Undo it with", build.Name+" restore "+app+" --to "+restored.Undo)
-		return nil
-	})
-}
-
-// restoreCopy puts a database of app back to the copy to, on server.
-// from names the server that made the copy, "" for this one. A key goes
-// to the server on stdin, never on a command line: the server opens the
-// copy with it and writes it nowhere.
-func restoreCopy(ctx context.Context, server, app, database, to, from string, key io.Reader, said io.Writer) (daemon.Restored, error) {
-	line := []string{"restore", app, "--to", to, "--database", database, "--from", from}
-	if key != nil {
-		line = append(line, "--key-stdin")
-	}
-	var restored daemon.Restored
-	err := sshAnswer(ctx, server, line, key, said, &restored)
-	return restored, err
-}
-
 // askBackupKey reads your backup key: typed or pasted on a terminal,
 // without showing it, or one line from a pipe.
 func askBackupKey(stdin io.Reader, stdout io.Writer, question string) (*age.X25519Identity, error) {
@@ -259,53 +193,6 @@ func askBackupKey(stdin io.Reader, stdout io.Writer, question string) (*age.X255
 		return nil, errors.New("that is not a backup key: one starts with AGE-SECRET-KEY-1")
 	}
 	return key, nil
-}
-
-// pickCopy shows the copies and undos of the app's database and asks
-// which one to go back to. Enter takes the newest copy. An app with
-// several databases is asked which one first.
-func pickCopy(ctx context.Context, server, app, name, from string, stdin io.Reader, stdout io.Writer) (database, to string, err error) {
-	if !isTerminal(stdin) {
-		return "", "", fmt.Errorf("say what to go back to with --to. See the copies with `%s backups %s`", build.Name, app)
-	}
-	databases, err := backupsFrom(ctx, server, app, from, os.Stderr)
-	if err != nil {
-		return "", "", err
-	}
-	chosen, err := pickDatabase(app, name, databases, stdin, stdout)
-	if err != nil {
-		return "", "", err
-	}
-	if len(chosen.Copies) == 0 {
-		return "", "", fmt.Errorf("%s of %s has no copy to go back to yet", chosen.Database, app)
-	}
-	printBackup(stdout, chosen, time.Now())
-	to, err = ask(stdin, stdout, "Go back to which copy?", chosen.Copies[0].ID)
-	return chosen.Database, to, err
-}
-
-// pickDatabase is the database named name, the app's only one, or the
-// one you pick.
-func pickDatabase(app, name string, databases []protocol.DatabaseBackup, stdin io.Reader, stdout io.Writer) (protocol.DatabaseBackup, error) {
-	if len(databases) == 0 {
-		return protocol.DatabaseBackup{}, fmt.Errorf("%s has no database %s can copy", app, build.Name)
-	}
-	if name == "" && len(databases) > 1 {
-		for _, database := range databases {
-			fmt.Fprintln(stdout, "  "+database.Database)
-		}
-		var err error
-		name, err = ask(stdin, stdout, "Which database?", databases[0].Database)
-		if err != nil {
-			return protocol.DatabaseBackup{}, err
-		}
-	}
-	for _, database := range databases {
-		if database.Database == name || name == "" {
-			return database, nil
-		}
-	}
-	return protocol.DatabaseBackup{}, fmt.Errorf("%s has no database %s", app, name)
 }
 
 // ask asks one question on a terminal. Enter takes suggested, when there
@@ -778,45 +665,5 @@ func testAlerts(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	done(stdout, "A test alert went out from %s", server)
-	return nil
-}
-
-// watcherConnect is `moin watcher connect <server> <url> <token>`: the
-// server reports to the watcher at url from now on.
-func watcherConnect(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("watcher connect", "watcher connect <server> <url> <token>")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() != 3 {
-		return flags.wrong()
-	}
-	server, watcher := flags.Arg(0), daemon.Watcher{URL: flags.Arg(1), Token: flags.Arg(2)}
-	if err := sendJSON(ctx, server, watcher, "watchers", "connect"); err != nil {
-		return err
-	}
-	done(stdout, "%s reports to %s every minute", server, watcher.URL)
-	return nil
-}
-
-// watcherDisconnect is `moin watcher disconnect <server> <url>`: the
-// server stops reporting there.
-func watcherDisconnect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("watcher disconnect", "watcher disconnect <server> <url> [-y]").withYes()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() != 2 {
-		return flags.wrong()
-	}
-	server, address := flags.Arg(0), flags.Arg(1)
-	question := fmt.Sprintf("Stop the reports of %s to %s? That watcher will say the server is silent.", server, address)
-	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
-		return err
-	}
-	if err := sshRun(ctx, server, hereLine("watchers", "disconnect", address), nil, io.Discard, os.Stderr); err != nil {
-		return err
-	}
-	done(stdout, "%s no longer reports to %s", server, address)
 	return nil
 }

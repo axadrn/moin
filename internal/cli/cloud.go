@@ -18,18 +18,21 @@ import (
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/daemon"
-	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
-// moin cloud runs a watcher for you. `moin cloud login` signs this laptop
-// in through the browser; `moin cloud connect prod` has prod report there.
-// The CLI talks to moin cloud over HTTPS with its session; it never gives
-// moin cloud a way to a server.
+// moin cloud is the watcher we run. `moin watcher connect prod` without
+// an address has prod report there: the browser signs this laptop in the
+// first time. The CLI talks to moin cloud over HTTPS with its session; it
+// never gives moin cloud a way to a server.
 
 // defaultCloudURL is moin cloud. MOIN_CLOUD_URL points the CLI at another
 // one, like a site on your laptop: MOIN_CLOUD_URL=http://localhost:8090.
 const defaultCloudURL = "https://" + build.Name + ".run"
+
+// cloudName is how the CLI names moin cloud, like in the WHERE of
+// `moin backups`.
+const cloudName = build.Name + " cloud"
 
 // cloudURL is the moin cloud the CLI talks to.
 func cloudURL() string {
@@ -39,35 +42,15 @@ func cloudURL() string {
 	return defaultCloudURL
 }
 
-// cloud is `moin cloud`, `moin cloud login`, `moin cloud connect <server>`,
-// `moin cloud disconnect <server>`, and the copies in moin cloud
-// (cloud_copies.go).
-func cloud(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "login":
-			return cloudLogin(ctx, args[1:], stdout)
-		case "connect":
-			return cloudConnect(ctx, args[1:], stdout)
-		case "disconnect":
-			return cloudDisconnect(ctx, args[1:], stdin, stdout)
-		case "copies":
-			return cloudCopies(ctx, args[1:], stdout)
-		case "restore":
-			return cloudRestore(ctx, args[1:], stdin, stdout)
-		}
-	}
-	return cloudStatus(ctx, args, stdout)
-}
-
-// cloudSession is what the CLI keeps of its sign-in, in
-// ~/.config/moin/cloud.json, only for you to read.
+// cloudSession is this laptop's sign-in to moin cloud, in
+// ~/.config/moin/cloud.json, only for you to read. With it the CLI
+// connects servers, and lists and restores the copies moin cloud keeps.
 type cloudSession struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
 }
 
-// cloudSessionFile is where the session lives.
+// cloudSessionFile is where the session of moin cloud lives.
 func cloudSessionFile() (string, error) {
 	dir, err := configDir()
 	if err != nil {
@@ -77,7 +60,10 @@ func cloudSessionFile() (string, error) {
 }
 
 // errNotSignedIn says how to sign in.
-var errNotSignedIn = fmt.Errorf("not signed in to %s cloud: run `%s cloud login`", build.Name, build.Name)
+var errNotSignedIn = fmt.Errorf("this laptop is not signed in to %s. `%s watcher connect <server>` signs it in", cloudName, build.Name)
+
+// errSessionEnded is a session that moin cloud no longer knows.
+var errSessionEnded = fmt.Errorf("your session at %s ended. `%s watcher connect <server>` signs this laptop in again", cloudName, build.Name)
 
 // loadCloudSession is the session for the moin cloud the CLI talks to.
 func loadCloudSession() (cloudSession, error) {
@@ -94,7 +80,7 @@ func loadCloudSession() (cloudSession, error) {
 		return session, err
 	}
 	if err := json.Unmarshal(data, &session); err != nil {
-		return session, fmt.Errorf("%s: %w. Run `%s cloud login` again", file, err, build.Name)
+		return session, fmt.Errorf("%s: %w. Remove it and sign in again with `%s watcher connect <server>`", file, err, build.Name)
 	}
 	if session.URL != cloudURL() || session.Token == "" {
 		return session, errNotSignedIn
@@ -125,10 +111,10 @@ func saveCloudSession(session cloudSession) error {
 // cloudClient talks to moin cloud.
 var cloudClient = &http.Client{Timeout: 30 * time.Second}
 
-// cloudCall sends body as JSON to path of moin cloud, with the session
-// token when there is one, and reads the JSON answer into out. It returns
-// the status code; an answer that is not 2xx is an error, but 202.
-func cloudCall(ctx context.Context, method, path, token string, body, out any) (int, error) {
+// call sends body as JSON to path of moin cloud, with the session token
+// when there is one, and reads the JSON answer into out. It returns the
+// status code; an answer that is not 2xx is an error, but 202.
+func (session cloudSession) call(ctx context.Context, method, path string, body, out any) (int, error) {
 	var reader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -137,87 +123,92 @@ func cloudCall(ctx context.Context, method, path, token string, body, out any) (
 		}
 		reader = bytes.NewReader(data)
 	}
-	request, err := http.NewRequestWithContext(ctx, method, cloudURL()+path, reader)
+	request, err := http.NewRequestWithContext(ctx, method, session.URL+path, reader)
 	if err != nil {
 		return 0, err
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("User-Agent", build.Name+"/"+build.Version)
-	if token != "" {
-		request.Header.Set("Authorization", "Bearer "+token)
+	if session.Token != "" {
+		request.Header.Set("Authorization", "Bearer "+session.Token)
 	}
 	response, err := cloudClient.Do(request)
 	if err != nil {
-		return 0, fmt.Errorf("%s cloud at %s: %w", build.Name, cloudURL(), err)
+		return 0, fmt.Errorf("%s at %s: %w", cloudName, session.URL, err)
 	}
 	defer response.Body.Close()
 	switch {
-	case response.StatusCode == http.StatusUnauthorized && token != "":
-		return response.StatusCode, fmt.Errorf("your session at %s cloud ended: run `%s cloud login`", build.Name, build.Name)
+	case response.StatusCode == http.StatusUnauthorized && session.Token != "":
+		return response.StatusCode, errSessionEnded
 	case response.StatusCode/100 != 2:
 		answer, _ := io.ReadAll(io.LimitReader(response.Body, 300))
-		return response.StatusCode, fmt.Errorf("%s cloud answered HTTP %d: %s", build.Name, response.StatusCode, strings.TrimSpace(string(answer)))
+		return response.StatusCode, fmt.Errorf("%s answered HTTP %d: %s", cloudName, response.StatusCode, strings.TrimSpace(string(answer)))
 	case out != nil && response.StatusCode != http.StatusAccepted && response.StatusCode != http.StatusNoContent:
 		if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(out); err != nil {
-			return response.StatusCode, fmt.Errorf("%s cloud answered something else than JSON: %w", build.Name, err)
+			return response.StatusCode, fmt.Errorf("%s answered something else than JSON: %w", cloudName, err)
 		}
 	}
 	return response.StatusCode, nil
 }
 
-// cloudLogin is `moin cloud login`: the browser signs in and allows the
-// code this terminal shows; then the CLI gets its session.
-func cloudLogin(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("cloud login", "cloud login")
-	if err := flags.parse(args); err != nil {
-		return err
+// cloudCall is a call to moin cloud with this laptop's session. Without
+// one, or when it ended, the browser signs this laptop in first.
+func cloudCall(ctx context.Context, stdout io.Writer, method, path string, body, out any) (int, error) {
+	session, err := loadCloudSession()
+	status := 0
+	if err == nil {
+		status, err = session.call(ctx, method, path, body, out)
 	}
-	if flags.NArg() > 0 {
-		return flags.wrong()
+	if errors.Is(err, errNotSignedIn) || errors.Is(err, errSessionEnded) {
+		if session, err = cloudSignIn(ctx, stdout); err != nil {
+			return 0, err
+		}
+		status, err = session.call(ctx, method, path, body, out)
 	}
+	return status, err
+}
+
+// cloudSignIn signs this laptop in to moin cloud: the browser signs in and
+// allows the code this terminal shows; then the CLI gets its session.
+func cloudSignIn(ctx context.Context, stdout io.Writer) (cloudSession, error) {
+	session := cloudSession{URL: cloudURL()}
 	var login struct {
 		Secret string `json:"secret"`
 		Code   string `json:"code"`
 		URL    string `json:"url"`
 	}
-	if _, err := cloudCall(ctx, http.MethodPost, "/api/cli/login", "", nil, &login); err != nil {
-		return err
+	if _, err := session.call(ctx, http.MethodPost, "/api/cli/login", nil, &login); err != nil {
+		return session, err
 	}
-	fmt.Fprintln(stdout, "Your code: "+style.Bold.Render(login.Code))
-	step(stdout, "Allow it in the browser when the codes match: %s", login.URL)
+	step(stdout, "Sign in to %s in the browser, and allow the code %s: %s", cloudName, style.Bold.Render(login.Code), login.URL)
 	openBrowser(login.URL)
 
 	var answer struct {
 		Token string `json:"token"`
 	}
 	for {
-		status, err := cloudCall(ctx, http.MethodPost, "/api/cli/login/finish", "", map[string]string{"secret": login.Secret}, &answer)
+		status, err := session.call(ctx, http.MethodPost, "/api/cli/login/finish", map[string]string{"secret": login.Secret}, &answer)
 		if status == http.StatusGone {
-			return errors.New("the login ran out after 10 minutes. Run it again")
+			return session, errors.New("the sign-in ran out after 10 minutes. Run it again")
 		}
 		if err != nil {
-			return err
+			return session, err
 		}
 		if status == http.StatusOK {
 			break
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return session, ctx.Err()
 		case <-time.After(2 * time.Second):
 		}
 	}
-	session := cloudSession{URL: cloudURL(), Token: answer.Token}
+	session.Token = answer.Token
 	if err := saveCloudSession(session); err != nil {
-		return err
+		return session, err
 	}
-	var space cloudWorkspace
-	if _, err := cloudCall(ctx, http.MethodGet, "/api/cloud", session.Token, nil, &space); err != nil {
-		return err
-	}
-	done(stdout, "Signed in to %s cloud as %s", build.Name, space.Mail)
-	hint(stdout, "Have a server report there:", build.Name+" cloud connect prod")
-	return nil
+	done(stdout, "Signed in to %s", cloudName)
+	return session, nil
 }
 
 // openBrowser opens address in the browser, when this machine has one.
@@ -233,133 +224,62 @@ func openBrowser(address string) {
 	}
 }
 
-// cloudWorkspace is what moin cloud answers `moin cloud`.
+// cloudWorkspace is what moin cloud says of your workspace, for
+// `moin watcher`.
 type cloudWorkspace struct {
 	Mail      string     `json:"mail"`
 	Status    string     `json:"status"`
 	Plan      string     `json:"plan"`
 	TrialEnds *time.Time `json:"trial_ends,omitempty"`
 	PaidUntil *time.Time `json:"paid_until,omitempty"`
+	// TrialDaysLeft is counted here, from TrialEnds.
+	TrialDaysLeft int `json:"trial_days_left,omitempty"`
 	// Billing is where to subscribe, or Stripe's portal once it knows you.
-	Billing  string   `json:"billing"`
-	NeedsYou []string `json:"needs_you"`
-	Servers  []struct {
-		Name    string `json:"name"`
-		OK      bool   `json:"ok"`
-		State   string `json:"state"`
-		Version string `json:"version,omitempty"`
-		Apps    int    `json:"apps"`
-	} `json:"servers"`
+	Billing string `json:"billing"`
 	// Storage is how many bytes the copies in moin cloud take, of
 	// StorageLimit.
 	Storage      int64 `json:"storage"`
 	StorageLimit int64 `json:"storage_limit"`
 }
 
-// cloudStatus is `moin cloud`: the workspace, its plan, its servers.
-func cloudStatus(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("cloud", "cloud [--json]").withJSON()
-	if err := flags.parse(args); err != nil {
-		return err
+// trialDaysLeft is how many days of the trial are left, 0 when it is not
+// a trial or it ended. A day begun counts.
+func trialDaysLeft(space cloudWorkspace, now time.Time) int {
+	if space.Status == "paid" || space.TrialEnds == nil || !space.TrialEnds.After(now) {
+		return 0
 	}
-	if flags.NArg() > 0 {
-		return fmt.Errorf("unknown command %q. `%s cloud` takes login, connect, disconnect, copies or restore", flags.Arg(0), build.Name)
-	}
-	session, err := loadCloudSession()
-	if err != nil {
-		return err
-	}
-	var space cloudWorkspace
-	if _, err := cloudCall(ctx, http.MethodGet, "/api/cloud", session.Token, nil, &space); err != nil {
-		return err
-	}
-	if flags.json() {
-		return printJSON(stdout, space)
-	}
-	fmt.Fprintln(stdout, style.Bold.Render(space.Mail)+"  "+style.Muted.Render(space.Plan))
-	if space.Billing != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("Billing: "+space.Billing))
-	}
-	if space.Status == "paid" || space.Storage > 0 {
-		fmt.Fprintln(stdout, style.Muted.Render("Copies: "+human.Size(float64(space.Storage))+" of "+human.Size(float64(space.StorageLimit))))
-	}
-	if len(space.Servers) == 0 {
-		fmt.Fprintln(stdout, style.Muted.Render("No servers yet."))
-		hint(stdout, "Have one report here:", build.Name+" cloud connect prod")
-		return nil
-	}
-	fmt.Fprintln(stdout)
-	rows := [][]string{}
-	for _, server := range space.Servers {
-		state := badge(stdout, style.Success.Render(style.SymbolLive)+" "+server.State, server.State)
-		if !server.OK {
-			state = badge(stdout, style.Danger.Render(style.SymbolFailed)+" "+server.State, server.State)
-		}
-		rows = append(rows, []string{server.Name, fmt.Sprint(server.Apps), server.Version, state})
-	}
-	table(stdout, []string{"SERVER", "APPS", "VERSION", "STATE"}, rows)
-	if len(space.NeedsYou) > 0 {
-		fmt.Fprintln(stdout)
-		for _, problem := range space.NeedsYou {
-			fmt.Fprintln(stdout, style.Danger.Render(style.SymbolFailed)+" "+problem)
-		}
-	}
-	return nil
+	return int((space.TrialEnds.Sub(now) + 24*time.Hour - 1) / (24 * time.Hour))
 }
 
-// cloudConnect is `moin cloud connect <server>`: moin cloud gives the
-// server a token, and the server reports there from now on.
-func cloudConnect(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("cloud connect", "cloud connect <server>")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	server, err := flags.server()
-	if err != nil {
-		return err
-	}
-	session, err := loadCloudSession()
-	if err != nil {
-		return err
-	}
+// cloudConnect has server report to moin cloud: moin cloud gives it a
+// token, and the server takes moin cloud as a watcher.
+func cloudConnect(ctx context.Context, server string, stdout io.Writer) error {
 	var watcher daemon.Watcher
-	if _, err := cloudCall(ctx, http.MethodPost, "/api/cloud/servers", session.Token, map[string]string{"name": serverName(server)}, &watcher); err != nil {
+	if _, err := cloudCall(ctx, stdout, http.MethodPost, "/api/cloud/servers", map[string]string{"name": serverName(server)}, &watcher); err != nil {
 		return err
 	}
 	if err := sendJSON(ctx, server, watcher, "watchers", "connect"); err != nil {
-		return fmt.Errorf("%s cloud waits for %s, but the server did not take the watcher: %w. Run it again", build.Name, server, err)
+		return fmt.Errorf("%s waits for %s, but the server did not take the watcher: %w. Run it again", cloudName, server, err)
 	}
-	done(stdout, "%s reports to %s cloud every minute", server, build.Name)
-	hint(stdout, "See it with", build.Name+" cloud")
+	done(stdout, "%s reports to %s every minute", server, cloudName)
+	hint(stdout, "See it with", build.Name+" watcher")
 	return nil
 }
 
-// cloudDisconnect is `moin cloud disconnect <server>`: moin cloud forgets
-// the server, and the server stops reporting there.
-func cloudDisconnect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("cloud disconnect", "cloud disconnect <server> [-y]").withYes()
-	if err := flags.parse(args); err != nil {
+// cloudDisconnect has moin cloud forget server, and the server stop
+// reporting there.
+func cloudDisconnect(ctx context.Context, server string, yes bool, stdin io.Reader, stdout io.Writer) error {
+	question := fmt.Sprintf("Stop watching %s in %s? Nobody gets a mail when it goes silent.", server, cloudName)
+	if err := confirm(stdin, stdout, yes, question); err != nil {
 		return err
 	}
-	server, err := flags.server()
-	if err != nil {
-		return err
-	}
-	session, err := loadCloudSession()
-	if err != nil {
-		return err
-	}
-	question := fmt.Sprintf("Stop watching %s in %s cloud? Nobody gets a mail when it goes silent.", server, build.Name)
-	if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
-		return err
-	}
-	status, err := cloudCall(ctx, http.MethodDelete, "/api/cloud/servers/"+url.PathEscape(serverName(server)), session.Token, nil, nil)
+	status, err := cloudCall(ctx, stdout, http.MethodDelete, "/api/cloud/servers/"+url.PathEscape(serverName(server)), nil, nil)
 	if err != nil && status != http.StatusNotFound {
 		return err
 	}
 	if err := sshRun(ctx, server, hereLine("watchers", "disconnect", cloudURL()), nil, io.Discard, os.Stderr); err != nil {
-		return fmt.Errorf("%s cloud no longer watches %s, but the server still has it as a watcher, its reports get no answer: %w", build.Name, server, err)
+		return fmt.Errorf("%s no longer watches %s, but the server still has it as a watcher, its reports get no answer: %w", cloudName, server, err)
 	}
-	done(stdout, "%s no longer reports to %s cloud", server, build.Name)
+	done(stdout, "%s no longer reports to %s", server, cloudName)
 	return nil
 }
