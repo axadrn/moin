@@ -119,7 +119,7 @@ func (c *Cloud) CopiesPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "the storage of the copies", err)
 		return
 	}
-	props := pages.CloudCopiesProps{Cloud: frame, Stored: stored, Limit: copies.Storage, Keep: copies.Keep, Server: server}
+	props := pages.CloudCopiesProps{Cloud: frame, Stored: stored, Limit: copies.StorageLimit(space), Keep: copies.Keep, Server: server}
 	for _, one := range every {
 		if !slices.Contains(props.Servers, one.Server) {
 			props.Servers = append(props.Servers, one.Server)
@@ -158,7 +158,7 @@ func (c *Cloud) PlanPage(w http.ResponseWriter, r *http.Request) {
 		renderError(w, "the storage of the copies", err)
 		return
 	}
-	render(w, r, pages.CloudPlan(pages.CloudPlanProps{Cloud: frame, Servers: len(servers), Stored: stored, Limit: copies.Storage}))
+	render(w, r, pages.CloudPlan(pages.CloudPlanProps{Cloud: frame, Servers: len(servers), Stored: stored, Limit: copies.StorageLimit(space)}))
 }
 
 // ConnectPage is /cloud/connect: the command that connects a server.

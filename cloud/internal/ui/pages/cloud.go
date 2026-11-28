@@ -65,11 +65,11 @@ func PlanOf(space workspace.Workspace, now time.Time, sells bool) Plan {
 	case space.TrialEnds.IsZero():
 		plan.Name, plan.State = "Trial", components.StateIdle
 		plan.Note = "starts with the first report"
-		plan.Text = strconv.Itoa(space.TrialDays) + " days with alerts and copies, from the first report. No card needed."
+		plan.Text = strconv.Itoa(space.TrialDays) + " days with alerts and copies, from the first report. 5 GB of copies during the trial. No card needed."
 	default:
 		plan.Name, plan.State = "Trial", components.StateIdle
 		plan.Note = daysLeft(space.TrialEnds.Sub(now))
-		plan.Text = "Alerts and copies are on until " + longDate(space.TrialEnds) + ". No card needed."
+		plan.Text = "Alerts and copies are on until " + longDate(space.TrialEnds) + ". 5 GB of copies during the trial. No card needed."
 	}
 	return plan
 }

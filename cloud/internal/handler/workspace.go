@@ -86,7 +86,7 @@ func (c *Cloud) CLIWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	answer := cliWorkspace{Mail: space.Mail, Status: space.Status, Plan: plan(space), Billing: c.billingURL(space), NeedsYou: view.NeedsYou, Servers: []cliServer{},
-		Storage: storage, StorageLimit: copies.Storage}
+		Storage: storage, StorageLimit: copies.StorageLimit(space)}
 	if answer.NeedsYou == nil {
 		answer.NeedsYou = []string{}
 	}

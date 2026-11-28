@@ -28,8 +28,12 @@ import (
 )
 
 const (
-	// Storage is how many bytes of copies a workspace keeps: fair use.
+	// Storage is how many bytes of copies a workspace keeps with a
+	// subscription or a free year: fair use.
 	Storage = 50 << 30
+	// TrialStorage is what a trial keeps, without a card: enough to try,
+	// too little to fill for free.
+	TrialStorage = 5 << 30
 	// Keep is how long a copy stays, as long as the bucket's lock.
 	Keep = 14 * 24 * time.Hour
 	// Grace is how long the copies stay after a subscription or a trial
@@ -46,7 +50,7 @@ const (
 var (
 	ErrUnknownToken = errors.New("unknown token")
 	ErrNotPaid      = errors.New("copies come with a paid plan of " + build.Name + " cloud")
-	ErrFull         = fmt.Errorf("the storage for copies is full, %d GB: old copies go after 14 days, then new ones fit", Storage>>30)
+	ErrFull         = errors.New("the storage for copies is full")
 	ErrTooOften     = errors.New("another copy of this database was made within 50 minutes: one an hour per database")
 	ErrNotUploaded  = errors.New("the copy is not in the bucket: upload it first")
 	ErrNotFound     = errors.New("no such copy")
@@ -114,9 +118,9 @@ func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, er
 	if err != nil {
 		return Upload{}, err
 	}
-	if used+r.Size > Storage {
+	if used+r.Size > StorageLimit(space) {
 		c.mailFull(ctx, space, now)
-		return Upload{}, ErrFull
+		return Upload{}, fmt.Errorf("%w, %s: old copies go after 14 days, then new ones fit", ErrFull, storageText(space))
 	}
 	copy, err := c.store.NewCopy(workspace.Copy{WorkspaceID: space.ID, Server: server, App: r.App, Database: r.Database, MadeAt: r.MadeAt, Size: r.Size})
 	if err != nil {
@@ -128,6 +132,24 @@ func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, er
 	}
 	slog.Info("copy: upload starts", "workspace", space.ID, "server", server, "app", r.App, "copy", copy.ID, "size", r.Size)
 	return Upload{ID: copy.ID, URL: address}, nil
+}
+
+// StorageLimit is how many bytes of copies a workspace keeps: less in a
+// trial, all in the free year and with a subscription.
+func StorageLimit(space workspace.Workspace) int64 {
+	if space.Status == "trial" && space.TrialDays <= 30 {
+		return TrialStorage
+	}
+	return Storage
+}
+
+// storageText says how much a workspace keeps, and in a trial what a
+// subscription keeps.
+func storageText(space workspace.Workspace) string {
+	if StorageLimit(space) == TrialStorage {
+		return fmt.Sprintf("%d GB during the trial, %d GB with a subscription", TrialStorage>>30, Storage>>30)
+	}
+	return fmt.Sprintf("%d GB", Storage>>30)
 }
 
 // check refuses a request that is no copy of a database. A copy made
@@ -256,10 +278,10 @@ func (c *Copies) mailFull(ctx context.Context, space workspace.Workspace, now ti
 	message := mailer.Message{
 		To:      space.Mail,
 		Subject: "Your " + build.Name + " cloud storage for copies is full",
-		Text: fmt.Sprintf("Your servers sent %d GB of copies to %s cloud. That is all it keeps for a workspace. "+
+		Text: fmt.Sprintf("Your servers sent %s cloud all the copies it keeps for your workspace: %s. "+
 			"No new copy goes in until old ones end, 14 days after they came. No old copy is deleted for it.\n\n"+
 			"Your servers still copy to your own bucket.\n\nSee the copies: %s backups <app>\n%s/cloud",
-			Storage>>30, build.Name, build.Name, c.appURL),
+			build.Name, storageText(space), build.Name, c.appURL),
 	}
 	if err := c.mailer.Send(ctx, message); err != nil {
 		slog.Error("mail not sent", "subject", message.Subject, "error", err)

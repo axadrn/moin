@@ -301,6 +301,36 @@ func TestPrune(t *testing.T) {
 	}
 }
 
+// A trial keeps 5 GB of copies, the free year and a subscription 50 GB.
+func TestTrialStorage(t *testing.T) {
+	test := newCopiesTest(t)
+	if err := test.store.StartTrial(test.space.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	space, _ := test.store.Workspace(test.space.ID)
+	if got := StorageLimit(space); got != TrialStorage {
+		t.Errorf("a trial keeps %d", got)
+	}
+	if got := StorageLimit(workspace.Workspace{Status: "trial", TrialDays: 365}); got != Storage {
+		t.Errorf("the free year keeps %d", got)
+	}
+	if got := StorageLimit(workspace.Workspace{Status: "paid", TrialDays: 30}); got != Storage {
+		t.Errorf("a subscription keeps %d", got)
+	}
+	request := Request{App: "shop", Database: "/data/app.db", MadeAt: time.Now(), Size: TrialStorage + 1}
+	_, err := test.copies.Start(test.ctx, test.token, request)
+	if !errors.Is(err, ErrFull) || !strings.Contains(err.Error(), "5 GB during the trial") {
+		t.Fatalf("more than the trial keeps: %v", err)
+	}
+	if len(test.mails.sent) != 1 || !strings.Contains(test.mails.sent[0].Text, "5 GB during the trial") {
+		t.Errorf("mails %+v", test.mails.sent)
+	}
+	request.Size = TrialStorage
+	if _, err := test.copies.Start(test.ctx, test.token, request); err != nil {
+		t.Errorf("all the trial keeps: %v", err)
+	}
+}
+
 // A trial that ran out, with nothing paid, is like a subscription that
 // ended: every copy goes Grace after the trial's end.
 func TestPruneTrial(t *testing.T) {

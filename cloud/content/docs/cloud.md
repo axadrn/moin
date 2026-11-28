@@ -100,7 +100,7 @@ The copies lie in a Cloudflare R2 bucket with a 14-day lock. Inside it nobody de
 
 ### Limits
 
-- 50 GB of copies per workspace, fair use. When it is full, no new copy goes in, and you get a mail. No old copy is deleted for it.
+- 5 GB of copies per workspace during the trial. 50 GB with a subscription or the free year, fair use. When it is full, no new copy goes in, and you get a mail. No old copy is deleted for it.
 - One copy an hour per database.
 - When a subscription ends, no new copy goes in. The copies stay 30 days, then they go.
 
