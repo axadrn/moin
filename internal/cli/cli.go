@@ -39,7 +39,7 @@ Apps
   domains [app]                The app's domains
   domains add [app] <domain>   Add one. The certificate follows by itself
   domains rm [app] <domain>    Remove one
-  follow [app]                 Deploy each new commit of a branch
+  follow [app]                 Deploy each new commit of a branch, or image of a tag
   catalog                      Open source apps to deploy with --catalog
 
 Backups
@@ -58,6 +58,9 @@ Servers
   bucket set <server>          Set it. Shows your backup key once
   bucket key <server>          A new backup key, or one you have
   bucket confirm <server>      Paste your backup key to show you have it
+  registry <server>            The registries it is logged in to, for private images
+  registry set <server> <registry> <user>  Log it in. The token is asked
+  registry rm <server> <registry>  Log it out
   alerts <server>              Where alerts go
   alerts add <server> <kind>   telegram, slack, discord or webhook
   alerts rm <server> <n>       Remove one
@@ -247,6 +250,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return unlock(ctx, rest, stdout)
 	case "follow":
 		return follow(ctx, rest, stdin, stdout)
+	case "registry":
+		return registry(ctx, rest, stdin, stdout)
 	case "knocks":
 		return knocks(ctx, rest, stdout)
 	case "cloud":

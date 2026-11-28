@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -113,19 +114,42 @@ func removeRegistry(ctx context.Context, args []string, stdin io.Reader, stdout 
 // it from its registry. An image no registry has, like shop:dev, is one
 // you built here: it is sent over SSH.
 func bringImage(ctx context.Context, server, image string, stdout io.Writer) error {
-	step(stdout, "pulling image %s on %s", image, server)
-	var said bytes.Buffer
-	var pulled daemon.Pulled
-	err := sshAnswer(ctx, server, []string{"registry", "pull", image}, nil, &said, &pulled)
-	var refused exitCode
-	if !errors.As(err, &refused) {
+	here := exec.CommandContext(ctx, "docker", "image", "inspect", "--", image).Run() == nil
+	if !here {
+		return task(stdout, "pulling image "+image+" on "+server, func() error {
+			why, err := pullImage(ctx, server, image)
+			if why != "" {
+				return fmt.Errorf("%s cannot pull %s, and this computer has no such image. Docker said: %s. A private registry needs a login: `%s registry set %s <registry> <user>`", server, image, why, build.Name, server)
+			}
+			return err
+		})
+	}
+	pulled := false
+	err := task(stdout, "asking the registry for image "+image, func() error {
+		why, err := pullImage(ctx, server, image)
+		pulled = why == "" && err == nil
+		return err
+	})
+	if err != nil || pulled {
 		return err
 	}
-	if exec.CommandContext(ctx, "docker", "image", "inspect", "--", image).Run() == nil {
-		return sendImage(ctx, server, image, stdout)
+	return task(stdout, "sending image "+image, func() error {
+		return sendImage(ctx, server, image)
+	})
+}
+
+// pullImage makes the server pull image. When Docker there refuses, why
+// says what it said, like "manifest unknown"; err is any other failure.
+func pullImage(ctx context.Context, server, image string) (why string, err error) {
+	var said bytes.Buffer
+	var pulled daemon.Pulled
+	err = sshAnswer(ctx, server, []string{"registry", "pull", image}, nil, &said, &pulled)
+	var refused exitCode
+	if !errors.As(err, &refused) {
+		return "", err
 	}
-	why := strings.TrimSpace(strings.TrimPrefix(strings.Join(strings.Fields(said.String()), " "), style.SymbolFailed))
-	return fmt.Errorf("%s cannot pull %s, and this computer has no such image. Docker said: %s. A private registry needs a login: `%s registry set %s <registry> <user>`", server, image, strings.TrimSuffix(why, "."), build.Name, server)
+	why = strings.TrimSpace(strings.TrimPrefix(strings.Join(strings.Fields(said.String()), " "), style.SymbolFailed))
+	return cmp.Or(strings.TrimSuffix(why, "."), err.Error()), nil
 }
 
 // startFollowImage sets the follow of an image on the server and pulls

@@ -18,11 +18,13 @@ import (
 
 // follow is `moin follow [app] --branch main`: the server deploys each
 // new commit of the branch, read with a deploy key made on the server.
-// `--off` stops it.
+// `moin follow [app] --image ghcr.io/you/shop:main` deploys each new
+// image under that tag instead. `--off` stops it.
 func follow(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("follow", "follow [app] [--branch main] [--repo <git url>] [--off] [-s server]").withServer()
+	flags := newFlags("follow", "follow [app] [--branch main] [--repo <git url>] [--image <image>] [--off] [-s server]").withServer()
 	branch := flags.String("branch", "", "the branch to deploy; default the branch of this folder")
 	repo := flags.String("repo", "", "the repo; default the origin of this folder")
+	image := flags.String("image", "", "deploy each new image under this tag, like ghcr.io/you/shop:main, instead of a branch")
 	off := flags.Bool("off", false, "stop following, and remove the deploy key from the server")
 	if err := flags.parse(args); err != nil {
 		return err
@@ -33,6 +35,12 @@ func follow(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	if *off {
 		return onApp(ctx, flags, app, func(server string) error { return unfollow(ctx, server, app, stdout) })
+	}
+	if *image != "" {
+		if *branch != "" || *repo != "" {
+			return errors.New("follow takes --image or a branch, not both")
+		}
+		return onApp(ctx, flags, app, func(server string) error { return startFollowImage(ctx, server, app, *image, stdout) })
 	}
 	// This folder says the branch and the repo, when it is the app's.
 	here, _ := folderApp()
@@ -133,6 +141,10 @@ func unfollow(ctx context.Context, server, app string, stdout io.Writer) error {
 	if err := sshJSON(ctx, server, []string{"follow", "off", app}, nil, &f); err != nil {
 		return err
 	}
+	if f.Image != "" {
+		done(stdout, "%s no longer follows %s", app, f.Image)
+		return nil
+	}
 	done(stdout, "%s no longer follows %s. The deploy key is gone from %s", app, f.Branch, server)
 	if owner := githubRepo(f.Repo); owner != "" {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("Remove it from the repo too: https://github.com/"+owner+"/settings/keys"))
@@ -163,15 +175,19 @@ func githubRepo(repo string) string {
 	return ""
 }
 
-// hereFollow is `here follow <app>` with the repo and the branch as JSON
-// on stdin, `here follow check <app>` and `here follow off <app>`.
+// hereFollow is `here follow <app>` with the repo and the branch, or the
+// image, as JSON on stdin, `here follow check <app>` and `here follow off <app>`.
 func hereFollow(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	dir := daemon.StateDir()
 	switch {
 	case len(args) == 1:
-		var want struct{ Repo, Branch string }
+		var want struct{ Repo, Branch, Image string }
 		if err := json.NewDecoder(stdin).Decode(&want); err != nil {
 			return fmt.Errorf("read the repo: %w", err)
+		}
+		if want.Image != "" {
+			f, err := daemon.FollowImageHere(dir, args[0], want.Image)
+			return respond(stdout, f, err)
 		}
 		f, err := daemon.FollowHere(dir, args[0], want.Repo, want.Branch)
 		return respond(stdout, f, err)

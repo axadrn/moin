@@ -20,9 +20,9 @@ import (
 // folder to the server, which builds and starts it. The first deploy to a
 // server sets moin up there; later ones go to where the app runs.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [server] [--image <local image> | --catalog <name>] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
+	flags := newFlags("deploy", "deploy [server] [--image <image> | --catalog <name>] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
 	noCopy := flags.Bool("no-copy", false, "deploy without the copy of the databases just before it, when that copy fails")
-	image := flags.String("image", "", "send this local image, like shop:dev, instead of building on the server")
+	image := flags.String("image", "", "run this image instead of building: the server pulls it, like ghcr.io/you/shop:1.4, or one only this computer has, like shop:dev, is sent")
 	catalogApp := flags.String("catalog", "", "deploy an app of the catalog, like umami, without a repo")
 	appName := flags.String("app", "", "the app's name; default this folder's name, or the catalog app's")
 	if err := flags.parse(args); err != nil {
@@ -60,10 +60,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return err
 	}
 	if *image != "" {
-		err := task(log, "sending image "+*image, func() error {
-			return sendImage(ctx, server, *image)
-		})
-		if err != nil {
+		if err := bringImage(ctx, server, *image, log); err != nil {
 			return err
 		}
 	}
