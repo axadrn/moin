@@ -397,8 +397,12 @@
     padding-block-start: var(--band);
   }
   :is(main, .moin-page:last-child) > .moin-band:last-child { padding-block-end: var(--band); }
+  /* A page made of bands starts with its head: less room above it, under
+     the bar. */
+  main.moin-page > .moin-band:first-child { padding-block-start: var(--page-head, 4rem); }
   @media (min-width: 40rem) {
     .moin-band { --band: 11rem; }
+    main.moin-page { --page-head: 6rem; }
   }
   /* The head of a band in the middle, 40 px over what follows: the band's
      gap and this. */
@@ -2495,6 +2499,44 @@
     .moin-compare-text:not(:has(.moin-small)) { display: flex; }
     .moin-compare-what { display: inline; }
     .moin-compare-foot { padding: var(--space-4) 0 0; border-top: 0; }
+  }
+  /* With words: each answer reads from the start, its mark, its words and
+     the line under them, the label at the top of its row. */
+  .moin-compare-answer { color: var(--foreground); font-weight: 500; }
+  .moin-compare[data-text] .moin-compare-text { display: flex; align-items: flex-start; }
+  .moin-compare[data-text] .moin-mark { margin-block-start: 1px; }
+  @media (min-width: 48rem) {
+    .moin-compare[data-text] { grid-template-columns: minmax(10rem, 1fr) repeat(var(--cols), minmax(0, 1.25fr)); }
+    .moin-compare[data-text] :is(.moin-compare-cell, .moin-compare-head) {
+      align-items: flex-start;
+      justify-content: flex-start;
+      text-align: start;
+    }
+    .moin-compare[data-text] .moin-compare-col .moin-compare-cell { flex-direction: row; gap: var(--space-3); }
+    .moin-compare[data-text] .moin-compare-cell { min-height: 0; padding-block: var(--space-4); }
+    /* Room under the table for the featured column, raised past it. */
+    .moin-compare { padding-block-end: var(--space-3); }
+    .moin-compare-head + .moin-compare-group { padding-block-start: 0; }
+  }
+  @media (max-width: 47.99rem) {
+    .moin-compare[data-text] .moin-compare-what { color: var(--muted-foreground); }
+  }
+  /* A group: its name over its first row, in the labels; the columns run
+     through it. */
+  .moin-compare-group {
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-8) 0 var(--space-3);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+  .moin-compare-col .moin-compare-group > span { visibility: hidden; }
+  @media (max-width: 47.99rem) {
+    .moin-compare-group { padding: var(--space-4) 0 var(--space-1); font-size: 1rem; }
+    .moin-compare-col .moin-compare-group > span { visibility: visible; }
+    .moin-compare-head + .moin-compare-group { padding-block-start: 0; }
   }
 }
 

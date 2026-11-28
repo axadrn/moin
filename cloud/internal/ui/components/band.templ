@@ -1,0 +1,38 @@
+package components
+
+// BandHeadProps is a BandHead: one title and at most one short line under
+// it. Page makes the title the page's h1.
+type BandHeadProps struct {
+	Title string
+	Line  string
+	Page  bool
+}
+
+// BandHead is the head of a section of a page, in the middle, the same on
+// every page: one title, one line, nothing more.
+templ BandHead(p BandHeadProps) {
+	<div class="moin-stack moin-band-head" data-gap="3">
+		if p.Page {
+			<h1 class="moin-statement">{ p.Title }</h1>
+		} else {
+			<h2 class="moin-statement">{ p.Title }</h2>
+		}
+		if p.Line != "" {
+			<p class="moin-lead">{ p.Line }</p>
+		}
+	</div>
+}
+
+// MoreProps is a More: where it goes and what it says.
+type MoreProps struct {
+	Href string
+	Text string
+}
+
+// More is the one quiet link under a section, to the page that says the
+// rest.
+templ More(p MoreProps) {
+	<p class="moin-center">
+		<a href={ templ.SafeURL(p.Href) } class="moin-link moin-foreground">{ p.Text }</a>
+	</p>
+}

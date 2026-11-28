@@ -33,6 +33,9 @@ func TestComparePagesAnswer(t *testing.T) {
 		if _, err := time.Parse("January 2, 2006", competitor.Read); err != nil {
 			t.Errorf("%s: read %q, want a date", competitor.Name, competitor.Read)
 		}
+		if competitor.Line == "" || len(competitor.Line) > 70 {
+			t.Errorf("%s: line %q, want one short line", competitor.Name, competitor.Line)
+		}
 		if len(competitor.Cells) != len(compare.Rows) {
 			t.Errorf("%s answers %d of %d questions", competitor.Name, len(competitor.Cells), len(compare.Rows))
 		}

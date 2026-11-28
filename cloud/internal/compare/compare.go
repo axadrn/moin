@@ -72,7 +72,10 @@ type Competitor struct {
 	// Read is when its facts were read at their sources.
 	Read string
 	// Lead says calmly what differs.
-	Lead  string
+	Lead string
+	// Line is what it is and how it differs, in one short line for the
+	// list of comparisons.
+	Line  string
 	Cells []Cell
 }
 
@@ -106,6 +109,7 @@ var Competitors = []Competitor{
 		Name: "Coolify",
 		Read: "November 28, 2026",
 		Lead: "Coolify is a dashboard that logs in to your servers over SSH with a key it keeps. " + brand.Name + " has no dashboard: only who has SSH can command your server.",
+		Line: "A dashboard that keeps an SSH key to every server it manages.",
 		Cells: []Cell{
 			no("Whoever runs Coolify", "It logs in over SSH with your private key, as root or a sudo user. Coolify Cloud gets that key from you.", "https://coolify.io/docs/start-with-cloud"),
 			no("8000, 6001, 6002 and SSH", "Its dashboard, live updates and terminal answer on 8000, 6001 and 6002 until you close them. Port 22 for SSH, 80 and 443 for apps.", "https://coolify.io/docs/knowledge-base/server/firewall"),
@@ -129,6 +133,7 @@ var Competitors = []Competitor{
 		Name: "Dokploy",
 		Read: "November 28, 2026",
 		Lead: "Dokploy is a dashboard that connects to your servers over SSH with a key. " + brand.Name + " has no dashboard: only who has SSH can command your server.",
+		Line: "A dashboard that connects to your servers with an SSH key.",
 		Cells: []Cell{
 			no("Whoever runs Dokploy", "It connects over SSH with a key, often as root. Dokploy Cloud does it from its own control plane.", "https://docs.dokploy.com/docs/core/cloud"),
 			no("3000 and SSH", "Its web interface answers on port 3000 until you turn that off. 80 and 443 for apps.", "https://docs.dokploy.com/docs/core/installation"),
@@ -152,6 +157,7 @@ var Competitors = []Competitor{
 		Name: "Kamal",
 		Read: "November 28, 2026",
 		Lead: "Both run over SSH with your key. Kamal builds on your laptop and deploys to many servers. " + brand.Name + " builds on the server and checks your backups every day.",
+		Line: "Builds on your laptop and deploys to many servers.",
 		Cells: []Cell{
 			yes("Who has SSH", "Servers need nothing but your SSH key.", "https://kamal-deploy.org/"),
 			no("SSH", "Port 22 by default.", "https://kamal-deploy.org/docs/configuration/ssh/"),
@@ -174,7 +180,8 @@ var Competitors = []Competitor{
 		Slug: "uncloud",
 		Name: "uncloud",
 		Read: "November 28, 2026",
-		Lead: "Both run over SSH, with no control plane. uncloud runs compose across machines without downtime. " + brand.Name + " is one server, and checks backups every day.",
+		Lead: "Both run over SSH with no central server. uncloud runs compose across machines without downtime. " + brand.Name + " is one server and checks backups every day.",
+		Line: "Runs compose across machines without downtime.",
 		Cells: []Cell{
 			yes("Who has SSH", "uc is a CLI that connects to your machines over SSH. No control plane.", "https://uncloud.run/"),
 			no("SSH and WireGuard", "uc connects over SSH. Machines talk over WireGuard on UDP port 51820.", "https://uncloud.run/docs/cli-reference/uc_machine_init"),
@@ -197,7 +204,8 @@ var Competitors = []Competitor{
 		Slug: "dokku",
 		Name: "Dokku",
 		Read: "November 28, 2026",
-		Lead: "Both run on your server, driven over SSH with your key. Dokku leaves the restore test to you. " + brand.Name + " restores and checks a copy every day.",
+		Lead: "Both run on your server over SSH with your key. Dokku leaves the restore test to you. " + brand.Name + " restores and checks a copy every day.",
+		Line: "Runs on your server. The restore test is up to you.",
 		Cells: []Cell{
 			yes("Who has SSH", "You add your public key to the server. Commands and pushes log in with it.", "https://dokku.com/docs/deployment/user-management/"),
 			no("SSH", "Remote commands and git remotes use SSH. The official client uses port 22 by default.", "https://dokku.com/docs/deployment/remote-commands/"),

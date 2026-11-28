@@ -5,8 +5,12 @@ import "strconv"
 // CompareCell is one answer: a Mark kind ("yes", "no", or "" for none) and
 // a short note that goes under it.
 // Href makes the mark a link, Title is what it says on hover.
+// Text is the answer in a few words, next to the mark: a table with text
+// reads from the start of each cell, and Href makes the words the quiet
+// link to where the answer is written.
 type CompareCell struct {
 	Mark  string
+	Text  string
 	Note  string
 	Href  string
 	Title string
@@ -30,11 +34,13 @@ type CompareColumn struct {
 }
 
 // CompareProps is Compare: the rows to compare, and the columns that
-// answer them, one cell for each row.
+// answer them, one cell for each row. Groups, when set, names the group
+// of each row: a line with the name goes before the first row of each.
 // On a phone the featured column comes first and the others follow in
 // order; with Reverse all of them stack last to first.
 type CompareProps struct {
 	Rows    []string
+	Groups  []string
 	Columns []CompareColumn
 	Reverse bool
 }
@@ -44,10 +50,13 @@ type CompareProps struct {
 // them. On a phone the columns become cards, one under another, each row
 // listed as its mark and what it is.
 templ Compare(p CompareProps) {
-	<div class="moin-compare" data-cols={ strconv.Itoa(len(p.Columns)) } data-reverse?={ p.Reverse } style={ templ.SafeCSS("--compare-rows:" + strconv.Itoa(compareLines(p))) }>
+	<div class="moin-compare" data-cols={ strconv.Itoa(len(p.Columns)) } data-reverse?={ p.Reverse } data-text?={ compareText(p) } style={ templ.SafeCSS("--compare-rows:" + strconv.Itoa(compareLines(p))) }>
 		<div class="moin-compare-labels" aria-hidden="true">
 			<div class="moin-compare-head"></div>
-			for _, row := range p.Rows {
+			for i, row := range p.Rows {
+				if group := compareGroupAt(p, i); group != "" {
+					<div class="moin-compare-group">{ group }</div>
+				}
 				<div class="moin-compare-cell">{ row }</div>
 			}
 			if compareFoot(p) {
@@ -68,8 +77,11 @@ templ Compare(p CompareProps) {
 					<span class="moin-small moin-muted">{ col.Caption }</span>
 				</div>
 				for i, row := range p.Rows {
+					if group := compareGroupAt(p, i); group != "" {
+						<div class="moin-compare-group"><span>{ group }</span></div>
+					}
 					<div class="moin-compare-cell">
-						if col.Cells[i].Href != "" {
+						if col.Cells[i].Href != "" && col.Cells[i].Text == "" {
 							<a href={ templ.SafeURL(col.Cells[i].Href) } title={ col.Cells[i].Title } rel="noopener">
 								@Mark(MarkProps{Kind: col.Cells[i].Mark})
 							</a>
@@ -80,6 +92,11 @@ templ Compare(p CompareProps) {
 						}
 						<span class="moin-compare-text">
 							<span class="moin-compare-what">{ row }</span>
+							if col.Cells[i].Text != "" && col.Cells[i].Href != "" {
+								<a href={ templ.SafeURL(col.Cells[i].Href) } class="moin-compare-answer moin-link" data-quiet>{ col.Cells[i].Text }</a>
+							} else if col.Cells[i].Text != "" {
+								<span class="moin-compare-answer">{ col.Cells[i].Text }</span>
+							}
 							if col.Cells[i].Note != "" {
 								<span class="moin-small moin-muted">{ col.Cells[i].Note }</span>
 							}
@@ -111,6 +128,18 @@ func compareButton(col CompareColumn) ButtonProps {
 	return p
 }
 
+// compareText says whether any cell has words next to its mark.
+func compareText(p CompareProps) bool {
+	for _, col := range p.Columns {
+		for _, cell := range col.Cells {
+			if cell.Text != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // compareFoot says whether any column has a button.
 func compareFoot(p CompareProps) bool {
 	for _, col := range p.Columns {
@@ -121,10 +150,25 @@ func compareFoot(p CompareProps) bool {
 	return false
 }
 
-// compareLines is the lines of the grid: the head, the rows, the foot.
-func compareLines(p CompareProps) int {
-	if compareFoot(p) {
-		return len(p.Rows) + 2
+// compareGroupAt is the group that starts at row i, or "".
+func compareGroupAt(p CompareProps, i int) string {
+	if i >= len(p.Groups) || (i > 0 && p.Groups[i] == p.Groups[i-1]) {
+		return ""
 	}
-	return len(p.Rows) + 1
+	return p.Groups[i]
+}
+
+// compareLines is the lines of the grid: the head, the groups, the rows,
+// the foot.
+func compareLines(p CompareProps) int {
+	lines := len(p.Rows) + 1
+	for i := range p.Rows {
+		if compareGroupAt(p, i) != "" {
+			lines++
+		}
+	}
+	if compareFoot(p) {
+		lines++
+	}
+	return lines
 }

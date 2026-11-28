@@ -1,0 +1,55 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/compare"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// CompareIndex is /compare: every tool, one under another, each a way to
+// its page: what it is, what differs, and the score.
+templ CompareIndex() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       brand.Name + " compared",
+		Description: compareIndexDescription(),
+		Path:        "/compare",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: brand.Name + " compared.", Line: "Fact by fact. From each tool's own docs. Where another tool does more the page says so."})
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, competitor := range compare.Competitors {
+							@components.Item(components.ItemProps{Href: "/compare/" + competitor.Slug, Name: brand.Name + " vs " + competitor.Name, Note: competitor.Line}) {
+								<span class="moin-text moin-muted moin-digits moin-hidden-phone">{ competitor.ScoreLine() }</span>
+							}
+						}
+					}
+				}
+			</section>
+			@HomeEnd()
+		</main>
+	}
+}
+
+// Compare is one tool next to this one: what differs, then the same facts
+// for both in one table, grouped, every answer linked to where it is
+// written, and the way in.
+templ Compare(competitor compare.Competitor) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       brand.Name + " vs " + competitor.Name,
+		Description: competitor.Lead,
+		Path:        "/compare/" + competitor.Slug,
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: brand.Name + " or " + competitor.Name + "?", Line: competitor.Lead})
+				@components.Compare(compareTable(competitor))
+				<p class="moin-small moin-muted moin-center">{ compareSources(competitor) }</p>
+				@components.More(components.MoreProps{Href: "/compare", Text: "All comparisons"})
+			</section>
+			@HomeEnd()
+		</main>
+	}
+}
