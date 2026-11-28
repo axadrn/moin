@@ -97,7 +97,7 @@ func backupsFrom(ctx context.Context, server, app, from string, stderr io.Writer
 func printBackup(stdout io.Writer, database protocol.DatabaseBackup, now time.Time) {
 	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
 	if database.Error != "" {
-		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" "+database.Error)
+		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" "+commands(stdout, sentence(database.Error)))
 	}
 	fmt.Fprintln(stdout, "  "+checkLine(database, now))
 	if database.CloudError != "" {

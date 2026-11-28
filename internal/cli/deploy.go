@@ -60,7 +60,10 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 		return err
 	}
 	if *image != "" {
-		if err := sendImage(ctx, server, *image, log); err != nil {
+		err := task(log, "sending image "+*image, func() error {
+			return sendImage(ctx, server, *image)
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -216,8 +219,7 @@ func printLive(stdout io.Writer, result daemon.Result, server string, bucket boo
 
 // sendImage puts a local image on the server: docker save here, docker
 // load there.
-func sendImage(ctx context.Context, server, image string, stdout io.Writer) error {
-	step(stdout, "sending image %s", image)
+func sendImage(ctx context.Context, server, image string) error {
 	save := exec.CommandContext(ctx, "docker", "save", "--", image)
 	save.Stderr = os.Stderr
 	pipe, err := save.StdoutPipe()
@@ -313,12 +315,15 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 	if info.version != "" {
 		return nil
 	}
-	step(stdout, "installing %s %s", build.Name, build.Version)
-	if err := installMoin(ctx, server, info.arch); err != nil {
+	err = task(stdout, "installing "+build.Name+" "+build.Version, func() error {
+		return installMoin(ctx, server, info.arch)
+	})
+	if err != nil {
 		return err
 	}
-	step(stdout, "starting the daemon: backups, restore checks, reports")
-	return sshRun(ctx, server, hereLine("setup", serverName(server)), nil, io.Discard, os.Stderr)
+	return task(stdout, "starting the daemon: backups, checks, reports", func() error {
+		return sshRun(ctx, server, hereLine("setup", serverName(server)), nil, io.Discard, os.Stderr)
+	})
 }
 
 // lastOldVersion is the last release whose daemon took its commands from

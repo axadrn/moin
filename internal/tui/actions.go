@@ -191,7 +191,7 @@ func (m *model) askRollback() tea.Cmd {
 		m.message = failed(known.err)
 		return nil
 	}
-	p := &picker{title: "Go back to which release of " + key.app + "?", cursor: -1}
+	p := &picker{title: "Go back to which deploy of " + key.app + "?", cursor: -1}
 	now := time.Now()
 	for index, release := range known.releases {
 		note := ""
@@ -205,7 +205,7 @@ func (m *model) askRollback() tea.Cmd {
 		p.rows = append(p.rows, pickerRow{name: releaseName(release.Number), when: human.Ago(release.At, now), note: note})
 	}
 	if p.cursor < 0 {
-		m.message = failed(key.app + " has no older release to go back to")
+		m.message = failed(key.app + " has no older deploy to go back to")
 		return nil
 	}
 	releases := known.releases

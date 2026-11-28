@@ -106,7 +106,7 @@ func printUsage(w io.Writer) {
 		name, description, ok := usageEntry(line)
 		switch {
 		case index == 0:
-			fmt.Fprintln(w, style.Accent.Render(build.Name)+strings.TrimPrefix(line, build.Name))
+			fmt.Fprintln(w, style.Mark.Render(build.Name)+"  "+strings.TrimPrefix(line, build.Name+": "))
 		case ok && len(name)+2 >= usageColumn:
 			fmt.Fprintln(w, "  "+name)
 			fmt.Fprintln(w, strings.Repeat(" ", usageColumn)+style.Muted.Render(description))

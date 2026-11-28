@@ -25,9 +25,15 @@ func (m *model) pressed(key string) tea.Cmd {
 	case "?":
 		m.help = true
 		return nil
-	case "esc", "backspace", "left", "h":
+	case "esc", "backspace":
 		m.closeApp()
 		return nil
+	case "left", "h":
+		if m.app != nil {
+			m.closeApp()
+			return nil
+		}
+		return m.switchTab((m.tab + 2) % 3)
 	}
 	if m.app != nil {
 		return m.actionKey(key)

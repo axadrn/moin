@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/daemon"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/axadrn/moin/protocol"
@@ -77,8 +79,10 @@ func (m *model) summary() string {
 	switch {
 	case down > 0:
 		return style.Danger.Render(style.SymbolFailed + " " + count(down, "server") + " unreachable")
-	case needs > 0:
-		return style.Warning.Render("! " + strconv.Itoa(needs) + " need you")
+	case needs == 1:
+		return style.Warning.Render("! 1 thing needs you")
+	case needs > 1:
+		return style.Warning.Render("! " + strconv.Itoa(needs) + " things need you")
 	case asking > 0:
 		return style.Warning.Render(m.spinner() + " asking " + count(asking, "server"))
 	}
@@ -272,7 +276,8 @@ func (m *model) sideLines() []string {
 			lines = append(lines, fact(label, database.Database+"  "+backupState(database, time.Now())))
 		}
 	}
-	return lines
+	server, _ := m.serverNamed(m.selected.server)
+	return append(lines, needLines(serverNeeds(server))...)
 }
 
 // deployedAgo says when the live release was deployed, from the facts.
@@ -379,10 +384,7 @@ func (m *model) serverFacts() []string {
 		knocks = human.Knocks(status.KnocksToday)
 	}
 	lines = append(lines, fact("Knocks", knocks))
-	for _, need := range status.Needs {
-		lines = append(lines, "", style.Danger.Render(style.SymbolFailed+" "+need.Text), "  "+style.Accent.Render(need.Command))
-	}
-	return lines
+	return append(lines, needLines(status.Needs)...)
 }
 
 // backupFacts are the backups of an app: each database with its check
@@ -473,22 +475,35 @@ func checkState(database protocol.DatabaseBackup, now time.Time) string {
 	return succeeded("Checked " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckedCopy + " restored and read fine")
 }
 
-// needs are what on a server needs you: what it says, port 22 open to
-// the internet, an app that does not run.
-func (m *model) needs(server server) []string {
-	needs := []string{}
-	for _, need := range server.status.Needs {
-		needs = append(needs, need.Text)
-	}
+// serverNeeds are what on a server needs you, each with the command
+// that settles it: what the server says, and port 22 open to the
+// internet.
+func serverNeeds(server server) []daemon.Need {
+	needs := slices.Clone(server.status.Needs)
 	if server.status.PublicSSH {
-		needs = append(needs, "port 22 is open")
+		needs = append(needs, daemon.Need{Text: server.name + ": port 22 is open to the internet.", Command: build.Name + " secure " + server.name})
 	}
+	return needs
+}
+
+// needs are what on a server needs you, an app that does not run too.
+func (m *model) needs(server server) []daemon.Need {
+	needs := serverNeeds(server)
 	for _, app := range server.status.Apps {
 		if !app.Running {
-			needs = append(needs, app.Name+" does not run")
+			needs = append(needs, daemon.Need{Text: app.Name + " does not run.", Command: build.Name + " logs " + app.Name})
 		}
 	}
 	return needs
+}
+
+// needLines are needs as lines: the text in amber, the command under it.
+func needLines(needs []daemon.Need) []string {
+	var lines []string
+	for _, need := range needs {
+		lines = append(lines, "", style.Warning.Render("! ")+need.Text, "  "+style.Accent.Render(need.Command))
+	}
+	return lines
 }
 
 // logsBox is the logs of the open app, as many of the newest lines as
@@ -598,10 +613,10 @@ func helpLines() []string {
 		{"enter", "an app's logs, a server's apps, a restore"},
 		{"esc", "back from the logs"},
 		{"r", "restart the app"},
-		{"b", "go back to an older release"},
+		{"b", "go back to an older deploy"},
 		{"c", "copy the app's databases now"},
 		{"R", "put a database back to a copy"},
-		{"o", "open the app's address in your browser"},
+		{"o", "open the app's domain in your browser"},
 		{"q", "quit"},
 	}
 	lines := []string{}

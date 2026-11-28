@@ -273,7 +273,7 @@ func TestRollbackPicksTheReleaseBefore(t *testing.T) {
 func TestRollbackWithoutAnOlderRelease(t *testing.T) {
 	m := start(t, &fake{releases: []daemon.Release{{Number: 1, Live: true}}})
 	run(m, press(m, "b"))
-	if m.picker != nil || !strings.Contains(m.message, "no older release") {
+	if m.picker != nil || !strings.Contains(m.message, "no older deploy") {
 		t.Errorf("picker %v, message %q", m.picker, m.message)
 	}
 }
@@ -422,7 +422,7 @@ func TestWhatNeedsYouIsOnItsServer(t *testing.T) {
 		Needs:     []daemon.Need{{Text: "shop: postgres has no backup yet.", Command: "moin bucket set prod"}},
 		Apps:      []daemon.AppStatus{{Name: "shop", Release: 1, Running: true}},
 	}})
-	if !strings.Contains(m.View().Content, "2 need you") {
+	if !strings.Contains(m.View().Content, "2 things need you") {
 		t.Errorf("the header does not say what needs you:\n%s", m.View().Content)
 	}
 	press(m, "2")

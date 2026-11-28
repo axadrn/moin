@@ -92,9 +92,17 @@ func hint(w io.Writer, lead, next string) {
 var errReported = errors.New("reported")
 
 // printError writes an error as ✗ and a sentence that says what to do.
+// On a terminal it wraps at spaces, never in a word.
 func printError(w io.Writer, err error) {
-	message := explain(err)
-	fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" "+commands(w, message))
+	message := commands(w, explain(err))
+	if isTTY(w) {
+		lines := strings.Split(lipgloss.NewStyle().Width(terminalWidth()-2).Render(message), "\n")
+		for index := range lines {
+			lines[index] = strings.TrimRight(lines[index], " ")
+		}
+		message = strings.Join(lines, "\n  ")
+	}
+	fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" "+message)
 }
 
 // explain turns an error into a sentence: capitalized, with the command to
@@ -189,16 +197,26 @@ type progress struct {
 	stopped chan struct{}
 }
 
+// task runs work as one step: a spinner while it runs, then ✓ or ✗
+// and how long it took.
+func task(w io.Writer, text string, work func() error) error {
+	p := newProgress(w, text)
+	err := work()
+	p.end(err != nil)
+	return err
+}
+
 // liveLines is how many tool lines show under the running step; keptLines
 // how many stay on the screen when it fails.
 const (
 	liveLines = 4
-	keptLines = 30
+	keptLines = 12
 )
 
 func newProgress(w io.Writer, current string) *progress {
 	p := &progress{w: w, tty: isTTY(w), current: current, since: time.Now(), stop: make(chan struct{}), stopped: make(chan struct{})}
 	if !p.tty {
+		fmt.Fprintln(w, style.Step(current))
 		close(p.stopped)
 		return p
 	}
@@ -264,10 +282,13 @@ func (p *progress) finish(failed bool) {
 	if p.current == "" {
 		return
 	}
-	took := style.Muted.Render("  " + human.Duration(time.Since(p.since)))
+	took := ""
+	if since := time.Since(p.since); since >= time.Second {
+		took = style.Muted.Render("  " + human.Duration(since))
+	}
 	if failed {
 		for _, line := range p.tail {
-			fmt.Fprintln(p.w, "    "+style.Noise(line))
+			fmt.Fprintln(p.w, "    "+style.Noise(clip(line, max(terminalWidth()-5, 10))))
 		}
 		fmt.Fprintln(p.w, style.Danger.Render(style.SymbolFailed)+" "+p.current+took)
 	} else {

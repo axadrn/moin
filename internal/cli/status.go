@@ -255,7 +255,7 @@ func printNeeds(stdout io.Writer, rows []serverRow) {
 	var lines []string
 	for _, row := range rows {
 		if row.err != nil {
-			lines = append(lines, style.Danger.Render(style.SymbolFailed)+" "+row.server+" does not answer. "+commands(stdout, explain(row.err)))
+			lines = append(lines, style.Danger.Render(style.SymbolFailed)+" "+commands(stdout, explain(row.err)))
 			continue
 		}
 		for _, app := range row.status.Apps {

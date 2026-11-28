@@ -29,7 +29,7 @@ func apps(ctx context.Context, args []string, stdout io.Writer) error {
 // names it; without either it is the release before.
 func rollback(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("rollback", "rollback [app] [--to v3] [-s server] [--json]").withServer().withJSON()
-	to := flags.String("to", "", "the release to go back to, like v3; default the one before the live one")
+	to := flags.String("to", "", "the deploy to go back to, like v3; default the one before the live one")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -110,10 +110,10 @@ func pickRelease(stdin io.Reader, stdout io.Writer, app string, releases []daemo
 		rows = append(rows, []string{"v" + strconv.Itoa(release.Number), human.Ago(release.At, now), note})
 	}
 	if suggested == 0 {
-		return 0, fmt.Errorf("%s has no older release to go back to", app)
+		return 0, fmt.Errorf("%s has no older deploy to go back to", app)
 	}
 	table(stdout, []string{"DEPLOY", "WHEN", "STATE"}, rows)
-	fmt.Fprint(stdout, style.Warning.Render("?")+" Go back to which release? "+style.Muted.Render("[v"+strconv.Itoa(suggested)+"]")+" ")
+	fmt.Fprint(stdout, style.Warning.Render("?")+" Go back to which deploy? "+style.Muted.Render("[v"+strconv.Itoa(suggested)+"]")+" ")
 	answer, err := readLine(stdin)
 	if err != nil {
 		return 0, err
@@ -128,7 +128,7 @@ func pickRelease(stdin io.Reader, stdout io.Writer, app string, releases []daemo
 func releaseNumber(text string) (int, error) {
 	number, err := strconv.Atoi(strings.TrimPrefix(text, "v"))
 	if err != nil || number < 1 {
-		return 0, fmt.Errorf("%q is not a release: name one like v3", text)
+		return 0, fmt.Errorf("%q is not a deploy: name one like v3", text)
 	}
 	return number, nil
 }
