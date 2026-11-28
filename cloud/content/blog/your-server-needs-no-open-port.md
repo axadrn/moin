@@ -1,6 +1,6 @@
 ---
 title: "Your server needs no open port"
-description: "Close every inbound port on your VPS and still deploy, SSH in and serve your apps. With Tailscale, a Cloudflare Tunnel and one firewall rule."
+description: "Close every inbound port on your VPS. Still deploy. Still SSH in. Still serve your apps. With Tailscale and a Cloudflare Tunnel and one firewall rule."
 date: "2026-11-25"
 ---
 

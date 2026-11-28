@@ -1,6 +1,6 @@
 ---
 title: "moin cloud"
-description: "A watcher we run for you, and a copy of your backups your server can't delete. 30 days free, then $7 a month or $49 a year."
+description: "A watcher we run for you. A copy of your backups your server can't delete. 30 days free. Then $7 a month or $49 a year."
 group: "Servers and data"
 order: 4
 ---

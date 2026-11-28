@@ -1,6 +1,6 @@
 ---
 title: "Deploy a Docker Compose app to a VPS"
-description: "From a fresh VPS to your app live on HTTPS, step by step: Docker, your compose.yml, Caddy for certificates, and updates."
+description: "From a fresh VPS to your app live on HTTPS. Step by step. Docker. Your compose.yml. Caddy for certificates. Updates."
 date: "2026-11-25"
 ---
 

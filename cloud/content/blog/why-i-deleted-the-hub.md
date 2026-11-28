@@ -1,6 +1,6 @@
 ---
 title: "Why I deleted the hub"
-description: "moin had a hub that every server trusted. I deleted it. Now commands go one way over your own SSH, reports go the other, and nothing in between holds a key."
+description: "moin had a hub that every server trusted. I deleted it. Now commands go one way over your own SSH. Reports go the other. Nothing in between holds a key."
 date: "2026-11-27"
 ---
 
@@ -33,7 +33,7 @@ This person is right. It is simple, and it works. Their SSH key is the only way 
 
 What they lack is small. A backup that really comes back. A way back after a bad deploy. Someone who notices when the server is gone. So that is what moin is now: their workflow, plus those three things.
 
-## Two roads, each one way
+## Two roads. Each one way.
 
 ```text
 your laptop
@@ -68,7 +68,7 @@ If `ssh my-server` works, this works. The first time, it installs Docker and moi
 
 **Knocks.** Bots try every new server within minutes. Once port 22 is closed, the firewall drops them and counts them. `moin knocks my-server` shows how many, by port. They knock. Nothing opens.
 
-## What moin cloud is, and isn't
+## What moin cloud is and isn't
 
 A dead server can't tell you it's dead. Someone else has to notice. That is a watcher. Run your own with `moin watcher run`, on a second small server. Or let moin cloud run one.
 

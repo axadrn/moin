@@ -1,6 +1,6 @@
 ---
 title: "Tailscale"
-description: "A private network of your own devices. Why SSH should only come over it, Tailnet Lock, the one rule a server needs, and key expiry."
+description: "A private network of your own devices. Why SSH should only come over it. Tailnet Lock. The one rule a server needs. Key expiry."
 group: "Basics"
 order: 5
 ---

@@ -1,6 +1,6 @@
 ---
 title: "Security"
-description: "Who can command your server. SSH only over Tailscale, Tailnet Lock, Cloudflare Tunnel, the firewall, the way back in, and updates you run yourself."
+description: "Who can command your server. SSH only over Tailscale. Tailnet Lock. Cloudflare Tunnel. The firewall. The way back in. Updates you run yourself."
 group: "Servers and data"
 order: 2
 ---

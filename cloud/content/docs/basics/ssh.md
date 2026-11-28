@@ -1,6 +1,6 @@
 ---
 title: "SSH and keys"
-description: "SSH is how your laptop logs in to your server. Make a key, give the server its public half, and name the server my-server in ~/.ssh/config."
+description: "SSH is how your laptop logs in to your server. Make a key. Give the server its public half. Name the server my-server in ~/.ssh/config."
 group: "Basics"
 order: 3
 ---
@@ -97,7 +97,7 @@ This name is what moin uses. If `ssh my-server` works, `moin deploy my-server` w
 
 Not root? Set `User` to your user. moin then runs `sudo` for you. It needs sudo without a password.
 
-## More people, more keys
+## More people. More keys.
 
 Each person makes their own key on their own laptop. Never share one key.
 

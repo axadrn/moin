@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite and Postgres, encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
+description: "SQLite and Postgres. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
 group: "Servers and data"
 order: 1
 ---

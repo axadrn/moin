@@ -1,6 +1,6 @@
 ---
 title: "What a backup is"
-description: "A backup you never restored is a hope. The 3-2-1 idea in plain words, and what moin does: a check every day, your own key, a copy at moin cloud."
+description: "A backup you never restored is a hope. The 3-2-1 idea in plain words. What moin does: a check every day. Your own key. A copy at moin cloud."
 group: "Basics"
 order: 9
 ---

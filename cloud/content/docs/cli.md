@@ -1,6 +1,6 @@
 ---
 title: "CLI"
-description: "Every moin command, in one pattern, and the terminal UI. Name the app, and moin finds its server. --json on every reading command, for scripts and AI agents."
+description: "Every moin command in one pattern. The terminal UI. Name the app and moin finds its server. --json on every reading command for scripts and AI agents."
 group: "Reference"
 order: 1
 ---
@@ -15,7 +15,7 @@ order: 1
 
 Flags may come before or after the words: `moin logs my-app -f` is `moin logs -f my-app`.
 
-## Name the app, from any folder
+## Name the app from any folder
 
 You name the app: `moin logs my-app`. moin finds the server it runs on. In the app's folder you may leave the name out: `moin logs`.
 

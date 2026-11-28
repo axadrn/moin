@@ -1,6 +1,6 @@
 ---
 title: "How moin ships"
-description: "From a change to your server: pull requests, deploys of the site, signed releases, and updates you run yourself."
+description: "From a change to your server. Pull requests. Deploys of the site. Signed releases. Updates you run yourself."
 group: "Reference"
 order: 4
 ---

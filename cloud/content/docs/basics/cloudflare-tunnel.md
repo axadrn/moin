@@ -1,6 +1,6 @@
 ---
 title: "Cloudflare Tunnel"
-description: "Visitors reach your app, and your server has no open web port. How a Cloudflare Tunnel works, what Cloudflare sees, and when to use one."
+description: "Visitors reach your app. Your server has no open web port. How a Cloudflare Tunnel works. What Cloudflare sees. When to use one."
 group: "Basics"
 order: 6
 ---

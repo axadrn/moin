@@ -1,6 +1,6 @@
 ---
 title: "What is a server"
-description: "A server is a computer that never sleeps. A VPS is a slice of a big one that you rent. What to pick, and what it costs."
+description: "A server is a computer that never sleeps. A VPS is a slice of a big one that you rent. What to pick. What it costs."
 group: "Basics"
 order: 1
 ---

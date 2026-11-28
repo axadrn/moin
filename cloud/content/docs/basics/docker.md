@@ -1,6 +1,6 @@
 ---
 title: "Docker and compose"
-description: "Image, container, volume and compose.yml in one page. How your app runs on the server, and how moin builds an app that has no Dockerfile."
+description: "Image and container and volume and compose.yml in one page. How your app runs on the server. How moin builds an app that has no Dockerfile."
 group: "Basics"
 order: 8
 ---

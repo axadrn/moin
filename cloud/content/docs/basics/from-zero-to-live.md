@@ -1,6 +1,6 @@
 ---
 title: "From zero to live"
-description: "One tutorial, start to end. Rent a server, log in with a key, deploy your app, add a domain, close every port, back it up and restore it."
+description: "One tutorial. Start to end. Rent a server. Log in with a key. Deploy your app. Add a domain. Close every port. Back it up. Restore it."
 group: "Basics"
 order: 10
 ---
@@ -135,7 +135,7 @@ Your backup key for my-server. It is shown once.
 
 Save it in your password manager first. Then paste it back. [What a backup is](/docs/basics/backups)
 
-## 9. See a backup, and restore it
+## 9. See a backup and restore it
 
 ```bash
 moin backups my-app

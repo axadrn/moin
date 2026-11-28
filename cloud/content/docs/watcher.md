@@ -1,6 +1,6 @@
 ---
 title: "Watcher"
-description: "A dead server can't tell you it's dead. A watcher on another machine notices, and alerts you. Set one up in four commands."
+description: "A dead server can't tell you it's dead. A watcher on another machine notices and alerts you. Set one up in four commands."
 group: "Servers and data"
 order: 3
 ---
@@ -9,7 +9,7 @@ A dead server can't tell you it's dead. Someone else has to notice. That is the 
 
 Your server sends it a short report every minute. When the reports stop, the watcher alerts you. It also visits your domains from outside, like a visitor.
 
-## Alone, or with a watcher
+## Alone or with a watcher
 
 Your server watches itself while it lives. A watcher tells you when it doesn't.
 

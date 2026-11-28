@@ -1,6 +1,6 @@
 ---
 title: "Deploy"
-description: "Deploy from your folder, from CI or from a registry. Roll back, restart, env vars, domains, logs and one-off commands."
+description: "Deploy from your folder or from CI or from a registry. Roll back. Restart. Env vars. Domains. Logs. One-off commands."
 group: "Apps"
 order: 1
 ---
@@ -214,7 +214,7 @@ v1       2m ago
 
 A rollback is a new release: v2 runs again, as v4. It runs with the env vars and domains as they are now. It brings back the code, not the data. For the data, see [Restore](/docs/backups#restore).
 
-## Restart, stop and start
+## Restart. Stop. Start.
 
 ```bash
 moin restart my-app

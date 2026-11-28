@@ -1,6 +1,6 @@
 ---
 title: "Server config"
-description: "/etc/moin/config.yml, key by key: the server's name, its watchers, alerts, bucket, backup key, backup schedule, mounts and server access."
+description: "/etc/moin/config.yml key by key. The server's name. Its watchers. Alerts. Bucket. Backup key. Backup schedule. Mounts. Server access."
 group: "Reference"
 order: 2
 ---

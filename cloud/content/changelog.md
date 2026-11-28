@@ -35,7 +35,7 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Your backup key**: `moin bucket set my-server` shows it once. `moin bucket confirm my-server` proves it by opening a copy on your laptop.
 - **Is your bucket locked?**: `moin bucket set my-server` and `moin bucket my-server` check whether a hacked server could delete your copies. The docs show how to lock R2, AWS S3, Backblaze B2 and MinIO.
 - **Restore when the server is gone**: On a new server, `moin restore my-app --from my-server --to <copy> --key` brings the copy back with your key.
-- **Alerts, set once**: `moin alerts add my-server telegram --token … --chat-id …`. A failed backup or restore check, a crashing app or a full disk goes to Telegram, Slack, Discord or a webhook.
+- **Alerts. Set once.**: `moin alerts add my-server telegram --token … --chat-id …`. A failed backup or restore check, a crashing app or a full disk goes to Telegram, Slack, Discord or a webhook.
 - **Alerts by email**: `moin alerts add my-server email --to ada@example.com --smtp smtp.example.com:587 --user alerts@example.com` sends them through your own SMTP server. The password is asked, never a flag.
 - **Every watcher alerts there too**: The server tells its watchers where its alerts go. A silent server or a domain down from outside reaches the same places.
 - **Your own watcher**: `moin watcher run`, on another machine. It alerts when a server goes silent, or a domain is down from outside.
@@ -44,7 +44,7 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Copies from day one**: During the trial with 5 GB. With a subscription or the free year with 50 GB.
 - **All copies in one list**: `moin backups my-app` shows the bucket's copies and moin cloud's in one table. `moin restore my-app` puts back either.
 - **moin cloud on the web**: [moin.run/cloud](/cloud) shows what needs you, your servers, the alerts, the copies, the last restore checks and your plan. It can't command a server.
-- **Security, side by side**: Each comparison on [moin.run/compare](/compare) has a Security group: who can command the server, the open ports, what one break-in reaches. Every answer has its source.
+- **Security. Side by side.**: Each comparison on [moin.run/compare](/compare) has a Security group: who can command the server, the open ports, what one break-in reaches. Every answer has its source.
 
 ### Changed
 - **Nobody else can command your server**: Only who has SSH to it as root. Not a watcher, not moin cloud, not us.
@@ -62,10 +62,10 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **The web app that ran your servers**: The CLI is the interface. `moin` shows everything.
 - **The API and the MCP server**: Scripts and AI agents use the CLI, with `--json`.
 - **`moin cloud …`**: Use `moin watcher connect`, `moin watcher`, `moin backups` and `moin restore`.
-- **Passkeys, teams and roles**: Whoever has SSH to the server is the team. `moin keys add my-server anna.pub`.
-- **`moin login`, CI tokens and the GitHub App**: Deploy from your laptop, or let the server follow a branch or a tag with `moin follow`.
+- **Passkeys and teams and roles**: Whoever has SSH to the server is the team. `moin keys add my-server anna.pub`.
+- **`moin login` and CI tokens and the GitHub App**: Deploy from your laptop, or let the server follow a branch or a tag with `moin follow`.
 - **The old terminal UI**: `moin` opens the new one.
-- **The data grid, the SQL editor and metrics**: `moin exec my-app -- psql`.
+- **The data grid and the SQL editor and metrics**: `moin exec my-app -- psql`.
 - **The app password**: `moin password` is gone. Use the app's own sign-in, or Cloudflare Access in front of it.
 - **The rules file**: `/etc/moin/rules` is gone. Nobody but SSH can command a server, so there is nothing to narrow.
 - **Updates by themselves**: A daemon no longer updates itself. Run `moin update my-server`.
@@ -149,7 +149,7 @@ Someone who breaks into a hub should find nothing worth stealing. This release m
 - **One password per app**: One switch guards the app's domains and its instant address. New apps start with it on. (#129)
 - **Uptime per domain**: Each domain is watched on its own. Down after 3 failed visits, up after 3 answers. (#115)
 - **Your server's journal**: Every request of the hub, and what came of it, in `journalctl -u moin-daemon`. Never a secret value. (#134)
-- **The rules, written down**: A new server gets `/etc/moin/rules` with every rule and its value. (#137)
+- **The rules. Written down.**: A new server gets `/etc/moin/rules` with every rule and its value. (#137)
 - **GitHub App in one click**: A self-hosted hub creates its GitHub App with one button. (#138)
 - **A blog**: Guides on servers, backups and deploys at `/blog`. (#128)
 - **moin on X**: News at [@usemoin](https://x.com/usemoin). (#146)
@@ -161,7 +161,7 @@ Someone who breaks into a hub should find nothing worth stealing. This release m
 - **compose.yml is plain Docker**: Domains, the password and backups are set in moin only. A compose file with an `x-moin` block stops the deploy and says why. moin finds the port in `ports`, `expose`, `PORT`, then the Dockerfile's `EXPOSE`. (#124)
 - **The instant address follows the password**: An app with a domain and no password of its own no longer guards its instant address. Turn on the password to guard it. (#129)
 - **A domain is unique per app**: Two apps may use the same domain. (#125)
-- **Code comes from GitHub, an image or the catalog**: `moin deploy` deploys the pushed commit. Your server fetches code only from GitHub, over HTTPS. (#106, #107)
+- **Code comes from GitHub or an image or the catalog**: `moin deploy` deploys the pushed commit. Your server fetches code only from GitHub, over HTTPS. (#106, #107)
 - **A rollback keeps today's settings**: It runs the old code with today's env, domains and password. (#130)
 - **Only what a normal app needs**: `privileged`, the Docker socket or a folder of the server are refused unless `/etc/moin/rules` allows them. (#96)
 - **Personal tokens are CI tokens**: Read stays read. Read and write becomes read, deploy and secrets, without delete and servers. (#135)
@@ -175,14 +175,14 @@ Someone who breaks into a hub should find nothing worth stealing. This release m
 - **1 update**: The TUI says "1 update", not "1 updates". (#93)
 
 ### Removed
-- **Passwords, sign-in links, password reset**: Use GitHub or a passkey. (#110)
+- **Passwords and sign-in links and password reset**: Use GitHub or a passkey. (#110)
 - **`x-moin`**: Set domains, the password and backups in moin. Use Docker's `expose` and `healthcheck`. (#124)
 - **Folder uploads**: `moin deploy --dir` is gone. Push to GitHub, or deploy an image. (#106)
 - **Reading env values**: `moin env --show`, `moin env pull`, `moin run` and MCP `get_env` are gone. Values are write-only. (#112)
 - **The instant password**: The app has one password now. (#129)
 - **`moin protect`**: Now `moin password <app>` and `moin password off <app>`. API `/apps/{app}/password`, MCP `set_password` and `remove_password`. `POST /apps` answers `{app, password}`. (#144)
 - **MCP aliases**: `name` for app and server is gone. `remove_bucket`, `set_default_bucket` and `set_bucket_key` take `name`.
-- **`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `API_URL`**: A self-hosted hub signs in through its one GitHub App. (#110)
+- **`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` and `API_URL`**: A self-hosted hub signs in through its one GitHub App. (#110)
 
 ### Upgrade
 
@@ -248,10 +248,10 @@ November 16, 2026
 - **Hub backup in Settings**: Admins see whether the hub's own database is backed up, and when the last copy landed. (#84)
 
 ### Changed
-- **Web, SSH and Firewall in plain words**: Each line says in one sentence what it is. Visitors is now Web.
+- **Web and SSH and Firewall in plain words**: Each line says in one sentence what it is. Visitors is now Web.
 - **SSH and the firewall always work**: Without Cloudflare or Tailscale too. Only the tunnel and SSH through Tailscale need them.
 - **Hosted moin is for businesses**: Subscribe asks you to confirm you subscribe as a business. (#83)
-- **Settings, GitHub is now Settings, Integrations**: Same place, with Cloudflare and Tailscale next to it.
+- **Settings. GitHub is now Settings and Integrations.**: Same place, with Cloudflare and Tailscale next to it.
 - **API: `ssh` replaces `ssh_tailscale`**: It takes `everyone`, `tailscale` or `off`.
 - **CLI: `--ssh everyone` replaces `--ssh open`**: And `--ssh off` is new.
 
@@ -390,7 +390,7 @@ November 9, 2026
 - **Pin apps**: Pinned apps come first.
 
 ### Changed
-- **The agent is now the daemon, and the control plane the hub**: The new names are in every command, page and file. An update moves a server over by itself.
+- **The agent is now the daemon. The control plane is now the hub.**: The new names are in every command, page and file. An update moves a server over by itself.
 - **`moin deploy` asks before it creates an app**: A typo no longer makes a new app. Scripts pass `--yes`.
 - **A setting in compose.yml is locked in moin**: Domains, backups, the instant address and a required password show **from compose.yml**. Change them only there.
 - **Saving never restarts an app**: A changed env var, domain or password waits. The top of the app page says how many wait.
@@ -536,7 +536,7 @@ November 4, 2026
 moin is how Hamburg says hello. Hamburg is a container port, and your apps run in containers too. [The story](https://moin.run/#why-moin).
 
 ### Changed
-- **New name, new home**: moin lives at [moin.run](https://moin.run). The command is `moin`. The logo is `moin.`. The old address sends you to the new one.
+- **New name. New home.**: moin lives at [moin.run](https://moin.run). The command is `moin`. The logo is `moin.`. The old address sends you to the new one.
 - **Your servers move by themselves**: The next update renames everything on the server to moin. It copies each app's data and checks it file by file. Apps keep serving while it moves.
 - **Backups go on**: Postgres starts a fresh continuous backup under its new name right away. Every older snapshot and point in time still restores.
 - **Self-hosted moves too**: `update.sh` copies your settings and data to the new folders. It starts moin from the image `ghcr.io/axadrn/moin`. The old folders stay.
@@ -636,7 +636,7 @@ November 4, 2026
 **In short:** Self-host ops on one server with one command, and see in one table on the home page how fresh your backups are.
 
 ### New
-- **One server, one command**: `curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain ops.example.com --email you@example.com` installs Docker, the hub and the daemon. It serves ops on your domain with a Let's Encrypt certificate. It prints your sign-in link.
+- **One server. One command.**: `curl -fsSL https://raw.githubusercontent.com/axadrn/ops/main/controlplane/deploy/install.sh | sh -s -- --domain ops.example.com --email you@example.com` installs Docker, the hub and the daemon. It serves ops on your domain with a Let's Encrypt certificate. It prints your sign-in link.
 - **Three ways to run ops**: Hosted, one server, or two servers. The [self-hosting guide](/docs/self-hosting) says when to pick which.
 
 ### Changed
@@ -799,7 +799,7 @@ November 3, 2026
 **In short:** ops watches your sites every minute and mails you when one goes down, puts apps and servers in your order, and updates itself and your servers.
 
 ### New
-- **Uptime checks, built in**: ops checks every domain of every app from outside once a minute, from the first deploy on, with nothing to set up. The app's **Uptime** tab shows 24 hours, 7 and 30 days, the certificate and the last outages. Also `ops uptime`, the TUI (`u` on an app), API and MCP. (#18)
+- **Uptime checks. Built in.**: ops checks every domain of every app from outside once a minute, from the first deploy on, with nothing to set up. The app's **Uptime** tab shows 24 hours, 7 and 30 days, the certificate and the last outages. Also `ops uptime`, the TUI (`u` on an app), API and MCP. (#18)
 - **Your own order**: Drag apps and servers where you want them, or use `ops apps move blog top`, or `K` / `J` in the TUI. Everyone in the workspace sees the same order everywhere. (#14)
 - **List or grid**: Switch how the Apps and Servers pages look. ops remembers it for you. (#14)
 - **Update now**: A self-hosted ops shows when a release is out, with its notes. It updates in one click. If the new version does not start, the old one comes back. Also `ops update`. (#8)

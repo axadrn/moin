@@ -1,6 +1,6 @@
 ---
 title: "A backup you never restored is not a backup"
-description: "Back up Postgres and SQLite in Docker the safe way, then prove the copy restores. The commands, and how to run the check every day."
+description: "Back up Postgres and SQLite in Docker the safe way. Then prove the copy restores. The commands. How to run the check every day."
 date: "2026-11-25"
 ---
 
@@ -69,7 +69,7 @@ A copy on the same disk dies with the disk. Send it somewhere else: an S3 bucket
 rclone copy app.dump r2:backups/$(date +%F)/
 ```
 
-## Every day, not once
+## Every day. Not once.
 
 A restore test from March says nothing about today. Schemas change, disks fill up, credentials expire. Put the copy and the check in a cron job, and send yourself a message when the check fails. Not when it works: you stop reading those.
 

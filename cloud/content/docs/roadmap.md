@@ -1,6 +1,6 @@
 ---
 title: "Roadmap"
-description: "What moin does today, what comes next, and what comes later. No dates."
+description: "What moin does today. What comes next. What comes later. No dates."
 group: "Reference"
 order: 5
 ---

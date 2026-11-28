@@ -1,6 +1,6 @@
 ---
 title: "Linux and the terminal"
-description: "Your server has no screen. You talk to it by typing. The ten Linux commands you need to look around, and what each one shows."
+description: "Your server has no screen. You talk to it by typing. The ten Linux commands you need to look around. What each one shows."
 group: "Basics"
 order: 2
 ---

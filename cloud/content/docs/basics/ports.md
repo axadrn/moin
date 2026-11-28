@@ -1,6 +1,6 @@
 ---
 title: "Ports and the firewall"
-description: "A port is a door of your server. Bots knock within minutes. Which doors a fresh server has open, why Docker walks past ufw, and what moin closes."
+description: "A port is a door of your server. Bots knock within minutes. Which doors a fresh server has open. Why Docker walks past ufw. What moin closes."
 group: "Basics"
 order: 4
 ---

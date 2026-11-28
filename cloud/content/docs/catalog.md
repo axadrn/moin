@@ -1,6 +1,6 @@
 ---
 title: "Catalog"
-description: "Open source apps like Umami, n8n and Vaultwarden on your server with one command. With backups and the daily restore check."
+description: "Open source apps like Umami and n8n and Vaultwarden on your server with one command. With backups and the daily restore check."
 group: "Apps"
 order: 2
 ---

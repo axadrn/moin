@@ -7,7 +7,7 @@ order: 3
 
 Your team is the SSH keys on the server. Whoever has a key there is on the team.
 
-## One key, everything
+## One key for everything
 
 A key logs in as root. So everyone with a key may do everything on that server: deploy, read env vars, restore, delete.
 

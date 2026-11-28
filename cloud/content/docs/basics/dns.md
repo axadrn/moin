@@ -1,6 +1,6 @@
 ---
 title: "Domains and DNS"
-description: "A domain is a name. DNS is the phone book that turns it into your server's address. A, AAAA and CNAME records, and the address moin gives you first."
+description: "A domain is a name. DNS is the phone book that turns it into your server's address. A, AAAA and CNAME records. The address moin gives you first."
 group: "Basics"
 order: 7
 ---

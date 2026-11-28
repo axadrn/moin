@@ -1,6 +1,6 @@
 ---
 title: "FAQ"
-description: "Short answers: what moin is, what it needs, where your data is, who can reach your server, and the license."
+description: "Short answers. What moin is. What it needs. Where your data is. Who can reach your server. The license."
 group: "Reference"
 order: 3
 ---
@@ -49,7 +49,7 @@ Everyone whose SSH key may log in as root can. `moin keys add my-server anna.pub
 
 Yes, through the CLI, like you do. [AI agents](/docs/cli#ai-agents)
 
-## How is moin different from Coolify, Kamal or uncloud?
+## How is moin different from Coolify or Kamal or uncloud?
 
 Coolify and Dokploy are dashboards that hold a key to your server. Kamal and uncloud run over SSH like moin, and do several servers. moin restores and checks your backups every day, and a watcher notices when a server is gone. [Every fact, with its source](/compare)
 
