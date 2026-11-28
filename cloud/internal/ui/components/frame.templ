@@ -56,7 +56,7 @@ type BarsProps struct {
 // Bars are a few counts, the biggest first, each with a thin bar as wide
 // as its share.
 templ Bars(p BarsProps) {
-	<ol class="moin-knocks">
+	<ol class="moin-bars">
 		for _, row := range p.Rows {
 			<li>
 				<span>
@@ -66,7 +66,7 @@ templ Bars(p BarsProps) {
 					}
 				</span>
 				<span class="moin-digits">{ row.Value }</span>
-				<span class="moin-knocks-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + barWidth(row.Share)) }></span></span>
+				<span class="moin-bars-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + barWidth(row.Share)) }></span></span>
 			</li>
 		}
 	</ol>

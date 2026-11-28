@@ -3,16 +3,18 @@ package components
 import "strconv"
 
 // RowsProps is Rows: the names of the columns. Their number sets the
-// grid; the first column is the widest.
+// grid; the first column is the widest. Top lines every cell up at the
+// top, for cells of a few lines.
 type RowsProps struct {
 	Head []string
+	Top  bool
 }
 
 // Rows are a compact table: one line per thing, the columns lined up. In a
 // Card it runs to the card's edges. On a phone each row folds: the first
 // cell on a line of its own, the rest quiet under it.
 templ Rows(p RowsProps) {
-	<div class="moin-rows" role="table" data-cols={ strconv.Itoa(len(p.Head)) }>
+	<div class="moin-rows" role="table" data-cols={ strconv.Itoa(len(p.Head)) } data-top?={ p.Top }>
 		<div class="moin-rows-head" role="row">
 			for _, name := range p.Head {
 				<span role="columnheader">{ name }</span>
