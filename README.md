@@ -2,7 +2,7 @@
 
 Deploy anything. Lose nothing.
 
-One command puts your app on your own server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
+One command puts your app on your own server. Your backups are restored and checked every day. Nothing but your SSH key can command your server.
 
 ```bash
 curl -fsSL https://moin.run/cli.sh | sh

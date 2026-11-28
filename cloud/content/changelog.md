@@ -7,7 +7,7 @@ description: What shipped in moin, newest first.
 
 November 27, 2026
 
-**In short:** moin without a hub. One command deploys over your own SSH, public SSH closes after it, and every backup is encrypted and checked every day.
+**In short:** moin runs without a hub now: you deploy over your own SSH, public SSH closes after the first deploy, and your backups are encrypted and checked every day.
 
 ### Why
 The hub was the one place every server trusted. Whoever took it over could reach every server behind it. Now commands go one way: from your laptop to your server, over SSH, with your key. Reports go one way: from your server to a watcher. Nothing in between holds a key. The story: [Why I deleted the hub](/blog/why-i-deleted-the-hub).
@@ -17,55 +17,57 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Set up by the first deploy**: The first `moin deploy prod` installs Docker and moin on the server, after you say yes.
 - **Live without DNS**: The first deploy ends in an HTTPS address, like `https://shop.203-0-113-7.sslip.io`.
 - **One command for everything**: `moin` shows every server you deployed to, its apps and what needs you. On a terminal it is a small live view: logs, backups, restart and rollback.
-- **Public SSH closes**: After the first deploy, moin asks to close port 22 and use Tailscale. It closes it only once a new SSH session over Tailscale works.
-- **`moin secure`**: The web through a Cloudflare Tunnel, and a firewall for every other port. No public TCP port is left.
-- **`moin unlock`**: Locked out? Type it in your provider's web console. Port 22 opens again.
-- **Knocks**: `moin knocks` shows what the firewall dropped, by port.
+- **Public SSH closes**: After the first deploy, moin asks to close port 22. Enter says yes. From then on, SSH goes over Tailscale.
+- **No lockout**: Port 22 closes only once a new SSH session over Tailscale works. If the next one fails, the server opens port 22 again within 2 minutes.
+- **`moin unlock`**: Locked out anyway? Type it in your provider's web console. Port 22 opens again.
+- **`moin secure`**: A firewall for every other port, and the web through a Cloudflare Tunnel. No public TCP port is left.
+- **Knocks**: Once public SSH is closed, `moin knocks` shows what the firewall dropped, by port.
 - **Encrypted backups**: Every copy is encrypted on the server before it leaves, for the server's key and for yours.
+- **Checked every day**: Once a day, the server restores a fresh copy into a throwaway database before it uploads it. A copy that does not restore is an alert.
 - **Your backup key**: `moin bucket set prod` shows it once. `moin bucket confirm prod` proves it by opening a copy on your laptop.
 - **Restore when the server is gone**: On a new server, `moin restore shop --from prod --to <copy> --key` brings the copy back with your key.
 - **`moin follow`**: The server deploys each new commit of a branch, read with a deploy key it makes. CI needs no key to your server.
 - **The team is SSH keys**: `moin keys add prod anna.pub` lets Anna in. `moin keys rm prod anna@laptop` takes her out.
-- **Alerts from the server**: A failed backup, a failed check, a crashing app or a full disk, to Telegram, Slack, Discord or a webhook. `moin alerts add prod telegram --token … --chat-id …`.
+- **Alerts from the server**: A failed backup or restore check, a crashing app or a full disk, to Telegram, Slack, Discord or a webhook. `moin alerts add prod telegram --token … --chat-id …`.
 - **Your own watcher**: `moin watcher run`, on another machine. It alerts when a server goes silent, or a domain is down from outside.
 - **moin cloud**: A watcher we run for you, with alerts by mail. `moin cloud login`, then `moin cloud connect prod`. 30 days free from the first report, then $7 a month or $49 a year. (#174)
-- **A copy nobody can delete**: On a paid plan, moin cloud keeps a copy of every scheduled backup for 14 days. Your server can add one, never delete one.
+- **A copy nobody can delete**: On a paid plan, moin cloud keeps your server's copies for 14 days, one an hour per database. Your server can add one, never delete one.
 
 ### Changed
 - **Nobody else can command your server**: Only who has SSH to it as root. Not a watcher, not moin cloud, not us.
 - **Code comes from your laptop**: A deploy sends your committed code over SSH, not from GitHub. `--image shop:dev` sends a local image instead.
+- **The catalog over SSH**: `moin catalog` lists the open source apps. `moin deploy prod --catalog umami` deploys one.
 - **Your server never updates by itself**: `moin update prod` puts your CLI's version on it, signed and checked. The CLI says once a day when a new release is out.
 - **Settings live on the server**: The bucket, the alerts, the watchers and the backup schedule are in `/etc/moin/config.yml`, for root only.
 - **A failed copy stops the deploy**: moin copies the databases right before a deploy. If that fails, the deploy stops. `moin deploy --no-copy` goes on without it.
-- **Apache-2.0**: moin is under Apache-2.0 now, not AGPL. [What it covers](/docs/faq#is-moin-open-source)
+- **A more open license**: moin stays open source, under a license that allows more. [What it allows](/docs/faq#is-moin-open-source)
 
 ### Removed
 - **The hosted hub**: moin.run no longer runs your servers. moin cloud watches them, and holds no key.
 - **Self-hosting a hub**: There is nothing to host. Run your own watcher with `moin watcher run`.
 - **The web app**: The CLI is the interface. `moin` shows everything.
 - **The API and the MCP server**: Scripts and AI agents use the CLI, with `--json`.
-- **Accounts, passkeys, teams and roles**: Whoever has SSH to the server is the team. `moin keys add prod anna.pub`.
+- **Passkeys, teams and roles**: Whoever has SSH to the server is the team. `moin keys add prod anna.pub`.
 - **`moin login`, CI tokens and the GitHub App**: Deploy from your laptop, or let the server follow a branch with `moin follow`.
 - **The old terminal UI**: `moin` opens the new one.
 - **The data grid, the SQL editor and metrics**: `moin exec shop -- psql`.
 - **The app password**: `moin password` is gone. Use the app's own sign-in, or Cloudflare Access in front of it.
-- **The rules file**: `/etc/moin/rules` is gone. No hub can command a server, so there is nothing to narrow.
-- **Daemon updates by themselves**: Run `moin update prod`.
+- **The rules file**: `/etc/moin/rules` is gone. Nobody but SSH can command a server, so there is nothing to narrow.
+- **Updates by themselves**: A daemon no longer updates itself. Run `moin update prod`.
 - **moin UI and moin next**: `/ui` and `/next` are gone.
 
 ### Upgrade
-Read all steps first. Your apps and their data stay. What lived in the hub does not: domains, the bucket, alerts.
+Read all steps first. Your apps and their data stay. Domains, the bucket and the alerts lived in the hub. You set them again.
 
-1. Install the new CLI on every laptop: `curl -fsSL https://moin.run/cli.sh | sh`.
-2. On each server from before, once: `ssh -t prod moin daemon uninstall`. The apps keep running, with their data.
-3. A tunnel from before: `ssh prod docker rm -f moin-cloudflared`. A firewall from before: `ssh prod nft delete table inet moin`. After step 5, `moin secure prod` sets them up again.
-4. The app password is gone. An app behind it is public after step 5. Give it a sign-in of its own, or put Cloudflare Access in front of it.
-5. In each app's folder: `moin deploy prod`. It takes the app over, with its data and env. The folder needs the app's name, or add `--app <name>`. A catalog app: `moin deploy prod --catalog umami`. The web pauses for a few seconds.
-6. Right after it, add your domains again: `moin domains add shop shop.example.com`. Until then they do not answer. The instant address does.
-7. Set the bucket and the alerts again: `moin bucket set prod`, then `moin alerts add prod …`. Your old copies stay in the bucket, but moin no longer lists them. They are plain `.db.gz` and `.dump` files in a folder named by a long ID. Delete it once the new copies cover you.
-8. Hosted accounts: `moin cloud login` with the same mail, then `moin cloud connect prod`. Early backers get their discount at the checkout.
-9. CI that deployed through the hub: remove that step, then `moin follow shop --branch main`.
-10. Self-hosted hub: in `/opt/moin`, `docker compose down --rmi all`, then `rm -rf /opt/moin /var/lib/moin-hub /etc/moin-hub /etc/moin/rules`.
+1. On every laptop: `curl -fsSL https://moin.run/cli.sh | sh`.
+2. On each server, once: `ssh -t prod moin daemon uninstall`. The apps keep running, with their data. An old tunnel: `ssh prod docker rm -f moin-cloudflared`. An old firewall: `ssh prod nft delete table inet moin`.
+3. The app password is gone. An app behind it is public after the next step. Give it a sign-in of its own, or put Cloudflare Access in front of it.
+4. In each app's folder: `moin deploy prod`. It takes the app over, with its data and env. The web pauses for a few seconds. Another folder name: add `--app <name>`. A catalog app: `moin deploy prod --catalog umami`.
+5. Right after it, add your domains again: `moin domains add shop shop.example.com`. Until then only the instant address answers.
+6. Set the rest again: `moin bucket set prod`, `moin alerts add prod …`, and `moin secure prod` for the tunnel and the firewall. Your old copies stay in the bucket, unlisted: plain `.db.gz` and `.dump` files in a folder named by a long ID. Delete it once the new copies cover you.
+7. moin cloud: `moin cloud login` with the same mail, then `moin cloud connect prod`. Your plan comes with you. Early backers keep their free year.
+8. CI that deployed through the hub: remove that step, then `moin follow shop --branch main`.
+9. A self-hosted hub: in `/opt/moin`, `docker compose down --rmi all`, then `rm -rf /opt/moin /var/lib/moin-hub /etc/moin-hub /etc/moin/rules`.
 
 ## v1.0.0-beta.37
 
