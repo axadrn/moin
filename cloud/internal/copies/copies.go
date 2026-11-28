@@ -250,7 +250,7 @@ func (c *Copies) mailFull(ctx context.Context, space workspace.Workspace, now ti
 		Subject: "Your " + build.Name + " cloud storage for copies is full",
 		Text: fmt.Sprintf("Your servers sent %d GB of copies to %s cloud. That is all it keeps for a workspace. "+
 			"No new copy goes in until old ones end, 14 days after they came. No old copy is deleted for it.\n\n"+
-			"Your servers still copy to your own bucket.\n\nSee the copies: %s cloud copies <server>\n%s/cloud",
+			"Your servers still copy to your own bucket.\n\nSee the copies: %s backups <app>\n%s/cloud",
 			Storage>>30, build.Name, build.Name, c.appURL),
 	}
 	if err := c.mailer.Send(ctx, message); err != nil {

@@ -45,8 +45,8 @@ func (c *Cloud) CopyDone(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// CLICopies answers `moin cloud copies <server> [app]`, and the list
-// `moin cloud restore` picks from.
+// CLICopies answers the copies in moin cloud that `moin backups` lists
+// and `moin restore` picks from.
 func (c *Cloud) CLICopies(w http.ResponseWriter, r *http.Request) {
 	space, ok := c.cliSession(w, r)
 	if !ok || !c.takesCopies(w) {

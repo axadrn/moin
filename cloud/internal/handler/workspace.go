@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/copies"
-	"github.com/axadrn/moin/cloud/internal/ui/pages"
 	"github.com/axadrn/moin/cloud/internal/watchers"
 	"github.com/axadrn/moin/cloud/internal/workspace"
 	"github.com/axadrn/moin/internal/report"
@@ -17,27 +16,6 @@ import (
 
 // reportLimit is the largest report moin cloud reads.
 const reportLimit = 1 << 20
-
-// WorkspacePage is /cloud: the workspace, its plan, and what its watcher
-// sees. It only reads.
-func (c *Cloud) WorkspacePage(w http.ResponseWriter, r *http.Request) {
-	space, ok := c.signedIn(r)
-	if !ok {
-		http.Redirect(w, r, "/login?next=/cloud", http.StatusSeeOther)
-		return
-	}
-	view, err := c.watchers.View(space.ID)
-	if err != nil {
-		renderError(w, "the watcher's view", err)
-		return
-	}
-	w.Header().Set("Cache-Control", "no-store")
-	render(w, r, pages.CloudWorkspace(pages.CloudWorkspaceProps{
-		Mail: space.Mail, Plan: plan(space), AlertsOff: space.TrialOver(time.Now()),
-		Subscribe: c.Stripe != nil && space.Status != "paid", Billing: c.Stripe != nil && space.StripeCustomer != "",
-		View: view,
-	}))
-}
 
 // plan says in a few words what a workspace pays and until when.
 func plan(space workspace.Workspace) string {
@@ -56,7 +34,7 @@ func plan(space workspace.Workspace) string {
 	return "Trial until " + space.TrialEnds.Format("January 2, 2006")
 }
 
-// cliWorkspace is what `moin cloud` shows.
+// cliWorkspace is what `moin watcher` shows of moin cloud.
 type cliWorkspace struct {
 	Mail      string     `json:"mail"`
 	Status    string     `json:"status"`
@@ -85,13 +63,13 @@ func (c *Cloud) cliSession(w http.ResponseWriter, r *http.Request) (workspace.Wo
 	token, _ := bearer(r)
 	space, err := c.store.SessionWorkspace(token)
 	if err != nil {
-		http.Error(w, "not signed in: run moin cloud login", http.StatusUnauthorized)
+		http.Error(w, "not signed in: run moin watcher connect <server>", http.StatusUnauthorized)
 		return space, false
 	}
 	return space, true
 }
 
-// CLIWorkspace answers `moin cloud`.
+// CLIWorkspace answers `moin watcher`: the plan of the workspace.
 func (c *Cloud) CLIWorkspace(w http.ResponseWriter, r *http.Request) {
 	space, ok := c.cliSession(w, r)
 	if !ok {

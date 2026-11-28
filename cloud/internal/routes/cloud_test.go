@@ -148,7 +148,7 @@ func TestMailLinkLimit(t *testing.T) {
 	}
 }
 
-// moin cloud login, connect, a report, and the page that shows it.
+// The sign-in of the CLI, connect, a report, and the page that shows it.
 func TestCLILoginConnectReport(t *testing.T) {
 	server, browser, mails := testSite(t)
 	cli := http.DefaultClient

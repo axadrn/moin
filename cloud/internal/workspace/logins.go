@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// How long a login waits: a mail link, and a `moin cloud login`.
+// How long a login waits: a mail link, and a sign-in of the CLI.
 const (
 	linkLasts     = 15 * time.Minute
 	cliLoginLasts = 10 * time.Minute
@@ -37,7 +37,7 @@ func (s *Store) UseMailLink(token string) (string, error) {
 	return mail, err
 }
 
-// NewCLILogin starts a `moin cloud login`. The CLI keeps the secret and
+// NewCLILogin starts a sign-in of the CLI. The CLI keeps the secret and
 // waits with it; the code is what the terminal and the page both show.
 func (s *Store) NewCLILogin() (secret, code string, err error) {
 	secret, code = newToken(), newCode()
@@ -46,7 +46,7 @@ func (s *Store) NewCLILogin() (secret, code string, err error) {
 	return secret, code, err
 }
 
-// CLILoginWaits says whether a `moin cloud login` with code waits for a
+// CLILoginWaits says whether a sign-in of the CLI with code waits for a
 // browser to allow it.
 func (s *Store) CLILoginWaits(code string) bool {
 	var found int
@@ -55,7 +55,7 @@ func (s *Store) CLILoginWaits(code string) bool {
 	return err == nil
 }
 
-// AllowCLILogin lets the `moin cloud login` with code into the workspace
+// AllowCLILogin lets the sign-in of the CLI with code into the workspace
 // of mail.
 func (s *Store) AllowCLILogin(code, mail string) error {
 	result, err := s.db.Exec(`UPDATE logins SET mail = ? WHERE code = ? AND kind = 'cli' AND mail = '' AND used = 0 AND expires > ?`,
@@ -69,10 +69,10 @@ func (s *Store) AllowCLILogin(code, mail string) error {
 	return nil
 }
 
-// ErrWaiting is a `moin cloud login` that no browser allowed yet.
+// ErrWaiting is a sign-in of the CLI that no browser allowed yet.
 var ErrWaiting = errors.New("waiting for the browser")
 
-// FinishCLILogin is the session token of a `moin cloud login` a browser
+// FinishCLILogin is the session token of a sign-in of the CLI a browser
 // allowed, handed out once. Before that it is ErrWaiting.
 func (s *Store) FinishCLILogin(secret string) (string, error) {
 	now := time.Now().Unix()

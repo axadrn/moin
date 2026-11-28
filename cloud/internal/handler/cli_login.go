@@ -11,18 +11,18 @@ import (
 	"github.com/axadrn/moin/cloud/internal/workspace"
 )
 
-// `moin cloud login`: the CLI starts a login and gets a code, opens
+// The sign-in of `moin watcher connect <server>`: the CLI starts a login and gets a code, opens
 // /cli?code=… in the browser, and waits. The browser signs in, shows the
 // same code, and one button allows it. Then the CLI gets its session.
 
-// cliLogin is the answer to a new `moin cloud login`.
+// cliLogin is the answer to a new sign-in of the CLI.
 type cliLogin struct {
 	Secret string `json:"secret"`
 	Code   string `json:"code"`
 	URL    string `json:"url"`
 }
 
-// StartCLILogin starts a `moin cloud login`.
+// StartCLILogin starts a sign-in of the CLI.
 func (c *Cloud) StartCLILogin(w http.ResponseWriter, r *http.Request) {
 	if !c.ipLimit.allow(clientIP(r), time.Now()) {
 		http.Error(w, "too many logins in a short time, wait 15 minutes", http.StatusTooManyRequests)
@@ -59,7 +59,7 @@ func (c *Cloud) FinishCLILogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// CLIPage shows the code of a `moin cloud login` to compare with the
+// CLIPage shows the code of a sign-in of the CLI to compare with the
 // terminal, and the button that allows it.
 func (c *Cloud) CLIPage(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
@@ -70,13 +70,13 @@ func (c *Cloud) CLIPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if !c.store.CLILoginWaits(code) {
 		w.WriteHeader(http.StatusGone)
-		render(w, r, pages.CloudLoginFailed("This login ran out or was used. Run moin cloud login again."))
+		render(w, r, pages.CloudLoginFailed("This sign-in ran out or was used. Run moin watcher connect again."))
 		return
 	}
 	render(w, r, pages.CloudCLI(code, space.Mail))
 }
 
-// AllowCLI lets a `moin cloud login` into the browser's workspace.
+// AllowCLI lets a sign-in of the CLI into the browser's workspace.
 func (c *Cloud) AllowCLI(w http.ResponseWriter, r *http.Request) {
 	space, ok := c.signedIn(r)
 	if !ok || !c.sameOrigin(r) {
@@ -86,7 +86,7 @@ func (c *Cloud) AllowCLI(w http.ResponseWriter, r *http.Request) {
 	err := c.store.AllowCLILogin(r.PostFormValue("code"), space.Mail)
 	if notFound(err) {
 		w.WriteHeader(http.StatusGone)
-		render(w, r, pages.CloudLoginFailed("This login ran out or was used. Run moin cloud login again."))
+		render(w, r, pages.CloudLoginFailed("This sign-in ran out or was used. Run moin watcher connect again."))
 		return
 	}
 	if err != nil {
