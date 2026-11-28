@@ -59,7 +59,7 @@ Then, every day:
 3. It reads every page or every row.
 4. It throws it away again.
 
-So "backed up" means: copied, restored and read. If that fails, you get an alert, and `moin` shows it in red.
+So "backed up" means: copied, restored and read. If that fails, you get an alert, and `moin` shows a `!` line.
 
 ```bash
 moin backups shop
@@ -67,7 +67,7 @@ moin backups shop
 
 ```text
 /data/shop.db
-  ✓ Restore check 3h ago: the copy 20261127T130000Z-482913 restored and read fine
+  ✓ Checked 3h ago: the copy marked checked restored and read fine
 ```
 
 ## Your key

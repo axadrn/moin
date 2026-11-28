@@ -42,7 +42,7 @@ Right after, moin shows your backup key, once, and asks you to paste it back. [Y
 - The key lives on the server, in `/etc/moin/config.yml`, readable only by root. [Server config](/docs/config#bucket)
 - `moin bucket prod` shows what is set, never the secret.
 
-Without a bucket and without [moin cloud](#copies-to-moin-cloud), moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.` And `moin` shows each app with a database in red: `shop: no backup yet.`
+Without a bucket and without [moin cloud](#copies-to-moin-cloud), moin copies nothing. `moin bucket prod` says so: `prod has no bucket yet, so nothing is backed up.` And `moin` shows a `!` line for each app with a database: `shop: no backup yet.`
 
 ## Copies to moin cloud
 
@@ -89,7 +89,7 @@ only this key reads the copies. Keep it in your password manager.
 
 To confirm it, moin takes a fresh copy of the server's smallest database. It fetches that copy as it lies in the bucket, and opens and reads it on your laptop, with the key you pasted. Only then does the server note that you have the key.
 
-- Until you confirm it, `moin` shows the server in red: `prod: your backup key is not confirmed.` Confirm it later with `moin bucket confirm prod`.
+- Until you confirm it, `moin` shows a `!` line: `prod: your backup key is not confirmed.` Confirm it later with `moin bucket confirm prod`.
 - `moin bucket prod` says whether every copy is encrypted for a key you confirmed, and shows its public half.
 - `moin bucket key prod` makes a new key. The copies made so far only open with the old one, so it asks first.
 - One key for several servers: `moin bucket key web-1 --public age1…` with the public half of the key you have. `moin bucket prod` shows it.
@@ -101,14 +101,14 @@ To confirm it, moin takes a fresh copy of the server's smallest database. It fet
 moin backups shop
 ```
 
-Every database of the app, its copies, the last restore check, and which copy that check proved.
+Every database of the app, its copies, the last restore check, and which copy that check proved: it says `✓ checked`. WHERE says where a copy lies: `bucket` or `moin cloud`.
 
 ```text
 /data/shop.db
-  ✓ Restore check 3h ago: the copy 20261127T130000Z-482913 restored and read fine
-COPY                      TAKEN    SIZE
-20261127T140000Z-118204   7m ago   2.1 MB
-20261127T130000Z-482913   1h ago   2.1 MB
+  ✓ Checked 3h ago: the copy marked checked restored and read fine
+COPY                      WHERE    TAKEN    SIZE
+20261127T140000Z-118204   bucket   7m ago   2.1 MB
+20261127T130000Z-482913   bucket   1h ago   2.1 MB   ✓ checked
   Go back to one with moin restore shop --to <copy>
 ```
 
@@ -149,6 +149,11 @@ A copy on the spot, before something risky:
 moin backup shop
 ```
 
+```text
+copying /data/shop.db
+✓ Copied /data/shop.db of shop: 20261127T140000Z-118204
+```
+
 Every deploy takes one too, just before the new release touches the data. If that copy fails, the deploy stops, so the way back is never missing. `moin deploy --no-copy` deploys all the same. A rollback goes on without it.
 
 ## The daily check
@@ -164,7 +169,7 @@ If it fails:
 - That copy is not uploaded.
 - You get an alert: `<app>: the restore check of <database> failed`.
 - `moin backups shop` shows it with a ✗, and the last copy that did restore.
-- `moin` shows it in red: `shop: today's backup is not proven. Last proven copy: Nov 26 14:00 UTC.`
+- `moin` shows it with a `!`: `shop: today's backup is not proven. Last proven copy: Nov 26 14:00 UTC.`
 - The next copy, an hour later, is checked before it leaves too, until one restores.
 
 ## Restore
@@ -173,7 +178,7 @@ If it fails:
 moin restore shop
 ```
 
-moin lists the copies, and you pick one. Enter takes the newest. In a script, name it: `--to` takes a copy from `moin backups shop`, or a time in UTC like `--to 2026-11-27T14:07`. Then moin takes the newest copy at or before it. An app with several databases: moin asks which one, or `--database <name>` names it.
+moin lists the copies, and you pick one: `? Go back to which copy? [20261127T140000Z-118204]`. Enter takes the newest. In a script, name it: `--to` takes a copy from `moin backups shop`, or a time in UTC like `--to 2026-11-27T14:07`. Then moin takes the newest copy at or before it. An app with several databases: moin asks which one, or `--database <name>` names it.
 
 A restore never changes your data in place:
 
@@ -185,8 +190,9 @@ A restore replaces live data, so moin asks first. Scripts pass `-y`.
 
 ```text
 ? Put the data of shop back to 20261127T130000Z-482913? The app stops for a moment. [y/N] y
+restoring /data/shop.db to 20261127T130000Z-482913
 ✓ /data/shop.db of shop is back at 20261127T130000Z-482913
-  Undo it with moin restore shop --to undo-…
+  Undo it with moin restore shop --to undo-20261127T150000Z-382601
 ```
 
 ## Undo a restore
@@ -195,7 +201,7 @@ A restore replaces live data, so moin asks first. Scripts pass `-y`.
 moin restore shop
 ```
 
-Every restore keeps the data from right before it. `moin backups shop` lists it as `undo-…`, `before a restore`. In a script it is `--to undo-…`. Going back to it is a restore too, so you can undo the undo.
+Every restore keeps the data from right before it. `moin backups shop` lists it as `undo-…`, `before a restore`, with WHERE `server`. In a script it is `--to undo-…`. Going back to it is a restore too, so you can undo the undo.
 
 An undo stays as long as the copies do: 7 days, unless the [config](/docs/config#backups) says otherwise.
 
