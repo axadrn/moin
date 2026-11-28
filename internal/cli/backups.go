@@ -469,8 +469,7 @@ func fetchAndOpen(ctx context.Context, server string, copy daemon.KeyCopy, key a
 	return openCopy(reader, copy.Kind, key)
 }
 
-// The first bytes of what a copy holds: a SQLite file, or a pg_dump in
-// its custom format. A dump of MySQL or MariaDB starts with a comment.
+// The first bytes of a SQLite file and of a pg_dump in its custom format.
 const (
 	sqliteStart   = "SQLite format 3\x00"
 	postgresStart = "PGDMP"
@@ -488,8 +487,8 @@ var copyStarts = map[string][]string{
 	protocol.DatabaseMongo:      {"\x6d\xe2\x99\x81"},
 	protocol.DatabaseClickHouse: {"PK\x03\x04"},
 }
-var notGzipped = []string{protocol.DatabasePostgres, protocol.DatabaseClickHouse}
 
+var notGzipped = []string{protocol.DatabasePostgres, protocol.DatabaseClickHouse}
 
 // openCopy decrypts a copy of a database of kind with key and reads it to
 // its end. Every part of it is checked on the way, so a copy that is cut
@@ -504,8 +503,9 @@ func openCopy(encrypted io.Reader, kind string, key age.Identity) error {
 			return fmt.Errorf("what it holds is not a database: %w", err)
 		}
 	}
-	first := make([]byte, len(start))
-	if _, err := io.ReadFull(plain, first); err != nil {
+	first := make([]byte, 16)
+	read, err := io.ReadFull(plain, first)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return fmt.Errorf("it ends before a database starts: %w", err)
 	}
 	starts := func(start string) bool { return strings.HasPrefix(string(first[:read]), start) }
