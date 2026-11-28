@@ -45,15 +45,16 @@ type LineView struct {
 }
 
 // OutageView is one outage: a silent server or a domain that was down.
+// Server is the server it belongs to.
 type OutageView struct {
-	What, From, Lasted, Reason string
-	Open                       bool
+	Server, What, From, Lasted, Reason string
+	Open                               bool
 }
 
-// CheckView is one restore check a daemon reported.
+// CheckView is one restore check a daemon reported, on Server.
 type CheckView struct {
-	What, At, Result string
-	OK               bool
+	Server, What, At, Result string
+	OK                       bool
 }
 
 // View is what the watcher's page shows now.
@@ -180,7 +181,7 @@ func outageLine(o outage, now time.Time) OutageView {
 	if o.Domain != "" {
 		what = o.Domain + " down (" + o.App + " on " + o.Server + ")"
 	}
-	line := OutageView{What: what, From: clock(o.From), Reason: o.Reason, Open: o.To.IsZero()}
+	line := OutageView{Server: o.Server, What: what, From: clock(o.From), Reason: o.Reason, Open: o.To.IsZero()}
 	if line.Open {
 		line.Lasted = "still, " + spoken(now.Sub(o.From))
 	} else {
@@ -191,7 +192,7 @@ func outageLine(o outage, now time.Time) OutageView {
 
 // checkLine is one restore check, newest first on the page.
 func checkLine(c check) CheckView {
-	line := CheckView{What: c.Database + " of " + c.App + " on " + c.Server, At: clock(c.At), OK: c.OK}
+	line := CheckView{Server: c.Server, What: c.Database + " of " + c.App + " on " + c.Server, At: clock(c.At), OK: c.OK}
 	if c.OK {
 		line.Result = "restored the copy of " + clock(c.Copy)
 	} else {
