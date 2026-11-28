@@ -22,15 +22,15 @@ import (
 const usage = `moin: your app on your server. Backups checked every day.
 
 Start
-  moin                         Every server, every app, and what needs you
+  moin                         Every server. Every app. What needs you
   deploy <server>              Deploy this folder. Name the server the first time
 
 Apps
-  deploy                       Deploy this folder again, where it runs
+  deploy                       Deploy this folder again where it runs
   apps                         Every app on every server
   logs [app]                   The app's logs. -f follows them
   rollback [app]               Go back to an older deploy
-  restart [app]                Start the app again, with its env and domains as now
+  restart [app]                Start the app again with its env and domains as now
   stop [app]                   Stop the app until you start it
   start [app]                  Start a stopped app
   exec [app] -- <command>      Run a command in the app's container
@@ -39,7 +39,7 @@ Apps
   domains [app]                The app's domains
   domains add [app] <domain>   Add one. The certificate follows by itself
   domains rm [app] <domain>    Remove one
-  follow [app]                 Deploy each new commit of a branch, or image of a tag
+  follow [app]                 Deploy each new commit of a branch or image of a tag
   catalog                      Open source apps to deploy with --catalog
 
 Backups
@@ -49,23 +49,23 @@ Backups
 
 Servers
   servers                      Your servers and their watchers
-  servers add <server>         Add one you deployed to before, as on a new laptop
+  servers add <server>         Add one you deployed to before. As on a new laptop
   servers rm <server>          Forget one. Nothing changes on it
   keys <server>                The SSH keys that may log in as root
   keys add <server> <file>     Let one more key in
   keys rm <server> <name>      Take a key out
   bucket <server>              Where the backups go
   bucket set <server>          Set it. Shows your backup key once
-  bucket key <server>          A new backup key, or one you have
+  bucket key <server>          A new backup key or one you have
   bucket confirm <server>      Paste your backup key to show you have it
-  registry <server>            The registries it is logged in to, for private images
+  registry <server>            The registries it is logged in to for private images
   registry set <server> <registry> <user>  Log it in. The token is asked
   registry rm <server> <registry>  Log it out
   alerts <server>              Where alerts go
   alerts add <server> <kind>   telegram, slack, discord, webhook or email
   alerts rm <server> <n>       Remove one
   alerts test <server>         Send a test alert
-  secure <server>              SSH only over Tailscale, a firewall for the rest
+  secure <server>              SSH only over Tailscale. A firewall for the rest
   knocks [server]              What the firewall dropped, by port
   update [server]              Update this CLI, or a server to this CLI's version
 
@@ -74,11 +74,11 @@ Watcher
   watcher connect <server>     The server reports to moin cloud. Signs you in
   watcher connect <server> <url> <token>  Or to a watcher you run
   watcher disconnect <server> [url]  It no longer does
-  watcher run                  Run a watcher, on another machine than your servers
+  watcher run                  Run a watcher on another machine than your servers
   watcher token <server>       On the watcher: the line that connects a server
 
 On the server
-  unlock                       Open port 22 again, from your provider's console
+  unlock                       Open port 22 again from your provider's console
   daemon uninstall             Remove moin. The apps keep running
 
   version                      Show the version
