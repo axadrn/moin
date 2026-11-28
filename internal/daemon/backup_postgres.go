@@ -89,7 +89,7 @@ func load(ctx context.Context, t pgTarget, name string, copy io.Reader) error {
 	}
 	if err := t.exec(ctx, copy, io.Discard, "pg_restore", "--exit-on-error", "-h", pgSocket, "-U", t.user, "-d", name); err != nil {
 		_, _ = admin(context.WithoutCancel(ctx), t, `DROP DATABASE IF EXISTS :"db";`, map[string]string{"db": name})
-		return fmt.Errorf("pg_restore: %w", err)
+		return err
 	}
 	return nil
 }
