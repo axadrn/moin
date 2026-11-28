@@ -131,6 +131,16 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		value, err := daemon.BackupHere(ctx, dir, app, log)
 		return respond(stdout, value, err)
+	case "schedule":
+		flags := newFlags("here schedule", "here schedule [app] [--every 1h] [--keep 7d]")
+		var set daemon.Schedule
+		flags.StringVar(&set.Every, "every", "", "a copy this often")
+		flags.StringVar(&set.Keep, "keep", "", "each kept this long")
+		if err := flags.parse(args); err != nil {
+			return err
+		}
+		value, err := daemon.ScheduleHere(flags.Arg(0), set)
+		return respond(stdout, value, err)
 	case "restore":
 		flags := newFlags("here restore", "here restore <app> --to <copy|time|undo-…> [--database <name>] [--from <server>] [--key-stdin]")
 		to := flags.String("to", "", "what to go back to")

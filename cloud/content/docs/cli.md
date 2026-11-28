@@ -137,7 +137,9 @@ The first deploy to a server asks first: `Set up moin on my-server and deploy my
 | Command | What it does |
 | --- | --- |
 | `moin backups [app]` | the copies in your bucket and in moin cloud, one table with WHERE. The last restore check, and which copy it proved |
+| `moin backups [app] --every 1h --keep 30d` | how often the app is copied, and how long each copy stays. Give one or both. With `-s <server>` and no app: the server's schedule. [How often](/docs/backups#how-often) |
 | `moin backup [app]` | a copy now |
+| `moin backup download [app]` | the newest copy as a file on your laptop, opened with your backup key, which moin asks for. `--to <copy>` another, `-o file` where, `--key-file` the key from a file. [Download a copy](/docs/backups#download-a-copy) |
 | `moin restore [app]` | pick a copy to go back to, from the bucket or moin cloud, or the undo of the last restore. A copy in moin cloud asks for your backup key |
 | `moin restore [app] --to <copy>` | the same, in a script: a copy from `moin backups`, a time like `2026-11-27T14:07` in UTC, or `undo-…` |
 | `moin backups [app] --from <server>` | the copies another server made, like one that is gone |

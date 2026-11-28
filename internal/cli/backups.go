@@ -44,31 +44,52 @@ func sendJSON(ctx context.Context, server string, value any, args ...string) err
 // shownCopies is how many copies of a database `moin backups` lists.
 const shownCopies = 10
 
-// backups is `moin backups [app]`: the copies of the app's databases, in
-// the bucket and at the watchers that take copies (restore.go), the last
-// daily check and the copy it proved.
+// backups is `moin backups [app]`: how often the app is copied, the
+// copies of its databases, in the bucket and at the watchers that take
+// copies (restore.go), the last daily check and the copy it proved.
+// --every and --keep change how often and how long; with -s and no app,
+// for the server, which every app without its own takes.
 func backups(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("backups", "backups [app] [--from <server>] [-s server] [--json]").withServer().withJSON()
+	flags := newFlags("backups", "backups [app] [--every 1h] [--keep 30d] [--from <server>] [-s server] [--json]").withServer().withJSON()
 	from := flags.String("from", "", "see the copies another server made, like one that is gone")
+	var set daemon.Schedule
+	flags.StringVar(&set.Every, "every", "", "take a copy this often, like 15m, 1h or 1d")
+	flags.StringVar(&set.Keep, "keep", "", "keep each copy this long, like 7d or 30d")
 	if err := flags.parse(args); err != nil {
 		return err
+	}
+	changes := set != (daemon.Schedule{})
+	if changes && flags.NArg() == 0 && flags.serverNamed() != "" {
+		return printSchedule(ctx, flags, flags.serverNamed(), "", set, stdout)
 	}
 	app, _, err := appArgs(flags, 0)
 	if err != nil {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
+		if changes {
+			return printSchedule(ctx, flags, server, app, set, stdout)
+		}
+		schedule, err := backupSchedule(ctx, server, app, daemon.Schedule{})
+		if err != nil {
+			return err
+		}
 		databases, err := listBackups(ctx, server, app, *from, os.Stderr)
 		if err != nil {
 			return err
 		}
 		if flags.json() {
-			return printJSON(stdout, databases)
+			return printJSON(stdout, struct {
+				Schedule  daemon.BackupSchedule `json:"schedule"`
+				Databases []databaseBackups     `json:"databases"`
+			}{schedule, databases})
 		}
 		if len(databases) == 0 {
 			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB or MongoDB service.")
 			return nil
 		}
+		fmt.Fprintln(stdout, scheduleLine(schedule))
+		fmt.Fprintln(stdout)
 		copies := false
 		for _, database := range databases {
 			printBackup(stdout, database, time.Now())
@@ -79,6 +100,45 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	})
+}
+
+// backupSchedule is how often app is copied on server and how long each
+// copy is kept, "" for the server's own. What set names changes first.
+func backupSchedule(ctx context.Context, server, app string, set daemon.Schedule) (daemon.BackupSchedule, error) {
+	var schedule daemon.BackupSchedule
+	args := []string{"schedule", "--every", set.Every, "--keep", set.Keep}
+	if app != "" {
+		args = append(args, app)
+	}
+	err := sshJSON(ctx, server, args, nil, &schedule)
+	return schedule, err
+}
+
+// printSchedule changes the schedule of app on server, or the server's
+// for "", and shows it.
+func printSchedule(ctx context.Context, flags *flagSet, server, app string, set daemon.Schedule, stdout io.Writer) error {
+	schedule, err := backupSchedule(ctx, server, app, set)
+	if err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, schedule)
+	}
+	if app == "" {
+		done(stdout, "%s takes a copy every %s and keeps each %s. Apps with their own schedule keep it", server, schedule.Every, schedule.Keep)
+		return nil
+	}
+	done(stdout, "%s: a copy every %s, each kept %s. It counts within a minute", app, schedule.Every, schedule.Keep)
+	return nil
+}
+
+// scheduleLine says how often an app is copied, and whose schedule it is.
+func scheduleLine(schedule daemon.BackupSchedule) string {
+	whose := "The server's schedule."
+	if schedule.Own {
+		whose = "Its own schedule."
+	}
+	return "A copy every " + schedule.Every + ", each kept " + schedule.Keep + ". " + style.Muted.Render(whose)
 }
 
 // appBackups is how the databases of app are backed up: the copies, the

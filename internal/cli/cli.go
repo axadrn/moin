@@ -52,7 +52,9 @@ Backups
   backups [app]                The copies of its databases and the last check
   backup [app]                 A copy now
   restore [app]                Go back to a copy. It can be undone
+  backups [app] --every 1h     How often a copy. --keep 30d how long. -s alone: the server's
 
+  backup download [app]        One copy, opened with your backup key, as a file
 Servers
   servers                      Your servers and their watchers
   servers add <server>         Add one you deployed to before. As on a new laptop
@@ -247,6 +249,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "bucket":
 		return bucket(ctx, rest, stdin, stdout)
 	case "alerts":
+		if len(rest) > 0 && rest[0] == "download" {
+			return backupDownload(ctx, rest[1:], stdin, stdout)
+		}
 		return alerts(ctx, rest, stdin, stdout)
 	case "secure":
 		return secure(ctx, rest, stdin, stdout)

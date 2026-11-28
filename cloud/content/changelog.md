@@ -19,6 +19,8 @@ November 29, 2026
 - **Every deploy and its log**: `moin deploys my-app` lists each deploy: from where, which commit or image, failed or not, how long it took. `moin deploys my-app v12` prints its log, also of a deploy nobody watched. A failed automatic deploy's alert names that command, and `moin rollback` shows the commit of each release. (#180)
 - **The server's own problems on the watcher**: A disk almost full or an app that keeps crashing shows under "Needs you" on your watcher and on moin cloud, not only in the alert. (#180)
 - **Signed webhooks**: `moin alerts add my-server webhook --url …` prints a secret. Every post carries `X-Moin-Signature`, and an `event` field says what it is about. A webhook added before stays unsigned: remove it and add it again. (#180)
+- **Download a backup**: `moin backup download my-app` brings the newest copy to your laptop as a plain database file. Your backup key opens it there. No link is made. (#180)
+- **Backup schedule from the CLI**: `moin backups my-app --every 15m --keep 30d` sets how often an app is copied and how long each copy stays. `-s my-server` without an app sets the server's. `moin backups my-app` shows it. (#180)
 - **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
 
 ### Fixed
