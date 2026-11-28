@@ -4,7 +4,12 @@ package components
 // the plain button.
 type Kind string
 
-const Primary Kind = "primary"
+// Primary is the one button that stands out. Danger is the one that
+// deletes.
+const (
+	Primary Kind = "primary"
+	Danger  Kind = "danger"
+)
 
 // ButtonProps is a Button. With Href it is a link that looks like a button.
 // Type is "button" unless set, like "submit" in a form. Icon is a round button with only an icon, and then Attrs needs an

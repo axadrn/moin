@@ -1,0 +1,28 @@
+package components
+
+// NoticeProps is a Notice: its state, a word or two in bold, and the
+// sentences after them, one line each.
+type NoticeProps struct {
+	State State
+	Title string
+	Lines []string
+}
+
+// Notice is the one strip at the top of a page that says what needs you.
+// Children are its action, a button.
+templ Notice(p NoticeProps) {
+	<div class="moin-notice" data-state={ string(p.State) } role="status">
+		@Dot(DotProps{State: p.State})
+		<div class="moin-notice-text">
+			<strong>{ p.Title }</strong>
+			for _, line := range p.Lines {
+				<span>{ line }</span>
+			}
+		</div>
+		if templ.GetChildren(ctx) != nil {
+			<div class="moin-notice-action">
+				{ children... }
+			</div>
+		}
+	</div>
+}

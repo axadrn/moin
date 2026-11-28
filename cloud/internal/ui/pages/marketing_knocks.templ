@@ -55,6 +55,15 @@ func knockRows(k report.Knocks) []knockRow {
 	return rows[:min(8, len(rows))]
 }
 
+// knockBars are rows of knocks as Bars.
+func knockBars(rows []knockRow) []components.BarRow {
+	var bars []components.BarRow
+	for _, row := range rows {
+		bars = append(bars, components.BarRow{Label: row.Label, Note: row.Ports, Value: human.Count(row.Count), Share: row.Share})
+	}
+	return bars
+}
+
 // siteHost is the site's own address without https://, like moin.run.
 func siteHost(site string) string {
 	if u, err := url.Parse(site); err == nil && u.Host != "" {
@@ -97,14 +106,6 @@ templ homeKnocks(k HomeKnocks) {
 templ knockList(rows []knockRow) {
 	@components.Card(components.CardProps{}) {
 		<span class="moin-fact-name">Most tried today</span>
-		<ol class="moin-knocks">
-			for _, row := range rows {
-				<li>
-					<span>{ row.Label } <span class="moin-muted">{ row.Ports }</span></span>
-					<span class="moin-digits">{ human.Count(row.Count) }</span>
-					<span class="moin-knocks-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + strconv.FormatInt(row.Share, 10) + "%") }></span></span>
-				</li>
-			}
-		</ol>
+		@components.Bars(components.BarsProps{Rows: knockBars(rows)})
 	}
 }

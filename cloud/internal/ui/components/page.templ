@@ -46,17 +46,26 @@ type Tab struct {
 	Active bool
 }
 
-// TabsProps is Tabs. Label names them for screen readers.
+// TabsProps is Tabs. Label names them for screen readers. Line is the
+// row of words under an AppBar, a line under the open one.
 type TabsProps struct {
 	ID    string
 	Label string
 	Tabs  []Tab
+	Line  bool
 }
 
 // Tabs are the parts of one page, each a plain link, so the address says
 // which one is open and the back button works.
 templ Tabs(p TabsProps) {
-	<nav id={ p.ID } class="moin-tabs" aria-label={ p.Label }>
+	<nav
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		class="moin-tabs"
+		aria-label={ p.Label }
+		data-line?={ p.Line }
+	>
 		for _, tab := range p.Tabs {
 			<a
 				href={ templ.SafeURL(tab.Href) }
@@ -78,6 +87,27 @@ templ Bar() {
 		<div class="moin-bar-inner">
 			{ children... }
 		</div>
+	</header>
+}
+
+// AppBarProps is an AppBar: the Tabs under it, if any.
+type AppBarProps struct {
+	Tabs templ.Component
+}
+
+// AppBar is the bar of an app: across the whole width, at the top while
+// the page scrolls, a line under it. Children are its row: the name, where
+// you are, links at the end. The tabs come under that row.
+templ AppBar(p AppBarProps) {
+	<header class="moin-bar" data-app>
+		<div class="moin-page moin-bar-inner">
+			{ children... }
+		</div>
+		if p.Tabs != nil {
+			<div class="moin-page">
+				@p.Tabs
+			</div>
+		}
 	</header>
 }
 

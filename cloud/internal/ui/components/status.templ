@@ -1,5 +1,7 @@
 package components
 
+import "strconv"
+
 // State is one of the states every status in moin shows as.
 type State string
 
@@ -26,4 +28,40 @@ templ Dot(p DotProps) {
 // Chip is a short label next to a name, like "Launch price".
 templ Chip(text string) {
 	<span class="moin-chip">{ text }</span>
+}
+
+// StatusProps is a Status: the state, the word that names it, and a quiet
+// note after it, like a version. Pill puts it on a small pill of its own,
+// for a row of them.
+type StatusProps struct {
+	State State
+	Text  string
+	Note  string
+	Pill  bool
+}
+
+// Status is a state as a dot and a word, everywhere a state shows.
+templ Status(p StatusProps) {
+	<span class="moin-status" data-state={ string(p.State) } data-pill?={ p.Pill }>
+		@Dot(DotProps{State: p.State})
+		if p.Text != "" {
+			<span>{ p.Text }</span>
+		}
+		if p.Note != "" {
+			<span class="moin-muted">{ p.Note }</span>
+		}
+	</span>
+}
+
+// MeterProps is a Meter: how full, in percent.
+type MeterProps struct {
+	Percent int
+	Label   string
+}
+
+// Meter is a thin bar as full as Percent.
+templ Meter(p MeterProps) {
+	<span class="moin-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={ strconv.Itoa(p.Percent) } aria-label={ p.Label }>
+		<span style={ templ.SafeCSS("width:" + strconv.Itoa(max(0, min(100, p.Percent))) + "%") }></span>
+	</span>
 }
