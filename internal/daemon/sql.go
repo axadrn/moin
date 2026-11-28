@@ -211,7 +211,7 @@ func (a *apps) sqlWrite(ctx context.Context, app string, database protocol.Datab
 		if err != nil {
 			return 0, err
 		}
-		out, _, err := runSQL(ctx, statement, t.container, nil,
+		out, err := runWrite(ctx, statement, t.container,
 			"psql", "-X", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-h", pgSocket, "-U", t.user, "-d", t.database)
 		return pgAffected(string(out)), err
 	case database.MySQL():
@@ -222,7 +222,7 @@ func (a *apps) sqlWrite(ctx context.Context, app string, database protocol.Datab
 		// The client stops at the first error and never reaches COMMIT.
 		// MySQL commits a CREATE, ALTER or DROP by itself.
 		script := "START TRANSACTION;\n" + strings.TrimRight(statement, "; \t\r\n") + ";\nSELECT ROW_COUNT();\nCOMMIT;\n"
-		out, _, err := runSQL(ctx, script, t.container, nil,
+		out, err := runWrite(ctx, script, t.container,
 			"sh", "-c", mysqlTool, "sh", mysqlClient[0], mysqlClient[1], "-uroot", "-N", "-B", t.database)
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		affected, _ := strconv.ParseInt(lines[len(lines)-1], 10, 64)
@@ -331,6 +331,42 @@ func runSQL(ctx context.Context, script, container string, env []string, client 
 		return nil, false, err
 	}
 	return stdout.Bytes(), false, nil
+}
+
+// sqlWriteTail is how much of what a write prints is kept: its end,
+// where the client says how many rows changed.
+const sqlWriteTail = 1 << 20
+
+// lastBytes keeps the last max bytes written to it.
+type lastBytes struct {
+	kept []byte
+	max  int
+}
+
+func (l *lastBytes) Write(p []byte) (int, error) {
+	l.kept = append(l.kept, p...)
+	if len(l.kept) > l.max {
+		l.kept = l.kept[len(l.kept)-l.max:]
+	}
+	return len(p), nil
+}
+
+// runWrite feeds a script that may change data to a database's client in
+// its container and answers the end of what the client printed. Nothing
+// ends the client early, as runSQL does for a read: a statement that
+// prints a lot, like one with RETURNING, still runs to its COMMIT.
+func runWrite(ctx context.Context, script, container string, client ...string) ([]byte, error) {
+	command := exec.CommandContext(ctx, "docker", append([]string{"exec", "-i", container}, client...)...)
+	stdout := &lastBytes{max: sqlWriteTail}
+	var stderr bytes.Buffer
+	command.Stdin, command.Stdout, command.Stderr = strings.NewReader(script), stdout, &stderr
+	if err := command.Run(); err != nil {
+		if said := strings.TrimSpace(stderr.String()); said != "" {
+			err = errors.New(said)
+		}
+		return nil, err
+	}
+	return stdout.kept, nil
 }
 
 // How psql prints the rows: the values of a row apart by pgField, the

@@ -243,3 +243,25 @@ func TestBeforeSQLNote(t *testing.T) {
 		t.Fatalf("the note = %s %s %v", database, copy, err)
 	}
 }
+
+// TestRunWriteIsNeverCutOff: a write that prints more than a read may,
+// like an UPDATE with RETURNING, runs to its end and still says how many
+// rows it changed. Nothing ends its client before the COMMIT.
+func TestRunWriteIsNeverCutOff(t *testing.T) {
+	dir := t.TempDir()
+	fake := "#!/bin/sh\ncat > /dev/null\nhead -c 17000000 /dev/zero | tr '\\0' 'x'\nprintf '\\nUPDATE 3\\n'\n"
+	if err := os.WriteFile(filepath.Join(dir, "docker"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	out, err := runWrite(context.Background(), "UPDATE notes SET text = 'x' RETURNING *", "container", "psql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) > sqlWriteTail {
+		t.Errorf("kept %d bytes, want at most %d", len(out), sqlWriteTail)
+	}
+	if affected := pgAffected(string(out)); affected != 3 {
+		t.Errorf("affected = %d, want 3", affected)
+	}
+}
