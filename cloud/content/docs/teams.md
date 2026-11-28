@@ -31,6 +31,8 @@ Not everyone needs root. A designer or a contractor may only need to ship.
 
 Now a merge to `main` deploys to the server within a minute. The person never gets a key. Whoever can push to that branch can deploy, so protect it. [Deploy from CI](/docs/deploy#deploy-from-ci)
 
+Does your CI build an image? `moin follow shop --image ghcr.io/you/shop:main` deploys each image it pushes. CI gets no key to the server either. [Deploy after your tests pass](/docs/deploy#deploy-after-your-tests-pass)
+
 ## Why no roles per key
 
 A deploy runs code on the server as root. Whoever may deploy may do anything. A role "can deploy, can't read env" would be a lock on an open door.

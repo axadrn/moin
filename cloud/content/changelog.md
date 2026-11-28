@@ -27,6 +27,9 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Your backup key**: `moin bucket set prod` shows it once. `moin bucket confirm prod` proves it by opening a copy on your laptop.
 - **Restore when the server is gone**: On a new server, `moin restore shop --from prod --to <copy> --key` brings the copy back with your key.
 - **`moin follow`**: The server deploys each new commit of a branch, read with a deploy key it makes. CI needs no key to your server.
+- **Images from your registry**: `moin deploy prod --image ghcr.io/you/shop:1.4` makes the server pull the image your CI built. An image only your laptop has is still sent over SSH.
+- **Deploy after your tests pass**: `moin follow shop --image ghcr.io/you/shop:main` deploys each new image your CI pushes under that tag. CI needs no key to your server.
+- **Private registries**: `moin registry set prod ghcr.io you` logs the server in. The token is asked, and stays on the server.
 - **The team is SSH keys**: `moin keys add prod anna.pub` lets Anna in. `moin keys rm prod anna@laptop` takes her out.
 - **Alerts from the server**: A failed backup or restore check, a crashing app or a full disk, to Telegram, Slack, Discord or a webhook. `moin alerts add prod telegram --token … --chat-id …`.
 - **Your own watcher**: `moin watcher run`, on another machine. It alerts when a server goes silent, or a domain is down from outside.

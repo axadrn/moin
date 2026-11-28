@@ -1,6 +1,6 @@
 ---
 title: "Deploy"
-description: "Deploy from your folder or a local image. Roll back, restart, env vars, domains, logs and one-off commands."
+description: "Deploy from your folder, from CI or from a registry. Roll back, restart, env vars, domains, logs and one-off commands."
 group: "Apps"
 order: 1
 ---
@@ -8,6 +8,19 @@ order: 1
 A deploy puts one version of your app on your server. Each deploy makes a release with a number: v1, v2, v3.
 
 Commands about an app name the app: `moin logs shop`. moin knows on which server it runs. In the app's folder you may leave the name out: `moin logs`. The same app on two servers, like staging and prod? Add `-s prod`.
+
+## Six ways to deploy
+
+| You have | Command | Who builds |
+| --- | --- | --- |
+| A commit in your folder | `moin deploy prod` | the server |
+| A branch on GitHub or GitLab | `moin follow shop --branch main` | the server, on each new commit |
+| An image in your registry | `moin deploy prod --image ghcr.io/you/shop:1.4` | your CI. The server pulls it |
+| A tag your CI pushes | `moin follow shop --image ghcr.io/you/shop:main` | your CI. The server pulls each new image |
+| An app from the [catalog](/docs/catalog) | `moin deploy prod --catalog umami` | nobody. The image is ready |
+| An image on your laptop | `moin deploy prod --image shop:dev` | your laptop. moin sends it over SSH |
+
+Every way ends the same: a release with a number, a rollback, and a copy of the databases just before it.
 
 ## Deploy your code
 
@@ -59,6 +72,48 @@ services:
 
 An app stays in its own room. It may mount its own folders, like `./data`, and its own named volumes. A setting that reaches beyond the app, like `privileged: true` or a mount of the Docker socket, is refused, and the deploy says why. The server's [config](/docs/config#mounts-and-server_access) can allow more.
 
+## Deploy an image from your registry
+
+```bash
+moin deploy prod --image ghcr.io/you/shop:1.4
+```
+
+```text
+shop · 3f2a9c1 with image ghcr.io/you/shop:1.4 → prod
+✓ pulling image ghcr.io/you/shop:1.4 on prod
+→ starting
+→ v4 is live
+✓ moin. shop is live: https://shop.example.com
+```
+
+The server pulls the image and runs it. It builds nothing.
+
+- Run it in the app's folder. The `compose.yml` and the settings come from your commit, as in any deploy. The image replaces the build of the service that gets the traffic.
+- moin keeps each image by its content, not by its tag. A new `1.4` never changes a release that runs, and a rollback finds the old image.
+- Use an image built for the server's CPU: `linux/amd64` for most servers, `linux/arm64` for ARM ones.
+
+### Private registries
+
+A public image needs nothing. For a private one, log the server in once:
+
+```bash
+moin registry set prod ghcr.io you
+```
+
+```text
+? Token of you at ghcr.io:
+✓ prod pulls from ghcr.io as you now
+  The token is on prod only, in root's Docker config.
+```
+
+- moin asks for the token and does not show it. In a script, pipe it in: `echo "$TOKEN" | moin registry set prod ghcr.io you`. It is never a flag.
+- Give the token read access only. On GitHub: a personal access token with `read:packages`.
+- The server asks the registry right away. A wrong token is refused, and nothing is kept.
+- It is a plain `docker login` as root. The login lives in `/root/.docker/config.json` on the server, for root only. Your laptop keeps nothing.
+- Builds on the server use it too, like a `FROM` of a private image.
+- `moin registry prod` lists the registries and the users, never a token. `moin registry rm prod ghcr.io` logs the server out.
+- For Docker Hub the registry is `docker.io`.
+
 ## Deploy an image from your laptop
 
 ```bash
@@ -66,6 +121,8 @@ moin deploy prod --image shop:dev
 ```
 
 moin sends the image you built on your laptop. The server builds nothing. This one needs Docker on your laptop.
+
+moin asks the registry first. Only an image no registry has is sent from your laptop. So if you built `ghcr.io/you/shop:1.4` again and did not push it, the server pulls the one in the registry. Push first, or give the local image a name of its own, like `shop:dev`.
 
 ## Deploy from CI
 
@@ -90,6 +147,43 @@ moin follow shop --branch main
 - `moin follow shop --off` stops it and removes the key from the server. Remove it from the repo too.
 
 Whoever can push to that branch can deploy, so pick the branch with care.
+
+## Deploy after your tests pass
+
+`moin follow --branch` deploys every commit, green or not. To deploy only what passed, let CI build the image and let the server follow its tag:
+
+```bash
+moin follow shop --image ghcr.io/you/shop:main
+```
+
+```text
+✓ shop follows ghcr.io/you/shop:main. It deploys 3f2a9c1e0b4d within a minute, then each new image under that tag
+  Whoever can push to ghcr.io/you/shop:main deploys to prod. A deploy that fails alerts.
+```
+
+In CI, after the tests, build and push. With GitHub Actions:
+
+```yaml
+- run: go test ./...
+- uses: docker/login-action@v3
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}
+- uses: docker/build-push-action@v6
+  with:
+    push: true
+    tags: ghcr.io/you/shop:main
+```
+
+- CI holds no key to your server. It pushes an image, as it does anyway. The server only goes out, to the registry.
+- Every minute the server asks the registry whether the tag has a new image. Only a new one is pulled and deployed.
+- Each image is tried once. A deploy that fails alerts once, and the next good one says it is over. The release before it keeps running.
+- The app must be deployed once before it follows. The `compose.yml` and the settings stay those of your last `moin deploy`. To change them, deploy from your laptop again.
+- A private image needs the server's login first: [Private registries](#private-registries).
+- An app follows a branch or an image, not both. `moin follow shop --off` stops it.
+
+Whoever can push to that tag can deploy, so guard the registry like the server.
 
 ## Roll back
 

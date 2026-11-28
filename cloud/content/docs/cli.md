@@ -72,7 +72,8 @@ Under the table, `moin` says what needs you, each with the command that settles 
 | --- | --- |
 | `moin deploy prod` | the first deploy of the app in this folder, to `prod`. Sets up moin there first |
 | `moin deploy` | deploy again, to the server the app runs on |
-| `moin deploy prod --image shop:dev` | send an image from your laptop instead of the source |
+| `moin deploy prod --image ghcr.io/you/shop:1.4` | the server pulls this image from its registry instead of building. [Deploy an image](/docs/deploy#deploy-an-image-from-your-registry) |
+| `moin deploy prod --image shop:dev` | an image only your laptop has is sent over SSH |
 | `moin deploy prod --catalog umami` | an app from the [catalog](/docs/catalog) |
 | `moin deploy --app shop` | another name for the app. Without it, the app is named after the folder |
 | `moin deploy --no-copy` | deploy even when the copy of the databases just before it fails |
@@ -83,6 +84,7 @@ Under the table, `moin` says what needs you, each with the command that settles 
 | `moin logs [app]` | the last 200 lines. `-f` follows them, `--tail 1000` shows more. `--json` prints them as a list of time, container and line |
 | `moin exec [app] -- <command>` | run one command in the app's container. `--service db` picks another service |
 | `moin follow [app] --branch main` | the server deploys each new commit of the branch, read with a deploy key. `--off` stops it. [Deploy from CI](/docs/deploy#deploy-from-ci) |
+| `moin follow [app] --image ghcr.io/you/shop:main` | the server deploys each new image your CI pushes under the tag. `--off` stops it. [Deploy after your tests pass](/docs/deploy#deploy-after-your-tests-pass) |
 | `moin catalog` | the apps of the catalog |
 
 The first deploy to a server asks first: `Set up moin on prod and deploy shop? [y/N]`. In a script, add `-y`. [Deploy](/docs/deploy)
@@ -123,6 +125,9 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin keys <server>` | the SSH keys that may log in as root: your team |
 | `moin keys add <server> <file.pub>` | let one more key in |
 | `moin keys rm <server> <name>` | take a key out, by its name or its fingerprint |
+| `moin registry <server>` | the registries the server is logged in to, for private images. Never a token |
+| `moin registry set <server> <registry> <user>` | log the server in. The token is asked, or read from stdin |
+| `moin registry rm <server> <registry>` | log the server out |
 | `moin alerts <server>` | where the server sends its alerts, numbered |
 | `moin alerts add <server> telegram --token … --chat-id …` | alerts to Telegram |
 | `moin alerts add <server> slack --url …` | alerts to Slack. `discord` and `webhook` take `--url` too |
@@ -205,7 +210,7 @@ Then, on your laptop: `moin watcher disconnect prod <url>` for each watcher, or 
 
 ## Asking first
 
-A command that deletes or replaces something asks first, like a restore, `moin keys rm` or `moin domains rm`. On a terminal you answer `y`. In a script it needs `-y`, or it stops.
+A command that deletes or replaces something asks first, like a restore, `moin keys rm`, `moin registry rm` or `moin domains rm`. On a terminal you answer `y`. In a script it needs `-y`, or it stops.
 
 ## For scripts: --json
 

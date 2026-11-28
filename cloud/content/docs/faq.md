@@ -19,7 +19,7 @@ No. moin cloud is the one part with an account. [moin cloud](/docs/cloud)
 
 ## Do I need Docker?
 
-Not on your laptop. moin installs Docker on the server. Only `moin deploy --image` needs Docker on your laptop, to send the image you built there.
+Not on your laptop. moin installs Docker on the server. Only an image you built on your laptop needs Docker there: `moin deploy --image shop:dev` sends it.
 
 ## Which servers work?
 
