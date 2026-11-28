@@ -848,8 +848,9 @@ func (b *backups) status(ctx context.Context, app string, database protocol.Data
 		status.CloudError, status.CloudFailingSince = s.CloudError, &s.CloudFailingSince
 	}
 	switch {
-	// A server without a bucket may still have its copies at a watcher.
-	case !b.on() && s.LastCopy.IsZero() && s.CopyError == "":
+	// A server without a bucket may still have its copies at a watcher:
+	// until a copy was due and none took it (CloudTried), it is no need.
+	case !b.on() && s.LastCopy.IsZero() && s.CopyError == "" && (len(b.config().Watchers) == 0 || !s.CloudTried.IsZero()):
 		status.Error = errNoBucket.Error()
 	case s.CopyError != "" && time.Since(s.FailingSince) > failGrace:
 		status.Error, status.BucketDown = s.CopyError, s.BucketDown
