@@ -108,7 +108,7 @@ The undo a restore leaves behind is kept just as long as the copies.
 ## backup_key
 
 - `public`: the public half of your backup key, `age1…`. Every copy is encrypted for it, and for the server's own key in `/etc/moin/backup.key`.
-- `confirmed`: you showed that you have the private half, by opening a copy with it. Until then `moin` shows the server in red.
+- `confirmed`: you showed that you have the private half, by opening a copy with it. Until then `moin` shows a `!` line: `prod: your backup key is not confirmed.`
 
 The private half is never on the server. [Your backup key](/docs/backups#your-backup-key)
 
@@ -127,6 +127,7 @@ An app may mount its own folders, like `./data`, and its own named volumes. Noth
 | `/etc/moin/backup.key` | the server's own backup key, next to this file. Root only |
 | `/var/lib/moin/server.json` | what is closed, and the Cloudflare Tunnel token. Root only |
 | `/var/lib/moin/` | the apps, their deploys and what the daemon knows |
+| `/root/.docker/config.json` | the logins of private registries, from `moin registry set`. Not moin's file: it is Docker's |
 | `/usr/local/bin/moin` | the program |
 | `moin-daemon` | the systemd service of `moin daemon` |
 

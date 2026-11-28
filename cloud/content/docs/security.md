@@ -40,10 +40,10 @@ With Tailscale, your tailnet's rules decide too: who may reach the server at all
 A fresh server only answers SSH on public port 22. So the first deploy goes that way. Right after it, moin asks:
 
 ```text
-Close public SSH, only Tailscale from now on? [Y/n]
+? Close public SSH, only Tailscale from now on? [Y/n]
 ```
 
-Enter means yes. Then:
+Enter means yes. Each step shows as it runs: putting the server in your tailnet, a new SSH session over Tailscale, closing the ports, one more session. Then:
 
 1. moin puts the server in your tailnet, your own private network. Paste a Tailscale auth key, or press Enter for a link to log in.
 2. It opens a new SSH session over Tailscale. The server must show the same host key as on its public address.
@@ -62,7 +62,7 @@ From then on, `moin deploy` goes over Tailscale. To the rest of the internet, po
 - It needs a Tailscale account. The free plan works.
 - sshd must listen on port 22. If it listens on another one, moin leaves public SSH open.
 - Tailscale keeps `41641/udp` open, for direct connections. If it is closed, Tailscale still works, through its relays.
-- Said no? `moin` shows a red line until it is closed: `prod: port 22 open to the internet`.
+- Said no? moin says `Port 22 stays open to the internet. Close it later with moin secure prod`, and `moin` shows a `!` line until it is closed: `prod: port 22 is open to the internet.`
 - A server's Tailscale key expires, and then SSH to it stops. Two weeks before, the server alerts and `moin` shows it. Better: turn key expiry off for the server. Tailscale admin console, Machines, the server, the ⋯ menu, Disable key expiry.
 
 ## Tailnet Lock
@@ -220,5 +220,6 @@ On your server, and only there. Root only.
 | `/etc/moin/backup.key` | the server's own backup key, which opens its copies |
 | `/var/lib/moin/server.json` | the Cloudflare Tunnel token, and what is closed |
 | `/var/lib/moin/follow/<app>/key` | the read-only deploy key of an app that follows a branch |
+| `/root/.docker/config.json` | the logins of the private registries, from `moin registry set`. Mode 600 |
 
 They reach the server over your SSH connection, and nothing else. No copy of them is kept anywhere but on the server.
