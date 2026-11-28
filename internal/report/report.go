@@ -40,12 +40,20 @@ type Report struct {
 }
 
 // Alert is one destination for alerts. Kind is "telegram", "slack",
-// "discord" or "webhook". Package alert sends to it.
+// "discord", "webhook" or "email". Package alert sends to it.
 type Alert struct {
 	Kind   string `yaml:"kind" json:"kind"`
 	URL    string `yaml:"url,omitempty" json:"url,omitempty"`         // slack, discord, webhook
 	Token  string `yaml:"token,omitempty" json:"token,omitempty"`     // telegram bot token
 	ChatID string `yaml:"chat_id,omitempty" json:"chat_id,omitempty"` // telegram
+	// email: a mail to To, sent through the SMTP server at host:port,
+	// signed in as User with Password. From is who the mail is from,
+	// when that is not the user.
+	To       string `yaml:"to,omitempty" json:"to,omitempty"`
+	SMTP     string `yaml:"smtp,omitempty" json:"smtp,omitempty"`
+	User     string `yaml:"user,omitempty" json:"user,omitempty"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty"`
+	From     string `yaml:"from,omitempty" json:"from,omitempty"`
 }
 
 // Knocks are the knocks a server's firewall dropped: today and this

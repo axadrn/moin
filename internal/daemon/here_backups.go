@@ -377,6 +377,9 @@ func alertName(d alert.Destination) string {
 	if d.Kind == "telegram" {
 		return "telegram chat " + d.ChatID
 	}
+	if d.Kind == "email" {
+		return "email " + d.To
+	}
 	if link, err := url.Parse(d.URL); err == nil && link.Host != "" {
 		return d.Kind + " " + link.Host
 	}

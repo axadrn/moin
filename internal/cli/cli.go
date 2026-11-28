@@ -62,7 +62,7 @@ Servers
   registry set <server> <registry> <user>  Log it in. The token is asked
   registry rm <server> <registry>  Log it out
   alerts <server>              Where alerts go
-  alerts add <server> <kind>   telegram, slack, discord or webhook
+  alerts add <server> <kind>   telegram, slack, discord, webhook or email
   alerts rm <server> <n>       Remove one
   alerts test <server>         Send a test alert
   secure <server>              SSH only over Tailscale, a firewall for the rest

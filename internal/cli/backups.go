@@ -612,16 +612,22 @@ func alerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	return nil
 }
 
-// addAlert is `moin alerts add <server> telegram --token … --chat-id …`,
-// or slack, discord or webhook with --url. On a terminal it asks for what
-// is missing. The server sends a test alert first and keeps the
-// destination only when that went out.
+// addAlert is `moin alerts add <server> <kind>`: telegram with --token and
+// --chat-id; slack, discord or webhook with --url; email with --to, --smtp
+// and --user. On a terminal it asks for what is missing. The password of
+// an email is asked without showing it, or read from stdin: never a flag,
+// which would stay in your shell's history. The server sends a test alert
+// first and keeps the destination only when that went out.
 func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("alerts add", "alerts add <server> telegram [--token <bot-token>] [--chat-id <id>], or slack|discord|webhook [--url <url>]")
+	flags := newFlags("alerts add", "alerts add <server> telegram [--token <bot-token>] [--chat-id <id>], or slack|discord|webhook [--url <url>], or email [--to <address>] [--smtp <host:port>] [--user <user>] [--from <address>], the password is asked or read from stdin")
 	var destination alert.Destination
 	flags.StringVar(&destination.Token, "token", "", "the token of your Telegram bot")
 	flags.StringVar(&destination.ChatID, "chat-id", "", "the Telegram chat the alerts go to")
 	flags.StringVar(&destination.URL, "url", "", "the webhook URL of Slack, Discord or your own")
+	flags.StringVar(&destination.To, "to", "", "the address the emails go to")
+	flags.StringVar(&destination.SMTP, "smtp", "", "the SMTP server that sends the emails, like smtp.example.com:587")
+	flags.StringVar(&destination.User, "user", "", "the user at the SMTP server")
+	flags.StringVar(&destination.From, "from", "", "who the emails are from, when the user is not an address")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
@@ -630,29 +636,58 @@ func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	}
 	server := flags.Arg(0)
 	destination.Kind = flags.Arg(1)
-	missing := map[string]*string{"--url": &destination.URL}
-	if destination.Kind == "telegram" {
-		missing = map[string]*string{"--token": &destination.Token, "--chat-id": &destination.ChatID}
+	needed := []string{"url"}
+	switch destination.Kind {
+	case "telegram":
+		needed = []string{"token", "chat-id"}
+	case "email":
+		needed = []string{"to", "smtp", "user"}
 	}
-	for _, flag := range []string{"--token", "--chat-id", "--url"} {
-		value := missing[flag]
-		if value == nil || *value != "" {
+	values := map[string]*string{"url": &destination.URL, "token": &destination.Token, "chat-id": &destination.ChatID, "to": &destination.To, "smtp": &destination.SMTP, "user": &destination.User}
+	for _, name := range needed {
+		if *values[name] != "" {
 			continue
 		}
 		if !isTerminal(stdin) {
-			return fmt.Errorf("%s alerts need %s", destination.Kind, flag)
+			return fmt.Errorf("%s alerts need --%s", destination.Kind, name)
 		}
-		answer, err := ask(stdin, stdout, "The "+strings.TrimPrefix(flag, "--")+" for "+destination.Kind+":", "")
+		answer, err := ask(stdin, stdout, "The "+name+" for "+destination.Kind+":", "")
 		if err != nil {
 			return err
 		}
-		*value = answer
+		*values[name] = answer
+	}
+	if destination.Kind == "email" {
+		password, err := askPassword(stdin, stdout, "Password of "+destination.User+" at "+destination.SMTP+":")
+		if err != nil {
+			return err
+		}
+		destination.Password = password
 	}
 	if err := sendJSON(ctx, server, destination, "alerts", "add"); err != nil {
 		return err
 	}
 	done(stdout, "A test alert went out. %s alerts %s from now on", server, destination.Kind)
 	return nil
+}
+
+// askPassword asks for a password without showing it on a terminal, or
+// reads it as one line from a pipe.
+func askPassword(stdin io.Reader, stdout io.Writer, question string) (string, error) {
+	if isTerminal(stdin) {
+		fmt.Fprint(stdout, style.Warning.Render("?")+" "+question+" ")
+	}
+	password, err := readSecret(stdin)
+	if isTerminal(stdin) {
+		fmt.Fprintln(stdout)
+	}
+	if err != nil {
+		return "", err
+	}
+	if password == "" {
+		return "", errors.New("no password, nothing changed. Type it when asked, or pipe it in")
+	}
+	return password, nil
 }
 
 // removeAlert is `moin alerts rm <server> <n>`, n as `moin alerts` lists it.

@@ -28,7 +28,7 @@ const (
 	maxDomains   = 50
 	maxDatabases = 20
 	// maxAlerts is how many alert destinations a report may hold, and
-	// maxAlertField how long a URL or token in one may be.
+	// maxAlertField how long all of one may be, its URL or token.
 	maxAlerts     = 10
 	maxAlertField = 2000
 	// maxError is how much of a backup error the watcher keeps.
@@ -189,7 +189,7 @@ func (w *Watcher) send(ctx context.Context, u unsent) error {
 var public = alert.NewSender(RefusePrivate)
 
 // SendPublic sends one alert to a destination a server's report named:
-// over https only, and never to a private address.
+// a url over https only, and never to a private address.
 func SendPublic(ctx context.Context, d alert.Destination, m alert.Message) error {
 	if d.URL != "" && !strings.HasPrefix(d.URL, "https://") {
 		return errors.New("the alert url must start with https://")
@@ -257,7 +257,7 @@ func checkReport(r *report.Report) error {
 		return fmt.Errorf("more than %d alerts", maxAlerts)
 	}
 	for _, d := range r.Alerts {
-		if len(d.Kind)+len(d.URL)+len(d.Token)+len(d.ChatID) > maxAlertField {
+		if len(d.Kind)+len(d.URL)+len(d.Token)+len(d.ChatID)+len(d.To)+len(d.SMTP)+len(d.User)+len(d.Password)+len(d.From) > maxAlertField {
 			return errors.New("an alert is too long")
 		}
 	}
@@ -290,11 +290,16 @@ func checkReport(r *report.Report) error {
 
 // sendable says whether a watcher sends to a destination a report named.
 // It does not to a kind it does not know, like one of a newer moin, to a
-// url without https, or to a private address written out. A name that
-// points at a private address is refused later, when the alert goes out.
+// url without https, or to a private address written out, as a webhook
+// or as the SMTP server of an email. A name that points at a private
+// address is refused later, when the alert goes out.
 func sendable(d report.Alert) bool {
 	if alert.Check(d) != nil {
 		return false
+	}
+	if d.Kind == "email" {
+		host, _, _ := net.SplitHostPort(d.SMTP)
+		return !privateAddress(host)
 	}
 	if d.URL == "" {
 		return true

@@ -1,5 +1,5 @@
 // Package alert sends one alert to one destination: Telegram, Slack,
-// Discord or a webhook. The daemon alerts what it sees while its server
+// Discord, a webhook or an email. The daemon alerts what it sees while its server
 // lives; the watcher alerts silence and a domain that is down from outside.
 package alert
 
@@ -23,8 +23,9 @@ import (
 )
 
 // Destination is where alerts go: the same thing a report carries to the
-// watchers. Kind is "telegram", "slack", "discord" or "webhook". Mail is
-// not a kind: only moin cloud sends mail.
+// watchers. Kind is "telegram", "slack", "discord", "webhook" or "email":
+// a mail through the SMTP server of the destination. The mail moin cloud
+// sends to an account is not a kind here.
 type Destination = report.Alert
 
 // Message is one alert. A webhook gets it as JSON.
@@ -42,10 +43,15 @@ var telegramAPI = "https://api.telegram.org"
 // Sender sends alerts over connections it dials itself.
 type Sender struct {
 	client *http.Client
+	// dialer connects to the SMTP server of an email.
+	dialer *net.Dialer
 }
 
 // plain is the sender of Send: it connects anywhere.
-var plain = &Sender{client: &http.Client{Timeout: 10 * time.Second, CheckRedirect: noRedirects}}
+var plain = &Sender{
+	client: &http.Client{Timeout: 10 * time.Second, CheckRedirect: noRedirects},
+	dialer: &net.Dialer{Timeout: 5 * time.Second},
+}
 
 // noRedirects follows no redirects: a destination that moved answers wrong.
 func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -57,7 +63,7 @@ func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastR
 func NewSender(control func(network, address string, conn syscall.RawConn) error) *Sender {
 	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: control}
 	transport := &http.Transport{DialContext: dialer.DialContext, TLSHandshakeTimeout: 5 * time.Second}
-	return &Sender{client: &http.Client{Timeout: 10 * time.Second, Transport: transport, CheckRedirect: noRedirects}}
+	return &Sender{client: &http.Client{Timeout: 10 * time.Second, Transport: transport, CheckRedirect: noRedirects}, dialer: dialer}
 }
 
 // Check says whether d can work: a known kind with what that kind needs.
@@ -70,8 +76,10 @@ func Check(d Destination) error {
 		return nil
 	case "slack", "discord", "webhook":
 		return checkURL(d.URL)
+	case "email":
+		return checkEmail(d)
 	}
-	return fmt.Errorf("unknown alert kind %q: use telegram, slack, discord or webhook", d.Kind)
+	return fmt.Errorf("unknown alert kind %q: use telegram, slack, discord, webhook or email", d.Kind)
 }
 
 // checkURL wants https, or http to this machine or a tailnet only: an
@@ -87,8 +95,8 @@ func checkURL(address string) error {
 	return errors.New("the alert url must start with https:// (http:// only to this machine or a tailnet address)")
 }
 
-// Send sends m to d. The error never holds the token or URL of d: both
-// are secrets.
+// Send sends m to d. The error never holds the token, URL or password
+// of d: they are secrets.
 func Send(ctx context.Context, d Destination, m Message) error {
 	return plain.Send(ctx, d, m)
 }
@@ -107,6 +115,11 @@ func (s *Sender) Send(ctx context.Context, d Destination, m Message) error {
 	case "discord":
 		body := map[string]any{"content": discordText(m), "allowed_mentions": map[string]any{"parse": []string{}}}
 		return post(ctx, s.client, d.URL, body, d.URL)
+	case "email":
+		if err := s.sendEmail(ctx, d, m); err != nil {
+			return errors.New(scrub(err.Error(), d.Password))
+		}
+		return nil
 	}
 	return post(ctx, s.client, d.URL, m, d.URL)
 }

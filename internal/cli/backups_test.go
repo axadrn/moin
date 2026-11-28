@@ -3,12 +3,18 @@ package cli
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"filippo.io/age"
 
+	"github.com/axadrn/moin/internal/alert"
 	"github.com/axadrn/moin/protocol"
 )
 
@@ -71,5 +77,42 @@ func TestCheckLineNamesTheProvenCopy(t *testing.T) {
 	line = checkLine(protocol.DatabaseBackup{CheckedAt: &checked, CheckError: "could not read the copy B"}, now)
 	if !strings.Contains(line, "No copy restored fine yet") {
 		t.Errorf("line = %q", line)
+	}
+}
+
+// TestAddEmailAlert: the password of an email alert comes from stdin and
+// goes to the server on ssh's stdin. It is never a flag, and never an
+// argument of ssh, which other users of a machine can see.
+func TestAddEmailAlert(t *testing.T) {
+	dir := t.TempDir()
+	sent, runs := filepath.Join(dir, "sent"), filepath.Join(dir, "runs")
+	fake := "#!/bin/sh\necho \"$@\" >> " + runs + "\nread -r line\nprintf '%s' \"$line\" > " + sent + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "ssh"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	args := []string{"prod", "email", "--to", "ada@example.com", "--smtp", "smtp.example.com:587", "--user", "alerts@example.com"}
+
+	if err := addAlert(context.Background(), args, strings.NewReader("secret-password\n"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	var got alert.Destination
+	data, _ := os.ReadFile(sent)
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("the server got %q: %v", data, err)
+	}
+	want := alert.Destination{Kind: "email", To: "ada@example.com", SMTP: "smtp.example.com:587", User: "alerts@example.com", Password: "secret-password"}
+	if got != want {
+		t.Errorf("the server got %+v, want %+v", got, want)
+	}
+	if ran, _ := os.ReadFile(runs); strings.Contains(string(ran), "secret-password") || !strings.Contains(string(ran), "'alerts' 'add'") {
+		t.Errorf("ssh ran with %q", ran)
+	}
+
+	if err := addAlert(context.Background(), args, strings.NewReader(""), io.Discard); err == nil {
+		t.Error("an email alert without a password: want an error")
+	}
+	if err := addAlert(context.Background(), append(args, "--password", "secret-password"), strings.NewReader(""), io.Discard); err == nil {
+		t.Error("--password is a flag: want an error")
 	}
 }

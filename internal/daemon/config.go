@@ -31,6 +31,11 @@ import (
 //	  - kind: telegram
 //	    token: …
 //	    chat_id: …
+//	  - kind: email
+//	    to: ada@example.com
+//	    smtp: smtp.example.com:587
+//	    user: alerts@example.com
+//	    password: …
 //	bucket:
 //	  endpoint: https://s3.example.com
 //	  region: auto

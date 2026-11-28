@@ -44,6 +44,11 @@ alerts:
     chat_id: <chat id>
   - kind: slack          # slack, discord or webhook: each takes a url
     url: https://hooks.slack.com/services/<your hook>
+  - kind: email          # through your SMTP server, with STARTTLS
+    to: ada@example.com
+    smtp: smtp.example.com:587
+    user: alerts@example.com
+    password: <the password of that user>
 
 # Where the copies go: any S3-compatible bucket.
 # `moin bucket set prod` writes it, after a test file went in.
@@ -87,7 +92,7 @@ server_access: false
 - **A key moin does not know is an error.** So a typo never goes unnoticed. The daemon alerts `the config has a mistake`, and the last good config keeps working until it is fixed. Commands say it too.
 - **A change counts within a minute.** The daemon reads the file every minute. No restart.
 - **A command keeps your comments.** When `moin bucket set` or another command changes the file, the comments you wrote stay.
-- **Root only.** It holds the bucket's secret key, the alert tokens and the watcher tokens. `moin bucket prod` shows the bucket, never the secret.
+- **Root only.** It holds the bucket's secret key, the alert tokens and passwords, and the watcher tokens. `moin bucket prod` shows the bucket, never the secret.
 
 ## backups
 

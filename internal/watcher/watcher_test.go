@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -672,12 +673,41 @@ func TestReportedGoesPublicOnly(t *testing.T) {
 	// to it is ever kept and tried again. The others stay.
 	outside := alert.Destination{Kind: "slack", URL: "https://hooks.example.com/services/x"}
 	named := testReport()
-	named.Alerts = []report.Alert{hook, {Kind: "webhook", URL: "https://10.0.0.5/hook"}, {Kind: "discord", URL: "https://[::1]:8443/hook"}, {Kind: "webhook", URL: "http://100.101.102.103/hook"}, outside}
+	email := alert.Destination{Kind: "email", To: "ada@example.com", SMTP: "smtp.example.com:587", User: "alerts@example.com", Password: "x"}
+	emailInside := email
+	emailInside.SMTP = "10.0.0.5:587"
+	named.Alerts = []report.Alert{hook, {Kind: "webhook", URL: "https://10.0.0.5/hook"}, {Kind: "discord", URL: "https://[::1]:8443/hook"}, {Kind: "webhook", URL: "http://100.101.102.103/hook"}, emailInside, outside, email}
 	if err := reported.Receive("prod", named); err != nil {
 		t.Fatal(err)
 	}
-	if got := reported.state.Servers["prod"].Report.Alerts; !slices.Equal(got, []report.Alert{outside}) {
+	if got := reported.state.Servers["prod"].Report.Alerts; !slices.Equal(got, []report.Alert{outside, email}) {
 		t.Errorf("kept the alerts %+v", got)
+	}
+}
+
+// An email a report named goes through a public SMTP server only: the
+// watcher does not even connect to one on its own machine.
+func TestReportedEmailGoesPublicOnly(t *testing.T) {
+	inside, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inside.Close()
+	connected := make(chan struct{})
+	go func() {
+		if connection, err := inside.Accept(); err == nil {
+			connection.Close()
+			close(connected)
+		}
+	}()
+	email := alert.Destination{Kind: "email", To: "ada@example.com", SMTP: inside.Addr().String(), User: "alerts@example.com", Password: "x"}
+	if err := SendPublic(t.Context(), email, alert.Message{Title: "prod stopped reporting"}); err == nil {
+		t.Error("the email went out through an SMTP server inside")
+	}
+	select {
+	case <-connected:
+		t.Error("the watcher connected to an SMTP server inside")
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 

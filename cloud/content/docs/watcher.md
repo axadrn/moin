@@ -11,18 +11,19 @@ Your server sends it a short report every minute. When the reports stop, the wat
 
 ## Alone, or with a watcher
 
-moin works alone. It deploys, backs up, checks the backups and alerts you while your server lives. But a server that is gone can't call for help. A watcher can.
+Your server watches itself while it lives. A watcher tells you when it doesn't.
 
-| | No watcher | Your own watcher | moin cloud |
+| | No watcher | Self-hosted | moin cloud |
 | --- | --- | --- | --- |
+| Deploys | yes | yes | yes |
+| Backups, restored every day | yes | yes | yes |
 | Alerts while your server lives | yes | yes | yes |
-| An alert when your server is gone | no | yes | yes |
-| Your domains, checked from outside | no | yes | yes |
-| A page with it all, on your phone too | no | yes | yes |
-| A copy of each backup nobody can delete, locked for you | no | with [a lock on your own bucket](/docs/backups#lock-your-bucket) (moin checks it) | yes |
-| Alerts by mail too, next to Telegram, Slack and the rest | no | no | yes |
-| No second server to run | yes | no | yes |
-| Nothing to set up | yes | no | yes |
+| Alerts by email | yes | yes | yes |
+| You hear when your server dies | no | yes | yes |
+| Your domains, visited from outside | no | yes | yes |
+| What happened, on your phone | no | yes | yes |
+| A copy a hacked server can't delete | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes, [lock your bucket](/docs/backups#lock-your-bucket) | yes |
+| No second machine | yes | no | yes |
 
 Your own watcher is free and open source: run it on a small second server. moin cloud runs one for you, from $7 a month: `moin watcher connect prod` and it is on.
 
@@ -60,18 +61,21 @@ shop.example.com is up again
 - **Down**: three visits in a row fail, one a minute. A visit fails on a 5xx, a timeout, a refused connection or a bad certificate. Any other answer, a redirect too, is up.
 - A domain of a silent server does not alert on its own. The silence says more.
 
-Alerts go to Telegram, Slack, Discord or a webhook. Set them once per server, and they go everywhere:
+Alerts go to Telegram, Slack, Discord, a webhook or an email. Set them once per server, and they go everywhere:
 
 ```bash
 moin alerts add prod telegram --token <bot token> --chat-id <chat id>
+moin alerts add prod email --to ada@example.com --smtp smtp.example.com:587 --user alerts@example.com
 ```
+
+An email goes through your own SMTP server. moin asks for the password and does not show it. In a script, pipe it in. The SMTP server must offer STARTTLS, most do on port 587. Without it nothing is sent, so the password never travels in the clear. Is the user not an address? Add `--from alerts@example.com`.
 
 - The daemon on prod alerts there while it lives.
 - Each report carries them to prod's watchers. So a watcher alerts there too, when prod goes silent or a domain is down.
 - Your own watcher and moin cloud do the same. moin cloud also sends a mail to your account.
 - A report only goes over HTTPS, or inside your tailnet. So the tokens never travel in the clear.
-- A watcher sends a server's alerts only to public `https://` addresses, and follows no redirect. So a hacked server can't make it knock on its own network.
-- A webhook inside your tailnet? Put it in the watcher's own [config](#its-config). What you wrote there goes anywhere.
+- A watcher sends a server's alerts only to public addresses: a webhook over `https://`, an email through a public SMTP server. It follows no redirect. So a hacked server can't make it knock on its own network.
+- A webhook or an SMTP server inside your tailnet? Put it in the watcher's own [config](#its-config). What you wrote there goes anywhere.
 
 [CLI](/docs/cli#the-team-and-alerts)
 
@@ -209,6 +213,11 @@ alerts:
     chat_id: <chat id>
   - kind: discord        # slack, discord or webhook: each takes a url
     url: https://discord.com/api/webhooks/<your hook>
+  - kind: email
+    to: ada@example.com
+    smtp: smtp.example.com:587
+    user: alerts@example.com
+    password: <the password of that user>
 ```
 
 - Only its owner may read it: `chmod 600`. Else the watcher does not start.
@@ -268,7 +277,7 @@ A server with no watcher is yellow in `moin` too. Without a plan to pay, the tri
 
 ## If it is hacked
 
-Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They get your alert channels, so they can post to them. Make a new bot token or webhook, and `moin alerts add` it. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
+Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They get your alert channels, so they can post to them, and send mail as your SMTP user. Make a new bot token, webhook or SMTP password, and `moin alerts add` it. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
 
 ## If it breaks
 

@@ -192,8 +192,8 @@ You want `Good "moin-release" signature`, then `OK` next to the binary. On a Mac
 A watcher only listens. If someone takes it over:
 
 - **They see** the names of your servers and apps, your domains, and when backups and checks ran.
-- **They get** your alert channels: the Telegram bot token and chat, the Slack, Discord or webhook addresses you set with `moin alerts add`. A watcher holds them so it can alert you when the server can't.
-- **They can** post to those channels. Nothing more: a channel reaches no server. Make a new bot token or webhook, then `moin alerts rm` the old one and `moin alerts add` the new.
+- **They get** your alert channels: the Telegram bot token and chat, the Slack, Discord or webhook addresses, and for an email the SMTP server, user and password you set with `moin alerts add`. A watcher holds them so it can alert you when the server can't.
+- **They can** post to those channels, and send mail as that SMTP user. Nothing more: a channel reaches no server. So give email alerts an SMTP user of their own, one that can only send. Make a new bot token, webhook or SMTP password, then `moin alerts rm` the old one and `moin alerts add` the new.
 - **They can** silence its alerts. So run two watchers, best at two providers.
 - **They can't** reach any server. A daemon sends reports out, and acts on nothing that comes back. The one exception is the upload address of a copy, above: the most a false one gets is an encrypted copy.
 
@@ -201,7 +201,8 @@ What a watcher holds:
 
 - **Your own watcher** keeps the channels in its state file, `/var/lib/moin/watcher/state.json`. Only its owner may read it.
 - **moin cloud** keeps them encrypted at rest, with AES-GCM. The key is not in the database.
-- **Both** send a server's alerts only to public `https://` addresses, and follow no redirect. A report can't make a watcher knock on its own network.
+- **Both** send a server's alerts only to public addresses: a webhook over `https://`, an email through a public SMTP server. They follow no redirect. A report can't make a watcher knock on its own network.
+- **An email** goes out only after the SMTP server turned on TLS with STARTTLS. Without it nothing is sent, the password least of all.
 - **On the way**, a report goes only over HTTPS, or inside your tailnet.
 
 ## If a server is hacked
@@ -217,7 +218,7 @@ On your server, and only there. Root only.
 | File | What is in it |
 | --- | --- |
 | `/var/lib/moin/apps/<app>/app.env` | the env vars of one app |
-| `/etc/moin/config.yml` | the bucket key, the alert tokens, the watcher tokens |
+| `/etc/moin/config.yml` | the bucket key, the alert tokens and SMTP passwords, the watcher tokens |
 | `/etc/moin/backup.key` | the server's own backup key, which opens its copies |
 | `/var/lib/moin/server.json` | the Cloudflare Tunnel token, and what is closed |
 | `/var/lib/moin/follow/<app>/key` | the read-only deploy key of an app that follows a branch |

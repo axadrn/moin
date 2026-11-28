@@ -32,6 +32,7 @@ The hub was the one place every server trusted. Whoever took it over could reach
 - **Private registries**: `moin registry set prod ghcr.io you` logs the server in. The token is asked, and stays on the server.
 - **The team is SSH keys**: `moin keys add prod anna.pub` lets Anna in. `moin keys rm prod anna@laptop` takes her out.
 - **Alerts from the server**: A failed backup or restore check, a crashing app or a full disk, to Telegram, Slack, Discord or a webhook. `moin alerts add prod telegram --token … --chat-id …`.
+- **Alerts by email**: `moin alerts add prod email --to ada@example.com --smtp smtp.example.com:587 --user alerts@example.com` sends them through your own SMTP server. The password is asked, never a flag.
 - **Your own watcher**: `moin watcher run`, on another machine. It alerts when a server goes silent, or a domain is down from outside.
 - **moin cloud**: A watcher we run for you, with alerts by mail. `moin watcher connect prod` signs you in the first time. `moin watcher` shows your plan and the days left of the trial. 30 days free from the first report, then $7 a month or $49 a year. (#174)
 - **A copy nobody can delete**: On a paid plan, and during the trial, moin cloud keeps your server's copies for 14 days, one an hour per database. Your server can add one, never delete one. `moin backups` lists them beside the bucket's, `moin restore` puts one back.
