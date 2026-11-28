@@ -37,6 +37,15 @@ var homeWatcherColumns = []components.CompareColumn{
 	},
 }
 
+// homeReplaces are the paid tools the built-in features replace today: the
+// job, the tools, a price only where one is sourced, and what moin does.
+var homeReplaces = []struct{ Job, Tools, Price, Does string }{
+	{"Hosting your apps", "Heroku, Render, Vercel", "", "Your own VPS and " + brand.Name + " deploy."},
+	{"Backups", "SimpleBackups, SnapShooter", "", "Encrypted copies and a restore check every day."},
+	{"Uptime checks", "UptimeRobot, Better Stack", "UptimeRobot from EUR 10 a month", "The watcher checks every minute. Needs a watcher."},
+	{"A deploy pipeline", "A deploy script in CI", "", brand.Name + " follow deploys each new commit or image."},
+}
+
 // HomePricing is the three ways to run moin side by side, with their
 // prices: no watcher, your own, and moin cloud.
 templ HomePricing() {
@@ -44,8 +53,30 @@ templ HomePricing() {
 		@homeHead("Free. Or free of worries.", "Works alone. Better with a watcher.")
 		<p class="moin-center moin-muted">Every setup: deploys, backups restored every day, alerts while your server lives, email alerts through your own mail server.</p>
 		@components.Compare(components.CompareProps{Rows: homeWatcherRows, Columns: homeWatcherColumns, Reverse: true})
+		@components.Card(components.CardProps{Title: "Included. Cancel these."}) {
+			@components.Rows(components.RowsProps{Head: []string{"The job", "Instead of", "What " + brand.Name + " does"}}) {
+				for _, row := range homeReplaces {
+					@components.Row(components.RowProps{}) {
+						@components.Cell() {
+							{ row.Job }
+						}
+						@components.Cell() {
+							<span class="moin-stack" data-gap="1">
+								<span>{ row.Tools }</span>
+								if row.Price != "" {
+									<span class="moin-small moin-muted">{ row.Price }</span>
+								}
+							</span>
+						}
+						@components.Cell() {
+							{ row.Does }
+						}
+					}
+				}
+			}
+		}
 		<p class="moin-text moin-muted moin-center">Your apps never leave your server. The launch price stays yours. <a href={ templ.SafeURL(homeFreeYear) } class="moin-link moin-foreground">Or get a year free.</a></p>
-		@homeMore("/docs/watcher", "How the watcher works")
+		@homeMore("/catalog", "More in the catalog")
 	</section>
 }
 
