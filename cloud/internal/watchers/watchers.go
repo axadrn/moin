@@ -29,8 +29,6 @@ const (
 	visitEvery = time.Minute
 	// visitsAtOnce is how many visits run at the same time, for everyone.
 	visitsAtOnce = 32
-	// trial is how long the trial lasts, from the first report.
-	trial = 30 * 24 * time.Hour
 )
 
 // ErrUnknownToken is a report with a token no server has.
@@ -156,7 +154,7 @@ func (ws *Watchers) Receive(token string, r report.Report) error {
 	if err := ws.counts.Report(id, name, r, time.Now()); err != nil {
 		slog.Error("count a report", "error", err)
 	}
-	return ws.store.StartTrial(id, time.Now().Add(trial))
+	return ws.store.StartTrial(id, time.Now())
 }
 
 // Changed tells the watcher of a workspace that its servers changed.

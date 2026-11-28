@@ -77,7 +77,7 @@ func TestTrialOver(t *testing.T) {
 	mails := &outbox{}
 	ws := New(store, counts.New(database), mails, "https://cloud.example.com")
 	space, _ := store.SignIn("ada@example.com")
-	if err := store.StartTrial(space.ID, time.Now().Add(4*24*time.Hour)); err != nil {
+	if err := store.StartTrial(space.ID, time.Now().Add(-26*24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	ws.mailTrials(t.Context())

@@ -25,6 +25,9 @@ type Workspace struct {
 	Mail string
 	// Status is trial, paid or ended.
 	Status string
+	// TrialDays is how long the trial lasts: 30, or an early backer's
+	// free year.
+	TrialDays int
 	// TrialEnds is zero until the first report starts the trial.
 	TrialEnds time.Time
 	PaidUntil time.Time
@@ -93,7 +96,7 @@ func (s *Store) Workspace(id string) (Workspace, error) {
 }
 
 // columns are what one reads into a Workspace.
-const columns = `workspaces.id, workspaces.mail, workspaces.status, coalesce(workspaces.trial_ends, 0),
+const columns = `workspaces.id, workspaces.mail, workspaces.status, workspaces.trial_days, coalesce(workspaces.trial_ends, 0),
 	coalesce(workspaces.paid_until, 0), coalesce(workspaces.coupon, ''),
 	coalesce(workspaces.stripe_customer, ''), coalesce(workspaces.stripe_subscription, '')`
 
@@ -110,15 +113,16 @@ func (s *Store) one(query string, args ...any) (Workspace, error) {
 func scanWorkspace(row interface{ Scan(...any) error }, more ...any) (Workspace, error) {
 	var w Workspace
 	var trialEnds, paidUntil int64
-	err := row.Scan(append([]any{&w.ID, &w.Mail, &w.Status, &trialEnds, &paidUntil, &w.Coupon, &w.StripeCustomer, &w.StripeSubscription}, more...)...)
+	err := row.Scan(append([]any{&w.ID, &w.Mail, &w.Status, &w.TrialDays, &trialEnds, &paidUntil, &w.Coupon, &w.StripeCustomer, &w.StripeSubscription}, more...)...)
 	w.TrialEnds, w.PaidUntil = unix(trialEnds), unix(paidUntil)
 	return w, err
 }
 
-// StartTrial starts the trial of a workspace that has none yet: the first
-// report of its first server does.
-func (s *Store) StartTrial(id string, ends time.Time) error {
-	_, err := s.db.Exec(`UPDATE workspaces SET trial_ends = ? WHERE id = ? AND status = 'trial' AND trial_ends IS NULL`, ends.Unix(), id)
+// StartTrial starts the trial of a workspace that has none yet, at start:
+// the first report of its first server does. It lasts the workspace's
+// trial days.
+func (s *Store) StartTrial(id string, start time.Time) error {
+	_, err := s.db.Exec(`UPDATE workspaces SET trial_ends = ? + trial_days * 86400 WHERE id = ? AND status = 'trial' AND trial_ends IS NULL`, start.Unix(), id)
 	return err
 }
 

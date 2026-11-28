@@ -178,6 +178,31 @@ func TestDeleteWorkspace(t *testing.T) {
 	}
 }
 
+// A new workspace gets 30 days from its start; an early backer keeps the
+// free year of the offer.
+func TestStartTrial(t *testing.T) {
+	s := testStore(t)
+	start := time.Unix(1_800_000_000, 0)
+	ada, _ := s.SignIn("ada@example.com")
+	backer, _ := s.SignIn("bob@example.com")
+	if _, err := s.db.Exec(`UPDATE workspaces SET trial_days = 365 WHERE id = ?`, backer.ID); err != nil {
+		t.Fatal(err)
+	}
+	for space, days := range map[string]int{ada.ID: 30, backer.ID: 365} {
+		if err := s.StartTrial(space, start); err != nil {
+			t.Fatal(err)
+		}
+		// The second report starts nothing again.
+		if err := s.StartTrial(space, start.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := s.Workspace(space)
+		if got.TrialDays != days || !got.TrialEnds.Equal(start.Add(time.Duration(days)*24*time.Hour)) {
+			t.Errorf("%s: %d days, ends %v, want %d", got.Mail, got.TrialDays, got.TrialEnds, days)
+		}
+	}
+}
+
 // Alerts go out while paid and during the trial, not after it.
 func TestAlertsOn(t *testing.T) {
 	now := time.Now()

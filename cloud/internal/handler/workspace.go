@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/axadrn/moin/cloud/internal/copies"
@@ -48,7 +49,7 @@ func plan(space workspace.Workspace) string {
 	case space.Status == "ended":
 		return "Ended"
 	case space.TrialEnds.IsZero():
-		return "Trial, starts with the first report"
+		return "Trial of " + strconv.Itoa(space.TrialDays) + " days, starts with the first report"
 	case space.TrialEnds.Before(time.Now()):
 		return "Trial ended " + space.TrialEnds.Format("January 2, 2006") + ", alerts are off"
 	}

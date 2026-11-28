@@ -7,10 +7,11 @@
 // have a Stripe customer, a subscription, a coupon or an offer. Each keeps
 // its old id, so the workspace_id in Stripe's metadata still matches, and
 // gets the mail of its owner. It refuses, and imports nothing, when a
-// paying workspace would be left out. An offer nobody claimed yet, the early
-// backers' deal, becomes a workspace of its mail with the coupon, so the
-// discount is there at the first sign-in. Running it twice adds nothing
-// twice.
+// paying workspace would be left out. An offer, the early backers' deal,
+// keeps its days free and its coupon. A claimed one counts its days from
+// when the old workspace was made, as the old service did. One nobody
+// claimed yet becomes a workspace of its mail, and its days count from the
+// first report, like everyone's. Running it twice adds nothing twice.
 package main
 
 import (
@@ -92,7 +93,7 @@ func importOld(ctx context.Context, oldPath, newPath string) (result, error) {
 		return r, err
 	}
 	inserted, err := tx.ExecContext(ctx, `
-INSERT INTO workspaces (id, mail, status, stripe_customer, stripe_subscription, paid_until, coupon, created)
+INSERT INTO workspaces (id, mail, status, stripe_customer, stripe_subscription, paid_until, coupon, trial_days, trial_ends, created)
 SELECT w.id, lower(trim(u.email)),
 	CASE
 		WHEN s.provider_subscription_id IS NOT NULL AND s.status IN ('active', 'past_due') THEN 'paid'
@@ -102,6 +103,8 @@ SELECT w.id, lower(trim(u.email)),
 	s.provider_customer_id, s.provider_subscription_id,
 	CASE WHEN s.provider_subscription_id IS NOT NULL THEN `+seconds("s.current_period_end")+` END,
 	coalesce(s.coupon_id, o.coupon_id),
+	coalesce(o.trial_days, 30),
+	CASE WHEN o.email IS NOT NULL THEN coalesce(`+seconds("w.created_at")+`, unixepoch()) + o.trial_days * 86400 END,
 	coalesce(`+seconds("w.created_at")+`, unixepoch())
 `+kept+`
 ORDER BY s.provider_subscription_id IS NOT NULL DESC, w.created_at, w.id
@@ -128,8 +131,8 @@ ON CONFLICT DO NOTHING`)
 	// The offers nobody claimed yet and that still hold, as the old
 	// service let them be claimed.
 	offers, err := tx.ExecContext(ctx, `
-INSERT INTO workspaces (id, mail, coupon, created)
-SELECT lower(hex(randomblob(16))), lower(trim(o.email)), o.coupon_id, coalesce(`+seconds("o.created_at")+`, unixepoch())
+INSERT INTO workspaces (id, mail, coupon, trial_days, created)
+SELECT lower(hex(randomblob(16))), lower(trim(o.email)), o.coupon_id, o.trial_days, coalesce(`+seconds("o.created_at")+`, unixepoch())
 FROM old.offers o
 WHERE o.claimed_at IS NULL AND (o.expires_at IS NULL OR `+seconds("o.expires_at")+` > unixepoch())
 ORDER BY o.created_at, o.email

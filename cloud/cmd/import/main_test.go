@@ -13,11 +13,12 @@ import (
 // oldDatabase is a database of the old service with fake rows:
 //
 //   - paid: a subscription in Stripe, owned by Ada.
-//   - backer: no subscription, but its owner has an offer.
+//   - backer: no subscription, but its owner claimed an offer of a free
+//     year.
 //   - coupon: a subscription row with a coupon only.
 //   - free: nothing to import.
 //   - second: a second paying workspace of Ada; her mail is taken.
-//   - an offer of Eve, never claimed.
+//   - an offer of Eve, a free year, never claimed.
 func oldDatabase(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "old.db")
@@ -47,8 +48,8 @@ INSERT INTO subscriptions (id, workspace_id, plan_id, status, provider_customer_
 	('s3', 'w-coupon', 'pro', 'trialing', NULL, NULL, NULL, NULL, 'BACKER'),
 	('s4', 'w-free', 'free', 'active', NULL, NULL, NULL, NULL, NULL);
 INSERT INTO offers (email, trial_days, coupon_id, created_at, claimed_at, claimed_workspace_id) VALUES
-	('bob@example.com', 30, 'EARLY', '2026-03-01 00:00:00', '2026-03-02 03:04:05', 'w-backer'),
-	('eve@example.com', 30, 'EARLY', '2026-03-01 00:00:00', NULL, NULL);
+	('bob@example.com', 365, 'EARLY', '2026-03-01 00:00:00', '2026-03-02 03:04:05', 'w-backer'),
+	('eve@example.com', 365, 'EARLY', '2026-03-01 00:00:00', NULL, NULL);
 INSERT INTO offers (email, trial_days, coupon_id, created_at, expires_at) VALUES
 	('gone@example.com', 30, 'EARLY', '2026-03-01 00:00:00', '2026-04-01 00:00:00');`
 	if _, err := database.Exec(string(schema) + rows); err != nil {
@@ -76,14 +77,16 @@ func TestImport(t *testing.T) {
 	defer database.Close()
 	type row struct {
 		id, mail, status, customer, subscription, coupon string
-		paidUntil                                        int64
+		paidUntil, trialDays, trialEnds                  int64
 	}
+	// Bob's free year counts from his old workspace: 2026-03-02 03:04:05.
 	want := map[string]row{
-		"w-paid":   {"w-paid", "ada@example.com", "paid", "cus_ada", "sub_ada", "", 1798848000},
-		"w-backer": {"w-backer", "bob@example.com", "trial", "", "", "EARLY", 0},
-		"w-coupon": {"w-coupon", "cy@example.com", "trial", "", "", "BACKER", 0},
+		"w-paid":   {"w-paid", "ada@example.com", "paid", "cus_ada", "sub_ada", "", 1798848000, 30, 0},
+		"w-backer": {"w-backer", "bob@example.com", "trial", "", "", "EARLY", 0, 365, 1772420645 + 365*86400},
+		"w-coupon": {"w-coupon", "cy@example.com", "trial", "", "", "BACKER", 0, 30, 0},
 	}
-	rows, err := database.Query(`SELECT id, mail, status, coalesce(stripe_customer, ''), coalesce(stripe_subscription, ''), coalesce(coupon, ''), coalesce(paid_until, 0) FROM workspaces`)
+	rows, err := database.Query(`SELECT id, mail, status, coalesce(stripe_customer, ''), coalesce(stripe_subscription, ''), coalesce(coupon, ''),
+		coalesce(paid_until, 0), trial_days, coalesce(trial_ends, 0) FROM workspaces`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,12 +94,13 @@ func TestImport(t *testing.T) {
 	seen := 0
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.id, &r.mail, &r.status, &r.customer, &r.subscription, &r.coupon, &r.paidUntil); err != nil {
+		if err := rows.Scan(&r.id, &r.mail, &r.status, &r.customer, &r.subscription, &r.coupon, &r.paidUntil, &r.trialDays, &r.trialEnds); err != nil {
 			t.Fatal(err)
 		}
 		if r.mail == "eve@example.com" {
-			// A new id: nobody had a workspace for the offer.
-			want[r.id] = row{r.id, "eve@example.com", "trial", "", "", "EARLY", 0}
+			// A new id: nobody had a workspace for the offer. Her year
+			// starts with her first report.
+			want[r.id] = row{r.id, "eve@example.com", "trial", "", "", "EARLY", 0, 365, 0}
 		}
 		if r != want[r.id] {
 			t.Errorf("%s = %+v, want %+v", r.id, r, want[r.id])

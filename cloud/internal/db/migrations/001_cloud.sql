@@ -8,6 +8,9 @@ CREATE TABLE workspaces (
     mail TEXT NOT NULL UNIQUE,
     -- trial, paid or ended.
     status TEXT NOT NULL DEFAULT 'trial' CHECK (status IN ('trial', 'paid', 'ended')),
+    -- How many days the trial lasts. An early backer's offer keeps its
+    -- free year.
+    trial_days INTEGER NOT NULL DEFAULT 30,
     -- Empty until the first report: the trial starts then.
     trial_ends INTEGER,
     -- The last trial mail sent: 0 none, 25 five days before the end, 30
