@@ -196,7 +196,10 @@ func checkLine(c check) CheckView {
 	if c.OK {
 		line.Result = "restored the copy of " + clock(c.Copy)
 	} else {
-		line.Result = "failed: " + c.Error
+		line.Result = "failed"
+		if c.Error != "" {
+			line.Result += ": " + c.Error
+		}
 	}
 	return line
 }
