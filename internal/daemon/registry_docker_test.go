@@ -144,11 +144,26 @@ func TestFollowImageFromARegistry(t *testing.T) {
 	}
 
 	// The image before it is still on the server, for a rollback.
-	if _, err := a.deployHere(ctx, protocol.DeployStart{DeployID: "back", App: app, FromNumber: 2, Domains: start.Domains}, &log); err != nil {
+	if _, err := a.deployHere(ctx, protocol.DeployStart{DeployID: "back", App: app, FromNumber: 2, Source: "rollback", Domains: start.Domains}, &log); err != nil {
 		t.Fatalf("roll back: %v\n%s", err, log.String())
 	}
 	if got := running(); got != pinned+" yes" {
 		t.Fatalf("after the rollback web runs %q, want %s", got, pinned)
+	}
+	// Each deploy kept its record: v3 the image it followed, v4 the
+	// rollback to v2 with v2's image.
+	list, err := DeploysHere(dir, app)
+	if err != nil || len(list) != 4 {
+		t.Fatalf("deploys %+v, %v", list, err)
+	}
+	if followed := list[1]; followed.Source != "follow" || followed.Image != image || followed.ImageID != shortID(f.ImageID) || followed.Status != deployOK {
+		t.Errorf("the followed image's record %+v", followed)
+	}
+	if back := list[0]; back.Source != "rollback" || back.From != 2 || back.ImageID != list[2].ImageID || !back.Live {
+		t.Errorf("the rollback's record %+v", back)
+	}
+	if deploy, err := DeployLogHere(dir, app, 3); err != nil || !strings.Contains(deploy.Log, "v3 is live") {
+		t.Errorf("the log of v3: %v\n%s", err, deploy.Log)
 	}
 
 	// A tag nobody can pull any more alerts, and deploys nothing.

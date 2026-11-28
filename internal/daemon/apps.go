@@ -22,6 +22,8 @@ import (
 //	releases/<n>/compose.json  the compose project moin runs, 0600
 //	releases/<n>/.env          a copy of the source's .env, when it has one
 //	releases/<n>/kind          build, apply or failed, for prune
+//	releases/<n>/deploy.log    what the deploy printed (deploys.go)
+//	releases/<n>/deploy.json   its record: from where, what, how it ended
 //	current                    the number of the running release
 //	stopped                    there while the app is stopped on purpose
 //	volumes/                   bind mounts that are not part of the repo

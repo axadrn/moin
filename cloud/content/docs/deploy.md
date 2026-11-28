@@ -1,6 +1,6 @@
 ---
 title: "Deploy"
-description: "Deploy from your folder or from CI or from a registry. Roll back. Restart. Remove. Env vars. Domains. Logs. One-off commands. Run it elsewhere."
+description: "Deploy from your folder or from CI or from a registry. Every deploy and its log. Roll back. Restart. Remove. Env vars. Domains. Logs. One-off commands. Run it elsewhere."
 group: "Apps"
 order: 1
 ---
@@ -20,7 +20,7 @@ Commands about an app name the app: `moin logs my-app`. moin knows on which serv
 | An app from the [catalog](/docs/catalog) | `moin deploy my-server --catalog umami` | nobody. The image is ready |
 | An image on your laptop | `moin deploy my-server --image my-app:dev` | your laptop. moin sends it over SSH |
 
-Every way ends the same: a release with a number, a rollback, and a copy of the databases just before it.
+Every way ends the same: a release with a number, its log, a rollback, and a copy of the databases just before it.
 
 ## Deploy your code
 
@@ -150,7 +150,7 @@ moin follow my-app --branch main
 - Every minute the server asks the repo for the newest commit of the branch. A new one is cloned and deployed like a deploy from your laptop.
 - In the folder of the app, the branch and the repo come from git. Else name them: `--branch main --repo git@github.com:you/my-app.git`.
 - The repo goes over SSH, and only over SSH. An `https://` address becomes its SSH address. git on the server may use no other way, so a repo address can't run a command or read a file there.
-- Each commit is tried once. A deploy that fails alerts once, and the next good one says it is over.
+- Each commit is tried once. A deploy that fails alerts once, with the command that shows its log, like `moin deploys my-app v7`. The next good one says it is over.
 - `moin follow my-app --off` stops it and removes the key from the server. Remove it from the repo too.
 
 Whoever can push to that branch can deploy, so pick the branch with care.
@@ -192,6 +192,28 @@ In CI, after the tests, build and push. With GitHub Actions:
 
 Whoever can push to that tag can deploy, so guard the registry like the server.
 
+## Every deploy
+
+```bash
+moin deploys my-app
+```
+
+```text
+DEPLOY   WHEN      FROM             WHAT                  STATE      TOOK
+v7       2m ago    follow           3f2a9c1               ✗ failed   41s
+v6       1h ago    rollback to v4   my-app:main 0a1b2c3   ● live     12s
+v5       3h ago    laptop           e4d5f6a               ok         1m 38s
+v4       1d ago    follow           my-app:main 0a1b2c3   ok         25s
+  Why it failed: moin deploys my-app v7
+```
+
+- FROM says where it came from: `laptop`, `follow`, `catalog`, a rollback, or `apply` for a restart, a start or new env and domains.
+- WHAT is the code it runs: the commit, the image with the start of its ID, or the catalog app.
+- `moin deploys my-app v7` prints what v7 printed, line by line, also when nobody watched it, like a deploy of a branch the server follows, or one whose SSH connection broke.
+- `--json` prints the list, or with `v7` the record and its log. The record also names the copies of the databases taken just before.
+- Each deploy keeps the last MB of its log, on the server, next to its release. A failed one keeps its log as long as the releases around it stay.
+- Releases from before beta.39 show `no record`.
+
 ## Roll back
 
 ```bash
@@ -201,10 +223,10 @@ moin rollback my-app
 moin lists the releases, and you pick one. Enter takes the one before the live one. In a script: `--to v3`, or nothing for the one before.
 
 ```text
-DEPLOY   WHEN     STATE
-v4       1m ago   ● live
-v2       1m ago   the one before
-v1       2m ago
+DEPLOY   WHEN     WHAT      STATE
+v4       1m ago   e4d5f6a   ● live
+v2       1m ago   3f2a9c1   the one before
+v1       2m ago   0a1b2c3
 ? Go back to which deploy? [v2]
 ✓ rolling back my-app
 ✓ rolling back to v2
@@ -362,6 +384,6 @@ What changed on the way out:
 
 ## If it breaks
 
-- **The build fails.** moin shows the build output. The live release keeps running.
+- **The build fails.** moin shows the build output. The live release keeps running. `moin deploys my-app v7` shows it again later.
 - **The new release does not come up.** moin starts the release before it again, and shows the app's last logs. `moin logs my-app` shows more.
 - **A bad deploy is live.** `moin rollback my-app`.

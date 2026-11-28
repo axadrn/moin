@@ -55,6 +55,7 @@ func (a *apps) recoverDeploys(ctx context.Context) {
 // starts again, as after any failed deploy.
 func (a *apps) endDeploy(ctx context.Context, app string, note deployNote) {
 	current := a.current(app)
+	a.stopped(app, note.Number, current == note.Number)
 	if current == note.Number {
 		return
 	}
@@ -90,6 +91,8 @@ type release struct {
 	env     map[string]string
 	// logf writes a line to the deploy log.
 	logf func(string, ...any)
+	// record is the deploy's log and record.
+	record *recorder
 }
 
 // hasSource reports whether a deploy brings source code to build.
@@ -103,7 +106,9 @@ func hasSource(start protocol.DeployStart) bool {
 // gets the next one here, once it holds the app's lock: two deploys at
 // once, like one from your laptop and one of a branch the server follows,
 // never take the same number, and neither wipes the other's release.
-func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf func(string, ...any)) (protocol.Detected, error) {
+// Every line goes to logf and to the release's deploy log, and the
+// release's record says how it ended (startRecord).
+func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf func(string, ...any)) (_ protocol.Detected, err error) {
 	if !protocol.ValidAppName(deploy.App) || deploy.Number < 0 {
 		return protocol.Detected{}, errors.New("invalid app name or deploy number")
 	}
@@ -117,7 +122,12 @@ func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf
 		return protocol.Detected{}, fmt.Errorf("write the deploy down: %w", err)
 	}
 	defer os.Remove(note)
-	release, err := a.newRelease(start, logf)
+	record, err := a.startRecord(start, logf)
+	if err != nil {
+		return protocol.Detected{}, fmt.Errorf("start the deploy log: %w", err)
+	}
+	defer func() { record.end(err) }()
+	release, err := a.newRelease(start, record)
 	if err != nil {
 		return protocol.Detected{}, err
 	}
@@ -136,22 +146,18 @@ func (a *apps) runDeploy(ctx context.Context, deploy *protocol.DeployStart, logf
 		return release.detected, err
 	}
 	a.afterStart(ctx, release)
+	release.logf("v%d is live", start.Number)
 	return release.detected, nil
 }
 
-// newRelease makes an empty folder for the release, with its kind for
-// prune.
-func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any)) (*release, error) {
+// newRelease fills the release's folder, which startRecord made, with
+// its kind for prune.
+func (a *apps) newRelease(start protocol.DeployStart, record *recorder) (*release, error) {
 	server, err := LoadConfig()
 	if err != nil {
 		return nil, err
 	}
 	dir := a.releaseDir(start.App, start.Number)
-	_ = os.RemoveAll(dir)
-	err = os.MkdirAll(dir, 0o700)
-	if err != nil {
-		return nil, err
-	}
 	kind := releaseApply
 	if hasSource(start) || start.Image != "" {
 		kind = releaseBuild
@@ -168,7 +174,7 @@ func (a *apps) newRelease(start protocol.DeployStart, logf func(string, ...any))
 	if err != nil {
 		return nil, err
 	}
-	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: logf}, nil
+	return &release{start: start, server: server, dir: dir, composeJSON: filepath.Join(dir, "compose.json"), envFile: a.envFile(start.App), env: env, logf: record.logf, record: record}, nil
 }
 
 // rollBack runs an older release again: its compose file and images, with
@@ -417,6 +423,7 @@ func (a *apps) copyDataBefore(ctx context.Context, release *release) error {
 	case err != nil:
 		return fmt.Errorf("the copy before this deploy failed: %w. Deploy anyway: %s deploy … --no-copy", err, build.Name)
 	case len(copies) > 0:
+		release.record.Copies = copies
 		release.logf("copied the data before v%d: %s", start.Number, strings.Join(copies, ", "))
 	}
 	return nil
@@ -625,7 +632,10 @@ func (a *apps) prune(ctx context.Context, app string) {
 		}
 		kind, _ := os.ReadFile(filepath.Join(a.releaseDir(app, number), "kind"))
 		if string(kind) == releaseFailed && number != current {
-			_ = os.RemoveAll(a.releaseDir(app, number))
+			// A failed deploy keeps only its log and its record, as long as
+			// a release without a build would stay.
+			a.keepRecordOnly(app, number)
+			releases = append(releases, protocol.Release{Number: number})
 			continue
 		}
 		build := string(kind) == releaseBuild

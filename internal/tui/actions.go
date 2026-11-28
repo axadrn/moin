@@ -197,15 +197,19 @@ func (m *model) askRollback() tea.Cmd {
 	p := &picker{title: "Go back to which deploy of " + key.app + "?", cursor: -1}
 	now := time.Now()
 	for index, release := range known.releases {
-		note := ""
+		// The code it runs, then live or the one before.
+		notes := []string{}
+		if what := release.What(); what != "" {
+			notes = append(notes, style.Muted.Render(what))
+		}
 		switch {
 		case release.Live:
-			note = style.Success.Render(style.SymbolLive + " live")
+			notes = append(notes, style.Success.Render(style.SymbolLive+" live"))
 		case release.Before:
-			note = style.Muted.Render("the one before")
+			notes = append(notes, style.Muted.Render("the one before"))
 			p.cursor = index
 		}
-		p.rows = append(p.rows, pickerRow{name: releaseName(release.Number), when: human.Ago(release.At, now), note: note})
+		p.rows = append(p.rows, pickerRow{name: releaseName(release.Number), when: human.Ago(release.At, now), note: strings.Join(notes, "  ")})
 	}
 	if p.cursor < 0 {
 		m.message = failed(key.app + " has no older deploy to go back to")

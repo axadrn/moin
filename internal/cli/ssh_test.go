@@ -84,11 +84,20 @@ func TestCatalog(t *testing.T) {
 // TestPickRelease: Enter takes the one before the live one, a typed one
 // wins.
 func TestPickRelease(t *testing.T) {
-	releases := []daemon.Release{{Number: 5, Live: true}, {Number: 4}, {Number: 3, Before: true}}
+	releases := []daemon.Release{
+		{DeployRecord: daemon.DeployRecord{Number: 5, Live: true, Commit: "3f2a9c1e0b4d"}},
+		{DeployRecord: daemon.DeployRecord{Number: 4, Image: "ghcr.io/ada/shop:main", ImageID: "9b1c2d3e4f5a"}},
+		{DeployRecord: daemon.DeployRecord{Number: 3}, Before: true},
+	}
 	for answer, want := range map[string]int{"\n": 3, "v4\n": 4, "4\n": 4} {
-		got, err := pickRelease(strings.NewReader(answer), io.Discard, "shop", releases, time.Now())
+		var out strings.Builder
+		got, err := pickRelease(strings.NewReader(answer), &out, "shop", releases, time.Now())
 		if err != nil || got != want {
 			t.Errorf("answer %q: v%d, %v; want v%d", answer, got, err, want)
+		}
+		// Each release shows the code it runs.
+		if !strings.Contains(out.String(), "3f2a9c1 ") || !strings.Contains(out.String(), "shop:main 9b1c2d3") {
+			t.Errorf("the picker shows no commit or image:\n%s", out.String())
 		}
 	}
 	if _, err := pickRelease(strings.NewReader("\n"), io.Discard, "shop", releases[:1], time.Now()); err == nil {

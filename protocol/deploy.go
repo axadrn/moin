@@ -32,6 +32,12 @@ type DeployStart struct {
 	// NoCopy deploys without the copy of the databases just before the new
 	// release starts: the way on when that copy fails.
 	NoCopy bool `json:"no_copy,omitempty"`
+	// Source is where the deploy comes from, for its record: laptop,
+	// follow, catalog, rollback or apply.
+	Source string `json:"-"`
+	// ImageName is the image as you named it, like ghcr.io/you/my-app:1.4,
+	// for the record. Image is the copy of it moin pinned for the release.
+	ImageName string `json:"-"`
 }
 
 // Domains is how visitors reach the app, as `moin domains` set them on

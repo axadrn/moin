@@ -30,6 +30,8 @@ Apps
   apps                         Every app on every server
   apps rm <app>                Remove an app. Its volumes stay
   logs [app]                   The app's logs. -f follows them
+  deploys [app]                Its deploys: from where, what, how they ended
+  deploys [app] v12            What deploy v12 printed
   rollback [app]               Go back to an older deploy
   restart [app]                Start the app again with its env and domains as now
   stop [app]                   Stop the app until you start it
@@ -218,6 +220,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		return apps(ctx, rest, stdin, stdout)
 	case "compose":
 		return compose(ctx, rest, stdout)
+	case "deploys":
+		return deploys(ctx, rest, stdout)
 	case "rollback":
 		return rollback(ctx, rest, stdin, stdout)
 	case "restart", "start", "stop":

@@ -65,6 +65,7 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 			return Result{}, err
 		}
 		start.Catalog = d.Catalog
+		start.Source = "catalog"
 	default:
 		file, err := a.receiveSource(d.Source)
 		if err != nil {
@@ -72,13 +73,14 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 		}
 		defer os.Remove(file)
 		start.SourceFile = file
+		start.Source = "laptop"
 	}
 	if d.Image != "" {
 		image, err := a.pinImage(ctx, d.App, d.Image)
 		if err != nil {
 			return Result{}, err
 		}
-		start.Image = image
+		start.Image, start.ImageName = image, d.Image
 	}
 	return a.deployHere(ctx, start, out)
 }
@@ -155,25 +157,27 @@ func ExecHere(ctx context.Context, dir, app, service string, tty bool, argv []st
 	return runTo(ctx, stdout, stderr, stdin, "docker", args...)
 }
 
-// newStart is a deploy of app with its domains. It gets its number when
-// it has the app's lock (runDeploy).
+// newStart is a deploy of app with its domains, an apply until the caller
+// says where it comes from. It gets its number when it has the app's
+// lock (runDeploy).
 func (a *apps) newStart(app string) protocol.DeployStart {
 	return protocol.DeployStart{
 		DeployID: newDeployID(),
 		App:      app,
+		Source:   "apply",
 		Domains:  &protocol.Domains{Domains: a.domains(app), Instant: "sslip.io", InstantIP: firstIPv4()},
 	}
 }
 
-// deployHere runs one deploy and says what runs after it.
+// deployHere runs one deploy and says what runs after it. A deploy that
+// failed says its number too, when it got one: its log tells why.
 func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out io.Writer) (Result, error) {
 	logf := func(format string, args ...any) { fmt.Fprintf(out, format+"\n", args...) }
 	detected, err := a.runDeploy(ctx, &start, logf)
 	if err != nil {
 		a.markFailed(start.App, start.Number)
-		return Result{}, err
+		return Result{App: start.App, Release: start.Number}, err
 	}
-	logf("v%d is live", start.Number)
 	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: addresses(detected)}
 	for _, database := range detected.Databases {
 		switch {

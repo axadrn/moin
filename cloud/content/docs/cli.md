@@ -105,6 +105,8 @@ In the terminal UI the same lines show on the Servers tab.
 | `moin deploy my-server --catalog umami` | an app from the [catalog](/docs/catalog) |
 | `moin deploy --app my-app` | another name for the app. Without it, the app is named after the folder |
 | `moin deploy --no-copy` | deploy even when the copy of the databases just before it fails |
+| `moin deploys [app]` | every deploy of the app: from where, what it runs, how it ended, how long it took. [Every deploy](/docs/deploy#every-deploy) |
+| `moin deploys [app] v7` | what deploy v7 printed |
 | `moin rollback [app]` | pick an older release to run again. `--to v3` names it. Without a terminal, the one before |
 | `moin restart [app]` | start the live release again, with its env and domains as they are now |
 | `moin stop [app]` | stop the app. It stays stopped after a reboot, until `moin start`. Its data stays |

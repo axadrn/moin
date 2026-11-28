@@ -143,12 +143,12 @@ func pickRelease(stdin io.Reader, stdout io.Writer, app string, releases []daemo
 			note = style.Muted.Render("the one before")
 			suggested = release.Number
 		}
-		rows = append(rows, []string{"v" + strconv.Itoa(release.Number), human.Ago(release.At, now), note})
+		rows = append(rows, []string{"v" + strconv.Itoa(release.Number), human.Ago(release.At, now), release.What(), note})
 	}
 	if suggested == 0 {
 		return 0, fmt.Errorf("%s has no older deploy to go back to", app)
 	}
-	table(stdout, []string{"DEPLOY", "WHEN", "STATE"}, rows)
+	table(stdout, []string{"DEPLOY", "WHEN", "WHAT", "STATE"}, rows)
 	fmt.Fprint(stdout, style.Warning.Render("?")+" Go back to which deploy? "+style.Muted.Render("[v"+strconv.Itoa(suggested)+"]")+" ")
 	answer, err := readLine(stdin)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -322,12 +323,9 @@ func (fw *follower) deployBranch(ctx context.Context, a *apps, f Follow) (string
 	}
 	start := a.newStart(f.App)
 	start.SourceFile = source
-	var log bytes.Buffer
-	_, err = a.deployHere(ctx, start, &log)
-	if err != nil {
-		return commit, fmt.Errorf("%w. See the releases with `%s rollback %s`", err, build.Name, f.App)
-	}
-	return commit, nil
+	start.Source = "follow"
+	result, err := a.deployHere(ctx, start, io.Discard)
+	return commit, whyFailed(f.App, result, err)
 }
 
 // deployImage deploys the image head just pulled: the release that runs,
@@ -338,14 +336,21 @@ func (fw *follower) deployImage(ctx context.Context, a *apps, f Follow) (string,
 		return "", err
 	}
 	start := a.newStart(f.App)
+	start.Source, start.ImageName = "follow", f.Image
 	if start.Image, err = a.pinImage(ctx, f.App, f.Image); err != nil {
 		return "", err
 	}
-	var log bytes.Buffer
-	if _, err := a.deployHere(ctx, start, &log); err != nil {
-		return id, fmt.Errorf("%w. See the releases with `%s rollback %s`", err, build.Name, f.App)
+	result, err := a.deployHere(ctx, start, io.Discard)
+	return id, whyFailed(f.App, result, err)
+}
+
+// whyFailed is the error of a deploy the server made on its own, with
+// the command that shows its log: nobody watched it.
+func whyFailed(app string, result Result, err error) error {
+	if err == nil || result.Release == 0 {
+		return err
 	}
-	return id, nil
+	return fmt.Errorf("%w. Why: `%s deploys %s v%d`", err, build.Name, app, result.Release)
 }
 
 // git runs git with the app's deploy key and nothing to ask, and returns

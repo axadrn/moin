@@ -51,6 +51,8 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 		}
 		value, err := daemon.RollbackHere(ctx, dir, app, *to, log)
 		return respond(stdout, value, err)
+	case "deploys":
+		return hereDeploys(dir, args, stdout)
 	case "releases":
 		app, err := name()
 		if err != nil {
