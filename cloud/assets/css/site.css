@@ -479,6 +479,12 @@
   .moin-icon-x { --i: url("../icons/x.svg"); }
   .moin-icon-x-logo { --i: url("../icons/x-logo.svg"); }
   .moin-icon-git-hub { --i: url("../icons/git-hub.svg"); }
+  .moin-icon-shield { --i: url("../icons/shield.svg"); }
+  .moin-icon-route { --i: url("../icons/route.svg"); }
+  .moin-icon-cloud { --i: url("../icons/cloud.svg"); }
+  .moin-icon-ban { --i: url("../icons/ban.svg"); }
+  .moin-icon-refresh { --i: url("../icons/refresh.svg"); }
+  .moin-icon-eye { --i: url("../icons/eye.svg"); }
 }
 
 @layer moin-components {
@@ -2481,5 +2487,29 @@
     .moin-compare-text:not(:has(.moin-small)) { display: flex; }
     .moin-compare-what { display: inline; }
     .moin-compare-foot { padding: var(--space-4) 0 0; border-top: 0; }
+  }
+}
+
+@layer moin-components {
+  /* Features: a grid of short items, each a line icon, a bold title and one
+     muted line. No cards. Three across, two on a tablet, one on a phone. */
+  .moin-features {
+    display: grid;
+    gap: var(--space-6) var(--space-8);
+    padding-block: var(--space-4);
+  }
+  .moin-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .moin-feature > .moin-icon { width: 1.5rem; height: 1.5rem; margin-block-start: 1px; }
+  .moin-feature-title { font-weight: 600; }
+  .moin-feature-note { color: var(--muted-foreground); }
+  @media (min-width: 40rem) { .moin-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 64rem) {
+    .moin-features { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 56rem; margin-inline: auto; }
+    .moin-feature { flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+    .moin-feature > .moin-stack { align-items: center; }
   }
 }

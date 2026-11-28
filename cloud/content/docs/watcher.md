@@ -18,7 +18,7 @@ Every setup: deploys, backups restored every day, alerts while your server lives
 | | No watcher | Self-hosted | moin cloud |
 | --- | --- | --- | --- |
 | You hear when your server dies | no | yes | yes |
-| Your domains, visited from outside | no | yes | yes |
+| Uptime checks every minute, instead of UptimeRobot | no | yes | yes |
 | What happened, on your phone | no | yes | yes |
 | A copy a hacked server can't delete | [lock your bucket](/docs/backups#lock-your-bucket) | [lock your bucket](/docs/backups#lock-your-bucket) | yes, built in |
 | Off-site copies without a bucket to set up | no | no | yes |

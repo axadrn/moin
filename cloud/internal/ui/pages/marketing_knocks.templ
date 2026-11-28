@@ -77,7 +77,7 @@ func siteHost(site string) string {
 templ homeKnocks(k HomeKnocks) {
 	{{ rows := knockRows(k.Knocks) }}
 	<section id="knocks" class="moin-band">
-		@homeHead(siteHost(brand.Site)+", right now.", "Every knock on a closed port. All dropped.")
+		@homeHead("Right now on "+siteHost(brand.Site)+".", "Every knock on a closed port. All dropped.")
 		if k.Sample {
 			<div class="moin-row" data-center>
 				@components.Chip("Sample data · development only")

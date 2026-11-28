@@ -193,16 +193,22 @@ templ homeAlert(title, text, at string) {
 templ HomeNobodyGetsIn() {
 	<section id="security" class="moin-band">
 		@homeHead("Zero trust deploys.", "No dashboard holds a key to your server. Not even ours.")
+		<div class="moin-row" data-center data-wrap data-gap="2">
+			@components.Chip("Tailscale")
+			@components.Chip("Cloudflare Tunnel")
+		</div>
 		@components.Card(components.CardProps{}) {
 			@homeRoads()
 			@homeRoadsTall()
 		}
-		<div class="moin-grid" data-cols="2">
-			@components.Fact(components.FactProps{Name: "No open ports.", Note: "Nothing listens for moin. Public SSH closes after the first deploy. It counts every knock."})
-			@components.Fact(components.FactProps{Name: "Tailscale and Cloudflare, built in.", Note: "SSH in your tailnet. Visitors through a tunnel."})
-			@components.Fact(components.FactProps{Name: "No surprise updates.", Note: "Your server updates when you say so."})
-			@components.Fact(components.FactProps{Name: "A hacked watcher is harmless.", Note: "It can read. It can't command."})
-		</div>
+		@components.Features() {
+			@components.Feature(components.FeatureProps{Icon: "shield", Title: "No open ports", Note: "Only 80 and 443. SSH closes after the first deploy."})
+			@components.Feature(components.FeatureProps{Icon: "route", Title: "SSH over Tailscale", Note: "In your tailnet, built in."})
+			@components.Feature(components.FeatureProps{Icon: "cloud", Title: "Cloudflare Tunnel", Note: "Visitors through a tunnel. No port at all."})
+			@components.Feature(components.FeatureProps{Icon: "ban", Title: "Nothing of moin listens", Note: "It counts every knock."})
+			@components.Feature(components.FeatureProps{Icon: "refresh", Title: "No surprise updates", Note: "Your server updates when you say so."})
+			@components.Feature(components.FeatureProps{Icon: "eye", Title: "A hacked watcher can't command", Note: "It can read. It can't command."})
+		}
 		@components.Fact(components.FactProps{Name: "0 bytes", Note: "Sent to us by the free software. Read the source.", Href: layouts.GitHubURL})
 		@homeMore("/docs/security", "Security in detail")
 	</section>
