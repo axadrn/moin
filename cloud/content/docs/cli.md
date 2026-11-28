@@ -23,7 +23,9 @@ You name the app: `moin logs my-app`. moin finds the server it runs on. In the a
 - A server is a name from your SSH config, like `my-server`, or `user@host`. If `ssh my-server` works, moin works.
 - moin keeps your servers in `~/.config/moin/servers`, one per line, and which app runs where in `~/.config/moin/apps.json`. On a miss, it asks every server.
 
-When something is missing and you are on a terminal, moin asks: a list to pick from, or a question. In a script it stops and names the flag to pass.
+## Leave a value out
+
+Leave a value out on a terminal and moin asks. It shows a list to pick from, like your servers, an alert kind, or a registry. Or it asks a question, like the key file, the domain or the watcher token. In scripts, pass the flags. Without a terminal moin stops and names the one to pass.
 
 ## The terminal UI
 
