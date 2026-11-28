@@ -377,7 +377,7 @@ ssh second "docker run --rm httpd:2 htpasswd -Bbn $reg_user $reg_pass > /root/ht
 ssh prod "printf '{\"insecure-registries\":[\"$registry\"]}' > /etc/docker/daemon.json && systemctl reload docker" || fail "let prod's Docker use the registry over http"
 # push_tag <tag> <upstream tag> puts a public image in the registry under a tag; out is its image ID.
 push_tag() {
-    ssh second "echo $reg_pass | docker login localhost:5000 -u $reg_user --password-stdin >/dev/null && docker pull -q traefik/whoami:$2 >/dev/null && docker tag traefik/whoami:$2 localhost:5000/e2e/whoami:$1 && docker push -q localhost:5000/e2e/whoami:$1 >/dev/null && docker image inspect --format '{{.Id}}' traefik/whoami:$2"
+    ssh second "echo $reg_pass | docker login localhost:5000 -u $reg_user --password-stdin >/dev/null && docker pull -q traefik/whoami:$2 >/dev/null && docker tag traefik/whoami:$2 localhost:5000/e2e/whoami:$1 && docker push -q localhost:5000/e2e/whoami:$1 >/dev/null && docker image inspect --format '{{index .RepoDigests 0}}' localhost:5000/e2e/whoami:$1 | sed 's/.*@//'"
 }
 id1=$(push_tag main v1.10.2) || fail "push an image to the registry on second" "$id1"
 pass "an image is in the registry on second"
@@ -392,7 +392,7 @@ cd "$work/$reg_app" || exit 1
 ref=$registry/e2e/whoami:main
 expect "moin deploy prod --image $ref" "$reg_app v[0-9]+ is live" moin deploy prod --image "$ref" -y
 eventually 120 "the app from the private registry answers" "Hostname:" get "$reg_url/"
-running() { ssh prod "docker image inspect --format '{{.Id}}' \$(docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1))"; }
+running() { ssh prod "docker image inspect --format '{{index .RepoDigests 0}}' \$(docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1)) | sed 's/.*@//'"; }
 expect "the app runs the image of the registry" "$id1" running
 expect "moin follow $reg_app --image $ref" "$reg_app follows $ref" moin follow $reg_app --image "$ref"
 id2=$(push_tag main v1.10.3) || fail "push a new image under the same tag" "$id2"
