@@ -301,6 +301,43 @@ func TestPrune(t *testing.T) {
 	}
 }
 
+// A trial that ran out, with nothing paid, is like a subscription that
+// ended: every copy goes Grace after the trial's end.
+func TestPruneTrial(t *testing.T) {
+	test := newCopiesTest(t)
+	now := time.Now()
+	ends := now.Add(-time.Hour)
+	if err := test.store.StartTrial(test.space.ID, ends.Add(-30*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	copy, err := test.store.NewCopy(workspace.Copy{WorkspaceID: test.space.ID, Server: "prod", App: "shop", Database: "/data/app.db", MadeAt: ends, Size: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := test.store.CopyDone(copy.ID, 10); err != nil {
+		t.Fatal(err)
+	}
+	left := func() int {
+		copies, err := test.store.Copies(test.space.ID, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(copies)
+	}
+	if err := test.copies.Prune(test.ctx, ends.Add(Grace-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if left() != 1 {
+		t.Fatal("the newest copy went before the grace ended")
+	}
+	if err := test.copies.Prune(test.ctx, ends.Add(Grace+time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if n := left(); n != 0 {
+		t.Fatalf("%d copies left after the grace", n)
+	}
+}
+
 // What only a real R2 bucket with its 14-day lock shows: the signed size
 // and If-None-Match hold, and nobody deletes a copy inside the lock. Run
 // with the settings of moin cloud's bucket (config.go):

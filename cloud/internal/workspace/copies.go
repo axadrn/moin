@@ -100,12 +100,14 @@ func (s *Store) CopiesMadeBetween(workspaceID, server, app, database string, fro
 // Due are the copies whose time is over at now, oldest first:
 //   - a done copy older than keep, but never the newest of its database
 //   - an upload that never said done, a day after it started
-//   - every copy of a workspace that ended more than grace ago, or is gone
+//   - every copy of a workspace that ended, or whose trial ran out, more
+//     than grace ago, or that is gone
 func (s *Store) Due(now time.Time, keep, grace time.Duration) ([]Copy, error) {
 	rows, err := s.db.Query(`SELECT `+copyColumns+` FROM copies
 		LEFT JOIN workspaces ON workspaces.id = copies.workspace_id
 		WHERE workspaces.id IS NULL
 		OR (workspaces.status = 'ended' AND workspaces.ended <= ?)
+		OR (workspaces.status = 'trial' AND workspaces.trial_ends <= ?)
 		OR (copies.state = 'uploading' AND copies.created <= ?)
 		OR (copies.state = 'done' AND copies.created <= ? AND copies.id != (
 			SELECT newest.id FROM copies AS newest
@@ -113,7 +115,7 @@ func (s *Store) Due(now time.Time, keep, grace time.Duration) ([]Copy, error) {
 			AND newest.app = copies.app AND newest.database = copies.database AND newest.state = 'done'
 			ORDER BY newest.made_at DESC, newest.id LIMIT 1))
 		ORDER BY copies.created`,
-		now.Add(-grace).Unix(), now.Add(-24*time.Hour).Unix(), now.Add(-keep).Unix())
+		now.Add(-grace).Unix(), now.Add(-grace).Unix(), now.Add(-24*time.Hour).Unix(), now.Add(-keep).Unix())
 	if err != nil {
 		return nil, err
 	}

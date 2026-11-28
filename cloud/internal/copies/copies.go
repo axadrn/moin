@@ -32,7 +32,8 @@ const (
 	Storage = 50 << 30
 	// Keep is how long a copy stays, as long as the bucket's lock.
 	Keep = 14 * 24 * time.Hour
-	// Grace is how long the copies stay after a subscription ended.
+	// Grace is how long the copies stay after a subscription or a trial
+	// ended.
 	Grace = 30 * 24 * time.Hour
 	// every is how far apart the copies of one database are made, by the
 	// time the server took them: one an hour, with ten minutes to spare
@@ -207,7 +208,8 @@ func (c *Copies) DownloadURL(ctx context.Context, workspaceID, id string) (strin
 
 // Prune deletes the copies whose time is over: older than Keep, but
 // never the newest of a database; uploads that never ended; and every
-// copy of a workspace that ended Grace ago, or was deleted. A copy the
+// copy of a workspace that ended, or whose trial ran out, Grace ago, or
+// was deleted. A copy the
 // lock still keeps goes on a later round.
 func (c *Copies) Prune(ctx context.Context, now time.Time) error {
 	due, err := c.store.Due(now, Keep, Grace)
