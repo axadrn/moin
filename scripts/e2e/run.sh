@@ -238,14 +238,14 @@ second_pid=$!
 step "1. A first deploy of $shop, with Postgres, from a fresh git repository"
 git_app shop "$shop"
 cd "$work/$shop" || exit 1
-expect "moin deploy prod sets up moin and deploys" "$shop is live: $shop_url" moin deploy prod -y
+expect "moin deploy prod sets up moin and deploys" "$shop v[0-9]+ is live: $shop_url" moin deploy prod -y
 said "the deploy found Postgres and points at its backups" "Postgres found. No backup yet"
 eventually 180 "$shop answers on its instant address, over HTTPS" "shop v1 .*rows=[0-9]+" get "$shop_url/"
 expect "$shop wrote a row in Postgres" "^[1-9][0-9]*$" rows
 
 step "2. Everyday work on $shop"
 sed -i 's/"v1"/"v2"/' index.js && commit v2
-expect "moin deploy, without a server, goes where $shop runs" "$shop is live" moin deploy
+expect "moin deploy, without a server, goes where $shop runs" "$shop v[0-9]+ is live" moin deploy
 eventually 60 "v2 answers" "shop v2" get "$shop_url/"
 expect "moin shows prod and $shop" "$shop" moin
 expect "moin --json is JSON with $shop" "$shop" sh -c "'$work/moin' --json | python3 -m json.tool"
@@ -334,7 +334,7 @@ eventually 150 "and that prod reports again" "prod reports again" hooks
 
 step "6. An app of the catalog"
 cd "$work" || exit 1
-expect "moin deploy prod --catalog it-tools --app $tools" "$tools is live" moin deploy prod --catalog it-tools --app "$tools" -y
+expect "moin deploy prod --catalog it-tools --app $tools" "$tools v[0-9]+ is live" moin deploy prod --catalog it-tools --app "$tools" -y
 eventually 120 "it-tools answers over HTTPS" "<html|<!DOCTYPE" get "$tools_url/"
 cd "$work/$shop" || exit 1
 
@@ -351,7 +351,7 @@ pass "anna is out again"
 ssh prod 'useradd -m -s /bin/bash ada && mkdir -p /home/ada/.ssh && cp /root/.ssh/authorized_keys /home/ada/.ssh/ && chown -R ada: /home/ada/.ssh && echo "ada ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ada'
 git_app hello "$hello"
 cd "$work/$hello" || exit 1
-expect "ada, a sudo user, deploys $hello: moin deploy prod-ada" "$hello is live" moin deploy prod-ada -y
+expect "ada, a sudo user, deploys $hello: moin deploy prod-ada" "$hello v[0-9]+ is live" moin deploy prod-ada -y
 eventually 120 "hello answers over HTTPS" "hello from a sudo user" get "$hello_url/"
 expect "moin servers rm prod-ada" "forgot prod-ada" moin servers rm prod-ada
 
@@ -360,9 +360,9 @@ whoami=whoami-$run
 whoami_url=https://$whoami.$(dashed "$prod_ip").sslip.io
 git_app whoami "$whoami"
 cd "$work/$whoami" || exit 1
-expect "moin deploy prod --image traefik/whoami:v1.10.2" "$whoami is live" moin deploy prod --image traefik/whoami:v1.10.2 -y
+expect "moin deploy prod --image traefik/whoami:v1.10.2" "$whoami v[0-9]+ is live" moin deploy prod --image traefik/whoami:v1.10.2 -y
 eventually 120 "the public image answers over HTTPS" "Hostname:" get "$whoami_url/"
-expect "moin deploy prod --image traefik/whoami:v1.10.3" "$whoami is live" moin deploy prod --image traefik/whoami:v1.10.3 -y
+expect "moin deploy prod --image traefik/whoami:v1.10.3" "$whoami v[0-9]+ is live" moin deploy prod --image traefik/whoami:v1.10.3 -y
 eventually 60 "the new image answers" "Hostname:" get "$whoami_url/"
 expect "moin rollback $whoami" "$whoami" moin rollback $whoami
 eventually 60 "the old image answers after the rollback" "Hostname:" get "$whoami_url/"
@@ -390,7 +390,7 @@ reg_url=https://$reg_app.$(dashed "$prod_ip").sslip.io
 git_app whoami "$reg_app"
 cd "$work/$reg_app" || exit 1
 ref=$registry/e2e/whoami:main
-expect "moin deploy prod --image $ref" "$reg_app is live" moin deploy prod --image "$ref" -y
+expect "moin deploy prod --image $ref" "$reg_app v[0-9]+ is live" moin deploy prod --image "$ref" -y
 eventually 120 "the app from the private registry answers" "Hostname:" get "$reg_url/"
 running() { ssh prod "docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1)"; }
 expect "the app runs the image of the registry" "$id1" running
@@ -428,7 +428,7 @@ ssh second 'systemctl stop moin-watcher && docker rm -f proxy' >/dev/null
 if [ "$server_moin" != "$work/moin" ]; then
     ssh second moin here setup second || fail "set up moin on second by hand"
 fi
-expect "moin deploy second puts $shop on a server that never had it" "$shop is live" moin deploy second -y
+expect "moin deploy second puts $shop on a server that never had it" "$shop v[0-9]+ is live" moin deploy second -y
 set_bucket second
 other=$(grep -oE 'AGE-SECRET-KEY-1[A-Z0-9]+' <<<"$out")
 expect "moin backups $shop -s second --from prod lists prod's copies" "$copy" moin backups $shop -s second --from prod
