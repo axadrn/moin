@@ -161,7 +161,7 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 		return nil, fmt.Errorf("workspace %s: %w", id, err)
 	}
 	w.Send = ws.sender(id, space.Mail)
-	w.Connect = func(server string) string { return build.Name + " cloud connect " + server }
+	w.Connect = func(server string) string { return build.Name + " watcher connect " + server }
 	ws.byWorkspace[id] = w
 	return w, nil
 }

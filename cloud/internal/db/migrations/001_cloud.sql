@@ -39,7 +39,7 @@ CREATE TABLE sessions (
 CREATE INDEX sessions_workspace ON sessions(workspace_id);
 
 -- A login waits to be used. browser: a mail link to mail. cli: a
--- `moin cloud login` that waits for a browser to allow its code; mail is
+-- `moin watcher connect` that waits for a browser to allow its code; mail is
 -- filled in when one does.
 CREATE TABLE logins (
     token_hash TEXT PRIMARY KEY,

@@ -68,7 +68,7 @@ Read all steps first. Your apps and their data stay. Domains, the bucket and the
 4. In each app's folder: `moin deploy prod`. It takes the app over, with its data and env. The web pauses for a few seconds. Another folder name: add `--app <name>`. A catalog app: `moin deploy prod --catalog umami`.
 5. Right after it, add your domains again: `moin domains add shop shop.example.com`. Until then only the instant address answers.
 6. Set the rest again: `moin bucket set prod`, `moin alerts add prod …`, and `moin secure prod` for the tunnel and the firewall. Your old copies stay in the bucket, unlisted: plain `.db.gz` and `.dump` files in a folder named by a long ID. Delete it once the new copies cover you.
-7. moin cloud: `moin cloud login` with the same mail, then `moin cloud connect prod`. Your plan comes with you. Early backers keep their free year.
+7. moin cloud: `moin watcher connect prod` with the same mail. Your plan comes with you. Early backers keep their free year.
 8. CI that deployed through the hub: remove that step, then `moin follow shop --branch main`.
 9. A self-hosted hub: in `/opt/moin`, `docker compose down --rmi all`, then `rm -rf /opt/moin /var/lib/moin-hub /etc/moin-hub /etc/moin/rules`.
 
