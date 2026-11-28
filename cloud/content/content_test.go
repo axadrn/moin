@@ -13,7 +13,7 @@ import (
 // files that start with an underscore too.
 func TestTheBinaryHoldsTheTexts(t *testing.T) {
 	texts := FS(false)
-	for _, name := range []string{"blog/your-server-needs-no-open-port.md", "changelog.md", "llms.txt", "docs/getting-started.md", "legal/terms.md"} {
+	for _, name := range []string{"blog/your-server-needs-no-open-port.md", "changelog.md", "llms.txt", "prices.json", "docs/getting-started.md", "legal/terms.md"} {
 		if _, err := fs.Stat(texts, name); err != nil {
 			t.Error(err)
 		}

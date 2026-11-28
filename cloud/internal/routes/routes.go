@@ -54,6 +54,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /catalog", catalogPages.List)
 	mux.HandleFunc("GET /catalog/{slug}", catalogPages.Show)
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
+	mux.HandleFunc("GET /kill-your-subscriptions", handler.Kill(texts, entries))
 	mux.HandleFunc("GET /compare", handler.CompareIndex)
 	mux.HandleFunc("GET /compare/{name}", handler.Compare)
 	mux.HandleFunc("GET /brand", handler.Brand)

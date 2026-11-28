@@ -37,7 +37,7 @@ func (h *SEOHandler) Sitemap(w http.ResponseWriter, _ *http.Request) {
 		renderError(w, "sitemap: docs", err)
 		return
 	}
-	pages := []service.SitemapPage{{Path: "/"}, {Path: "/docs"}, {Path: "/catalog"}, {Path: "/compare"}, {Path: "/brand"}, {Path: "/roadmap"}, {Path: "/legal/terms"}, {Path: "/legal/privacy"}}
+	pages := []service.SitemapPage{{Path: "/"}, {Path: "/docs"}, {Path: "/catalog"}, {Path: "/kill-your-subscriptions"}, {Path: "/compare"}, {Path: "/brand"}, {Path: "/roadmap"}, {Path: "/legal/terms"}, {Path: "/legal/privacy"}}
 	for _, page := range docs {
 		// The roadmap has its own page, /roadmap.
 		if page.Slug != "roadmap" {

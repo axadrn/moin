@@ -1244,6 +1244,122 @@
 }
 
 @layer moin-components {
+  /* A command among other words: drawn as a terminal draws it. */
+  .moin-command[data-terminal] {
+    height: auto;
+    min-height: var(--press);
+    padding-block: var(--space-1);
+    background: var(--terminal);
+    color: var(--terminal-foreground);
+  }
+  /* It breaks between words, never in one. */
+  .moin-command[data-terminal] > code { padding-block: var(--space-2); white-space: normal; }
+  .moin-command[data-terminal] > code > span { white-space: nowrap; }
+  .moin-command[data-terminal] > code::before { content: "$ "; opacity: 0.45; }
+  .moin-command[data-terminal] .moin-copy { color: inherit; opacity: 0.7; }
+  .moin-command[data-terminal] .moin-copy:hover { background: color-mix(in oklab, currentColor 12%, transparent); opacity: 1; }
+  .moin-command[data-terminal] .moin-copy[data-copied] { color: var(--live); opacity: 1; }
+}
+
+@layer moin-components {
+  /* A receipt: paper with torn edges at the top and the bottom, lying on
+     the page. Its parts under each other, a hairline between. */
+  .moin-receipt {
+    width: 100%;
+    max-width: 30rem;
+    margin-inline: auto;
+    filter: drop-shadow(0 1px 1px light-dark(rgb(0 0 0 / 6%), transparent))
+      drop-shadow(0 20px 30px light-dark(rgb(0 0 0 / 8%), transparent))
+      drop-shadow(0 0 0.5px light-dark(transparent, rgb(255 255 255 / 30%)));
+  }
+  .moin-receipt-paper {
+    --tooth: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    padding: 2.25rem var(--space-5) 2.5rem;
+    background: var(--card);
+    color: var(--card-foreground);
+    -webkit-mask:
+      conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--tooth) 51% repeat-x,
+      conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--tooth) 51% repeat-x;
+    mask:
+      conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--tooth) 51% repeat-x,
+      conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--tooth) 51% repeat-x;
+  }
+  @media (min-width: 30rem) {
+    .moin-receipt-paper { padding: 2.5rem var(--space-8) 2.75rem; }
+  }
+  .moin-receipt-paper > * { padding-block: var(--space-5); }
+  .moin-receipt-paper > :first-child { padding-block-start: 0; }
+  .moin-receipt-paper > :last-child { padding-block-end: 0; }
+  .moin-receipt-paper > * + * { border-top: 1px solid var(--border); }
+  /* The sum: the one big number. */
+  .moin-receipt-total {
+    font-family: var(--font-heading);
+    font-size: 3rem;
+    font-weight: var(--weight-title);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .moin-receipt-total > small {
+    color: var(--muted-foreground);
+    font-size: 1rem;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  /* A line to tick off: a box, the name and a note, the value at the end.
+     Ticked, the name and the value are struck through. */
+  .moin-tick {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.125rem minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-3);
+    min-height: var(--press);
+    margin-inline: calc(-1 * var(--space-2));
+    padding-inline: var(--space-2);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+  .moin-tick:hover { background: var(--hover); }
+  .moin-tick:active { background: var(--active); }
+  .moin-tick:has(:focus-visible) { box-shadow: var(--focus); }
+  .moin-tick > input { position: absolute; opacity: 0; pointer-events: none; }
+  .moin-tick-box {
+    display: grid;
+    place-items: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--foreground) 28%, transparent);
+  }
+  .moin-tick-box > .moin-icon { width: 0.875rem; height: 0.875rem; color: var(--card); opacity: 0; }
+  .moin-tick:has(:checked) .moin-tick-box { background: var(--foreground); box-shadow: none; }
+  .moin-tick:has(:checked) .moin-tick-box > .moin-icon { opacity: 1; }
+  .moin-tick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .moin-tick-strike { position: relative; transition: color 200ms var(--ease); }
+  .moin-tick-strike::after {
+    content: "";
+    position: absolute;
+    top: 55%;
+    left: -2px;
+    right: -2px;
+    height: 1px;
+    background: var(--foreground);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 240ms var(--ease);
+  }
+  .moin-tick:has(:checked) .moin-tick-strike { color: var(--muted-foreground); }
+  .moin-tick:has(:checked) .moin-tick-strike::after { transform: scaleX(1); }
+  @media (prefers-reduced-motion: reduce) {
+    .moin-tick-strike,
+    .moin-tick-strike::after { transition: none; }
+  }
+}
+
+@layer moin-components {
   /* Overlays float one step lighter than what they cover, with no border. */
   .moin-palette::backdrop { background: var(--dim); }
 
@@ -2707,3 +2823,44 @@
 }
 .moin-brand-glyphs { font-weight: 600; letter-spacing: -0.04em; }
 .moin-brand-wrong-font { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 3rem; line-height: 1; }
+
+/* Kill your subscriptions: each bill and the command that replaces it,
+   and a dock that keeps the sum in view while you tick. */
+.moin-swaps { margin-block: calc(-1 * var(--pad)) calc(var(--pad) - var(--space-4)); }
+.moin-swaps:not(:has(> :not([hidden]))) { display: none; }
+.moin-swap {
+  display: grid;
+  gap: var(--space-4);
+  padding-block: var(--pad);
+  border-bottom: 1px solid var(--border);
+}
+.moin-swap > .moin-command { width: 100%; }
+@media (min-width: 52rem) {
+  .moin-swap { grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); align-items: center; column-gap: var(--space-8); }
+}
+.moin-kill-dock {
+  position: fixed;
+  z-index: 30;
+  right: var(--gutter, 1rem);
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  left: var(--gutter, 1rem);
+  display: flex;
+  max-width: 26rem;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 0 0 1px var(--border), 0 12px 32px -12px rgb(0 0 0 / 30%);
+  transform: translateY(150%);
+  visibility: hidden;
+  transition: transform 260ms var(--ease), visibility 0s 260ms;
+}
+.moin-kill-dock[data-show] { transform: none; visibility: visible; transition: transform 260ms var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+  .moin-kill-dock,
+  .moin-kill-dock[data-show] { transition: none; }
+}

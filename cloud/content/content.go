@@ -1,6 +1,7 @@
 // Package content holds the texts of the site: the blog, docs, legal
-// pages, the changelog, llms.txt and the posts from X. The catalog is its
-// own package, catalog/ at the root, which the daemon has built in too.
+// pages, the changelog, llms.txt, the prices of /kill-your-subscriptions and
+// the posts from X. The catalog is its own package, catalog/ at the root,
+// which the daemon has built in too.
 package content
 
 import (
@@ -9,7 +10,7 @@ import (
 	"os"
 )
 
-//go:embed all:blog all:docs all:legal changelog.md llms.txt tweets.json
+//go:embed all:blog all:docs all:legal changelog.md llms.txt prices.json tweets.json
 var files embed.FS
 
 // FS is the texts: from disk in development, so an edit shows on reload, else

@@ -1,0 +1,33 @@
+package components
+
+// Receipt is a paper receipt with torn edges at the top and the bottom:
+// bills and their sum. Each child is a part of it, a hairline between.
+templ Receipt() {
+	<div class="moin-receipt">
+		<div class="moin-receipt-paper">
+			{ children... }
+		</div>
+	</div>
+}
+
+// TickProps is a Tick: the name and a quiet note after it, the value at
+// the end, and whether it starts ticked. Attrs go on its checkbox.
+type TickProps struct {
+	ID      string
+	Name    string
+	Note    string
+	Value   string
+	Checked bool
+	Attrs   templ.Attributes
+}
+
+// Tick is a line to tick off, like a bill on a receipt: once ticked, its
+// name and its value are struck through.
+templ Tick(p TickProps) {
+	<label class="moin-tick" for={ p.ID }>
+		<input type="checkbox" id={ p.ID } checked?={ p.Checked } autocomplete="off" { p.Attrs... }/>
+		<span class="moin-tick-box" aria-hidden="true"><i class="moin-icon moin-icon-check"></i></span>
+		<span class="moin-tick-text"><span class="moin-tick-strike">{ p.Name }</span> <span class="moin-muted">{ p.Note }</span></span>
+		<span class="moin-tick-strike moin-digits">{ p.Value }</span>
+	</label>
+}
