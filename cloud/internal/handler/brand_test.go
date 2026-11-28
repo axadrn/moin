@@ -42,10 +42,10 @@ func TestBrandPage(t *testing.T) {
 	for _, file := range files {
 		data, err := assets.Files.ReadFile(file[1])
 		if err != nil || len(data) == 0 {
-			t.Errorf("/brand offers %s, which is missing", file[1])
+			t.Errorf("/brand offers %s, which is missing: run scripts/brand/build.cjs", file[1])
 		}
 		if strings.HasSuffix(file[1], ".svg") && !strings.Contains(string(data), string(path[1])) && !strings.Contains(file[1], "wordmark") {
-			t.Errorf("%s draws another mark than assets/img/mark.svg", file[1])
+			t.Errorf("%s draws another mark than assets/img/mark.svg: run scripts/brand/build.cjs", file[1])
 		}
 	}
 }
