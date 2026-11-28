@@ -46,6 +46,15 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
+	// A deploy of this folder sends the commit from here, pushed or not.
+	var pushed *bool
+	if *image == "" && *catalogApp == "" {
+		remote, ok := onRemote(ctx)
+		pushed = &ok
+		if !ok && !flags.json() {
+			fmt.Fprintln(log, style.Warning.Render("!")+" "+from+" is not on "+remote+" yet. Deploying it anyway.")
+		}
+	}
 	server, err := deployServer(ctx, flags, app)
 	if err != nil {
 		return err
@@ -70,7 +79,10 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	rememberApp(server, app)
 	if flags.json() {
-		return printJSON(stdout, result)
+		return printJSON(stdout, struct {
+			daemon.Result
+			Pushed *bool `json:"pushed,omitempty"`
+		}{result, pushed})
 	}
 	printLive(stdout, result, server, len(result.Databases) == 0 || hasBucket(ctx, server))
 	if result.Release == 1 {
@@ -138,6 +150,21 @@ func deploySource(ctx context.Context, image, catalogApp string, stdout io.Write
 		return commit + " with image " + image, nil
 	}
 	return commit, nil
+}
+
+// onRemote says whether the upstream of this branch has HEAD, and names
+// its remote, like origin. Without an upstream, HEAD is on none: the
+// remote named is the first one.
+func onRemote(ctx context.Context) (remote string, ok bool) {
+	branch, _ := gitOutput(ctx, "branch", "--show-current")
+	if remote, _ := gitOutput(ctx, "config", "branch."+branch+".remote"); remote != "" {
+		return remote, exec.CommandContext(ctx, "git", "merge-base", "--is-ancestor", "HEAD", "@{upstream}").Run() == nil
+	}
+	remotes, _ := gitOutput(ctx, "remote")
+	if remote, _, _ = strings.Cut(remotes, "\n"); remote == "" {
+		remote = "a remote"
+	}
+	return remote, false
 }
 
 // runDeploy runs the deploy on the server and shows its log as it comes.

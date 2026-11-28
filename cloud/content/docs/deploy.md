@@ -50,6 +50,7 @@ The first deploy to a server asks first, then installs Docker and moin there: `S
 The next time, `moin deploy` is enough: it deploys to the server the app runs on. On two servers, like staging and production, name the one: `moin deploy production`.
 
 - Changes you did not commit stay on your laptop. moin says so: `Changes that are not committed stay here: moin sends 3f2a9c1.` Commit first.
+- A commit you did not push deploys too. moin says so: `! 3f2a9c1 is not on origin yet. Deploying it anyway.` With `--json`, the result says `"pushed": false`.
 - The source may be 200 MB at most.
 - With a `Dockerfile` or a `compose.yml`, the server builds from those.
 - Without either, moin builds the app with [Railpack](https://railpack.com). Node, Bun, Python, Ruby, PHP and Go work like that.
