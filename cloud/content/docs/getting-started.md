@@ -93,7 +93,7 @@ Before your first deploy, `moin` shows three steps instead: `cd my-app`, `moin d
 
 ## 5. Back it up
 
-moin finds SQLite, Postgres, MySQL, MariaDB, MongoDB and ClickHouse by itself. It needs a place to put the copies: a bucket, at any S3-compatible provider.
+moin finds SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis by itself. It needs a place to put the copies: a bucket, at any S3-compatible provider.
 
 ```bash
 moin bucket set my-server

@@ -130,7 +130,7 @@ func inCategory(entries []catalog.Entry, category string) []catalog.Entry {
 // catalogBackup says what moin backs up of an app, from its database.
 func catalogBackup(entry catalog.Entry) string {
 	if !entry.BackedUp() {
-		return entry.DatabaseNote()
+		return ""
 	}
 	return brand.Name + " copies its " + entry.DatabaseName() + " database into your own bucket on a schedule. Every day it checks that a copy restores."
 }

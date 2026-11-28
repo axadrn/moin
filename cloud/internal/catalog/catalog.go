@@ -139,25 +139,12 @@ var databaseNames = map[string]string{
 	"mysql": "MySQL", "mongodb": "MongoDB", "clickhouse": "ClickHouse",
 }
 
-// BackedUp reports whether moin backs up the app's database.
-func (e Entry) BackedUp() bool {
-	return e.Database == "postgres" || e.Database == "sqlite"
-}
+// BackedUp reports whether moin backs up the app's database: every one
+// an entry may name.
+func (e Entry) BackedUp() bool { return e.Database != "" }
 
 // DatabaseName is the app's database as people write it, such as MySQL.
 func (e Entry) DatabaseName() string { return databaseNames[e.Database] }
-
-// DatabaseNote says plainly what moin does with the app's database: empty
-// for one moin backs up or for no database, a sentence for the others.
-func (e Entry) DatabaseNote() string {
-	if e.Database == "" || e.BackedUp() {
-		return ""
-	}
-	if e.Database == "mysql" {
-		return "Runs on MySQL: moin backups for MySQL come next."
-	}
-	return "Runs on " + e.DatabaseName() + ": moin doesn't back it up yet."
-}
 
 // Similar are up to n other apps of e's category, in the order of entries.
 func Similar(entries []Entry, e Entry, n int) []Entry {

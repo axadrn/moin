@@ -45,7 +45,8 @@ func BackupsHere(ctx context.Context, dir, app, from string) ([]protocol.Databas
 	for _, database := range b.databases(ctx, app) {
 		statuses = append(statuses, b.status(ctx, app, database, true))
 	}
-	return append(statuses, b.cannotBackUp(app)...), nil
+	statuses = append(statuses, b.cannotBackUp(app)...)
+	return append(statuses, b.caches(app)...), nil
 }
 
 // Copied is one copy BackupHere took.

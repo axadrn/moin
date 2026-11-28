@@ -224,7 +224,7 @@ func (e *clickhouseEngine) Check(ctx context.Context, from source) error {
 	if err != nil {
 		return notChecked{err}
 	}
-	name, remove := e.b.apps.checkContainer(ctx, e.app, e.database.Service)
+	name, remove := e.b.apps.throwawayContainer(ctx, "check", e.app, e.database.Service)
 	// One a check that was cut off left.
 	remove()
 	defer remove()

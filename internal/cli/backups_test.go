@@ -63,6 +63,9 @@ func TestOpenCopy(t *testing.T) {
 	if err := openCopy(bytes.NewReader(encryptedCopy(t, "PK\x03\x04"+rows, false, yours)), "clickhouse", yours); err != nil {
 		t.Errorf("a ClickHouse copy: %v", err)
 	}
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "REDIS0012"+rows, true, yours)), "redis", yours); err != nil {
+		t.Errorf("a Redis copy: %v", err)
+	}
 	if err := openCopy(bytes.NewReader(encryptedCopy(t, "short", true, yours)), "mongo", yours); err == nil {
 		t.Error("a few bytes that are no database passed")
 	}
@@ -158,5 +161,21 @@ func TestAddWebhookAlertSecret(t *testing.T) {
 	}
 	if ran, _ := os.ReadFile(runs); strings.Contains(string(ran), got.Secret) {
 		t.Errorf("ssh ran with the secret: %q", ran)
+	}
+}
+
+// A Redis that is only a cache is listed with its note and nothing else,
+// and is no database to pick for a restore.
+func TestCacheIsListedNotPicked(t *testing.T) {
+	cache := databaseBackups{DatabaseBackup: protocol.DatabaseBackup{Database: "redis-cache", Kind: "redis", Note: "cache, not backed up"}}
+	var out strings.Builder
+	printBackup(&out, cache, time.Now())
+	if got := out.String(); !strings.Contains(got, "redis-cache") || !strings.Contains(got, "cache, not backed up") || strings.Contains(got, "check") {
+		t.Errorf("the cache prints as\n%s", got)
+	}
+	database := databaseBackups{DatabaseBackup: protocol.DatabaseBackup{Database: "postgres-db"}}
+	picked, err := pickDatabase("shop", "", []databaseBackups{database, cache}, strings.NewReader(""), &out)
+	if err != nil || picked.Database != "postgres-db" {
+		t.Errorf("picked %q, %v", picked.Database, err)
 	}
 }

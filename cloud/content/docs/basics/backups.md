@@ -44,7 +44,7 @@ The provider's snapshots help with some of these. They live at the same provider
 
 ## What moin does
 
-moin finds your SQLite, Postgres, MySQL, MariaDB, MongoDB and ClickHouse databases by itself. Once you give it a bucket, it copies each one every hour.
+moin finds your SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis databases by itself. Once you give it a bucket, it copies each one every hour.
 
 ```bash
 moin bucket set my-server

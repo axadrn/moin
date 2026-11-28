@@ -85,7 +85,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 			}{schedule, databases})
 		}
 		if len(databases) == 0 {
-			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB, MongoDB or ClickHouse service.")
+			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB, MongoDB, ClickHouse or Redis service.")
 			return nil
 		}
 		fmt.Fprintln(stdout, scheduleLine(schedule))
@@ -144,7 +144,9 @@ func scheduleLine(schedule daemon.BackupSchedule) string {
 // appBackups is how the databases of app are backed up: the copies, the
 // undos and the last check of each.
 func appBackups(ctx context.Context, server, app string, stderr io.Writer) ([]protocol.DatabaseBackup, error) {
-	return backupsFrom(ctx, server, app, "", stderr)
+	databases, err := backupsFrom(ctx, server, app, "", stderr)
+	// A cache is listed with a note only: it is no database to pick.
+	return slices.DeleteFunc(databases, func(database protocol.DatabaseBackup) bool { return database.Note != "" }), err
 }
 
 // backupsFrom is appBackups with the copies another server left in the
@@ -159,6 +161,11 @@ func backupsFrom(ctx context.Context, server, app, from string, stderr io.Writer
 // the copies, where each is, the one the check restored marked.
 func printBackup(stdout io.Writer, database databaseBackups, now time.Time) {
 	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
+	if database.Note != "" {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(database.Note))
+		fmt.Fprintln(stdout)
+		return
+	}
 	if database.Error != "" {
 		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" "+commands(stdout, sentence(database.Error)))
 	}
@@ -477,15 +484,16 @@ const (
 
 // copyStarts are the first bytes of what a copy of each kind holds, once
 // it is decrypted and unzipped: a SQLite file, a pg_dump, a dump of MySQL
-// or MariaDB, which starts with a comment, an archive of mongodump, or a
-// zip of ClickHouse. notGzipped are the kinds whose copies are not
-// gzipped on top.
+// or MariaDB, which starts with a comment, an archive of mongodump, a zip
+// of ClickHouse, or a dump of Redis or Valkey. notGzipped are the kinds
+// whose copies are not gzipped on top.
 var copyStarts = map[string][]string{
 	"":                          {sqliteStart},
 	protocol.DatabasePostgres:   {postgresStart},
 	protocol.DatabaseMySQL:      {"-- ", "/*"},
 	protocol.DatabaseMongo:      {"\x6d\xe2\x99\x81"},
 	protocol.DatabaseClickHouse: {"PK\x03\x04"},
+	protocol.DatabaseRedis:      {"REDIS", "VALKEY"},
 }
 
 var notGzipped = []string{protocol.DatabasePostgres, protocol.DatabaseClickHouse}

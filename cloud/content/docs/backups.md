@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite, Postgres, MySQL, MariaDB, MongoDB and ClickHouse. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
+description: "SQLite, Postgres, MySQL, MariaDB, MongoDB, ClickHouse and Redis. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
 group: "Servers and data"
 order: 1
 ---
@@ -16,6 +16,7 @@ Databases, not files.
 - **MySQL and MariaDB**: the database `MYSQL_DATABASE` or `MARIADB_DATABASE` names, in a service that runs the official `mysql` or `mariadb` image. No change to your `compose.yml`.
 - **MongoDB**: every database in a service that runs the official `mongo` image. No change to your `compose.yml`.
 - **ClickHouse**: every database in a service that runs the `clickhouse/clickhouse-server` or `clickhouse` image. No change to your `compose.yml`.
+- **Redis and Valkey**: a service that runs the official `redis` or `valkey/valkey` image and mounts a volume at `/data`. That volume says it keeps data. Without it the Redis is a cache: it is empty after every deploy anyway, so moin does not back it up. `moin backups my-app` lists it as `cache, not backed up`.
 
 moin finds them by itself, also a database your app makes long after the deploy.
 
@@ -180,7 +181,7 @@ COPY                      WHERE    TAKEN    SIZE
   Go back to one with moin restore my-app --to <copy>
 ```
 
-A SQLite database is named by its path in the container. Every other database by its service, like `postgres-db`, `mysql-db`, `mongo-db` or `clickhouse-events`.
+A SQLite database is named by its path in the container. Every other database by its service, like `postgres-db`, `mysql-db`, `mongo-db`, `clickhouse-events` or `redis-queue`.
 
 It lists the newest 10 copies. `--json` lists them all. A copy from before every copy was encrypted says `not encrypted` next to its size, until it expires.
 
@@ -219,6 +220,7 @@ Postgres: pg_dump ─▶ age ─▶ a file on the server
 MySQL:    mysqldump or mariadb-dump ─▶ gzip ─▶ age ─▶ a file on the server
 MongoDB:  mongodump, gzipped ─▶ age ─▶ a file on the server
 ClickHouse: BACKUP into a zip ─▶ age ─▶ a file on the server
+Redis:    redis-cli --rdb ─▶ gzip ─▶ age ─▶ a file on the server
 Then:     the first copy of the day is restored and read ─▶ your bucket, moin cloud
 ```
 
@@ -229,6 +231,7 @@ Each makes a clean copy while your app keeps running.
 - **MySQL and MariaDB** copies run inside your database container too, with the dump tool of your own image. One consistent state, with routines, triggers and events. moin logs in as root with the `MYSQL_ROOT_PASSWORD` or `MARIADB_ROOT_PASSWORD` of the service. It reads the password inside the container, so it never leaves it.
 - **MongoDB** copies run inside your MongoDB container, with the `mongodump` of your own image. One copy holds every database of the service. moin logs in with the `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD` of the service, if it has them. The password never leaves the container. MongoDB dumps one collection after the other, so writes during a copy can land in one collection and miss another.
 - **ClickHouse** copies are made by ClickHouse's own `BACKUP`. One copy holds every database of the service. ClickHouse writes the zip into the `backups` folder of its data first, so its disk needs room for one copy, for a moment. moin reads the zip out and removes it. The official image allows that folder as it comes. A config of your own that sets `backups` must keep `<allowed_path>backups</allowed_path>`. moin logs in with the `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD` of the service, if it has them. Tables that only point somewhere else, like Kafka or MySQL tables, come back as tables without data. Replicated tables need their Keeper, so their check fails.
+- **Redis and Valkey** copies are the dump Redis sends a replica, fetched with the `redis-cli` of your own image. It works with dumps, with an append only file and with both. The dump lies in `/data` for a moment, so that volume needs room for one copy. A Redis with a password: moin reads it from `--requirepass` in the `command` of the service. A password in a config file it cannot see, so set `REDISCLI_AUTH` in the `environment` of the service then.
 
 A copy on the spot, before something risky:
 
@@ -247,7 +250,7 @@ Every deploy takes one too, just before the new release touches the data. If tha
 
 The first copy of each day is checked before it leaves the server. moin opens it with the server's key and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it. Only then does the copy go up, the very bytes that were read.
 
-For MySQL, MariaDB, MongoDB and ClickHouse the throwaway database runs in a container of its own, from the same image as yours, without a network. The check never touches your live database. moin removes the container when it is done.
+For MySQL, MariaDB, MongoDB, ClickHouse and Redis the throwaway database runs in a container of its own, from the same image as yours, without a network. The check never touches your live database. moin removes the container when it is done.
 
 So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while.
 
@@ -275,9 +278,9 @@ A restore never changes your data in place:
 2. It stops the app for one quick switch, and starts it again.
 3. It keeps the database from before, as the undo.
 
-MySQL, MariaDB, MongoDB and ClickHouse cannot switch a database in one step. So there moin stops the app, keeps the live database as the undo, a dump on the server, and loads the copy. If the load fails, the undo goes back in and your data is as it was.
+MySQL, MariaDB, MongoDB, ClickHouse and Redis cannot switch a database in one step. So there moin stops the app, keeps the live database as the undo, a dump on the server, and loads the copy. If the load fails, the undo goes back in and your data is as it was.
 
-A MongoDB restore replaces every database of the service but `admin` and `config`. So the users of your MongoDB stay as they are. A ClickHouse restore replaces every database of the service but ClickHouse's own.
+A MongoDB restore replaces every database of the service but `admin` and `config`. So the users of your MongoDB stay as they are. A ClickHouse restore replaces every database of the service but ClickHouse's own. A Redis restore starts a second Redis with the copy next to yours and has yours take all its data, as a replica does. Your Redis keeps running and writes its own files.
 
 A restore replaces live data, so moin asks first. Scripts pass `-y`.
 
@@ -381,9 +384,11 @@ age -d -i key.txt 20261127T140000Z-118204.db.gz.age | gunzip > my-app.db
 age -d -i key.txt 20261127T140000Z-118204.dump.age > my-app.dump
 age -d -i key.txt 20261127T140000Z-118204.sql.gz.age | gunzip > my-app.sql
 age -d -i key.txt 20261127T140000Z-118204.archive.gz.age > my-app.archive.gz
+age -d -i key.txt 20261127T140000Z-118204.zip.age > my-app.zip
+age -d -i key.txt 20261127T140000Z-118204.rdb.gz.age | gunzip > dump.rdb
 ```
 
-A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. A MySQL or MariaDB copy, `.sql.gz.age`, is plain SQL: `mysql` or `mariadb` loads it. A MongoDB copy, `.archive.gz.age`, is an archive of `mongodump`: `mongorestore --archive=my-app.archive.gz --gzip` loads it. A ClickHouse copy, `.zip.age`, is a zip of `BACKUP`: put it in the `backups` folder of a ClickHouse and run `RESTORE ALL FROM File('my-app.zip')`. You need no moin for any of them.
+A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. A MySQL or MariaDB copy, `.sql.gz.age`, is plain SQL: `mysql` or `mariadb` loads it. A MongoDB copy, `.archive.gz.age`, is an archive of `mongodump`: `mongorestore --archive=my-app.archive.gz --gzip` loads it. A ClickHouse copy, `.zip.age`, is a zip of `BACKUP`: put it in the `backups` folder of a ClickHouse and run `RESTORE ALL FROM File('my-app.zip')`. A Redis copy, `.rdb.gz.age`, is a `dump.rdb`: a Redis without an append only file loads it from its data folder when it starts. You need no moin for any of them.
 
 ## If it breaks
 

@@ -62,11 +62,11 @@ func (a *apps) serviceContainer(ctx context.Context, app, service, what string) 
 	return container, strings.TrimSpace(image), err
 }
 
-// checkContainer names the throwaway container the daily check of an
-// app's service runs in. remove takes it and its data away.
-func (a *apps) checkContainer(ctx context.Context, app, service string) (name string, remove func()) {
+// throwawayContainer names the throwaway container of an app's service
+// for what, "check" or "restore". remove takes it and its data away.
+func (a *apps) throwawayContainer(ctx context.Context, what, app, service string) (name string, remove func()) {
 	sum := sha256.Sum256([]byte(app + "/" + service))
-	name = tempName("check-" + hex.EncodeToString(sum[:4]))
+	name = tempName(what + "-" + hex.EncodeToString(sum[:4]))
 	return name, func() {
 		_, _ = a.output(context.WithoutCancel(ctx), "docker", "rm", "-f", "-v", name)
 	}

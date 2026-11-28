@@ -463,10 +463,11 @@ func (a *apps) startPreviousAgain(ctx context.Context, release *release, previou
 // afterStart notes the databases the running release has, which the
 // daemon copies from its next minute on, and drops old releases and images.
 func (a *apps) afterStart(ctx context.Context, release *release) {
-	databases, noBackup, err := a.scanDatabases(ctx, release.composeJSON)
+	databases, noBackup, caches, err := a.scanDatabases(ctx, release.composeJSON)
 	if err == nil {
 		release.detected.Databases = databases
 		release.detected.NoBackup = noBackup
+		release.detected.Caches = caches
 		writeErr := writeState(filepath.Join(release.dir, "detected.json"), release.detected)
 		if writeErr != nil {
 			release.logf("write down the databases: %s", writeErr)
@@ -488,6 +489,9 @@ func logDatabases(detected protocol.Detected, logf func(string, ...any)) {
 	}
 	for _, database := range detected.NoBackup {
 		logf("database %s: %s", database.Path, noBackupText)
+	}
+	for _, cache := range detected.Caches {
+		logf("%s: %s", cache.Path, cacheText)
 	}
 }
 

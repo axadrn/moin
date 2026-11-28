@@ -21,6 +21,9 @@ type Detected struct {
 	Databases      []Database          `json:"databases"`
 	// NoBackup is what looks like a database but moin cannot back up.
 	NoBackup []Database `json:"no_backup,omitempty"`
+	// Caches are the Redis and Valkey services that keep no data: moin
+	// backs up none of them, and says so.
+	Caches []Database `json:"caches,omitempty"`
 }
 
 // Database is a database of an app: a SQLite file the daemon found on one

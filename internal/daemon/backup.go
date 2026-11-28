@@ -46,7 +46,8 @@ import (
 //
 // backup_sqlite.go copies with VACUUM INTO, backup_postgres.go with
 // pg_dump, backup_mysql.go with mysqldump or mariadb-dump,
-// backup_mongo.go with mongodump, backup_clickhouse.go with BACKUP.
+// backup_mongo.go with mongodump, backup_clickhouse.go with BACKUP,
+// backup_redis.go with redis-cli --rdb.
 type engine interface {
 	// Copy writes a full copy of the live database to w.
 	Copy(ctx context.Context, w io.Writer) error
@@ -196,6 +197,8 @@ func (b *backups) engine(app string, database protocol.Database) engine {
 		return newMongoEngine(b, app, database)
 	case protocol.DatabaseClickHouse:
 		return newClickhouseEngine(b, app, database)
+	case protocol.DatabaseRedis:
+		return newRedisEngine(b, app, database)
 	}
 	return &sqliteEngine{b: b, app: app, database: database}
 }
@@ -823,6 +826,18 @@ func (b *backups) cannotBackUp(app string) []protocol.DatabaseBackup {
 	detected, _ := b.apps.live(app)
 	for _, database := range detected.NoBackup {
 		statuses = append(statuses, protocol.DatabaseBackup{Database: database.Path, Kind: database.Kind, Error: noBackupText})
+	}
+	return statuses
+}
+
+// caches are the Redis and Valkey services of the app that are only a
+// cache, each with a note that says so. They are no problem, so only
+// `moin backups` shows them.
+func (b *backups) caches(app string) []protocol.DatabaseBackup {
+	statuses := []protocol.DatabaseBackup{}
+	detected, _ := b.apps.live(app)
+	for _, cache := range detected.Caches {
+		statuses = append(statuses, protocol.DatabaseBackup{Database: cache.Path, Kind: cache.Kind, Note: cacheText})
 	}
 	return statuses
 }
