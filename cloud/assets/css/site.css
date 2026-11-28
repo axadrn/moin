@@ -1873,7 +1873,7 @@
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     border-bottom: 1px solid var(--border);
   }
-  .moin-card > .moin-stats + * { margin-block-start: calc(-1 * var(--space-2)); }
+  .moin-card > .moin-stats + * { margin-block-start: calc(-1 * var(--space-1)); }
   .moin-stat-value > small {
     color: var(--muted-foreground);
     font-size: 1.25rem;

@@ -83,25 +83,26 @@ templ homeKnocks(k HomeKnocks) {
 				@components.Chip("Sample data · development only")
 			</div>
 		}
-		@components.Stats() {
-			@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)})
-			@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)}) {
-				Nothing answered.
+		@components.Card(components.CardProps{}) {
+			@components.Stats() {
+				@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)}) {
+					All dropped.
+				}
+				@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)}) {
+					Nothing answered.
+				}
+				@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)}) {
+					Since the first count.
+				}
+				if len(rows) > 0 {
+					@components.Stat(components.StatProps{Label: "Most tried", Value: rows[0].Label}) {
+						{ strconv.FormatInt(rows[0].Share, 10) }% of today.
+					}
+				}
 			}
-			@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)}) {
-				Since the first count.
+			if len(rows) > 0 {
+				@components.Bars(components.BarsProps{Rows: knockBars(rows)})
 			}
-		}
-		if len(rows) > 0 {
-			@knockList(rows)
 		}
 	</section>
-}
-
-// knockList is the card of the ports bots tried most today: the name and
-// its ports, the count, and a thin bar as wide as its share.
-templ knockList(rows []knockRow) {
-	@components.Card(components.CardProps{}) {
-		@components.Bars(components.BarsProps{Rows: knockBars(rows)})
-	}
 }
