@@ -339,7 +339,11 @@ func printApps(stdout io.Writer, rows []serverRow) {
 			if app.Password {
 				domain += "  " + style.Muted.Render("password on")
 			}
-			lines = append(lines, []string{style.Bold.Render(row.server), app.Name, "v" + strconv.Itoa(app.Release), appState(stdout, app.Running), domain})
+			deploy := "v" + strconv.Itoa(app.Release)
+			if app.Catalog != "" {
+				deploy += "  " + style.Muted.Render(app.Catalog+" "+app.Version)
+			}
+			lines = append(lines, []string{style.Bold.Render(row.server), app.Name, deploy, appState(stdout, app.Running), domain})
 		}
 	}
 	table(stdout, []string{"SERVER", "APP", "DEPLOY", "STATE", "DOMAIN"}, lines)

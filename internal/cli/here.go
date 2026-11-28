@@ -109,6 +109,15 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			return err
 		}
 		return daemon.UpdateHere(ctx, version)
+	case "update-app":
+		flags := newFlags("here update-app", "here update-app <app> [--version <version>]")
+		version := flags.String("version", "", "the version, like 2.15.1")
+		app, err := hereApp(flags, args)
+		if err != nil {
+			return err
+		}
+		value, err := daemon.UpdateAppHere(ctx, dir, app, *version, log)
+		return respond(stdout, value, err)
 	case "setup":
 		server, err := name()
 		if err != nil {
@@ -189,15 +198,16 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 // hereDeploy reads the source of a deploy from stdin, unless it is an app
 // of the catalog.
 func hereDeploy(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("here deploy", "here deploy <app> [--image <image>] [--catalog <name>] [--no-copy]")
+	flags := newFlags("here deploy", "here deploy <app> [--image <image>] [--catalog <name> [--domain <domain>]] [--no-copy]")
 	noCopy := flags.Bool("no-copy", false, "no copy of the databases before it")
 	image := flags.String("image", "", "a loaded image")
 	catalogApp := flags.String("catalog", "", "an app of the catalog")
+	domain := flags.String("domain", "", "the catalog app's domain")
 	app, err := hereApp(flags, args)
 	if err != nil {
 		return err
 	}
-	deploy := daemon.Deploy{App: app, Image: *image, Catalog: *catalogApp, NoCopy: *noCopy}
+	deploy := daemon.Deploy{App: app, Image: *image, Catalog: *catalogApp, Domain: *domain, NoCopy: *noCopy}
 	if *catalogApp == "" {
 		deploy.Source = stdin
 	}

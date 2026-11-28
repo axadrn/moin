@@ -28,3 +28,15 @@ func TestPrintNeedsShowsWhatTheServerSaid(t *testing.T) {
 		}
 	}
 }
+
+// A catalog app shows which app of the catalog it runs, at which version.
+func TestPrintAppsShowsTheCatalogVersion(t *testing.T) {
+	var out strings.Builder
+	printApps(&out, []serverRow{{server: "prod", status: daemon.Status{Apps: []daemon.AppStatus{
+		{Name: "stats", Release: 3, Running: true, Catalog: "umami", Version: "latest"},
+		{Name: "shop", Release: 7, Running: true},
+	}}}})
+	if !strings.Contains(out.String(), "umami latest") || strings.Count(out.String(), "latest") != 1 {
+		t.Errorf("apps:\n%s", out.String())
+	}
+}

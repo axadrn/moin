@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -147,20 +148,48 @@ func askGitHub(ctx context.Context) (string, error) {
 	return latest, nil
 }
 
-// update is `moin update`, this CLI to the newest release, and `moin
-// update <server>`, the server to this CLI's version.
+// update is `moin update`, this CLI to the newest release, `moin update
+// <server>`, the server to this CLI's version, and `moin update <app>`, a
+// catalog app to the newest images of its version. A name of your servers
+// is the server.
 func update(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("update", "update, or update <server>")
+	flags := newFlags("update", "update, update <server>, or update <app> [--version <version>] [-s server]").withServer()
+	version := flags.String("version", "", "the catalog app's new version, like 2.15.1; left out, the newest images of the one it has")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	switch flags.NArg() {
 	case 0:
+		if *version != "" {
+			return flags.wrong()
+		}
 		return updateSelf(ctx, stdout)
 	case 1:
-		return updateServer(ctx, flags.Arg(0), stdout)
+		name := flags.Arg(0)
+		servers, _ := loadServers()
+		if *version == "" && flags.serverNamed() == "" && slices.Contains(servers, name) {
+			return updateServer(ctx, name, stdout)
+		}
+		return updateApp(ctx, flags, name, *version, stdout)
 	}
 	return flags.wrong()
+}
+
+// updateApp deploys a catalog app again with the newest images of its
+// version, after a copy of its databases.
+func updateApp(ctx context.Context, flags *flagSet, app, version string, stdout io.Writer) error {
+	command := []string{"update-app", app}
+	if version != "" {
+		command = append(command, "--version", version)
+	}
+	return onApp(ctx, flags, app, func(server string) error {
+		result, err := runRelease(ctx, server, command, nil, stdout, "updating "+app)
+		if err != nil {
+			return err
+		}
+		done(stdout, "%s runs v%d", app, result.Release)
+		return nil
+	})
 }
 
 // updateSelf puts the newest signed release in place of this binary.

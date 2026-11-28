@@ -102,7 +102,7 @@ In the terminal UI the same lines show on the Servers tab.
 | `moin deploy` | deploy again, to the server the app runs on |
 | `moin deploy my-server --image ghcr.io/you/my-app:1.4` | the server pulls this image from its registry instead of building. [Deploy an image](/docs/deploy#deploy-an-image-from-your-registry) |
 | `moin deploy my-server --image my-app:dev` | an image only your laptop has is sent over SSH |
-| `moin deploy my-server --catalog umami` | an app from the [catalog](/docs/catalog) |
+| `moin deploy my-server --catalog umami` | an app from the [catalog](/docs/catalog). `--domain stats.example.com` gives it its domain before it starts |
 | `moin deploy --app my-app` | another name for the app. Without it, the app is named after the folder |
 | `moin deploy --no-copy` | deploy even when the copy of the databases just before it fails |
 | `moin deploys [app]` | every deploy of the app: from where, what it runs, how it ended, how long it took. [Every deploy](/docs/deploy#every-deploy) |
@@ -200,6 +200,7 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | --- | --- |
 | `moin update` | update the CLI on your laptop to the newest release |
 | `moin update <server>` | put the version of your CLI on the server |
+| `moin update <app>` | a [catalog](/docs/catalog#update-one) app to the newest images of its version, after a copy of its databases. `--version 2.15.1` picks one |
 | `moin daemon uninstall` | on the server: remove moin. The apps keep running |
 | `moin daemon uninstall --apps` | on the server: remove moin and every app, with its data |
 | `moin version` | the version. `--json` prints it as JSON |

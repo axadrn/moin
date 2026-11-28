@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,8 +35,13 @@ type Deploy struct {
 	Source  io.Reader
 	Image   string
 	Catalog string
+	// Domain is one more domain for a catalog app, set before it starts,
+	// so it knows its own address from the first start.
+	Domain string
 	// NoCopy deploys without the copy of the databases just before it.
 	NoCopy bool
+	// Pull fetches the newest images of every service first.
+	Pull bool
 }
 
 // Result is what a deploy ends with: the release that runs and its
@@ -56,11 +62,17 @@ func DeployHere(ctx context.Context, dir string, d Deploy, out io.Writer) (Resul
 	}
 	a := newApps(dir)
 	start := a.newStart(d.App)
-	start.NoCopy = d.NoCopy
+	start.NoCopy, start.Pull = d.NoCopy, d.Pull
 	switch {
 	case d.Catalog != "":
 		if _, ok := catalog.Compose(d.Catalog); !ok {
 			return Result{}, fmt.Errorf("the catalog has no %s: see them with `%s catalog`", d.Catalog, build.Name)
+		}
+		if d.Domain != "" {
+			if err := a.addDomainLine(d.App, d.Domain); err != nil {
+				return Result{}, err
+			}
+			start.Domains = a.routing(d.App)
 		}
 		if err := a.catalogEnv(d.App, start.Domains); err != nil {
 			return Result{}, err
@@ -258,12 +270,15 @@ func (a *apps) pinImage(ctx context.Context, app, image string) (string, error) 
 
 // catalogEnv gives a catalog app what its compose file needs and its env
 // lacks: VERSION, latest unless set, and its own address in APP_URL and
-// APP_DOMAIN, its first domain or else its instant address.
+// APP_DOMAIN, its first domain or else its instant address. An address
+// that is still the instant address follows the first domain once there
+// is one. One you set yourself stays.
 func (a *apps) catalogEnv(app string, domains *protocol.Domains) error {
 	if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
 		return err
 	}
-	host := protocol.InstantHost(app, domains.InstantIP, domains.Instant)
+	instant := protocol.InstantHost(app, domains.InstantIP, domains.Instant)
+	host := instant
 	if len(domains.Domains) > 0 {
 		host = domains.Domains[0]
 	}
@@ -276,14 +291,46 @@ func (a *apps) catalogEnv(app string, domains *protocol.Domains) error {
 	if _, ok := env[catalog.VersionVar]; !ok {
 		env[catalog.VersionVar] = "latest"
 	}
-	if _, ok := env[catalog.URLVar]; !ok && host != "" {
+	if url, ok := env[catalog.URLVar]; (!ok || instant != "" && url == "https://"+instant) && host != "" {
 		env[catalog.URLVar] = "https://" + host
 	}
-	if _, ok := env[catalog.DomainVar]; !ok && host != "" {
+	if domain, ok := env[catalog.DomainVar]; (!ok || instant != "" && domain == instant) && host != "" {
 		env[catalog.DomainVar] = host
 	}
 	return writeEnv(a.envFile(app), env)
 }
+
+// UpdateAppHere deploys a catalog app again with the newest images of its
+// version: version when given, else the VERSION it has. Like every
+// deploy it takes a copy of the databases first. When it fails, VERSION
+// stays as it was.
+func UpdateAppHere(ctx context.Context, dir, app, version string, out io.Writer) (Result, error) {
+	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return Result{}, err
+	}
+	name := a.record(app, a.current(app)).Catalog
+	if name == "" {
+		return Result{}, fmt.Errorf("%s is not an app of the catalog. Deploy its new version with `%s deploy`", app, build.Name)
+	}
+	if version != "" && !versionPattern.MatchString(version) {
+		return Result{}, fmt.Errorf("%q is not a version, like 2.15.1 or latest", version)
+	}
+	old, _ := os.ReadFile(a.envFile(app))
+	if version != "" {
+		if _, err := a.setEnv(protocol.EnvSet{App: app, Set: map[string]string{catalog.VersionVar: version}}); err != nil {
+			return Result{}, err
+		}
+	}
+	result, err := DeployHere(ctx, dir, Deploy{App: app, Catalog: name, Pull: true}, out)
+	if err != nil && version != "" {
+		_ = writeWhole(a.envFile(app), old)
+	}
+	return result, err
+}
+
+// versionPattern is what an image tag may be.
+var versionPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
 
 // runTo runs a program with its output going straight to stdout and
 // stderr, for logs and exec that stream.

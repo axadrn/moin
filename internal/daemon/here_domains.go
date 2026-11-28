@@ -101,6 +101,26 @@ func AddDomainHere(ctx context.Context, dir, app, domain, service string, out io
 	return a.changeDomains(ctx, app, append(a.domainList(app), Domain{Domain: domain, Service: service}), out)
 }
 
+// addDomainLine gives a catalog app a domain before it starts, unless it
+// has it already.
+func (a *apps) addDomainLine(app, domain string) error {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if !domainPattern.MatchString(domain) {
+		return fmt.Errorf("%q is not a domain name, like my-app.example.com", domain)
+	}
+	owner := a.domainOwner(domain)
+	if owner == app {
+		return nil
+	}
+	if owner != "" {
+		return fmt.Errorf("%s belongs to %s already", domain, owner)
+	}
+	if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
+		return err
+	}
+	return a.writeDomains(app, append(a.domainList(app), Domain{Domain: domain}))
+}
+
 // RemoveDomainHere takes a domain off the app and starts it without it.
 func RemoveDomainHere(ctx context.Context, dir, app, domain string, out io.Writer) (Result, error) {
 	a := newApps(dir)
@@ -116,22 +136,41 @@ func RemoveDomainHere(ctx context.Context, dir, app, domain string, out io.Write
 	return a.changeDomains(ctx, app, rest, out)
 }
 
-// changeDomains writes the new list and applies it. A failed deploy puts
-// the old list back, as the old release runs again.
+// changeDomains writes the new list and applies it. A catalog app's
+// APP_URL and APP_DOMAIN follow its first domain while they are still its
+// instant address. A failed deploy puts the old list and env back, as the
+// old release runs again.
 func (a *apps) changeDomains(ctx context.Context, app string, list []Domain, out io.Writer) (Result, error) {
 	old, _ := os.ReadFile(a.domainsFile(app))
+	oldEnv, _ := os.ReadFile(a.envFile(app))
+	if err := a.writeDomains(app, list); err != nil {
+		return Result{}, err
+	}
+	start := a.newStart(app)
+	catalogApp := a.record(app, a.current(app)).Catalog != ""
+	if catalogApp {
+		if err := a.catalogEnv(app, start.Domains); err != nil {
+			_ = writeWhole(a.domainsFile(app), old)
+			return Result{}, err
+		}
+	}
+	result, err := a.deployHere(ctx, start, out)
+	if err != nil {
+		_ = writeWhole(a.domainsFile(app), old)
+		if catalogApp {
+			_ = writeWhole(a.envFile(app), oldEnv)
+		}
+	}
+	return result, err
+}
+
+// writeDomains writes the app's domains file, one line each.
+func (a *apps) writeDomains(app string, list []Domain) error {
 	lines := ""
 	for _, line := range list {
 		lines += strings.TrimSpace(line.Domain+" "+line.Service) + "\n"
 	}
-	if err := writeWhole(a.domainsFile(app), []byte(lines)); err != nil {
-		return Result{}, err
-	}
-	result, err := a.deployHere(ctx, a.newStart(app), out)
-	if err != nil {
-		_ = writeWhole(a.domainsFile(app), old)
-	}
-	return result, err
+	return writeWhole(a.domainsFile(app), []byte(lines))
 }
 
 // domainOwner is the app on this server that has domain, "" for none.

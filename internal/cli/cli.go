@@ -78,6 +78,7 @@ Servers
   secure <server>              SSH only over Tailscale. A firewall for the rest
   knocks [server]              What the firewall dropped, by port
   update [server]              Update this CLI, or a server to this CLI's version
+  update <app>                 A catalog app to its newest images. --version 2.15.1 picks one
 
 Watcher
   watcher                      Each server's watchers. Your plan of moin cloud

@@ -20,16 +20,20 @@ import (
 // folder to the server, which builds and starts it. The first deploy to a
 // server sets moin up there; later ones go to where the app runs.
 func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("deploy", "deploy [server] [--image <image> | --catalog <name>] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
+	flags := newFlags("deploy", "deploy [server] [--image <image> | --catalog <name> [--domain <domain>]] [--app <name>] [--no-copy] [-y] [--json]").withServer().withYes().withJSON()
 	noCopy := flags.Bool("no-copy", false, "deploy without the copy of the databases just before it, when that copy fails")
 	image := flags.String("image", "", "run this image instead of building: the server pulls it, like ghcr.io/you/my-app:1.4, or one only this computer has, like my-app:dev, is sent")
 	catalogApp := flags.String("catalog", "", "deploy an app of the catalog, like umami, without a repo")
+	domain := flags.String("domain", "", "the catalog app's domain, set before it starts, like analytics.example.com")
 	appName := flags.String("app", "", "the app's name; default this folder's name, or the catalog app's")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	if *image != "" && *catalogApp != "" {
 		return errors.New("deploy takes --image or --catalog, not both")
+	}
+	if *domain != "" && *catalogApp == "" {
+		return fmt.Errorf("--domain goes with --catalog. Give your own app a domain with `%s domains add`", build.Name)
 	}
 	app, err := deployedApp(*appName, *catalogApp)
 	if err != nil {
@@ -73,7 +77,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 			return err
 		}
 	}
-	result, err := runDeploy(ctx, server, app, *image, *catalogApp, *noCopy, log)
+	result, err := runDeploy(ctx, server, app, *image, *catalogApp, *domain, *noCopy, log)
 	if err != nil {
 		return err
 	}
@@ -157,7 +161,7 @@ func onRemote(ctx context.Context) (remote string, ok bool) {
 }
 
 // runDeploy runs the deploy on the server and shows its log as it comes.
-func runDeploy(ctx context.Context, server, app, image, catalogApp string, noCopy bool, stdout io.Writer) (daemon.Result, error) {
+func runDeploy(ctx context.Context, server, app, image, catalogApp, domain string, noCopy bool, stdout io.Writer) (daemon.Result, error) {
 	args := []string{"deploy", app}
 	if noCopy {
 		args = append(args, "--no-copy")
@@ -167,6 +171,9 @@ func runDeploy(ctx context.Context, server, app, image, catalogApp string, noCop
 	}
 	if catalogApp != "" {
 		args = append(args, "--catalog", catalogApp)
+	}
+	if domain != "" {
+		args = append(args, "--domain", domain)
 	}
 	var source io.Reader
 	if catalogApp == "" {

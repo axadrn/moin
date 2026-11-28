@@ -358,6 +358,13 @@ func (a *apps) build(ctx context.Context, release *release, pull bool) error {
 	start := release.start
 	detected := release.detected
 	logf := release.logf
+	if start.Pull {
+		logf("pulling the newest images")
+		err := a.run(ctx, logf, nil, a.composeArgs(start.App, release.composeJSON, "--progress", "plain", "pull")...)
+		if err != nil {
+			return fmt.Errorf("pull: %w", err)
+		}
+	}
 	if pull {
 		logf("pulling %s", start.Image)
 		err := a.pull(ctx, release)

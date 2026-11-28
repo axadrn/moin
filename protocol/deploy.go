@@ -32,6 +32,9 @@ type DeployStart struct {
 	// NoCopy deploys without the copy of the databases just before the new
 	// release starts: the way on when that copy fails.
 	NoCopy bool `json:"no_copy,omitempty"`
+	// Pull fetches the newest images of every service before the start,
+	// for `moin update <app>`.
+	Pull bool `json:"pull,omitempty"`
 	// Source is where the deploy comes from, for its record: laptop,
 	// follow, catalog, rollback or apply.
 	Source string `json:"-"`

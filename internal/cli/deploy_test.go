@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,4 +76,12 @@ func TestOnRemote(t *testing.T) {
 
 	git("commit", "-q", "--allow-empty", "--no-verify", "-m", "two")
 	check("origin", false)
+}
+
+// --domain is for a catalog app: your own app gets one with domains add.
+func TestDeployDomainNeedsCatalog(t *testing.T) {
+	err := deploy(t.Context(), []string{"prod", "--domain", "shop.example.com"}, strings.NewReader(""), io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "--domain goes with --catalog") {
+		t.Errorf("err = %v", err)
+	}
 }
