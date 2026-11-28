@@ -43,7 +43,19 @@ shop.example.com is up again
 - **Down**: three visits in a row fail, one a minute. A visit fails on a 5xx, a timeout, a refused connection or a bad certificate. Any other answer, a redirect too, is up.
 - A domain of a silent server does not alert on its own. The silence says more.
 
-Alerts go to Telegram, Slack, Discord or a webhook. The server's own alerts are set with `moin alerts`. [CLI](/docs/cli#the-team-and-alerts)
+Alerts go to Telegram, Slack, Discord or a webhook. Set them once per server, and they go everywhere:
+
+```bash
+moin alerts add prod telegram --token <bot token> --chat-id <chat id>
+```
+
+- The daemon on prod alerts there while it lives.
+- Each report carries them to prod's watchers. So a watcher alerts there too, when prod goes silent or a domain is down.
+- Your own watcher and moin cloud do the same. moin cloud also sends a mail to your account.
+- A report only goes over HTTPS, or inside your tailnet. So the tokens never travel in the clear.
+- moin cloud sends only to public `https://` addresses and follows no redirect.
+
+[CLI](/docs/cli#the-team-and-alerts)
 
 ## Where it runs
 
@@ -74,22 +86,18 @@ moin watcher token prod --url https://watcher.example.com
 The first time, there is no config yet. It prints one, and the line for your laptop:
 
 ```text
-1. Save this as /etc/moin/watcher.yml, fill in alerts:, then run: chmod 600 /etc/moin/watcher.yml
+1. Save this as /etc/moin/watcher.yml, then run: chmod 600 /etc/moin/watcher.yml
 
 password: <a new password for the page>
 servers:
   prod: <a new token>
-alerts:
-  - kind: telegram
-    token: <bot token>
-    chat_id: <chat id>
 
 2. On your laptop, point prod at this watcher:
 
   moin watcher connect prod https://watcher.example.com <a new token>
 ```
 
-Do what it says: save the file, fill in `alerts:`, then `chmod 600`.
+Do what it says: save the file, then `chmod 600`. The alerts come from prod itself: `moin alerts add prod …`.
 
 **3. Start the watcher:**
 
@@ -162,7 +170,8 @@ servers:
   prod: <token>
   web-1: <token>
 
-# Where the watcher's alerts go. At least one.
+# Optional: the watcher's own alerts. They get every alert too.
+# For a server that set no alerts, or runs an older moin, they are all there is.
 alerts:
   - kind: telegram
     token: <bot token>
@@ -214,7 +223,7 @@ moin watcher disconnect prod https://watcher.example.com
 
 ## If it is hacked
 
-Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
+Someone who takes over a watcher sees your server and app names, your domains, and when backups ran. They get your alert channels, so they can post to them. Make a new bot token or webhook, and `moin alerts add` it. They can silence its alerts. They can't reach any server: the daemon acts on nothing a watcher answers, but the upload address of a copy, and that only gets an encrypted copy. Run two watchers, and one hacked watcher can't silence you.
 
 ## If it breaks
 

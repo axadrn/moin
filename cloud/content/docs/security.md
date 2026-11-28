@@ -192,8 +192,16 @@ You want `Good "moin-release" signature`, then `OK` next to the binary. On a Mac
 A watcher only listens. If someone takes it over:
 
 - **They see** the names of your servers and apps, your domains, and when backups and checks ran.
+- **They get** your alert channels: the Telegram bot token and chat, the Slack, Discord or webhook addresses you set with `moin alerts add`. A watcher holds them so it can alert you when the server can't.
+- **They can** post to those channels. Nothing more: a channel reaches no server. Make a new bot token or webhook, then `moin alerts rm` the old one and `moin alerts add` the new.
 - **They can** silence its alerts. So run two watchers, best at two providers.
 - **They can't** reach any server. A daemon sends reports out, and acts on nothing that comes back. The one exception is the upload address of a copy, above: the most a false one gets is an encrypted copy.
+
+What a watcher holds:
+
+- **Your own watcher** keeps the channels in its state file, `/var/lib/moin/watcher/state.json`. Only its owner may read it.
+- **moin cloud** keeps them encrypted at rest, with AES-GCM. The key is not in the database. It sends alerts only to public `https://` addresses and follows no redirect.
+- **On the way**, a report goes only over HTTPS, or inside your tailnet.
 
 ## If a server is hacked
 
