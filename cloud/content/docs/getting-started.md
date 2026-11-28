@@ -42,16 +42,20 @@ moin deploy prod
 ```text
 shop · 3f2a9c1 → prod
 ? Set up moin on prod and deploy shop? [y/N] y
-→ installing moin v1.2.3
-→ starting the daemon: backups, restore checks, reports
-→ building
-→ starting
-→ v1 is live
-✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
-  Postgres found. No backup yet: moin bucket set prod
+✓ installing Docker  41s
+✓ installing moin v1.2.3  1s
+✓ starting the daemon: backups, checks, reports  1s
+✓ sending the source
+✓ starting the proxy on ports 80 and 443
+✓ detected compose, service web on port 3000
+✓ building  9s
+✓ starting  12s
+✓ database /data/shop.db (/var/lib/moin/apps/shop/volumes/data/shop.db)
+✓ shop v1 is live: https://shop.203-0-113-7.sslip.io
+  SQLite found. No backup yet: moin bucket set prod
 ```
 
-Your app is live, with HTTPS. On a fresh server this takes about two minutes. Most of it is installing Docker. What Docker and the build print shows dimmed, between the steps.
+Your app is live, with HTTPS. On a fresh server this takes about two minutes. Most of it is installing Docker. Each step shows a spinner while it runs, then a tick and how long it took. What Docker and the build print shows dimmed under the step, and stays only when a step fails.
 
 ## What happened
 
@@ -81,7 +85,9 @@ Then point `prod` at the tailnet, as moin prints it, in `~/.ssh/config`. From th
 moin
 ```
 
-On a terminal, this opens the terminal UI: every server and every app, live. Pick an app and press Enter for its logs and backups. `q` quits. [The terminal UI](/docs/cli#the-terminal-ui)
+On a terminal, this opens the terminal UI: three tabs, Apps, Servers and Backups, live. Pick an app and press Enter for its logs. `tab` goes to the next tab, `?` shows the keys, `q` quits. Under the tabs moin says what needs you, with the command that settles it. [The terminal UI](/docs/cli#the-terminal-ui)
+
+Before your first deploy, `moin` shows three steps instead: `cd my-app`, `moin deploy <server>`, `moin`.
 
 ## 5. Back it up
 
@@ -95,6 +101,7 @@ moin asks for the endpoint, the bucket's name, the access key and the secret key
 
 ```text
 ✓ prod backs up to backups. The first copies come within a minute
+  See them with `moin backups <app>`
 ```
 
 Then moin shows your backup key, once. Every copy is encrypted for it. Put it in your password manager, and paste it back: moin opens a fresh copy with it, to prove it works. When the server is gone, only this key opens its copies.

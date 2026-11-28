@@ -32,14 +32,18 @@ moin deploy prod
 
 ```text
 shop · 3f2a9c1 → prod
-→ building
-→ starting
-→ v1 is live
-✓ moin. shop is live: https://shop.203-0-113-7.sslip.io
+✓ sending the source
+✓ detected compose, service web on port 3000
+✓ building  9s
+✓ starting  12s
+✓ database /data/shop.db (/var/lib/moin/apps/shop/volumes/data/shop.db)
+✓ shop v1 is live: https://shop.203-0-113-7.sslip.io
   SQLite found. See its backups: moin backups shop
 ```
 
 moin sends the committed source of the folder to `prod`, over SSH. The server builds it and starts it. The app is named after the folder. Another name: `--app shop`. A name is lowercase letters, digits and dashes.
+
+Every step shows a spinner while it runs, then a tick and how long it took. The output of Docker and of the build shows dimmed under the step. It goes away when the step is done, and stays when the step fails.
 
 The first deploy to a server asks first, then installs Docker and moin there: `Set up moin on prod and deploy shop? [y/N]`. In a script, add `-y`.
 
@@ -80,10 +84,12 @@ moin deploy prod --image ghcr.io/you/shop:1.4
 
 ```text
 shop · 3f2a9c1 with image ghcr.io/you/shop:1.4 → prod
-✓ pulling image ghcr.io/you/shop:1.4 on prod
-→ starting
-→ v4 is live
-✓ moin. shop is live: https://shop.example.com
+✓ pulling image ghcr.io/you/shop:1.4 on prod  2s
+✓ sending the source
+✓ detected compose, service web on port 8080
+✓ building
+✓ starting  8s
+✓ shop v4 is live: https://shop.example.com
 ```
 
 The server pulls the image and runs it. It builds nothing.
@@ -194,7 +200,15 @@ moin rollback shop
 moin lists the releases, and you pick one. Enter takes the one before the live one. In a script: `--to v3`, or nothing for the one before.
 
 ```text
-✓ shop runs v2 again, as v4
+DEPLOY   WHEN     STATE
+v4       1m ago   ● live
+v2       1m ago   the one before
+v1       2m ago
+? Go back to which deploy? [v2]
+✓ rolling back shop
+✓ rolling back to v2
+✓ starting  22s
+✓ shop runs v2 again, as v5
 ```
 
 A rollback is a new release: v2 runs again, as v4. It runs with the env vars and domains as they are now. It brings back the code, not the data. For the data, see [Restore](/docs/backups#restore).
@@ -240,6 +254,7 @@ moin domains add shop shop.example.com
 ```
 
 ```text
+✓ starting shop with its domains  4s
 ✓ shop answers on https://shop.example.com
   Point the DNS of shop.example.com to prod: an A record with its IP. The certificate follows by itself.
 ```
