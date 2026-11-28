@@ -19,10 +19,9 @@ func TestPrintNeedsShowsWhatTheServerSaid(t *testing.T) {
 	var out strings.Builder
 	printNeeds(terminal(&out), rows)
 	for _, want := range []string{
-		"prod: port 22 open to the internet",
-		"`moin secure prod`",
-		"shop: postgres has no backup yet.  `moin bucket set prod`",
-		"The last proven copy is from November 26.  `moin backups shop`",
+		"! prod: port 22 is open to the internet.\n  `moin secure prod`",
+		"! shop: postgres has no backup yet.\n  `moin bucket set prod`",
+		"The last proven copy is from November 26.\n  `moin backups shop`",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("printNeeds wrote\n%s\nwant %q", out.String(), want)

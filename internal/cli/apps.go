@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -101,7 +102,7 @@ func pickRelease(stdin io.Reader, stdout io.Writer, app string, releases []daemo
 		note := ""
 		switch {
 		case release.Live:
-			note = style.Success.Render("live")
+			note = badge(stdout, style.Badge(style.StatusLive, "live"), "live")
 		case release.Before:
 			note = style.Muted.Render("the one before")
 			suggested = release.Number
@@ -111,7 +112,7 @@ func pickRelease(stdin io.Reader, stdout io.Writer, app string, releases []daemo
 	if suggested == 0 {
 		return 0, fmt.Errorf("%s has no older release to go back to", app)
 	}
-	table(stdout, []string{"RELEASE", "DEPLOYED", ""}, rows)
+	table(stdout, []string{"DEPLOY", "WHEN", "STATE"}, rows)
 	fmt.Fprint(stdout, style.Warning.Render("?")+" Go back to which release? "+style.Muted.Render("[v"+strconv.Itoa(suggested)+"]")+" ")
 	answer, err := readLine(stdin)
 	if err != nil {
@@ -193,7 +194,15 @@ func logs(ctx context.Context, args []string, stdout io.Writer) error {
 			}
 			return printJSON(stdout, logLines(out.String()))
 		}
-		err := appLogs(ctx, server, app, *tail, *follow, raw(stdout), os.Stderr)
+		// On a terminal each line shows its time short and its
+		// container dimmed; in a pipe the lines stay as they come.
+		out := raw(stdout)
+		if isTTY(stdout) {
+			pretty := &lineWriter{w: stdout, format: style.AppLog}
+			defer pretty.flush()
+			out = pretty
+		}
+		err := appLogs(ctx, server, app, *tail, *follow, out, os.Stderr)
 		if ctx.Err() != nil {
 			// Ctrl-C ends -f: that is how it is meant to stop.
 			return nil
@@ -225,19 +234,39 @@ type logLine struct {
 func logLines(text string) []logLine {
 	lines := []logLine{}
 	for raw := range strings.Lines(text) {
-		var line logLine
-		rest := strings.TrimRight(raw, "\r\n")
-		if container, after, ok := strings.Cut(rest, " | "); ok {
-			line.Container, rest = strings.TrimSpace(container), after
-		}
-		stamp, after, _ := strings.Cut(rest, " ")
-		if _, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
-			line.Time, rest = stamp, after
-		}
-		line.Line = rest
-		lines = append(lines, line)
+		container, stamp, rest := style.SplitAppLog(raw)
+		lines = append(lines, logLine{Time: stamp, Container: container, Line: rest})
 	}
 	return lines
+}
+
+// lineWriter writes each whole line through format, for logs on a
+// terminal. flush writes what is left of a last line.
+type lineWriter struct {
+	w      io.Writer
+	format func(string) string
+	rest   []byte
+}
+
+func (l *lineWriter) Write(p []byte) (int, error) {
+	l.rest = append(l.rest, p...)
+	for {
+		end := bytes.IndexByte(l.rest, '\n')
+		if end < 0 {
+			return len(p), nil
+		}
+		if _, err := fmt.Fprintln(l.w, l.format(string(l.rest[:end]))); err != nil {
+			return 0, err
+		}
+		l.rest = l.rest[end+1:]
+	}
+}
+
+func (l *lineWriter) flush() {
+	if len(l.rest) > 0 {
+		fmt.Fprintln(l.w, l.format(string(l.rest)))
+		l.rest = nil
+	}
 }
 
 // execArgs splits `exec [app] [flags] -- <command…>` at the first "--":

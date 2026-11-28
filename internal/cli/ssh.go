@@ -106,7 +106,7 @@ func sshLog(ctx context.Context, server, line string, stdin io.Reader, stdout io
 	err := sshRun(ctx, server, line, stdin, &out, writer)
 	writer.Close()
 	<-shown
-	progress.end()
+	progress.end(err != nil)
 	var code exitCode
 	if errors.As(err, &code) && failure != "" {
 		return nil, errors.New(failure)

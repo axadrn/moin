@@ -39,7 +39,11 @@ func keys(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 	}
 	rows := [][]string{}
 	for _, key := range list {
-		rows = append(rows, []string{dash(key.Comment), style.Muted.Render(key.Fingerprint)})
+		name := key.Comment
+		if name == "" {
+			name = badge(stdout, style.Muted.Render("no name"), "-")
+		}
+		rows = append(rows, []string{name, style.Muted.Render(key.Fingerprint)})
 	}
 	table(stdout, []string{"NAME", "FINGERPRINT"}, rows)
 	fmt.Fprintln(stdout)
@@ -65,7 +69,7 @@ func addKey(ctx context.Context, args []string, stdout io.Writer) error {
 	if err := sshJSON(ctx, server, []string{"keys", "add"}, bytes.NewReader(body), &key); err != nil {
 		return err
 	}
-	done(stdout, "%s may log in to %s as root now", dash(key.Comment), server)
+	done(stdout, "%s may log in to %s as root now", keyName(key), server)
 	return nil
 }
 
@@ -104,14 +108,14 @@ func removeKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	if err := readAnswer(server, out, &key); err != nil {
 		return err
 	}
-	done(stdout, "%s can no longer log in to %s", dash(key.Comment), server)
+	done(stdout, "%s can no longer log in to %s", keyName(key), server)
 	return nil
 }
 
-// dash is value, or - when it is empty.
-func dash(value string) string {
-	if value == "" {
-		return "-"
+// keyName is the name of a key, or its fingerprint when it has none.
+func keyName(key daemon.Key) string {
+	if key.Comment == "" {
+		return "The key " + key.Fingerprint
 	}
-	return value
+	return key.Comment
 }

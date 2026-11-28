@@ -21,103 +21,101 @@ import (
 
 const usage = `moin: your app on your server. Backups checked every day.
 
-Usage
-  moin                     Every server you deployed to, every app, what needs you [--json]
-  moin <command>           Run one command
+Start
+  moin                         Every server, every app, and what needs you
+  deploy <server>              Deploy this folder. Name the server the first time
 
 Apps
-  deploy                   Deploy this folder: deploy prod the first time, then deploy [--image shop:dev] [--catalog umami] [--app shop] [--no-copy]
-  apps                     Every app on every server [--json]
-  rollback                 Go back to an older release, picked on a terminal: rollback [app] [--to v3]
-  restart                  Start the app again, with its env and domains as they are now: restart [app]
-  stop                     Stop the app until you start it: stop [app]
-  start                    Start a stopped app: start [app]
-  logs                     The app's logs: logs [app] [-f] [--tail 200] [--json]
-  exec                     Run a command in the app's container: exec [app] -- psql
-  env                      The names of the app's env vars, never a value: env [app] [--json]
-  env edit                 Change them in $EDITOR; the app restarts with them: env edit [app]
-  domains                  The app's domains: domains [app] [--json]
-  domains add              Add one; the certificate follows by itself: domains add [app] shop.example.com
-  domains rm               Remove one: domains rm [app] shop.example.com [-y]
-  follow                   Deploy each new commit of a branch, read with a deploy key: follow [app] [--branch main] [--off]
-  catalog                  Open source apps to deploy with deploy --catalog [--json]
+  deploy                       Deploy this folder again, where it runs
+  apps                         Every app on every server
+  logs [app]                   The app's logs. -f follows them
+  rollback [app]               Go back to an older deploy
+  restart [app]                Start the app again, with its env and domains as now
+  stop [app]                   Stop the app until you start it
+  start [app]                  Start a stopped app
+  exec [app] -- <command>      Run a command in the app's container
+  env [app]                    The names of its env vars, never a value
+  env edit [app]               Change them in $EDITOR. The app restarts with them
+  domains [app]                The app's domains
+  domains add [app] <domain>   Add one. The certificate follows by itself
+  domains rm [app] <domain>    Remove one
+  follow [app]                 Deploy each new commit of a branch
+  catalog                      Open source apps to deploy with --catalog
 
 Backups
-  backups                  The copies of the app's databases and the last restore check: backups [app] [--from <server>] [--json]
-  backup                   A copy now: backup [app]
-  restore                  Go back to a copy, picked on a terminal; can be undone: restore [app] [--to <copy | 2026-11-27T14:07 | undo-…>]
-                           The server is gone: on a new one, with your backup key: restore shop --from prod --to <copy> --key
+  backups [app]                The copies of its databases and the last check
+  backup [app]                 A copy now
+  restore [app]                Go back to a copy. It can be undone
 
 Servers
-  servers                  Your servers and their watchers [--json]
-  servers add              Add one you deployed to before, as on a new laptop: servers add prod
-  servers rm               Forget one; nothing changes on it: servers rm prod
-  keys                     The team: the SSH keys that may log in as root: keys prod [--json]
-  keys add                 Let one more key in: keys add prod anna.pub
-  keys rm                  Take a key out; never the one you are logged in with: keys rm prod anna@laptop
-  bucket                   Where the backups go: bucket prod [--json]
-  bucket set               Set it; asks for each value, and shows your backup key once: bucket set prod
-  bucket key               A new backup key of yours, or one you have: bucket key prod [--public age1…]
-  bucket confirm           Paste your backup key; it opens a fresh copy on your laptop: bucket confirm prod
-  alerts                   Where alerts go: alerts prod [--json]
-  alerts add               Add one: alerts add prod telegram --token … --chat-id …, or slack|discord|webhook --url …
-  alerts rm                Remove one: alerts rm prod 2
-  alerts test              Send a test alert: alerts test prod
-  secure                   SSH only over Tailscale, the web through a Cloudflare Tunnel, a firewall for the rest: secure prod [--tunnel off]
-  knocks                   What the firewall dropped, by port: knocks [server] [--json]
-  update                   Update this CLI to the newest release
-  update <server>          Put this CLI's version of moin on a server: update prod
+  servers                      Your servers and their watchers
+  servers add <server>         Add one you deployed to before, as on a new laptop
+  servers rm <server>          Forget one. Nothing changes on it
+  keys <server>                The SSH keys that may log in as root
+  keys add <server> <file>     Let one more key in
+  keys rm <server> <name>      Take a key out
+  bucket <server>              Where the backups go
+  bucket set <server>          Set it. Shows your backup key once
+  bucket key <server>          A new backup key, or one you have
+  bucket confirm <server>      Paste your backup key to show you have it
+  alerts <server>              Where alerts go
+  alerts add <server> <kind>   telegram, slack, discord or webhook
+  alerts rm <server> <n>       Remove one
+  alerts test <server>         Send a test alert
+  secure <server>              SSH only over Tailscale, a firewall for the rest
+  knocks [server]              What the firewall dropped, by port
+  update [server]              Update this CLI, or a server to this CLI's version
 
 Cloud
-  cloud                    Your moin cloud: plan, billing, servers [--json]
-  cloud login              Sign this laptop in, through the browser
-  cloud connect            The server reports to moin cloud: cloud connect prod
-  cloud disconnect         It no longer does: cloud disconnect prod [-y]
-  cloud copies             The copies a server sent, which it can't delete: cloud copies prod [app] [--json]
-  cloud restore            Put a database back to one, on any server: cloud restore [app] [--to <copy>] [-s server] [-y]
+  cloud                        Your moin cloud: plan, billing, servers
+  cloud login                  Sign this laptop in, through the browser
+  cloud connect <server>       The server reports to moin cloud
+  cloud disconnect <server>    It no longer does
+  cloud copies <server> [app]  The copies a server sent, which it can't delete
+  cloud restore [app]          Put a database back to one, on any server
 
 Watcher
-  watcher run              Run a watcher, on another machine than your servers
-  watcher token            On the watcher: the line that connects a server: watcher token prod [--url https://watcher.example.com]
-  watcher connect          On your laptop: the server reports there: watcher connect prod <url> <token>
-  watcher disconnect       It no longer does: watcher disconnect prod <url>
+  watcher run                  Run a watcher, on another machine than your servers
+  watcher token <server>       On the watcher: the line that connects a server
+  watcher connect <server> <url> <token>  On your laptop: the server reports there
+  watcher disconnect <server> <url>  It no longer does
 
 On the server
-  unlock                   Open port 22 to the internet again, from your provider's web console
-  daemon uninstall         Remove moin from this server; the apps keep running: daemon uninstall [--apps] [-y]
+  unlock                       Open port 22 again, from your provider's console
+  daemon uninstall             Remove moin. The apps keep running
 
-  version                  Show the version [--json]
-  help                     Show this help
+  version                      Show the version
+  help                         Show this help
 
-A server is a name from your ssh config, like prod, or user@host: if
-ssh prod works, moin works. Name the app, or leave it out in its folder;
-moin finds its server. When it runs on two, add -s prod. Every command
-shows its flags with --help.
+A server is a name from your ssh config, like prod, or user@host. If
+ssh prod works, moin works. Leave the app out in its folder. When it
+runs on two servers, add -s prod. Every reading command takes --json.
+Every command shows its flags with --help.
 
 Docs: https://moin.run/docs
 `
 
-// printUsage writes the help: section names bold, descriptions muted on a
-// terminal, all in one column after the longest command.
+// usageColumn is where the descriptions of the help start. A longer
+// command gets its description on the next line.
+const usageColumn = 31
+
+// printUsage writes the help: section names bold, commands in one
+// column, descriptions muted after it.
 func printUsage(w io.Writer) {
-	lines := strings.Split(strings.TrimRight(usage, "\n"), "\n")
-	width := 0
-	for _, line := range lines {
-		if name, _, ok := usageEntry(line); ok {
-			width = max(width, len(name))
-		}
-	}
-	for index, line := range lines {
+	for index, line := range strings.Split(strings.TrimRight(usage, "\n"), "\n") {
 		name, description, ok := usageEntry(line)
 		switch {
 		case index == 0:
 			fmt.Fprintln(w, style.Accent.Render(build.Name)+strings.TrimPrefix(line, build.Name))
+		case ok && len(name)+2 >= usageColumn:
+			fmt.Fprintln(w, "  "+name)
+			fmt.Fprintln(w, strings.Repeat(" ", usageColumn)+style.Muted.Render(description))
 		case ok:
-			fmt.Fprintln(w, "  "+name+strings.Repeat(" ", width-len(name)+2)+style.Muted.Render(description))
+			fmt.Fprintln(w, "  "+name+strings.Repeat(" ", usageColumn-2-len(name))+style.Muted.Render(description))
 		case isHeading(line):
 			fmt.Fprintln(w, style.Bold.Render(line))
 		default:
-			fmt.Fprintln(w, line)
+			fmt.Fprintln(w, style.Muted.Render(line))
 		}
 	}
 }

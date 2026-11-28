@@ -4,6 +4,7 @@ package style
 
 import (
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 )
@@ -149,4 +150,34 @@ func Step(text string) string {
 		return Danger.Render(SymbolFailed + " " + text)
 	}
 	return Muted.Render(SymbolStep) + " " + text
+}
+
+// SplitAppLog splits a line of an app's logs, as docker compose logs
+// --timestamps prints it, like "web-1  | 2026-11-27T16:39:08.672Z hello",
+// into the container, the time as docker wrote it and the text. A part
+// it does not find stays empty, and the text keeps the rest.
+func SplitAppLog(line string) (container, stamp, text string) {
+	text = strings.TrimRight(line, "\r\n")
+	if name, after, ok := strings.Cut(text, " | "); ok {
+		container, text = strings.TrimSpace(name), after
+	}
+	first, after, _ := strings.Cut(text, " ")
+	if _, err := time.Parse(time.RFC3339Nano, first); err == nil {
+		stamp, text = first, after
+	}
+	return container, stamp, text
+}
+
+// AppLog renders a line of an app's logs for people: the time in the
+// terminal's time zone and the container dimmed, the text as it is.
+func AppLog(line string) string {
+	container, stamp, text := SplitAppLog(line)
+	head := container
+	if at, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
+		head = strings.TrimSpace(at.Local().Format("15:04:05") + " " + container)
+	}
+	if head == "" {
+		return text
+	}
+	return Dim.Render(head) + "  " + text
 }

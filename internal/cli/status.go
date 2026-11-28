@@ -217,10 +217,7 @@ func overview(ctx context.Context, name string, args []string, stdout io.Writer)
 		return err
 	}
 	if len(servers) == 0 && !flags.json() {
-		fmt.Fprintln(stdout, build.Name+": your app on your server. Backups checked every day.")
-		fmt.Fprintln(stdout)
-		hint(stdout, "Deploy this folder to a server you can ssh to:", build.Name+" deploy <server>")
-		hint(stdout, "All commands:", build.Name+" help")
+		welcome(stdout)
 		return nil
 	}
 	rows := askServers(ctx, servers)
@@ -233,46 +230,65 @@ func overview(ctx context.Context, name string, args []string, stdout io.Writer)
 	return nil
 }
 
-// printNeeds says under the table what needs you: a server nobody
-// watches, an app that does not run.
+// welcome is `moin` before the first deploy: what moin is, and the
+// three steps to an app on a server.
+func welcome(w io.Writer) {
+	fmt.Fprintln(w, style.Mark.Render(build.Name)+"  your app on your server. Backups checked every day.")
+	fmt.Fprintln(w)
+	steps := [][3]string{
+		{"1", "cd my-app", "the app's folder, a git repository"},
+		{"2", build.Name + " deploy <server>", "any server you can ssh to, like ssh prod"},
+		{"3", build.Name, "your apps, live, with their backups"},
+	}
+	for _, step := range steps {
+		fmt.Fprintln(w, "  "+style.Muted.Render(step[0])+"  "+command(w, step[1])+strings.Repeat(" ", max(22-len(step[1]), 1))+style.Muted.Render(step[2]))
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, style.Muted.Render("All commands: ")+command(w, build.Name+" help")+style.Muted.Render("   Docs: https://moin.run/docs"))
+}
+
+// printNeeds says under the table what needs you, one thing each: a
+// server that does not answer, an app that does not run, a server open
+// to the internet or watched by nobody. The command that settles it
+// follows on the next line.
 func printNeeds(stdout io.Writer, rows []serverRow) {
-	var needs, open, knocked []string
-	var urgent []daemon.Need
+	var lines []string
 	for _, row := range rows {
 		if row.err != nil {
+			lines = append(lines, style.Danger.Render(style.SymbolFailed)+" "+row.server+" does not answer. "+commands(stdout, explain(row.err)))
 			continue
-		}
-		urgent = append(urgent, row.status.Needs...)
-		if row.status.PublicSSH {
-			open = append(open, row.server)
-		}
-		if row.status.KnocksToday > 0 {
-			knocked = append(knocked, row.server+": "+human.Knocks(row.status.KnocksToday))
-		}
-		if len(row.status.Watchers) == 0 {
-			needs = append(needs, fmt.Sprintf("%s reports to no watcher: nobody notices when it is gone. `%s watcher connect %s <url> <token>`", row.server, build.Name, row.server))
 		}
 		for _, app := range row.status.Apps {
 			if !app.Running {
-				needs = append(needs, fmt.Sprintf("%s does not run. See why with `%s logs %s`, start it with `%s start %s`", app.Name, build.Name, app.Name, build.Name, app.Name))
+				lines = append(lines, needLine(stdout, app.Name+" does not run. Its logs say why.", build.Name+" logs "+app.Name))
 			}
 		}
+		for _, need := range row.status.Needs {
+			lines = append(lines, needLine(stdout, need.Text, need.Command))
+		}
+		if row.status.PublicSSH {
+			lines = append(lines, needLine(stdout, row.server+": port 22 is open to the internet.", build.Name+" secure "+row.server))
+		}
+		if len(row.status.Watchers) == 0 {
+			lines = append(lines, needLine(stdout, row.server+" reports to no watcher. Nobody notices when it is gone.", build.Name+" watcher connect "+row.server+" <url> <token>"))
+		}
+		if row.status.KnocksToday > 0 {
+			lines = append(lines, style.Muted.Render(row.server+": "+human.Knocks(row.status.KnocksToday)))
+		}
 	}
-	if len(needs)+len(open)+len(knocked)+len(urgent) > 0 {
-		fmt.Fprintln(stdout)
+	if len(lines) == 0 {
+		return
 	}
-	for _, line := range knocked {
-		fmt.Fprintln(stdout, style.Muted.Render(line))
+	fmt.Fprintln(stdout)
+	for _, line := range lines {
+		fmt.Fprintln(stdout, line)
 	}
-	for _, server := range open {
-		fmt.Fprintln(stdout, style.Danger.Render(server+": port 22 open to the internet")+"  "+style.Muted.Render("Close it:")+" "+command(stdout, build.Name+" secure "+server))
-	}
-	for _, need := range urgent {
-		fmt.Fprintln(stdout, style.Danger.Render(need.Text)+"  "+command(stdout, need.Command))
-	}
-	for _, need := range needs {
-		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+commands(stdout, need))
-	}
+}
+
+// needLine is one thing that needs you, in amber, and the command that
+// settles it under it.
+func needLine(w io.Writer, text, next string) string {
+	return style.Warning.Render("!") + " " + text + "\n  " + command(w, next)
 }
 
 // askServers asks every server at once and waits for all, at most
@@ -308,7 +324,7 @@ func printApps(stdout io.Writer, rows []serverRow) {
 	lines := [][]string{}
 	for _, row := range rows {
 		if row.err != nil {
-			lines = append(lines, []string{style.Bold.Render(row.server), "", "", badge(stdout, style.Badge(style.StatusFailed, "unreachable"), "unreachable"), style.Muted.Render(explain(row.err))})
+			lines = append(lines, []string{style.Bold.Render(row.server), "", "", badge(stdout, style.Badge(style.StatusFailed, "unreachable"), "unreachable"), ""})
 			continue
 		}
 		if len(row.status.Apps) == 0 {
@@ -318,7 +334,7 @@ func printApps(stdout io.Writer, rows []serverRow) {
 			lines = append(lines, []string{style.Bold.Render(row.server), app.Name, "v" + strconv.Itoa(app.Release), appState(stdout, app.Running), strings.Join(app.Addresses, " ")})
 		}
 	}
-	table(stdout, []string{"SERVER", "APP", "RELEASE", "STATE", "ADDRESS"}, lines)
+	table(stdout, []string{"SERVER", "APP", "DEPLOY", "STATE", "DOMAIN"}, lines)
 }
 
 // serverJSON is one server in `moin --json`.

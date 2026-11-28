@@ -35,16 +35,18 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err != nil {
 		return err
 	}
-	server, err := deployServer(ctx, flags, app)
-	if err != nil {
-		return err
-	}
 	// With --json, stdout is for the JSON alone: the log goes to stderr.
 	log := stdout
 	if flags.json() {
 		log = terminal(os.Stderr)
 	}
+	// What to send first: without a commit there is nothing to deploy,
+	// wherever it goes.
 	from, err := deploySource(ctx, *image, *catalogApp, log)
+	if err != nil {
+		return err
+	}
+	server, err := deployServer(ctx, flags, app)
 	if err != nil {
 		return err
 	}
@@ -194,11 +196,12 @@ func hasBucket(ctx context.Context, server string) bool {
 // printLive says the app is live, with its address and what to do next:
 // with a database, its backups, or the bucket they need first.
 func printLive(stdout io.Writer, result daemon.Result, server string, bucket bool) {
+	fmt.Fprintln(stdout)
 	if len(result.Addresses) == 0 {
-		done(stdout, "%s. %s runs v%d. It has no address yet: `%s domains add %s <domain>`", build.Name, result.App, result.Release, build.Name, result.App)
+		done(stdout, "%s v%d runs. It has no domain yet: `%s domains add %s <domain>`", result.App, result.Release, build.Name, result.App)
 		return
 	}
-	done(stdout, "%s. %s is live: %s", build.Name, result.App, result.Addresses[0])
+	done(stdout, "%s v%d is live: %s", result.App, result.Release, result.Addresses[0])
 	for _, address := range result.Addresses[1:] {
 		fmt.Fprintln(stdout, "  "+style.Muted.Render("also "+address))
 	}

@@ -66,8 +66,13 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres service.")
 			return nil
 		}
+		copies := false
 		for _, database := range databases {
-			printBackup(stdout, app, database, time.Now())
+			printBackup(stdout, database, time.Now())
+			copies = copies || len(database.Copies) > 0
+		}
+		if copies {
+			hint(stdout, "Go back to one with", build.Name+" restore "+app+" --to <copy>")
 		}
 		return nil
 	})
@@ -87,34 +92,39 @@ func backupsFrom(ctx context.Context, server, app, from string, stderr io.Writer
 	return databases, err
 }
 
-// printBackup shows how one database is backed up.
-func printBackup(stdout io.Writer, app string, database protocol.DatabaseBackup, now time.Time) {
+// printBackup shows how one database is backed up: the last check and
+// the copies, the one the check restored marked.
+func printBackup(stdout io.Writer, database protocol.DatabaseBackup, now time.Time) {
 	fmt.Fprintln(stdout, style.Bold.Render(database.Database))
 	if database.Error != "" {
-		fmt.Fprintln(stdout, "  "+style.Danger.Render("✗")+" "+database.Error)
+		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" "+database.Error)
 	}
 	fmt.Fprintln(stdout, "  "+checkLine(database, now))
 	if database.CloudError != "" {
-		fmt.Fprintln(stdout, "  "+style.Danger.Render("✗")+" No watcher took the last copy: "+database.CloudError)
+		fmt.Fprintln(stdout, "  "+style.Danger.Render(style.SymbolFailed)+" No watcher took the last copy: "+database.CloudError)
 	}
 	rows := [][]string{}
 	for index, copy := range database.Copies {
 		if index == shownCopies {
-			rows = append(rows, []string{style.Muted.Render(fmt.Sprintf("and %d older, see --json", len(database.Copies)-shownCopies)), "", ""})
+			rows = append(rows, []string{style.Muted.Render(fmt.Sprintf("and %d older, see --json", len(database.Copies)-shownCopies)), "", "", ""})
 			break
 		}
 		size := human.Size(float64(copy.Size))
 		if copy.Plain {
 			size += ", not encrypted"
 		}
-		rows = append(rows, []string{copy.ID, human.Ago(copy.At, now), size})
+		note := ""
+		if copy.ID == database.CheckedCopy && database.CheckError == "" {
+			note = badge(stdout, style.Success.Render(style.SymbolDone+" checked"), "checked")
+		}
+		rows = append(rows, []string{copy.ID, human.Ago(copy.At, now), size, note})
 	}
 	for _, undo := range database.Undos {
-		rows = append(rows, []string{"undo-" + undo.ID, human.Ago(undo.At, now), "before a restore"})
+		rows = append(rows, []string{"undo-" + undo.ID, human.Ago(undo.At, now), "", style.Muted.Render("before a restore")})
 	}
 	if len(rows) > 0 {
-		table(stdout, []string{"COPY", "TAKEN", "SIZE"}, rows)
-		hint(stdout, "Go back to one with", build.Name+" restore "+app+" --to <copy>")
+		fmt.Fprintln(stdout)
+		table(stdout, []string{"COPY", "TAKEN", "SIZE", ""}, rows)
 	}
 	fmt.Fprintln(stdout)
 }
@@ -123,13 +133,13 @@ func printBackup(stdout io.Writer, app string, database protocol.DatabaseBackup,
 func checkLine(database protocol.DatabaseBackup, now time.Time) string {
 	switch {
 	case database.CheckedAt == nil:
-		return style.Muted.Render("No restore check yet. The newest copy is restored and read once a day.")
+		return style.Muted.Render("No check yet. Once a day the newest copy is restored and read.")
 	case database.CheckError != "" && database.CheckedCopy != "":
-		return style.Danger.Render("✗") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError + ". The last copy that restored fine: " + database.CheckedCopy
+		return style.Danger.Render(style.SymbolFailed) + " Checked " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError + ". The last copy that restored fine: " + database.CheckedCopy
 	case database.CheckError != "":
-		return style.Danger.Render("✗") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError + ". No copy restored fine yet"
+		return style.Danger.Render(style.SymbolFailed) + " Checked " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError + ". No copy restored fine yet"
 	}
-	return style.Success.Render("✓") + " Restore check " + human.Ago(*database.CheckedAt, now) + ": the copy " + database.CheckedCopy + " restored and read fine"
+	return style.Success.Render(style.SymbolDone) + " Checked " + human.Ago(*database.CheckedAt, now) + ": the copy marked checked restored and read fine"
 }
 
 // backUp is `moin backup [app]`: a copy of the app's databases now.
@@ -143,8 +153,8 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	return onApp(ctx, flags, app, func(server string) error {
-		var copied []daemon.Copied
-		if err := sshJSON(ctx, server, []string{"backup", app}, nil, &copied); err != nil {
+		copied, err := backupNow(ctx, server, app, os.Stderr)
+		if err != nil {
 			return err
 		}
 		if flags.json() {
@@ -155,6 +165,13 @@ func backUp(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		return nil
 	})
+}
+
+// backupNow copies every database of app into the bucket now.
+func backupNow(ctx context.Context, server, app string, said io.Writer) ([]daemon.Copied, error) {
+	var copied []daemon.Copied
+	err := sshAnswer(ctx, server, []string{"backup", app}, nil, said, &copied)
+	return copied, err
 }
 
 // restore is `moin restore [app]`: a database goes back to a copy, and
@@ -189,19 +206,16 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		if err := confirm(stdin, prompts, flags.yes(), question); err != nil {
 			return err
 		}
-		line := []string{"restore", app, "--to", *to, "--database", *database, "--from", *from}
-		// Your key goes to the server on stdin, never on a command line. The
-		// server opens the copy with it and writes it nowhere.
 		var key io.Reader
 		if *withKey {
 			secret, err := askBackupKey(stdin, prompts, "Your backup key:")
 			if err != nil {
 				return err
 			}
-			line, key = append(line, "--key-stdin"), strings.NewReader(secret.String()+"\n")
+			key = strings.NewReader(secret.String() + "\n")
 		}
-		var restored daemon.Restored
-		if err := sshJSON(ctx, server, line, key, &restored); err != nil {
+		restored, err := restoreCopy(ctx, server, app, *database, *to, *from, key, os.Stderr)
+		if err != nil {
 			return err
 		}
 		if flags.json() {
@@ -211,6 +225,20 @@ func restore(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 		hint(stdout, "Undo it with", build.Name+" restore "+app+" --to "+restored.Undo)
 		return nil
 	})
+}
+
+// restoreCopy puts a database of app back to the copy to, on server.
+// from names the server that made the copy, "" for this one. A key goes
+// to the server on stdin, never on a command line: the server opens the
+// copy with it and writes it nowhere.
+func restoreCopy(ctx context.Context, server, app, database, to, from string, key io.Reader, said io.Writer) (daemon.Restored, error) {
+	line := []string{"restore", app, "--to", to, "--database", database, "--from", from}
+	if key != nil {
+		line = append(line, "--key-stdin")
+	}
+	var restored daemon.Restored
+	err := sshAnswer(ctx, server, line, key, said, &restored)
+	return restored, err
 }
 
 // askBackupKey reads your backup key: typed or pasted on a terminal,
@@ -251,7 +279,7 @@ func pickCopy(ctx context.Context, server, app, name, from string, stdin io.Read
 	if len(chosen.Copies) == 0 {
 		return "", "", fmt.Errorf("%s of %s has no copy to go back to yet", chosen.Database, app)
 	}
-	printBackup(stdout, app, chosen, time.Now())
+	printBackup(stdout, chosen, time.Now())
 	to, err = ask(stdin, stdout, "Go back to which copy?", chosen.Copies[0].ID)
 	return chosen.Database, to, err
 }
