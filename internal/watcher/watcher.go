@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"maps"
 	"net"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -245,9 +246,9 @@ func (w *Watcher) Save(write func([]byte) error) error {
 var hostname = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 // checkReport refuses a report that is too big or names things oddly. It
-// cuts long backup errors and leaves out the alert destinations it cannot
-// send to. The watcher visits the domains of a report, so each must be a
-// plain public name.
+// cuts long backup errors and leaves out the alert destinations a watcher
+// never sends to. The watcher visits the domains of a report, so each
+// must be a plain public name.
 func checkReport(r *report.Report) error {
 	if len(r.Apps) > maxApps {
 		return fmt.Errorf("more than %d apps", maxApps)
@@ -260,12 +261,9 @@ func checkReport(r *report.Report) error {
 			return errors.New("an alert is too long")
 		}
 	}
-	// A destination this watcher cannot send to, like a kind of a newer
-	// moin or a url without https, is left out: it would fail again
-	// every few seconds.
-	r.Alerts = slices.DeleteFunc(r.Alerts, func(d report.Alert) bool {
-		return alert.Check(d) != nil || d.URL != "" && !strings.HasPrefix(d.URL, "https://")
-	})
+	// A destination this watcher never sends to is left out: it would
+	// fail again every few seconds, and fill the list of unsent alerts.
+	r.Alerts = slices.DeleteFunc(r.Alerts, func(d report.Alert) bool { return !sendable(d) })
 	for i := range r.Apps {
 		app := &r.Apps[i]
 		if !serverName.MatchString(app.Name) {
@@ -288,6 +286,27 @@ func checkReport(r *report.Report) error {
 		}
 	}
 	return nil
+}
+
+// sendable says whether a watcher sends to a destination a report named.
+// It does not to a kind it does not know, like one of a newer moin, to a
+// url without https, or to a private address written out. A name that
+// points at a private address is refused later, when the alert goes out.
+func sendable(d report.Alert) bool {
+	if alert.Check(d) != nil {
+		return false
+	}
+	if d.URL == "" {
+		return true
+	}
+	address, err := url.Parse(d.URL)
+	return err == nil && address.Scheme == "https" && !privateAddress(address.Hostname())
+}
+
+// privateAddress says whether host is an IP address RefusePrivate stops.
+// A name is not: only a connection shows where it points.
+func privateAddress(host string) bool {
+	return net.ParseIP(host) != nil && RefusePrivate("tcp", net.JoinHostPort(host, "443"), nil) != nil
 }
 
 // clip cuts text to at most n bytes, on a whole character.

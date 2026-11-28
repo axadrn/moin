@@ -667,13 +667,16 @@ func TestReportedGoesPublicOnly(t *testing.T) {
 		t.Errorf("the watcher's own destination: %d calls, %d unsent", calls, len(own.state.Unsent))
 	}
 
-	// A report cannot name it at all: without https it is left out.
+	// A report cannot name it at all. A url without https or with a
+	// private address written out is left out at the door, so no alert
+	// to it is ever kept and tried again. The others stay.
+	outside := alert.Destination{Kind: "slack", URL: "https://hooks.example.com/services/x"}
 	named := testReport()
-	named.Alerts = []report.Alert{hook}
+	named.Alerts = []report.Alert{hook, {Kind: "webhook", URL: "https://10.0.0.5/hook"}, {Kind: "discord", URL: "https://[::1]:8443/hook"}, {Kind: "webhook", URL: "http://100.101.102.103/hook"}, outside}
 	if err := reported.Receive("prod", named); err != nil {
 		t.Fatal(err)
 	}
-	if got := reported.state.Servers["prod"].Report.Alerts; len(got) != 0 {
+	if got := reported.state.Servers["prod"].Report.Alerts; !slices.Equal(got, []report.Alert{outside}) {
 		t.Errorf("kept the alerts %+v", got)
 	}
 }

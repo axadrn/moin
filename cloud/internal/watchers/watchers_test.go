@@ -258,3 +258,34 @@ func TestTickAtOnce(t *testing.T) {
 		}
 	}
 }
+
+// A destination moin cloud never sends to is left out when the report
+// comes in: a webhook for a watcher on the tailnet, valid for
+// `moin alerts add`. So no alert to it is kept and tried again every few
+// seconds, in the way of the ones that can go out.
+func TestTailnetWebhookLeftOut(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "cloud.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	store := workspace.NewStore(database)
+	ws := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{1})
+	space, _ := store.SignIn("ada@example.com")
+	token, _ := store.ConnectServer(space.ID, "prod")
+	alerts := []report.Alert{
+		{Kind: "webhook", URL: "http://100.101.102.103/hook"},
+		{Kind: "webhook", URL: "https://100.101.102.103/hook"},
+		{Kind: "slack", URL: "https://hooks.example.com/services/x"},
+	}
+	if err := ws.Receive(token, report.Report{Server: "prod", EverySeconds: 60, Alerts: alerts}); err != nil {
+		t.Fatal(err)
+	}
+	ws.tick(t.Context())
+	ws.save()
+	sealed, _ := store.WatcherState(space.ID)
+	state, err := ws.open(space.ID, sealed)
+	if err != nil || strings.Contains(string(state), "100.101.102.103") || !strings.Contains(string(state), "hooks.example.com") {
+		t.Errorf("the saved state = %s, %v", state, err)
+	}
+}
