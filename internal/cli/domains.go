@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/axadrn/moin/internal/build"
 	"github.com/axadrn/moin/internal/style"
@@ -43,7 +45,8 @@ func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 	})
 }
 
-// changeDomain adds or removes one domain.
+// changeDomain adds or removes one domain. Left out, it is asked on a
+// terminal.
 func changeDomain(ctx context.Context, verb string, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("domains "+verb, "domains "+verb+" [app] <domain> [-s server]").withServer()
 	if verb == "rm" {
@@ -53,11 +56,30 @@ func changeDomain(ctx context.Context, verb string, args []string, stdin io.Read
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	app, rest, err := appArgs(flags, 1)
+	// The domain may be left out, to be asked: an app name has no dot, a
+	// domain has one.
+	others := 1
+	if flags.NArg() < 2 && !strings.Contains(flags.Arg(0), ".") {
+		others = 0
+	}
+	app, rest, err := appArgs(flags, others)
 	if err != nil {
 		return err
 	}
-	domain := rest[0]
+	var domain string
+	switch {
+	case len(rest) == 1:
+		domain = rest[0]
+	case !isTerminal(stdin):
+		return flags.wrong()
+	default:
+		if domain, err = ask(stdin, stdout, "Domain, like "+app+".example.com:", ""); err != nil {
+			return err
+		}
+		if domain == "" {
+			return errors.New("no domain, nothing changed")
+		}
+	}
 	if verb == "rm" {
 		if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Take %s off %s? Visitors there get no answer.", domain, app)); err != nil {
 			return err

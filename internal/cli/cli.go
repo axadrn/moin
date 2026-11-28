@@ -207,7 +207,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "update":
 		return update(ctx, rest, stdout)
 	case "servers":
-		return servers(ctx, rest, stdout)
+		return servers(ctx, rest, stdin, stdout)
 	case "deploy":
 		return deploy(ctx, rest, stdin, stdout)
 	case "apps":

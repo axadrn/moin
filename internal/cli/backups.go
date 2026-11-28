@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -231,7 +232,7 @@ func bucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}
@@ -292,7 +293,7 @@ func bucketKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}
@@ -343,7 +344,7 @@ func bucketConfirm(ctx context.Context, args []string, stdin io.Reader, stdout i
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}
@@ -495,7 +496,7 @@ func setBucket(ctx context.Context, args []string, stdin io.Reader, stdout io.Wr
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}
@@ -582,13 +583,13 @@ func alerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	case "rm":
 		return removeAlert(ctx, args[1:], stdin, stdout)
 	case "test":
-		return testAlerts(ctx, args[1:], stdout)
+		return testAlerts(ctx, args[1:], stdin, stdout)
 	}
 	flags := newFlags("alerts", "alerts <server> [--json]").withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}
@@ -614,10 +615,11 @@ func alerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 
 // addAlert is `moin alerts add <server> <kind>`: telegram with --token and
 // --chat-id; slack, discord or webhook with --url; email with --to, --smtp
-// and --user. On a terminal it asks for what is missing. The password of
-// an email is asked without showing it, or read from stdin: never a flag,
-// which would stay in your shell's history. The server sends a test alert
-// first and keeps the destination only when that went out.
+// and --user. On a terminal it asks for what is missing, the kind too. The
+// password of
+// an email is asked without showing it, or read from stdin: never a
+// flag, which would stay in your shell's history. The server sends a test
+// alert first and keeps the destination only when that went out.
 func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("alerts add", "alerts add <server> telegram [--token <bot-token>] [--chat-id <id>], or slack|discord|webhook [--url <url>], or email [--to <address>] [--smtp <host:port>] [--user <user>] [--from <address>], the password is asked or read from stdin")
 	var destination alert.Destination
@@ -631,34 +633,23 @@ func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 2 {
-		return flags.wrong()
+	server, rest, err := flags.serverArgs(stdin, 1)
+	if err != nil {
+		return err
 	}
-	server := flags.Arg(0)
-	destination.Kind = flags.Arg(1)
-	needed := []string{"url"}
-	switch destination.Kind {
-	case "telegram":
-		needed = []string{"token", "chat-id"}
-	case "email":
-		needed = []string{"to", "smtp", "user"}
+	if len(rest) == 1 {
+		destination.Kind = rest[0]
 	}
-	values := map[string]*string{"url": &destination.URL, "token": &destination.Token, "chat-id": &destination.ChatID, "to": &destination.To, "smtp": &destination.SMTP, "user": &destination.User}
-	for _, name := range needed {
-		if *values[name] != "" {
-			continue
-		}
-		if !isTerminal(stdin) {
-			return fmt.Errorf("%s alerts need --%s", destination.Kind, name)
-		}
-		answer, err := ask(stdin, stdout, "The "+name+" for "+destination.Kind+":", "")
-		if err != nil {
-			return err
-		}
-		*values[name] = answer
+	if isTerminal(stdin) {
+		err = askAlert(&destination, stdin, stdout)
+	} else {
+		err = checkAlert(destination)
+	}
+	if err != nil {
+		return err
 	}
 	if destination.Kind == "email" {
-		password, err := askPassword(stdin, stdout, "Password of "+destination.User+" at "+destination.SMTP+":")
+		password, err := askSecret(stdin, stdout, "Password of "+destination.User+" at "+destination.SMTP+":", "password")
 		if err != nil {
 			return err
 		}
@@ -671,23 +662,94 @@ func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	return nil
 }
 
-// askPassword asks for a password without showing it on a terminal, or
-// reads it as one line from a pipe.
-func askPassword(stdin io.Reader, stdout io.Writer, question string) (string, error) {
+// alertKinds are where alerts can go.
+var alertKinds = []string{"telegram", "slack", "discord", "webhook", "email"}
+
+// alertValue is one value an alert needs, by the name of its flag.
+type alertValue struct {
+	flag  string
+	value *string
+}
+
+// alertValues are the values the kind of destination needs.
+func alertValues(destination *alert.Destination) []alertValue {
+	switch destination.Kind {
+	case "telegram":
+		return []alertValue{{"token", &destination.Token}, {"chat-id", &destination.ChatID}}
+	case "email":
+		return []alertValue{{"to", &destination.To}, {"smtp", &destination.SMTP}, {"user", &destination.User}}
+	}
+	return []alertValue{{"url", &destination.URL}}
+}
+
+// checkAlert fails without a terminal for what is missing, naming the
+// flag to pass.
+func checkAlert(destination alert.Destination) error {
+	if !slices.Contains(alertKinds, destination.Kind) {
+		return fmt.Errorf("name where alerts go: %s, like `%s alerts add my-server telegram`", strings.Join(alertKinds, ", "), build.Name)
+	}
+	for _, each := range alertValues(&destination) {
+		if *each.value == "" {
+			return fmt.Errorf("%s alerts need --%s", destination.Kind, each.flag)
+		}
+	}
+	return nil
+}
+
+// askAlert asks on a terminal for the kind and the values the flags left
+// out. An email may name who it is from; Enter skips that.
+func askAlert(destination *alert.Destination, stdin io.Reader, stdout io.Writer) error {
+	if destination.Kind == "" {
+		kind, err := pick(stdin, stdout, "Where do alerts go?", alertKinds, "")
+		if err != nil {
+			return err
+		}
+		destination.Kind = kind
+	}
+	if !slices.Contains(alertKinds, destination.Kind) {
+		return fmt.Errorf("alerts go to %s, not %s", strings.Join(alertKinds, ", "), destination.Kind)
+	}
+	for _, each := range alertValues(destination) {
+		if *each.value != "" {
+			continue
+		}
+		answer, err := ask(stdin, stdout, "The "+each.flag+" for "+destination.Kind+":", "")
+		if err != nil {
+			return err
+		}
+		if answer == "" {
+			return fmt.Errorf("no %s, nothing changed", each.flag)
+		}
+		*each.value = answer
+	}
+	if destination.Kind == "email" && destination.From == "" {
+		from, err := ask(stdin, stdout, "From address, Enter skips:", "")
+		if err != nil {
+			return err
+		}
+		destination.From = from
+	}
+	return nil
+}
+
+// askSecret asks for a password or token without showing it on a
+// terminal, or reads it as one line from a pipe. name says what it is in
+// the error when there is none.
+func askSecret(stdin io.Reader, stdout io.Writer, question, name string) (string, error) {
 	if isTerminal(stdin) {
 		fmt.Fprint(stdout, style.Warning.Render("?")+" "+question+" ")
 	}
-	password, err := readSecret(stdin)
+	secret, err := readSecret(stdin)
 	if isTerminal(stdin) {
 		fmt.Fprintln(stdout)
 	}
 	if err != nil {
 		return "", err
 	}
-	if password == "" {
-		return "", errors.New("no password, nothing changed. Type it when asked, or pipe it in")
+	if secret == "" {
+		return "", fmt.Errorf("no %s, nothing changed. Type it when asked, or pipe it in", name)
 	}
-	return password, nil
+	return secret, nil
 }
 
 // removeAlert is `moin alerts rm <server> <n>`, n as `moin alerts` lists it.
@@ -696,10 +758,14 @@ func removeAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 2 {
+	server, rest, err := flags.serverArgs(stdin, 1)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
 		return flags.wrong()
 	}
-	server, number := flags.Arg(0), flags.Arg(1)
+	number := rest[0]
 	if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove alert %s from %s?", number, server)); err != nil {
 		return err
 	}
@@ -711,12 +777,12 @@ func removeAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.
 }
 
 // testAlerts is `moin alerts test <server>`: a test alert to everyone.
-func testAlerts(ctx context.Context, args []string, stdout io.Writer) error {
+func testAlerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("alerts test", "alerts test <server>")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}

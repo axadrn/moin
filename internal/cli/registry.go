@@ -31,7 +31,7 @@ func registry(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}
@@ -63,11 +63,21 @@ func setRegistry(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 3 {
-		return flags.wrong()
+	server, rest, err := flags.serverArgs(stdin, 2)
+	if err != nil {
+		return err
 	}
-	server := flags.Arg(0)
-	login := daemon.Registry{Registry: flags.Arg(1), User: flags.Arg(2)}
+	var login daemon.Registry
+	switch {
+	case len(rest) == 2:
+		login = daemon.Registry{Registry: rest[0], User: rest[1]}
+	case !isTerminal(stdin):
+		return flags.wrong()
+	default:
+		if login, err = askLogin(rest, stdin, stdout); err != nil {
+			return err
+		}
+	}
 	if isTerminal(stdin) {
 		fmt.Fprint(stdout, style.Warning.Render("?")+" Token of "+login.User+" at "+login.Registry+": ")
 	}
@@ -90,16 +100,39 @@ func setRegistry(ctx context.Context, args []string, stdin io.Reader, stdout io.
 	return nil
 }
 
+// askLogin asks for the registry and the user that rest leaves out.
+// Enter takes ghcr.io.
+func askLogin(rest []string, stdin io.Reader, stdout io.Writer) (daemon.Registry, error) {
+	var login daemon.Registry
+	var err error
+	if len(rest) > 0 {
+		login.Registry = rest[0]
+	} else if login.Registry, err = ask(stdin, stdout, "Registry:", "ghcr.io"); err != nil {
+		return login, err
+	}
+	if login.User, err = ask(stdin, stdout, "User at "+login.Registry+":", ""); err != nil {
+		return login, err
+	}
+	if login.User == "" {
+		return login, errors.New("no user, nothing changed")
+	}
+	return login, nil
+}
+
 // removeRegistry logs the server out of a registry.
 func removeRegistry(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("registry rm", "registry rm <server> <registry> [-y]").withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 2 {
+	server, rest, err := flags.serverArgs(stdin, 1)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
 		return flags.wrong()
 	}
-	server, name := flags.Arg(0), flags.Arg(1)
+	name := rest[0]
 	if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Log %s out of %s? It can no longer pull private images from it.", server, name)); err != nil {
 		return err
 	}

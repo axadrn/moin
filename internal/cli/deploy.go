@@ -55,7 +55,7 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 			fmt.Fprintln(log, style.Warning.Render("!")+" "+from+" is not on "+remote+" yet. Deploying it anyway.")
 		}
 	}
-	server, err := deployServer(ctx, flags, app)
+	server, err := deployServer(ctx, flags, app, stdin)
 	if err != nil {
 		return err
 	}
@@ -104,8 +104,9 @@ func deployedApp(appName, catalogApp string) (string, error) {
 }
 
 // deployServer is where the deploy goes: the server named, else the one
-// that runs the app already.
-func deployServer(ctx context.Context, flags *flagSet, app string) (string, error) {
+// that runs the app already. The first deploy picks one of your servers
+// on a terminal.
+func deployServer(ctx context.Context, flags *flagSet, app string, stdin io.Reader) (string, error) {
 	if flags.NArg() > 1 {
 		return "", flags.wrong()
 	}
@@ -125,6 +126,9 @@ func deployServer(ctx context.Context, flags *flagSet, app string) (string, erro
 	}
 	switch len(servers) {
 	case 0:
+		if known, err := loadServers(); err == nil && len(known) > 0 && isTerminal(stdin) {
+			return pickServer(stdin, terminal(os.Stderr), known)
+		}
 		return "", fmt.Errorf("where to? The first deploy of %s names the server: `%s deploy <server>`, a name from your ssh config or user@host", app, build.Name)
 	case 1:
 		return servers[0], nil

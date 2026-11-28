@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
@@ -85,13 +86,69 @@ func (f *flagSet) yes() bool { return f.yesFlag != nil && *f.yesFlag }
 // json reports whether --json was given.
 func (f *flagSet) json() bool { return f.jsonFlag != nil && *f.jsonFlag }
 
-// server is the one argument of a command that takes one, like the
-// server of `keys my-server` or the app of `moin here logs my-app`.
-func (f *flagSet) server() (string, error) {
+// oneArg is the one argument of a command that takes one, like the new
+// server of `servers add my-server` or the app of `moin here logs my-app`.
+func (f *flagSet) oneArg() (string, error) {
 	if f.NArg() != 1 {
 		return "", f.wrong()
 	}
 	return f.Arg(0), nil
+}
+
+// serverArgs reads the arguments of a command on a server, like
+// `keys add my-server anna.pub`: the server first, then at most others
+// more. With no arguments at all, you pick the server on a terminal from
+// your servers. Without a terminal that is the usage error.
+func (f *flagSet) serverArgs(stdin io.Reader, others int) (server string, rest []string, err error) {
+	if f.NArg() > others+1 {
+		return "", nil, f.wrong()
+	}
+	if f.NArg() > 0 {
+		return f.Arg(0), f.Args()[1:], nil
+	}
+	if !isTerminal(stdin) {
+		return "", nil, f.wrong()
+	}
+	servers, err := loadServers()
+	if err != nil {
+		return "", nil, err
+	}
+	if len(servers) == 0 {
+		return "", nil, fmt.Errorf("you have no servers yet. Name one: `%s`", f.usage)
+	}
+	server, err = pickServer(stdin, terminal(os.Stderr), servers)
+	return server, nil, err
+}
+
+// pickServer asks which of your servers. With one, Enter takes it.
+func pickServer(stdin io.Reader, stdout io.Writer, servers []string) (string, error) {
+	suggested := ""
+	if len(servers) == 1 {
+		suggested = servers[0]
+	}
+	return pick(stdin, stdout, "Which server?", servers, suggested)
+}
+
+// pick shows the choices with a number each and asks for one, by its
+// number or its name. Enter takes suggested, when there is one.
+func pick(stdin io.Reader, stdout io.Writer, question string, choices []string, suggested string) (string, error) {
+	for index, choice := range choices {
+		fmt.Fprintln(stdout, "  "+style.Muted.Render(strconv.Itoa(index+1))+"  "+choice)
+	}
+	answer, err := ask(stdin, stdout, question, suggested)
+	if err != nil {
+		return "", err
+	}
+	if number, err := strconv.Atoi(answer); err == nil && number >= 1 && number <= len(choices) {
+		return choices[number-1], nil
+	}
+	if slices.Contains(choices, answer) {
+		return answer, nil
+	}
+	if answer == "" {
+		return "", errors.New("nothing picked, nothing changed")
+	}
+	return "", fmt.Errorf("%q is not in the list: type its number or its name", answer)
 }
 
 // helpError carries the help of a command: Run prints it and exits with 0.

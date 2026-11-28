@@ -272,7 +272,7 @@ func hereApp(flags *flagSet, args []string) (string, error) {
 	if err := flags.parse(args); err != nil {
 		return "", err
 	}
-	return flags.server()
+	return flags.oneArg()
 }
 
 // respond prints the value a here command returns as JSON, or returns

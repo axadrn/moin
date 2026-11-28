@@ -65,7 +65,7 @@ func secure(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}

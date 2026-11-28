@@ -92,12 +92,12 @@ func saveServers(servers []string) error {
 
 // servers is `moin servers`, the servers you deployed to with their
 // watchers, and `servers add|rm <server>`.
-func servers(ctx context.Context, args []string, stdout io.Writer) error {
+func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) > 0 && args[0] == "add" {
 		return addServerCommand(ctx, args[1:], stdout)
 	}
 	if len(args) > 0 && args[0] == "rm" {
-		return removeServerCommand(args[1:], stdout)
+		return removeServerCommand(args[1:], stdin, stdout)
 	}
 	flags := newFlags("servers", "servers [--json], or servers add|rm <server>").withJSON()
 	if err := flags.parse(args); err != nil {
@@ -143,7 +143,7 @@ func addServerCommand(ctx context.Context, args []string, stdout io.Writer) erro
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, err := flags.oneArg()
 	if err != nil {
 		return err
 	}
@@ -161,12 +161,12 @@ func addServerCommand(ctx context.Context, args []string, stdout io.Writer) erro
 
 // removeServerCommand is `moin servers rm <server>`: moin forgets the
 // server. Nothing changes on it.
-func removeServerCommand(args []string, stdout io.Writer) error {
+func removeServerCommand(args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("servers rm", "servers rm <server>")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.server()
+	server, _, err := flags.serverArgs(stdin, 0)
 	if err != nil {
 		return err
 	}

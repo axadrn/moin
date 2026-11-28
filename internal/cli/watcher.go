@@ -33,7 +33,7 @@ func watcherCommand(ctx context.Context, args []string, stdin io.Reader, stdout 
 	case "token":
 		return watcherToken(args[1:], stdin, stdout)
 	case "connect":
-		return watcherConnect(ctx, args[1:], stdout)
+		return watcherConnect(ctx, args[1:], stdin, stdout)
 	case "disconnect":
 		return watcherDisconnect(ctx, args[1:], stdin, stdout)
 	}
@@ -150,19 +150,27 @@ func printCloud(stdout io.Writer, space cloudWorkspace) {
 
 // watcherConnect is `moin watcher connect <server> [<url> <token>]`: the
 // server reports to the watcher at url from now on. Without an address it
-// is moin cloud, and the browser signs this laptop in the first time.
-func watcherConnect(ctx context.Context, args []string, stdout io.Writer) error {
+// is moin cloud, and the browser signs this laptop in the first time. An
+// address without its token asks for the token without showing it, or
+// reads it from stdin.
+func watcherConnect(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("watcher connect", "watcher connect <server> [<url> <token>]")
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() == 1 {
-		return cloudConnect(ctx, flags.Arg(0), stdout)
+	server, rest, err := flags.serverArgs(stdin, 2)
+	if err != nil {
+		return err
 	}
-	if flags.NArg() != 3 {
-		return flags.wrong()
+	if len(rest) == 0 {
+		return cloudConnect(ctx, server, stdout)
 	}
-	server, to := flags.Arg(0), daemon.Watcher{URL: flags.Arg(1), Token: flags.Arg(2)}
+	to := daemon.Watcher{URL: rest[0]}
+	if len(rest) == 2 {
+		to.Token = rest[1]
+	} else if to.Token, err = askSecret(stdin, stdout, "Token of "+to.URL+":", "token"); err != nil {
+		return err
+	}
 	if err := sendJSON(ctx, server, to, "watchers", "connect"); err != nil {
 		return err
 	}
@@ -177,10 +185,14 @@ func watcherDisconnect(ctx context.Context, args []string, stdin io.Reader, stdo
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() < 1 || flags.NArg() > 2 {
-		return flags.wrong()
+	server, rest, err := flags.serverArgs(stdin, 1)
+	if err != nil {
+		return err
 	}
-	server, address := flags.Arg(0), flags.Arg(1)
+	address := ""
+	if len(rest) == 1 {
+		address = rest[0]
+	}
 	if address == "" || address == cloudURL() {
 		return cloudDisconnect(ctx, server, flags.yes(), stdin, stdout)
 	}
@@ -234,7 +246,7 @@ func watcherToken(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	name, err := flags.server()
+	name, err := flags.oneArg()
 	if err != nil {
 		return err
 	}
