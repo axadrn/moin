@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,13 +106,17 @@ func TestCopyUploadAndDownload(t *testing.T) {
 	body := []byte("age-encryption.org/v1 and then the copy")
 	request := Request{App: "shop", Database: "/data/app.db", MadeAt: time.Now().UTC().Truncate(time.Second), Size: int64(len(body))}
 
+	// A trial that is over takes no copies.
+	if err := test.store.StartTrial(test.space.ID, time.Now().Add(-31*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := test.copies.Start(test.ctx, test.token, request); !errors.Is(err, ErrNotPaid) {
-		t.Fatalf("a trial: %v", err)
+		t.Fatalf("a trial that is over: %v", err)
 	}
 	// The daemon asks with an empty request whether copies are taken:
 	// the plan is answered before the request is looked at.
 	if _, err := test.copies.Start(test.ctx, test.token, Request{}); !errors.Is(err, ErrNotPaid) {
-		t.Fatalf("an empty request on a trial: %v", err)
+		t.Fatalf("an empty request after the trial: %v", err)
 	}
 	if _, err := test.copies.Start(test.ctx, "wrong", request); !errors.Is(err, ErrUnknownToken) {
 		t.Fatalf("a wrong token: %v", err)
@@ -210,6 +215,29 @@ func TestCopyUploadAndDownload(t *testing.T) {
 
 // Old copies go, never the newest of a database; an upload that never
 // ended goes after a day; every copy goes 30 days after the end.
+// Requests at once can't all pass the storage limit before one counts.
+func TestStartAtOnce(t *testing.T) {
+	test := newCopiesTest(t)
+	test.pay("paid")
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	started := 0
+	for i := range 8 {
+		wg.Go(func() {
+			request := Request{App: "shop", Database: "db-" + string(rune('a'+i)), MadeAt: time.Now(), Size: Storage}
+			if _, err := test.copies.Start(test.ctx, test.token, request); err == nil {
+				mu.Lock()
+				started++
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	if started != 1 {
+		t.Errorf("%d copies of the whole storage started, want 1", started)
+	}
+}
+
 func TestPrune(t *testing.T) {
 	test := newCopiesTest(t)
 	test.pay("paid")

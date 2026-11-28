@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -57,6 +58,9 @@ type Copies struct {
 	bucket *Bucket
 	mailer mailer.Mailer
 	appURL string
+	// mu lets one Start at a time count and add, so requests at once
+	// can't all pass the limits before any of them is counted.
+	mu sync.Mutex
 }
 
 // New keeps the copies of the workspaces in store in bucket.
@@ -85,13 +89,15 @@ func (c *Copies) Start(ctx context.Context, token string, r Request) (Upload, er
 	if err != nil {
 		return Upload{}, err
 	}
-	if !space.CopiesOn(time.Now()) {
+	now := time.Now()
+	if !space.CopiesOn(now) {
 		return Upload{}, ErrNotPaid
 	}
-	now := time.Now()
 	if err := r.check(now); err != nil {
 		return Upload{}, err
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	near, err := c.store.CopiesMadeBetween(space.ID, server, r.App, r.Database, r.MadeAt.Add(-every), r.MadeAt.Add(every))
 	if err != nil {
 		return Upload{}, err
