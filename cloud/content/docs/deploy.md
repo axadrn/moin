@@ -39,6 +39,8 @@ my-app · 3f2a9c1 → my-server
 ✓ database /data/my-app.db (/var/lib/moin/apps/my-app/volumes/data/my-app.db)
 ✓ my-app v1 is live: https://my-app.203-0-113-7.sslip.io
   SQLite found. See its backups: moin backups my-app
+  Nobody watches my-server yet. If it dies at 3 a.m., your users tell you first.
+  moin watcher connect my-server   30 days free. No card.
 ```
 
 moin sends the committed source of the folder to `my-server`, over SSH. The server builds it and starts it. The app is named after the folder. Another name: `--app my-app`. A name is lowercase letters, digits and dashes.

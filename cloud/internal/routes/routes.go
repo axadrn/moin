@@ -107,7 +107,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 		middleware.RequestLogging,
 		middleware.OldDomain(cfg.OldURLs, cfg.AppURL),
 		middleware.SecurityHeaders(cfg),
-		middleware.RenderContext(cfg.RenderConfig),
+		middleware.RenderContext(cfg.RenderConfig, cloud.HasSession),
 	), nil
 }
 

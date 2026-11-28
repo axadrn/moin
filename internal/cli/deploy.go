@@ -86,6 +86,11 @@ func deploy(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 	}
 	printLive(stdout, result, server, len(result.Databases) == 0 || hasBucket(ctx, server))
 	if result.Release == 1 {
+		if status, err := quietStatus(ctx, server); err == nil && len(status.Watchers) == 0 {
+			fmt.Fprintln(stdout)
+			fmt.Fprintln(stdout, "  "+style.Muted.Render("Nobody watches "+server+" yet. If it dies at 3 a.m., your users tell you first."))
+			fmt.Fprintln(stdout, "  "+command(stdout, build.Name+" watcher connect "+server)+"   "+style.Muted.Render("30 days free. No card."))
+		}
 		return offerClose(ctx, server, stdin, stdout)
 	}
 	return nil

@@ -67,6 +67,8 @@ my-app · 3f2a9c1 → my-server
 ✓ database postgres-db (Postgres, service db)
 ✓ my-app v1 is live: https://my-app.203-0-113-7.sslip.io
   Postgres found. No backup yet: moin bucket set my-server
+  Nobody watches my-server yet. If it dies at 3 a.m., your users tell you first.
+  moin watcher connect my-server   30 days free. No card.
 ```
 
 The first time it installs Docker and moin on the server. That takes about two minutes. The app is named after the folder.

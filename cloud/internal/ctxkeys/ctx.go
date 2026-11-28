@@ -12,6 +12,7 @@ type contextKey string
 const (
 	urlPathKey      contextKey = "url_path"
 	renderConfigKey contextKey = "render_config"
+	signedInKey     contextKey = "signed_in"
 )
 
 func URLPath(ctx context.Context) string {
@@ -30,4 +31,14 @@ func RenderConfig(ctx context.Context) config.RenderConfig {
 
 func WithRenderConfig(ctx context.Context, cfg config.RenderConfig) context.Context {
 	return context.WithValue(ctx, renderConfigKey, cfg)
+}
+
+// SignedIn says whether the request carries a valid moin cloud session.
+func SignedIn(ctx context.Context) bool {
+	in, _ := ctx.Value(signedInKey).(bool)
+	return in
+}
+
+func WithSignedIn(ctx context.Context, in bool) context.Context {
+	return context.WithValue(ctx, signedInKey, in)
 }

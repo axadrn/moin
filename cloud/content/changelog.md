@@ -26,6 +26,7 @@ November 29, 2026
 - **Download a backup**: `moin backup download my-app` brings the newest copy to your laptop as a plain database file. Your backup key opens it there. No link is made. (#180)
 - **Backup schedule from the CLI**: `moin backups my-app --every 15m --keep 30d` sets how often an app is copied and how long each copy stays. `-s my-server` without an app sets the server's. `moin backups my-app` shows it. (#180)
 - **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
+- **Back to moin cloud**: The header of the site shows `Sign in` next to `Get started`. Signed in, it shows `moin cloud` instead, a link to your workspace.
 - **Sessions in moin cloud**: Settings lists every browser and CLI signed in to your account, with when each was last used. Sign out one, or all. `moin watcher logout` signs this laptop out. (#180)
 
 ### Changed
