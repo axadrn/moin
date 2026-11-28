@@ -90,7 +90,7 @@ p { margin: 0; }
 {{range .Servers}}<section class="card">
 <div class="head"><div><div class="name">{{.Name}}</div><div class="muted small">{{if .Version}}{{.Version}} · {{end}}{{.State}}</div></div>
 <span class="status{{if red .}} bad-text{{end}}"><i class="dot{{if red .}} bad{{else if not .Version}} off{{end}}"></i>{{if red .}}silent{{else if .Version}}online{{else}}no report yet{{end}}</span></div>
-{{if .Apps}}<div class="chips">{{range .Apps}}<span class="chip"><i class="dot{{if not .OK}} bad{{end}}"></i>{{.Name}} <span>{{.State}}</span></span>{{end}}</div>
+{{if .Apps}}<div class="chips">{{range .Apps}}<span class="chip"><i class="dot{{if not .OK}} bad{{else if .Stopped}} off{{end}}"></i>{{.Name}} <span>{{.State}}</span></span>{{end}}</div>
 <div class="rows"><div class="row th"><span>App</span><span>Domains, from outside</span><span>Databases</span></div>
 {{range .Apps}}<div class="row"><span>{{.Name}}</span>
 <span class="lines">{{range .Domains}}<span{{if .Problem}} class="bad-text"{{end}}>{{.Name}} <span class="muted">{{.State}}</span></span>{{else}}<span class="muted">none</span>{{end}}</span>

@@ -90,6 +90,29 @@ func TestAlertOnceAndWhenOver(t *testing.T) {
 	if !hook.got[1].OK || hook.got[0].OK {
 		t.Fatalf("ok flags: %+v", hook.got)
 	}
+	if hook.got[0].Event != "disk" || hook.got[1].Event != "disk" {
+		t.Fatalf("events: %+v", hook.got)
+	}
+}
+
+// An app stopped on purpose is in the report as stopped, crashes no
+// more, and a deploy that starts it ends that.
+func TestStoppedOnPurpose(t *testing.T) {
+	a := newApps(t.TempDir())
+	os.MkdirAll(a.releaseDir("shop", 1), 0o700)
+	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
+	w := newWatch(a)
+	if w.reportApp("shop", appContainers{}, nil).Stopped {
+		t.Fatal("an app that stopped by itself is stopped on purpose")
+	}
+	os.WriteFile(a.stoppedFile("shop"), nil, 0o600)
+	if app := w.reportApp("shop", appContainers{}, nil); !app.Stopped || app.Running {
+		t.Fatalf("app = %+v", app)
+	}
+	w.open["crash/shop"] = alert.Message{Title: "shop keeps crashing"}
+	if problems := w.problems(Config{Name: "prod"}, map[string]appContainers{"shop": {restarts: 9}}, nil); len(problems) != 0 {
+		t.Fatalf("an app stopped on purpose has problems: %v", problems)
+	}
 }
 
 // The problems of a server: a backup that fails, a copy that did not
@@ -226,12 +249,22 @@ func TestReport(t *testing.T) {
 	w := newWatch(a)
 	chat := alert.Destination{Kind: "telegram", Token: "123:test", ChatID: "42"}
 	config := Config{Name: "prod", Watchers: []Watcher{{URL: watcher.URL, Token: "t1"}}, Alerts: []alert.Destination{chat}}
-	w.report(context.Background(), config, map[string]appContainers{"shop": {running: true}}, statuses)
+	problems := map[string]alert.Message{
+		"disk":                     {Title: "the disk is 93% full"},
+		"crash/shop":               {Title: "shop keeps crashing"},
+		"backup/shop//data/app.db": {Title: "shop: the backup of /data/app.db fails"},
+		"watchers":                 {Title: "no watcher is reachable"},
+	}
+	w.report(context.Background(), config, map[string]appContainers{"shop": {running: true}}, statuses, problems)
 	if token != "Bearer t1" || got.Server != "prod" || len(got.Apps) != 1 || w.missed != 0 {
 		t.Fatalf("report = %+v, token %q, missed %d", got, token, w.missed)
 	}
 	if len(got.Alerts) != 1 || got.Alerts[0] != chat {
 		t.Fatalf("the report's alerts = %+v", got.Alerts)
+	}
+	// The server's own problems, without what a database's line says.
+	if strings.Join(got.Problems, " | ") != "shop keeps crashing | the disk is 93% full" {
+		t.Fatalf("the report's problems = %q", got.Problems)
 	}
 	app := got.Apps[0]
 	if app.Name != "shop" || app.Release != 2 || !app.Running || strings.Join(app.Domains, ",") != "shop.example.com,shop.203-0-113-7.sslip.io" {
@@ -242,8 +275,8 @@ func TestReport(t *testing.T) {
 		t.Fatalf("database = %+v", database)
 	}
 	watcher.Close()
-	w.report(context.Background(), config, nil, nil)
-	w.report(context.Background(), config, nil, nil)
+	w.report(context.Background(), config, nil, nil, nil)
+	w.report(context.Background(), config, nil, nil, nil)
 	if w.missed != 2 {
 		t.Fatalf("missed = %d", w.missed)
 	}

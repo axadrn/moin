@@ -285,6 +285,36 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 	}
 }
 
+// Every service keeps its logs small, unless it sets its own logging.
+func TestFinishRotatesLogs(t *testing.T) {
+	own := map[string]any{"driver": "local"}
+	base := map[string]any{"services": map[string]any{
+		"web": map[string]any{"image": "nginx"},
+		"db":  map[string]any{"image": "postgres:17", "logging": own},
+	}}
+	file := filepath.Join(t.TempDir(), "compose.json")
+	if err := finish(&release{start: protocol.DeployStart{App: "blog", Number: 1}, config: base, detected: protocol.Detected{Service: "web"}, composeJSON: file}); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(file)
+	var config struct {
+		Services map[string]struct {
+			Logging map[string]any `json:"logging"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(body, &config); err != nil {
+		t.Fatal(err)
+	}
+	web, db := config.Services["web"].Logging, config.Services["db"].Logging
+	options, _ := web["options"].(map[string]any)
+	if web["driver"] != "json-file" || options["max-size"] != "10m" || options["max-file"] != "3" {
+		t.Errorf("web logging = %v", web)
+	}
+	if fmt.Sprint(db) != fmt.Sprint(own) {
+		t.Errorf("db logging = %v, want its own %v", db, own)
+	}
+}
+
 func TestRouterLabels(t *testing.T) {
 	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}})
 	if err != nil {
@@ -413,7 +443,8 @@ func TestPruneKeepsBuildsAndTheRestartsAfterThem(t *testing.T) {
 			kept = append(kept, number)
 		}
 	}
-	if want := []int{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}; !slices.Equal(kept, want) {
+	// The failed v14 keeps what says why it failed, like a restart.
+	if want := []int{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}; !slices.Equal(kept, want) {
 		t.Fatalf("kept %v, want %v", kept, want)
 	}
 }

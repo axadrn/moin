@@ -127,4 +127,12 @@ func TestOldProjectDocker(t *testing.T) {
 	if got := docker("inspect", "-f", "{{.State.Running}}", folder+"-web-1"); got != "false" {
 		t.Fatalf("running after stop = %s", got)
 	}
+	// Stopped on purpose, until a deploy starts it again.
+	if !a.stoppedOnPurpose(folder) {
+		t.Fatal("stop did not mark the app stopped on purpose")
+	}
+	deploy(protocol.DeployStart{DeployID: "d3", App: folder, Number: 3, FromNumber: 2})
+	if a.stoppedOnPurpose(folder) || len(running(folder)) != 1 {
+		t.Fatalf("after a deploy: stopped %v, containers %v", a.stoppedOnPurpose(folder), running(folder))
+	}
 }

@@ -307,6 +307,7 @@ func (s *state) serverAlert(name string, started, now time.Time) (alert.Message,
 		srv.Silent = true
 		s.addOutage(outage{Server: name, From: srv.Received})
 		return alert.Message{
+			Event:  "silent",
 			Server: name,
 			Title:  name + " stopped reporting",
 			Text: "No report since " + clock(srv.Received) + ". The server, its network or moin on it is down." + appsOf(srv.Report) +
@@ -318,7 +319,7 @@ func (s *state) serverAlert(name string, started, now time.Time) (alert.Message,
 	if !quiet && srv.Silent && srv.Received.After(started) {
 		srv.Silent = false
 		from := s.end(name, "", now)
-		return alert.Message{Server: name, Title: name + " reports again", OK: true, Text: "It was silent for " + spoken(now.Sub(from)) + "."}, true
+		return alert.Message{Event: "silent", Server: name, Title: name + " reports again", OK: true, Text: "It was silent for " + spoken(now.Sub(from)) + "."}, true
 	}
 	return alert.Message{}, false
 }
@@ -333,7 +334,7 @@ func (s *state) domainAlert(name string, now time.Time) (alert.Message, bool) {
 		d.Alerted = true
 		s.addOutage(outage{Server: d.Server, App: d.App, Domain: name, From: d.Since, Reason: d.Reason})
 		return alert.Message{
-			Server: d.Server, App: d.App,
+			Event: "down", Server: d.Server, App: d.App,
 			Title: name + " is down",
 			Text: "No good answer from outside since " + clock(d.Since) + ": " + d.Reason + ".\n" +
 				d.Server + " still reports, so look at the app: " + build.Name + " logs " + d.App,
@@ -342,7 +343,7 @@ func (s *state) domainAlert(name string, now time.Time) (alert.Message, bool) {
 	if !d.Down && d.Alerted {
 		d.Alerted = false
 		from := s.end(d.Server, name, now)
-		return alert.Message{Server: d.Server, App: d.App, Title: name + " is up again", OK: true, Text: "It was down for " + spoken(now.Sub(from)) + "."}, true
+		return alert.Message{Event: "down", Server: d.Server, App: d.App, Title: name + " is up again", OK: true, Text: "It was down for " + spoken(now.Sub(from)) + "."}, true
 	}
 	return alert.Message{}, false
 }

@@ -44,6 +44,9 @@ alerts:
     chat_id: <chat id>
   - kind: slack          # slack, discord or webhook: each takes a url
     url: https://hooks.slack.com/services/<your hook>
+  - kind: webhook
+    url: https://hooks.example.com/moin
+    secret: <made by moin alerts add>   # signs every post
   - kind: email          # through your SMTP server, with STARTTLS
     to: ada@example.com
     smtp: smtp.example.com:587

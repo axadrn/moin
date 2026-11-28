@@ -44,10 +44,16 @@ func TestAlertsOptional(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"server":"prod","version":"v1.0.0","every_seconds":60,"apps":[]}`), &old); err != nil {
 		t.Fatal(err)
 	}
-	if old.Server != "prod" || old.Alerts != nil {
+	if old.Server != "prod" || old.Alerts != nil || old.Problems != nil {
 		t.Errorf("old report = %+v", old)
 	}
-	body, _ := json.Marshal(Report{Server: "prod"})
+	body, _ := json.Marshal(Report{Server: "prod", Apps: []App{{Name: "shop"}}, Alerts: []Alert{{Kind: "slack", URL: "https://hooks.example.com/x"}}})
+	for _, field := range []string{"problems", "stopped", "secret"} {
+		if strings.Contains(string(body), field) {
+			t.Errorf("a report without %s says %s", field, body)
+		}
+	}
+	body, _ = json.Marshal(Report{Server: "prod"})
 	if strings.Contains(string(body), "alerts") {
 		t.Errorf("a report without alerts says %s", body)
 	}

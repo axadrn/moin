@@ -434,7 +434,7 @@ func SendTestAlertHere(ctx context.Context) error {
 
 // testAlert is the alert that shows a destination works.
 func testAlert(config Config) alert.Message {
-	return alert.Message{Server: config.Name, Title: "a test alert from " + config.Name, Text: "Alerts from this server reach you here.", OK: true}
+	return alert.Message{Event: "test", Server: config.Name, Title: "a test alert from " + config.Name, Text: "Alerts from this server reach you here.", OK: true}
 }
 
 // WatchersHere lists the addresses of the watchers the server reports to.

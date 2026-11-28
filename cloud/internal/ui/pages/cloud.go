@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +101,7 @@ func connectCommand(server string) string {
 type summary struct {
 	Servers, Silent       int
 	Apps, Stopped         int
+	StoppedOnPurpose      int
 	Databases, Fine       int
 	Domains, Up           int
 	KnocksToday, KnocksYr int64
@@ -121,6 +121,7 @@ func summarize(servers []watcher.ServerView) summary {
 		}
 		s.Apps += c.Apps
 		s.Stopped += c.Stopped
+		s.StoppedOnPurpose += c.StoppedOnPurpose
 		s.Databases += c.Databases
 		s.Fine += c.Fine
 		s.Domains += c.Domains
@@ -144,6 +145,9 @@ func serverCount(server watcher.ServerView) summary {
 		s.Apps++
 		if app.Problem != "" {
 			s.Stopped++
+		}
+		if app.Stopped {
+			s.StoppedOnPurpose++
 		}
 		for _, d := range app.Domains {
 			s.Domains++
@@ -186,25 +190,6 @@ func serverWord(server watcher.ServerView) string {
 	return "online"
 }
 
-// problemsOf is what is red on one server, one sentence each.
-func problemsOf(server watcher.ServerView) []string {
-	var out []string
-	if server.Problem != "" {
-		out = append(out, server.Problem)
-	}
-	for _, app := range server.Apps {
-		if app.Problem != "" {
-			out = append(out, app.Problem)
-		}
-		for _, line := range slices.Concat(app.Domains, app.Databases) {
-			if line.Problem != "" {
-				out = append(out, line.Problem)
-			}
-		}
-	}
-	return out
-}
-
 // firstRed is the first server that is not fine, the one the overview's
 // notice opens.
 func firstRed(servers []watcher.ServerView) string {
@@ -221,12 +206,16 @@ func serverHref(name string) string {
 	return "/cloud/servers/" + name
 }
 
-// okState is the dot of something fine or red.
-func okState(ok bool) components.State {
-	if ok {
-		return components.StateLive
+// appState is the dot of an app: red when it is not fine, quiet while it
+// is stopped on purpose, green otherwise.
+func appState(app watcher.AppView) components.State {
+	switch {
+	case !app.OK:
+		return components.StateFailed
+	case app.Stopped:
+		return components.StateIdle
 	}
-	return components.StateFailed
+	return components.StateLive
 }
 
 // lineState is the dot of a domain or a database: red with a problem,

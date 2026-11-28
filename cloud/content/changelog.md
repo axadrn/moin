@@ -15,9 +15,13 @@ November 29, 2026
 - **Env from scripts**: `moin env set my-app API_KEY` reads the value from a hidden prompt or stdin, never the command line. `moin env push my-app prod.env` lists the names that change and asks first. (#180)
 - **See the compose file**: `moin compose my-app > compose.yml` saves the file moin runs, without your env values, to run the app anywhere. `C` in the terminal UI shows it. (#180)
 - **Remove an app**: `moin apps rm my-app` removes it after you say yes. Its volumes and copies stay. (#180)
+- **The server's own problems on the watcher**: A disk almost full or an app that keeps crashing shows under "Needs you" on your watcher and on moin cloud, not only in the alert. (#180)
+- **Signed webhooks**: `moin alerts add my-server webhook --url …` prints a secret. Every post carries `X-Moin-Signature`, and an `event` field says what it is about. A webhook added before stays unsigned: remove it and add it again. (#180)
 
 ### Fixed
 - **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.
+- **Stopped on purpose**: An app you stopped with `moin stop` shows grey on the watcher and on moin cloud, not as a problem. (#180)
+- **Logs fill no disk**: Each service keeps three log files of 10 MB at most, from its next deploy or restart. (#180)
 
 ### Upgrade
 `moin update my-server`, then `moin restart my-app` for an app with both domains.

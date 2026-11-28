@@ -6,6 +6,9 @@ package alert
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,12 +33,20 @@ type Destination = report.Alert
 
 // Message is one alert. A webhook gets it as JSON.
 type Message struct {
+	// Event is the kind of what happened, the same when it starts and
+	// when it is over (OK): "disk", "crash", "down", "silent" and more,
+	// listed in the docs of the watcher.
+	Event  string `json:"event"`
 	Server string `json:"server"` // "my-server"
 	App    string `json:"app"`    // "" for the whole server
 	Title  string `json:"title"`  // one line: "my-app: the backup of today did not restore"
 	Text   string `json:"text"`   // a few lines more, may be ""
 	OK     bool   `json:"ok"`     // true when something came back, like "my-app is up again"
 }
+
+// SignatureHeader carries the signature of a webhook post: sha256= and
+// the hex HMAC-SHA256 of the body under the webhook's secret.
+var SignatureHeader = http.CanonicalHeaderKey("X-" + build.Name + "-Signature")
 
 // telegramAPI is the Bot API; tests point it at a fake.
 var telegramAPI = "https://api.telegram.org"
@@ -109,24 +120,24 @@ func (s *Sender) Send(ctx context.Context, d Destination, m Message) error {
 	switch d.Kind {
 	case "telegram":
 		body := map[string]any{"chat_id": d.ChatID, "text": telegramText(m), "parse_mode": "HTML", "disable_web_page_preview": true}
-		return post(ctx, s.client, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token)
+		return post(ctx, s.client, telegramAPI+"/bot"+d.Token+"/sendMessage", body, d.Token, "")
 	case "slack":
-		return post(ctx, s.client, d.URL, map[string]any{"text": slackText(m)}, d.URL)
+		return post(ctx, s.client, d.URL, map[string]any{"text": slackText(m)}, d.URL, "")
 	case "discord":
 		body := map[string]any{"content": discordText(m), "allowed_mentions": map[string]any{"parse": []string{}}}
-		return post(ctx, s.client, d.URL, body, d.URL)
+		return post(ctx, s.client, d.URL, body, d.URL, "")
 	case "email":
 		if err := s.sendEmail(ctx, d, m); err != nil {
 			return errors.New(scrub(err.Error(), d.Password))
 		}
 		return nil
 	}
-	return post(ctx, s.client, d.URL, m, d.URL)
+	return post(ctx, s.client, d.URL, m, d.URL, d.Secret)
 }
 
-// post sends body as JSON to address and wants a 2xx back. The secret
-// never shows in the error.
-func post(ctx context.Context, client *http.Client, address string, body any, secret string) error {
+// post sends body as JSON to address and wants a 2xx back, signed when
+// signWith is not "". The secret never shows in the error.
+func post(ctx context.Context, client *http.Client, address string, body any, secret, signWith string) error {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
@@ -139,6 +150,11 @@ func post(ctx context.Context, client *http.Client, address string, body any, se
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("User-Agent", build.Name+"/"+build.Version)
+	if signWith != "" {
+		mac := hmac.New(sha256.New, []byte(signWith))
+		mac.Write(buffer.Bytes())
+		request.Header.Set(SignatureHeader, "sha256="+hex.EncodeToString(mac.Sum(nil)))
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return errors.New(scrub(err.Error(), secret))

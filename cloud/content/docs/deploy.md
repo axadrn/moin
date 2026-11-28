@@ -224,6 +224,8 @@ moin start my-app
 
 A restart starts the live release again, with the env vars and domains as they are now. `moin start` does the same for a stopped app. A stopped app stays stopped, also after a reboot, and keeps its data.
 
+You stopped it on purpose, so nothing alerts. The watcher shows it grey, not as a problem. `moin start` or a deploy ends that.
+
 `moin apps` lists every app on every server, with its live release.
 
 ## Remove an app
@@ -312,6 +314,8 @@ moin logs my-app --tail 1000
 The last 200 lines of the app. `-f` follows them as they come, until Ctrl-C.
 
 `moin logs my-app --json` prints them as a list, each with its time, its container and the line. It takes no `-f`.
+
+Logs never fill the disk. Each service keeps three files of 10 MB, the oldest goes. A service with its own `logging:` keeps it, with the `json-file` or `local` driver. Another driver would send the logs off the server, so it needs `server_access: true` in the [config](/docs/config).
 
 ## Run a command
 

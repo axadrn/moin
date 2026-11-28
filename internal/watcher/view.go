@@ -22,9 +22,11 @@ type View struct {
 
 // ServerView is one server with its apps. ServerView, AppView and
 // LineView each have a Problem: one sentence for "Needs you" when it is
-// red, empty when it is fine.
+// red, empty when it is fine. A server's Problem is that it is silent;
+// Problems are what it says is wrong itself.
 type ServerView struct {
 	Name, Version, State, Problem string
+	Problems                      []string
 	OK                            bool
 	Apps                          []AppView
 	// Knocks are what the server's firewall dropped, as its last report
@@ -32,10 +34,11 @@ type ServerView struct {
 	Knocks *report.Knocks
 }
 
-// AppView is one app of a server.
+// AppView is one app of a server. Stopped is true while it is stopped
+// on purpose: grey, not red.
 type AppView struct {
 	Name, State, Problem string
-	OK                   bool
+	OK, Stopped          bool
 	Domains, Databases   []LineView
 }
 
@@ -70,7 +73,7 @@ func (w *Watcher) view(now time.Time) View {
 	for _, name := range w.servers {
 		server := w.serverView(name, now)
 		v.Servers = append(v.Servers, server)
-		v.NeedsYou = append(v.NeedsYou, problems(server)...)
+		v.NeedsYou = append(v.NeedsYou, server.NeedsYou()...)
 	}
 	for _, o := range slices.Backward(w.state.Outages) {
 		v.Outages = append(v.Outages, outageLine(o, now))
@@ -89,10 +92,15 @@ func (w *Watcher) serverView(name string, now time.Time) ServerView {
 			Problem: name + " has not reported yet. On your laptop: " + w.Connect(name)}
 	}
 	server := ServerView{Name: name, Version: srv.Report.Version, State: "last report " + ago(now, srv.Received), Knocks: srv.Report.Knocks}
+	// What a silent server said last is old: the silence says more.
 	if srv.Silent {
 		server.Problem = name + " stopped reporting " + ago(now, srv.Received) + ". Look: ssh " + name
+	} else {
+		for _, problem := range srv.Report.Problems {
+			server.Problems = append(server.Problems, name+": "+problem+".")
+		}
 	}
-	server.OK = server.Problem == ""
+	server.OK = server.Problem == "" && len(server.Problems) == 0
 	for _, app := range srv.Report.Apps {
 		a := w.appView(name, app, now)
 		server.OK = server.OK && a.OK
@@ -105,7 +113,11 @@ func (w *Watcher) serverView(name string, now time.Time) ServerView {
 // its databases with the last copy and the last proven restore.
 func (w *Watcher) appView(server string, app report.App, now time.Time) AppView {
 	a := AppView{Name: app.Name, State: "v" + strconv.Itoa(app.Release) + " running"}
-	if !app.Running {
+	switch {
+	case app.Running:
+	case app.Stopped:
+		a.State, a.Stopped = "v"+strconv.Itoa(app.Release)+" stopped on purpose", true
+	default:
 		a.State = "v" + strconv.Itoa(app.Release) + " stopped"
 		a.Problem = app.Name + " on " + server + " is stopped."
 	}
@@ -156,12 +168,13 @@ func databaseLine(server, app string, db report.Database, now time.Time) LineVie
 	return line
 }
 
-// problems lists what is red on a server, one sentence each.
-func problems(server ServerView) []string {
+// NeedsYou lists what is red on a server, one sentence each.
+func (server ServerView) NeedsYou() []string {
 	var out []string
 	if server.Problem != "" {
 		out = append(out, server.Problem)
 	}
+	out = append(out, server.Problems...)
 	for _, app := range server.Apps {
 		if app.Problem != "" {
 			out = append(out, app.Problem)

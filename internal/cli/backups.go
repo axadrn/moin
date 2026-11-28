@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -623,7 +624,8 @@ func alerts(ctx context.Context, args []string, stdin io.Reader, stdout io.Write
 // password of
 // an email is asked without showing it, or read from stdin: never a
 // flag, which would stay in your shell's history. The server sends a test
-// alert first and keeps the destination only when that went out.
+// alert first and keeps the destination only when that went out. A
+// webhook gets a secret that signs every post, shown here once.
 func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := newFlags("alerts add", "alerts add <server> telegram [--token <bot-token>] [--chat-id <id>], or slack|discord|webhook [--url <url>], or email [--to <address>] [--smtp <host:port>] [--user <user>] [--from <address>], the password is asked or read from stdin")
 	var destination alert.Destination
@@ -659,10 +661,17 @@ func addAlert(ctx context.Context, args []string, stdin io.Reader, stdout io.Wri
 		}
 		destination.Password = password
 	}
+	if destination.Kind == "webhook" {
+		destination.Secret = rand.Text()
+	}
 	if err := sendJSON(ctx, server, destination, "alerts", "add"); err != nil {
 		return err
 	}
 	done(stdout, "A test alert went out. %s alerts %s from now on", server, destination.Kind)
+	if destination.Secret != "" {
+		fmt.Fprintln(stdout, "Its signing secret, shown only now: "+destination.Secret)
+		fmt.Fprintln(stdout, "Every post carries "+alert.SignatureHeader+": sha256= and the hex HMAC-SHA256 of the body with it.")
+	}
 	return nil
 }
 

@@ -2,6 +2,9 @@ package alert
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -31,7 +34,7 @@ func receiver(t *testing.T, status int) (*httptest.Server, *string, *map[string]
 	return server, &path, &body
 }
 
-var down = Message{Server: "prod", App: "shop", Title: "shop.example.com is down", Text: "No answer within 10s.\n"}
+var down = Message{Event: "down", Server: "prod", App: "shop", Title: "shop.example.com is down", Text: "No answer within 10s.\n"}
 
 func TestSendWebhook(t *testing.T) {
 	server, _, body := receiver(t, http.StatusOK)
@@ -39,8 +42,38 @@ func TestSendWebhook(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := *body
-	if got["server"] != "prod" || got["app"] != "shop" || got["title"] != down.Title || got["ok"] != false {
+	if got["event"] != "down" || got["server"] != "prod" || got["app"] != "shop" || got["title"] != down.Title || got["ok"] != false {
 		t.Errorf("webhook body = %v", got)
+	}
+}
+
+// A webhook with a secret signs every post; the check in the docs of the
+// watcher passes it. One without a secret sends no signature.
+func TestSendWebhookSigned(t *testing.T) {
+	var body []byte
+	var signature []string
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		signature = r.Header.Values("X-Moin-Signature")
+	}))
+	defer server.Close()
+	secret := "a-secret"
+	if err := Send(context.Background(), Destination{Kind: "webhook", URL: server.URL, Secret: secret}, down); err != nil {
+		t.Fatal(err)
+	}
+	if len(signature) != 1 {
+		t.Fatalf("signature = %q", signature)
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	if !hmac.Equal([]byte(signature[0]), []byte("sha256="+hex.EncodeToString(mac.Sum(nil)))) {
+		t.Errorf("signature %q does not check out for %s", signature[0], body)
+	}
+	if err := Send(context.Background(), Destination{Kind: "webhook", URL: server.URL}, down); err != nil {
+		t.Fatal(err)
+	}
+	if len(signature) != 0 {
+		t.Errorf("a webhook without a secret is signed: %q", signature)
 	}
 }
 

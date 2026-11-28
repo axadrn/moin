@@ -161,7 +161,8 @@ In a script, `moin bucket set` takes `--endpoint`, `--bucket` and `--access-key`
 | `moin registry rm <server> <registry>` | log the server out |
 | `moin alerts <server>` | where the server sends its alerts, numbered |
 | `moin alerts add <server> telegram --token … --chat-id …` | alerts to Telegram |
-| `moin alerts add <server> slack --url …` | alerts to Slack. `discord` and `webhook` take `--url` too |
+| `moin alerts add <server> slack --url …` | alerts to Slack. `discord` takes `--url` too |
+| `moin alerts add <server> webhook --url …` | alerts as JSON to your own URL, signed. Prints the signing secret once. [Webhooks](/docs/watcher#webhooks) |
 | `moin alerts add <server> email --to … --smtp host:port --user …` | alerts by email, through your SMTP server (STARTTLS, or TLS on port 465). The password is asked, or read from stdin. `--from` when the user is not an address |
 | `moin alerts rm <server> <n>` | remove one, by its number in `moin alerts` |
 | `moin alerts test <server>` | send a test alert to each |

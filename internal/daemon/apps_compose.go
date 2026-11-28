@@ -416,7 +416,7 @@ func imagesOfRelease(dir string) map[string]string {
 // per deploy, or keep their running image when there is no source; the main
 // service runs start.Image when set; the app's services read the env file;
 // the main service gets the router labels; every service restarts unless
-// stopped.
+// stopped and keeps its logs small, unless it says otherwise.
 // release.config stays as it is.
 func finish(release *release) error {
 	config, err := copyConfig(release.config)
@@ -441,6 +441,9 @@ func finish(release *release) error {
 		if service["restart"] == nil {
 			service["restart"] = "unless-stopped"
 		}
+		if service["logging"] == nil {
+			service["logging"] = logRotation()
+		}
 		routeService(release, config, name, service)
 	}
 	body, err := json.MarshalIndent(config, "", "  ")
@@ -448,6 +451,13 @@ func finish(release *release) error {
 		return err
 	}
 	return os.WriteFile(release.composeJSON, body, 0o600)
+}
+
+// logRotation keeps the logs of a service at 30 MB: Docker's json-file
+// keeps three files of 10 MB and drops the oldest. Without it they grow
+// until the disk is full.
+func logRotation() map[string]any {
+	return map[string]any{"driver": "json-file", "options": map[string]any{"max-size": "10m", "max-file": "3"}}
 }
 
 // copyConfig makes a copy of a compose file that shares nothing with it.

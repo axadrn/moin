@@ -395,6 +395,8 @@ func (a *apps) startRelease(ctx context.Context, release *release) error {
 		return err
 	}
 	release.logf("starting")
+	// A deploy starts an app that was stopped on purpose.
+	_ = os.Remove(a.stoppedFile(start.App))
 	err = a.start(ctx, start.App, release.composeJSON, release.detected, restart, release.logf)
 	if err != nil {
 		return a.startPreviousAgain(ctx, release, previous, err)

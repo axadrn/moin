@@ -287,7 +287,7 @@ func (fw *follower) look(ctx context.Context, f Follow) Follow {
 // problem alerts title once: a problem that lasts says nothing new.
 func (fw *follower) problem(ctx context.Context, f Follow, title string, err error) Follow {
 	if f.Problem != title {
-		fw.alert(ctx, alert.Message{App: f.App, Title: title, Text: err.Error()})
+		fw.alert(ctx, alert.Message{Event: "deploy", App: f.App, Title: title, Text: err.Error()})
 		f.Problem = title
 	}
 	return f
@@ -295,7 +295,7 @@ func (fw *follower) problem(ctx context.Context, f Follow, title string, err err
 
 // over alerts that the last problem is over.
 func (fw *follower) over(ctx context.Context, f Follow) Follow {
-	fw.alert(ctx, alert.Message{App: f.App, Title: "over: " + f.Problem, OK: true})
+	fw.alert(ctx, alert.Message{Event: "deploy", App: f.App, Title: "over: " + f.Problem, OK: true})
 	f.Problem = ""
 	return f
 }

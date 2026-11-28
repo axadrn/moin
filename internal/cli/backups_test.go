@@ -124,3 +124,30 @@ func TestAddEmailAlert(t *testing.T) {
 		t.Error("--password is a flag: want an error")
 	}
 }
+
+// A webhook gets a secret that signs its posts. The server gets it on
+// stdin, never in ssh's arguments, and the CLI shows it once.
+func TestAddWebhookAlertSecret(t *testing.T) {
+	dir := t.TempDir()
+	sent, runs := filepath.Join(dir, "sent"), filepath.Join(dir, "runs")
+	fake := "#!/bin/sh\necho \"$@\" >> " + runs + "\nread -r line\nprintf '%s' \"$line\" > " + sent + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "ssh"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	var out strings.Builder
+	if err := addAlert(context.Background(), []string{"prod", "webhook", "--url", "https://hooks.example.com/moin"}, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	var got alert.Destination
+	data, _ := os.ReadFile(sent)
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("the server got %q: %v", data, err)
+	}
+	if got.Kind != "webhook" || len(got.Secret) < 20 || !strings.Contains(out.String(), got.Secret) {
+		t.Errorf("the server got %+v, the CLI said %q", got, out.String())
+	}
+	if ran, _ := os.ReadFile(runs); strings.Contains(string(ran), got.Secret) {
+		t.Errorf("ssh ran with the secret: %q", ran)
+	}
+}

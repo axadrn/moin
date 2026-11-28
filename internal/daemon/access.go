@@ -65,6 +65,7 @@ var serviceKeys = map[string]string{
 	"platform":          "which CPU the image is for",
 	"pull_policy":       "when to pull the image",
 	"scale":             "how many containers",
+	"logging":           "checked: only the json-file and local drivers, on the server's disk",
 }
 
 // buildKeys are the settings a build may use. Not tags: a tag like
@@ -309,6 +310,14 @@ func (r appRoom) checkService(service map[string]any) string {
 		if option, _ := item.(string); option != "no-new-privileges" && option != "no-new-privileges:true" {
 			return "security_opt " + option + " is not allowed"
 		}
+	}
+	// Another driver sends the logs off the server, or into its journal.
+	logging, _ := service["logging"].(map[string]any)
+	if reason := onlyKeys(logging, "driver", "options"); reason != "" {
+		return "logging: " + reason
+	}
+	if driver := logging["driver"]; driver != nil && driver != "json-file" && driver != "local" {
+		return fmt.Sprintf("logging driver %v is not allowed", driver)
 	}
 	sysctls, _ := service["sysctls"].(map[string]any)
 	for _, key := range sortedKeys(sysctls) {
