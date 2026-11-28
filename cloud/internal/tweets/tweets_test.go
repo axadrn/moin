@@ -24,24 +24,25 @@ func find(t *testing.T, id string) Tweet {
 }
 
 func TestPartsTurnsEntitiesBack(t *testing.T) {
-	parts := find(t, "1009718178744762369").Parts()
-	if len(parts) != 1 || !strings.HasSuffix(parts[0].Text, "<sigh>") {
-		t.Fatalf("got %q, want one part ending in <sigh>", parts)
+	text := "RAID &gt; backup? &lt;sigh&gt; &amp; restore"
+	parts := Tweet{Text: text, Range: [2]int{0, len([]rune(text))}}.Parts()
+	if len(parts) != 1 || parts[0].Text != "RAID > backup? <sigh> & restore" {
+		t.Fatalf("got %q, want the entities turned back", parts)
 	}
 }
 
 func TestPartsLinksMentionsAndLinks(t *testing.T) {
-	parts := find(t, "1808089314707784167").Parts()
-	mention := Part{Text: "@digitalocean", Href: "https://x.com/digitalocean"}
-	link := Part{Text: "digitalocean.com/community/tuto…", Href: "https://www.digitalocean.com/community/tutorials/how-to-protect-ssh-with-fail2ban-on-ubuntu-20-04"}
+	parts := find(t, "1770803425074204694").Parts()
+	mention := Part{Text: "@syntaxfm", Href: "https://x.com/syntaxfm"}
+	link := Part{Text: "youtube.com/watch?v=Q1Y_g0…", Href: "https://www.youtube.com/watch?v=Q1Y_g0wMwww"}
 	if !slices.Contains(parts, mention) {
 		t.Errorf("no mention part in %q", parts)
 	}
 	if parts[len(parts)-1] != link {
 		t.Errorf("last part %q, want %q", parts[len(parts)-1], link)
 	}
-	if !strings.Contains(parts[0].Text, "CVE-2024-6387 & brute force") {
-		t.Errorf("first part %q, want &amp; as &", parts[0].Text)
+	if !strings.HasPrefix(parts[0].Text, "I started a series over on ") {
+		t.Errorf("first part %q", parts[0].Text)
 	}
 }
 
