@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -94,6 +95,33 @@ func onApp(ctx context.Context, flags *flagSet, app string, do func(server strin
 		return notThere(errNoApp, known[0], app)
 	}
 	return do(found[0])
+}
+
+// appServer is the server of app, also of an app no server runs yet: the
+// one -s names, else the one that runs it, else on a terminal the one you
+// pick from your servers. Without a terminal that is none.
+func appServer(ctx context.Context, flags *flagSet, app string, stdin io.Reader, none error) (string, error) {
+	if named := flags.serverNamed(); named != "" {
+		return named, nil
+	}
+	servers := knownServers(app)
+	if len(servers) != 1 {
+		found, _, err := findServers(ctx, app)
+		if err != nil {
+			return "", err
+		}
+		servers = found
+	}
+	switch len(servers) {
+	case 0:
+		if known, err := loadServers(); err == nil && len(known) > 0 && isTerminal(stdin) {
+			return pickServer(stdin, terminal(os.Stderr), known)
+		}
+		return "", none
+	case 1:
+		return servers[0], nil
+	}
+	return "", twoServers(app, servers)
 }
 
 // notThere turns errNoApp into words: which server does not run which app.
@@ -193,6 +221,16 @@ func rememberApp(server, app string) {
 		apps[app] = append(apps[app], server)
 		_ = saveApps(apps)
 	}
+}
+
+// forgetApp notes that server no longer runs app, after its removal.
+func forgetApp(server, app string) {
+	apps := loadApps()
+	apps[app] = slices.DeleteFunc(apps[app], func(s string) bool { return s == server })
+	if len(apps[app]) == 0 {
+		delete(apps, app)
+	}
+	_ = saveApps(apps)
 }
 
 // rememberApps keeps what the servers that answered run. A server that

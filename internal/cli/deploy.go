@@ -113,27 +113,7 @@ func deployServer(ctx context.Context, flags *flagSet, app string, stdin io.Read
 	if flags.NArg() == 1 {
 		return flags.Arg(0), nil
 	}
-	if named := flags.serverNamed(); named != "" {
-		return named, nil
-	}
-	servers := knownServers(app)
-	if len(servers) != 1 {
-		found, _, err := findServers(ctx, app)
-		if err != nil {
-			return "", err
-		}
-		servers = found
-	}
-	switch len(servers) {
-	case 0:
-		if known, err := loadServers(); err == nil && len(known) > 0 && isTerminal(stdin) {
-			return pickServer(stdin, terminal(os.Stderr), known)
-		}
-		return "", fmt.Errorf("where to? The first deploy of %s names the server: `%s deploy <server>`, a name from your ssh config or user@host", app, build.Name)
-	case 1:
-		return servers[0], nil
-	}
-	return "", twoServers(app, servers)
+	return appServer(ctx, flags, app, stdin, fmt.Errorf("where to? The first deploy of %s names the server: `%s deploy <server>`, a name from your ssh config or user@host", app, build.Name))
 }
 
 // deploySource says what the deploy sends, like "3f2a9c1" or "catalog

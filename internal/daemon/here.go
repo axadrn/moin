@@ -104,6 +104,17 @@ func StopHere(ctx context.Context, dir, app string) error {
 	return a.stop(ctx, app)
 }
 
+// RemoveHere removes the app from this server: its containers, images,
+// releases, env, domains and what it follows. Its volumes stay, and so
+// do its copies in the bucket.
+func RemoveHere(ctx context.Context, dir, app string) error {
+	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return err
+	}
+	return a.remove(ctx, app)
+}
+
 // LogsHere writes the last tail lines of the app's containers to out and,
 // with follow, what they write from then on, until ctx ends.
 func LogsHere(ctx context.Context, dir, app string, tail int, follow bool, out io.Writer) error {
@@ -282,11 +293,19 @@ func ValidServerName(name string) bool { return serverName.MatchString(name) }
 
 // mustHave fails when app has no release on this server.
 func (a *apps) mustHave(app string) error {
-	if !protocol.ValidAppName(app) {
-		return fmt.Errorf("%q is not a valid app name: lowercase letters, digits and dashes", app)
+	if err := checkAppName(app); err != nil {
+		return err
 	}
 	if a.current(app) == 0 {
 		return fmt.Errorf("%w: %s", ErrNoApp, app)
+	}
+	return nil
+}
+
+// checkAppName fails for a name that cannot be an app.
+func checkAppName(app string) error {
+	if !protocol.ValidAppName(app) {
+		return fmt.Errorf("%q is not a valid app name: lowercase letters, digits and dashes", app)
 	}
 	return nil
 }

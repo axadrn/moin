@@ -1,6 +1,6 @@
 ---
 title: "Deploy"
-description: "Deploy from your folder or from CI or from a registry. Roll back. Restart. Env vars. Domains. Logs. One-off commands."
+description: "Deploy from your folder or from CI or from a registry. Roll back. Restart. Remove. Env vars. Domains. Logs. One-off commands. Run it elsewhere."
 group: "Apps"
 order: 1
 ---
@@ -226,6 +226,23 @@ A restart starts the live release again, with the env vars and domains as they a
 
 `moin apps` lists every app on every server, with its live release.
 
+## Remove an app
+
+```bash
+moin apps rm my-app
+```
+
+```text
+? Remove my-app from my-server? Its containers, images, env and domains go. Its volumes and its copies stay. [y/N] y
+✓ removing my-app  3s
+✓ my-app is gone from my-server. Its volumes stay there, with its data: a new deploy of my-app finds them
+```
+
+- It asks first. In a script, add `-y`.
+- Its containers, images, releases, env vars and domains go. So does what it follows, with its deploy key.
+- Its volumes stay, with the data. Deploy an app of the same name again and it finds them.
+- Its copies in the bucket stay too. No new ones are made.
+
 ## Env vars
 
 Settings and secrets of your app, like `DATABASE_URL`.
@@ -233,12 +250,25 @@ Settings and secrets of your app, like `DATABASE_URL`.
 ```bash
 moin env my-app
 moin env edit my-app
+moin env set my-app API_KEY
+moin env push my-app prod.env
 ```
 
 - `moin env my-app` lists the names, never the values.
 - `moin env edit my-app` opens your `$EDITOR` with the values, as a `.env` file. Save and close. The app restarts with them.
 - A mistake in the file? moin says what, and opens it again. Quit without saving to keep the env as it was.
 - The file lives in a folder only you can read, and is gone when the editor closes.
+- `moin env set my-app API_KEY` sets one. moin asks for the value and does not show it. In a script, pipe it in: `echo "$API_KEY" | moin env set my-app API_KEY`. The value is never an argument, where your shell history would keep it.
+- `moin env push my-app prod.env` replaces the env with the file, `.env` when you leave it out. `-` reads it from stdin. It lists what changes by name, `+` added, `~` changed, `-` removed, and asks first. In a script, add `-y`.
+
+The env works before the first deploy too. An app that needs `DATABASE_URL` to start gets it first:
+
+```bash
+moin env set my-app DATABASE_URL -s my-server
+moin deploy my-server
+```
+
+No server runs the app yet, so name the one it goes to with `-s`. On a terminal moin asks instead. The first deploy starts with the env.
 
 They live in `/var/lib/moin/apps/<app>/app.env` on the server, readable only by root. They never pass through anything but your SSH connection.
 
@@ -294,6 +324,37 @@ moin exec my-app -- bin/rails db:migrate
 Everything after `--` is the command. It runs once and prints what it prints. On a terminal it gets a terminal, so a shell works: `moin exec my-app -- sh`. moin exits with the command's exit code.
 
 It runs in the app's main service. Another one: `moin exec my-app --service db -- psql -U postgres`.
+
+## Run it elsewhere
+
+`moin compose` prints the compose file moin runs for the app: your services, plus the proxy that serves your domains with HTTPS. It is your way out. Nothing in it needs moin.
+
+```bash
+moin compose my-app > compose.yml
+```
+
+- It holds no value of your env. Every `${NAME}` stays as you wrote it. The settings the deploy filled in show the value they ran with: `image`, `ports`, `expose`, `volumes`, `user`, the env `PORT` and the paths of a `build`.
+- Before the server sends it, it checks the file for every env value of 6 characters or more. A file that holds one stays on the server.
+- It is the file of the live deploy. `--json` gives the app, the release and the file.
+- In the terminal UI, `C` shows it in your `$PAGER`.
+
+To run the app on any server with Docker:
+
+1. Save it as `compose.yml` in a folder, next to your repo's files when it builds from them.
+2. Put a `.env` next to it with your env vars, and the values of the `.env` in your repo if it has one. Docker fills `${NAME}` from it, and the app reads it too.
+3. Point your domains at the new server.
+4. Run `docker compose up -d`.
+
+The proxy takes ports 80 and 443 and gets the certificates from Let's Encrypt, as on your server. It does that also when your server gets its traffic through a [Cloudflare Tunnel](/docs/basics/cloudflare-tunnel).
+
+Each file brings its own proxy. For several apps on one server, keep the proxy of one file, delete it from the others, and write `external: true` under `moin-proxy` in their `networks`.
+
+What changed on the way out:
+
+- **Source**: the folder of the file is your repo, `.`. A service moin built has `build: .` again.
+- **Data**: the folders moin kept outside each release are where your `compose.yml` put them, like `./data`. Copy the data there first. Named volumes keep their names.
+- **Instant address**: it stays with moin. It names your server's IP, so the file routes only your domains.
+- **Railpack apps**: their build plan is not in your repo. The file keeps the image moin built, which is only on your server. Run `railpack build .` in your repo there and put the image's name in the file, or push the image to a registry.
 
 ## If it breaks
 

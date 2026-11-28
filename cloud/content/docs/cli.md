@@ -54,6 +54,7 @@ Pick an app and press Enter: its logs, following. `esc` goes back.
 | `c` | a copy of the app's databases now |
 | `R` | put a database back to a copy: pick one, then say `y` |
 | `o` | open the app's address in your browser |
+| `C` | the compose file moin runs, in your `$PAGER` |
 | `?` | the keys. Any key closes them |
 | `q` | quit |
 
@@ -67,6 +68,7 @@ Before your first deploy, `moin` shows three steps: `cd my-app`, `moin deploy <s
 | --- | --- |
 | `moin` | the terminal UI, or a table of every server and app, and what needs you |
 | `moin apps` | the table: every app on every server, its release, its state and its address |
+| `moin apps rm <app>` | remove the app: its containers, images, env and domains. Its volumes and copies stay. It asks first. [Remove an app](/docs/deploy#remove-an-app) |
 | `moin servers` | your servers, the moin version on each, and the watchers each one reports to |
 | `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A first deploy adds it too |
 | `moin servers rm <server>` | take a server off your list. Nothing changes on it |
@@ -112,6 +114,7 @@ In the terminal UI the same lines show on the Servers tab.
 | `moin follow [app] --branch main` | the server deploys each new commit of the branch, read with a deploy key. `--off` stops it. [Deploy from CI](/docs/deploy#deploy-from-ci) |
 | `moin follow [app] --image ghcr.io/you/my-app:main` | the server deploys each new image your CI pushes under the tag. `--off` stops it. [Deploy after your tests pass](/docs/deploy#deploy-after-your-tests-pass) |
 | `moin catalog` | the apps of the catalog |
+| `moin compose [app]` | the compose file moin runs, without a value of the env: `moin compose my-app > compose.yml`. [Run it elsewhere](/docs/deploy#run-it-elsewhere) |
 
 The first deploy to a server asks first: `Set up moin on my-server and deploy my-app? [y/N]`. In a script, add `-y`. [Deploy](/docs/deploy)
 
@@ -121,6 +124,8 @@ The first deploy to a server asks first: `Set up moin on my-server and deploy my
 | --- | --- |
 | `moin env [app]` | the names of the env vars, never the values |
 | `moin env edit [app]` | open `$EDITOR` with the values. The app restarts with them |
+| `moin env set [app] <NAME>` | set one. The value is asked without showing it, or read from stdin. Never an argument |
+| `moin env push [app] [file\|-]` | replace the env with a `.env` file, or stdin with `-`. Lists the names that change and asks first |
 | `moin domains [app]` | the app's domains |
 | `moin domains add [app] <domain>` | add a domain, with HTTPS |
 | `moin domains rm [app] <domain>` | remove one. It asks first |

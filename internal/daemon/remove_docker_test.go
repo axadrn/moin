@@ -18,11 +18,16 @@ func TestRemoveStopsFollowing(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(followDir(dir, "gone-app"), "key"), []byte("key"), 0o600)
+	os.WriteFile(a.envFile("gone-app"), []byte("A=b\n"), 0o600)
+	os.WriteFile(a.domainsFile("gone-app"), []byte("gone.example.com\n"), 0o600)
 	if err := a.remove(t.Context(), "gone-app"); err != nil {
 		t.Fatal(err)
 	}
 	if exists(followDir(dir, "gone-app")) || exists(a.releaseDir("gone-app", 1)) {
 		t.Fatal("the follow or the releases stayed")
+	}
+	if exists(a.envFile("gone-app")) || exists(a.domainsFile("gone-app")) {
+		t.Fatal("the env or the domains stayed: another app could not take the domain")
 	}
 	if _, err := loadFollow(dir, "gone-app"); err == nil {
 		t.Fatal("the app still follows its branch")

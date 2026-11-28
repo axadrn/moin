@@ -20,8 +20,44 @@ import (
 )
 
 // apps is `moin apps`: every app on every server, the table of `moin`.
-func apps(ctx context.Context, args []string, stdout io.Writer) error {
+// `moin apps rm <app>` removes one.
+func apps(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) > 0 && args[0] == "rm" {
+		return removeApp(ctx, args[1:], stdin, stdout)
+	}
 	return overview(ctx, "apps", args, stdout)
+}
+
+// removeApp is `moin apps rm <app>`: the app goes from its server, with
+// its containers, images, releases, env and domains. Its volumes stay,
+// with its data, and so do its copies. It asks first.
+func removeApp(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("apps rm", "apps rm <app> [-s server] [-y]").withServer().withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	app, err := flags.oneArg()
+	if err != nil {
+		return err
+	}
+	if err := checkApp(app); err != nil {
+		return err
+	}
+	return onApp(ctx, flags, app, func(server string) error {
+		question := fmt.Sprintf("Remove %s from %s? Its containers, images, env and domains go. Its volumes and its copies stay.", app, server)
+		if err := confirm(stdin, stdout, flags.yes(), question); err != nil {
+			return err
+		}
+		err := task(stdout, "removing "+app, func() error {
+			return sshRun(ctx, server, hereLine("rm", app), nil, io.Discard, os.Stderr)
+		})
+		if err != nil {
+			return err
+		}
+		forgetApp(server, app)
+		done(stdout, "%s is gone from %s. Its volumes stay there, with its data: a new deploy of %s finds them", app, server, app)
+		return nil
+	})
 }
 
 // rollback is `moin rollback [app]`: an older release runs again, with

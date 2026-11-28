@@ -141,8 +141,10 @@ func (a *apps) remove(ctx context.Context, app string) error {
 	_ = os.Remove(filepath.Join(a.appDir(app), "current"))
 	// Its containers are gone; volumes.json stays with the volumes.
 	_ = os.Remove(filepath.Join(a.appDir(app), "project"))
-	// Its env goes with it: nothing runs that reads it.
+	// Its env and its domains go with it: nothing runs that reads them,
+	// and a domain is free for another app.
 	_ = os.Remove(a.envFile(app))
+	_ = os.Remove(a.domainsFile(app))
 	// And the branch or image it follows, with its deploy key: no push brings the
 	// app back.
 	_ = os.RemoveAll(followDir(filepath.Dir(a.dir), app))

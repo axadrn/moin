@@ -38,6 +38,9 @@ type CLI struct {
 	// Restore puts a database of the app back to a copy, as `moin
 	// restore --to`.
 	Restore func(ctx context.Context, server, app, database, to string, said io.Writer) (daemon.Restored, error)
+	// Compose is the compose file moin runs for the app, as `moin
+	// compose`.
+	Compose func(ctx context.Context, server, app string, said io.Writer) (string, error)
 	// Explain turns an error into the sentence the CLI shows.
 	Explain func(error) string
 }

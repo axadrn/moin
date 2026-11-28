@@ -71,6 +71,19 @@ func here(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer)
 			return err
 		}
 		return daemon.StopHere(ctx, dir, app)
+	case "rm":
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		return daemon.RemoveHere(ctx, dir, app)
+	case "compose":
+		app, err := name()
+		if err != nil {
+			return err
+		}
+		value, err := daemon.ComposeHere(dir, app)
+		return respond(stdout, value, err)
 	case "logs":
 		flags := newFlags("here logs", "here logs <app> [--tail 200] [--follow]")
 		tail := flags.Int("tail", 200, "lines")
@@ -199,8 +212,17 @@ func hereExec(ctx context.Context, dir string, args []string, stdin io.Reader, s
 }
 
 // hereEnv is `here env <app>`, the names, `here env get <app>`, the .env
-// text, and `here env set <app>`, a new .env text from stdin.
+// text, `here env set <app>`, a new .env text from stdin, and `here env
+// set <app> <NAME>`, the value of one from stdin.
 func hereEnv(ctx context.Context, dir string, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) == 3 && args[0] == "set" {
+		value, err := io.ReadAll(io.LimitReader(stdin, 1<<20))
+		if err != nil {
+			return err
+		}
+		saved, err := daemon.SetEnvVarHere(dir, args[1], args[2], string(value))
+		return respond(stdout, saved, err)
+	}
 	if len(args) == 2 && args[0] == "get" {
 		text, err := daemon.EnvFileHere(dir, args[1])
 		if err != nil {
@@ -218,7 +240,7 @@ func hereEnv(ctx context.Context, dir string, args []string, stdin io.Reader, st
 		return respond(stdout, value, err)
 	}
 	if len(args) != 1 {
-		return errors.New("usage: here env <app> | get <app> | set <app>")
+		return errors.New("usage: here env <app> | get <app> | set <app> [<NAME>]")
 	}
 	value, err := daemon.EnvNamesHere(dir, args[0])
 	return respond(stdout, value, err)

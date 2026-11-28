@@ -11,6 +11,10 @@ November 29, 2026
 
 ### New
 - **MySQL and MariaDB backups**: moin finds a `mysql` or `mariadb` service in your `compose.yml` and backs it up like Postgres: encrypted copies, the daily restore check, restore and undo.
+- **Env before the first deploy**: `moin env set my-app DATABASE_URL -s my-server` works before the app ever ran, so its first deploy starts with it. (#180)
+- **Env from scripts**: `moin env set my-app API_KEY` reads the value from a hidden prompt or stdin, never the command line. `moin env push my-app prod.env` lists the names that change and asks first. (#180)
+- **See the compose file**: `moin compose my-app > compose.yml` saves the file moin runs, without your env values, to run the app anywhere. `C` in the terminal UI shows it. (#180)
+- **Remove an app**: `moin apps rm my-app` removes it after you say yes. Its volumes and copies stay. (#180)
 
 ### Fixed
 - **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.

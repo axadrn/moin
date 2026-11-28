@@ -620,6 +620,7 @@ func helpLines() []string {
 		{"b", "go back to an older deploy"},
 		{"c", "copy the app's databases now"},
 		{"R", "put a database back to a copy"},
+		{"C", "the compose file moin runs, in your pager"},
 		{"o", "open the app's domain in your browser"},
 		{"q", "quit"},
 	}

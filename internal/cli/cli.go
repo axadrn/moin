@@ -28,6 +28,7 @@ Start
 Apps
   deploy                       Deploy this folder again where it runs
   apps                         Every app on every server
+  apps rm <app>                Remove an app. Its volumes stay
   logs [app]                   The app's logs. -f follows them
   rollback [app]               Go back to an older deploy
   restart [app]                Start the app again with its env and domains as now
@@ -36,10 +37,13 @@ Apps
   exec [app] -- <command>      Run a command in the app's container
   env [app]                    The names of its env vars, never a value
   env edit [app]               Change them in $EDITOR. The app restarts with them
+  env push [app] [file|-]      Replace them with a .env file. Shows the names first
+  env set [app] <NAME>         Set one. The value is asked or read from stdin
   domains [app]                The app's domains
   domains add [app] <domain>   Add one. The certificate follows by itself
   domains rm [app] <domain>    Remove one
   follow [app]                 Deploy each new commit of a branch or image of a tag
+  compose [app]                The compose file moin runs, to run it elsewhere
   catalog                      Open source apps to deploy with --catalog
 
 Backups
@@ -211,7 +215,9 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	case "deploy":
 		return deploy(ctx, rest, stdin, stdout)
 	case "apps":
-		return apps(ctx, rest, stdout)
+		return apps(ctx, rest, stdin, stdout)
+	case "compose":
+		return compose(ctx, rest, stdout)
 	case "rollback":
 		return rollback(ctx, rest, stdin, stdout)
 	case "restart", "start", "stop":

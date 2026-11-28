@@ -45,6 +45,25 @@ import (
 // app has a service of that name.
 const proxyService = "proxy"
 
+// Compose is the compose file of an app's live release, for `moin
+// compose`.
+type Compose struct {
+	App     string `json:"app"`
+	Release int    `json:"release"`
+	Compose string `json:"compose"`
+}
+
+// ComposeHere makes the compose file of the app's live release.
+func ComposeHere(dir, app string) (Compose, error) {
+	a := newApps(dir)
+	if err := a.mustHave(app); err != nil {
+		return Compose{}, err
+	}
+	release := a.current(app)
+	file, err := a.composeFile(app, release)
+	return Compose{App: app, Release: release, Compose: file}, err
+}
+
 // composeFile makes the compose file of release number of an app.
 func (a *apps) composeFile(app string, number int) (string, error) {
 	dir := a.releaseDir(app, number)
