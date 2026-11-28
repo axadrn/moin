@@ -5,18 +5,7 @@ import (
 
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
-	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 )
-
-// cloudPage is the frame of every page of moin cloud: narrow, never in a
-// search engine.
-templ cloudPage(title string) {
-	@layouts.Home(layouts.SEOProps{Title: title, Description: brand.Name + " cloud watches your servers.", Path: "/cloud", NoIndex: true}) {
-		<main class="moin-page moin-narrow moin-content">
-			{ children... }
-		</main>
-	}
-}
 
 // CloudLoginProps is the sign-in page: where it goes after, whether GitHub
 // signs in, and what was typed and went wrong.
@@ -27,34 +16,42 @@ type CloudLoginProps struct {
 	Problem string
 }
 
-// CloudLogin signs in with GitHub or a link by mail. Both land in the
-// workspace of the mail.
+// CloudLogin signs in with GitHub, the one big button, or a link by mail,
+// the small way under it. Both land in the workspace of the mail.
 templ CloudLogin(p CloudLoginProps) {
-	@cloudPage("Sign in") {
-		@components.Header(components.HeaderProps{Title: "Sign in to " + brand.Name + " cloud"})
-		<p class="moin-text moin-muted">Your email is your workspace. The first sign-in makes it.</p>
+	@cloudAuth("Sign in") {
+		<h1 class="moin-title">Sign in to { brand.Name } cloud</h1>
 		if p.GitHub {
-			<div>
-				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth/github?" + url.Values{"next": {p.Next}}.Encode()}) {
-					Continue with GitHub
-				}
-			</div>
-			<p class="moin-small moin-muted">Or get a link by mail.</p>
-		}
-		<form method="post" action="/login" class="moin-stack" data-gap="3">
-			<input type="hidden" name="next" value={ p.Next }/>
-			<label for="mail" class="moin-small">Email</label>
-			@components.Input(components.InputProps{ID: "mail", Name: "mail", Type: "email", Value: p.Mail, Placeholder: "ada@example.com", Attrs: templ.Attributes{"required": true, "autocomplete": "email"}})
-			if p.Problem != "" {
-				<p class="moin-message" data-state="failed" role="alert">{ p.Problem }</p>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/auth/github?" + url.Values{"next": {p.Next}}.Encode()}) {
+				@components.Icon("git-hub")
+				Continue with GitHub
 			}
-			<div>
-				@components.Button(components.ButtonProps{Type: "submit", Kind: loginKind(p.GitHub)}) {
-					Mail me a link
-				}
-			</div>
-		</form>
+			@components.Expand(components.ExpandProps{Name: "Use a link by mail instead", Quiet: true, Open: p.Mail != "" || p.Problem != ""}) {
+				@loginMailForm(p)
+			}
+		} else {
+			@loginMailForm(p)
+		}
+		<p class="moin-small moin-muted moin-center">No password. The first sign-in makes your workspace.</p>
 	}
+}
+
+// loginMailForm asks for the mail to send a sign-in link to.
+templ loginMailForm(p CloudLoginProps) {
+	<form method="post" action="/login" class="moin-stack" data-gap="3">
+		<input type="hidden" name="next" value={ p.Next }/>
+		<label for="mail" class="moin-small moin-muted">Mail</label>
+		@components.Input(components.InputProps{ID: "mail", Name: "mail", Type: "email", Value: p.Mail, Placeholder: "ada@example.com", Attrs: templ.Attributes{"required": true, "autocomplete": "email"}})
+		if p.Problem != "" {
+			<p class="moin-message" data-state="failed" role="alert">{ p.Problem }</p>
+		}
+		@components.Button(components.ButtonProps{Type: "submit", Kind: loginKind(p.GitHub)}) {
+			Mail me a link
+		}
+		if p.GitHub {
+			<p class="moin-small moin-muted">For a workspace whose mail is not the one on your GitHub.</p>
+		}
+	</form>
 }
 
 // loginKind is the mail button's kind: the one that stands out when there
@@ -68,55 +65,68 @@ func loginKind(github bool) components.Kind {
 
 // CloudLinkSent says the link is on its way.
 templ CloudLinkSent(mail string) {
-	@cloudPage("Check your mail") {
-		@components.Header(components.HeaderProps{Title: "Check your mail"})
-		<p class="moin-text">A sign-in link is on its way to <strong>{ mail }</strong>.</p>
-		<p class="moin-text moin-muted">It works once, for 15 minutes. You can close this page.</p>
+	@cloudAuth("Check your mail") {
+		<h1 class="moin-title">Check your mail</h1>
+		<p class="moin-text moin-muted">A sign-in link is on its way to <strong class="moin-foreground">{ mail }</strong>. It works once, for 15 minutes. You can close this page.</p>
+		@components.Button(components.ButtonProps{Href: "/login"}) {
+			Use another mail
+		}
 	}
 }
 
 // CloudLink is where a sign-in link opens: one button signs in, so a mail
 // scanner that opens the link does not use it up.
 templ CloudLink(token, next string) {
-	@cloudPage("Sign in") {
-		@components.Header(components.HeaderProps{Title: "Sign in to " + brand.Name + " cloud"})
-		<form method="post" action="/login/link" class="moin-stack" data-gap="3">
+	@cloudAuth("Sign in") {
+		<h1 class="moin-title">Sign in to { brand.Name } cloud</h1>
+		<p class="moin-text moin-muted">One click and you are in.</p>
+		<form method="post" action="/login/link" class="moin-stack">
 			<input type="hidden" name="token" value={ token }/>
 			<input type="hidden" name="next" value={ next }/>
-			<div>
-				@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary}) {
-					Sign in
-				}
-			</div>
+			@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary}) {
+				Sign in
+			}
 		</form>
 	}
 }
 
 // CloudLoginFailed says why a sign-in did not work, and the way back.
 templ CloudLoginFailed(reason string) {
-	@cloudPage("Not signed in") {
-		@components.Header(components.HeaderProps{Title: "Not signed in"})
+	@cloudAuth("Not signed in") {
+		<h1 class="moin-title">Not signed in</h1>
 		<p class="moin-text moin-muted">{ reason }</p>
-		<div>
-			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/login"}) {
-				Sign in again
-			}
-		</div>
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/login"}) {
+			Sign in again
+		}
 	}
 }
 
-// CloudCLI shows the code of a `moin cloud login`, to compare with the
+// CloudLinkExpired says a sign-in link was used or is too old.
+templ CloudLinkExpired() {
+	@cloudAuth("This link ran out") {
+		<h1 class="moin-title">This link ran out</h1>
+		<p class="moin-text moin-muted">A link works once, for 15 minutes. Get a new one.</p>
+		@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/login"}) {
+			Sign in again
+		}
+	}
+}
+
+// CloudCLI shows the code of a login of the CLI, to compare with the
 // terminal before allowing it.
 templ CloudCLI(code, mail string) {
-	@cloudPage("Allow the CLI") {
-		@components.Header(components.HeaderProps{Title: "Allow " + brand.Name + " cloud login"})
-		<p class="moin-text">Your terminal shows this code:</p>
-		<p class="moin-title moin-mono">{ code }</p>
-		<p class="moin-text moin-muted">Allow it only when you just ran { brand.Name } cloud login and the codes match. The CLI then acts as { mail }.</p>
-		<form method="post" action="/cli">
+	@cloudAuth("Allow the CLI") {
+		<h1 class="moin-title">Allow the CLI</h1>
+		<p class="moin-text moin-muted">Your terminal shows this code:</p>
+		<p class="moin-title moin-mono moin-center">{ code }</p>
+		<p class="moin-small moin-muted">Allow it only when you just ran <code class="moin-mono moin-foreground">{ brand.Name } watcher connect</code> and the codes match. The CLI then acts as { mail }.</p>
+		<form method="post" action="/cli" class="moin-stack" data-gap="3">
 			<input type="hidden" name="code" value={ code }/>
 			@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary}) {
 				Allow
+			}
+			@components.Button(components.ButtonProps{Href: "/cloud", Quiet: true}) {
+				Cancel
 			}
 		</form>
 	}
@@ -124,8 +134,8 @@ templ CloudCLI(code, mail string) {
 
 // CloudCLIAllowed says the CLI is signed in.
 templ CloudCLIAllowed() {
-	@cloudPage("CLI signed in") {
-		@components.Header(components.HeaderProps{Title: "The CLI is signed in"})
+	@cloudAuth("CLI signed in") {
+		<h1 class="moin-title">The CLI is signed in</h1>
 		<p class="moin-text moin-muted">Go back to your terminal. You can close this page.</p>
 	}
 }

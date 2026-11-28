@@ -1,0 +1,68 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// cloudTabs are the places of a workspace, the open one marked.
+func cloudTabs(open string) templ.Component {
+	var tabs []components.Tab
+	for _, tab := range []struct{ label, href string }{
+		{"Overview", "/cloud"}, {"Copies", "/cloud/copies"}, {"Plan", "/cloud/plan"}, {"Settings", "/cloud/settings"},
+	} {
+		tabs = append(tabs, components.Tab{Label: tab.label, Href: tab.href, Active: tab.label == open})
+	}
+	return components.Tabs(components.TabsProps{Label: brand.Name + " cloud", Tabs: tabs, Line: true})
+}
+
+// cloudApp is the frame of every page of a signed-in workspace: the bar
+// with whose it is and its plan, the tabs, the page, a quiet foot. It is
+// never in a search engine.
+templ cloudApp(c Cloud, title, tab string) {
+	@layouts.Base(layouts.SEOProps{Title: title, Description: brand.Name + " cloud watches your servers.", Path: "/cloud", NoIndex: true}) {
+		@components.AppBar(components.AppBarProps{Tabs: cloudTabs(tab)}) {
+			<a href="/cloud" class="moin-row" aria-label={ brand.Name + " cloud" }>
+				@components.Wordmark(components.WordmarkProps{})
+			</a>
+			<span class="moin-muted" aria-hidden="true">/</span>
+			<span class="moin-text moin-strong moin-truncate">{ c.Mail }</span>
+			<a href="/cloud/plan" class="moin-row" aria-label={ "Plan: " + c.Plan.Name }>
+				@components.Badge(components.BadgeProps{}) {
+					{ c.Plan.Name }
+					if c.Plan.Note != "" {
+						<span class="moin-hidden-phone">· { c.Plan.Note }</span>
+					}
+				}
+			</a>
+			<span class="moin-fill"></span>
+			<span class="moin-hidden-phone">
+				@components.Button(components.ButtonProps{Href: "/docs/watcher", Quiet: true}) {
+					Docs
+				}
+			</span>
+		}
+		<main class="moin-page moin-content">
+			{ children... }
+		</main>
+		@components.AppFoot(components.AppFootProps{Links: cloudLinks})
+	}
+}
+
+// cloudLinks are the quiet links at the foot of every page of moin cloud.
+var cloudLinks = []components.FooterLink{
+	{Label: "Docs", Href: "/docs/watcher"},
+	{Label: "Changelog", Href: "/changelog"},
+	{Label: "Terms", Href: "/legal/terms"},
+	{Label: "Privacy", Href: "/legal/privacy"},
+}
+
+// cloudAuth is the frame of signing in and of the pages around it.
+templ cloudAuth(title string) {
+	@layouts.Base(layouts.SEOProps{Title: title, Description: brand.Name + " cloud watches your servers.", Path: "/login", NoIndex: true}) {
+		@components.Auth(components.AuthProps{Links: cloudLinks}) {
+			{ children... }
+		}
+	}
+}

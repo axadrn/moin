@@ -115,7 +115,7 @@ func TestMailLinkSignIn(t *testing.T) {
 		t.Errorf("mail to %q", mails.last(t).To)
 	}
 	page := body(t, browser, server.URL+"/cloud")
-	if !strings.Contains(page, "ada@example.com") || !strings.Contains(page, "No servers yet") {
+	if !strings.Contains(page, "ada@example.com") || !strings.Contains(page, "Connect your first server") {
 		t.Errorf("workspace page: %s", page)
 	}
 	// The same link again does not work.

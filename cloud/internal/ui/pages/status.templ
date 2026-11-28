@@ -1,14 +1,30 @@
 package pages
 
 import (
+	"strings"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ctxkeys"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
 	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 )
 
-// NotFound is the page of every address the site does not have.
+// NotFound is the page of every address the site does not have. Under
+// /cloud it keeps the frame of moin cloud and leads back there.
 templ NotFound() {
-	@StatusPage("Page not found", "The address does not exist or has moved.", "404 not found: "+ctxkeys.URLPath(ctx))
+	if path := ctxkeys.URLPath(ctx); strings.HasPrefix(path, "/cloud") {
+		@cloudAuth("Page not found") {
+			<p class="moin-title moin-muted moin-digits">404</p>
+			<h1 class="moin-title">Page not found</h1>
+			<p class="moin-text moin-muted">The address does not exist or has moved.</p>
+			<p class="moin-small moin-mono moin-muted moin-break">404 not found: { path }</p>
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/cloud"}) {
+				Back to { brand.Name } cloud
+			}
+		}
+	} else {
+		@StatusPage("Page not found", "The address does not exist or has moved.", "404 not found: "+path)
+	}
 }
 
 // StatusPage is the page for a 404 or an error: what happened, the way

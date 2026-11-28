@@ -81,7 +81,7 @@ func (c *Cloud) UseLink(w http.ResponseWriter, r *http.Request) {
 	mail, err := c.store.UseMailLink(r.PostFormValue("token"))
 	if notFound(err) {
 		w.WriteHeader(http.StatusGone)
-		render(w, r, pages.CloudLoginFailed("This link was used or is older than 15 minutes. Ask for a new one."))
+		render(w, r, pages.CloudLinkExpired())
 		return
 	}
 	if err != nil {

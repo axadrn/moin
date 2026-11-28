@@ -1,0 +1,29 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/watcher"
+)
+
+// CloudAlertsProps is every outage and restore check a workspace's
+// watcher keeps.
+type CloudAlertsProps struct {
+	Cloud Cloud
+	View  watcher.View
+}
+
+// CloudAlerts is /cloud/alerts: all of them, newest first.
+templ CloudAlerts(p CloudAlertsProps) {
+	@cloudApp(p.Cloud, "Alerts", "Overview") {
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: "/cloud"}, Title: "Alerts"})
+		<p class="moin-text moin-muted">What the watcher saw from outside, and every restore check. Newest first.</p>
+		@alertsCard(p.View.Outages, len(p.View.Outages), "")
+		@components.Card(components.CardProps{Title: "Restore checks"}) {
+			if len(p.View.Checks) == 0 {
+				<p class="moin-text moin-muted">None yet. Each server restores the newest copy of every database once a day.</p>
+			} else {
+				@checkRows(p.View.Checks)
+			}
+		}
+	}
+}

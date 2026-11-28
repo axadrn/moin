@@ -1,0 +1,127 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/watcher"
+)
+
+// CloudServerProps is the page of one server: its view, and its outages
+// and restore checks.
+type CloudServerProps struct {
+	Cloud   Cloud
+	Server  watcher.ServerView
+	Outages []watcher.OutageView
+	Checks  []watcher.CheckView
+}
+
+// CloudServer is /cloud/servers/{name}: the apps with their domains, the
+// databases with their backups, the alerts and the knocks of one server.
+templ CloudServer(p CloudServerProps) {
+	@cloudApp(p.Cloud, p.Server.Name, "Overview") {
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: "/cloud"}, Title: p.Server.Name}) {
+			@components.Button(components.ButtonProps{Href: "/cloud/copies?server=" + p.Server.Name}) {
+				Copies
+			}
+		}
+		<div class="moin-row" data-wrap data-gap="3">
+			@components.Status(components.StatusProps{State: serverState(p.Server), Text: serverWord(p.Server)})
+			<span class="moin-text moin-muted">
+				if p.Server.Version != "" {
+					{ p.Server.Version } ·
+				}
+				{ p.Server.State }
+			</span>
+		</div>
+		if problems := problemsOf(p.Server); len(problems) > 0 {
+			@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "Needs you", Lines: problems})
+		}
+		@components.Card(components.CardProps{Title: "Apps"}) {
+			if len(p.Server.Apps) == 0 {
+				<p class="moin-text moin-muted">No app yet. Deploy one from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } deploy { p.Server.Name }</code></p>
+			} else {
+				@components.Rows(components.RowsProps{Head: []string{"App", "Deploy", "Domains, from outside"}}) {
+					for _, app := range p.Server.Apps {
+						@components.Row(components.RowProps{}) {
+							@components.Cell() {
+								@components.Status(components.StatusProps{State: okState(app.OK), Text: app.Name})
+							}
+							@components.Cell() {
+								{ app.State }
+							}
+							@components.Cell() {
+								for _, domain := range app.Domains {
+									@components.Status(components.StatusProps{State: lineState(domain), Text: domain.Name, Note: domain.State})
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if databases := databasesOf(p.Server); len(databases) > 0 {
+			@components.Card(components.CardProps{Title: "Databases"}) {
+				@components.Rows(components.RowsProps{Head: []string{"Database", "App", "Backups"}}) {
+					for _, db := range databases {
+						@components.Row(components.RowProps{}) {
+							@components.Cell() {
+								@components.Status(components.StatusProps{State: lineState(db.LineView), Text: db.Name})
+							}
+							@components.Cell() {
+								{ db.App }
+							}
+							@components.Cell() {
+								{ db.State }
+							}
+						}
+					}
+				}
+			}
+		}
+		@serverAlerts(p.Outages, p.Checks)
+		@serverKnocks(p.Server)
+	}
+}
+
+// serverAlerts are a server's outages and restore checks, newest first.
+templ serverAlerts(outages []watcher.OutageView, checks []watcher.CheckView) {
+	@alertsCard(outages, 5, "/cloud/alerts")
+	@components.Card(components.CardProps{Title: "Restore checks"}) {
+		if len(checks) == 0 {
+			<p class="moin-text moin-muted">None yet. The server restores the newest copy of every database once a day.</p>
+		} else {
+			@checkRows(first(checks, 5)) {
+				if len(checks) > 5 {
+					@components.RowsMore(components.RowsMoreProps{Href: "/cloud/alerts"}) {
+						See all { strconv.Itoa(len(checks)) } checks
+					}
+				}
+			}
+		}
+	}
+}
+
+// serverKnocks is what the server's firewall dropped: today, this year,
+// and the ports bots tried most today.
+templ serverKnocks(server watcher.ServerView) {
+	@components.Card(components.CardProps{Title: "Knocks"}) {
+		if server.Knocks == nil {
+			<p class="moin-text moin-muted">None counted yet. The firewall counts every knock on a closed port.</p>
+		} else {
+			@components.Values() {
+				@components.Value(components.ValueProps{Name: "Today"}) {
+					<span class="moin-digits">{ human.Count(server.Knocks.Today) }</span>
+				}
+				@components.Value(components.ValueProps{Name: "This year"}) {
+					<span class="moin-digits">{ human.Count(server.Knocks.Year) }</span>
+				}
+			}
+			if rows := knockRows(*server.Knocks); len(rows) > 0 {
+				@components.Bars(components.BarsProps{Rows: knockBars(first(rows, 5))})
+			}
+		}
+	}
+}

@@ -1,122 +1,180 @@
 package pages
 
 import (
-	"slices"
-
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/watcher"
+	"strconv"
 )
 
-// CloudWorkspaceProps is the workspace page: who, what plan, and what the
-// watcher sees.
-type CloudWorkspaceProps struct {
-	Mail string
-	Plan string
-	// AlertsOff is a trial that ran out, or a subscription that ended.
-	AlertsOff bool
-	// Subscribe shows the offer: the workspace doesn't pay, and the site
-	// can sell. Billing links Stripe's portal, once Stripe knows you.
-	Subscribe bool
-	Billing   bool
-	View      watcher.View
+// CloudOverviewProps is the overview of a workspace: its bar, and what
+// its watcher sees.
+type CloudOverviewProps struct {
+	Cloud Cloud
+	View  watcher.View
 }
 
-// CloudWorkspace is /cloud. It only reads: nothing on it changes a server.
-templ CloudWorkspace(p CloudWorkspaceProps) {
-	@cloudPage(brand.Name + " cloud") {
-		@components.Header(components.HeaderProps{Title: brand.Name + " cloud"}) {
-			if p.Billing {
-				@components.Button(components.ButtonProps{Href: "/cloud/billing", Quiet: true}) {
-					Billing
-				}
-			}
-			@components.Button(components.ButtonProps{Href: "/cloud/settings", Quiet: true}) {
-				Settings
-			}
-			<form method="post" action="/logout">
-				@components.Button(components.ButtonProps{Type: "submit", Quiet: true}) {
-					Sign out
-				}
-			</form>
-		}
-		<p class="moin-text moin-muted">{ p.Mail }. { p.Plan }.</p>
-		if p.AlertsOff {
-			@components.Card(components.CardProps{Title: "Alerts are off."}) {
-				<p class="moin-text moin-muted">Your servers still report, and this page still shows them. Nobody gets a mail when one goes silent.</p>
+// CloudOverview is /cloud: what needs you, the servers, the alerts and
+// the last proven restores. It only reads: nothing on it changes a server.
+templ CloudOverview(p CloudOverviewProps) {
+	@cloudApp(p.Cloud, "Overview", "Overview") {
+		@components.Header(components.HeaderProps{Title: "Overview"}) {
+			@components.Button(components.ButtonProps{Href: "/cloud/connect"}) {
+				Connect a server
 			}
 		}
-		if p.Subscribe {
-			@components.Card(components.CardProps{Title: "Subscribe"}) {
-				<p class="moin-text moin-muted">$7 a month, or $49 a year, for the whole workspace. Alerts for every server, and a copy of every backup your server can't delete. For businesses only.</p>
-				<form method="post" action="/cloud/subscribe" class="moin-row" data-gap="3" data-wrap>
-					@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary, Attrs: templ.Attributes{"name": "interval", "value": "yearly"}}) {
-						$49 a year
-					}
-					@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"name": "interval", "value": "monthly"}}) {
-						$7 a month
-					}
-				</form>
-			}
-		}
+		@alertsOff(p.Cloud.Plan)
 		if len(p.View.Servers) == 0 {
-			@components.Card(components.CardProps{Title: "No servers yet"}) {
-				<p class="moin-text moin-muted">Connect one from your laptop. It reports here every minute, and you get a mail when it goes silent.</p>
-				@components.Command(components.CommandProps{Text: brand.Name + " cloud connect prod"})
-			}
+			@cloudFirstRun(p.Cloud.Plan)
 		} else {
+			<p class="moin-text moin-muted">{ reportHere(len(p.View.Servers)) }</p>
 			if len(p.View.NeedsYou) > 0 {
-				@components.Card(components.CardProps{Title: "Needs you"}) {
-					@components.List() {
-						for _, problem := range p.View.NeedsYou {
-							@components.Item(components.ItemProps{Name: problem, Lead: components.Dot(components.DotProps{State: components.StateFailed})})
+				@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "Needs you", Lines: p.View.NeedsYou}) {
+					if red := firstRed(p.View.Servers); red != "" {
+						@components.Button(components.ButtonProps{Href: serverHref(red)}) {
+							Open { red }
 						}
 					}
 				}
+			}
+			@overviewStats(summarize(p.View.Servers))
+			<section class="moin-section">
+				<div class="moin-section-head"><h2>Servers</h2></div>
+				<div class="moin-grid">
+					for _, server := range p.View.Servers {
+						@serverCard(server)
+					}
+				</div>
+			</section>
+			@alertsCard(p.View.Outages, 5, "/cloud/alerts")
+			@backupsCard(p.View.Checks)
+		}
+		<p class="moin-small moin-muted moin-center">
+			Win a free year: <a href={ templ.SafeURL(cloudFreeYear) } class="moin-link" target="_blank" rel="noopener">report a bug or an idea</a>. If it gets in, the year is yours.
+		</p>
+	}
+}
+
+// alertsOff is the notice that the plan sends no alerts, with the way to
+// turn them on.
+templ alertsOff(plan Plan) {
+	if !plan.AlertsOn {
+		@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "Alerts are off", Lines: []string{"Your " + plan.Note + ". Servers still report, nobody gets a mail."}}) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/cloud/plan"}) {
+				Turn alerts on
+			}
+		}
+	}
+}
+
+// cloudFirstRun is the overview before the first server: the one command,
+// and the wait for its first report.
+templ cloudFirstRun(plan Plan) {
+	@components.Card(components.CardProps{Title: "Connect your first server"}) {
+		<p class="moin-text moin-muted">Run this on your laptop, with the name of the server in your SSH config. It signs you in, and the server reports here every minute. When it goes silent, you get a mail.</p>
+		@components.Command(components.CommandProps{Text: connectCommand("prod")})
+		@components.Status(components.StatusProps{State: components.StateRunning, Text: "Waiting for the first report"})
+		<p class="moin-small moin-muted">{ plan.Text }</p>
+	}
+}
+
+// overviewStats are the four numbers of a workspace: servers, apps,
+// backups and knocks.
+templ overviewStats(s summary) {
+	@components.Stats() {
+		@components.Stat(components.StatProps{Label: "Servers", Value: strconv.Itoa(s.Servers)}) {
+			if s.Silent > 0 {
+				@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(s.Silent) + " silent"})
 			} else {
-				<p class="moin-text">
-					@components.Dot(components.DotProps{State: components.StateLive})
-					Everything is fine.
-				</p>
+				@components.Status(components.StatusProps{State: components.StateLive, Text: "all reporting"})
 			}
-			for _, server := range p.View.Servers {
-				@components.Card(components.CardProps{Title: server.Name}) {
-					<p class="moin-small moin-muted">
-						{ server.State }
-						if server.Version != "" {
-							, { server.Version }
-						}
-					</p>
-					if len(server.Apps) > 0 {
-						@components.List() {
-							for _, app := range server.Apps {
-								@components.Item(components.ItemProps{Name: app.Name, Note: appNote(app), Lead: components.Dot(components.DotProps{State: okState(app.OK)})})
-							}
-						}
-					} else {
-						<p class="moin-small moin-muted">No apps.</p>
+		}
+		@components.Stat(components.StatProps{Label: "Apps", Value: strconv.Itoa(s.Apps)}) {
+			switch  {
+				case s.Apps == 0:
+					<span>none yet</span>
+				case s.Stopped > 0:
+					@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(s.Stopped) + " stopped"})
+				default:
+					@components.Status(components.StatusProps{State: components.StateLive, Text: "all running"})
+			}
+		}
+		@components.Stat(components.StatProps{Label: "Backups", Value: strconv.Itoa(s.Fine), Of: "/" + strconv.Itoa(s.Databases)}) {
+			switch  {
+				case s.Databases == 0:
+					<span>no database yet</span>
+				case s.FirstRed != "":
+					@components.Status(components.StatusProps{State: components.StateFailed, Text: s.FirstRed + " needs you"})
+				default:
+					@components.Status(components.StatusProps{State: components.StateDone, Text: "copied and proven"})
+			}
+		}
+		@components.Stat(components.StatProps{Label: "Knocks today", Value: human.Count(s.KnocksToday)}) {
+			<span class="moin-digits">{ human.Count(s.KnocksYr) } this year</span>
+		}
+	}
+}
+
+// serverCard is one server on the overview: its state, its apps as
+// pills, and three facts. The whole card opens the server.
+templ serverCard(server watcher.ServerView) {
+	{{ c := serverCount(server) }}
+	@components.Card(components.CardProps{Href: serverHref(server.Name)}) {
+		<div class="moin-row" data-between data-top>
+			<div class="moin-stack" data-gap="1">
+				<div class="moin-row" data-wrap data-gap="3">
+					<span class="moin-heading">{ server.Name }</span>
+					if n := len(problemsOf(server)); n > 0 {
+						@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(n) + " needs you"})
 					}
+				</div>
+				<span class="moin-small moin-muted">
+					if server.Version != "" {
+						{ server.Version } ·
+					}
+					{ server.State }
+				</span>
+			</div>
+			@components.Status(components.StatusProps{State: serverState(server), Text: serverWord(server)})
+		</div>
+		if len(server.Apps) > 0 {
+			<div class="moin-row" data-wrap data-gap="2">
+				for _, app := range server.Apps {
+					@components.Status(components.StatusProps{State: okState(app.OK), Text: app.Name, Note: app.State, Pill: true})
+				}
+			</div>
+		}
+		@components.Values() {
+			@components.Value(components.ValueProps{Name: "Backups"}) {
+				if c.Databases == 0 {
+					none
+				} else {
+					{ strconv.Itoa(c.Fine) } of { strconv.Itoa(c.Databases) } fine
 				}
 			}
-			@components.Card(components.CardProps{Title: "Last proven restores"}) {
-				if len(p.View.Checks) == 0 {
-					<p class="moin-small moin-muted">None yet. A server checks a copy of every database each day.</p>
-				} else {
-					@components.List() {
-						for _, check := range p.View.Checks[:min(len(p.View.Checks), 10)] {
-							@components.Item(components.ItemProps{Name: check.What, Note: check.At + ": " + check.Result, Lead: components.Dot(components.DotProps{State: okState(check.OK)})})
-						}
-					}
-				}
+			@components.Value(components.ValueProps{Name: "Domains"}) {
+				{ strconv.Itoa(c.Up) } of { strconv.Itoa(c.Domains) } up
 			}
-			@components.Card(components.CardProps{Title: "Outages"}) {
-				if len(p.View.Outages) == 0 {
-					<p class="moin-small moin-muted">None.</p>
-				} else {
-					@components.List() {
-						for _, outage := range p.View.Outages[:min(len(p.View.Outages), 20)] {
-							@components.Item(components.ItemProps{Name: outage.What, Note: outageNote(outage), Lead: components.Dot(components.DotProps{State: outageState(outage.Open)})})
-						}
+			@components.Value(components.ValueProps{Name: "Knocks today"}) {
+				<span class="moin-digits">{ human.Count(c.KnocksToday) }</span>
+			}
+		}
+	}
+}
+
+// alertsCard is the outages, newest first: a silent server or a domain
+// that was down from outside. At most n, and a way to all of them when
+// more says where.
+templ alertsCard(outages []watcher.OutageView, n int, more string) {
+	@components.Card(components.CardProps{Title: "Alerts"}) {
+		if len(outages) == 0 {
+			<p class="moin-text moin-muted">None. A mail goes out when a server goes silent or a domain is down from outside.</p>
+		} else {
+			@outageRows(first(outages, n)) {
+				if more != "" && len(outages) > n {
+					@components.RowsMore(components.RowsMoreProps{Href: more}) {
+						See all { strconv.Itoa(len(outages)) } alerts
 					}
 				}
 			}
@@ -124,36 +182,57 @@ templ CloudWorkspace(p CloudWorkspaceProps) {
 	}
 }
 
-// okState is the dot of something fine or red.
-func okState(ok bool) components.State {
-	if ok {
-		return components.StateLive
+// outageRows are outages, one row each. Children end the rows.
+templ outageRows(outages []watcher.OutageView) {
+	@components.Rows(components.RowsProps{Head: []string{"What", "From", "How long"}}) {
+		for _, outage := range outages {
+			@components.Row(components.RowProps{}) {
+				@components.Cell() {
+					@components.Status(components.StatusProps{State: outageState(outage.Open), Text: outage.What})
+				}
+				@components.Cell() {
+					{ outage.From }
+				}
+				@components.Cell() {
+					{ outageNote(outage) }
+				}
+			}
+		}
+		{ children... }
 	}
-	return components.StateFailed
 }
 
-// outageState is the dot of an outage: red while it lasts.
-func outageState(open bool) components.State {
-	if open {
-		return components.StateFailed
+// backupsCard is the newest restore check of each database.
+templ backupsCard(checks []watcher.CheckView) {
+	@components.Card(components.CardProps{Title: "Backups"}) {
+		if len(checks) == 0 {
+			<p class="moin-text moin-muted">No restore check yet. Each server restores the newest copy of every database once a day, and says how it went.</p>
+		} else {
+			@checkRows(newestChecks(checks)) {
+				@components.RowsMore(components.RowsMoreProps{Href: "/cloud/copies"}) {
+					Copies in { brand.Name } cloud
+				}
+			}
+		}
 	}
-	return components.StateIdle
 }
 
-// appNote is an app's state with its domains and databases in one line.
-func appNote(app watcher.AppView) string {
-	note := app.State
-	for _, line := range slices.Concat(app.Domains, app.Databases) {
-		note += ". " + line.Name + ": " + line.State
+// checkRows are restore checks, one row each. Children end the rows.
+templ checkRows(checks []watcher.CheckView) {
+	@components.Rows(components.RowsProps{Head: []string{"Database", "Ran", "Result"}}) {
+		for _, check := range checks {
+			@components.Row(components.RowProps{}) {
+				@components.Cell() {
+					@components.Status(components.StatusProps{State: checkState(check.OK), Text: check.What})
+				}
+				@components.Cell() {
+					{ check.At }
+				}
+				@components.Cell() {
+					{ check.Result }
+				}
+			}
+		}
+		{ children... }
 	}
-	return note
-}
-
-// outageNote says when an outage began, how long it lasted, and why.
-func outageNote(o watcher.OutageView) string {
-	note := o.From + ", " + o.Lasted
-	if o.Reason != "" {
-		note += ": " + o.Reason
-	}
-	return note
 }

@@ -139,7 +139,7 @@ func TestSubscribe(t *testing.T) {
 	server, browser, mails, fake, store, _ := billingSite(t)
 	signIn(t, server, browser, mails, "ada@example.com")
 	space, _ := store.SignIn("ada@example.com")
-	if page := body(t, browser, server.URL+"/cloud"); !strings.Contains(page, "$49 a year") || strings.Contains(page, `href="/cloud/billing"`) {
+	if page := body(t, browser, server.URL+"/cloud/plan"); !strings.Contains(page, "$49 a year") || strings.Contains(page, `href="/cloud/billing"`) {
 		t.Fatalf("a trial shows the offer, without billing: %s", page)
 	}
 
@@ -161,7 +161,7 @@ func TestSubscribe(t *testing.T) {
 	if space.Status != "paid" || space.StripeCustomer != "cus_1" || space.StripeSubscription != "sub_1" || !space.PaidUntil.Equal(end) {
 		t.Fatalf("after the checkout: %+v", space)
 	}
-	page := body(t, browser, server.URL+"/cloud")
+	page := body(t, browser, server.URL+"/cloud/plan")
 	if strings.Contains(page, "$49 a year") || !strings.Contains(page, `href="/cloud/billing"`) || !strings.Contains(page, "Paid until") {
 		t.Errorf("a paid workspace shows billing, no offer: %s", page)
 	}
@@ -192,7 +192,7 @@ func TestSubscribe(t *testing.T) {
 	if len(mails.sent) != sent+1 || !strings.Contains(mails.last(t).Subject, "ended") {
 		t.Errorf("one mail about the end, got %d: %+v", len(mails.sent)-sent, mails.last(t))
 	}
-	if page := body(t, browser, server.URL+"/cloud"); !strings.Contains(page, "Alerts are off.") || strings.Contains(page, "trial") {
+	if page := body(t, browser, server.URL+"/cloud"); !strings.Contains(page, "Alerts are off") || strings.Contains(page, "trial") {
 		t.Errorf("an ended subscription is no trial: %s", page)
 	}
 }
