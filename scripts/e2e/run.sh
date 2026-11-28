@@ -272,6 +272,7 @@ set_bucket prod
 said "it shows your backup key, once" "Your backup key for prod. It is shown once"
 key=$(grep -oE 'AGE-SECRET-KEY-1[A-Z0-9]+' <<<"$out")
 [ -n "$key" ] || fail "the backup key is in what moin bucket set printed" "$out"
+expect "moin bucket prod says whether the bucket is locked" "locked" moin bucket prod
 refuse "moin bucket prod never shows the secret or your key" "$bucket_secret|AGE-SECRET-KEY" moin bucket prod --json
 expect "moin shows that the key is not confirmed" "your backup key is not confirmed" moin
 eventually 240 "the daemon took the first copy by itself" '"copies"' moin backups $shop --json
@@ -321,6 +322,8 @@ pass "moin watcher token prod prints: ${line/$token/<token>}"
 ssh second "printf 'servers:\n  prod: %s\n' $token >> /etc/moin/watcher.yml && systemctl restart moin-watcher"
 expect "moin watcher connect prod" "prod reports to $watcher_url" moin watcher connect prod "$watcher_url" "$token"
 expect "moin servers shows the watcher" "${watcher_url#https://}" moin servers
+expect "moin watcher lists the watcher prod reports to" "${watcher_url#https://}" moin watcher
+expect "moin watcher --json lists it" "$watcher_url" moin watcher --json
 eventually 150 "a report arrived: the page shows prod and $shop" "$shop" get -u "e2e:$watcher_password" "$watcher_url/"
 ssh second 'truncate -s 0 /root/hooks.log'
 ssh prod systemctl stop moin-daemon
@@ -352,7 +355,71 @@ expect "ada, a sudo user, deploys $hello: moin deploy prod-ada" "$hello is live"
 eventually 120 "hello answers over HTTPS" "hello from a sudo user" get "$hello_url/"
 expect "moin servers rm prod-ada" "forgot prod-ada" moin servers rm prod-ada
 
-step "8. prod is gone: its copy on another server, with only your key"
+step "8. Images: a public one, a rollback"
+whoami=whoami-$run
+whoami_url=https://$whoami.$(dashed "$prod_ip").sslip.io
+git_app whoami "$whoami"
+cd "$work/$whoami" || exit 1
+expect "moin deploy prod --image traefik/whoami:v1.10.2" "$whoami is live" moin deploy prod --image traefik/whoami:v1.10.2 -y
+eventually 120 "the public image answers over HTTPS" "Hostname:" get "$whoami_url/"
+expect "moin deploy prod --image traefik/whoami:v1.10.3" "$whoami is live" moin deploy prod --image traefik/whoami:v1.10.3 -y
+eventually 60 "the new image answers" "Hostname:" get "$whoami_url/"
+expect "moin rollback $whoami" "$whoami" moin rollback $whoami
+eventually 60 "the old image answers after the rollback" "Hostname:" get "$whoami_url/"
+cd "$work/$shop" || exit 1
+
+step "9. A private registry on second: login, deploy, follow a tag"
+registry=$second_ip:5000
+reg_user=ada
+reg_pass=e2e-registry-password
+ssh second "docker run --rm httpd:2 htpasswd -Bbn $reg_user $reg_pass > /root/htpasswd && mkdir -p /root/auth && mv /root/htpasswd /root/auth/htpasswd && docker run -d --name registry -p 5000:5000 -v /root/auth:/auth -e REGISTRY_AUTH=htpasswd -e REGISTRY_AUTH_HTPASSWD_REALM=e2e -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd registry:2" >/dev/null 2>&1 || fail "start a registry with basic auth on second"
+# Plain http: prod must trust this one address. Docker reloads it without a restart.
+ssh prod "printf '{\"insecure-registries\":[\"$registry\"]}' > /etc/docker/daemon.json && systemctl reload docker" || fail "let prod's Docker use the registry over http"
+# push_tag <tag> <upstream tag> puts a public image in the registry under a tag; out is its image ID.
+push_tag() {
+    ssh second "echo $reg_pass | docker login localhost:5000 -u $reg_user --password-stdin >/dev/null && docker pull -q traefik/whoami:$2 >/dev/null && docker tag traefik/whoami:$2 localhost:5000/e2e/whoami:$1 && docker push -q localhost:5000/e2e/whoami:$1 >/dev/null && docker image inspect --format '{{.Id}}' traefik/whoami:$2"
+}
+id1=$(push_tag main v1.10.2) || fail "push an image to the registry on second" "$id1"
+pass "an image is in the registry on second"
+expect "moin registry prod is logged in to none" "no registry" moin registry prod
+expect "moin registry set prod $registry $reg_user" "prod pulls from $registry as $reg_user" sh -c "echo '$reg_pass' | '$work/moin' registry set prod $registry $reg_user"
+expect "moin registry prod lists it" "$registry" moin registry prod --json
+refuse "moin registry prod never shows the token" "$reg_pass" moin registry prod --json
+reg_app=whoami-reg-$run
+reg_url=https://$reg_app.$(dashed "$prod_ip").sslip.io
+git_app whoami "$reg_app"
+cd "$work/$reg_app" || exit 1
+ref=$registry/e2e/whoami:main
+expect "moin deploy prod --image $ref" "$reg_app is live" moin deploy prod --image "$ref" -y
+eventually 120 "the app from the private registry answers" "Hostname:" get "$reg_url/"
+running() { ssh prod "docker inspect --format '{{.Image}}' \$(docker ps -q --filter name=$reg_app | head -1)"; }
+expect "the app runs the image of the registry" "$id1" running
+expect "moin follow $reg_app --image $ref" "$reg_app follows $ref" moin follow $reg_app --image "$ref"
+id2=$(push_tag main v1.10.3) || fail "push a new image under the same tag" "$id2"
+[ "$id1" != "$id2" ] || fail "the second image differs from the first"
+pass "a new image lies under the tag main"
+eventually 180 "the server deployed the new image within 3 minutes" "$id2" running
+eventually 60 "the app answers after it" "Hostname:" get "$reg_url/"
+expect "moin follow $reg_app --off" "$reg_app" moin follow $reg_app --off
+expect "moin registry rm prod $registry" "prod is logged out of $registry" moin registry rm prod "$registry" -y
+cd "$work/$shop" || exit 1
+
+step "10. Alerts on the server itself, to a webhook on prod"
+# Plain http is allowed to this machine only, so the catcher runs on prod.
+ssh prod 'cat > /root/hook.py && systemd-run --unit e2e-hook python3 /root/hook.py 8098 /root/prod-hooks.log && touch /root/prod-hooks.log' <"$here/hook.py" >/dev/null 2>&1 || fail "start a webhook on prod"
+prod_hooks() { ssh prod cat /root/prod-hooks.log; }
+expect "moin alerts prod lists nobody" "alerts nobody" moin alerts prod
+expect "moin alerts add prod webhook sends a test alert" "A test alert went out" moin alerts add prod webhook --url http://127.0.0.1:8098/hook
+eventually 30 "the webhook on prod got the test alert" "." prod_hooks
+expect "moin alerts prod lists the webhook" "webhook" moin alerts prod --json
+ssh prod 'truncate -s 0 /root/prod-hooks.log'
+expect "moin alerts test prod" "." moin alerts test prod
+eventually 30 "the webhook got that one too" "." prod_hooks
+expect "moin alerts rm prod 1" "Removed alert 1" moin alerts rm prod 1 -y
+refuse "moin alerts prod lists nothing" "webhook" moin alerts prod --json
+ssh prod 'systemctl stop e2e-hook'
+
+step "11. prod is gone: its copy on another server, with only your key"
 # second never had prod's key. Its Caddy gives way to moin's own proxy.
 cd "$work/$shop" || exit 1
 ssh prod 'systemctl stop moin-daemon && rm /etc/moin/backup.key'

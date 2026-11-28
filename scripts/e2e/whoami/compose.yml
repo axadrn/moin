@@ -1,0 +1,5 @@
+services:
+  web:
+    image: traefik/whoami
+    expose:
+      - "80"
