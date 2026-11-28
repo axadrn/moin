@@ -9,7 +9,7 @@ AI coding agents like Claude Code, Codex and Cursor use moin the way you do. The
 
 ## What an agent needs
 
-- **`--json`**: every reading command takes it and prints JSON, not a table. `moin --json`, `moin apps --json`, `moin backups shop --json`.
+- **`--json`**: every reading command takes it and prints JSON, not a table. `moin --json`, `moin apps --json`, `moin backups my-app --json`.
 - **`-y`**: a command that deletes or replaces something asks first. An agent has no terminal, so without `-y` it stops. With `-y`, the step shows in the transcript, and you can see it.
 - **Exit codes**: `0` is good. Anything else is a failure, and the command says why. `moin exec` exits with the code of the command it ran.
 - **Quiet stdout**: with `--json`, `moin deploy`, `moin rollback`, `moin backup` and `moin restore` send their log to stderr. stdout holds only the JSON.
@@ -17,16 +17,16 @@ AI coding agents like Claude Code, Codex and Cursor use moin the way you do. The
 ## An example session
 
 ```bash
-moin deploy prod --json
+moin deploy my-server --json
 moin --json
-moin logs shop --json
-moin rollback shop --to v3 --json
+moin logs my-app --json
+moin rollback my-app --to v3 --json
 ```
 
-- `moin deploy prod --json` deploys the folder. The answer says which app and which deploy.
+- `moin deploy my-server --json` deploys the folder. The answer says which app and which deploy.
 - `moin --json` reads every server and app, and what needs you.
-- `moin logs shop --json` prints the last lines of the app. It takes no `-f`.
-- `moin rollback shop --to v3 --json` goes back to v3. With no `--to`, it goes to the one before the live one.
+- `moin logs my-app --json` prints the last lines of the app. It takes no `-f`.
+- `moin rollback my-app --to v3 --json` goes back to v3. With no `--to`, it goes to the one before the live one.
 
 A deploy that fails brings the last good one back. The agent sees the exit code and the log, and tries again.
 
@@ -35,8 +35,8 @@ A deploy that fails brings the last good one back. The agent sees the exit code 
 Put this in your project's `AGENTS.md` or `CLAUDE.md`:
 
 ```markdown
-Deploy with `moin deploy prod --json`. Check with `moin --json`.
-Logs: `moin logs shop --json`. Go back: `moin rollback shop`.
+Deploy with `moin deploy my-server --json`. Check with `moin --json`.
+Logs: `moin logs my-app --json`. Go back: `moin rollback my-app`.
 Every command shows its flags with `--help`.
 ```
 

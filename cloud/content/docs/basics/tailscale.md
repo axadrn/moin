@@ -14,13 +14,13 @@ the internet: sees nothing on port 22
        ✗
 ┌──────────────── your tailnet ────────────────┐
 │                                              │
-│  laptop ◀──── encrypted, direct ────▶ prod   │
+│  laptop ◀── encrypted, direct ──▶ my-server  │
 │  100.64.0.2                       100.64.0.5 │
 │                                              │
 └──────────────────────────────────────────────┘
 ```
 
-Each device gets an address of its own, like `100.64.0.5`, and a name, like `prod.tail0000.ts.net`. The line between two devices is encrypted, with WireGuard. It works through home routers and office networks. The server needs no open port for it.
+Each device gets an address of its own, like `100.64.0.5`, and a name, like `my-server.tail0000.ts.net`. The line between two devices is encrypted, with WireGuard. It works through home routers and office networks. The server needs no open port for it.
 
 ## Why SSH only over it
 
@@ -35,12 +35,12 @@ So moin moves SSH there. Right after the first deploy, it asks:
 Enter means yes. moin puts the server in your tailnet. It opens a new SSH session over Tailscale. Only when that works does port 22 close to the internet. Then it prints the new line for `~/.ssh/config`:
 
 ```text
-  Point prod at the tailnet. In ~/.ssh/config, set:
-    Host prod
-      HostName prod.tail0000.ts.net
+  Point my-server at the tailnet. In ~/.ssh/config, set:
+    Host my-server
+      HostName my-server.tail0000.ts.net
 ```
 
-moin never edits that file itself. You change `HostName`, and `ssh prod` goes over Tailscale from then on. [SSH only over Tailscale](/docs/security#ssh-only-over-tailscale)
+moin never edits that file itself. You change `HostName`, and `ssh my-server` goes over Tailscale from then on. [SSH only over Tailscale](/docs/security#ssh-only-over-tailscale)
 
 ## What you need
 

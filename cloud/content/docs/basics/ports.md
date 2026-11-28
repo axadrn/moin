@@ -32,11 +32,11 @@ Bots try every address on the internet, all day. A new server gets its first kno
 They don't pick you. They try everyone. moin counts the knocks once public SSH is closed:
 
 ```bash
-moin knocks prod
+moin knocks my-server
 ```
 
 ```text
-prod
+my-server
 PORT       HOUR   TODAY   7 DAYS   YEAR      TOTAL     PER MINUTE
 ssh        47     1,120   7,904    131,220   240,017   0.8
 postgres   6      142     1,003    17,436    30,551    0.1
@@ -91,7 +91,7 @@ The fix is to not publish what only your app needs. Two containers in one compos
 moin brings its own firewall. It is one table in nftables, the firewall built into Linux. It guards the server itself, and the ports your containers publish. Docker can't walk past it.
 
 - **After your first deploy**, moin asks to close public SSH. Port 22 then answers only over Tailscale, your private network. [Tailscale](/docs/basics/tailscale)
-- **With `moin secure prod`**, the firewall closes every other port too. Published ports like `5432` close to the internet. Your tailnet still reaches them.
+- **With `moin secure my-server`**, the firewall closes every other port too. Published ports like `5432` close to the internet. Your tailnet still reaches them.
 - **With a Cloudflare Tunnel**, 80 and 443 close as well. Then no public TCP port is left. [Cloudflare Tunnel](/docs/basics/cloudflare-tunnel)
 
 Tailscale keeps `41641/udp` open, for direct connections. It works without it too, a little slower.

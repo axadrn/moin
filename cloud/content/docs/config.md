@@ -17,7 +17,7 @@ You rarely write it by hand. The commands write it for you:
 | `moin bucket set` | `bucket` |
 | `moin bucket key`, `moin bucket confirm` | `backup_key` |
 
-The backup schedule, `mounts` and `server_access` you set by hand: `ssh prod`, then edit the file as root.
+The backup schedule, `mounts` and `server_access` you set by hand: `ssh my-server`, then edit the file as root.
 
 ## Every key
 
@@ -28,13 +28,13 @@ The backup schedule, `mounts` and `server_access` you set by hand: `ssh prod`, t
 # watchers know the server by it. The first deploy writes your SSH
 # alias here. Letters, digits, dots and dashes. Keep it: a new name
 # means a new folder in the bucket.
-name: prod
+name: my-server
 
 # The watchers this server reports to, every minute.
-# `moin watcher connect prod <url> <token>` adds one.
+# `moin watcher connect my-server <url> <token>` adds one.
 watchers:
   - url: https://watcher.example.com
-    token: <the token from moin watcher token prod>
+    token: <the token from moin watcher token my-server>
 
 # Where the server's own alerts go.
 # `moin alerts add` adds one, after a test alert went out.
@@ -51,7 +51,7 @@ alerts:
     password: <the password of that user>
 
 # Where the copies go: any S3-compatible bucket.
-# `moin bucket set prod` writes it, after a test file went in.
+# `moin bucket set my-server` writes it, after a test file went in.
 bucket:
   endpoint: https://s3.example.com   # leave it out for AWS S3
   region: auto                       # default us-east-1
@@ -62,7 +62,7 @@ bucket:
   locked: true                       # the server writes it at each check
 
 # The public half of your backup key: every copy is encrypted for it.
-# `moin bucket key prod` writes it, `moin bucket confirm prod` sets
+# `moin bucket key my-server` writes it, `moin bucket confirm my-server` sets
 # confirmed once your key opened a copy.
 backup_key:
   public: age1…
@@ -73,7 +73,7 @@ backups:
   every: 1h        # default 1h, at least 5m
   keep: 7d         # default 7d, at least 1d
   apps:            # an app with its own schedule
-    shop:
+    my-app:
       every: 15m
       keep: 30d
 
@@ -92,7 +92,7 @@ server_access: false
 - **A key moin does not know is an error.** So a typo never goes unnoticed. The daemon alerts `the config has a mistake`, and the last good config keeps working until it is fixed. Commands say it too.
 - **A change counts within a minute.** The daemon reads the file every minute. No restart.
 - **A command keeps your comments.** When `moin bucket set` or another command changes the file, the comments you wrote stay.
-- **Root only.** It holds the bucket's secret key, the alert tokens and passwords, and the watcher tokens. `moin bucket prod` shows the bucket, never the secret.
+- **Root only.** It holds the bucket's secret key, the alert tokens and passwords, and the watcher tokens. `moin bucket my-server` shows the bucket, never the secret.
 
 ## backups
 
@@ -110,12 +110,12 @@ The undo a restore leaves behind is kept just as long as the copies.
 - `region`: the bucket's region. Default `us-east-1`. Cloudflare R2 takes `auto`.
 - `bucket`, `access_key`, `secret_key`: needed, all three.
 - `path`: a folder in the bucket. Then copies go to `<path>/<server>/<app>/<database>/copies/`.
-- `locked`: the bucket refused to delete a fresh file at the last check. The server writes it, at `moin bucket set` and `moin bucket prod`. [Lock your bucket](/docs/backups#lock-your-bucket)
+- `locked`: the bucket refused to delete a fresh file at the last check. The server writes it, at `moin bucket set` and `moin bucket my-server`. [Lock your bucket](/docs/backups#lock-your-bucket)
 
 ## backup_key
 
 - `public`: the public half of your backup key, `age1…`. Every copy is encrypted for it, and for the server's own key in `/etc/moin/backup.key`.
-- `confirmed`: you showed that you have the private half, by opening a copy with it. Until then `moin` shows a `!` line: `prod: your backup key is not confirmed.`
+- `confirmed`: you showed that you have the private half, by opening a copy with it. Until then `moin` shows a `!` line: `my-server: your backup key is not confirmed.`
 
 The private half is never on the server. [Your backup key](/docs/backups#your-backup-key)
 

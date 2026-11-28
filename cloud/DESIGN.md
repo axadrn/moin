@@ -134,7 +134,7 @@ Changed.
 
 | Word | Means | Not |
 | --- | --- | --- |
-| server | a machine you reach with `ssh`; its name is your SSH alias, like `prod` | node, host, machine (in copy) |
+| server | a machine you reach with `ssh`; its name is your SSH alias, like `my-server` | node, host, machine (in copy) |
 | daemon | the moin process on a server (`moin daemon`): backups, checks, follows, reports | agent, node agent, connector |
 | app | what you deploy | project, service (a service is one container of an app's compose file) |
 | deploy | one version of an app, v12; also the verb | release (in copy), build, rollout |
@@ -148,8 +148,9 @@ Changed.
 | catalog | the open source apps you deploy with one command; its items are apps | apps (for the place), templates, marketplace |
 | changelog | what changed in each version of moin | what's new, release notes |
 
-Examples everywhere: the server `prod` (a second one `web-1`), the app
-`shop` (a second one `blog`), the domain `shop.example.com`.
+Examples everywhere: the server `my-server` (two: `staging` and
+`production`), the app `my-app` (a second one `blog`), the domain
+`my-app.example.com`.
 
 ## Copy
 

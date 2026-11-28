@@ -25,7 +25,7 @@ A hosted hub is worse. One break-in there reaches every server of every customer
 ## Who I build for
 
 ```bash
-ssh prod
+ssh my-server
 git pull && ./deploy.sh
 ```
 
@@ -46,7 +46,7 @@ your laptop
 └──────────────────────────┘                       └──────────────┘
 ```
 
-**Commands go in.** From your laptop to your server, over SSH, with your key. `moin deploy prod` is `ssh prod`, then the work on the server.
+**Commands go in.** From your laptop to your server, over SSH, with your key. `moin deploy my-server` is `ssh my-server`, then the work on the server.
 
 **Reports go out.** Every minute the daemon tells a watcher what it sees: the apps, the domains, the backups, the last check. The watcher answers with a status code. The daemon acts on nothing in it.
 
@@ -57,16 +57,16 @@ Who can command your server? Whoever can SSH to it as root. Not a watcher. Not m
 **One command.** In your app's folder:
 
 ```bash
-moin deploy prod
+moin deploy my-server
 ```
 
-If `ssh prod` works, this works. The first time, it installs Docker and moin on the server. It sends your committed code over SSH, and the server builds it. It ends in a link with HTTPS, before you touched DNS.
+If `ssh my-server` works, this works. The first time, it installs Docker and moin on the server. It sends your committed code over SSH, and the server builds it. It ends in a link with HTTPS, before you touched DNS.
 
-**Closed SSH.** Right after the first deploy, moin asks to close port 22. It puts the server in your tailnet, opens a new session over Tailscale, and closes port 22 only when that works. `moin secure prod` puts the web behind a Cloudflare Tunnel and a firewall around the rest. Then no public TCP port is left. Locked out? `moin unlock` in your provider's web console opens port 22 again.
+**Closed SSH.** Right after the first deploy, moin asks to close port 22. It puts the server in your tailnet, opens a new session over Tailscale, and closes port 22 only when that works. `moin secure my-server` puts the web behind a Cloudflare Tunnel and a firewall around the rest. Then no public TCP port is left. Locked out? `moin unlock` in your provider's web console opens port 22 again.
 
 **Proven backups.** moin finds SQLite and Postgres by itself. Every copy is encrypted on the server before it goes to your bucket. Every day, moin restores the newest copy and reads it. A backup you never restored is a hope.
 
-**Knocks.** Bots try every new server within minutes. Once port 22 is closed, the firewall drops them and counts them. `moin knocks prod` shows how many, by port. They knock. Nothing opens.
+**Knocks.** Bots try every new server within minutes. Once port 22 is closed, the firewall drops them and counts them. `moin knocks my-server` shows how many, by port. They knock. Nothing opens.
 
 ## What moin cloud is, and isn't
 

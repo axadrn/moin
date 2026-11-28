@@ -47,7 +47,7 @@ The provider's snapshots help with some of these. They live at the same provider
 moin finds your SQLite and Postgres databases by itself. Once you give it a bucket, it copies each one every hour.
 
 ```bash
-moin bucket set prod
+moin bucket set my-server
 ```
 
 A bucket is storage for files, at any S3-compatible provider. Pick one at another provider than your server. That is the "far away".
@@ -62,11 +62,11 @@ Then, every day:
 So "backed up" means: copied, restored and read. If that fails, you get an alert, and `moin` shows a `!` line.
 
 ```bash
-moin backups shop
+moin backups my-app
 ```
 
 ```text
-/data/shop.db
+/data/my-app.db
   ✓ Checked 3h ago: the copy marked checked restored and read fine
 ```
 
@@ -90,7 +90,7 @@ A server that is broken into holds the key to its bucket. That key can delete co
 ## Restore
 
 ```bash
-moin restore shop
+moin restore my-app
 ```
 
 Pick a copy, and moin puts it back. It builds the database beside the live one, switches in one quick step, and keeps the old data as an undo. [Restore](/docs/backups#restore)

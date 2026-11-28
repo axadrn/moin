@@ -7,7 +7,7 @@ order: 3
 
 ## What is moin?
 
-Deploy anything. Lose nothing. Like `ssh prod` and `./deploy.sh`, in one command. One command puts your app on your server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
+Deploy anything. Lose nothing. Like `ssh my-server` and `./deploy.sh`, in one command. One command puts your app on your server. Every backup is restored and checked, every day. Nothing but your SSH key can command your server.
 
 ## Is there a dashboard?
 
@@ -19,7 +19,7 @@ No. moin cloud is the one part with an account. [moin cloud](/docs/cloud)
 
 ## Do I need Docker?
 
-Not on your laptop. moin installs Docker on the server. Only an image you built on your laptop needs Docker there: `moin deploy --image shop:dev` sends it.
+Not on your laptop. moin installs Docker on the server. Only an image you built on your laptop needs Docker there: `moin deploy --image my-app:dev` sends it.
 
 ## Which servers work?
 
@@ -31,7 +31,7 @@ No. Your server builds your app. Your source goes from your laptop to it over SS
 
 ## Do I need a domain?
 
-Not to start. Every app answers at an address that needs no DNS, like `https://shop.203-0-113-7.sslip.io`, with HTTPS.
+Not to start. Every app answers at an address that needs no DNS, like `https://my-app.203-0-113-7.sslip.io`, with HTTPS.
 
 ## Where is my data?
 
@@ -43,7 +43,7 @@ No. moin backs up databases: SQLite and Postgres. [Backups](/docs/backups)
 
 ## Can my team deploy?
 
-Everyone whose SSH key may log in as root can. `moin keys add prod anna.pub`. [The team](/docs/security#the-team)
+Everyone whose SSH key may log in as root can. `moin keys add my-server anna.pub`. [The team](/docs/security#the-team)
 
 ## Can an AI agent use it?
 
@@ -55,7 +55,7 @@ Coolify and Dokploy are dashboards that hold a key to your server. Kamal and unc
 
 ## Does my server update by itself?
 
-Never. `moin update prod` updates it, when you run it. [Updates](/docs/security#updates)
+Never. `moin update my-server` updates it, when you run it. [Updates](/docs/security#updates)
 
 ## Is moin open source?
 

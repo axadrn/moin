@@ -50,7 +50,7 @@ So nobody sees a new version before its signed release is complete.
 Nothing updates by itself. Not the CLI, not a server, not a watcher.
 
 - `moin update` updates the CLI on your laptop, from the GitHub release, after it checked the signature.
-- `moin update prod` puts that same version on the server, over SSH. The server downloads it, checks its signature, and restarts the daemon. Your apps keep running.
+- `moin update my-server` puts that same version on the server, over SSH. The server downloads it, checks its signature, and restarts the daemon. Your apps keep running.
 - Once a day the CLI says when a new version is out.
 
 What a release needs from you, if anything, is in its notes, under Upgrade. [Updates](/docs/security#updates)

@@ -33,18 +33,18 @@ There is one program, `moin`. The same file runs in three places.
 
 | Where | What it does |
 | --- | --- |
-| your laptop | `moin deploy prod` and every other command. It logs in to the server over SSH and runs `moin` there. |
+| your laptop | `moin deploy my-server` and every other command. It logs in to the server over SSH and runs `moin` there. |
 | the server | `moin daemon` runs the timers: backups, the daily restore check, a report to the watchers every minute, alerts, the branches and images apps follow, the count of knocks, and a daily cleanup of old images. It takes no commands. Its systemd service is `moin-daemon`. |
 | another server | `moin watcher run`, if you run your own. [Watcher](/docs/watcher) |
 
 ## Commands go in
 
-`moin deploy prod` is `ssh prod`, then the work on the server. There is no service in between.
+`moin deploy my-server` is `ssh my-server`, then the work on the server. There is no service in between.
 
 - Who can command your server: whoever can SSH to it as root. Nobody else.
 - moin opens no port for itself. After the first deploy, public SSH closes too, and SSH comes only over Tailscale. [Security](/docs/security)
 - moin runs as root on the server. For a user who is not root, it runs `sudo` by itself.
-- Your laptop keeps a list of the servers you deployed to, in `~/.config/moin/servers`. `moin` alone shows them. On a new laptop, `moin servers add prod` puts one back.
+- Your laptop keeps a list of the servers you deployed to, in `~/.config/moin/servers`. `moin` alone shows them. On a new laptop, `moin servers add my-server` puts one back.
 
 ## Reports go out
 
@@ -65,7 +65,7 @@ There is one way back, and you take it yourself: a restore. Your CLI asks the se
 4. It points your domains at it, with HTTPS from Let's Encrypt.
 5. If the new deploy does not come up, the one before runs again.
 
-No registry, no build on your laptop, no CI needed. Want a registry anyway? `moin deploy prod --image ghcr.io/you/shop:1.4` makes the server pull the image, and `moin registry set` logs it in to a private one. [Deploy](/docs/deploy#deploy-an-image-from-your-registry)
+No registry, no build on your laptop, no CI needed. Want a registry anyway? `moin deploy my-server --image ghcr.io/you/my-app:1.4` makes the server pull the image, and `moin registry set` logs it in to a private one. [Deploy](/docs/deploy#deploy-an-image-from-your-registry)
 
 ## Where things are on the server
 

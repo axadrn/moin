@@ -1,6 +1,6 @@
 ---
 title: "SSH and keys"
-description: "SSH is how your laptop logs in to your server. Make a key, give the server its public half, and name the server prod in ~/.ssh/config."
+description: "SSH is how your laptop logs in to your server. Make a key, give the server its public half, and name the server my-server in ~/.ssh/config."
 group: "Basics"
 order: 3
 ---
@@ -76,13 +76,13 @@ Type `yes`. SSH notes the server's own key in `~/.ssh/known_hosts`. Next time, i
 Typing the IP each time is tiring. Give the server a short name, in `~/.ssh/config` on your laptop:
 
 ```text
-Host prod
+Host my-server
   HostName 203.0.113.7
   User root
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-- `Host` is the name you pick. Here `prod`.
+- `Host` is the name you pick. Here `my-server`.
 - `HostName` is the server's address.
 - `User` is who you log in as.
 - `IdentityFile` is your private key.
@@ -90,10 +90,10 @@ Host prod
 Now this is enough:
 
 ```bash
-ssh prod
+ssh my-server
 ```
 
-This name is what moin uses. If `ssh prod` works, `moin deploy prod` works. moin reads the same file, and goes the same way.
+This name is what moin uses. If `ssh my-server` works, `moin deploy my-server` works. moin reads the same file, and goes the same way.
 
 Not root? Set `User` to your user. moin then runs `sudo` for you. It needs sudo without a password.
 
@@ -102,9 +102,9 @@ Not root? Set `User` to your user. moin then runs `sudo` for you. It needs sudo 
 Each person makes their own key on their own laptop. Never share one key.
 
 ```bash
-moin keys prod
-moin keys add prod anna.pub
-moin keys rm prod anna@laptop
+moin keys my-server
+moin keys add my-server anna.pub
+moin keys rm my-server anna@laptop
 ```
 
 `moin keys add` takes Anna's public key, from her `.pub` file. A private key never leaves a laptop: moin refuses one. [The team](/docs/security#the-team)
@@ -112,5 +112,5 @@ moin keys rm prod anna@laptop
 ## If it goes wrong
 
 - **`Permission denied (publickey)`.** The server does not know this key. Check that the `.pub` line is on the server, and that `IdentityFile` names the right file.
-- **Lost the laptop.** Take its key out from another laptop: `moin keys rm prod ada@laptop`. Or in your provider's web console.
+- **Lost the laptop.** Take its key out from another laptop: `moin keys rm my-server ada@laptop`. Or in your provider's web console.
 - **The private key leaked.** Same: take it out now, and make a new one.

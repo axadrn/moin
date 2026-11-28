@@ -1,6 +1,6 @@
 # moin
 
-> Deploy anything. Lose nothing. moin is one open source program. `moin deploy prod` logs in to your server over SSH, with your key, sends the committed source of your app and builds it there. Right after the first deploy it offers to close public SSH, so the server answers SSH only over Tailscale. It finds the app's SQLite and Postgres databases, encrypts copies of them on the server for the server's key and yours, puts them into your own S3-compatible bucket on a schedule, and every day restores the newest copy into a throwaway database and reads it. A watcher on another server notices when a server goes silent. There is no dashboard and no service between you and your server: only who has SSH can command it. moin cloud is optional: a watcher we run, and a copy of your backups your server can't delete. `moin` alone opens a terminal UI. Every reading command takes --json, for scripts and AI agents.
+> Deploy anything. Lose nothing. moin is one open source program. `moin deploy my-server` logs in to your server over SSH, with your key, sends the committed source of your app and builds it there. Right after the first deploy it offers to close public SSH, so the server answers SSH only over Tailscale. It finds the app's SQLite and Postgres databases, encrypts copies of them on the server for the server's key and yours, puts them into your own S3-compatible bucket on a schedule, and every day restores the newest copy into a throwaway database and reads it. A watcher on another server notices when a server goes silent. There is no dashboard and no service between you and your server: only who has SSH can command it. moin cloud is optional: a watcher we run, and a copy of your backups your server can't delete. `moin` alone opens a terminal UI. Every reading command takes --json, for scripts and AI agents.
 
 Every docs page is also available as Markdown: add .md to its URL. The list of all pages is at /docs.md.
 
@@ -9,7 +9,7 @@ Every docs page is also available as Markdown: add .md to its URL. The list of a
 - [Home](/): What moin does, how it compares, and questions
 - [Docs](/docs): Get started, how it works, deploy, backups, security, the watcher, moin cloud, the CLI and the server config
 - [Compare](/compare): moin next to Coolify, Dokploy, Kamal, uncloud and Dokku, fact by fact, with sources
-- [Catalog](/catalog): Open source apps to deploy with `moin deploy prod --catalog <app>`
+- [Catalog](/catalog): Open source apps to deploy with `moin deploy my-server --catalog <app>`
 - [Roadmap](/roadmap): Now, next and later
 - [Changelog](/changelog): What shipped, newest first, also as RSS at /changelog.xml
 - [Privacy](/legal/privacy): Privacy policy

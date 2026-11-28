@@ -6,15 +6,15 @@ One command puts your app on your own server. Your backups are restored and chec
 
 ```bash
 curl -fsSL https://moin.run/cli.sh | sh
-cd shop
-moin deploy prod     # ✓ shop v1 is live: https://shop.203-0-113-7.sslip.io
-moin                 # every server, every app, what needs you
-moin backups shop    # the copies, and the last restore check
+cd my-app
+moin deploy my-server   # ✓ my-app v1 is live: https://my-app.203-0-113-7.sslip.io
+moin                    # every server, every app, what needs you
+moin backups my-app     # the copies, and the last restore check
 ```
 
-If `ssh prod` works, `moin deploy prod` works. No account, no dashboard, no Docker on your laptop.
+If `ssh my-server` works, `moin deploy my-server` works. No account, no dashboard, no Docker on your laptop.
 
-A watcher on another machine alerts you when a server goes silent. moin cloud is the watcher we run: `moin watcher connect prod`. It keeps a copy of every database that a hacked server can't delete.
+A watcher on another machine alerts you when a server goes silent. moin cloud is the watcher we run: `moin watcher connect my-server`. It keeps a copy of every database that a hacked server can't delete.
 
 ## Documentation
 

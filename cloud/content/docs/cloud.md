@@ -12,7 +12,7 @@ moin cloud is a [watcher](/docs/watcher) we run for you, on our servers. Your ap
 Connect a server, on your laptop:
 
 ```bash
-moin watcher connect prod
+moin watcher connect my-server
 ```
 
 The first time, it opens the browser. Sign in with GitHub or a link we send to your mail. No password. The page shows a code. Allow it when it is the one in your terminal.
@@ -20,17 +20,17 @@ The first time, it opens the browser. Sign in with GitHub or a link we send to y
 ```text
 → Sign in to moin cloud in the browser, and allow the code K7QF-92MD: https://moin.run/cli?code=K7QF-92MD
 ✓ Signed in to moin cloud
-✓ prod reports to moin cloud every minute
+✓ my-server reports to moin cloud every minute
   See it with `moin watcher`
 ```
 
-Then prod gets a token. From then on prod reports to moin cloud. Connect every server the same way.
+Then my-server gets a token. From then on my-server reports to moin cloud. Connect every server the same way.
 
-Alerts are set once, on the server: `moin alerts add prod telegram`. Each report carries them, so moin cloud alerts there too, and sends a mail. [Watcher](/docs/watcher#alerts)
+Alerts are set once, on the server: `moin alerts add my-server telegram`. Each report carries them, so moin cloud alerts there too, and sends a mail. [Watcher](/docs/watcher#alerts)
 
 ```bash
 moin watcher                       # each server's watchers, your plan, trial days left, billing
-moin watcher disconnect prod       # prod no longer reports
+moin watcher disconnect my-server  # my-server no longer reports
 ```
 
 The same is on [moin.run/cloud](/cloud) in the browser. It only shows. Nothing on it changes a server.
@@ -76,19 +76,19 @@ Your server holds the key to your own bucket. That key can delete copies, becaus
 So moin cloud keeps a copy, during the trial and with a subscription:
 
 - Each scheduled copy of every database goes to moin cloud. With your own bucket it goes there too, and moin cloud holds the second copy. Without one, moin cloud holds the only copy. [Copies to moin cloud](/docs/backups#copies-to-moin-cloud)
-- Encrypted on your server, for the server's key and [your backup key](/docs/backups#your-backup-key). moin cloud can't read it. Make your key with `moin bucket key prod`: a restore needs it.
+- Encrypted on your server, for the server's key and [your backup key](/docs/backups#your-backup-key). moin cloud can't read it. Make your key with `moin bucket key my-server`: a restore needs it.
 - Proven before it leaves: the first copy of each day is restored and read on your server. A copy that does not restore is not uploaded.
 - Your server can add copies. It can never read, list, delete or overwrite one.
 - Each copy stays 14 days, then goes. The newest copy of a database always stays.
 
 ```bash
-moin backups shop               # the copies of shop, in your bucket and in moin cloud
-moin restore shop               # put shop back to one
+moin backups my-app             # the copies of my-app, in your bucket and in moin cloud
+moin restore my-app             # put my-app back to one
 ```
 
-`moin backups shop` shows every copy in one table. WHERE says where it is: `bucket` or `moin cloud`. `moin restore shop` asks which one. Enter takes the newest. A copy in moin cloud asks for your backup key. In a script, name the copy with `--to <copy>` and pass `-y`.
+`moin backups my-app` shows every copy in one table. WHERE says where it is: `bucket` or `moin cloud`. `moin restore my-app` asks which one. Enter takes the newest. A copy in moin cloud asks for your backup key. In a script, name the copy with `--to <copy>` and pass `-y`.
 
-It works for a server that is gone, too. Set up a new one, deploy shop there, then `moin restore shop -s new --from prod`. Like every restore, it keeps the data from before as an undo: `moin restore shop --to undo-…`.
+It works for a server that is gone, too. Set up a new one, deploy my-app there, then `moin restore my-app -s new --from my-server`. Like every restore, it keeps the data from before as an undo: `moin restore my-app --to undo-…`.
 
 ### How it works
 
@@ -109,7 +109,7 @@ The copies lie in a Cloudflare R2 bucket with a 14-day lock. Inside it nobody de
 moin cloud is open source, in `cloud/` of the repo. To point the CLI at another one, like one on your laptop, set `MOIN_CLOUD_URL`:
 
 ```bash
-MOIN_CLOUD_URL=http://localhost:8090 moin watcher connect prod
+MOIN_CLOUD_URL=http://localhost:8090 moin watcher connect my-server
 ```
 
 Without it the CLI talks to https://moin.run.

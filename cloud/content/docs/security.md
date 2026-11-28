@@ -23,12 +23,12 @@ Whoever can SSH to it as root. Nobody else.
 Your team is the SSH keys on the server. Whoever has a key there is on the team. More in [Teams](/docs/teams).
 
 ```bash
-moin keys prod
-moin keys add prod anna.pub
-moin keys rm prod anna@laptop
+moin keys my-server
+moin keys add my-server anna.pub
+moin keys rm my-server anna@laptop
 ```
 
-- `moin keys prod` lists the keys that may log in as root, by name and fingerprint. They are the lines of `/root/.ssh/authorized_keys`.
+- `moin keys my-server` lists the keys that may log in as root, by name and fingerprint. They are the lines of `/root/.ssh/authorized_keys`.
 - `moin keys add` adds a public key, from its `.pub` file. A private key never leaves your laptop: moin refuses one.
 - A key's name is the comment at its end, like `anna@laptop`. `moin keys rm` takes it by that name, or by its fingerprint. Anna can't log in from then on.
 - `moin keys rm` never takes out the key you are logged in with, so you can't lock yourself out.
@@ -52,9 +52,9 @@ Enter means yes. Each step shows as it runs: putting the server in your tailnet,
 5. moin prints the line for your `~/.ssh/config`. It never edits that file itself:
 
 ```text
-  Point prod at the tailnet. In ~/.ssh/config, set:
-    Host prod
-      HostName prod.tail0000.ts.net
+  Point my-server at the tailnet. In ~/.ssh/config, set:
+    Host my-server
+      HostName my-server.tail0000.ts.net
 ```
 
 From then on, `moin deploy` goes over Tailscale. To the rest of the internet, port 22 is gone.
@@ -62,7 +62,7 @@ From then on, `moin deploy` goes over Tailscale. To the rest of the internet, po
 - It needs a Tailscale account. The free plan works.
 - sshd must listen on port 22. If it listens on another one, moin leaves public SSH open.
 - Tailscale keeps `41641/udp` open, for direct connections. If it is closed, Tailscale still works, through its relays.
-- Said no? moin says `Port 22 stays open to the internet. Close it later with moin secure prod`, and `moin` shows a `!` line until it is closed: `prod: port 22 is open to the internet.`
+- Said no? moin says `Port 22 stays open to the internet. Close it later with moin secure my-server`, and `moin` shows a `!` line until it is closed: `my-server: port 22 is open to the internet.`
 - A server's Tailscale key expires, and then SSH to it stops. Two weeks before, the server alerts and `moin` shows it. Better: turn key expiry off for the server. Tailscale admin console, Machines, the server, the ⋯ menu, Disable key expiry.
 
 ## Tailnet Lock
@@ -74,7 +74,7 @@ Without it, whoever controls your Tailscale account could add a device to your t
 ## Cloudflare Tunnel and the firewall
 
 ```bash
-moin secure prod
+moin secure my-server
 ```
 
 It closes public SSH as above, then asks for the token of a Cloudflare Tunnel. Make one in the Cloudflare dashboard: Networks, Tunnels, Create a tunnel, Cloudflared. The token is the long text after `--token`. Enter without one keeps the web on ports 80 and 443.
@@ -93,18 +93,18 @@ After it, no public TCP port is left on the server.
 - Ports your apps publish, like `5432` in a `compose.yml`, are closed to the internet too. Your tailnet still reaches them. Without a tunnel, 80 and 443 stay open for the web.
 - The tunnel takes the web only once it reaches Cloudflare. With a wrong token, the web stays where it was.
 - In the tunnel's Public Hostnames, send each domain to `http://moin-traefik:8080`.
-- `moin secure prod --tunnel off` takes the web out of the tunnel. It comes on ports 80 and 443 again.
+- `moin secure my-server --tunnel off` takes the web out of the tunnel. It comes on ports 80 and 443 again.
 
 ## Knocks
 
 Bots try every new server within minutes: SSH, databases, admin pages. Each connection attempt is a knock. Once public SSH is closed, moin's firewall drops them, and counts each one under the name of its port.
 
 ```bash
-moin knocks prod
+moin knocks my-server
 ```
 
 ```text
-prod
+my-server
 PORT       HOUR   TODAY   7 DAYS   YEAR      TOTAL     PER MINUTE
 ssh        47     1,120   7,904    131,220   240,017   0.8
 postgres   6      142     1,003    17,436    30,551    0.1
@@ -135,7 +135,7 @@ Otherwise no port opens by itself. Only the guard does, in the 2 minutes after a
 
 ## Troubleshooting
 
-**This computer does not reach the server over Tailscale.** moin says so, and public SSH stays open. Turn Tailscale on here, in the same tailnet, then `moin secure prod` again.
+**This computer does not reach the server over Tailscale.** moin says so, and public SSH stays open. Turn Tailscale on here, in the same tailnet, then `moin secure my-server` again.
 
 **Both are in the tailnet, but port 22 does not answer.** Your tailnet's rules keep them apart. moin prints the fix, with the name your rules know this computer by. In the Tailscale admin console, Access controls, add a tag for servers and let this computer reach it on port 22:
 
@@ -144,9 +144,9 @@ Otherwise no port opens by itself. Only the guard does, in the 2 minutes after a
 "grants": [{"src": ["ada@example.com"], "dst": ["tag:server"], "ip": ["tcp:22"]}]
 ```
 
-The source is this computer: its tags if it has any, like `tag:laptop`, else your login. Then give the server the tag: Machines, the server, the ⋯ menu, Edit ACL tags, `tag:server`. Then `moin secure prod` again. A tagged server's key does not expire.
+The source is this computer: its tags if it has any, like `tag:laptop`, else your login. Then give the server the tag: Machines, the server, the ⋯ menu, Edit ACL tags, `tag:server`. Then `moin secure my-server` again. A tagged server's key does not expire.
 
-**moin says "No new SSH session over Tailscale came through".** The change closed something that kept you out. Wait 2 minutes: the guard opens port 22 again by itself. Then `ssh prod` over the public address works, and `moin secure prod` tries again.
+**moin says "No new SSH session over Tailscale came through".** The change closed something that kept you out. Wait 2 minutes: the guard opens port 22 again by itself. Then `ssh my-server` over the public address works, and `moin secure my-server` tries again.
 
 **`moin` says Tailscale does not run on the server.** SSH only comes through it. In your provider's web console, run `tailscale up`, or `/usr/local/bin/moin unlock`.
 
@@ -156,18 +156,18 @@ Your server never updates by itself. Not moin, not ever.
 
 ```bash
 moin update
-moin update prod
+moin update my-server
 ```
 
 - `moin update` updates the CLI on your laptop.
-- `moin update prod` puts that same version on the server, over SSH. Your apps keep running.
+- `moin update my-server` puts that same version on the server, over SSH. Your apps keep running.
 - Once a day the CLI asks GitHub for the newest release, and says so when one is out. You decide when.
 - `moin deploy` says so when the server runs another version than your CLI. The watcher's page shows the version of each server.
 
 Each release is signed. moin checks the signature before it installs anything. The signing key never leaves a protected place in GitHub: only a release tag reaches it, and only after a maintainer approves.
 
 - Every download comes from the GitHub release: the binaries, `SHA256SUMS`, and two signatures of it.
-- `SHA256SUMS.sig` is for `moin update` and `moin update prod`. They check it themselves.
+- `SHA256SUMS.sig` is for `moin update` and `moin update my-server`. They check it themselves.
 - `SHA256SUMS.sshsig` is for `cli.sh`. It checks it with `ssh-keygen`, which every Mac and Linux has. It needs OpenSSH 8.1 or newer: `ssh -V` says which.
 - Both are made with the same key. A spare key, kept offline, may sign one day instead.
 

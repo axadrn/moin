@@ -18,7 +18,7 @@ Or browse it on the site: [/catalog](/catalog), one page per app.
 ## Deploy one
 
 ```bash
-moin deploy prod --catalog umami
+moin deploy my-server --catalog umami
 ```
 
 You need no folder and no code. The app is called `umami`. For a second one, or another name, add `--app stats`.

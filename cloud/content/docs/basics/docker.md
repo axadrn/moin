@@ -60,7 +60,7 @@ volumes:
 - `services` are the boxes. Here `web`, built from your Dockerfile, and `db`, a ready Postgres image.
 - They reach each other by name. The app finds Postgres at `db:5432`.
 - `pgdata` is a named volume. Postgres's files outlive every release.
-- `${POSTGRES_PASSWORD}` comes from the env. With moin: `moin env edit shop`.
+- `${POSTGRES_PASSWORD}` comes from the env. With moin: `moin env edit my-app`.
 
 No `ports` on `db`. Only the app reaches it. A published port would open it to the internet. [Ports and the firewall](/docs/basics/ports#docker-walks-past-ufw)
 
@@ -69,7 +69,7 @@ No `ports` on `db`. Only the app reaches it. A published port would open it to t
 You don't run Docker yourself. moin installs it on the server, and runs it for you. Your laptop needs no Docker.
 
 ```bash
-moin deploy prod
+moin deploy my-server
 ```
 
 moin sends your committed code. The server builds it, in this order:
@@ -108,6 +108,6 @@ docker logs <container>
 From your laptop, the same through moin:
 
 ```bash
-moin logs shop
-moin exec shop -- sh
+moin logs my-app
+moin exec my-app -- sh
 ```

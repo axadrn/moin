@@ -16,10 +16,10 @@ moin does the hard parts for you. These ten commands are for looking around.
 From your laptop, open the terminal app and log in:
 
 ```bash
-ssh prod
+ssh my-server
 ```
 
-The prompt changes. It now shows the server's name. Every command you type runs there, not on your laptop. `exit` takes you back. [SSH and keys](/docs/basics/ssh) sets up the name `prod`.
+The prompt changes. It now shows the server's name. Every command you type runs there, not on your laptop. `exit` takes you back. [SSH and keys](/docs/basics/ssh) sets up the name `my-server`.
 
 ## The ten commands
 
@@ -120,8 +120,8 @@ Each app runs in one or more containers. You see their names, their images and h
 With moin you seldom log in at all. The CLI on your laptop does it for you:
 
 ```bash
-moin logs shop
-moin exec shop -- sh
+moin logs my-app
+moin exec my-app -- sh
 ```
 
 `moin logs` shows the app's logs. `moin exec` runs a command in the app's container, here a shell. [Deploy](/docs/deploy#logs)

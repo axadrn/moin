@@ -22,7 +22,7 @@ A door that only opens from the inside. Nobody can knock on it.
 1. A small program, `cloudflared`, runs on your server.
 2. It dials out to Cloudflare and keeps that line open.
 3. Your domain points at Cloudflare, not at your server.
-4. A visitor asks for `shop.example.com`. Cloudflare sends the request down the line.
+4. A visitor asks for `my-app.example.com`. Cloudflare sends the request down the line.
 5. Your app answers the same way back.
 
 Your server never accepts a connection from the internet. So ports 80 and 443 can close. Bots that scan your IP find nothing at all.
@@ -30,7 +30,7 @@ Your server never accepts a connection from the internet. So ports 80 and 443 ca
 ## With moin
 
 ```bash
-moin secure prod
+moin secure my-server
 ```
 
 It closes public SSH, then asks for the token of a tunnel. Make one in the Cloudflare dashboard: Networks, Tunnels, Create a tunnel, Cloudflared. The token is the long text after `--token`.
@@ -48,7 +48,7 @@ After that, no public TCP port is left on the server. The firewall drops the res
 The web comes into the tunnel only once it reaches Cloudflare. With a wrong token, it stays where it was. To take the web out again:
 
 ```bash
-moin secure prod --tunnel off
+moin secure my-server --tunnel off
 ```
 
 It comes on ports 80 and 443 again.
