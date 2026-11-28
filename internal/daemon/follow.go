@@ -26,8 +26,8 @@ import (
 // the branch deploys.
 //
 // `moin follow --image` follows a tag in a registry instead, like
-// ghcr.io/ada/shop:main. The daemon pulls it every minute, which asks the
-// registry one question while nothing changed. A new image under the tag
+// ghcr.io/ada/shop:main. Every minute the daemon asks the registry for the
+// digest of the tag, and pulls only when it changed. A new image under the tag
 // runs with the compose file of the release that runs. Whoever can push
 // to the tag deploys.
 //
@@ -147,7 +147,7 @@ func FollowImageHere(dir, app, image string) (Follow, error) {
 }
 
 // CheckFollowHere reads the branch once, with the deploy key, and says
-// its newest commit. For an image it pulls it and says its ID.
+// its newest commit. For an image it pulls it, if it changed, and says its ID.
 func CheckFollowHere(ctx context.Context, dir, app string) (string, error) {
 	f, err := loadFollow(dir, app)
 	if err != nil {

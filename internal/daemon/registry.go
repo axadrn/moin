@@ -144,10 +144,35 @@ func pullImage(ctx context.Context, image string) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
+	if id, err := imageID(ctx, image); err == nil && haveRemoteDigest(ctx, image) {
+		return id, nil
+	}
 	if _, err := registryDocker(ctx, nil, "pull", "--quiet", "--", image); err != nil {
 		return "", err
 	}
 	return imageID(ctx, image)
+}
+
+// haveRemoteDigest reports whether the image on this server is the one the
+// registry has under its tag. It asks for the digest only: Docker Hub counts
+// every pull against a limit, and a pull every minute would reach it. Any
+// doubt says no, and the image is pulled.
+func haveRemoteDigest(ctx context.Context, image string) bool {
+	remote, err := registryDocker(ctx, nil, "buildx", "imagetools", "inspect", "--format", "{{.Manifest.Digest}}", "--", image)
+	remote = strings.TrimSpace(remote)
+	if err != nil || remote == "" {
+		return false
+	}
+	have, err := registryDocker(ctx, nil, "image", "inspect", "--format", "{{range .RepoDigests}}{{println .}}{{end}}", "--", image)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Fields(have) {
+		if strings.HasSuffix(line, "@"+remote) {
+			return true
+		}
+	}
+	return false
 }
 
 // imageID is Docker's ID of an image on this server.
