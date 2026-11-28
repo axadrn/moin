@@ -13,13 +13,14 @@ import (
 
 // TestFirewallRules: what each switch closes, and what it leaves open.
 func TestFirewallRules(t *testing.T) {
-	if rules := firewallRules(serverFile{}); rules != "" {
+	if rules := firewallRules(serverFile{}, true); rules != "" {
 		t.Fatalf("nothing closed, but rules:\n%s", rules)
 	}
 	syn := "tcp flags & (syn | ack) == syn"
 	cases := []struct {
 		name          string
 		file          serverFile
+		web           bool
 		want, unwants []string
 	}{
 		{
@@ -33,6 +34,7 @@ func TestFirewallRules(t *testing.T) {
 		{
 			name: "firewall web direct ssh public",
 			file: serverFile{Firewall: true},
+			web:  true,
 			want: []string{"policy drop", "ct state established,related accept", "tcp dport 22 accept",
 				"tcp dport 80 accept", "tcp dport 443 accept", "udp dport 41641 accept",
 				`tcp dport { 23, 2323 } ` + syn + ` counter name knock_telnet drop`,
@@ -56,7 +58,7 @@ func TestFirewallRules(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		rules := firewallRules(c.file)
+		rules := firewallRules(c.file, c.web)
 		for _, want := range c.want {
 			if !strings.Contains(rules, want) {
 				t.Errorf("%s: rules miss %q:\n%s", c.name, want, rules)
@@ -164,7 +166,7 @@ esac
 // Without nft the firewall says what to install, not an empty error.
 func TestFirewallWithoutNftSaysWhatToInstall(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	err := setFirewall(t.Context(), firewallRules(serverFile{Firewall: true}))
+	err := setFirewall(t.Context(), firewallRules(serverFile{Firewall: true}, true))
 	if !errors.Is(err, errNoNft) {
 		t.Fatalf("err = %v, want errNoNft", err)
 	}
@@ -229,5 +231,28 @@ func TestTokenLabel(t *testing.T) {
 	label := tokenLabel(token)
 	if len(label) != 12 || strings.Contains(token, label) || label == tokenLabel(token+"x") || tokenLabel("") != "" {
 		t.Fatalf("label %q for %q", label, token)
+	}
+}
+
+// TestWebNeedsAnApp: a server without apps keeps 80 and 443 closed behind
+// the firewall and starts no proxy. Its first deploy opens them, unless a
+// tunnel brings the web.
+func TestWebNeedsAnApp(t *testing.T) {
+	dir := t.TempDir()
+	a := newApps(dir)
+	s := newSecurity(dir, a)
+	s.file = serverFile{Firewall: true, SSHOnTailscale: true}
+	// Env set before the first deploy makes the app's folder, no release.
+	os.MkdirAll(a.appDir("shop"), 0o700)
+	if s.web() || strings.Contains(firewallRules(s.file, s.web()), "dport 443 accept") {
+		t.Fatal("a server without apps opens 443")
+	}
+	os.MkdirAll(a.releaseDir("shop", 1), 0o700)
+	if !s.web() || !strings.Contains(firewallRules(s.file, s.web()), "tcp dport 443 accept") {
+		t.Fatal("the first deploy does not open 443")
+	}
+	s.file.TunnelToken = "token"
+	if s.web() {
+		t.Fatal("behind a tunnel 443 opens")
 	}
 }

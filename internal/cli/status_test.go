@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -38,5 +40,23 @@ func TestPrintAppsShowsTheCatalogVersion(t *testing.T) {
 	}}}})
 	if !strings.Contains(out.String(), "umami latest") || strings.Count(out.String(), "latest") != 1 {
 		t.Errorf("apps:\n%s", out.String())
+	}
+}
+
+// moin servers add sets up a server without moin, after a yes, with no
+// app: in a script that needs --yes, and nothing is installed or added.
+func TestServersAddSetsUp(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	runs := fakeSSH(t, "x86_64\n")
+	err := servers(t.Context(), []string{"add", "prod"}, strings.NewReader(""), io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "Set up moin on prod? Answer it on a terminal, or add --yes") {
+		t.Fatalf("err = %v", err)
+	}
+	body, _ := os.ReadFile(runs)
+	if strings.Count(string(body), "\n") != 1 {
+		t.Errorf("ssh ran more than the probe:\n%s", body)
+	}
+	if list, _ := loadServers(); len(list) != 0 {
+		t.Errorf("servers = %v", list)
 	}
 }

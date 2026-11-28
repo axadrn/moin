@@ -387,6 +387,17 @@ func (a *apps) releases(app string) []int {
 	return numbers
 }
 
+// hasApps reports whether an app on this server has a release, even one
+// that still starts.
+func (a *apps) hasApps() bool {
+	for _, app := range a.names() {
+		if len(a.releases(app)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func newDeployID() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)

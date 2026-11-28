@@ -94,7 +94,7 @@ func saveServers(servers []string) error {
 // watchers, and `servers add|rm <server>`.
 func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) > 0 && args[0] == "add" {
-		return addServerCommand(ctx, args[1:], stdout)
+		return addServerCommand(ctx, args[1:], stdin, stdout)
 	}
 	if len(args) > 0 && args[0] == "rm" {
 		return removeServerCommand(args[1:], stdin, stdout)
@@ -137,14 +137,19 @@ func servers(ctx context.Context, args []string, stdin io.Reader, stdout io.Writ
 }
 
 // addServerCommand is `moin servers add <server>`, as on a new laptop. It
-// asks the server first, so a typo is not added.
-func addServerCommand(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("servers add", "servers add <server>")
+// asks the server first, so a typo is not added. A server without moin
+// gets it, after a yes, with no app: then it runs the firewall, the
+// knocks and the reports, and no proxy.
+func addServerCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("servers add", "servers add <server> [-y]").withYes()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
 	server, err := flags.oneArg()
 	if err != nil {
+		return err
+	}
+	if err := setUp(ctx, server, "", flags.yes(), stdin, stdout); err != nil {
 		return err
 	}
 	status, err := serverStatus(ctx, server)

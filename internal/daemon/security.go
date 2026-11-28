@@ -122,9 +122,16 @@ func (s *security) now(ctx context.Context) Security {
 		Tailnet:        TailnetHere(ctx),
 	}
 	if now.Firewall {
-		now.OpenPorts = openPorts(s.file)
+		now.OpenPorts = openPorts(s.file, s.web())
 	}
 	return now
+}
+
+// web reports whether ports 80 and 443 are open to everyone: the server
+// has an app, and no Cloudflare Tunnel brings the web. A server without
+// apps runs no proxy and keeps them closed, until its first deploy.
+func (s *security) web() bool {
+	return s.file.TunnelToken == "" && s.apps.hasApps()
 }
 
 // PublicSSHHere says whether port 22 of this server is open to the
@@ -220,7 +227,7 @@ func ConfirmHere(ctx context.Context, dir string) (Security, error) {
 			return Security{}, fmt.Errorf("stop the guard: %s", lastLine(string(output)))
 		}
 	}
-	return newSecurity(dir, nil).now(ctx), nil
+	return newSecurity(dir, newApps(dir)).now(ctx), nil
 }
 
 // UnlockHere opens public port 22 again, and starts sshd if it is off.
@@ -230,13 +237,13 @@ func UnlockHere(ctx context.Context, dir string) error {
 	if os.Geteuid() != 0 {
 		return errors.New("run it as root: sudo " + installedPath + " unlock")
 	}
-	s := newSecurity(dir, nil)
+	s := newSecurity(dir, newApps(dir))
 	s.file.SSHOnTailscale = false
 	saved := s.save()
 	if saved != nil {
 		saved = fmt.Errorf("write %s: %w. Port 22 opens now, but the daemon closes it again within 5 minutes", serverConfigFile, saved)
 	}
-	return errors.Join(saved, setFirewall(ctx, firewallRules(s.file)), startSSHD(ctx))
+	return errors.Join(saved, setFirewall(ctx, firewallRules(s.file, s.web())), startSSHD(ctx))
 }
 
 // keepSecurity puts back what is closed, now and every securityEvery:
@@ -260,14 +267,18 @@ func keepSecurity(ctx context.Context, dir string, a *apps) {
 	}
 }
 
-// apply makes the server match server.json: the proxy in its mode, the
-// tunnel, and the firewall rules, now and at boot. A part that fails
-// does not stop the others.
+// apply makes the server match server.json: the proxy in its mode, once
+// the server has an app, the tunnel, and the firewall rules, now and at
+// boot. A part that fails does not stop the others.
 func (s *security) apply(ctx context.Context) error {
+	var proxy error
+	if s.apps.hasApps() {
+		proxy = s.apps.ensureProxy(ctx, func(string, ...any) {})
+	}
 	return errors.Join(
-		s.apps.ensureProxy(ctx, func(string, ...any) {}),
+		proxy,
 		s.ensureTunnel(ctx, s.file.TunnelToken),
-		setFirewall(ctx, firewallRules(s.file)),
+		setFirewall(ctx, firewallRules(s.file, s.web())),
 	)
 }
 

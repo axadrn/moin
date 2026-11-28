@@ -303,8 +303,9 @@ func goArch(machine string) string {
 	return ""
 }
 
-// setUp installs Docker and moin on a server that lacks them, after a yes.
-// A server with another version of moin gets a hint, never an update.
+// setUp installs Docker and moin on a server that lacks them, after a yes,
+// for the first deploy of app, or for no app. A server with another
+// version of moin gets a hint, never an update.
 func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, stdout io.Writer) error {
 	info, err := probe(ctx, server)
 	if err != nil {
@@ -324,6 +325,9 @@ func setUp(ctx context.Context, server, app string, yes bool, stdin io.Reader, s
 		return fmt.Errorf("the server calls itself %q for its backups and watchers, and that cannot be a name. Give it one in your ssh config, like Host my-server, and deploy to my-server", serverName(server))
 	}
 	question := fmt.Sprintf("Set up %s on %s and deploy %s?", build.Name, server, app)
+	if app == "" {
+		question = fmt.Sprintf("Set up %s on %s?", build.Name, server)
+	}
 	if err := confirm(stdin, stdout, yes, question); err != nil {
 		return err
 	}

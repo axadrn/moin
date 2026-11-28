@@ -70,7 +70,7 @@ Before your first deploy, `moin` shows three steps: `cd my-app`, `moin deploy <s
 | `moin apps` | the table: every app on every server, its release, its state and its address |
 | `moin apps rm <app>` | remove the app: its containers, images, env and domains. Its volumes and copies stay. It asks first. [Remove an app](/docs/deploy#remove-an-app) |
 | `moin servers` | your servers, the moin version on each, and the watchers each one reports to |
-| `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A first deploy adds it too |
+| `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A server without moin gets it, after a yes, with no app: [a server without apps](/docs/security#a-server-without-apps). A first deploy adds it too |
 | `moin servers rm <server>` | take a server off your list. Nothing changes on it |
 
 Under the table, `moin` says what needs you. Each thing is one line with a `!`, and under it the command that settles it:

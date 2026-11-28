@@ -340,7 +340,7 @@ func (a *apps) writeCompose(ctx context.Context, release *release) error {
 	if !needsProxy(release.detected) {
 		return nil
 	}
-	err = a.ensureProxy(ctx, release.logf)
+	err = a.serveWeb(ctx, release.logf)
 	if err != nil {
 		return fmt.Errorf("proxy: %w", err)
 	}

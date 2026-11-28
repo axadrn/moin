@@ -59,7 +59,7 @@ Backups
   backup download [app]        One copy, opened with your backup key, as a file
 Servers
   servers                      Your servers and their watchers
-  servers add <server>         Add one you deployed to before. As on a new laptop
+  servers add <server>         Add one you deployed to before. Sets moin up on a new one, with no app
   servers rm <server>          Forget one. Nothing changes on it
   keys <server>                The SSH keys that may log in as root
   keys add <server> <file>     Let one more key in

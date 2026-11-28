@@ -54,13 +54,14 @@ WantedBy=sysinit.target
 `
 }
 
-// openPorts are the ports the firewall lets in from everywhere.
-func openPorts(file serverFile) []string {
+// openPorts are the ports the firewall lets in from everywhere. web
+// opens 80 and 443 (security.web).
+func openPorts(file serverFile, web bool) []string {
 	ports := []string{}
 	if !file.SSHOnTailscale {
 		ports = append(ports, "22/tcp")
 	}
-	if file.TunnelToken == "" {
+	if web {
 		ports = append(ports, "80/tcp", "443/tcp")
 	}
 	// Tailscale's direct connections. Closed, it still works, through
@@ -69,9 +70,9 @@ func openPorts(file serverFile) []string {
 }
 
 // firewallRules is moin's nftables table for file, "" when nothing is
-// closed. Each connection attempt it drops on a well-known port counts
-// under that port's name (knockPorts).
-func firewallRules(file serverFile) string {
+// closed. web opens 80 and 443 (security.web). Each connection attempt it
+// drops on a well-known port counts under that port's name (knockPorts).
+func firewallRules(file serverFile, web bool) string {
 	if !file.SSHOnTailscale && !file.Firewall {
 		return ""
 	}
@@ -105,7 +106,7 @@ func firewallRules(file serverFile) string {
 		// for it.
 		rule(fmt.Sprintf("iifname %q accept", tailnetInterface))
 	}
-	open := openPorts(file)
+	open := openPorts(file, web)
 	for _, port := range open {
 		number, protocol, _ := strings.Cut(port, "/")
 		rule(fmt.Sprintf("%s dport %s accept", protocol, number))
@@ -126,7 +127,7 @@ func firewallRules(file serverFile) string {
 	rule(fmt.Sprintf("ct status dnat iifname %q accept", tailnetInterface))
 	rule(`ct status dnat iifname "docker0" accept`)
 	rule(`ct status dnat iifname "br-*" accept`)
-	if file.TunnelToken == "" {
+	if web {
 		rule("ct status dnat ct original proto-dst { 80, 443 } accept")
 	}
 	rule("ct status dnat drop")

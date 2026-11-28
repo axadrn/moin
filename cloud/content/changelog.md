@@ -29,12 +29,14 @@ November 29, 2026
 - **Domains for other services**: `moin domains add my-app api.example.com --service api` sends a domain to another service of your `compose.yml`, on its own port. `moin domains` shows which service each one reaches. (#180)
 - **A catalog app with its domain**: `moin deploy my-server --catalog umami --domain stats.example.com` starts the app with its domain, so it knows its own address. A domain added later becomes its address too. (#180)
 - **Update a catalog app**: `moin update umami` takes a copy, then starts the newest images of its version. `--version 2.15.1` picks one. `moin apps` shows the version. (#180)
+- **A server without apps**: `moin servers add my-server` sets moin up on a server with no app, for the firewall, the knocks and the reports. `moin secure my-server` there closes every port and asks for no tunnel.
 - **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
 - **Back to moin cloud**: The header of the site shows `Sign in` next to `Get started`. Signed in, it shows `moin cloud` instead, a link to your workspace.
 - **Sessions in moin cloud**: Settings lists every browser and CLI signed in to your account, with when each was last used. Sign out one, or all. `moin watcher logout` signs this laptop out. (#180)
 
 ### Changed
 - **The proxy starts again once**: The first deploy or restart on a server after the update starts its proxy again, so it can read app passwords. Its apps do not answer for a few seconds. (#180)
+- **80 and 443 wait for an app**: A server without apps starts no proxy, and moin's firewall keeps ports 80 and 443 closed. The first deploy opens them.
 
 ### Fixed
 - **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.

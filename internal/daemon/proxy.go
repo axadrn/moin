@@ -255,6 +255,20 @@ func (a *apps) ensureProxy(ctx context.Context, logf func(string, ...any)) error
 	return err
 }
 
+// serveWeb starts the proxy for a deploy and, behind moin's firewall,
+// opens ports 80 and 443: the first app of a server opens them.
+func (a *apps) serveWeb(ctx context.Context, logf func(string, ...any)) error {
+	if err := a.ensureProxy(ctx, logf); err != nil {
+		return err
+	}
+	state := filepath.Dir(a.dir)
+	if _, ok := loadServerFile(state); !ok {
+		return nil
+	}
+	s := newSecurity(state, a)
+	return setFirewall(ctx, firewallRules(s.file, s.web()))
+}
+
 // proxyFlags configures Traefik for the mode. In direct mode the HTTPS
 // entrypoint gets its certificates from Let's Encrypt. In tunnel mode
 // Cloudflare serves HTTPS and no port is open, so Let's Encrypt could never
