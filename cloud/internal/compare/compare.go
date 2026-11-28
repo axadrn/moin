@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/githubrepo"
 )
 
 // Mark is how a cell reads at a glance. The answer is judged by
@@ -76,13 +77,18 @@ type Competitor struct {
 }
 
 // Groups are the headings of the table, in order.
-var Groups = []string{"Your server", "Your data", "Every day"}
+var Groups = []string{"Security", "Your data", "Every day"}
 
 // Rows are the facts every competitor answers. A row whose answers carry no
 // mark is a fact to know, not a point: it counts for nobody.
 var Rows = []Row{
-	{"Your server", "Who can command your server", yes("Who has SSH", "Your key, over SSH. The watcher and "+brand.Name+" cloud cannot.", "")},
-	{"Your server", "Open to the internet", yes("80 and 443", "Public SSH closes after the first deploy. With a Cloudflare Tunnel, no port at all.", "")},
+	{"Security", "Who can command your server", yes("Who has SSH", "Your key, over SSH. The watcher and "+brand.Name+" cloud cannot.", "/docs/security#who-can-command-your-server")},
+	{"Security", "Open to the internet", yes("80 and 443", "Public SSH closes after the first deploy: SSH goes over Tailscale. Nothing of "+brand.Name+" listens. With a Cloudflare Tunnel, no port at all.", "/docs/security#ssh-only-over-tailscale")},
+	{"Security", "What one break-in reaches", yes("That one server", "There is no dashboard. A server holds no key to another server.", "/docs/security#if-a-server-is-hacked")},
+	{"Security", "Where app secrets live", plain("On the server, root only", "One file per app. They pass only through your SSH connection.", "/docs/security#where-your-secrets-live")},
+	{"Security", "Backups encrypted", yes("Always", "With age, on the server, before a copy leaves. For the server's key and for yours.", "/docs/backups#encryption")},
+	{"Security", "Signed releases, checked", yes("Yes", "cli.sh and "+brand.Name+" update check the signature before they install, on your laptop and on the server.", "/docs/security#updates")},
+	{"Security", "Security advisories, last two years", plain("None", "None published.", "https://github.com/"+githubrepo.Repo+"/security/advisories")},
 	{"Your data", "Database backups", yes("SQLite and Postgres", "Found by themselves. On a schedule, into your bucket.", "")},
 	{"Your data", "Restored and checked every day", yes("Yes", "The newest copy is restored into a throwaway database and read.", "")},
 	{"Your data", "A copy a hacked server can't delete", plain("A lock on your bucket, or "+brand.Name+" cloud", "Lock your own bucket, and "+brand.Name+" checks the lock. Or "+brand.Name+" cloud keeps a copy the server can add to, never delete.", "/docs/backups#lock-your-bucket")},
@@ -98,11 +104,16 @@ var Competitors = []Competitor{
 	{
 		Slug: "coolify",
 		Name: "Coolify",
-		Read: "November 27, 2026",
+		Read: "November 28, 2026",
 		Lead: "Coolify is a dashboard that logs in to your servers over SSH with a key it keeps. " + brand.Name + " has no dashboard: only who has SSH can command your server.",
 		Cells: []Cell{
 			no("Whoever runs Coolify", "It logs in over SSH with your private key, as root or a sudo user. Coolify Cloud gets that key from you.", "https://coolify.io/docs/start-with-cloud"),
-			part("SSH, or a Cloudflare Tunnel", "Port 22 open to Coolify, unless a Cloudflare Tunnel carries SSH.", "https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh"),
+			no("8000, 6001, 6002 and SSH", "Its dashboard, live updates and terminal answer on 8000, 6001 and 6002 until you close them. Port 22 for SSH, 80 and 443 for apps.", "https://coolify.io/docs/knowledge-base/server/firewall"),
+			no("Every server it manages", "Coolify stores the SSH private keys it uses to connect to your servers.", "https://coolify.io/docs/core/security/credentials/ssh-keys"),
+			plain("In its database, encrypted", "Encrypted with APP_KEY, which sits in /data/coolify/source/.env on the same server.", "https://coolify.io/docs/get-started/installation"),
+			notDocumented("https://coolify.io/docs/databases/backups"),
+			no("Not checked", "Its install script checks no checksum or signature.", "https://cdn.coollabs.io/coolify/install.sh"),
+			plain("70", "21 critical, 26 high, 15 medium, 8 low. Published January 2025 to July 2026.", "https://github.com/coollabsio/coolify/security/advisories"),
 			yes("Six engines, on a schedule", "PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse and SQLite. On the server, and in S3 if you add it.", "https://coolify.io/docs/databases/backups"),
 			no("By hand", "Its docs: a successful backup only proves that Coolify created a file. Restore one yourself to check it.", "https://coolify.io/docs/databases/backups"),
 			plain("Its key can delete", "Coolify removes old copies from S3 by your retention, and deletes a backup from every S3 storage.", "https://coolify.io/docs/databases/backups"),
@@ -116,11 +127,16 @@ var Competitors = []Competitor{
 	{
 		Slug: "dokploy",
 		Name: "Dokploy",
-		Read: "November 27, 2026",
+		Read: "November 28, 2026",
 		Lead: "Dokploy is a dashboard that connects to your servers over SSH with a key. " + brand.Name + " has no dashboard: only who has SSH can command your server.",
 		Cells: []Cell{
 			no("Whoever runs Dokploy", "It connects over SSH with a key, often as root. Dokploy Cloud does it from its own control plane.", "https://docs.dokploy.com/docs/core/cloud"),
-			no("SSH", "It has to reach the server over SSH.", "https://docs.dokploy.com/docs/core/cloud"),
+			no("3000 and SSH", "Its web interface answers on port 3000 until you turn that off. 80 and 443 for apps.", "https://docs.dokploy.com/docs/core/installation"),
+			no("Every remote server", "Dokploy keeps the SSH keys to your remote servers, encrypted in its database.", "https://docs.dokploy.com/docs/core/ssh-keys"),
+			notDocumented("https://docs.dokploy.com/docs/core/variables"),
+			notDocumented("https://docs.dokploy.com/docs/core/databases/backups"),
+			no("Not checked", "Its install script checks no checksum or signature.", "https://dokploy.com/install.sh"),
+			plain("135", "64 critical, 45 high, 24 medium, 2 low. Published July 2025 to November 2026.", "https://github.com/Dokploy/dokploy/security/advisories"),
 			yes("Four engines, on a schedule", "PostgreSQL, MySQL, MariaDB and MongoDB, to S3.", "https://docs.dokploy.com/docs/core/databases/backups"),
 			no("By hand", "Its docs say to run a backup and check the bucket for the result.", "https://docs.dokploy.com/docs/core/databases/backups"),
 			plain("Its key can delete", "Keep the latest N backups removes older ones from the bucket.", "https://docs.dokploy.com/docs/core/databases/backups"),
@@ -134,11 +150,16 @@ var Competitors = []Competitor{
 	{
 		Slug: "kamal",
 		Name: "Kamal",
-		Read: "November 27, 2026",
+		Read: "November 28, 2026",
 		Lead: "Both run over SSH with your key. Kamal builds on your laptop and deploys to many servers. " + brand.Name + " builds on the server and checks your backups every day.",
 		Cells: []Cell{
 			yes("Who has SSH", "Servers need nothing but your SSH key.", "https://kamal-deploy.org/"),
 			no("SSH", "Port 22 by default.", "https://kamal-deploy.org/docs/configuration/ssh/"),
+			yes("That one server", "There is no dashboard. The SSH key stays on your laptop.", "https://kamal-deploy.org/"),
+			plain("Your laptop, then the server", "Read from .kamal/secrets on your laptop, then kept in an env file on the server.", "https://kamal-deploy.org/docs/configuration/environment-variables/"),
+			plain("No backups", "Nothing to encrypt.", "https://kamal-deploy.org/docs/configuration/accessories/"),
+			notDocumented("https://kamal-deploy.org/docs/installation/"),
+			plain("None, 2 for its proxy", "None for Kamal. kamal-proxy has one high and one medium, from October 2026.", "https://github.com/basecamp/kamal-proxy/security/advisories"),
 			no("Not built in", "Its docs on accessories, where a database runs, do not mention backups.", "https://kamal-deploy.org/docs/configuration/accessories/"),
 			no("No backups", "Nothing to restore.", "https://kamal-deploy.org/docs/configuration/accessories/"),
 			plain("No backups", "Nothing to keep.", "https://kamal-deploy.org/docs/configuration/accessories/"),
@@ -152,11 +173,16 @@ var Competitors = []Competitor{
 	{
 		Slug: "uncloud",
 		Name: "uncloud",
-		Read: "November 27, 2026",
+		Read: "November 28, 2026",
 		Lead: "Both run over SSH, with no control plane. uncloud runs compose across machines without downtime. " + brand.Name + " is one server, and checks backups every day.",
 		Cells: []Cell{
 			yes("Who has SSH", "uc is a CLI that connects to your machines over SSH. No control plane.", "https://uncloud.run/"),
-			no("SSH", "uc connects over SSH.", "https://uncloud.run/"),
+			no("SSH and WireGuard", "uc connects over SSH. Machines talk over WireGuard on UDP port 51820.", "https://uncloud.run/docs/cli-reference/uc_machine_init"),
+			no("Every machine", "No control plane: each machine has the complete cluster state and can control everything.", "https://github.com/psviderski/uncloud"),
+			plain("Your laptop, at each deploy", "Read from your password manager or a file when you deploy, then set on the container.", "https://uncloud.run/docs/concepts/secrets"),
+			plain("No backups", "Nothing to encrypt.", "https://uncloud.run/docs/"),
+			part("A checksum", "Its install script checks a SHA-256 sum from the same release. No signature.", "https://get.uncloud.run/install.sh"),
+			plain("None", "None published.", "https://github.com/psviderski/uncloud/security/advisories"),
 			no("Not built in", "Its docs list no backups.", "https://uncloud.run/docs/"),
 			no("No backups", "Nothing to restore.", "https://uncloud.run/docs/"),
 			plain("No backups", "Nothing to keep.", "https://uncloud.run/docs/"),
@@ -170,11 +196,16 @@ var Competitors = []Competitor{
 	{
 		Slug: "dokku",
 		Name: "Dokku",
-		Read: "November 27, 2026",
+		Read: "November 28, 2026",
 		Lead: "Both run on your server, driven over SSH with your key. Dokku leaves the restore test to you. " + brand.Name + " restores and checks a copy every day.",
 		Cells: []Cell{
 			yes("Who has SSH", "You add your public key to the server. Commands and pushes log in with it.", "https://dokku.com/docs/deployment/user-management/"),
 			no("SSH", "Remote commands and git remotes use SSH. The official client uses port 22 by default.", "https://dokku.com/docs/deployment/remote-commands/"),
+			yes("That one server", "There is no dashboard. You push with your own SSH key.", "https://dokku.com/docs/deployment/user-management/"),
+			plain("On the server", "Set per app with dokku config:set.", "https://dokku.com/docs/configuration/environment-variables/"),
+			part("Once you turn it on", "The Postgres plugin encrypts backups with a passphrase or a GPG key you set.", "https://github.com/dokku/dokku-postgres"),
+			yes("Signed packages", "Installed and updated with apt, from its repository with its GPG key.", "https://dokku.com/docs/getting-started/install/debian/"),
+			plain("6", "5 critical, 1 medium. Published May to September 2026.", "https://github.com/dokku/dokku/security/advisories"),
 			yes("Postgres, on a schedule", "With the official Postgres plugin. To S3 or an S3-compatible bucket.", "https://github.com/dokku/dokku-postgres"),
 			no("By hand", "Its docs say to test your backups regularly yourself.", "https://dokku.com/docs/advanced-usage/backup-recovery/"),
 			notDocumented("https://github.com/dokku/dokku-postgres"),

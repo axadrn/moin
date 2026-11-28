@@ -32,5 +32,5 @@ func homeCompareHead() []string {
 // compare.Rows: who commands the server, what is open to the internet,
 // the daily check, and who notices a dead server.
 func homeCompareRows() []int {
-	return []int{0, 1, 3, 5}
+	return []int{0, 1, 8, 10}
 }
