@@ -3,6 +3,7 @@ package pages
 import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 )
 
 // homeWatcherRows are what the watcher table compares, in order.
@@ -21,28 +22,33 @@ var homeWatcherRows = []string{
 var homeWatcherColumns = []components.CompareColumn{
 	{
 		Name: "No watcher", Caption: "Free",
-		Cells:      []components.CompareCell{{Mark: "no"}, {Mark: "no"}, {Mark: "no"}, {Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "yes"}},
+		Cells:      []components.CompareCell{{Mark: "no"}, {Mark: "no"}, {Mark: "no"}, {Mark: "part", Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "yes"}},
 		ActionHref: "/docs/getting-started", ActionText: "Get started",
 	},
 	{
 		Name: "Self-hosted", Caption: "Free, your own machine",
-		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "no"}},
+		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "part", Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "no"}},
 		ActionHref: "/docs/watcher#set-one-up", ActionText: "Run your own",
 	},
 	{
-		Name: brand.Name + " cloud", Caption: "$7 a month", Badge: "Recommended", Featured: true,
+		Name: brand.Name + " cloud", Caption: "$7 a month or $49 a year", Badge: "Recommended", Featured: true,
 		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes", Note: "Built in"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}},
-		ActionHref: "/login", ActionText: "Start free", ActionNote: "30 days free. No card.",
+		ActionHref: "/login", ActionText: "Start free", ActionNote: homeTrial,
 	},
 }
 
-// HomeWatcher is the three ways side by side: no watcher, your own, and
-// moin cloud.
-templ HomeWatcher() {
-	<section id="watcher" class="moin-band">
-		@homeHead("Works alone. Better with a watcher.", "Your server watches itself while it lives. A watcher tells you when it doesn't.")
+// HomePricing is the three ways to run moin side by side, with their
+// prices: no watcher, your own, and moin cloud.
+templ HomePricing() {
+	<section id="pricing" class="moin-band">
+		@homeHead("Free. Or free of worries.", "Works alone. Better with a watcher.")
 		<p class="moin-center moin-muted">Every setup: deploys, backups restored every day, alerts while your server lives, email alerts through your own mail server.</p>
 		@components.Compare(components.CompareProps{Rows: homeWatcherRows, Columns: homeWatcherColumns, Reverse: true})
+		<p class="moin-text moin-muted moin-center">Your apps never leave your server. The launch price stays yours. <a href={ templ.SafeURL(homeFreeYear) } class="moin-link moin-foreground">Or get a year free.</a></p>
 		@homeMore("/docs/watcher", "How the watcher works")
 	</section>
 }
+
+// homeFreeYear is where the free year of moin cloud is explained, for
+// now the discussions of the repo.
+const homeFreeYear = layouts.GitHubURL + "/discussions"

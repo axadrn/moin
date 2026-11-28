@@ -72,12 +72,15 @@ func siteHost(site string) string {
 	return site
 }
 
-// homeKnocks is the proof after zero trust: the site's own server, every
+// homeKnocks is the proof inside zero trust: the site's own server, every
 // knock dropped. Four numbers, then the ports bots tried most today.
 templ homeKnocks(k HomeKnocks) {
 	{{ rows := knockRows(k.Knocks) }}
-	<section id="knocks" class="moin-band">
-		@homeHead(siteHost(brand.Site)+", right now.", "Every knock on a closed port. All dropped.")
+	<div id="knocks" class="moin-stack" data-gap="4">
+		<div class="moin-stack" data-gap="1">
+			<h3 class="moin-strong">{ siteHost(brand.Site) }, right now.</h3>
+			<p class="moin-text moin-muted">Every knock on a closed port. All dropped.</p>
+		</div>
 		if k.Sample {
 			<div class="moin-row" data-center>
 				@components.Chip("Sample data · development only")
@@ -105,7 +108,7 @@ templ homeKnocks(k HomeKnocks) {
 		<p class="moin-text moin-muted moin-center">
 			Every { brand.Name } server counts its knocks. See yours: <code class="moin-mono moin-foreground">{ brand.Name } knocks</code>
 		</p>
-	</section>
+	</div>
 }
 
 // knockList is the card of the ports bots tried most today: the name and

@@ -69,16 +69,3 @@ templ itemText(p ItemProps) {
 		</div>
 	}
 }
-
-// Ticks are a few short lines of what you get, each with a quiet tick in
-// front.
-templ Ticks(lines ...string) {
-	<ul class="moin-ticks moin-text">
-		for _, line := range lines {
-			<li>
-				@Icon("check")
-				{ line }
-			</li>
-		}
-	</ul>
-}

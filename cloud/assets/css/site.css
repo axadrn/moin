@@ -1107,8 +1107,6 @@
   }
   /* The foot of a card in a grid sits at its bottom, so cards side by side
      end on one line. What is in it is as wide as the card. */
-  .moin-card-end { display: flex; margin-block-start: auto; }
-  .moin-card-end > * { flex: 1; }
 }
 
 @layer moin-components {
@@ -1524,24 +1522,6 @@
     color: var(--failed-text);
   }
   .moin-mark > .moin-icon { width: 0.75rem; height: 0.75rem; }
-
-  /* Ticks: short lines of what you get, a quiet tick in front of each. */
-  .moin-ticks {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  .moin-ticks > li {
-    display: flex;
-    align-items: start;
-    gap: var(--space-3);
-  }
-  .moin-ticks .moin-icon {
-    width: 1rem;
-    height: 1rem;
-    margin-block-start: 0.125rem;
-    color: var(--muted-foreground);
-  }
 }
 
 @layer moin-components {
@@ -2387,7 +2367,8 @@
      surface from head to foot. */
   .moin-compare {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) repeat(var(--cols), minmax(0, 1fr));
+    grid-template-columns: minmax(14rem, 1.5fr) repeat(var(--cols), minmax(0, 1fr));
+    column-gap: var(--space-2);
     padding: var(--pad) var(--pad);
     border-radius: var(--radius-lg);
     background: var(--card);
@@ -2423,22 +2404,30 @@
   .moin-compare-cell { min-height: 4.5rem; border-top: 1px solid var(--border); }
   .moin-compare-labels .moin-compare-cell { align-items: flex-start; font-weight: 500; text-align: start; padding-inline-start: 0; }
   .moin-compare-head { gap: 2px; padding-block: var(--space-5) var(--space-4); }
-  .moin-compare-name { font-size: 1rem; line-height: 1.5rem; font-weight: 500; }
-  .moin-compare-foot { justify-content: flex-start; padding-block: var(--space-5) var(--space-2); border-top: 1px solid var(--border); }
+  .moin-compare-name { font-size: 1.125rem; line-height: 1.5rem; font-weight: 500; }
+  .moin-compare-head .moin-small { font-size: 0.875rem; line-height: 1.25rem; color: var(--foreground); }
+  .moin-compare-foot { justify-content: flex-start; padding-block: var(--space-5) var(--space-2); }
   .moin-compare-foot .moin-button { width: 100%; }
   .moin-compare-text { display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .moin-compare-what { display: none; }
-  .moin-compare-cell > .moin-mark:empty { display: none; }
+  .moin-compare-text:not(:has(.moin-small)) { display: none; }
+  /* Only a plain yes has a color: the other answers are quiet. */
+  .moin-compare .moin-mark:not([data-kind="yes"]) {
+    border-color: var(--border);
+    color: var(--muted-foreground);
+  }
   /* The featured column: raised past the top and bottom of the card, one
      surface with a quiet ink edge and a soft shadow. */
   .moin-compare-col[data-featured] {
     position: relative;
-    margin-block: calc(-1 * var(--space-4));
-    padding-block: var(--space-4);
+    margin-block: calc(-1 * (var(--pad) + var(--space-3)));
+    padding-block: calc(var(--pad) + var(--space-3));
     border-radius: var(--radius-lg);
-    background: var(--card);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 16%, transparent), 0 12px 32px -8px rgb(0 0 0 / 18%);
+    background: color-mix(in oklab, var(--foreground) 4%, var(--card));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 24%, transparent), 0 8px 24px -12px rgb(0 0 0 / 30%);
   }
+  .moin-compare-col[data-featured] .moin-compare-name { font-weight: 600; }
+  .moin-compare-col[data-featured] .moin-compare-cell { border-top-color: color-mix(in oklab, var(--border) 50%, transparent); }
   .moin-compare-col[data-featured] .moin-compare-cell:nth-child(2) { border-top-color: transparent; }
   .moin-compare-badge {
     position: absolute;
@@ -2469,6 +2458,9 @@
       background: var(--card);
     }
     .moin-compare:not([data-reverse]) > .moin-compare-col[data-featured] { order: -1; }
+    .moin-compare[data-cols="5"] > .moin-compare-col,
+    .moin-compare[data-cols="6"] > .moin-compare-col,
+    .moin-compare[data-cols="7"] > .moin-compare-col { padding-block: var(--space-4); }
     .moin-compare-col[data-featured] { margin-block: var(--space-3) 0; padding-block: var(--pad); }
     .moin-compare-head { align-items: flex-start; padding: 0 0 var(--space-3); text-align: start; }
     .moin-compare-cell {
@@ -2481,8 +2473,8 @@
       border-top: 0;
       text-align: start;
     }
-    .moin-compare-cell > .moin-mark:empty { display: inline-flex; visibility: hidden; }
     .moin-compare-text { align-items: flex-start; }
+    .moin-compare-text:not(:has(.moin-small)) { display: flex; }
     .moin-compare-what { display: inline; }
     .moin-compare-foot { padding: var(--space-4) 0 0; border-top: 0; }
   }

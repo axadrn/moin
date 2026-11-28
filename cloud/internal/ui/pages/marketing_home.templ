@@ -10,10 +10,11 @@ import (
 )
 
 // Home is the landing page, top to bottom: the promise and a real
-// deploy; real posts that say the problem; zero trust, how nobody gets
-// in; the knocks the site's own server dropped, as proof; how nothing
-// gets lost; the others; the two prices; the numbers we have; the
-// latest posts of the blog; the way in. Every part shows a real thing
+// deploy; how nothing gets lost; real posts that say the problem; zero
+// trust, how nobody gets in, with the knocks the site's own server
+// dropped as proof; the others; the numbers we have; the three ways to
+// run moin, with their prices; the latest posts of the blog; the story;
+// the way in. Every part shows a real thing
 // moin prints, sends or counts. posts are the posts from X, knocks the
 // site's own server's (nil: none), numbers what moin counted, blog the
 // newest posts of the blog.
@@ -26,21 +27,19 @@ templ Home(posts []tweets.Tweet, knocks *HomeKnocks, numbers *HomeNumbers, blog 
 		@templ.Raw(homeJSONLD(ctxkeys.RenderConfig(ctx).AppURL))
 		<main>
 			@HomeHero()
+			<div class="moin-page">
+				@HomeLoseNothing()
+			</div>
 			if len(posts) > 0 {
 				@HomeVoices(posts)
 			}
 			<div class="moin-page">
-				@HomeNobodyGetsIn()
-				if knocks != nil {
-					@homeKnocks(*knocks)
-				}
-				@HomeLoseNothing()
+				@HomeNobodyGetsIn(knocks)
 				@HomeCompare()
-				@HomeWatcher()
-				@HomePricing()
 				if numbers != nil {
 					@homeNumbers(*numbers)
 				}
+				@HomePricing()
 				if len(blog) > 0 {
 					@homeBlog(blog)
 				}
@@ -58,7 +57,17 @@ templ homePrimary() {
 	}
 }
 
-// homeStar is the quiet button next to it, to the source.
+// homeTrial is the line under every button that starts moin cloud.
+const homeTrial = "30 days free. No card."
+
+// homeStart is the button that starts moin cloud.
+templ homeStart() {
+	@components.Button(components.ButtonProps{Href: "/login"}) {
+		Start free
+	}
+}
+
+// homeStar is the quiet button to the source.
 templ homeStar() {
 	@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
 		<i class="moin-icon moin-icon-git-hub"></i>
@@ -178,8 +187,9 @@ templ homeAlert(title, text, at string) {
 
 // ---------------------------------------------------------------- nobody gets in
 // HomeNobodyGetsIn is the shape of moin: commands go in over SSH, reports
-// go out, and nothing comes back the other way.
-templ HomeNobodyGetsIn() {
+// go out, and nothing comes back the other way. The knocks of the site's
+// own server (nil: none) are its proof.
+templ HomeNobodyGetsIn(knocks *HomeKnocks) {
 	<section id="security" class="moin-band">
 		@homeHead("Zero trust deploys.", "No dashboard holds a key to your server. Not even ours.")
 		@components.Card(components.CardProps{}) {
@@ -193,6 +203,9 @@ templ HomeNobodyGetsIn() {
 			@components.Fact(components.FactProps{Name: "A hacked watcher is harmless.", Note: "It can read. It can't command."})
 		</div>
 		@components.Fact(components.FactProps{Name: "0 bytes", Note: "Sent to us by the free software. Read the source.", Href: layouts.GitHubURL})
+		if knocks != nil {
+			@homeKnocks(*knocks)
+		}
 		@homeMore("/docs/security", "Security in detail")
 	</section>
 }
@@ -277,63 +290,6 @@ templ homeRoadsTall() {
 	</svg>
 }
 
-// HomePricing puts the free moin next to moin cloud, in two cards of the
-// same shape: a name, a price, one line, five rows, a button.
-templ HomePricing() {
-	<section id="pricing" class="moin-band">
-		@homeHead("Free. Or free of worries.", "Open source, all of it. Or let us watch.")
-		<div class="moin-grid" data-cols="2">
-			@homePlan(homePlanProps{
-				Name: brand.Name, Price: "$0", Per: "forever", Line: "Open source. All of it.",
-				Rows: []string{"Deploy, rollback, logs", "Backups to your own bucket", "A restore check every day", "Alerts while your server lives", "Your own watcher"},
-			}) {
-				@homePrimary()
-			}
-			@homePlan(homePlanProps{
-				Name: brand.Name + " cloud", Chip: "Launch price", Price: "$7", Per: "a month, or $49 a year", Line: "A watcher and a copy.",
-				Rows: []string{"Everything in " + brand.Name, "We watch your servers", "A copy nobody can delete", "Encrypted. We can't read it", "No bucket to set up"},
-			}) {
-				@components.Button(components.ButtonProps{Href: "/login"}) {
-					Start free trial
-				}
-			}
-		</div>
-		<p class="moin-text moin-muted moin-center">Your apps never leave your server. The launch price stays yours. <a href={ templ.SafeURL(homeFreeYear) } class="moin-link moin-foreground">Or get a year free.</a></p>
-	</section>
-}
-
-// homeFreeYear is where the free year of moin cloud is explained, for
-// now the discussions of the repo.
-const homeFreeYear = layouts.GitHubURL + "/discussions"
-
-// homePlanProps are one plan: its name, maybe a chip, the price and what
-// it is per, one line, and its rows.
-type homePlanProps struct {
-	Name, Chip, Price, Per, Line string
-	Rows                         []string
-}
-
-// homePlan is one plan in a card. Its button, the children, sits at the
-// bottom, so both cards end on the same line.
-templ homePlan(p homePlanProps) {
-	@components.Card(components.CardProps{}) {
-		<div class="moin-stack" data-gap="2">
-			<span class="moin-row" data-gap="2">
-				<span class="moin-strong">{ p.Name }</span>
-				if p.Chip != "" {
-					@components.Chip(p.Chip)
-				}
-			</span>
-			<span class="moin-row" data-gap="2" data-baseline><span class="moin-title moin-digits">{ p.Price }</span><span class="moin-small moin-muted">{ p.Per }</span></span>
-			<span class="moin-text moin-muted">{ p.Line }</span>
-		</div>
-		@components.Ticks(p.Rows...)
-		<div class="moin-card-end">
-			{ children... }
-		</div>
-	}
-}
-
 // homeBlog is the newest posts of the blog, as the list /blog shows.
 templ homeBlog(posts []service.BlogPost) {
 	<section id="blog" class="moin-band">
@@ -373,7 +329,7 @@ templ HomeStory() {
 }
 
 // HomeEnd is the end of the page, the way in: the promise, the line that
-// installs the CLI and the two buttons of the first screen.
+// installs the CLI, the main button and the start of moin cloud.
 templ HomeEnd() {
 	<section id="start" class="moin-band">
 		<div class="moin-stack moin-band-head">
@@ -387,8 +343,9 @@ templ HomeEnd() {
 			@components.Command(components.CommandProps{Text: homeInstall(brand.Site)})
 			<div class="moin-row" data-gap="2" data-center data-wrap>
 				@homePrimary()
-				@homeStar()
+				@homeStart()
 			</div>
+			<p class="moin-small moin-muted moin-center">{ homeTrial }</p>
 		</div>
 	</section>
 }

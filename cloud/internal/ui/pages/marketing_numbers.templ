@@ -32,7 +32,6 @@ func numberRows(t counts.Totals) []numberRow {
 	var rows []numberRow
 	for _, row := range []numberRow{
 		{"Deploys", t.Deploys},
-		{"Knocks dropped", t.Knocks},
 	} {
 		if row.Period.Total > 0 {
 			rows = append(rows, row)
@@ -91,5 +90,8 @@ templ homeNumbers(n HomeNumbers) {
 				}
 			}
 		}
+		<div class="moin-row" data-center>
+			@homeStar()
+		</div>
 	</section>
 }
