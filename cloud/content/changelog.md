@@ -30,9 +30,8 @@ November 29, 2026
 - **A catalog app with its domain**: `moin deploy my-server --catalog umami --domain stats.example.com` starts the app with its domain, so it knows its own address. A domain added later becomes its address too. (#180)
 - **Update a catalog app**: `moin update umami` takes a copy, then starts the newest images of its version. `--version 2.15.1` picks one. `moin apps` shows the version. (#180)
 - **A server without apps**: `moin servers add my-server` sets moin up on a server with no app, for the firewall, the knocks and the reports. `moin secure my-server` there closes every port and asks for no tunnel.
-- **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
-- **Back to moin cloud**: The header of the site shows `Sign in` next to `Get started`. Signed in, it shows `moin cloud` instead, a link to your workspace.
 - **Sessions in moin cloud**: Settings lists every browser and CLI signed in to your account, with when each was last used. Sign out one, or all. `moin watcher logout` signs this laptop out. (#180)
+- **Kill your subscriptions**: [A new page](/kill-your-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
 
 ### Changed
 - **The proxy starts again once**: The first deploy or restart on a server after the update starts its proxy again, so it can read app passwords. Its apps do not answer for a few seconds. (#180)
@@ -44,15 +43,16 @@ November 29, 2026
 - **Logs fill no disk**: Each service keeps three log files of 10 MB at most, from its next deploy or restart. (#180)
 - **http to https behind a Cloudflare Tunnel**: A visitor on `http://` goes to `https://`, with the path and the query. (#180)
 - **No false alarms behind a tunnel**: A server behind a Cloudflare Tunnel no longer reports the instant addresses of its apps, which nobody can reach there. So the watcher stops mailing that they are down.
+- **Back to moin cloud**: The header of the site shows `Sign in` next to `Get started`. Signed in, it shows `moin cloud` instead, a link to your workspace.
+- **No bucket warning with moin cloud**: A server whose copies go to moin cloud no longer says "no bucket yet", and never asks for one. (#180)
+- **No maintenance databases**: Postgres's own `postgres`, `template0` and `template1` are not backed up as a second database of the app. (#180)
+- **Connect adds the server**: `moin watcher connect my-server` on a laptop that never deployed there adds the server, so `moin watcher` shows it. (#180)
 
 ### Upgrade
 `moin update my-server`, then `moin restart my-app` for an app with both domains.
 
 ## v1.0.0-beta.38
 
-- **No bucket warning with moin cloud**: A server whose copies go to moin cloud no longer says "no bucket yet", and never asks for one. (#180)
-- **No maintenance databases**: Postgres's own `postgres`, `template0` and `template1` are not backed up as a second database of the app. (#180)
-- **Connect adds the server**: `moin watcher connect my-server` on a laptop that never deployed there adds the server, so `moin watcher` shows it. (#180)
 November 28, 2026
 
 **In short:** moin runs without a hub now: you deploy over your own SSH, public SSH closes after the first deploy, and every backup is encrypted, checked every day and kept where a hacked server can't delete it.
