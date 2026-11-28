@@ -25,21 +25,32 @@ import (
 // that fails alerts. CI needs no key to the server: whoever can push to
 // the branch deploys.
 //
+// `moin follow --image` follows a tag in a registry instead, like
+// ghcr.io/ada/shop:main. The daemon pulls it every minute, which asks the
+// registry one question while nothing changed. A new image under the tag
+// runs with the compose file of the release that runs. Whoever can push
+// to the tag deploys.
+//
 // Each app that follows has a folder <state dir>/follow/<app>:
 //
-//	follow.json   the repo, the branch and the newest commit tried
-//	key, key.pub  the deploy key
+//	follow.json   the repo and the branch, or the image, and the newest
+//	              commit or image tried
+//	key, key.pub  the deploy key of a branch
 //	known_hosts   the repo's host key, kept on first contact
 
 const followEvery = time.Minute
 
-// Follow is an app that deploys a branch.
+// Follow is an app that deploys a branch of a repo, or an image.
 type Follow struct {
 	App    string `json:"app"`
-	Repo   string `json:"repo"`
-	Branch string `json:"branch"`
+	Repo   string `json:"repo,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	// Image is the image the app follows, like ghcr.io/ada/shop:main.
+	Image string `json:"image,omitempty"`
 	// Commit is the newest commit moin tried, deployed or failed.
 	Commit string `json:"commit,omitempty"`
+	// ImageID is the newest image moin tried, as Docker's ID of it.
+	ImageID string `json:"image_id,omitempty"`
 	// Problem is the title of what went wrong last, alerted once. Empty
 	// while all is well.
 	Problem string `json:"problem,omitempty"`
@@ -47,6 +58,20 @@ type Follow struct {
 	// kept in key.pub.
 	PublicKey string `json:"public_key,omitempty"`
 }
+
+// from is what the app follows: its branch, or its image.
+func (f Follow) from() string { return cmp.Or(f.Image, f.Branch) }
+
+// what is from with its kind, like "the branch main".
+func (f Follow) what() string {
+	if f.Image != "" {
+		return "the image " + f.Image
+	}
+	return "the branch " + f.Branch
+}
+
+// tried is the newest commit or image moin tried.
+func (f Follow) tried() string { return cmp.Or(f.ImageID, f.Commit) }
 
 func followDir(dir, app string) string { return filepath.Join(dir, "follow", app) }
 
@@ -77,7 +102,7 @@ func FollowHere(dir, app, repo, branch string) (Follow, error) {
 		return Follow{}, fmt.Errorf("%q is not a branch name", branch)
 	}
 	f, err := loadFollow(dir, app)
-	if err != nil || f.Repo != repo || f.Branch != branch {
+	if err != nil || f.Image != "" || f.Repo != repo || f.Branch != branch {
 		f = Follow{App: app, Repo: repo, Branch: branch}
 	}
 	key := filepath.Join(followDir(dir, app), "key")
@@ -102,12 +127,31 @@ func FollowHere(dir, app, repo, branch string) (Follow, error) {
 	return f, err
 }
 
+// FollowImageHere makes app follow image. The deploy key of a branch it
+// followed goes.
+func FollowImageHere(dir, app, image string) (Follow, error) {
+	if err := newApps(dir).mustHave(app); err != nil {
+		return Follow{}, err
+	}
+	if !validImage(image) {
+		return Follow{}, fmt.Errorf("%q is not an image", image)
+	}
+	f, err := loadFollow(dir, app)
+	if err != nil || f.Image != image {
+		if err := os.RemoveAll(followDir(dir, app)); err != nil {
+			return Follow{}, err
+		}
+		f = Follow{App: app, Image: image}
+	}
+	return f, saveFollow(dir, f)
+}
+
 // CheckFollowHere reads the branch once, with the deploy key, and says
-// its newest commit.
+// its newest commit. For an image it pulls it and says its ID.
 func CheckFollowHere(ctx context.Context, dir, app string) (string, error) {
 	f, err := loadFollow(dir, app)
 	if err != nil {
-		return "", fmt.Errorf("%s follows no branch", app)
+		return "", fmt.Errorf("%s follows nothing", app)
 	}
 	return newFollower(newApps(dir), dir).head(ctx, f)
 }
@@ -116,7 +160,7 @@ func CheckFollowHere(ctx context.Context, dir, app string) (string, error) {
 func UnfollowHere(dir, app string) (Follow, error) {
 	f, err := loadFollow(dir, app)
 	if err != nil {
-		return Follow{}, fmt.Errorf("%s follows no branch", app)
+		return Follow{}, fmt.Errorf("%s follows nothing", app)
 	}
 	return f, os.RemoveAll(followDir(dir, app))
 }
@@ -126,8 +170,9 @@ func validBranch(name string) bool {
 	return name != "" && !strings.HasPrefix(name, "-") && !strings.ContainsAny(name, " \t\n~^:?*[\\") && !strings.Contains(name, "..")
 }
 
-// follower looks at the branches. head and deploy do the git and the
-// deploy, alert says what went wrong; tests give their own.
+// follower looks at the branches and the images. head says the newest
+// commit or image, deploy deploys it and says which one it took, alert
+// says what went wrong; tests give their own.
 type follower struct {
 	dir    string
 	head   func(ctx context.Context, f Follow) (string, error)
@@ -138,6 +183,9 @@ type follower struct {
 func newFollower(a *apps, dir string) *follower {
 	fw := &follower{dir: dir}
 	fw.head = func(ctx context.Context, f Follow) (string, error) {
+		if f.Image != "" {
+			return pullImage(ctx, f.Image)
+		}
 		out, err := fw.git(ctx, f, "ls-remote", "--", f.Repo, "refs/heads/"+f.Branch)
 		if err != nil {
 			return "", err
@@ -149,6 +197,9 @@ func newFollower(a *apps, dir string) *follower {
 		return commit, nil
 	}
 	fw.deploy = func(ctx context.Context, f Follow) (string, error) {
+		if f.Image != "" {
+			return fw.deployImage(ctx, a, f)
+		}
 		return fw.deployBranch(ctx, a, f)
 	}
 	fw.alert = func(ctx context.Context, message alert.Message) {
@@ -161,7 +212,7 @@ func newFollower(a *apps, dir string) *follower {
 	return fw
 }
 
-// loop looks at every branch now and every followEvery, until ctx ends.
+// loop looks at every branch and image now and every followEvery, until ctx ends.
 func (fw *follower) loop(ctx context.Context) {
 	ticker := time.NewTicker(followEvery)
 	defer ticker.Stop()
@@ -175,7 +226,7 @@ func (fw *follower) loop(ctx context.Context) {
 	}
 }
 
-// round looks at each app that follows a branch, one after the other.
+// round looks at each app that follows, one after the other.
 func (fw *follower) round(ctx context.Context) {
 	entries, _ := os.ReadDir(filepath.Join(fw.dir, "follow"))
 	for _, entry := range entries {
@@ -190,7 +241,7 @@ func (fw *follower) round(ctx context.Context) {
 		// Kept only when nobody changed the follow meanwhile, or
 		// stopped it.
 		now, err := loadFollow(fw.dir, f.App)
-		if err != nil || now.Repo != f.Repo || now.Branch != f.Branch {
+		if err != nil || now.Repo != f.Repo || now.Branch != f.Branch || now.Image != f.Image {
 			continue
 		}
 		if err := saveFollow(fw.dir, next); err != nil {
@@ -199,9 +250,10 @@ func (fw *follower) round(ctx context.Context) {
 	}
 }
 
-// look reads the branch once and deploys a commit it did not try yet.
+// look reads the branch or pulls the image once, and deploys a commit or
+// an image it did not try yet.
 func (fw *follower) look(ctx context.Context, f Follow) Follow {
-	cannotRead := fmt.Sprintf("%s: %s cannot read the branch %s", f.App, build.Name, f.Branch)
+	cannotRead := fmt.Sprintf("%s: %s cannot read %s", f.App, build.Name, f.what())
 	head, err := fw.head(ctx, f)
 	if err != nil {
 		return fw.problem(ctx, f, cannotRead, err)
@@ -209,19 +261,23 @@ func (fw *follower) look(ctx context.Context, f Follow) Follow {
 	if f.Problem == cannotRead {
 		f = fw.over(ctx, f)
 	}
-	if head == f.Commit {
+	if head == f.tried() {
 		return f
 	}
-	commit, err := fw.deploy(ctx, f)
+	tried, err := fw.deploy(ctx, f)
 	// A deploy that got no commit did not start, like a clone in a
 	// network blip: the next look tries again.
-	if commit != "" {
-		f.Commit = commit
+	switch {
+	case tried == "":
+	case f.Image != "":
+		f.ImageID = tried
+	default:
+		f.Commit = tried
 	}
 	if err != nil {
-		return fw.problem(ctx, f, fmt.Sprintf("%s: the deploy of %s from %s failed", f.App, short(cmp.Or(commit, head)), f.Branch), err)
+		return fw.problem(ctx, f, fmt.Sprintf("%s: the deploy of %s from %s failed", f.App, short(cmp.Or(tried, head)), f.from()), err)
 	}
-	slog.Info("follow: deployed", "app", f.App, "branch", f.Branch, "commit", short(f.Commit))
+	slog.Info("follow: deployed", "app", f.App, "from", f.from(), "tried", short(tried))
 	if f.Problem != "" {
 		f = fw.over(ctx, f)
 	}
@@ -274,6 +330,24 @@ func (fw *follower) deployBranch(ctx context.Context, a *apps, f Follow) (string
 	return commit, nil
 }
 
+// deployImage deploys the image head just pulled: the release that runs,
+// with this image as its main service. It returns the image's ID.
+func (fw *follower) deployImage(ctx context.Context, a *apps, f Follow) (string, error) {
+	id, err := imageID(ctx, f.Image)
+	if err != nil {
+		return "", err
+	}
+	start := a.newStart(f.App)
+	if start.Image, err = a.pinImage(ctx, f.App, f.Image); err != nil {
+		return "", err
+	}
+	var log bytes.Buffer
+	if _, err := a.deployHere(ctx, start, &log); err != nil {
+		return id, fmt.Errorf("%w. See the releases with `%s rollback %s`", err, build.Name, f.App)
+	}
+	return id, nil
+}
+
 // git runs git with the app's deploy key and nothing to ask, and returns
 // what it printed.
 func (fw *follower) git(ctx context.Context, f Follow, args ...string) (string, error) {
@@ -306,5 +380,11 @@ func shellQuote(word string) string {
 	return "'" + strings.ReplaceAll(word, "'", `'\''`) + "'"
 }
 
-// short is the first 7 characters of a commit.
-func short(commit string) string { return commit[:min(len(commit), 7)] }
+// short is the first 7 characters of a commit, or the first 12 of an
+// image's ID.
+func short(tried string) string {
+	if strings.HasPrefix(tried, "sha256:") {
+		return shortID(tried)
+	}
+	return tried[:min(len(tried), 7)]
+}
