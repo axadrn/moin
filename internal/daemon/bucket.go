@@ -3,7 +3,9 @@ package daemon
 import (
 	"context"
 	"errors"
+	"net/http"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"github.com/axadrn/moin/internal/build"
 )
@@ -36,9 +39,9 @@ const lockCheckText = build.Name + " writes this file to check whether the bucke
 // checkBucket writes a small object into the server's folder, which needs
 // the same rights as a backup, and tries to delete it again. locked says
 // the bucket refused: a lock keeps the copies, also from a hacked server
-// with the same keys. Every check writes the same key, so a locked bucket
-// keeps one such object, not one per check. A bucket that refuses to
-// overwrite the one from an earlier check is locked as well.
+// with the same keys. Every check writes the same key, so a bucket that
+// deletes keeps no such object. A bucket that refuses to overwrite the one
+// from an earlier check gets one more per check, with the time in its name.
 func checkBucket(ctx context.Context, config Config) (locked bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -47,15 +50,36 @@ func checkBucket(ctx context.Context, config Config) (locked bool, err error) {
 	name := aws.String(bucket.Bucket)
 	key := aws.String(strings.TrimLeft(path.Join(bucket.Path, config.Name, build.Name+"-lock-check"), "/"))
 	put, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: name, Key: key, Body: strings.NewReader(lockCheckText)})
-	if err != nil {
-		if _, there := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: name, Key: key}); there == nil {
-			return true, nil
+	if refused(err) {
+		if _, there := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: name, Key: key}); there != nil {
+			return false, err
 		}
+		// An earlier check left the object, and the bucket keeps it. That
+		// is a lock only when these keys can write at all: a read-only key
+		// is refused too. So write one under a new name.
+		fresh := aws.String(*key + "-" + time.Now().UTC().Format("20060102-150405"))
+		if _, again := client.PutObject(ctx, &s3.PutObjectInput{Bucket: name, Key: fresh, Body: strings.NewReader(lockCheckText)}); again != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if err != nil {
 		return false, err
 	}
 	// In a bucket with versions, as under S3 Object Lock, a delete without
 	// the version only hides the object. Deleting its version deletes it.
 	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: name, Key: key, VersionId: put.VersionId})
-	var refused smithy.APIError
-	return errors.As(err, &refused), nil
+	var answer smithy.APIError
+	return errors.As(err, &answer), nil
+}
+
+// refused says the bucket said no: the keys lack the right, or a lock
+// keeps the object. A bucket that is busy or broken said no such thing.
+func refused(err error) bool {
+	var answer smithy.APIError
+	if errors.As(err, &answer) && slices.Contains([]string{"AccessDenied", "InvalidRequest"}, answer.ErrorCode()) {
+		return true
+	}
+	var response *smithyhttp.ResponseError
+	return errors.As(err, &response) && (response.HTTPStatusCode() == http.StatusForbidden || response.HTTPStatusCode() == http.StatusConflict)
 }
