@@ -47,7 +47,7 @@ func compareLinks() []components.FooterLink {
 templ Footer() {
 	@components.Footer(components.FooterProps{Columns: footerColumns, End: footerEnd()}) {
 		<a href="/" aria-label={ brand.Name + " home" }>
-			@components.Wordmark(components.WordmarkProps{})
+			@components.Wordmark(components.WordmarkProps{Mark: true})
 		</a>
 		<p>
 			Deploy anything.

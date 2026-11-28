@@ -29,6 +29,7 @@ func TestVersionedAssets(t *testing.T) {
 		css,
 		components.AssetURL("/assets/js/site.js"),
 		components.AssetURL("/assets/img/og.png"),
+		components.AssetURL("/assets/manifest.json"),
 		components.AssetURL("/assets/icons/check.svg"),
 		components.AssetURL("/assets/fonts/geist/geist-variable.woff2"),
 	} {

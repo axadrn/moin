@@ -27,8 +27,9 @@ templ Base(props ...SEOProps) {
 				<title>{ brand.Name }</title>
 			}
 			<link rel="icon" href="/favicon.ico" sizes="32x32"/>
-			<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"/>
-			<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png"/>
+			<link rel="icon" href={ components.AssetURL("/assets/img/favicon.svg") } type="image/svg+xml"/>
+			<link rel="apple-touch-icon" href={ components.AssetURL("/assets/img/apple-touch-icon.png") }/>
+			<link rel="manifest" href={ components.AssetURL("/assets/manifest.json") }/>
 			// The text font loads with the stylesheet, not after it, so the
 			// first paint is already in Geist.
 			<link rel="preload" href={ components.AssetURL("/assets/fonts/geist/geist-variable.woff2") } as="font" type="font/woff2" crossorigin/>

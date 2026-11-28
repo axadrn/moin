@@ -4,5 +4,5 @@ package assets
 
 import "embed"
 
-//go:embed css js fonts icons img
+//go:embed css js fonts icons img manifest.json
 var Files embed.FS

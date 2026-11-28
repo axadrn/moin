@@ -35,7 +35,7 @@ func navLinks(path string) []components.BarLink {
 templ Navbar() {
 	@components.Bar() {
 		<a href="/" class="moin-row" data-gap="2" aria-label={ brand.Name + " home" }>
-			@components.Wordmark(components.WordmarkProps{})
+			@components.Wordmark(components.WordmarkProps{Mark: true})
 			@components.Badge(components.BadgeProps{Class: "moin-hidden-phone"}) {
 				Beta
 			}

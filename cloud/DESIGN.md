@@ -65,10 +65,15 @@ phrases ("supercharge", "unleash", "seamless", "effortless",
 Classes: `moin-display` (Geist 800, tight), `moin-live`, `moin-running`,
 `moin-failed`. Numbers `moin-digits`.
 
-**Logo.** The wordmark `moin.`, drawn as a shape: lowercase, with a round full
-stop, round like the dot on the i. `components.Wordmark` on the page;
-`assets/img/logo.svg`, the favicon (`m.` white on a black tile) and the OG
-image are the same shapes. The story behind the name is Why moin in the FAQ.
+**Logo.** The mark and the wordmark. The mark is Sunrise: a disc with the
+sun cut out, half up over the waterline (`assets/img/mark.svg`, on a 24
+grid). The wordmark is `moin.`, drawn as a shape: lowercase, with a round
+full stop, round like the dot on the i (`assets/img/logo.svg`). Together
+they are `components.Wordmark` with `Mark`: the mark as high as the i with
+its dot, one o-counter before the m. The favicon is the mark drawn again by
+hand for 16 and 32 pixels, in ink on nothing. The app icons and the avatar
+are the mark in white on the ink. The OG image uses the same shapes. The
+story behind the name is Why moin in the FAQ.
 
 ## Geometry
 
