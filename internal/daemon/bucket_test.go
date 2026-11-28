@@ -16,6 +16,8 @@ import (
 // refuses a locked object.
 type lockBucket struct {
 	locked   bool // refuses to overwrite or delete an object it has
+	versions bool // keeps every version and refuses to delete one
+	noDelete bool // the keys can't delete
 	readOnly bool // the keys can't write
 	objects  map[string]bool
 }
@@ -32,12 +34,15 @@ func (l *lockBucket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		l.objects[r.URL.Path] = true
+		if l.versions {
+			w.Header().Set("x-amz-version-id", "v1")
+		}
 	case http.MethodHead:
 		if !has {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	case http.MethodDelete:
-		if l.locked && has {
+		if l.locked && has || l.versions || l.noDelete {
 			refuse(w)
 			return
 		}
@@ -54,9 +59,10 @@ func refuse(w http.ResponseWriter) {
 // earlierCheck is the object an earlier check left in the bucket.
 var earlierCheck = map[string]bool{"/b/prod/" + build.Name + "-lock-check": true}
 
-// The check says locked when the bucket refuses to delete the fresh
-// object, or to overwrite the one an earlier check left. Keys that can't
-// write at all fail, also when an earlier check left its object.
+// The check says locked when the bucket keeps the fresh object: it
+// refuses to delete its version, or to delete and overwrite it. Keys that
+// only can't delete are no lock: they can write over a copy. Keys that
+// can't write at all fail, also when an earlier check left its object.
 func TestCheckBucket(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -65,7 +71,9 @@ func TestCheckBucket(t *testing.T) {
 		fails  bool
 	}{
 		{"deletes", lockBucket{}, false, false},
-		{"refuses the delete", lockBucket{locked: true}, true, false},
+		{"refuses the delete and the overwrite", lockBucket{locked: true}, true, false},
+		{"keeps versions", lockBucket{versions: true}, true, false},
+		{"keys that can't delete", lockBucket{noDelete: true}, false, false},
 		{"refuses to overwrite an earlier check", lockBucket{locked: true, objects: earlierCheck}, true, false},
 		{"read-only keys and an earlier check", lockBucket{readOnly: true, objects: earlierCheck}, false, true},
 		{"refuses every write", lockBucket{readOnly: true}, false, true},

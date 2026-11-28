@@ -69,8 +69,21 @@ func checkBucket(ctx context.Context, config Config) (locked bool, err error) {
 	// In a bucket with versions, as under S3 Object Lock, a delete without
 	// the version only hides the object. Deleting its version deletes it.
 	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: name, Key: key, VersionId: put.VersionId})
-	var answer smithy.APIError
-	return errors.As(err, &answer), nil
+	if !refused(err) {
+		return false, err
+	}
+	// A bucket with versions keeps this one, whatever is written over it.
+	// The version "null" is no such version: the next write replaces it.
+	if version := aws.ToString(put.VersionId); version != "" && version != "null" {
+		return true, nil
+	}
+	// Without versions, keys that can't delete can still wipe a copy by
+	// writing over it. Only a bucket that refuses that too is locked.
+	_, err = client.PutObject(ctx, &s3.PutObjectInput{Bucket: name, Key: key, Body: strings.NewReader(lockCheckText)})
+	if !refused(err) {
+		return false, err
+	}
+	return true, nil
 }
 
 // refused says the bucket said no: the keys lack the right, or a lock

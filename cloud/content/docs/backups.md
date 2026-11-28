@@ -68,6 +68,7 @@ Turn the lock on at your provider, below. Then run `moin bucket prod`. It checks
 
 - The check leaves a small file in the bucket: `<path>/<server>/moin-lock-check`. Each check writes the same one. A bucket that refuses to overwrite it gets one more per check, with the time in its name. Each goes away when its lock ends.
 - A lock means what it says. Nobody can delete a file before its days are up, also the provider's support. That is the point.
+- Keys that may write but not delete are no lock. They can still write over a copy. So moin says Not locked.
 
 ### Cloudflare R2
 
