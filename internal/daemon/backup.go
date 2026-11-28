@@ -46,7 +46,7 @@ import (
 //
 // backup_sqlite.go copies with VACUUM INTO, backup_postgres.go with
 // pg_dump, backup_mysql.go with mysqldump or mariadb-dump,
-// backup_mongo.go with mongodump.
+// backup_mongo.go with mongodump, backup_clickhouse.go with BACKUP.
 type engine interface {
 	// Copy writes a full copy of the live database to w.
 	Copy(ctx context.Context, w io.Writer) error
@@ -194,6 +194,8 @@ func (b *backups) engine(app string, database protocol.Database) engine {
 		return &mysqlEngine{b: b, app: app, database: database}
 	case protocol.DatabaseMongo:
 		return newMongoEngine(b, app, database)
+	case protocol.DatabaseClickHouse:
+		return newClickhouseEngine(b, app, database)
 	}
 	return &sqliteEngine{b: b, app: app, database: database}
 }

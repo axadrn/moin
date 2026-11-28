@@ -20,8 +20,8 @@ const noBackupText = "moin cannot back up this database"
 
 // scanDatabases finds what a release keeps its data in. The first list is
 // what moin backs up: every SQLite file on a mounted folder and every
-// Postgres, MySQL, MariaDB and MongoDB service. The second is what looks
-// like a database but moin cannot back up.
+// Postgres, MySQL, MariaDB, MongoDB and ClickHouse service. The second
+// is what looks like a database but moin cannot back up.
 func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protocol.Database, []protocol.Database, error) {
 	body, err := os.ReadFile(composeJSON)
 	if err != nil {
@@ -161,6 +161,8 @@ func serviceDatabase(service composeService) string {
 	switch plainImage(service.Image) {
 	case "mongo":
 		return protocol.DatabaseMongo
+	case "clickhouse", "clickhouse/clickhouse-server":
+		return protocol.DatabaseClickHouse
 	}
 	return ""
 }

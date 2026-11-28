@@ -12,6 +12,7 @@ November 29, 2026
 ### New
 - **MySQL and MariaDB backups**: moin finds a `mysql` or `mariadb` service in your `compose.yml` and backs it up like Postgres: encrypted copies, the daily restore check, restore and undo.
 - **MongoDB backups**: moin finds a `mongo` service in your `compose.yml` and backs up every database in it, with the same check, restore and undo.
+- **ClickHouse backups**: moin finds a `clickhouse` service in your `compose.yml`, like the one of Plausible, and backs up every database in it. No disk to set up.
 - **Env before the first deploy**: `moin env set my-app DATABASE_URL -s my-server` works before the app ever ran, so its first deploy starts with it. (#180)
 - **Env from scripts**: `moin env set my-app API_KEY` reads the value from a hidden prompt or stdin, never the command line. `moin env push my-app prod.env` lists the names that change and asks first. (#180)
 - **See the compose file**: `moin compose my-app > compose.yml` saves the file moin runs, without your env values, to run the app anywhere. `C` in the terminal UI shows it. (#180)

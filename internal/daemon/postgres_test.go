@@ -37,12 +37,12 @@ func TestPostgresImage(t *testing.T) {
 
 // TestDatabasesFindsPostgres: a service that runs Postgres is a database,
 // keyed postgres-<service>, after the SQLite files, and so is one that
-// runs MySQL or MariaDB, keyed mysql-<service>, or MongoDB, keyed
-// mongo-<service>.
+// runs MySQL or MariaDB, keyed mysql-<service>, MongoDB, keyed
+// mongo-<service>, or ClickHouse, keyed clickhouse-<service>.
 func TestDatabasesFindsPostgres(t *testing.T) {
 	dir := t.TempDir()
 	composeJSON := filepath.Join(dir, "compose.json")
-	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"legacy":{"image":"mysql:8"},"wiki":{"image":"docker.io/library/mariadb:11"},"docs":{"image":"mongo:8"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
+	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"legacy":{"image":"mysql:8"},"wiki":{"image":"docker.io/library/mariadb:11"},"docs":{"image":"mongo:8"},"events":{"image":"clickhouse/clickhouse-server:24.12-alpine"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
 	if err := os.WriteFile(composeJSON, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -55,6 +55,7 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 		{Path: "postgres-analytics", Kind: "postgres", Service: "analytics"},
 		{Path: "postgres-db", Kind: "postgres", Service: "db"},
 		{Path: "mongo-docs", Kind: "mongo", Service: "docs"},
+		{Path: "clickhouse-events", Kind: "clickhouse", Service: "events"},
 		{Path: "mysql-legacy", Kind: "mysql", Service: "legacy"},
 		{Path: "mysql-wiki", Kind: "mysql", Service: "wiki"},
 	}

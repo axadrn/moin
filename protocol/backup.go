@@ -64,8 +64,9 @@ const Encrypted = ".age"
 
 // CopyFile is the copy id in the folder of a database of kind: a gzipped
 // SQLite file, a pg_dump in its custom format, a gzipped dump of MySQL or
-// MariaDB, or a gzipped archive of mongodump, encrypted with age. plain
-// names a copy from before every copy was encrypted.
+// MariaDB, a gzipped archive of mongodump, or a zip of ClickHouse's
+// BACKUP, encrypted with age. plain names a copy from before every copy
+// was encrypted.
 func CopyFile(id, kind string, plain bool) string {
 	name := "copies/" + id + ".db.gz"
 	switch kind {
@@ -75,6 +76,8 @@ func CopyFile(id, kind string, plain bool) string {
 		name = "copies/" + id + ".sql.gz"
 	case DatabaseMongo:
 		name = "copies/" + id + ".archive.gz"
+	case DatabaseClickHouse:
+		name = "copies/" + id + ".zip"
 	}
 	if plain {
 		return name

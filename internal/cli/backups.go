@@ -85,7 +85,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 			}{schedule, databases})
 		}
 		if len(databases) == 0 {
-			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB or MongoDB service.")
+			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB, MongoDB or ClickHouse service.")
 			return nil
 		}
 		fmt.Fprintln(stdout, scheduleLine(schedule))
@@ -477,15 +477,19 @@ const (
 )
 
 // copyStarts are the first bytes of what a copy of each kind holds, once
-// it is decrypted and, but for Postgres, unzipped: a SQLite file, a
-// pg_dump, a dump of MySQL or MariaDB, which starts with a comment, or an
-// archive of mongodump.
+// it is decrypted and unzipped: a SQLite file, a pg_dump, a dump of MySQL
+// or MariaDB, which starts with a comment, an archive of mongodump, or a
+// zip of ClickHouse. notGzipped are the kinds whose copies are not
+// gzipped on top.
 var copyStarts = map[string][]string{
-	"":                        {sqliteStart},
-	protocol.DatabasePostgres: {postgresStart},
-	protocol.DatabaseMySQL:    {"-- ", "/*"},
-	protocol.DatabaseMongo:    {"\x6d\xe2\x99\x81"},
+	"":                          {sqliteStart},
+	protocol.DatabasePostgres:   {postgresStart},
+	protocol.DatabaseMySQL:      {"-- ", "/*"},
+	protocol.DatabaseMongo:      {"\x6d\xe2\x99\x81"},
+	protocol.DatabaseClickHouse: {"PK\x03\x04"},
 }
+var notGzipped = []string{protocol.DatabasePostgres, protocol.DatabaseClickHouse}
+
 
 // openCopy decrypts a copy of a database of kind with key and reads it to
 // its end. Every part of it is checked on the way, so a copy that is cut
@@ -495,7 +499,7 @@ func openCopy(encrypted io.Reader, kind string, key age.Identity) error {
 	if err != nil {
 		return err
 	}
-	if kind != protocol.DatabasePostgres {
+	if !slices.Contains(notGzipped, kind) {
 		if plain, err = gzip.NewReader(plain); err != nil {
 			return fmt.Errorf("what it holds is not a database: %w", err)
 		}

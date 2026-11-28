@@ -60,6 +60,9 @@ func TestOpenCopy(t *testing.T) {
 	if err := openCopy(bytes.NewReader(encryptedCopy(t, "\x6d\xe2\x99\x81"+rows, true, yours)), "mongo", yours); err != nil {
 		t.Errorf("a MongoDB copy: %v", err)
 	}
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "PK\x03\x04"+rows, false, yours)), "clickhouse", yours); err != nil {
+		t.Errorf("a ClickHouse copy: %v", err)
+	}
 	if err := openCopy(bytes.NewReader(encryptedCopy(t, "short", true, yours)), "mongo", yours); err == nil {
 		t.Error("a few bytes that are no database passed")
 	}
