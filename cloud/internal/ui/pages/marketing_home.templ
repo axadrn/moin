@@ -192,22 +192,28 @@ templ homeAlert(title, text, at string) {
 templ HomeNobodyGetsIn(knocks *HomeKnocks) {
 	<section id="security" class="moin-band">
 		@homeHead("Zero trust deploys.", "No dashboard holds a key to your server. Not even ours.")
-		@components.Card(components.CardProps{}) {
-			@homeRoads()
-			@homeRoadsTall()
+		@components.Features() {
+			@components.Feature(components.FeatureProps{Icon: "shield", Title: "No open ports", Note: "Only 80 and 443. SSH closes after the first deploy."})
+			@components.Feature(components.FeatureProps{Icon: "route", Title: "SSH over Tailscale", Note: "In your tailnet, built in."})
+			@components.Feature(components.FeatureProps{Icon: "cloud", Title: "Cloudflare Tunnel", Note: "Visitors through a tunnel. No port at all."})
+			@components.Feature(components.FeatureProps{Icon: "ban", Title: "Nothing of moin listens", Note: "It counts every knock."})
+			@components.Feature(components.FeatureProps{Icon: "refresh", Title: "No surprise updates", Note: "Your server updates when you say so."})
+			@components.Feature(components.FeatureProps{Icon: "eye", Title: "A hacked watcher can't command", Note: "It can read. It can't command."})
 		}
-		<div class="moin-grid" data-cols="2">
-			@components.Fact(components.FactProps{Name: "No open ports.", Note: "Nothing listens for moin. Public SSH closes after the first deploy. It counts every knock."})
-			@components.Fact(components.FactProps{Name: "Tailscale and Cloudflare, built in.", Note: "SSH in your tailnet. Visitors through a tunnel."})
-			@components.Fact(components.FactProps{Name: "No surprise updates.", Note: "Your server updates when you say so."})
-			@components.Fact(components.FactProps{Name: "A hacked watcher is harmless.", Note: "It can read. It can't command."})
-		</div>
-		@components.Fact(components.FactProps{Name: "0 bytes", Note: "Sent to us by the free software. Read the source.", Href: layouts.GitHubURL})
 		if knocks != nil {
 			@homeKnocks(*knocks)
 		}
-		@homeMore("/docs/security", "Security in detail")
+		<p class="moin-text moin-muted moin-center">0 bytes sent to us. No telemetry. <a href="/docs/how-it-works" class="moin-link moin-foreground">How it works</a></p>
 	</section>
+}
+
+// homeWays are the two built-in ways in, in one row of chips.
+templ homeWays() {
+	<div class="moin-row" data-center data-wrap data-gap="2">
+		@components.Chip("Tailscale")
+		@components.Chip("Cloudflare Tunnel")
+		@components.Chip("Built in")
+	</div>
 }
 
 // homeHead is the top of a section: a statement and one short line.
@@ -223,71 +229,6 @@ templ homeMore(href, text string) {
 	<p class="moin-center">
 		<a href={ templ.SafeURL(href) } class="moin-link moin-foreground">{ text }</a>
 	</p>
-}
-
-// homeRoads draws the two one-way roads: laptop to server over SSH, server
-// to watcher and bucket, arrows one way only.
-templ homeRoads() {
-	<svg class="moin-roads" viewBox="0 0 960 220" role="img" aria-label="Your laptop sends commands to your server over SSH. The server sends reports to a watcher and copies to your bucket. Nothing goes back.">
-		<defs>
-			<marker id="road-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-				<path d="M0 0 10 5 0 10z" fill="currentColor"></path>
-			</marker>
-		</defs>
-		<g fill="none" stroke="currentColor" stroke-width="2">
-			<rect x="10" y="70" width="190" height="80" rx="20"></rect>
-			<rect x="385" y="70" width="190" height="80" rx="20" class="moin-roads-ink"></rect>
-			<rect x="760" y="10" width="190" height="80" rx="20"></rect>
-			<rect x="760" y="130" width="190" height="80" rx="20"></rect>
-			<path d="M200 110H377" marker-end="url(#road-arrow)"></path>
-			<path d="M575 95C670 95 680 50 752 50" marker-end="url(#road-arrow)"></path>
-			<path d="M575 125C670 125 680 170 752 170" marker-end="url(#road-arrow)"></path>
-		</g>
-		<g fill="currentColor" font-family="var(--font-sans)" text-anchor="middle">
-			<text x="105" y="106" font-size="20" font-weight="600">your laptop</text>
-			<text x="105" y="130" font-size="15" class="moin-roads-muted">moin deploy my-server</text>
-			<text x="480" y="106" font-size="20" font-weight="600" class="moin-roads-ink-text">your server</text>
-			<text x="480" y="130" font-size="15" class="moin-roads-ink-text">apps, backups, checks</text>
-			<text x="855" y="46" font-size="20" font-weight="600">watcher</text>
-			<text x="855" y="70" font-size="15" class="moin-roads-muted">alerts you</text>
-			<text x="855" y="166" font-size="20" font-weight="600">your bucket</text>
-			<text x="855" y="190" font-size="15" class="moin-roads-muted">the copies</text>
-			<text x="290" y="96" font-size="15" class="moin-roads-muted">ssh, your key</text>
-			<text x="672" y="40" font-size="15" class="moin-roads-muted">reports</text>
-			<text x="672" y="200" font-size="15" class="moin-roads-muted">copies</text>
-		</g>
-	</svg>
-}
-
-// homeRoadsTall is homeRoads for a phone: the same roads, top to bottom.
-templ homeRoadsTall() {
-	<svg class="moin-roads" data-tall viewBox="0 0 360 430" role="img" aria-label="Your laptop sends commands to your server over SSH. The server sends reports to a watcher and copies to your bucket. Nothing goes back.">
-		<defs>
-			<marker id="road-arrow-tall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-				<path d="M0 0 10 5 0 10z" fill="currentColor"></path>
-			</marker>
-		</defs>
-		<g fill="none" stroke="currentColor" stroke-width="2">
-			<rect x="80" y="10" width="200" height="80" rx="20"></rect>
-			<rect x="80" y="175" width="200" height="80" rx="20" class="moin-roads-ink"></rect>
-			<rect x="5" y="340" width="160" height="80" rx="20"></rect>
-			<rect x="195" y="340" width="160" height="80" rx="20"></rect>
-			<path d="M180 90V167" marker-end="url(#road-arrow-tall)"></path>
-			<path d="M150 255C150 300 85 295 85 332" marker-end="url(#road-arrow-tall)"></path>
-			<path d="M210 255C210 300 275 295 275 332" marker-end="url(#road-arrow-tall)"></path>
-		</g>
-		<g fill="currentColor" font-family="var(--font-sans)" text-anchor="middle">
-			<text x="180" y="46" font-size="20" font-weight="600">your laptop</text>
-			<text x="180" y="70" font-size="15" class="moin-roads-muted">moin deploy my-server</text>
-			<text x="250" y="134" font-size="15" class="moin-roads-muted">ssh, your key</text>
-			<text x="180" y="211" font-size="20" font-weight="600" class="moin-roads-ink-text">your server</text>
-			<text x="180" y="235" font-size="15" class="moin-roads-ink-text">apps, backups, checks</text>
-			<text x="85" y="376" font-size="20" font-weight="600">watcher</text>
-			<text x="85" y="400" font-size="15" class="moin-roads-muted">reports</text>
-			<text x="275" y="376" font-size="20" font-weight="600">your bucket</text>
-			<text x="275" y="400" font-size="15" class="moin-roads-muted">copies</text>
-		</g>
-	</svg>
 }
 
 // homeBlog is the newest posts of the blog, as the list /blog shows.

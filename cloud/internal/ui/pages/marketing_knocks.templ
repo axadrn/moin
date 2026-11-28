@@ -76,45 +76,28 @@ func siteHost(site string) string {
 // knock dropped. Four numbers, then the ports bots tried most today.
 templ homeKnocks(k HomeKnocks) {
 	{{ rows := knockRows(k.Knocks) }}
-	<div id="knocks" class="moin-stack" data-gap="4">
-		<div class="moin-stack" data-gap="1">
-			<h3 class="moin-strong">{ siteHost(brand.Site) }, right now.</h3>
-			<p class="moin-text moin-muted">Every knock on a closed port. All dropped.</p>
-		</div>
+	<div id="knocks" class="moin-stack" data-gap="3">
+		<p class="moin-text moin-center"><span class="moin-strong">{ siteHost(brand.Site) }, right now.</span> <span class="moin-muted">Every knock on a closed port. All dropped.</span></p>
 		if k.Sample {
 			<div class="moin-row" data-center>
 				@components.Chip("Sample data · development only")
 			</div>
 		}
-		@components.Stats() {
-			@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)}) {
-				All dropped.
-			}
-			@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)}) {
-				Nothing answered.
-			}
-			@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)}) {
-				Since the first count.
-			}
-			if len(rows) > 0 {
-				@components.Stat(components.StatProps{Label: "Most tried", Value: rows[0].Label}) {
-					{ strconv.FormatInt(rows[0].Share, 10) }% of today.
-				}
-			}
+		@components.StatsCentered() {
+			@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)})
+			@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)})
+			@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)})
 		}
 		if len(rows) > 0 {
-			@knockList(rows)
+			<p class="moin-knocks-ports moin-small moin-muted">
+				<span>Most tried today:</span>
+				for _, row := range rows[:min(5, len(rows))] {
+					<span>{ strings.TrimSpace(row.Label + " " + row.Ports) } <span class="moin-digits moin-foreground">{ human.Count(row.Count) }</span></span>
+				}
+			</p>
 		}
-		<p class="moin-text moin-muted moin-center">
+		<p class="moin-small moin-muted moin-center">
 			Every { brand.Name } server counts its knocks. See yours: <code class="moin-mono moin-foreground">{ brand.Name } knocks</code>
 		</p>
 	</div>
-}
-
-// knockList is the card of the ports bots tried most today: the name and
-// its ports, the count, and a thin bar as wide as its share.
-templ knockList(rows []knockRow) {
-	@components.Card(components.CardProps{Title: "Most tried today"}) {
-		@components.Bars(components.BarsProps{Rows: knockBars(rows)})
-	}
 }

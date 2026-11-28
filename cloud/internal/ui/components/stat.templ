@@ -8,6 +8,14 @@ templ Stats() {
 	</div>
 }
 
+// StatsCentered is Stats with each number centered in its cell, and all of
+// them in one row, also on a phone. For a few short numbers.
+templ StatsCentered() {
+	<div class="moin-stats" data-center>
+		{ children... }
+	</div>
+}
+
 // StatProps is one Stat: its name, the number, and what it is out of,
 // like "/3".
 type StatProps struct {

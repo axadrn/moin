@@ -479,6 +479,12 @@
   .moin-icon-x { --i: url("../icons/x.svg"); }
   .moin-icon-x-logo { --i: url("../icons/x-logo.svg"); }
   .moin-icon-git-hub { --i: url("../icons/git-hub.svg"); }
+  .moin-icon-shield { --i: url("../icons/shield.svg"); }
+  .moin-icon-route { --i: url("../icons/route.svg"); }
+  .moin-icon-cloud { --i: url("../icons/cloud.svg"); }
+  .moin-icon-ban { --i: url("../icons/ban.svg"); }
+  .moin-icon-refresh { --i: url("../icons/refresh.svg"); }
+  .moin-icon-eye { --i: url("../icons/eye.svg"); }
 }
 
 @layer moin-components {
@@ -1856,6 +1862,11 @@
     line-height: 2.5rem;
     overflow-wrap: anywhere;
   }
+  /* Centered: every number in the middle of its cell, all in one row. */
+  .moin-stats[data-center] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .moin-stats[data-center] > :last-child:nth-child(odd) { grid-column: auto; }
+  .moin-stats[data-center] > .moin-stat { align-items: center; padding-inline: var(--space-2); text-align: center; }
+  .moin-stats[data-center] .moin-stat-value { font-size: clamp(1.25rem, 5.6vw, 2rem); white-space: nowrap; }
   .moin-stat-value > small {
     color: var(--muted-foreground);
     font-size: 1.25rem;
@@ -2232,13 +2243,6 @@
   overflow-wrap: anywhere;
 }
 .moin-chat-message time { float: right; margin: 0.25rem 0 0 var(--space-3); font-size: 0.75rem; }
-.moin-roads { display: block; width: 100%; height: auto; color: var(--foreground); }
-.moin-roads-muted { fill: var(--muted-foreground); }
-.moin-roads-ink { fill: var(--foreground); }
-.moin-roads-ink-text { fill: var(--background); }
-.moin-roads[data-tall] { max-width: 22rem; margin-inline: auto; }
-@media (min-width: 40rem) { .moin-roads[data-tall] { display: none; } }
-@media (max-width: 39.99rem) { .moin-roads:not([data-tall]) { display: none; } }
 
 
 
@@ -2481,5 +2485,32 @@
     .moin-compare-text:not(:has(.moin-small)) { display: flex; }
     .moin-compare-what { display: inline; }
     .moin-compare-foot { padding: var(--space-4) 0 0; border-top: 0; }
+  }
+}
+
+@layer moin-components {
+  /* Features: a grid of short items, each a line icon, a bold title and one
+     muted line. No cards. Three across, two on a tablet, one on a phone. */
+  .moin-features {
+    display: grid;
+    gap: var(--space-6) var(--space-8);
+    padding-block: var(--space-4);
+  }
+  .moin-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .moin-feature > .moin-icon { width: 1.5rem; height: 1.5rem; margin-block-start: 1px; }
+  .moin-feature-title { font-weight: 600; }
+  .moin-feature-note { color: var(--muted-foreground); }
+  /* The ports bots tried most, in one wrapped line. */
+  .moin-knocks-ports { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1) var(--space-4); max-width: 44rem; margin-inline: auto; text-align: center; }
+  .moin-knocks-ports > * { white-space: nowrap; }
+  @media (min-width: 40rem) { .moin-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 64rem) {
+    .moin-features { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 56rem; margin-inline: auto; }
+    .moin-feature { flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+    .moin-feature > .moin-stack { align-items: center; }
   }
 }
