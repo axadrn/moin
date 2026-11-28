@@ -205,9 +205,10 @@ func (w *Watcher) Save(write func([]byte) error) error {
 // hostname is a plain domain name: no port, path, user or IP address.
 var hostname = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// checkReport refuses a report that is too big or names things oddly, and
-// cuts long backup errors. The watcher visits the domains of a report, so
-// each must be a plain public name.
+// checkReport refuses a report that is too big or names things oddly. It
+// cuts long backup errors and leaves out the alert destinations it cannot
+// send to. The watcher visits the domains of a report, so each must be a
+// plain public name.
 func checkReport(r *report.Report) error {
 	if len(r.Apps) > maxApps {
 		return fmt.Errorf("more than %d apps", maxApps)
@@ -220,6 +221,9 @@ func checkReport(r *report.Report) error {
 			return errors.New("an alert is too long")
 		}
 	}
+	// A destination this watcher cannot send to, like a kind of a newer
+	// moin, is left out: it would fail again every few seconds.
+	r.Alerts = slices.DeleteFunc(r.Alerts, func(d report.Alert) bool { return alert.Check(d) != nil })
 	for i := range r.Apps {
 		app := &r.Apps[i]
 		if !serverName.MatchString(app.Name) {

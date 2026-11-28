@@ -614,6 +614,16 @@ func TestReportAlerts(t *testing.T) {
 		t.Errorf("unsent = %+v", w.state.Unsent)
 	}
 
+	// A destination the watcher cannot send to is left out.
+	unknown := testReport()
+	unknown.Alerts = []report.Alert{{Kind: "pager", URL: "https://pager.example.com"}, chat}
+	if err := w.Receive("prod", unknown); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.state.Servers["prod"].Report.Alerts; !slices.Equal(got, []report.Alert{chat}) {
+		t.Errorf("kept the alerts %+v", got)
+	}
+
 	many := testReport()
 	many.Alerts = make([]report.Alert, maxAlerts+1)
 	if err := w.Receive("prod", many); err == nil {
