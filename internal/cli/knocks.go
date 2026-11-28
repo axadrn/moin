@@ -36,7 +36,7 @@ func knocks(ctx context.Context, args []string, stdout io.Writer) error {
 		}
 		servers = list
 	case 1:
-		servers = []string{flags.Arg(0)}
+		servers = []string{savedServer(flags.Arg(0))}
 	default:
 		return flags.wrong()
 	}

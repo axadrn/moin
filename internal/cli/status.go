@@ -56,6 +56,31 @@ func loadServers() ([]string, error) {
 	return parseServers(string(body)), err
 }
 
+// savedServer is the server of your list that name means.
+func savedServer(name string) string {
+	servers, _ := loadServers()
+	return matchServer(servers, name)
+}
+
+// matchServer is the server of servers that name means: name itself, or
+// for a name without user@ the one server with that host, like
+// root@my-server for my-server. Any other name stays as it is.
+func matchServer(servers []string, name string) string {
+	if slices.Contains(servers, name) || strings.Contains(name, "@") {
+		return name
+	}
+	var found []string
+	for _, server := range servers {
+		if _, host, ok := strings.Cut(server, "@"); ok && host == name {
+			found = append(found, server)
+		}
+	}
+	if len(found) == 1 {
+		return found[0]
+	}
+	return name
+}
+
 // parseServers reads one server per line. Blank lines and # comments are
 // skipped, a name twice counts once.
 func parseServers(text string) []string {
@@ -145,10 +170,11 @@ func addServerCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	server, err := flags.oneArg()
+	name, err := flags.oneArg()
 	if err != nil {
 		return err
 	}
+	server := savedServer(name)
 	if err := setUp(ctx, server, "", flags.yes(), stdin, stdout); err != nil {
 		return err
 	}

@@ -105,6 +105,36 @@ func TestServersFile(t *testing.T) {
 	}
 }
 
+// TestShortServerName: my-server means the saved root@my-server, when it
+// is the only one with that host. Any other name stays as typed.
+func TestShortServerName(t *testing.T) {
+	servers := []string{"root@my-server", "my-other", "root@web-1", "deploy@web-1"}
+	for name, want := range map[string]string{
+		"my-server":      "root@my-server",
+		"root@my-server": "root@my-server",
+		"my-other":       "my-other",
+		"web-1":          "web-1",
+		"ada@my-server":  "ada@my-server",
+		"new-server":     "new-server",
+	} {
+		if got := matchServer(servers, name); got != want {
+			t.Errorf("matchServer(%q) = %q, want %q", name, got, want)
+		}
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := addServer("root@my-server"); err != nil {
+		t.Fatal(err)
+	}
+	flags := newFlags("secure", "secure <server>").withServer()
+	if err := flags.parse([]string{"my-server", "-s", "my-server"}); err != nil {
+		t.Fatal(err)
+	}
+	server, _, err := flags.serverArgs(strings.NewReader(""), 0)
+	if err != nil || server != "root@my-server" || flags.serverNamed() != "root@my-server" {
+		t.Errorf("server %q, -s %q, err %v", server, flags.serverNamed(), err)
+	}
+}
+
 // TestTwoServersNeedsS: moin never guesses between two servers.
 func TestTwoServersNeedsS(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
