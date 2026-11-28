@@ -420,10 +420,14 @@ func (m *model) backupFacts(key appKey) []string {
 				lines = append(lines, style.Muted.Render(fmt.Sprintf("  and %d older", len(database.Copies)-5)))
 				break
 			}
-			lines = append(lines, "  "+pad(copy.ID, 26)+"  "+pad(human.Ago(copy.At, now), 10)+style.Muted.Render(human.Size(float64(copy.Size))))
+			note := style.Muted.Render(human.Size(float64(copy.Size)))
+			if copy.ID == database.CheckedCopy && database.CheckError == "" {
+				note += "  " + style.Success.Render(style.SymbolDone+" checked")
+			}
+			lines = append(lines, "  "+pad(copy.ID, 30)+pad(human.Ago(copy.At, now), 10)+note)
 		}
 		for _, undo := range database.Undos {
-			lines = append(lines, "  "+pad("undo-"+undo.ID, 26)+"  "+pad(human.Ago(undo.At, now), 10)+style.Muted.Render("before a restore"))
+			lines = append(lines, "  "+pad("undo-"+undo.ID, 30)+pad(human.Ago(undo.At, now), 10)+style.Muted.Render("before a restore"))
 		}
 	}
 	return lines
@@ -472,7 +476,7 @@ func checkState(database protocol.DatabaseBackup, now time.Time) string {
 	case database.CheckError != "":
 		return failed("Checked " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckError)
 	}
-	return succeeded("Checked " + human.Ago(*database.CheckedAt, now) + ": " + database.CheckedCopy + " restored and read fine")
+	return succeeded("Checked " + human.Ago(*database.CheckedAt, now) + ": the copy marked checked restored fine")
 }
 
 // serverNeeds are what on a server needs you, each with the command
