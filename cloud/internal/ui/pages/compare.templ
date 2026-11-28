@@ -17,9 +17,9 @@ templ CompareIndex() {
 	}) {
 		<main class="moin-page">
 			<section class="moin-band">
-				@components.BandHead(components.BandHeadProps{Page: true, Title: brand.Name + " compared.", Line: "Fact by fact. From each tool's own docs. Where another tool does more the page says so."})
+				@components.BandHead(components.BandHeadProps{Page: true, Title: brand.Name + " compared", Line: "Fact by fact. From each tool's own docs. Where another tool does more the page says so."})
 				@components.Card(components.CardProps{}) {
-					@components.List() {
+					@components.List(templ.Attributes{"data-wrap": true}) {
 						for _, competitor := range compare.Competitors {
 							@components.Item(components.ItemProps{Href: "/compare/" + competitor.Slug, Name: brand.Name + " vs " + competitor.Name, Note: competitor.Line}) {
 								<span class="moin-text moin-muted moin-digits moin-hidden-phone">{ competitor.ScoreLine() }</span>
