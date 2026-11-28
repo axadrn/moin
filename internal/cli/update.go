@@ -167,8 +167,8 @@ func update(ctx context.Context, args []string, stdout io.Writer) error {
 	case 1:
 		name := flags.Arg(0)
 		servers, _ := loadServers()
-		if *version == "" && flags.serverNamed() == "" && slices.Contains(servers, name) {
-			return updateServer(ctx, name, stdout)
+		if server := matchServer(servers, name); *version == "" && flags.serverNamed() == "" && slices.Contains(servers, server) {
+			return updateServer(ctx, server, stdout)
 		}
 		return updateApp(ctx, flags, name, *version, stdout)
 	}

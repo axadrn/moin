@@ -120,7 +120,7 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 		return err
 	}
 	// Already reached through the tailnet: nothing to point elsewhere.
-	viaTailnet := public == tailnet.Name || public == tailnet.IP
+	viaTailnet := reachesTailnet(public, tailnet)
 	reach := public
 	if !viaTailnet {
 		step(stdout, "trying a new SSH session to %s over Tailscale", server)
@@ -146,23 +146,38 @@ func lockDown(ctx context.Context, server string, change daemon.Secure, stdin io
 	}
 	// The name checked above, not the one of a second answer.
 	now.Tailnet.Name = tailnet.Name
-	printSecurity(stdout, server, public, viaTailnet, change, now)
+	printSecurity(stdout, server, change, now)
 	if !viaTailnet && now.SSHOnTailscale {
 		pointAlias(stdout, server, reach)
 	}
 	return failed
 }
 
-// printSecurity says what is closed on the server now.
-func printSecurity(stdout io.Writer, server, public string, viaTailnet bool, change daemon.Secure, now daemon.Security) {
+// reachesTailnet says whether ssh dials the server through the tailnet
+// already: public is its tailnet name or address, or a name that
+// resolves to it, like the short name MagicDNS answers.
+func reachesTailnet(public string, tailnet daemon.Tailnet) bool {
+	if public == tailnet.Name || public == tailnet.IP {
+		return true
+	}
+	addresses, _ := net.LookupHost(public)
+	return tailnet.IP != "" && slices.Contains(addresses, tailnet.IP)
+}
+
+// printSecurity says what is closed on the server now. Whether port 22
+// still answers it tries on the server's public addresses, never through
+// the tailnet, where SSH always answers.
+func printSecurity(stdout io.Writer, server string, change daemon.Secure, now daemon.Security) {
 	switch {
 	case now.PublicSSH && change.CloseSSH:
 		fmt.Fprintln(stdout, style.Warning.Render("!")+" Port 22 of "+server+" is still open to the internet.")
 	case now.PublicSSH:
-	case !viaTailnet && portAnswers(public, "22"):
-		fmt.Fprintln(stdout, style.Warning.Render("!")+" "+public+" still answers on port 22 from here. Check it with `"+build.Name+"`.")
-	case now.SSHOnTailscale:
-		done(stdout, "Public port 22 is closed. %s answers SSH only over Tailscale", server)
+	default:
+		if address := answersSSH(now.PublicAddresses); address != "" {
+			fmt.Fprintln(stdout, style.Warning.Render("!")+" "+address+" still answers on port 22 from here. Check it with `"+build.Name+"`.")
+		} else if now.SSHOnTailscale {
+			done(stdout, "Public port 22 is closed. %s answers SSH only over Tailscale", server)
+		}
 	}
 	apps := slices.DeleteFunc(slices.Clone(now.Published), func(port string) bool { return port == "80/tcp" || port == "443/tcp" })
 	if now.Firewall {
@@ -401,6 +416,17 @@ func sshHostname(ctx context.Context, server string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("ssh -G %s names no host", server)
+}
+
+// answersSSH is the first of addresses that takes a connection on port
+// 22, "" when none does or none is known.
+func answersSSH(addresses []string) string {
+	for _, address := range addresses {
+		if portAnswers(address, "22") {
+			return address
+		}
+	}
+	return ""
 }
 
 // portAnswers says whether host takes a TCP connection on port.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -240,19 +241,31 @@ func tableLoaded(ctx context.Context) bool {
 }
 
 // publishedPort is one port in what `docker ps` says, like
-// 0.0.0.0:5432->5432/tcp: the host's side.
-var publishedPort = regexp.MustCompile(`:(\d+)->\d+/(tcp|udp)`)
+// 0.0.0.0:5432->5432/tcp or [::1]:5432->5432/tcp: the host's address and
+// port.
+var publishedPort = regexp.MustCompile(`(\S+):(\d+)->\d+/(tcp|udp)`)
 
 // publishedPorts are the ports the containers publish on the server, like
 // 5432/tcp.
 func publishedPorts(ctx context.Context) []string {
-	ports := []string{}
 	out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Ports}}").Output()
 	if err != nil {
-		return ports
+		return []string{}
 	}
-	for _, match := range publishedPort.FindAllStringSubmatch(string(out), -1) {
-		port := match[1] + "/" + match[2]
+	return outsidePorts(string(out))
+}
+
+// outsidePorts are the ports in what `docker ps` says that others can
+// reach: on every address or a public one. A port on loopback, like
+// 127.0.0.1:8090, only the server itself reaches.
+func outsidePorts(dockerPorts string) []string {
+	ports := []string{}
+	for _, match := range publishedPort.FindAllStringSubmatch(dockerPorts, -1) {
+		ip, err := netip.ParseAddr(strings.Trim(match[1], "[]"))
+		if err == nil && ip.IsLoopback() {
+			continue
+		}
+		port := match[2] + "/" + match[3]
 		if !slices.Contains(ports, port) {
 			ports = append(ports, port)
 		}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -179,6 +180,33 @@ func TestSecureNeedsATailnetToCloseSSH(t *testing.T) {
 	_, err := SecureHere(t.Context(), t.TempDir(), Secure{CloseSSH: true}, new(strings.Builder))
 	if err == nil || !strings.Contains(err.Error(), "no tailnet") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// SSH closes on a server in a tailnet, also when no sshd listens on port
+// 22: Tailscale SSH may answer it. The CLI's new session over Tailscale
+// is the test. Without nft, it stops at the firewall, past the SSH check.
+func TestSecureClosesSSHWithoutSSHD(t *testing.T) {
+	bin := fakeCommand(t, "tailscale", `echo '{"BackendState":"Running","Self":{"DNSName":"my-server.tail0000.ts.net.","TailscaleIPs":["100.64.0.7"]}}'`)
+	t.Setenv("PATH", bin)
+	_, err := SecureHere(t.Context(), t.TempDir(), Secure{CloseSSH: true}, new(strings.Builder))
+	if !errors.Is(err, errNoNft) {
+		t.Fatalf("err = %v, want errNoNft", err)
+	}
+}
+
+// A port published on loopback is not open to the internet. One on every
+// address, or a public one, is.
+func TestOutsidePorts(t *testing.T) {
+	docker := "127.0.0.1:8090->8090/tcp\n" +
+		"[::1]:8091->8091/tcp\n" +
+		"0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp\n" +
+		"203.0.113.7:6379->6379/tcp\n" +
+		"9000/tcp\n" +
+		"0.0.0.0:53->53/udp\n"
+	got := outsidePorts(docker)
+	if want := []string{"53/udp", "5432/tcp", "6379/tcp"}; !slices.Equal(got, want) {
+		t.Fatalf("ports = %v, want %v", got, want)
 	}
 }
 

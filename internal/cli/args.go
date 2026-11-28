@@ -104,7 +104,7 @@ func (f *flagSet) serverArgs(stdin io.Reader, others int) (server string, rest [
 		return "", nil, f.wrong()
 	}
 	if f.NArg() > 0 {
-		return f.Arg(0), f.Args()[1:], nil
+		return savedServer(f.Arg(0)), f.Args()[1:], nil
 	}
 	if !isTerminal(stdin) {
 		return "", nil, f.wrong()

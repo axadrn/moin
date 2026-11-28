@@ -120,7 +120,7 @@ func deployServer(ctx context.Context, flags *flagSet, app string, stdin io.Read
 		return "", flags.wrong()
 	}
 	if flags.NArg() == 1 {
-		return flags.Arg(0), nil
+		return savedServer(flags.Arg(0)), nil
 	}
 	return appServer(ctx, flags, app, stdin, fmt.Errorf("where to? The first deploy of %s names the server: `%s deploy <server>`, a name from your ssh config or user@host", app, build.Name))
 }

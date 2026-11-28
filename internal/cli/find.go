@@ -35,12 +35,12 @@ func (f *flagSet) withServer() *flagSet {
 	return f
 }
 
-// serverNamed is what -s named, "" without it.
+// serverNamed is the server -s named, "" without it.
 func (f *flagSet) serverNamed() string {
-	if f.serverFlag == nil {
+	if f.serverFlag == nil || *f.serverFlag == "" {
 		return ""
 	}
-	return *f.serverFlag
+	return savedServer(*f.serverFlag)
 }
 
 // appArgs reads the app and the other arguments of an app command: the

@@ -107,19 +107,23 @@ type Security struct {
 	Published []string `json:"published"`
 	// Tailnet is where the server is in the tailnet.
 	Tailnet Tailnet `json:"tailnet"`
+	// PublicAddresses are the server's own addresses on the internet,
+	// none behind NAT. The CLI knocks there to see that port 22 closed.
+	PublicAddresses []string `json:"public_addresses"`
 }
 
 // now says what is closed now: what server.json asks for and whether the
 // rules are really loaded.
 func (s *security) now(ctx context.Context) Security {
 	now := Security{
-		PublicSSH:      publicSSH(ctx, s.file),
-		SSHOnTailscale: s.file.SSHOnTailscale && tableLoaded(ctx),
-		Firewall:       s.file.Firewall && tableLoaded(ctx),
-		Tunnel:         s.file.TunnelToken != "",
-		OpenPorts:      []string{},
-		Published:      publishedPorts(ctx),
-		Tailnet:        TailnetHere(ctx),
+		PublicSSH:       publicSSH(ctx, s.file),
+		SSHOnTailscale:  s.file.SSHOnTailscale && tableLoaded(ctx),
+		Firewall:        s.file.Firewall && tableLoaded(ctx),
+		Tunnel:          s.file.TunnelToken != "",
+		OpenPorts:       []string{},
+		Published:       publishedPorts(ctx),
+		Tailnet:         TailnetHere(ctx),
+		PublicAddresses: publicAddresses(),
 	}
 	if now.Firewall {
 		now.OpenPorts = openPorts(s.file, s.web())
@@ -159,15 +163,13 @@ type Secure struct {
 }
 
 // SecureHere makes change. SSH closes only when the server is in a
-// tailnet and sshd answers on port 22. A tunnel only takes the web when
-// cloudflared reaches Cloudflare. Before anything closes, the guard is
-// set: the CLI stops it with ConfirmHere.
+// tailnet. Whether SSH over Tailscale lets you in, through sshd or
+// Tailscale SSH, the CLI tries with a new session, before and after. A
+// tunnel only takes the web when cloudflared reaches Cloudflare. Before
+// anything closes, the guard is set: the CLI stops it with ConfirmHere.
 func SecureHere(ctx context.Context, dir string, change Secure, out io.Writer) (Security, error) {
 	if change.CloseSSH && TailnetHere(ctx).IP == "" {
 		return Security{}, errors.New("this server is in no tailnet, so public SSH stays open")
-	}
-	if change.CloseSSH && !listening(22) {
-		return Security{}, errors.New("sshd does not listen on port 22, and SSH through the tailnet goes there. Public SSH stays open")
 	}
 	if change.TunnelToken != "" && !validTunnelToken(change.TunnelToken) {
 		return Security{}, errors.New("that is not a Cloudflare Tunnel token. Copy it from the tunnel's install command: the long text after --token")
