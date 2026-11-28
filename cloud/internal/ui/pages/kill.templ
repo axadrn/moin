@@ -10,18 +10,18 @@ import (
 )
 
 // Kill is the page that adds up the tools you pay for, on a receipt, and
-// shows the command that puts the open source app for each on your own
+// shows the command that puts an app you host yourself for each on your own
 // server. The prices come from content/prices.json; apps is how many the
 // catalog has. site.js adds it up again on every tick.
 templ Kill(swaps []KillSwap, apps int) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       "Kill your SaaS subscriptions",
-		Description: "Tick the tools you pay for, like Slack, Notion, Zapier and Sentry. See what you stop paying. Run the open source app on your own server. One command each.",
+		Description: "Tick the tools you pay for, like Slack, Notion, Zapier and Sentry. See what you stop paying. Run an app you host yourself. One command each.",
 		Path:        "/kill-your-saas-subscriptions",
 	}) {
 		<main class="moin-page" data-kill>
 			<section class="moin-band">
-				@components.BandHead(components.BandHeadProps{Page: true, Title: "Kill your SaaS subscriptions.", Line: "Tick what you pay for. Run the open source app on your own server."})
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Kill your SaaS subscriptions.", Line: "Tick what you pay for. Run an app you host yourself."})
 				@components.Receipt() {
 					<div class="moin-row" data-between data-wrap>
 						<h2 class="moin-heading">Your monthly bills</h2>
