@@ -181,7 +181,11 @@ func cloudSignIn(ctx context.Context, stdout io.Writer) (cloudSession, error) {
 		return session, err
 	}
 	step(stdout, "Sign in to %s in the browser, and allow the code %s: %s", cloudName, style.Bold.Render(login.Code), login.URL)
-	openBrowser(login.URL)
+	// The browser opens only a page of moin cloud, never another address
+	// or scheme an answer names.
+	if strings.HasPrefix(login.URL, session.URL+"/") {
+		openBrowser(login.URL)
+	}
 
 	var answer struct {
 		Token string `json:"token"`
