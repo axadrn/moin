@@ -35,6 +35,9 @@ November 29, 2026
 
 ## v1.0.0-beta.38
 
+- **No bucket warning with moin cloud**: A server whose copies go to moin cloud no longer says "no bucket yet", and never asks for one. (#180)
+- **No maintenance databases**: Postgres's own `postgres`, `template0` and `template1` are not backed up as a second database of the app. (#180)
+- **Connect adds the server**: `moin watcher connect my-server` on a laptop that never deployed there adds the server, so `moin watcher` shows it. (#180)
 November 28, 2026
 
 **In short:** moin runs without a hub now: you deploy over your own SSH, public SSH closes after the first deploy, and every backup is encrypted, checked every day and kept where a hacked server can't delete it.
