@@ -44,7 +44,7 @@ The provider's snapshots help with some of these. They live at the same provider
 
 ## What moin does
 
-moin finds your SQLite and Postgres databases by itself. Once you give it a bucket, it copies each one every hour.
+moin finds your SQLite, Postgres, MySQL and MariaDB databases by itself. Once you give it a bucket, it copies each one every hour.
 
 ```bash
 moin bucket set my-server

@@ -62,13 +62,17 @@ type BackupRestore struct {
 // Encrypted ends the name of every copy in the bucket: an age file.
 const Encrypted = ".age"
 
-// CopyFile is the copy id in its database's folder: a gzipped SQLite
-// file, or a pg_dump in its custom format, encrypted with age. plain names
-// a copy from before every copy was encrypted.
-func CopyFile(id string, postgres, plain bool) string {
+// CopyFile is the copy id in the folder of a database of kind: a gzipped
+// SQLite file, a pg_dump in its custom format, or a gzipped dump of MySQL
+// or MariaDB, encrypted with age. plain names a copy from before every
+// copy was encrypted.
+func CopyFile(id, kind string, plain bool) string {
 	name := "copies/" + id + ".db.gz"
-	if postgres {
+	switch kind {
+	case DatabasePostgres:
 		name = "copies/" + id + ".dump"
+	case DatabaseMySQL:
+		name = "copies/" + id + ".sql.gz"
 	}
 	if plain {
 		return name

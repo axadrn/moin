@@ -1,6 +1,6 @@
 ---
 title: "Backups"
-description: "SQLite and Postgres. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
+description: "SQLite, Postgres, MySQL and MariaDB. Encrypted and copied to your bucket or moin cloud. Every day one copy is restored and read before it leaves."
 group: "Servers and data"
 order: 1
 ---
@@ -13,8 +13,9 @@ Databases, not files.
 
 - **SQLite**: every database file in a folder the app mounts, like `./data`.
 - **Postgres**: every database in a service that runs a Postgres image. No password, no change to your `compose.yml`.
+- **MySQL and MariaDB**: the database `MYSQL_DATABASE` or `MARIADB_DATABASE` names, in a service that runs the official `mysql` or `mariadb` image. No change to your `compose.yml`.
 
-moin finds them by itself, also a database your app makes long after the deploy. MySQL and MongoDB run, but moin can't back them up yet. `moin backups my-app` says so.
+moin finds them by itself, also a database your app makes long after the deploy. MongoDB runs, but moin can't back it up yet. `moin backups my-app` says so.
 
 ## The bucket
 
@@ -177,7 +178,7 @@ COPY                      WHERE    TAKEN    SIZE
   Go back to one with moin restore my-app --to <copy>
 ```
 
-A SQLite database is named by its path in the container. A Postgres database by its service, like `postgres-db`.
+A SQLite database is named by its path in the container. A Postgres, MySQL or MariaDB database by its service, like `postgres-db` or `mysql-db`.
 
 It lists the newest 10 copies. `--json` lists them all. A copy from before every copy was encrypted says `not encrypted` next to its size, until it expires.
 
@@ -200,13 +201,15 @@ backups:
 ```text
 SQLite:   VACUUM INTO a temp file ─▶ gzip ─▶ age ─▶ a file on the server
 Postgres: pg_dump ─▶ age ─▶ a file on the server
+MySQL:    mysqldump or mariadb-dump ─▶ gzip ─▶ age ─▶ a file on the server
 Then:     the first copy of the day is restored and read ─▶ your bucket, moin cloud
 ```
 
-Both make a clean copy while your app keeps running.
+Each makes a clean copy while your app keeps running.
 
 - **SQLite** needs room on the disk for one copy, for a moment. moin looks first.
 - **Postgres** copies run inside your Postgres container, so no password leaves it. Every database in it gets its own copies.
+- **MySQL and MariaDB** copies run inside your database container too, with the dump tool of your own image. One consistent state, with routines, triggers and events. moin logs in as root with the `MYSQL_ROOT_PASSWORD` or `MARIADB_ROOT_PASSWORD` of the service. It reads the password inside the container, so it never leaves it.
 
 A copy on the spot, before something risky:
 
@@ -224,6 +227,8 @@ Every deploy takes one too, just before the new release touches the data. If tha
 ## The daily check
 
 The first copy of each day is checked before it leaves the server. moin opens it with the server's key and restores it into a throwaway database on your server. It reads every page or every row. Then it drops it. Only then does the copy go up, the very bytes that were read.
+
+For MySQL and MariaDB the throwaway database runs in a container of its own, from the same image as yours, without a network. The check never touches your live database. moin removes the container when it is done.
 
 So "backed up" means: copied, restored and read. The check needs room on the disk for one more copy, for a while.
 
@@ -250,6 +255,8 @@ A restore never changes your data in place:
 1. moin builds the database beside the live one. Your app keeps running.
 2. It stops the app for one quick switch, and starts it again.
 3. It keeps the database from before, as the undo.
+
+MySQL and MariaDB cannot switch a database in one step. So there moin stops the app, keeps the live database as the undo, a dump on the server, and loads the copy. If the load fails, the undo goes back in and your data is as it was.
 
 A restore replaces live data, so moin asks first. Scripts pass `-y`.
 
@@ -296,9 +303,10 @@ The copies of a database are in `<path>/<server>/<app>/<database>/copies/` in yo
 ```bash
 age -d -i key.txt 20261127T140000Z-118204.db.gz.age | gunzip > my-app.db
 age -d -i key.txt 20261127T140000Z-118204.dump.age > my-app.dump
+age -d -i key.txt 20261127T140000Z-118204.sql.gz.age | gunzip > my-app.sql
 ```
 
-A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. You need no moin for either.
+A SQLite copy, `.db.gz.age`, is then a file for `sqlite3`. A Postgres copy, `.dump.age`, is a `pg_dump -Fc`: `pg_restore` puts it into any Postgres. A MySQL or MariaDB copy, `.sql.gz.age`, is plain SQL: `mysql` or `mariadb` loads it. You need no moin for any of them.
 
 ## If it breaks
 

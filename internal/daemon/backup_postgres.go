@@ -5,11 +5,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -204,7 +202,7 @@ func (e *postgresEngine) Restore(ctx context.Context, from source, keepAs string
 	}
 	// An app that is only its database has no other service to stop.
 	start := func() error { return nil }
-	if others := e.others(); len(others) > 0 {
+	if others := e.b.otherServices(e.app, e.database.Service); len(others) > 0 {
 		start, err = e.b.apps.stopServices(ctx, e.app, others...)
 		if err != nil {
 			return err
@@ -257,22 +255,6 @@ func (e *postgresEngine) switchIn(ctx context.Context, t pgTarget, live, aside, 
 		return nil
 	}
 	return fmt.Errorf("switch: %w; nothing changed", err)
-}
-
-// others are the app's services but the database, which keeps running.
-func (e *postgresEngine) others() []string {
-	var config struct {
-		Services map[string]json.RawMessage `json:"services"`
-	}
-	body, _ := os.ReadFile(e.b.apps.composeJSON(e.app))
-	_ = json.Unmarshal(body, &config)
-	others := []string{}
-	for name := range config.Services {
-		if name != e.database.Service {
-			others = append(others, name)
-		}
-	}
-	return others
 }
 
 // Recover tells from the undo, once the Postgres answers, up to two

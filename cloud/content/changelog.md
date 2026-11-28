@@ -9,6 +9,9 @@ November 29, 2026
 
 **In short:** www redirects to your domain again.
 
+### New
+- **MySQL and MariaDB backups**: moin finds a `mysql` or `mariadb` service in your `compose.yml` and backs it up like Postgres: encrypted copies, the daily restore check, restore and undo.
+
 ### Fixed
 - **www goes to your domain**: An app with `example.com` and `www.example.com` sends www to `example.com` again, for good. The path and the query stay.
 

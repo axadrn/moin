@@ -52,6 +52,14 @@ func TestOpenCopy(t *testing.T) {
 	if err := openCopy(bytes.NewReader(postgres), true, yours); err != nil {
 		t.Errorf("a Postgres copy: %v", err)
 	}
+	for _, start := range []string{"-- MySQL dump 10.13\n", "/*M!999999\\- enable the sandbox mode */\n"} {
+		if err := openCopy(bytes.NewReader(encryptedCopy(t, start+rows, true, yours)), false, yours); err != nil {
+			t.Errorf("a MySQL copy that starts %q: %v", start, err)
+		}
+	}
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "an error page that is long enough", true, yours)), false, yours); err == nil {
+		t.Error("gzipped text that is no database passed")
+	}
 	if err := openCopy(bytes.NewReader(sqlite), false, other); err == nil || !strings.Contains(err.Error(), "the key does not open this copy") {
 		t.Errorf("another key: %v", err)
 	}

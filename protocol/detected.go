@@ -22,9 +22,10 @@ type Detected struct {
 }
 
 // Database is a database of an app: a SQLite file the daemon found on one
-// of the app's mounts, or, with Kind "postgres", a compose service that runs
-// Postgres. Path names a SQLite file in the container; for Postgres it is
-// postgres-<service>, and HostPath is empty. Older daemons send no Kind.
+// of the app's mounts, or, with Kind "postgres" or "mysql", a compose
+// service that runs Postgres, MySQL or MariaDB. Path names a SQLite file
+// in the container; for a service it is postgres-<service> or
+// mysql-<service>, and HostPath is empty. Older daemons send no Kind.
 // Name is a database of a Postgres service besides the one POSTGRES_DB
 // names, which backups copy too; its Path is postgres-<service>/<name>.
 type Database struct {
@@ -48,3 +49,12 @@ func (d Database) Postgres() bool { return d.Kind == DatabasePostgres }
 // PostgresKey is the name of a Postgres service's database in moin: in the
 // bucket, the API and on every surface.
 func PostgresKey(service string) string { return "postgres-" + service }
+
+// DatabaseMySQL is the Kind of a MySQL or MariaDB service.
+const DatabaseMySQL = "mysql"
+
+// MySQL reports whether the database is a MySQL or MariaDB service.
+func (d Database) MySQL() bool { return d.Kind == DatabaseMySQL }
+
+// MySQLKey is the name of a MySQL or MariaDB service's database in moin.
+func MySQLKey(service string) string { return "mysql-" + service }

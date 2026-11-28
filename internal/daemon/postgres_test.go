@@ -36,12 +36,13 @@ func TestPostgresImage(t *testing.T) {
 }
 
 // TestDatabasesFindsPostgres: a service that runs Postgres is a database,
-// keyed postgres-<service>, after the SQLite files; MySQL is seen and
-// cannot be backed up.
+// keyed postgres-<service>, after the SQLite files, and so is one that
+// runs MySQL or MariaDB, keyed mysql-<service>; MongoDB is seen and cannot
+// be backed up.
 func TestDatabasesFindsPostgres(t *testing.T) {
 	dir := t.TempDir()
 	composeJSON := filepath.Join(dir, "compose.json")
-	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"legacy":{"image":"mysql:8"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
+	body := `{"services":{"web":{"image":"moin-shop-web:1"},"db":{"image":"postgres:17"},"cache":{"image":"redis:7"},"legacy":{"image":"mysql:8"},"wiki":{"image":"docker.io/library/mariadb:11"},"docs":{"image":"mongo:8"},"analytics":{"image":"docker.io/library/postgres:16"}}}`
 	if err := os.WriteFile(composeJSON, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -53,14 +54,16 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 	want := []protocol.Database{
 		{Path: "postgres-analytics", Kind: "postgres", Service: "analytics"},
 		{Path: "postgres-db", Kind: "postgres", Service: "db"},
+		{Path: "mysql-legacy", Kind: "mysql", Service: "legacy"},
+		{Path: "mysql-wiki", Kind: "mysql", Service: "wiki"},
 	}
 	if !reflect.DeepEqual(found, want) {
 		t.Errorf("found %+v, want %+v", found, want)
 	}
-	if protocol.CopyFile("x", found[0].Postgres(), false) != "copies/x.dump.age" || protocol.CopyFile("x", false, true) != "copies/x.db.gz" {
+	if protocol.CopyFile("x", found[0].Kind, false) != "copies/x.dump.age" || protocol.CopyFile("x", found[2].Kind, false) != "copies/x.sql.gz.age" || protocol.CopyFile("x", "", true) != "copies/x.db.gz" {
 		t.Error("copy file endings")
 	}
-	if len(noBackup) != 1 || noBackup[0].Path != "mysql-legacy" {
+	if len(noBackup) != 1 || noBackup[0].Path != "mongo-docs" {
 		t.Errorf("cannot back up %+v", noBackup)
 	}
 }

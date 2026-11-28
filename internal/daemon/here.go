@@ -165,9 +165,12 @@ func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out i
 	logf("v%d is live", start.Number)
 	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: addresses(detected)}
 	for _, database := range detected.Databases {
-		if database.Postgres() {
+		switch {
+		case database.Postgres():
 			result.Databases = append(result.Databases, "Postgres")
-		} else {
+		case database.MySQL():
+			result.Databases = append(result.Databases, "MySQL")
+		default:
 			result.Databases = append(result.Databases, "SQLite")
 		}
 	}

@@ -45,7 +45,7 @@ import (
 //	                      the live one kept as the undo
 //
 // backup_sqlite.go copies with VACUUM INTO, backup_postgres.go with
-// pg_dump.
+// pg_dump, backup_mysql.go with mysqldump or mariadb-dump.
 type engine interface {
 	// Copy writes a full copy of the live database to w.
 	Copy(ctx context.Context, w io.Writer) error
@@ -189,14 +189,34 @@ func (b *backups) engine(app string, database protocol.Database) engine {
 	if database.Postgres() {
 		return &postgresEngine{b: b, app: app, database: database}
 	}
+	if database.MySQL() {
+		return &mysqlEngine{b: b, app: app, database: database}
+	}
 	return &sqliteEngine{b: b, app: app, database: database}
+}
+
+// otherServices are the app's services but service, a database that keeps
+// running through its restore.
+func (b *backups) otherServices(app, service string) []string {
+	var config struct {
+		Services map[string]json.RawMessage `json:"services"`
+	}
+	body, _ := os.ReadFile(b.apps.composeJSON(app))
+	_ = json.Unmarshal(body, &config)
+	others := []string{}
+	for name := range config.Services {
+		if name != service {
+			others = append(others, name)
+		}
+	}
+	return others
 }
 
 // state is the state of a database, by its file or its app and service.
 // The caller holds the lock.
 func (b *backups) state(app string, database protocol.Database) *state {
 	k := database.HostPath
-	if database.Postgres() {
+	if database.Service != "" {
 		k = app + "/" + database.Service + "/" + database.Name
 	}
 	if b.states[k] == nil {
@@ -241,14 +261,14 @@ func databaseKey(config Config, app, database string) string {
 
 // copyKey is where a copy lives in its bucket.
 func copyKey(folder string, copy protocol.Copy, database protocol.Database) *string {
-	return aws.String(folder + "/" + protocol.CopyFile(copy.ID, database.Postgres(), copy.Plain))
+	return aws.String(folder + "/" + protocol.CopyFile(copy.ID, database.Kind, copy.Plain))
 }
 
 // copyOf is the copy a key in the bucket holds: its ID, and whether it is
 // a plain one, from before copies were encrypted.
 func copyOf(key string, database protocol.Database) protocol.Copy {
 	name := path.Base(key)
-	plain := path.Base(protocol.CopyFile("", database.Postgres(), true))
+	plain := path.Base(protocol.CopyFile("", database.Kind, true))
 	if id, ok := strings.CutSuffix(name, plain+protocol.Encrypted); ok {
 		return protocol.Copy{ID: id}
 	}

@@ -466,6 +466,10 @@ func logDatabases(detected protocol.Detected, logf func(string, ...any)) {
 			logf("database %s (Postgres, service %s)", database.Path, database.Service)
 			continue
 		}
+		if database.MySQL() {
+			logf("database %s (MySQL, service %s)", database.Path, database.Service)
+			continue
+		}
 		logf("database %s (%s)", database.Path, database.HostPath)
 	}
 	for _, database := range detected.NoBackup {

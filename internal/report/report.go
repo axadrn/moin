@@ -78,7 +78,7 @@ type App struct {
 // Database is one database of an app and its backups.
 type Database struct {
 	Name        string    `json:"name"`                  // as the daemon names it today
-	Kind        string    `json:"kind"`                  // "sqlite" or "postgres"
+	Kind        string    `json:"kind"`                  // "sqlite", "postgres" or "mysql"
 	LastCopy    time.Time `json:"last_copy,omitzero"`    // zero: never
 	LastCheck   time.Time `json:"last_check,omitzero"`   // the last restore check that ran
 	CheckOK     bool      `json:"check_ok"`              // whether that check restored the copy

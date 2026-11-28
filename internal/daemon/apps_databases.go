@@ -20,8 +20,8 @@ const noBackupText = "moin cannot back up this database"
 
 // scanDatabases finds what a release keeps its data in. The first list is
 // what moin backs up: every SQLite file on a mounted folder and every
-// Postgres service. The second is what looks like a database but moin
-// cannot back up.
+// Postgres, MySQL and MariaDB service. The second is what looks like a
+// database but moin cannot back up.
 func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protocol.Database, []protocol.Database, error) {
 	body, err := os.ReadFile(composeJSON)
 	if err != nil {
@@ -45,6 +45,10 @@ func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protoco
 		service := config.Services[name]
 		if postgresImage(service.Image) {
 			databases = append(databases, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
+			continue
+		}
+		if mysqlImage(service.Image) {
+			databases = append(databases, protocol.Database{Path: protocol.MySQLKey(name), Kind: protocol.DatabaseMySQL, Service: name})
 			continue
 		}
 		kind := a.otherDatabase(ctx, config, service)
@@ -93,10 +97,7 @@ func addSQLiteFiles(databases []protocol.Database, folder, target string) []prot
 // cannot back it up, "" when it runs none of those: a known image, or a
 // Postgres data folder in a mount of an image moin does not know.
 func (a *apps) otherDatabase(ctx context.Context, config composeConfig, service composeService) string {
-	switch plainImage(service.Image) {
-	case "mysql", "mariadb":
-		return "mysql"
-	case "mongo":
+	if plainImage(service.Image) == "mongo" {
 		return "mongo"
 	}
 	for _, mount := range service.Volumes {
@@ -145,6 +146,13 @@ func postgresImage(image string) bool {
 		return true
 	}
 	return strings.HasPrefix(name, "timescale/timescaledb")
+}
+
+// mysqlImage reports whether an image runs MySQL or MariaDB: the official
+// ones from Docker Hub, with any tag or digest.
+func mysqlImage(image string) bool {
+	name := plainImage(image)
+	return name == "mysql" || name == "mariadb"
 }
 
 // sqliteFiles returns the files under dir, three levels deep, that are
