@@ -1,6 +1,6 @@
 ---
 name: listmonk
-pitch: Newsletters and mailing lists, fast, for millions of subscribers.
+pitch: Newsletters and mailing lists. Fast. For millions of subscribers.
 category: Marketing
 website: https://listmonk.app
 source: github.com/knadh/listmonk

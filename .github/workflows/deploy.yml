@@ -3,21 +3,20 @@ name: Deploy
 # One way to ship, for a release tag and by hand (Actions, Deploy, Run
 # workflow):
 #   1. test: the same checks as CI.
-#   2. box: build the hub image, ghcr.io/axadrn/moin, which
-#      the hosted hub and every self-hoster runs. For a tag only as a
-#      candidate, which no hub pulls.
+#   2. box: build the image of the site, ghcr.io/axadrn/moin, with the
+#      moin binaries cli.sh downloads. For a tag only as a candidate.
 #   3. release: for a tag, after a maintainer approves, the GitHub release
-#      with its notes from hub/content/changelog.md, the signed binaries
-#      and the signed digest of the hub image; then the image gets its
+#      with its notes from cloud/content/changelog.md, the signed binaries
+#      and the signed digest of the image; then the image gets its
 #      version, stable and latest.
-#   4. deploy: through Tailscale, the hosted hub gets the deploy
+#   4. deploy: through Tailscale, the server of the site gets the deploy
 #      files of this commit, fills its settings from 1Password and runs
-#      update.sh with the new box.
+#      update.sh with the new image.
 # Only main and tags ship: run by hand on another branch, it does nothing.
 # Forks only build: the deploy runs in axadrn/moin alone, with the
 # repository variables DEPLOY_HOST and TS_CLIENT_ID. The one secret is
 # RELEASE_SIGNING_KEY in the environment release, which signs releases,
-# waits for a maintainer's approval and never reaches the hub.
+# waits for a maintainer's approval and never reaches the site.
 # Each job gets only the rights it needs.
 on:
   push:
@@ -56,9 +55,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       # A release is pushed as candidate-<commit> here; it gets its version,
       # stable and latest only once its signed release is complete
-      # (release, below), so no hub pulls a build nobody approved. A deploy
+      # (release, below), so nothing pulls a build nobody approved. A deploy
       # by hand is main-<commit> alone. image is the name the release and
-      # the deploy use. hub/content/docs/reference/shipping.md
+      # the deploy use. cloud/content/docs/shipping.md
       - name: Tags
         id: tags
         run: |
@@ -96,11 +95,11 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # The binaries of the box, the ones under /download, and SHA256SUMS
+      # The binaries the box built, in /app/downloads, and SHA256SUMS
       # signed with the release key. SHA256SUMS also names the box by its
-      # digest, so the signature covers the exact hub image too. Daemons
-      # update from here and check the signature:
-      # hub/content/docs/guides/security.md#updates
+      # digest, so the signature covers the exact image too. moin update
+      # sends these to a server and checks the signature first. The same
+      # key signs it the way ssh-keygen checks, for cli.sh.
       - name: Sign the binaries and the image
         env:
           IMAGE: ${{ needs.box.outputs.image }}
@@ -112,23 +111,24 @@ jobs:
             exit 1
           fi
           public=$(printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkey -pubout -outform DER | tail -c 32 | base64)
-          if ! grep -q "\"$public\", // RELEASE_SIGNING_KEY$" internal/daemon/update.go; then
-            echo "RELEASE_SIGNING_KEY is not the signing key in internal/daemon/update.go (the spare stays offline)" >&2
+          if ! grep -q "\"$public\", // RELEASE_SIGNING_KEY$" internal/build/release.go; then
+            echo "RELEASE_SIGNING_KEY is not the signing key in internal/build/release.go (the spare stays offline)" >&2
             exit 1
           fi
           docker create --name box "ghcr.io/axadrn/moin@$DIGEST" >/dev/null
           docker cp box:/app/downloads downloads
           printf '%s  %s\n' "${DIGEST#sha256:}" "$IMAGE" >> downloads/SHA256SUMS
           printf '%s\n' "$RELEASE_SIGNING_KEY" | openssl pkeyutl -sign -rawin -inkey /dev/stdin -in downloads/SHA256SUMS -out downloads/SHA256SUMS.sig
+          printf '%s\n' "$RELEASE_SIGNING_KEY" | sh scripts/sshsig.sh downloads/SHA256SUMS > downloads/SHA256SUMS.sshsig
       # The notes are the tag's section of the changelog, without its date.
       - name: Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          awk -v tag="## $TAG" '$0 == tag { on = 1; next } on && /^## / { exit } on' hub/content/changelog.md | sed '1,3d' > notes.md
+          awk -v tag="## $TAG" '$0 == tag { on = 1; next } on && /^## / { exit } on' cloud/content/changelog.md | sed '1,3d' > notes.md
           if [ ! -s notes.md ]; then
-            echo "hub/content/changelog.md has no section $TAG" >&2
+            echo "cloud/content/changelog.md has no section $TAG" >&2
             exit 1
           fi
           # A draft until every file is there: nobody sees a release
@@ -136,7 +136,7 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 && gh release edit "$TAG" --notes-file notes.md || gh release create "$TAG" --title "$TAG" --notes-file notes.md --draft
           gh release upload "$TAG" downloads/* --clobber
           gh release edit "$TAG" --draft=false --latest
-      # Only now hubs see the new version: the image of this release gets
+      # Only now the new version is out: the image of this release gets
       # its version, stable and latest, the same image by its signed
       # digest, not built again. A plain docker login: the job that holds
       # the signing key runs no action but checkout.
@@ -149,8 +149,7 @@ jobs:
           printf '%s\n' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           docker buildx imagetools create --tag "$IMAGE" --tag ghcr.io/axadrn/moin:stable --tag ghcr.io/axadrn/moin:latest "ghcr.io/axadrn/moin@$DIGEST"
 
-  # After the release: the hub tells the daemons to update to it, and they
-  # take it from there.
+  # After the release: the site serves it.
   deploy:
     needs: [box, release]
     # A tag deploys only after its release: before, its version has no image.
@@ -182,15 +181,15 @@ jobs:
           IMAGE: ${{ needs.box.outputs.image }}
         run: |
           tailscale ssh "root@$HOST" "mkdir -p /opt/moin"
-          for file in setup.sh update.sh compose.yml compose.same-server.yml compose.caddy.yml compose.tunnel.yml; do
-            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "hub/deploy/$file"
+          for file in update.sh compose.yml compose.tunnel.yml; do
+            tailscale ssh "root@$HOST" "cat > /opt/moin/$file" < "cloud/deploy/$file"
           done
-          # moin.run only: its settings come from 1Password. The token in
-          # /etc/moin-hub/op-token fills the op:// references of .env.tpl
-          # into .env. If that fails, this step fails and the running hub
+          # The settings come from 1Password. The token in
+          # /etc/moin-cloud/op-token fills the op:// references of .env.tpl
+          # into .env. If that fails, this step fails and the running site
           # stays.
           tailscale ssh "root@$HOST" 'set -eu; umask 077; cd /opt/moin
-            OP_SERVICE_ACCOUNT_TOKEN=$(cat /etc/moin-hub/op-token) docker run --rm -i -e OP_SERVICE_ACCOUNT_TOKEN 1password/op:2 op inject < .env.tpl > .env.new
+            OP_SERVICE_ACCOUNT_TOKEN=$(cat /etc/moin-cloud/op-token) docker run --rm -i -e OP_SERVICE_ACCOUNT_TOKEN 1password/op:2 op inject < .env.tpl > .env.new
             mv .env.new .env'
           tailscale ssh "root@$HOST" "cd /opt/moin && MOIN_IMAGE='$IMAGE' sh update.sh"
       - name: Wait until it answers
@@ -199,5 +198,5 @@ jobs:
             tailscale ssh "root@$HOST" "curl --fail --silent --output /dev/null http://127.0.0.1:8090/healthz" && exit 0
             sleep 5
           done
-          echo "the hub on $HOST does not answer" >&2
+          echo "the site on $HOST does not answer" >&2
           exit 1

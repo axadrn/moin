@@ -1,0 +1,2709 @@
+/* The look of the site: one file, no build step. Theme, layout, icons, then
+   one section per part the pages use, then the site's own: its fonts and
+   the art of the home page. Each layer knows only the ones before it. */
+
+/* Theme: every value moin UI knows, in one place. Only
+   this file holds colors, sizes and motion. Each color is one line with its
+   light and its dark value, so a theme is this list and nothing else.
+   Nothing here is a class. */
+
+@layer moin-theme, moin-layout, moin-components;
+
+@layer moin-theme {
+  :root {
+    color-scheme: light dark;
+
+    /* Type */
+    /* The system's fonts: nothing to load, nothing that flickers. */
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-sans);
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --weight-title: 600;
+    --tracking-title: -0.025em;
+
+    /* Size: everything is in rem, so this one number scales everything. */
+    --scale: 1;
+    font-size: calc(100% * var(--scale));
+
+    /* Space: five steps do almost everything, 20 and 32 are the rare ones. */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    /* Shape: one number. Every corner is a multiple of it, so at 0 everything
+       is square: tiny things, what you press, what holds it. Something inside
+       a box takes the box's corner minus the gap, never its own number.
+       Round things stay round. */
+    --radius: 0.5rem;
+    --radius-sm: calc(var(--radius) * 0.5);
+    --radius-md: calc(var(--radius) * 1.5);
+    --radius-lg: calc(var(--radius) * 2);
+    --radius-full: 9999px;
+    /* The gap around anything lit inside a group. */
+    --inset: 0.1875rem;
+    /* How far a scrollbar stays from the edge of a round box: what the
+       biggest corner cuts off. */
+    --scroll-edge: calc(var(--radius-lg) * 0.3);
+    /* How far what is lit in a menu stays from its edge. */
+    --menu-gap: max(calc(2 * var(--inset)), var(--scroll-edge));
+
+    /* Density: one number for how tight everything sits. Everything you press
+       is this high, rows and cards follow. */
+    --density: 1;
+    --press-size: calc(2.75 * var(--density));
+    --press: calc(var(--press-size) * 1rem);
+    --row: calc(4rem * var(--density));
+    --pad: calc(1.5rem * var(--density));
+
+    /* Motion */
+    --fast: 120ms;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+
+    /* Focus */
+    --focus: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
+
+    /* Lit: what the pointer is on, one step toward the text, so it shows
+       on any surface. Pressed is one more step. */
+    --hover: color-mix(in oklab, var(--foreground) 8%, transparent);
+    --active: color-mix(in oklab, var(--foreground) 12%, transparent);
+
+    /* Depth */
+    --shadow-low: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
+    --shadow-float: 0 25px 50px -12px rgb(0 0 0 / 25%);
+
+    /* Ground and text */
+    --background: light-dark(#f2f2f7, #000000);
+    --foreground: light-dark(#000000, #ffffff);
+    --card: light-dark(#ffffff, #1c1c1e);
+    --card-foreground: light-dark(#000000, #ffffff);
+    --popover: light-dark(#ffffff, #2c2c2e);
+    --popover-foreground: light-dark(#000000, #ffffff);
+    --muted: light-dark(#e5e5ea, #2c2c2e);
+    --muted-foreground: light-dark(#636366, #98989f);
+    --border: light-dark(rgb(0 0 0 / 8%), rgb(255 255 255 / 16%));
+
+    /* Ink: the brand is black on light and white on dark. */
+    --primary: light-dark(oklch(0.16 0 0), oklch(0.96 0 0));
+    --primary-foreground: light-dark(oklch(0.99 0 0), oklch(0.13 0 0));
+    --ring: light-dark(oklch(0.16 0 0 / 40%), oklch(0.97 0 0 / 40%));
+
+    /* Status: the only color there is. */
+    --live: light-dark(oklch(0.66 0.17 150), oklch(0.74 0.17 150));
+    --running: light-dark(oklch(0.64 0.15 70), oklch(0.82 0.15 80));
+    --failed: light-dark(oklch(0.6 0.22 25), oklch(0.68 0.2 25));
+    --idle: light-dark(oklch(0.6 0 0), oklch(0.55 0 0));
+    /* A status as words: pulled toward the text color, so it stays readable. */
+    --live-text: color-mix(in oklab, var(--live), var(--foreground) 34%);
+    --failed-text: color-mix(in oklab, var(--failed), var(--foreground) 30%);
+
+    /* Logs and commands */
+    --terminal: light-dark(oklch(0.16 0 0), #2c2c2e);
+    --terminal-foreground: light-dark(oklch(0.9 0 0), oklch(0.88 0 0));
+    /* What a highlighter marks in code. */
+    --code-keyword: #fc5fa3;
+    --code-string: #fc6a5d;
+    --code-comment: #7f8c98;
+    --code-function: #67b7a4;
+    --code-number: #d0bf69;
+
+    /* Charts: one color and its shades. Ink by default. */
+    --chart-base: var(--foreground);
+    --chart-1: var(--chart-base);
+    --chart-2: color-mix(in oklab, var(--chart-base) 72%, var(--card));
+    --chart-3: color-mix(in oklab, var(--chart-base) 50%, var(--card));
+    --chart-4: color-mix(in oklab, var(--chart-base) 30%, var(--card));
+    --chart-5: color-mix(in oklab, var(--chart-base) 16%, var(--card));
+
+    /* Menus: a select's list and the palette. */
+    --menu: var(--popover);
+    --menu-foreground: var(--popover-foreground);
+    --menu-lit: color-mix(in oklab, currentColor 8%, transparent);
+    --menu-blur: none;
+
+    /* Overlays */
+    --muted-raised: light-dark(#e5e5ea, #3a3a3c);
+    --knob: #ffffff;
+    --dim: rgb(0 0 0 / 30%);
+  }
+
+  /* Hidden stays hidden, whatever display a component sets. */
+  [hidden] {
+    display: none !important;
+  }
+
+  /* Nothing set follows the system. A class or data-theme picks one. */
+  :root.light,
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root.dark,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  *,
+  ::before,
+  ::after {
+    box-sizing: border-box;
+  }
+
+  /* Every scrollbar: thin, in the color of the text, on nothing. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent;
+  }
+
+  html {
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
+  }
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :where(h1, h2, h3, p, ul, ol, figure, pre) {
+    margin: 0;
+    padding: 0;
+    font: inherit;
+  }
+  :where(ul, ol) {
+    list-style: none;
+  }
+  :where(a) {
+    color: inherit;
+    text-decoration: none;
+  }
+  :where(button, input, textarea, select) {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+  :where(button) {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+@keyframes moin-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Layout: how things sit next to each other, and the five sizes
+   of text. The container makes the space with gap, never the element. */
+
+@layer moin-layout {
+  .moin-stack,
+  .moin-row,
+  .moin-grid {
+    --gap: var(--space-4);
+    gap: var(--gap);
+    min-width: 0;
+  }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="1"] { --gap: var(--space-1); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="2"] { --gap: var(--space-2); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="3"] { --gap: var(--space-3); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="6"] { --gap: var(--space-6); }
+  :is(.moin-stack, .moin-row, .moin-grid)[data-gap="8"] { --gap: var(--space-8); }
+
+  /* Under each other. */
+  .moin-stack {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Next to each other. */
+  .moin-row {
+    display: flex;
+    align-items: center;
+  }
+  .moin-row[data-wrap] { flex-wrap: wrap; }
+  .moin-row[data-between] { justify-content: space-between; }
+  .moin-row[data-end] { justify-content: flex-end; }
+  .moin-row[data-top] { align-items: flex-start; }
+
+  /* Next to each other from a tablet up, under each other on a phone. */
+  @media (max-width: 39.99rem) {
+    .moin-row[data-phone="stack"] {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  /* Two columns from a tablet up, as high as the highest. */
+  .moin-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  @media (min-width: 40rem) {
+    .moin-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  /* Up to this many columns, each at least 14rem wide: it wraps by itself. */
+  .moin-grid:is([data-cols="2"], [data-cols="3"], [data-cols="4"]) {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(14rem, calc((100% - (var(--n) - 1) * var(--gap)) / var(--n)))), 1fr));
+  }
+  .moin-grid[data-cols="2"] { --n: 2; }
+  .moin-grid[data-cols="3"] { --n: 3; }
+  .moin-grid[data-cols="4"] { --n: 4; }
+  /* One wide and one narrow. */
+  @media (min-width: 40rem) {
+    .moin-grid[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    .moin-grid[data-cols="1-2"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  }
+  /* Tiles of different sizes. data-wide takes two columns, data-tall two
+     rows. Two columns, four on a desktop. */
+  .moin-bento {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: dense;
+    gap: var(--space-4);
+  }
+  .moin-bento > [data-wide] { grid-column: span 2; }
+  @media (min-width: 64rem) {
+    .moin-bento { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .moin-bento > [data-tall] { grid-row: span 2; }
+  }
+
+  /* Groups of different length, two columns from a tablet up: each column
+     fills up, so no holes stay. */
+  @media (min-width: 48rem) {
+    .moin-columns { columns: 2; column-gap: var(--space-6); }
+  }
+
+  /* As many columns as fit, each at least --min wide, sharing the width. */
+  .moin-grid[data-fit] {
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--min, 12rem), 100%), 1fr));
+  }
+
+  /* One width for the whole product. */
+  .moin-page {
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding-left: max(var(--gutter, 1rem), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--gutter, 1rem), env(safe-area-inset-right, 0px));
+    padding-top: var(--page-top, 0);
+  }
+  @media (min-width: 40rem) {
+    .moin-page {
+      --gutter: 1.5rem;
+    }
+  }
+
+  /* What a page holds: the page width, what is in it under each other. */
+  .moin-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding-block: var(--space-6) 5rem;
+  }
+
+  /* A block of a page: a quiet title, an action at its end. */
+  .moin-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .moin-section-head {
+    display: flex;
+    min-height: 2rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .moin-section-head > :is(h2, h3) {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  .moin-row[data-center] { justify-content: center; }
+  .moin-row[data-baseline] { align-items: baseline; }
+  .moin-stack[data-center] { align-items: center; }
+  /* As wide as text reads well, or --width. On a moin-page it stays centered. */
+  .moin-narrow { max-width: var(--width, 42rem); }
+
+  /* The first screen of a landing page: under a floating bar, words in the
+     middle, and what shows them below. */
+  .moin-hero {
+    --bar: 4.25rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    margin-block-start: calc(var(--bar) * -1);
+    overflow: hidden;
+  }
+  .moin-hero > :first-child {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    padding-block: calc(var(--bar) + 2rem) 2rem;
+    text-align: center;
+  }
+  /* The picture under the words, whole, as much room above it as the
+     words have between them. */
+  .moin-hero > :last-child {
+    flex: none;
+    width: 100%;
+    padding-block: var(--space-6) var(--space-8);
+  }
+  @media (min-width: 40rem) {
+    .moin-hero { --bar: 4.75rem; }
+    .moin-hero > :first-child { padding-block: calc(var(--bar) + 2.5rem) 2.5rem; }
+    .moin-hero > :last-child { padding-block-start: var(--space-8); }
+  }
+
+  /* A section of a landing page: room above it, its head, then
+     everything else in one flow, one gap apart: cards, grids, tables,
+     lines. The head stands further off, the same everywhere. */
+  .moin-band {
+    --band: 8rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding-block-start: var(--band);
+  }
+  :is(main, .moin-page:last-child) > .moin-band:last-child { padding-block-end: var(--band); }
+  /* A page made of bands starts with its head: less room above it, under
+     the bar. */
+  main.moin-page > .moin-band:first-child { padding-block-start: var(--page-head, 4rem); }
+  /* Text to read in a band: as wide as it reads well, in the middle. */
+  .moin-band > .moin-narrow { width: 100%; margin-inline: auto; }
+  @media (min-width: 40rem) {
+    .moin-band { --band: 11rem; }
+    main.moin-page { --page-head: 6rem; }
+  }
+  /* The head of a band in the middle, 40 px over what follows: the band's
+     gap and this. */
+  .moin-band-head { align-items: center; text-align: center; margin-block-end: var(--space-6); }
+  .moin-band-head > .moin-lead { max-width: 60ch; text-wrap: balance; }
+  /* The first of a stack takes the room left, so what follows sits at the
+     bottom. */
+  .moin-stack[data-fill] > :first-child { flex: 1; }
+  .moin-fill { flex: 1; min-width: var(--fill-min, 0); }
+  .moin-end { margin-inline-start: auto; }
+  .moin-scroll { overflow-x: auto; min-width: 0; }
+  /* Both ways, up to --scroll-max high: what stays in view needs this box. */
+  .moin-scroll[data-both] {
+    max-height: var(--scroll-max, 36rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .moin-hidden-phone { display: none; }
+  @media (min-width: 40rem) {
+    .moin-hidden-phone { display: revert; }
+    .moin-only-phone { display: none; }
+  }
+
+  /* Out to the edge of its card, past the card's padding. */
+  .moin-bleed { margin-inline: calc(-1 * var(--pad)); }
+  /* The whole width of a grid. */
+  .moin-grid > [data-wide] { grid-column: 1 / -1; }
+
+  /* A link to a place on the page stops under the floating bar, or --jump. */
+  :target { scroll-margin-block-start: var(--jump, 6rem); }
+
+  /* A form with two ways. Inside data-either, the radio marked data-other
+     shows the parts marked data-way="other" in place of those marked
+     data-way="first", with no script. */
+  [data-either]:not(:has(input[data-other]:checked)) [data-way="other"],
+  [data-either]:has(input[data-other]:checked) [data-way="first"] { display: none; }
+
+  /* What a pick opens. In a list, the item marked data-picked right after a
+     pick item shows only while that one is picked, with no script. */
+  label.moin-item:not(:has(:checked)) + [data-picked] { display: none; }
+}
+
+/* A group of moin-columns is one box on its own line, past the display of
+   whatever it is, a card too. So a column break never carries its margin to
+   the top of the next column, in any engine. */
+@layer moin-components {
+  .moin-columns.moin-columns > * {
+    display: inline-flex;
+    flex-direction: column;
+    width: 100%;
+    vertical-align: top;
+    break-inside: avoid;
+    margin-block-end: var(--space-6);
+  }
+}
+
+/* The icons, drawn on one 24 grid. Each is a mask, so it takes the color of
+   the text around it. One file each in assets/icons. */
+
+@layer moin-components {
+  .moin-icon {
+    display: inline-block;
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    background: currentColor;
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+  .moin-icon[data-size="s"] {
+    width: 1rem;
+    height: 1rem;
+  }
+  .moin-icon-check { --i: url("../icons/check.svg"); }
+  .moin-icon-copy { --i: url("../icons/copy.svg"); }
+  .moin-icon-search { --i: url("../icons/search.svg"); }
+  .moin-icon-theme { --i: url("../icons/theme.svg"); }
+  .moin-icon-x { --i: url("../icons/x.svg"); }
+  .moin-icon-x-logo { --i: url("../icons/x-logo.svg"); }
+  .moin-icon-git-hub { --i: url("../icons/git-hub.svg"); }
+  .moin-icon-shield { --i: url("../icons/shield.svg"); }
+  .moin-icon-route { --i: url("../icons/route.svg"); }
+  .moin-icon-cloud { --i: url("../icons/cloud.svg"); }
+  .moin-icon-ban { --i: url("../icons/ban.svg"); }
+  .moin-icon-refresh { --i: url("../icons/refresh.svg"); }
+  .moin-icon-eye { --i: url("../icons/eye.svg"); }
+}
+
+@layer moin-components {
+  /* Whatever scrolls at the edge of a round box. A scrollbar sits inside the
+     border, so a see-through border keeps it and its corner in the curve. */
+  .moin-code > pre,
+  .moin-palette-list {
+    border: var(--scroll-edge) solid transparent;
+  }
+
+  /* The focus ring of everything you can press. */
+  .moin-button:focus-visible,
+  .moin-input:focus-visible,
+  .moin-tab:focus-visible,
+  .moin-back:focus-visible,
+  .moin-copy:focus-visible,
+  .moin-choice > label:has(:focus-visible) {
+    box-shadow: var(--focus);
+  }
+}
+
+@layer moin-components {
+  /* Text: five sizes and a few ways to say more. */
+  .moin-title {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-family: var(--font-heading);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+  }
+  .moin-heading {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 500;
+  }
+  .moin-text {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-small {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .moin-muted { color: var(--muted-foreground); }
+  .moin-strong { font-weight: 500; }
+  .moin-mono { font-family: var(--font-mono); }
+  .moin-digits { font-variant-numeric: tabular-nums; }
+  .moin-center { text-align: center; text-wrap: balance; }
+  /* The sizes of a landing page: its one promise, a statement per section,
+     a sentence that leads to the rest, and a sign-off word as big as the page. */
+  .moin-display {
+    font-family: var(--font-heading);
+    font-size: 12vw;
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.06em;
+  }
+  .moin-statement {
+    font-family: var(--font-heading);
+    font-size: 2.25rem;
+    font-weight: var(--weight-title);
+    line-height: 2.5rem;
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+  .moin-lead {
+    max-width: var(--measure, 76ch);
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    color: var(--muted-foreground);
+    text-wrap: pretty;
+  }
+  .moin-huge { font-size: clamp(4rem, 13vw, 8rem); line-height: 1; }
+  @media (min-width: 40rem) {
+    .moin-display { font-size: clamp(3rem, 5.4vw, 5.75rem); letter-spacing: -0.05em; }
+    .moin-statement { font-size: 3rem; line-height: 1; }
+    .moin-lead[data-large] { font-size: 1.25rem; }
+  }
+  /* The plain text color inside a quiet line, and the colors of a state. */
+  .moin-foreground { color: var(--foreground); }
+  /* Long words break instead of pushing the box wider. */
+  .moin-break { overflow-wrap: anywhere; }
+  .moin-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A link in a line of text. */
+  .moin-link {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
+  .moin-link:hover { color: var(--foreground); }
+  /* A link that is a name: the underline comes with the pointer. */
+  .moin-link[data-quiet]:not(:hover) { text-decoration: none; }
+}
+
+@layer moin-components {
+  /* Button: a pill, the same height everywhere. One primary per screen. */
+  .moin-button {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    height: var(--press);
+    padding-inline: var(--space-5);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    cursor: pointer;
+    transition: background-color var(--fast) var(--ease);
+  }
+  .moin-button:hover { background: color-mix(in oklab, var(--muted) 70%, transparent); }
+  .moin-button[data-kind="primary"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .moin-button[data-kind="primary"]:hover { background: color-mix(in oklab, var(--primary) 85%, transparent); }
+  .moin-button[data-kind="danger"] { color: var(--failed-text); }
+  .moin-button[data-kind="danger"]:hover { background: color-mix(in oklab, var(--failed) 10%, transparent); }
+  .moin-button:disabled {
+    pointer-events: none;
+    opacity: 0.4;
+  }
+
+  /* A button that stays pressed: a real checkbox inside it. */
+  .moin-button:has(> input[type="checkbox"]) { position: relative; }
+  .moin-button > input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .moin-button:has(> input:checked),
+  .moin-button:has(> input:checked):hover {
+    background: var(--foreground);
+    color: var(--background);
+  }
+  .moin-button:has(> input:focus-visible) { box-shadow: var(--focus); }
+
+  /* A button that did its job shows a check, at the same size. */
+  .moin-button:is([data-done], [data-copied]),
+  .moin-button[aria-busy="true"] {
+    position: relative;
+    color: transparent;
+  }
+  .moin-button:is([data-done], [data-copied])::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    background: var(--foreground);
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+  .moin-button[data-kind="primary"]:is([data-done], [data-copied])::after { background: var(--primary-foreground); }
+  .moin-button[aria-busy="true"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--muted-foreground);
+    border-top-color: var(--foreground);
+    border-radius: var(--radius-full);
+    animation: moin-spin 0.7s linear infinite;
+  }
+
+  /* A button with only an icon in it. */
+  .moin-button[data-icon] {
+    width: var(--press);
+    padding-inline: 0;
+    color: var(--muted-foreground);
+  }
+  .moin-button[data-icon]:hover {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+  .moin-button[data-icon][data-kind="danger"]:hover { color: var(--failed-text); }
+  .moin-button[data-quiet] { background: transparent; }
+  /* Quiet words: a way elsewhere under the real buttons. */
+  .moin-button[data-muted] { color: var(--muted-foreground); }
+  .moin-button[data-muted]:hover { color: var(--foreground); }
+  .moin-button[data-quiet]:hover { background: var(--muted); }
+  .moin-button[data-icon][aria-current] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  /* The button of a row that shares the line with a short control. */
+  @media (max-width: 39.99rem) {
+    .moin-button[data-phone="fill"] { flex: 1; }
+  }
+}
+
+@layer moin-components {
+  /* Fields. 16 px on phones, so iOS does not zoom in. */
+  .moin-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: var(--press);
+    padding-inline: var(--space-5);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    font-size: 1rem;
+    outline: none;
+  }
+  @media (min-width: 40rem) {
+    .moin-input { font-size: 0.875rem; }
+  }
+  .moin-input::placeholder { color: var(--muted-foreground); }
+  .moin-input:disabled { opacity: 0.4; }
+  /* A field without a box until you press it, for a cell of a table. */
+  .moin-input[data-bare] {
+    max-width: 22rem;
+    min-width: 6rem;
+    padding-inline: var(--space-3);
+    overflow: hidden;
+    background: transparent;
+    font-family: var(--font-mono);
+    text-overflow: ellipsis;
+    field-sizing: content;
+  }
+  .moin-input[data-bare]:hover { background: var(--hover); }
+  .moin-input[data-bare]:focus-visible { background: var(--muted); }
+  .moin-input[data-bare]::placeholder { font-style: italic; }
+  .moin-input[data-num] { text-align: right; }
+  .moin-input[data-state="saved"] { color: var(--live-text); }
+  .moin-input[data-state="failed"] { color: var(--failed-text); }
+  .moin-input[aria-invalid="true"] {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--failed) 30%, transparent);
+  }
+
+  /* A field with an icon in it. An input cannot hold anything, so a box holds
+     both: the icon sits over the field and the text moves over for it. */
+  .moin-input-icon {
+    position: relative;
+    min-width: 0;
+  }
+  .moin-input-icon > .moin-icon {
+    position: absolute;
+    top: 50%;
+    left: var(--space-5);
+    translate: 0 -50%;
+    color: var(--muted-foreground);
+    pointer-events: none;
+  }
+  .moin-input-icon > .moin-input { padding-inline-start: 3rem; }
+
+}
+
+@layer moin-components {
+  /* One of these: pills in a pill, the open one lifted. Links in .moin-tabs,
+     radios in .moin-choice. */
+  .moin-tabs,
+  .moin-choice {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    width: fit-content;
+    max-width: 100%;
+    height: var(--press);
+    padding: var(--space-1);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .moin-choice[data-size="s"] { height: 2.25rem; }
+  .moin-tab,
+  .moin-choice > label {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-2);
+    height: 100%;
+    padding-inline: var(--space-4);
+    border-radius: max(0px, calc(var(--radius-md) - var(--space-1)));
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-tab:hover,
+  .moin-choice > label:hover { color: var(--foreground); }
+  .moin-tab[aria-current],
+  .moin-choice > label:has(:checked) {
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow: var(--shadow-low);
+  }
+  .moin-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  /* One that cannot be picked yet. */
+  .moin-choice > label:has(:disabled) { opacity: 0.4; cursor: not-allowed; }
+  .moin-choice > label:has(:disabled):hover { color: var(--muted-foreground); }
+  /* The one in use: a green dot after the label. */
+  .moin-tab[data-live]::after {
+    content: "";
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--live);
+  }
+
+  /* The parts of a choice: inside data-surfaces, the data-surface of the
+     checked radio shows and the others go. */
+  [data-surface] { display: none; }
+  [data-surfaces]:has([value="web"]:checked) [data-surface="web"],
+  [data-surfaces]:has([value="cli"]:checked) [data-surface="cli"],
+  [data-surfaces]:has([value="tui"]:checked) [data-surface="tui"],
+  [data-surfaces]:has([value="api"]:checked) [data-surface="api"],
+  [data-surfaces]:has([value="mcp"]:checked) [data-surface="mcp"] { display: block; }
+
+  /* Quiet: only words, for tabs under tabs. */
+  .moin-tabs[data-quiet] {
+    gap: var(--space-5);
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .moin-tabs[data-quiet] .moin-tab {
+    height: auto;
+    padding: var(--space-1) 0;
+  }
+  .moin-tabs[data-quiet] .moin-tab[aria-current]:not(:focus-visible) {
+    background: none;
+    box-shadow: none;
+  }
+}
+
+@layer moin-components {
+  /* As wide as its longest option, within the screen. */
+  [data-select-label] > .moin-icon {
+    margin-inline-end: var(--space-2);
+    vertical-align: text-bottom;
+  }
+
+  /* One option of a list you pick from: a select and the palette. */
+  .moin-option {
+    display: flex;
+    width: 100%;
+    min-height: var(--press);
+    align-items: center;
+    gap: var(--space-3);
+    /* The text starts where the text of the field it belongs to starts. */
+    padding: var(--space-2) calc(var(--space-5) - var(--menu-gap));
+    /* Its curve runs along the one of the menu it is in. */
+    border-radius: max(0px, calc(var(--radius-lg) - var(--menu-gap)));
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: left;
+    outline: none;
+    cursor: pointer;
+  }
+  button.moin-option:is(:hover, :focus-visible),
+  .moin-option:has(:focus),
+  .moin-option[aria-selected="true"] {
+    background: var(--menu-lit);
+    color: var(--menu-lit-foreground, inherit);
+  }
+  .moin-option:has(:checked) { font-weight: 500; }
+  .moin-option:has(:checked)::after {
+    content: "";
+    flex: none;
+    margin-inline-start: auto;
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+}
+
+@layer moin-components {
+  /* A list is only rows, with a thin line between them. A card is the
+     surface under them. */
+  .moin-list {
+    --item-edge: var(--space-5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .moin-item {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    width: 100%;
+    min-height: var(--row);
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--item-edge);
+    border: 0;
+    background: none;
+    text-align: left;
+    outline: none;
+  }
+  /* The line over every item but the first; it starts where the text does. */
+  .moin-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--item-edge);
+    right: var(--item-edge);
+    height: 1px;
+    background: var(--border);
+  }
+  .moin-item:first-child::before { display: none; }
+  .moin-item:has(> [data-lead])::before { left: calc(var(--item-edge) + 3rem); }
+  /* The light of an item: the same gap on every side, so two lit items never
+     touch. Its corners are the card's minus the two gaps, all four the same. */
+  .moin-item::after {
+    content: "";
+    position: absolute;
+    inset: var(--inset);
+    z-index: -1;
+    border-radius: var(--lit);
+  }
+  .moin-item,
+  .moin-expand > summary {
+    --lit: max(0px, calc(var(--radius-lg) - 2 * var(--inset)));
+  }
+  .moin-item[data-control] { flex-wrap: wrap; }
+  :is(a, button, label).moin-item { cursor: pointer; }
+  :is(a, button, label).moin-item:is(:hover, :focus-visible)::after,
+  a.moin-item[aria-current]::after,
+  label.moin-item:is(:has(:checked), :has(:focus-visible))::after {
+    background: var(--hover);
+  }
+  :is(a, button, label).moin-item:active::after {
+    background: var(--active);
+  }
+  /* A lit item and the lines next to it give way. */
+  :is(a, button, label).moin-item:is(:hover, :focus-visible)::before,
+  :is(a, button, label).moin-item:is(:hover, :focus-visible) + :is(.moin-item, .moin-expand)::before,
+  a.moin-item[aria-current]::before,
+  a.moin-item[aria-current] + :is(.moin-item, .moin-expand)::before,
+  label.moin-item:is(:has(:checked), :has(:focus-visible))::before,
+  label.moin-item:is(:has(:checked), :has(:focus-visible)) + :is(.moin-item, .moin-expand)::before {
+    opacity: 0;
+  }
+  button.moin-item[data-danger] { color: var(--failed-text); }
+  label.moin-item input:is([type="radio"], [type="checkbox"]) { position: absolute; opacity: 0; pointer-events: none; }
+
+  .moin-item-text { flex: 1; min-width: 0; }
+  .moin-item-name {
+    display: block;
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-item-note {
+    display: block;
+    overflow: hidden;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* A list whose notes are sentences: they wrap instead of ending in "…". */
+  .moin-list[data-wrap] :is(.moin-item-name, .moin-item-note) { white-space: normal; text-wrap: pretty; }
+  /* A hint says what the item is about, in a sentence that wraps. */
+  .moin-item-value {
+    flex: none;
+    max-width: 50%;
+    overflow: hidden;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moin-chevron,
+  .moin-out {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    background: var(--muted-foreground);
+    -webkit-mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+    mask: url("../icons/chevron-right.svg") center / contain no-repeat;
+  }
+  .moin-out {
+    -webkit-mask-image: url("../icons/external.svg");
+    mask-image: url("../icons/external.svg");
+  }
+
+  .moin-item > [data-lead] { display: flex; flex: none; }
+}
+
+@layer moin-components {
+  /* An item that opens what is under it in place. */
+  .moin-expand { position: relative; }
+  .moin-expand::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--item-edge, var(--space-5));
+    right: var(--item-edge, var(--space-5));
+    height: 1px;
+    background: var(--border);
+  }
+  .moin-expand > summary {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    min-height: var(--row);
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--item-edge, var(--space-5));
+    font-weight: 500;
+    list-style: none;
+    outline: none;
+    cursor: pointer;
+  }
+  .moin-expand > summary::-webkit-details-marker { display: none; }
+  .moin-expand > summary::after {
+    content: "";
+    position: absolute;
+    inset: var(--inset);
+    z-index: -1;
+    border-radius: var(--lit);
+  }
+  .moin-expand > summary:is(:hover, :focus-visible)::after {
+    background: var(--hover);
+  }
+  .moin-expand > summary .moin-chevron { transition: rotate var(--fast) var(--ease); }
+  .moin-expand[open] > summary .moin-chevron { rotate: 90deg; }
+  .moin-expand > div > .moin-item:first-child::before { display: block; }
+
+  /* Quiet: a few words that open more words under them. No line, no light,
+     the size of the text around it. The chevron says it opens. */
+  .moin-expand[data-quiet] { color: var(--muted-foreground); }
+  .moin-expand[data-quiet]::before,
+  .moin-expand[data-quiet] > summary::after { display: none; }
+  .moin-expand[data-quiet] > summary {
+    display: inline-flex;
+    max-width: 100%;
+    min-height: 0;
+    gap: var(--space-1);
+    padding: var(--space-1) 0;
+    font-weight: inherit;
+  }
+  .moin-expand[data-quiet] > summary .moin-item-name { font-weight: inherit; }
+  .moin-expand[data-quiet] > summary:is(:hover, :focus-visible) { color: var(--foreground); }
+  .moin-list > .moin-expand:first-child::before { display: none; }
+  /* A lit item and the lines next to it give way, as for any other item. */
+  .moin-expand:has(> summary:is(:hover, :focus-visible))::before,
+  .moin-expand:has(> summary:is(:hover, :focus-visible)) > div > .moin-item:first-child::before,
+  .moin-expand:not([open]):has(> summary:is(:hover, :focus-visible)) + :is(.moin-expand, .moin-item)::before,
+  .moin-expand[open]:has(> div > :is(a, button, label).moin-item:last-child:is(:hover, :focus-visible)) + :is(.moin-expand, .moin-item)::before {
+    opacity: 0;
+  }
+}
+
+@layer moin-components {
+  /* A card: one topic. A title with at most one action next to it, and a
+     foot with buttons when it asks for something. */
+  .moin-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+    padding: var(--pad);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .moin-card[data-center] { justify-content: center; }
+  .moin-card[data-gap="1"] { gap: var(--space-1); }
+  .moin-card[data-gap="6"] { gap: var(--space-6); }
+  .moin-card[data-gap="8"] { gap: var(--space-8); }
+  .moin-card[data-flush] { padding-inline: 0; }
+  /* The one card that closes a page: more room around what it says, and
+     shorter lines. */
+  .moin-card[data-roomy] { --pad: calc(2rem * var(--density)); --measure: 60ch; }
+  @media (min-width: 40rem) {
+    .moin-card[data-roomy] { --pad: calc(4rem * var(--density)); }
+  }
+  .moin-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: var(--press);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+  }
+  /* A fact: a name a step bigger than text. */
+  .moin-fact-name {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    line-height: 1.3;
+  }
+  /* The foot of a card in a grid sits at its bottom, so cards side by side
+     end on one line. What is in it is as wide as the card. */
+}
+
+@layer moin-components {
+  /* A whole card can be a link. */
+  a.moin-card { transition: background-color var(--fast) var(--ease); }
+  a.moin-card:hover { background-image: linear-gradient(var(--hover), var(--hover)); }
+  a.moin-card:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  /* The one card that stands out. */
+  .moin-card[data-ink] {
+    --card: var(--foreground);
+    --card-foreground: var(--background);
+    --muted-foreground: color-mix(in oklab, var(--background) 65%, var(--foreground));
+  }
+  a.moin-card[data-ink]:hover { background: color-mix(in oklab, var(--foreground), var(--background) 12%); }
+}
+
+@layer moin-components {
+  /* A list in a card runs to --inset from the card's edge. The light of an
+     item then sits the same distance from the card on every side, and the
+     words line up with the card's own. */
+  .moin-card > .moin-list {
+    --item-edge: calc(var(--pad) - var(--inset));
+    margin-inline: calc(var(--inset) - var(--pad));
+  }
+  .moin-card > .moin-list:first-child { margin-block-start: calc(var(--inset) - var(--pad)); }
+  .moin-card > .moin-list:last-child { margin-block-end: calc(var(--inset) - var(--pad)); }
+  /* A flush card has no padding at the sides to run past. */
+  .moin-card[data-flush] > .moin-list { margin-inline: var(--inset); }
+
+  /* In a grid a card with only a list is as tall as its rows, not as its
+     neighbor. */
+  .moin-grid > .moin-card:has(> .moin-list:only-child) { align-self: start; }
+}
+
+@layer moin-components {
+  /* State: a dot, a word, a pill. */
+  .moin-dot {
+    display: inline-block;
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--idle);
+  }
+  .moin-dot[data-state="live"] {
+    background: var(--live);
+    animation: moin-breathe 2.4s ease-out infinite;
+  }
+  .moin-dot[data-state="running"] {
+    background: var(--running);
+    animation: moin-blink 1.2s ease-in-out infinite;
+  }
+  .moin-dot[data-state="failed"] { background: var(--failed); }
+  .moin-dot[data-state="waiting"] {
+    background: none;
+    border: 1.5px solid var(--running);
+  }
+  .moin-dot[data-state="idle"] {
+    background: none;
+    border: 1.5px solid var(--muted-foreground);
+  }
+  .moin-dot[data-state="done"] {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 0;
+    background: var(--muted-foreground);
+    -webkit-mask: url("../icons/check.svg") center / contain no-repeat;
+    mask: url("../icons/check.svg") center / contain no-repeat;
+  }
+
+}
+
+@layer moin-components {
+  /* A command to copy: as wide as the command, never wider than its
+     place; there it scrolls inside. */
+  .moin-command {
+    --copy-gap: max(var(--scroll-edge), var(--space-1));
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    height: var(--press);
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-5) var(--copy-gap);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+  }
+  .moin-command > code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .moin-copy {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    /* In the corner of its box its curve runs along the box's. */
+    border-radius: max(0px, calc(var(--copy-outer, var(--radius-md)) - var(--copy-gap, 0px)));
+    color: var(--muted-foreground);
+    outline: none;
+  }
+  .moin-copy:hover {
+    background: var(--hover);
+    color: var(--foreground);
+  }
+  .moin-copy[data-copied] { color: var(--live); }
+  .moin-copy > .moin-icon { width: 1rem; height: 1rem; }
+  .moin-copy[data-copied] > .moin-icon {
+    -webkit-mask-image: url("../icons/check.svg");
+    mask-image: url("../icons/check.svg");
+  }
+}
+
+@layer moin-components {
+  /* Overlays float one step lighter than what they cover, with no border. */
+  .moin-palette::backdrop { background: var(--dim); }
+
+  .moin-palette {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .moin-palette-box {
+    display: flex;
+    flex-direction: column;
+    width: min(38rem, calc(100vw - 2rem));
+    max-height: min(70vh, 34rem);
+    margin: 12vh auto 0;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--menu);
+    color: var(--menu-foreground);
+    backdrop-filter: var(--menu-blur);
+    -webkit-backdrop-filter: var(--menu-blur);
+    box-shadow: var(--shadow-float);
+  }
+  .moin-palette-box > .moin-input-icon { flex: none; }
+  .moin-palette-box .moin-input::-webkit-search-cancel-button { display: none; }
+  .moin-palette-box .moin-input {
+    height: 4rem;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 1rem;
+  }
+  .moin-palette-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: calc(var(--menu-gap) - var(--scroll-edge));
+    padding-top: calc(2 * var(--inset));
+    border-top: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .moin-palette-list:empty { display: none; }
+
+}
+
+@layer moin-components {
+  /* The head of every page: the way back, then the title, big. */
+  .moin-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .moin-header-back {
+    display: flex;
+    height: 1.5rem;
+    align-items: center;
+  }
+  .moin-back {
+    display: flex;
+    height: 2rem;
+    margin-inline-start: -0.375rem;
+    align-items: center;
+    gap: 2px;
+    padding-inline: var(--space-1) var(--space-2);
+    border-radius: var(--radius-md);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    outline: none;
+  }
+  .moin-back:hover { color: var(--foreground); }
+  .moin-back::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    -webkit-mask: url("../icons/chevron-left.svg") center / contain no-repeat;
+    mask: url("../icons/chevron-left.svg") center / contain no-repeat;
+  }
+  .moin-header-main {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: var(--press);
+    align-items: center;
+    gap: var(--space-3) var(--space-2);
+  }
+  .moin-header-main > .moin-title {
+    margin-inline-end: var(--space-2);
+    padding-block: var(--space-1);
+  }
+  /* The actions keep their own width at the end of the title's line, on a
+     phone too: a button, not a block. */
+  .moin-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+  }
+
+}
+
+@layer moin-components {
+  /* The bar: the same on every page, a line only once the page scrolls. */
+  .moin-bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 40;
+    background: color-mix(in oklab, var(--background) 85%, transparent);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    animation: moin-bar-line linear both;
+    animation-timeline: scroll();
+    animation-range: 0 1.5rem;
+  }
+  .moin-bar-inner {
+    display: flex;
+    height: 4rem;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  /* Floating: over the page, for a public site. */
+  .moin-bar[data-float] {
+    padding: var(--space-3) var(--space-3) 0;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    animation: none;
+  }
+  .moin-bar[data-float] > .moin-bar-inner {
+    max-width: 64rem;
+    height: 3.5rem;
+    margin-inline: auto;
+    /* What you press in it nests: its corner is the bar's minus the gap. */
+    --bar-gap: 0.375rem;
+    padding-inline: var(--space-5) var(--bar-gap);
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklab, var(--card) 85%, transparent);
+    box-shadow: var(--shadow-low), 0 0 0 1px color-mix(in oklab, var(--foreground) 5%, transparent);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  @media (min-width: 40rem) {
+    .moin-bar[data-float] {
+      padding-inline: var(--space-6);
+    }
+    .moin-bar[data-float] > .moin-bar-inner {
+      --bar-gap: 0.625rem;
+      height: 4rem;
+      padding-inline: var(--space-6) var(--bar-gap);
+    }
+  }
+
+  /* The places of a site, next to its name. On a phone the footer has them. */
+  .moin-bar-links {
+    display: none;
+    align-items: center;
+    margin-inline-start: var(--space-3);
+  }
+  .moin-bar-links > a {
+    padding-inline: var(--space-4);
+    color: var(--muted-foreground);
+  }
+  .moin-bar-links > a[aria-current] { color: var(--foreground); }
+  @media (min-width: 48rem) {
+    .moin-bar-links { display: flex; }
+  }
+}
+
+@layer moin-components {
+  /* Footer: a brand, columns of links, one last line. */
+  .moin-footer {
+    padding-block: var(--space-8);
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-footer-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-8) var(--space-6);
+  }
+  .moin-footer-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+    grid-column: 1 / -1;
+  }
+  .moin-footer-brand > a { color: var(--foreground); }
+  .moin-footer-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .moin-footer-column > h2 {
+    margin-block-end: var(--space-2);
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  /* Big enough to hit with a finger. */
+  .moin-footer-column > a {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+  .moin-footer-column > a:hover { color: var(--foreground); }
+  .moin-footer-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-6);
+    margin-block-start: var(--space-8);
+  }
+  @media (min-width: 40rem) {
+    .moin-footer { padding-block: 4rem var(--space-8); }
+    .moin-footer-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (min-width: 64rem) {
+    /* The brand, then one column for each column of links, however many. */
+    .moin-footer-columns {
+      grid-template-columns: 1.6fr;
+      grid-auto-columns: minmax(0, 1fr);
+      grid-auto-flow: column;
+    }
+    .moin-footer-brand { grid-column: auto; }
+  }
+}
+
+@layer moin-components {
+  /* A badge: a word that labels something. */
+  .moin-badge {
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-full);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+  }
+  /* A chip: a short label next to a name, a step louder than a badge. */
+  .moin-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 1.5rem;
+    padding-inline: 0.625rem;
+    border-radius: var(--radius-full);
+    background: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* A pill link: a quiet pill with an arrow, for the one next step. */
+  .moin-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 2rem;
+    padding-inline: var(--space-4);
+    border-radius: var(--radius-full);
+    background: var(--card);
+    box-shadow: 0 0 0 1px light-dark(rgb(0 0 0 / 14%), rgb(255 255 255 / 24%));
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background-color var(--fast) var(--ease), gap var(--fast) var(--ease);
+  }
+  .moin-pill:hover { background: var(--hover); gap: var(--space-3); }
+  .moin-pill:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--foreground), var(--focus); }
+
+  /* A mark: a round answer as high as a line. yes, part, no, or blank. */
+  .moin-mark {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .moin-mark[data-kind="yes"] {
+    background: var(--live);
+    color: #fff;
+  }
+  .moin-mark[data-kind="part"] {
+    border: 1px solid color-mix(in oklab, var(--foreground) 30%, transparent);
+    color: var(--muted-foreground);
+  }
+  .moin-mark[data-kind="no"] {
+    border: 1px solid color-mix(in oklab, var(--failed) 55%, transparent);
+    color: var(--failed-text);
+  }
+  .moin-mark > .moin-icon { width: 0.75rem; height: 0.75rem; }
+}
+
+@layer moin-components {
+
+}
+
+@layer moin-components {
+  /* App icon: a logo on a white tile in both themes, or a letter on ink. */
+  .moin-app-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0.375rem;
+    overflow: hidden;
+    border-radius: 28%;
+    background: white;
+    box-shadow: 0 0 0 1px color-mix(in oklab, black 8%, transparent);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .moin-app-icon[data-large] { width: 2.75rem; height: 2.75rem; font-size: 1.125rem; }
+  .moin-app-icon[data-letter] { background: var(--foreground); color: var(--background); box-shadow: none; }
+  .moin-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
+}
+
+@layer moin-components {
+  /* A line in the page that says what failed, under what sent it. */
+  .moin-message {
+    padding: var(--space-2) var(--space-5);
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+  }
+  .moin-message[data-state="failed"] { color: var(--failed-text); }
+}
+
+@layer moin-components {
+  /* Code to read and copy. */
+  .moin-code {
+    /* On this box, quiet text and hovers follow its own text color. */
+    --foreground: var(--terminal-foreground);
+    --muted-foreground: color-mix(in oklab, var(--terminal-foreground) 65%, transparent);
+    position: relative;
+    min-width: 0;
+    --copy-outer: var(--radius-lg);
+    --copy-gap: max(var(--scroll-edge), var(--space-1));
+    /* Always a box, also on a card of the same color. */
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--terminal);
+    color: var(--terminal-foreground);
+  }
+  .moin-code > pre {
+    max-height: 28rem;
+    padding: calc(var(--space-4) - var(--scroll-edge)) calc(var(--space-5) - var(--scroll-edge));
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    font-variant-ligatures: none;
+    white-space: pre;
+    tab-size: 2;
+  }
+  .moin-code[data-wrap] > pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .moin-code > .moin-copy {
+    position: absolute;
+    /* Off the corner also when the theme has no radius. */
+    top: var(--copy-gap);
+    right: var(--copy-gap);
+    background: var(--terminal);
+  }
+  .moin-code > .moin-copy:hover { background: color-mix(in oklab, var(--foreground) 12%, var(--terminal)); }
+  /* Code a highlighter marked. Chroma, Pygments and Rouge write these names. */
+  .moin-code :is(.k, .kc, .kd, .kn, .kp, .kr, .kt) { color: var(--code-keyword); }
+  .moin-code :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sx) { color: var(--code-string); }
+  .moin-code :is(.c, .c1, .ch, .cm, .cp, .cs) { color: var(--code-comment); }
+  .moin-code :is(.nf, .fm, .nb) { color: var(--code-function); }
+  .moin-code :is(.m, .mb, .mf, .mh, .mi, .mo) { color: var(--code-number); }
+}
+
+@layer moin-components {
+  /* What happened, newest first. */
+  .moin-timeline > li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0 0 var(--space-5) var(--space-6);
+  }
+  .moin-timeline > li:last-child { padding-bottom: 0; }
+  .moin-timeline > li::before {
+    content: "";
+    position: absolute;
+    top: 0.4375rem;
+    left: 0;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-full);
+    background: var(--foreground);
+  }
+  .moin-timeline > li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 1.375rem;
+    bottom: 0.1875rem;
+    left: 0.28125rem;
+    width: 1px;
+    background: var(--border);
+  }
+}
+
+@layer moin-components {
+  /* Prose: docs and articles. One class on what holds the markdown. */
+  /* It stops at a preview and at code: those look like themselves. */
+  @scope (.moin-prose) to (.moin-preview > *, .moin-code > *) {
+    :scope { line-height: 1.7; }
+    :scope > * + * { margin-block-start: var(--space-4); }
+    :is(h1, h2, h3) {
+      font-family: var(--font-heading);
+      font-weight: var(--weight-title);
+      letter-spacing: var(--tracking-title);
+    }
+    h1 { font-size: 1.875rem; line-height: 2.25rem; }
+    h2 { margin-block-start: var(--space-8); font-size: 1.5rem; line-height: 2rem; }
+    h3 { margin-block-start: var(--space-6); font-size: 1.125rem; line-height: 1.75rem; }
+    a { text-decoration: underline; text-underline-offset: 0.2em; }
+    ul { padding-inline-start: 1.25rem; list-style: disc; }
+    ol { padding-inline-start: 1.25rem; list-style: decimal; }
+    :not(pre) > code {
+      padding: 0.125em 0.375em;
+      border-radius: var(--radius-sm);
+      background: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+    }
+    pre {
+      padding: var(--space-4) var(--space-5);
+      overflow-x: auto;
+      border-radius: var(--radius-lg);
+      background: var(--terminal);
+      color: var(--terminal-foreground);
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+    }
+    blockquote {
+      padding-inline-start: var(--space-4);
+      border-inline-start: 2px solid var(--border);
+      color: var(--muted-foreground);
+    }
+    hr {
+      height: 1px;
+      border: 0;
+      background: var(--border);
+    }
+    img {
+      max-width: 100%;
+      border-radius: var(--radius-lg);
+    }
+    /* A table: a line between its rows. Only its own box scrolls sideways. */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    th {
+      padding: var(--space-2) var(--space-3);
+      color: var(--muted-foreground);
+      font-weight: 500;
+      text-align: left;
+      white-space: nowrap;
+    }
+    td {
+      padding: var(--space-2) var(--space-3);
+      border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr > :first-child { padding-inline-start: 0; }
+    tr > :last-child { padding-inline-end: 0; }
+  }
+}
+
+@layer moin-components {
+  /* The bar of an app: whole width, a line under it, the tabs at its
+     bottom edge. */
+  .moin-bar[data-app] {
+    animation: none;
+    box-shadow: 0 1px 0 var(--border);
+  }
+  .moin-bar[data-app] .moin-bar-inner { gap: var(--space-3); }
+
+  /* Tabs as a line of words: the open one dark, a line under it. Each is
+     as high as a finger, its words in line with the page's edge. */
+  .moin-tabs[data-line] {
+    gap: 0;
+    height: auto;
+    margin-inline-start: calc(-1 * var(--space-3));
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    overflow: visible;
+  }
+  .moin-tabs[data-line] .moin-tab {
+    position: relative;
+    height: var(--press);
+    padding-inline: var(--space-3);
+  }
+  .moin-tabs[data-line] .moin-tab[aria-current] {
+    background: none;
+    box-shadow: none;
+  }
+  .moin-tabs[data-line] .moin-tab[aria-current]::after {
+    content: "";
+    position: absolute;
+    right: var(--space-3);
+    bottom: 0;
+    left: var(--space-3);
+    height: 2px;
+    border-radius: var(--radius-full);
+    background: var(--foreground);
+  }
+}
+
+@layer moin-components {
+  /* A state as a dot and a word. Failed says it in red. */
+  .moin-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+  .moin-status[data-state="failed"] { color: var(--failed-text); }
+  .moin-status > .moin-muted { margin-inline-start: calc(-1 * var(--space-1)); }
+  /* In a narrow place it wraps, the dot on the first line. */
+  :is(.moin-stat-note, .moin-rows-cell) > .moin-status { align-items: baseline; white-space: normal; }
+  :is(.moin-stat-note, .moin-rows-cell) > .moin-status > .moin-dot { translate: 0 -0.0625rem; }
+  /* On a pill of its own, one of a row. */
+  .moin-status[data-pill] {
+    height: 2rem;
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    font-weight: 500;
+  }
+  .moin-status[data-pill] > .moin-muted { font-weight: 400; }
+
+  /* A thin bar as full as its share. */
+  .moin-meter {
+    display: block;
+    height: 0.375rem;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--muted);
+  }
+  .moin-meter > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--foreground);
+  }
+
+  /* The strip that says what needs you: on the card's surface, a thin
+     line in the state's color around it. */
+  .moin-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--idle) 45%, transparent);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-notice[data-state="failed"] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--failed) 45%, transparent); }
+  .moin-notice[data-state="running"] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--running) 45%, transparent); }
+  .moin-notice > .moin-dot { align-self: flex-start; margin-block-start: 0.375rem; }
+  .moin-notice-text {
+    display: flex;
+    flex: 1 1 16rem;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .moin-notice-text > strong { font-weight: 600; }
+  .moin-notice-action { display: flex; flex: none; gap: var(--space-2); }
+
+  /* Big numbers side by side on one surface, a hairline between them. */
+  .moin-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--border);
+  }
+  .moin-stats > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  @media (min-width: 40rem) {
+    .moin-stats {
+      grid-template-columns: none;
+      grid-auto-columns: minmax(0, 1fr);
+      grid-auto-flow: column;
+    }
+    .moin-stats > :last-child:nth-child(odd) { grid-column: auto; }
+  }
+  .moin-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-5) var(--pad);
+    background: var(--card);
+  }
+  .moin-stat-label,
+  .moin-stat-note {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-stat-note { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+  .moin-stat-value {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    line-height: 2.5rem;
+    overflow-wrap: anywhere;
+  }
+  /* In a Card the stats run to its top and sides, one surface with what
+     follows, a hairline between. */
+  .moin-card > .moin-stats {
+    margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .moin-card > .moin-stats + * { margin-block-start: calc(-1 * var(--space-1)); }
+  .moin-stat-value > small {
+    color: var(--muted-foreground);
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+
+  /* A few short facts in a row, a quiet name over each. */
+  .moin-values {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+    gap: var(--space-3) var(--space-4);
+    margin: 0;
+    padding-block-start: var(--space-4);
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-values dt { color: var(--muted-foreground); font-size: 0.75rem; line-height: 1rem; }
+  .moin-values dd { margin: var(--space-1) 0 0; font-weight: 500; }
+
+  /* Bars: a few counts, one row each: the name and a quiet note, the
+     number at the end, a thin bar under it as wide as its share. */
+  .moin-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-bars > li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+  }
+  /* Two columns in a Card, under the columns of Stats: the left under the
+     first two, the right under the last two. */
+  @media (min-width: 40rem) {
+    .moin-card > .moin-bars[data-cols="2"] {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(var(--bars-rows), auto);
+      gap: var(--space-3) calc(2 * var(--pad));
+      margin-inline: calc(-1 * var(--pad));
+      padding-inline: var(--pad);
+    }
+  }
+  .moin-bars-bar {
+    grid-column: 1 / -1;
+    height: 0.1875rem;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--muted);
+  }
+  .moin-bars-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--muted-foreground);
+  }
+}
+
+@layer moin-components {
+  /* A compact table: one line per thing, the columns lined up, a line
+     between the rows. The first column is the widest. */
+  .moin-rows {
+    --rows-edge: var(--space-5);
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) repeat(var(--rows-rest, 1), minmax(0, 1fr));
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-rows[data-cols="3"] { --rows-rest: 2; }
+  .moin-rows[data-cols="4"] { --rows-rest: 3; }
+  .moin-rows[data-cols="5"] { --rows-rest: 4; }
+  .moin-rows[data-cols="6"] { --rows-rest: 5; }
+  .moin-rows[data-cols="7"] { --rows-rest: 6; }
+  .moin-rows-head,
+  .moin-rows-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    gap: 0 var(--space-4);
+    padding-inline: var(--rows-edge);
+  }
+  .moin-rows-head {
+    min-height: 2.25rem;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  .moin-rows-row {
+    min-height: 3.25rem;
+    padding-block: var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+  a.moin-rows-row,
+  .moin-rows-more { transition: background-color var(--fast) var(--ease); }
+  a.moin-rows-row:hover,
+  .moin-rows-more:hover { background: var(--hover); }
+  a.moin-rows-row:focus-visible,
+  .moin-rows-more:focus-visible { outline: none; box-shadow: inset var(--focus); }
+  .moin-rows-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-4);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .moin-rows-cell:first-child { font-weight: 500; }
+  .moin-rows-cell:first-child .moin-muted { font-weight: 400; }
+  /* Cells of a few lines start at the top, a mark on their first line. */
+  .moin-rows[data-top] .moin-rows-row { align-items: start; }
+  .moin-rows[data-top] .moin-rows-row { padding-block: var(--space-4); }
+  .moin-rows[data-top] .moin-rows-cell { flex-wrap: nowrap; align-items: start; gap: var(--space-3); }
+  .moin-rows-more {
+    display: flex;
+    grid-column: 1 / -1;
+    min-height: var(--press);
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+  }
+  .moin-rows-more:hover { color: var(--foreground); }
+  /* On a phone a row folds: the first cell on a line, the rest after it. */
+  @media (max-width: 39.99rem) {
+    .moin-rows { display: flex; flex-direction: column; }
+    .moin-rows-head { display: none; }
+    .moin-rows-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-3);
+      padding-block: var(--space-3);
+    }
+    .moin-rows-cell { color: var(--muted-foreground); }
+    .moin-rows-cell:first-child { flex-basis: 100%; color: var(--foreground); }
+    .moin-rows-cell:empty { display: none; }
+    .moin-rows-row > :first-child + * { margin-inline-start: 0; }
+  }
+  /* In a card the rows run to its edges, the words in line with the
+     card's own; the first line under the card's head. */
+  .moin-card > .moin-rows {
+    --rows-edge: var(--pad);
+    margin-inline: calc(-1 * var(--pad));
+  }
+  .moin-card > .moin-rows:last-child { margin-block-end: calc(-1 * var(--pad)); }
+  .moin-card > .moin-rows:last-child > :last-child { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+  /* Rows that open a card start at its top edge. On a phone, with no
+     head, the first row has no line over it. */
+  .moin-card > .moin-rows:first-child { margin-block-start: calc(-1 * var(--pad)); }
+  .moin-card > .moin-rows:first-child > .moin-rows-head { min-height: var(--press); }
+  .moin-card > .moin-rows[data-top]:first-child > .moin-rows-head { padding-block-start: var(--space-4); min-height: 0; padding-block-end: var(--space-2); }
+  @media (max-width: 39.99rem) {
+    .moin-card > .moin-rows:first-child > .moin-rows-head + * { border-top: 0; }
+  }
+  .moin-card-head + .moin-rows { margin-block-start: calc(-1 * var(--space-3)); }
+  .moin-card-head + .moin-list { margin-block-start: calc(-1 * var(--space-3)); }
+  .moin-card-head + .moin-values { padding-block-start: 0; border-top: 0; }
+}
+
+
+@layer moin-components {
+  /* The last line of an app's page: quiet links, the theme at its end. */
+  .moin-app-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-5);
+    padding-block: var(--space-4) var(--space-6);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-app-foot > a { display: flex; align-items: center; min-height: var(--press); }
+  .moin-app-foot > a:hover { color: var(--foreground); }
+
+  /* Signing in: the wordmark at the top, one narrow column in the middle
+     of the screen, the foot at the bottom. What you press in the column
+     is as wide as it. */
+  .moin-auth {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100svh;
+  }
+  .moin-auth > header { height: 4rem; }
+  .moin-auth-main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-4);
+    width: min(100% - 2rem, 24rem);
+    margin-inline: auto;
+    padding-block: var(--space-8) 4rem;
+  }
+  .moin-auth-main :is(.moin-button, .moin-input, .moin-command) { width: 100%; }
+  /* Signing in reads in the middle, like the head of every page. */
+  .moin-auth-main > :is(h1, p) { text-align: center; text-wrap: balance; }
+}
+
+@layer moin-components {
+  @media (prefers-reduced-motion: reduce) {
+    .moin-dot,
+    .moin-bar { animation: none; }
+  }
+}
+
+@keyframes moin-breathe {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent); }
+  70% { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes moin-pulse {
+  50% { opacity: 0.5; }
+}
+@keyframes moin-blink {
+  50% { opacity: 0.35; }
+}
+@keyframes moin-bar-line {
+  from { box-shadow: 0 1px 0 transparent; }
+  to { box-shadow: 0 1px 0 var(--border); }
+}
+
+/* A terminal window with real CLI output: a bar with three dots and its
+   title, then the lines. Playing, the lines come one after the other. */
+@layer moin-components {
+  .moin-terminal {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--terminal);
+    color: var(--terminal-foreground);
+    box-shadow: var(--shadow-float);
+  }
+  .moin-terminal-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--terminal-foreground) 10%, transparent);
+  }
+  .moin-terminal-bar > i {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--terminal-foreground) 22%, transparent);
+  }
+  .moin-terminal-bar > span {
+    flex: 1;
+    margin-inline-end: 3.25rem;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: color-mix(in oklab, var(--terminal-foreground) 55%, transparent);
+  }
+  .moin-terminal-body {
+    padding: 1.25rem 1.5rem 1.5rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: clamp(12px, 1.3vw, 14px);
+    line-height: 1.6;
+    font-variant-ligatures: none;
+  }
+  .moin-terminal-line { white-space: pre; color: color-mix(in oklab, var(--terminal-foreground) 62%, transparent); }
+  .moin-terminal[data-wrap] .moin-terminal-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .moin-terminal-line[data-kind="prompt"] { color: var(--terminal-foreground); font-weight: 600; }
+  .moin-terminal-line[data-kind="done"] { color: var(--terminal-foreground); font-weight: 600; }
+  .moin-terminal-line[data-kind="done"]::first-letter { color: var(--live); }
+  .moin-terminal-line[data-kind="failed"]::first-letter { color: var(--failed); }
+  .moin-terminal-line[data-kind="ask"] { color: var(--terminal-foreground); }
+  .moin-terminal-line[data-kind="hint"] { color: color-mix(in oklab, var(--terminal-foreground) 80%, transparent); }
+  .moin-terminal-cursor::after {
+    content: "";
+    display: inline-block;
+    width: 0.6em;
+    height: 1.1em;
+    vertical-align: -0.2em;
+    background: var(--terminal-foreground);
+    animation: moin-blink 1.1s steps(1) infinite;
+  }
+  @keyframes moin-blink { 50% { opacity: 0; } }
+  @keyframes moin-line-in { from { opacity: 0; transform: translateY(0.25rem); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .moin-terminal[data-play] .moin-terminal-line {
+      animation: moin-line-in 0.28s var(--ease) both;
+      animation-delay: calc(0.35s + var(--line) * 0.22s);
+    }
+    .moin-terminal[data-play] .moin-terminal-cursor { animation: moin-line-in 0.28s var(--ease) both; animation-delay: calc(0.35s + var(--line) * 0.22s); }
+  }
+  @media (prefers-reduced-motion: reduce) { .moin-terminal-cursor::after { animation: none; } }
+}
+
+/* The site's own: its fonts and the art of the home page. */
+@font-face {
+  font-family: "Geist";
+  src: url("../fonts/geist/geist-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../fonts/geist/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The wall of containers at the bottom of the home page's last card, out to
+   its edges and round with its corners. light-dark() takes colors only, so
+   every shade is a whole color with its alpha. */
+.hub-harbor-in-card {
+  height: clamp(9rem, 24vw, 18rem);
+  margin-bottom: calc(-1 * var(--pad));
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+/* Gulls over the wall, on its right, in the air between the words and it. */
+.hub-gulls {
+  align-self: flex-end;
+  width: clamp(5rem, 12vw, 8rem);
+  margin: var(--space-4) 8% 0 0;
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+.hub-harbor {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+.hub-harbor-shade { stop-color: light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.6)); }
+.hub-harbor-card { fill: var(--card); }
+.hub-harbor-muted { fill: var(--muted); }
+.hub-harbor-ink { fill: var(--foreground); }
+.hub-harbor-tint-5 { fill: color-mix(in oklab, var(--foreground) 5%, transparent); }
+.hub-harbor-tint-9 { fill: color-mix(in oklab, var(--foreground) 9%, transparent); }
+.hub-harbor-side { fill: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.5)); }
+.hub-harbor-foot { fill: light-dark(rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.65)); }
+.hub-harbor-on-ink { fill: var(--background); }
+.hub-harbor-on-steel { fill: var(--foreground); }
+.hub-harbor-owner { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; }
+.hub-harbor-type { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.45; }
+.hub-harbor-app { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; opacity: 0.60; }
+.hub-harbor-app[data-ink] { opacity: 0.85; }
+.hub-harbor-rib { fill: color-mix(in oklab, var(--foreground) 7.5%, transparent); }
+.hub-harbor-rib-ink { fill: color-mix(in oklab, var(--background) 14%, transparent); }
+.hub-harbor-rail { fill: color-mix(in oklab, var(--foreground) 10%, transparent); }
+.hub-harbor-rail-ink { fill: color-mix(in oklab, var(--background) 12%, transparent); }
+
+/* The landing page: the start of its hero, the watcher's chat and the two
+   roads. */
+.moin-hero-start { width: min(100%, 34rem); margin-inline: auto; }
+.moin-pre { white-space: pre-line; }
+.moin-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+/* The chat's avatar, and its messages at the bottom, the newest last, as
+   Telegram shows them. */
+.moin-chat-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; }
+.moin-chat-messages { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-2); }
+.moin-chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 28rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.moin-chat-message time { float: right; margin: 0.25rem 0 0 var(--space-3); font-size: 0.75rem; }
+.moin-roads { display: block; width: 100%; height: auto; color: var(--foreground); }
+.moin-roads-muted { fill: var(--muted-foreground); }
+.moin-roads-ink { fill: var(--foreground); }
+.moin-roads-ink-text { fill: var(--background); }
+.moin-roads[data-tall] { max-width: 22rem; margin-inline: auto; }
+@media (min-width: 40rem) { .moin-roads[data-tall] { display: none; } }
+@media (max-width: 39.99rem) { .moin-roads:not([data-tall]) { display: none; } }
+
+
+
+/* A post from X, as X shows it: who wrote it, the words, what people did
+   with it. Every card has the same size, so the row is calm: the words are
+   cut to fit. The link to the post stretches over the whole card; the
+   links in the words sit on top. */
+.moin-tweet {
+  position: relative;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 17.5rem;
+  height: 12.5rem;
+  overflow: hidden;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--card-foreground);
+  transition: background-color var(--fast) var(--ease);
+}
+@media (min-width: 40rem) { .moin-tweet { width: 21.25rem; } }
+.moin-tweet:hover { background-image: linear-gradient(var(--hover), var(--hover)); }
+.moin-tweet:has(.moin-tweet-view:focus-visible) { box-shadow: var(--focus); }
+.moin-tweet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.moin-tweet-head > .moin-icon { align-self: flex-start; margin-inline-start: auto; color: var(--muted-foreground); }
+.moin-tweet-face {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  object-fit: cover;
+}
+.moin-tweet-who { display: flex; flex-direction: column; min-width: 0; }
+.moin-tweet-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 0.875rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+}
+.moin-tweet-check { flex: none; width: 0.875rem; height: 0.875rem; }
+.moin-tweet-meta { font-size: 0.8125rem; line-height: 1rem; color: var(--muted-foreground); }
+/* Five lines at most, then an ellipsis. */
+.moin-tweet-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  min-height: 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+/* Links in the words: quiet, the underline comes with the pointer. */
+.moin-tweet-inner {
+  position: relative;
+  z-index: 1;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+.moin-tweet-inner:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
+.moin-tweet-foot {
+  flex: none;
+  display: flex;
+  gap: var(--space-4);
+  margin-block-start: auto;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.moin-tweet-view:focus-visible { outline: none; }
+.moin-tweet-view::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* The marquee: a row of posts that site.js moves slowly to the left, and a
+   hand can drag or swipe. It holds its posts twice, so the loop has no
+   seam. The edges fade out. Reduced motion: it only scrolls, and the copy
+   goes. */
+.moin-marquee {
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+.moin-marquee::-webkit-scrollbar { display: none; }
+.moin-marquee[data-dragging] { cursor: grabbing; }
+.moin-marquee img { -webkit-user-drag: none; }
+.moin-marquee-row { display: flex; width: max-content; }
+.moin-marquee-track {
+  display: flex;
+  gap: var(--space-4);
+  padding-inline-end: var(--space-4);
+}
+@media (max-width: 39.99rem) {
+  .moin-marquee {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .moin-marquee { padding-inline: var(--gutter, 1rem); }
+  .moin-marquee-track[aria-hidden] { display: none; }
+}
+
+/* "Open source." in the hero: the one word that stands out, a quiet link
+   to the code. */
+.moin-hero-open { font-weight: 600; }
+
+@layer moin-components {
+  /* Compare: the choices side by side. One grid; each column spans every
+     row on the rows' own lines, so the rows line up and a column is one
+     surface from head to foot. */
+  .moin-compare {
+    display: grid;
+    grid-template-columns: minmax(12rem, 1.5fr) repeat(var(--cols), minmax(0, 1fr));
+    column-gap: var(--space-2);
+    padding-block-start: var(--space-4);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-compare[data-cols="2"] { --cols: 2; }
+  .moin-compare[data-cols="3"] { --cols: 3; }
+  .moin-compare[data-cols="4"] { --cols: 4; }
+  .moin-compare[data-cols="5"] { --cols: 5; }
+  .moin-compare[data-cols="6"] { --cols: 6; }
+  .moin-compare[data-cols="7"] { --cols: 7; }
+  .moin-compare-labels,
+  .moin-compare-col {
+    display: grid;
+    grid-row: 1 / span var(--compare-rows);
+    grid-template-rows: subgrid;
+    min-width: 0;
+  }
+  .moin-compare-cell,
+  .moin-compare-head,
+  .moin-compare-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    text-align: center;
+  }
+  .moin-compare-cell { min-height: 4.5rem; border-top: 1px solid var(--border); }
+  .moin-compare-labels .moin-compare-cell { align-items: flex-start; font-weight: 500; text-align: start; padding-inline-start: 0; }
+  .moin-compare-head { gap: 2px; padding-block: var(--space-6) var(--space-4); }
+  .moin-compare-name.moin-link { text-decoration: none; }
+  .moin-compare-name.moin-link:hover { text-decoration: underline; }
+  .moin-compare-name { font-size: 1.125rem; line-height: 1.5rem; font-weight: 500; }
+  .moin-compare-head .moin-small { font-size: 0.875rem; line-height: 1.25rem; color: var(--foreground); }
+  .moin-compare-foot { justify-content: flex-start; padding-block: var(--space-5) var(--space-2); }
+  .moin-compare-foot .moin-button { width: 100%; }
+  .moin-compare-text { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .moin-compare-what { display: none; }
+  .moin-compare-text:not(:has(.moin-small)) { display: none; }
+  /* Only a plain yes has a color: the other answers are quiet. */
+  .moin-compare .moin-mark:not([data-kind="yes"]) {
+    border-color: var(--border);
+    color: var(--muted-foreground);
+  }
+  /* The featured column: raised past the top and bottom of the card, one
+     surface with a quiet ink edge and a soft shadow. */
+  .moin-compare-col[data-featured] {
+    position: relative;
+    isolation: isolate;
+    border-radius: var(--radius-lg);
+  }
+  .moin-compare-col[data-featured]::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 calc(-1 * var(--space-3));
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px light-dark(rgb(0 0 0 / 14%), rgb(255 255 255 / 28%));
+  }
+  .moin-compare-col[data-featured] .moin-compare-name { font-weight: 600; }
+  .moin-compare-badge {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 50%;
+    translate: -50% -50%;
+    padding: 2px var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  /* On a phone: one card for each choice, the featured one first. */
+  @media (max-width: 47.99rem) {
+    .moin-compare { display: flex; flex-direction: column; gap: var(--space-6); padding: 0; background: none; }
+    .moin-compare[data-reverse] { flex-direction: column-reverse; }
+    .moin-compare-labels { display: none; }
+    .moin-compare-col {
+      display: flex;
+      flex-direction: column;
+      padding: var(--pad);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+    }
+    .moin-compare:not([data-reverse]) > .moin-compare-col[data-featured] { order: -1; }
+    .moin-compare[data-cols="5"] > .moin-compare-col,
+    .moin-compare[data-cols="6"] > .moin-compare-col,
+    .moin-compare[data-cols="7"] > .moin-compare-col { padding-block: var(--space-4); }
+    .moin-compare-col[data-featured]::before { inset: 0; }
+    .moin-compare > .moin-compare-col[data-featured]:has(.moin-compare-badge) { margin-block-start: var(--space-4); padding-block-start: calc(var(--pad) + var(--space-2)); }
+    .moin-compare-head { align-items: flex-start; padding: 0 0 var(--space-3); text-align: start; }
+    .moin-compare-cell {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-start;
+      min-height: 0;
+      gap: var(--space-3);
+      padding: var(--space-2) 0;
+      border-top: 0;
+      text-align: start;
+    }
+    .moin-compare-text { align-items: flex-start; }
+    .moin-compare-text:not(:has(.moin-small)) { display: flex; }
+    .moin-compare-what { display: inline; }
+    .moin-compare-foot { padding: var(--space-4) 0 0; border-top: 0; }
+  }
+  /* With words: each answer reads from the start, its mark, its words and
+     the line under them, the label at the top of its row. */
+  .moin-compare-answer { color: var(--foreground); font-weight: 500; }
+  .moin-compare[data-text] .moin-compare-text { display: flex; align-items: flex-start; }
+  .moin-compare[data-text] .moin-mark { margin-block-start: 1px; }
+  @media (min-width: 48rem) {
+    .moin-compare[data-text] { grid-template-columns: minmax(10rem, 1fr) repeat(var(--cols), minmax(0, 1.25fr)); }
+    .moin-compare[data-text] :is(.moin-compare-cell, .moin-compare-head) {
+      align-items: flex-start;
+      justify-content: flex-start;
+      text-align: start;
+    }
+    .moin-compare[data-text] .moin-compare-col .moin-compare-cell { flex-direction: row; gap: var(--space-3); }
+    .moin-compare[data-text] .moin-compare-cell { min-height: 0; padding-block: var(--space-4); }
+    /* Room under the table for the featured column, raised past it. */
+    .moin-compare { padding-block-end: var(--space-3); }
+    .moin-compare-head + .moin-compare-group { padding-block-start: 0; }
+  }
+  @media (max-width: 47.99rem) {
+    .moin-compare[data-text] .moin-compare-what { color: var(--muted-foreground); }
+  }
+  /* A group: its name over its first row, in the labels; the columns run
+     through it. */
+  .moin-compare-group {
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-8) 0 var(--space-3);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+  .moin-compare-col .moin-compare-group > span { visibility: hidden; }
+  @media (max-width: 47.99rem) {
+    .moin-compare-group { padding: var(--space-4) 0 var(--space-1); font-size: 1rem; }
+    .moin-compare-col .moin-compare-group > span { visibility: visible; }
+    .moin-compare-head + .moin-compare-group { padding-block-start: 0; }
+  }
+}
+
+@layer moin-components {
+  /* Features: a grid of short items, each a line icon, a bold title and one
+     muted line. No cards. Three across, two on a tablet, one on a phone. */
+  .moin-features {
+    display: grid;
+    gap: var(--space-6) var(--space-8);
+    padding-block: var(--space-4);
+  }
+  .moin-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .moin-feature > .moin-icon { width: 1.5rem; height: 1.5rem; margin-block-start: 1px; }
+  .moin-feature-title { font-weight: 600; }
+  .moin-feature-note { color: var(--muted-foreground); }
+  @media (min-width: 40rem) { .moin-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 64rem) {
+    .moin-features { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 56rem; margin-inline: auto; }
+    .moin-feature { flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+    .moin-feature > .moin-stack { align-items: center; }
+  }
+}
+
+@layer moin-components {
+  /* A drawing on its ground: light, dark, or the page's own. A ground with a
+     scheme keeps it whatever the page's theme, so the kit inside it too. */
+  .moin-ground {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px var(--border);
+    overflow: hidden;
+  }
+  [data-scheme="light"] { color-scheme: light; }
+  [data-scheme="dark"] { color-scheme: dark; }
+  .moin-ground[data-scheme="dark"] { background: var(--background); }
+  .moin-ground-art {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    min-height: 13rem;
+    padding: var(--space-8) var(--pad);
+  }
+  .moin-ground-art > img { height: 4.5rem; max-width: 80%; object-fit: contain; }
+  .moin-ground-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: calc(var(--press) + 2 * var(--space-3));
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  @media (max-width: 39.99rem) {
+    .moin-ground-art { min-height: 10rem; }
+    .moin-ground-art > img { height: 3.5rem; }
+  }
+
+  /* A color, light and dark side by side, each drawn from its token. */
+  .moin-swatch {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-2) var(--space-2) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+  }
+  .moin-swatch-chips,
+  .moin-swatch-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  /* The outline is drawn over both halves, so a white half shows on a white
+     card. */
+  .moin-swatch-chips {
+    height: 6rem;
+    overflow: hidden;
+    border-radius: calc(var(--radius-lg) - var(--space-2));
+    outline: 1px solid var(--border);
+    outline-offset: -1px;
+  }
+  .moin-swatch-chips > span { background: var(--swatch); }
+  .moin-swatch-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-inline: var(--space-3);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-swatch-values { font-size: 0.75rem; line-height: 1rem; }
+  @media (max-width: 39.99rem) {
+    .moin-swatch-chips { height: 4rem; }
+    .moin-swatch-text { padding-inline: var(--space-2); }
+  }
+
+  /* One size of type: its name and setting, then the size, live. */
+  .moin-specimen {
+    display: grid;
+    gap: var(--space-3);
+    padding-block: var(--space-6);
+    border-top: 1px solid var(--border);
+  }
+  .moin-specimen:first-child { border-top: 0; padding-block-start: 0; }
+  .moin-specimen:last-child { padding-block-end: 0; }
+  .moin-specimen-sample { min-width: 0; overflow-wrap: break-word; }
+  @media (min-width: 48rem) {
+    .moin-specimen { grid-template-columns: 12rem minmax(0, 1fr); align-items: center; gap: var(--space-6); }
+  }
+}
+
+/* The brand page: the mark with its sun coming up, the glyphs of the two
+   fonts, and the wordmark set in a font it must never be set in. */
+.moin-brand-story { align-items: center; gap: var(--space-8); }
+.moin-brand-sunrise { display: grid; place-items: center; }
+.moin-sunrise { width: min(100%, 15rem); height: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .moin-sunrise-sun { animation: moin-sunrise 2.4s var(--ease) 0.3s both; }
+}
+@keyframes moin-sunrise {
+  from { transform: translateY(8px); }
+}
+.moin-brand-glyphs { font-weight: 600; letter-spacing: -0.04em; }
+.moin-brand-wrong-font { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 3rem; line-height: 1; }

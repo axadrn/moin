@@ -21,9 +21,8 @@ import (
 // run anywhere: the compose.json of a release, with the proxy as a service
 // of its own and no path of this server. Save it, put a .env with the
 // app's values next to it, and docker compose up -d runs the app, its
-// domains and HTTPS. It holds no value of the env and no hash of the app's
-// password: those stay on the server, and a file that holds one is not
-// made (secretIn). Each ${NAME} stays as written, but
+// domains and HTTPS. It holds no value of the env: those stay on the
+// server, and a file that holds one is not made (secretIn). Each ${NAME} stays as written, but
 // for the settings the deploy filled in (takePlaces): image, ports,
 // expose, volumes, user, the env PORT and the paths of a build.
 //
@@ -35,7 +34,6 @@ import (
 //     the repo's compose file put them, such as ./data;
 //   - app.env, which the app's services read, is .env, the file docker
 //     compose also fills ${NAME} from;
-//   - the app's password is ./htpasswd, mounted into the proxy;
 //   - the instant address stays with moin: it names this server;
 //   - the proxy's network is the file's own, not external;
 //   - a service moin built builds again from ".". A Railpack build keeps
@@ -46,10 +44,6 @@ import (
 // proxyService names the proxy in the compose file, or proxyName when the
 // app has a service of that name.
 const proxyService = "proxy"
-
-// proxyUsers is where the proxy of the compose file reads the app's
-// password.
-const proxyUsers = "/htpasswd"
 
 // composeFile makes the compose file of release number of an app.
 func (a *apps) composeFile(app string, number int) (string, error) {
@@ -78,14 +72,14 @@ func (a *apps) composeFile(app string, number int) (string, error) {
 	dropInstant(app, config)
 	config = takeAlong(config, a.serverPaths(app)).(map[string]any)
 	takeEnvFile(services)
-	held, err := a.secretIn(app, dir, config)
+	held, err := a.secretIn(app, config)
 	if err != nil {
 		return "", err
 	}
 	if held != "" {
 		return "", fmt.Errorf("it holds %s, so it stays on the server: deploy from source once to see it", held)
 	}
-	err = addProxy(config, exists(filepath.Join(dir, "htpasswd")))
+	err = addProxy(config)
 	if err != nil {
 		return "", err
 	}
@@ -97,14 +91,14 @@ func (a *apps) composeFile(app string, number int) (string, error) {
 // such as 1, true or a port, is in many a compose file by chance.
 const minSecret = 6
 
-// secretIn names the env value or password hash of the app the compose
-// file config of the release in dir holds, "" for none. It looks
+// secretIn names the env value of the app the compose file config of the
+// release in dir holds, "" for none. It looks
 // everywhere but in the settings the deploy fills in on purpose
 // (takePlaces) and in the proxy's labels, which name the domains. A
 // deploy from before v1.0.0-beta.35 wrote the values into base.json, and
 // a restart takes the compose file from there: such a file never leaves
 // the server.
-func (a *apps) secretIn(app, dir string, config map[string]any) (string, error) {
+func (a *apps) secretIn(app string, config map[string]any) (string, error) {
 	secrets := map[string]string{}
 	env, err := a.env(app)
 	if err != nil {
@@ -114,15 +108,6 @@ func (a *apps) secretIn(app, dir string, config map[string]any) (string, error) 
 		if len(value) >= minSecret {
 			secrets[value] = "the value of " + key
 			secrets[escape(value)] = "the value of " + key
-		}
-	}
-	// A hash in a compose file has each $ written $$: what follows its
-	// last $, the salt and the digest, is the same either way.
-	body, _ := os.ReadFile(filepath.Join(dir, "htpasswd"))
-	for _, line := range strings.Fields(string(body)) {
-		_, hash, _ := strings.Cut(line, ":")
-		if hash = hash[strings.LastIndex(hash, "$")+1:]; len(hash) >= minSecret {
-			secrets[hash] = "the hash of the app's password"
 		}
 	}
 	if len(secrets) == 0 {
@@ -244,19 +229,17 @@ func dropInstant(app string, config map[string]any) {
 // serverPaths are the paths of an app on this server, and how the compose
 // file writes them.
 type serverPaths struct {
-	source   *regexp.Regexp
-	volumes  string
-	envFile  string
-	password *regexp.Regexp
+	source  *regexp.Regexp
+	volumes string
+	envFile string
 }
 
 func (a *apps) serverPaths(app string) serverPaths {
 	releases := regexp.QuoteMeta(filepath.Join(a.appDir(app), "releases") + "/")
 	return serverPaths{
-		source:   regexp.MustCompile(`^` + releases + `[0-9]+/src(/|$)`),
-		volumes:  filepath.Join(a.appDir(app), "volumes"),
-		envFile:  a.envFile(app),
-		password: regexp.MustCompile(`^` + regexp.QuoteMeta(proxyApps+"/"+app+"/releases/") + `[0-9]+/htpasswd$`),
+		source:  regexp.MustCompile(`^` + releases + `[0-9]+/src(/|$)`),
+		volumes: filepath.Join(a.appDir(app), "volumes"),
+		envFile: a.envFile(app),
 	}
 }
 
@@ -266,8 +249,6 @@ func (paths serverPaths) path(value string) string {
 	switch {
 	case value == paths.envFile:
 		return ".env"
-	case paths.password.MatchString(value):
-		return proxyUsers
 	case paths.source.MatchString(value):
 		return "." + strings.TrimSuffix(paths.source.ReplaceAllString(value, "/"), "/")
 	case value == paths.volumes || strings.HasPrefix(value, paths.volumes+"/"):
@@ -327,8 +308,8 @@ func takeEnvFile(services map[string]any) {
 
 // addProxy adds the proxy as moin runs it, on ports 80 and 443 with
 // certificates from Let's Encrypt, when a service of the app is on its
-// network. password mounts the app's password.
-func addProxy(config map[string]any, password bool) error {
+// network.
+func addProxy(config map[string]any) error {
 	networks, _ := config["networks"].(map[string]any)
 	network, _ := networks[proxyNetwork].(map[string]any)
 	if network == nil {
@@ -344,9 +325,6 @@ func addProxy(config map[string]any, password bool) error {
 		return fmt.Errorf("the app has services named %s and %s, so the proxy has no name: rename one", proxyService, proxyName)
 	}
 	volumes := []any{"/var/run/docker.sock:/var/run/docker.sock:ro", "./traefik:/data"}
-	if password {
-		volumes = append(volumes, "./htpasswd:"+proxyUsers+":ro")
-	}
 	command := []any{}
 	for _, flag := range proxyFlags("direct") {
 		command = append(command, flag)

@@ -1,6 +1,6 @@
 ---
 name: Vikunja
-pitch: To-dos and projects, as lists, boards or a timeline.
+pitch: To-dos and projects. Lists. Boards. A timeline.
 category: Productivity
 website: "https://vikunja.io"
 source: github.com/go-vikunja/vikunja

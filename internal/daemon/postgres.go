@@ -1,21 +1,17 @@
 package daemon
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"log/slog"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/axadrn/moin/protocol"
 )
@@ -62,28 +58,6 @@ func (a *apps) postgres(ctx context.Context, app string, database protocol.Datab
 	return pgTarget{container: container, image: strings.TrimSpace(image), user: user, database: name}, nil
 }
 
-// serviceImage is the image of a service in the app's live release, or ""
-// when there is none.
-func (a *apps) serviceImage(app, service string) string {
-	current := a.current(app)
-	if current == 0 {
-		return ""
-	}
-	body, err := os.ReadFile(filepath.Join(a.releaseDir(app, current), "compose.json"))
-	if err != nil {
-		return ""
-	}
-	var config struct {
-		Services map[string]struct {
-			Image string `json:"image"`
-		} `json:"services"`
-	}
-	if json.Unmarshal(body, &config) != nil {
-		return ""
-	}
-	return config.Services[service].Image
-}
-
 // errPostgresDown is a Postgres service that is not running, such as one
 // that restarts over and over.
 var errPostgresDown = errors.New("not running")
@@ -114,13 +88,15 @@ var servicePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 func validService(name string) bool { return len(name) <= 63 && servicePattern.MatchString(name) }
 
 // exec runs a command in the container with stdin, writing stdout to
-// stdout. A failure carries stderr.
+// stdout. A failure carries the errors of stderr (pgError); all of stderr
+// goes to the server's log only.
 func (t pgTarget) exec(ctx context.Context, stdin io.Reader, stdout io.Writer, args ...string) error {
 	command := exec.CommandContext(ctx, "docker", append([]string{"exec", "-i", t.container}, args...)...)
 	var stderr bytes.Buffer
 	command.Stdin, command.Stdout, command.Stderr = stdin, stdout, &stderr
 	err := command.Run()
 	if err != nil {
+		slog.Error("postgres: a command failed", "command", args[0], "stderr", stderr.String())
 		if message := pgError(stderr.String()); message != "" {
 			return errors.New(message)
 		}
@@ -129,14 +105,30 @@ func (t pgTarget) exec(ctx context.Context, stdin io.Reader, stdout io.Writer, a
 	return nil
 }
 
+// pgPrivate start the parts of an error that quote the app's data: the
+// row a COPY stopped at, the key that is there twice, the command
+// pg_restore ran. pgMessage start the next message, where such a part ends.
+var (
+	pgPrivate = []string{"CONTEXT:", "DETAIL:", "Command was:"}
+	pgMessage = []string{"pg_restore:", "pg_dump:", "psql:", "ERROR:", "FATAL:", "HINT:", "WARNING:", "NOTICE:"}
+)
+
 // pgError turns psql's and pg_restore's stderr into one line: the errors
-// without the input position psql puts before them.
+// without the input position psql puts before them, and without the parts
+// that quote the app's data, so none of it lands in an alert or a report.
 func pgError(stderr string) string {
 	var lines []string
+	private := false
 	for _, line := range strings.Split(stderr, "\n") {
 		line = strings.TrimSpace(line)
+		switch {
+		case startsWith(line, pgPrivate):
+			private = true
+		case startsWith(line, pgMessage):
+			private = false
+		}
 		// The query echo and its caret say where; the message says what.
-		if line == "" || line == "^" || strings.HasPrefix(line, "LINE ") {
+		if private || line == "" || line == "^" || strings.HasPrefix(line, "LINE ") {
 			continue
 		}
 		if strings.HasPrefix(line, "psql:") {
@@ -149,6 +141,11 @@ func pgError(stderr string) string {
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "; ")
+}
+
+// startsWith says line starts with one of starts.
+func startsWith(line string, starts []string) bool {
+	return slices.ContainsFunc(starts, func(start string) bool { return strings.HasPrefix(line, start) })
 }
 
 // psql runs a script on the database: quiet unless tags, unaligned, rows
@@ -171,523 +168,3 @@ func (t pgTarget) psql(ctx context.Context, script string, vars map[string]strin
 // it keeps a PGHOST in the container's environment from sending the tools
 // over TCP, where the image asks for a password.
 const pgSocket = "/var/run/postgresql"
-
-// pgStatementTimeout bounds each statement the browser runs.
-const pgStatementTimeout = "SET statement_timeout = '25s';\n"
-
-// pgTablesSQL lists the tables, partitioned tables, views and materialized
-// views of the public schema with their columns, primary keys, indexes and
-// exact row counts, as one JSON array.
-const pgTablesSQL = `SELECT coalesce(json_agg(json_build_object(
-	'name', c.relname,
-	'type', CASE WHEN c.relkind IN ('v', 'm') THEN 'view' ELSE 'table' END,
-	'rows', CASE WHEN c.relkind IN ('r', 'p', 'm') THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', n.nspname, c.relname), false, true, '')))[1]::text::bigint ELSE 0 END,
-	'rowid', false,
-	'sql', CASE
-		WHEN c.relkind = 'v' THEN format('CREATE VIEW %I AS', c.relname) || E'\n' || rtrim(pg_get_viewdef(c.oid), ';')
-		WHEN c.relkind = 'm' THEN format('CREATE MATERIALIZED VIEW %I AS', c.relname) || E'\n' || rtrim(pg_get_viewdef(c.oid), ';')
-		ELSE format('CREATE TABLE %I (', c.relname) || E'\n' || (
-			SELECT string_agg('  ' || format('%I %s', a.attname, format_type(a.atttypid, a.atttypmod))
-				|| CASE WHEN a.attnotnull THEN ' NOT NULL' ELSE '' END
-				|| coalesce(' DEFAULT ' || pg_get_expr(d.adbin, d.adrelid), ''), E',\n' ORDER BY a.attnum)
-			FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-			WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped)
-			|| coalesce(E',\n  ' || (SELECT pg_get_constraintdef(k.oid) FROM pg_constraint k WHERE k.conrelid = c.oid AND k.contype = 'p'), '')
-			|| E'\n)'
-	END,
-	'columns', (SELECT coalesce(json_agg(json_build_object(
-			'name', a.attname,
-			'type', format_type(a.atttypid, a.atttypmod),
-			'not_null', a.attnotnull,
-			'primary_key', coalesce(a.attnum = ANY(p.indkey), false)) ORDER BY a.attnum), '[]'::json)
-		FROM pg_attribute a LEFT JOIN pg_index p ON p.indrelid = c.oid AND p.indisprimary
-		WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
-	'indexes', (SELECT json_agg(pg_get_indexdef(i.indexrelid) ORDER BY i.indexrelid) FROM pg_index i WHERE i.indrelid = c.oid)
-) ORDER BY c.relname), '[]'::json)
-FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm');`
-
-// pgMigrationTools are the migration tables the browser reads in Postgres,
-// with the query for the newest migration: its version and when it ran.
-var pgMigrationTools = []struct{ table, tool, query string }{
-	{"goose_db_version", "goose", `SELECT json_build_array(version_id::text, tstamp::text) FROM goose_db_version WHERE is_applied ORDER BY id DESC LIMIT 1;`},
-	{"schema_migrations", "migrate", `SELECT json_build_array(version::text, '') FROM schema_migrations ORDER BY version DESC LIMIT 1;`},
-	{"_prisma_migrations", "prisma", `SELECT json_build_array(migration_name, finished_at::text) FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1;`},
-}
-
-// pgTables lists the tables of a Postgres database.
-func (a *apps) pgTables(ctx context.Context, app string, database protocol.Database) (protocol.DBTables, error) {
-	result := protocol.DBTables{Database: database.Path, Tables: []protocol.DBTable{}}
-	target, err := a.postgres(ctx, app, database)
-	if err != nil {
-		return result, err
-	}
-	out, err := target.psql(ctx, pgStatementTimeout+"BEGIN READ ONLY;\n"+pgTablesSQL+"\nROLLBACK;\n", nil, false)
-	if err != nil {
-		return result, err
-	}
-	err = json.Unmarshal([]byte(strings.TrimSpace(out)), &result.Tables)
-	if err != nil {
-		return result, fmt.Errorf("read the tables: %w", err)
-	}
-	for _, known := range pgMigrationTools {
-		for _, table := range result.Tables {
-			if table.Name != known.table {
-				continue
-			}
-			out, err := target.psql(ctx, pgStatementTimeout+"BEGIN READ ONLY;\n"+known.query+"\nROLLBACK;\n", nil, false)
-			var found []string
-			if err == nil && json.Unmarshal([]byte(strings.TrimSpace(out)), &found) == nil && len(found) == 2 {
-				result.Migration = &protocol.DBMigration{Tool: known.tool, Version: found[0], AppliedAt: found[1]}
-			}
-			return result, nil
-		}
-	}
-	return result, nil
-}
-
-// pgQuery runs one read or one write on a Postgres database. Params take
-// the places of the ? marks outside literals, identifiers and comments; a
-// read is one statement and runs in a READ ONLY transaction.
-func (a *apps) pgQuery(ctx context.Context, request protocol.DBQuery, database protocol.Database, before *time.Time) (protocol.DBResult, error) {
-	result := protocol.DBResult{Database: database.Path, Columns: []string{}, Rows: [][]any{}}
-	sql, vars, err := pgBind(request.SQL, request.Params)
-	if err != nil {
-		return result, err
-	}
-	target, err := a.postgres(ctx, request.App, database)
-	if err != nil {
-		return result, err
-	}
-	if request.Write {
-		result.Before = before
-		out, err := target.psql(ctx, pgStatementTimeout+"BEGIN;\n"+sql+"\n;\nCOMMIT;\n", vars, true)
-		if err != nil {
-			return result, err
-		}
-		result.Changes = pgChanges(out)
-		return result, nil
-	}
-	sql = strings.TrimRight(strings.TrimSpace(sql), "; \t\n")
-	if pgMultiple(sql) {
-		return result, errors.New("a read runs one statement: run the others one by one")
-	}
-	first := pgFirstWord(sql)
-	if !slices.Contains([]string{"SELECT", "WITH", "VALUES", "TABLE", "SHOW", "EXPLAIN"}, first) {
-		return result, errors.New("A read cannot change data: run it with --write.")
-	}
-	if first == "SHOW" || first == "EXPLAIN" {
-		return target.pgPlain(ctx, sql, vars, result)
-	}
-	limit := request.Limit
-	if limit <= 0 {
-		limit = defaultRows
-	}
-	limit = min(limit, maxRows)
-	script := pgStatementTimeout + "BEGIN READ ONLY;\n" +
-		"SELECT coalesce(json_agg(to_json(t)), '[]'::json) FROM (SELECT * FROM (\n" + sql + "\n) q LIMIT " + strconv.Itoa(limit+1) + ") t;\n" +
-		"ROLLBACK;\n"
-	out, err := target.psql(ctx, script, vars, false)
-	if err != nil {
-		return result, err
-	}
-	result.Columns, result.Rows, err = pgRows(out)
-	if err != nil {
-		return result, err
-	}
-	if len(result.Rows) > limit {
-		result.Rows, result.Truncated = result.Rows[:limit], true
-	}
-	size := 0
-	for index, row := range result.Rows {
-		for _, value := range row {
-			if text, ok := value.(string); ok {
-				size += len(text)
-			}
-			size += 8
-		}
-		if size > maxResultSize {
-			result.Rows, result.Truncated = result.Rows[:index], true
-			break
-		}
-	}
-	if len(result.Rows) == 0 {
-		// No row names no column: ask Postgres to describe the result.
-		out, err := target.psql(ctx, "BEGIN READ ONLY;\n"+sql+" \\gdesc\nROLLBACK;\n", vars, false)
-		if err == nil {
-			for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-				if name, _, ok := strings.Cut(line, "|"); ok {
-					result.Columns = append(result.Columns, name)
-				}
-			}
-		}
-	}
-	return result, nil
-}
-
-// pgFirstWord is the first keyword of SQL, upper case, after comments,
-// spaces and opening parentheses.
-func pgFirstWord(sql string) string {
-	for {
-		sql = strings.TrimLeft(sql, " \t\r\n(")
-		switch {
-		case strings.HasPrefix(sql, "--"):
-			_, rest, found := strings.Cut(sql, "\n")
-			if !found {
-				return ""
-			}
-			sql = rest
-		case strings.HasPrefix(sql, "/*"):
-			_, rest, found := strings.Cut(sql, "*/")
-			if !found {
-				return ""
-			}
-			sql = rest
-		default:
-			end := strings.IndexFunc(sql, func(r rune) bool { return !(r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') })
-			if end < 0 {
-				end = len(sql)
-			}
-			return strings.ToUpper(sql[:end])
-		}
-	}
-}
-
-// pgPlain runs SHOW or EXPLAIN, which cannot sit in a subquery, in a READ
-// ONLY transaction: one row per line, the columns from \gdesc.
-func (t pgTarget) pgPlain(ctx context.Context, sql string, vars map[string]string, result protocol.DBResult) (protocol.DBResult, error) {
-	const separator = "\x1f"
-	pset := "\\pset fieldsep '\\037'\n"
-	desc, err := t.psql(ctx, "BEGIN READ ONLY;\n"+pset+sql+" \\gdesc\nROLLBACK;\n", vars, false)
-	if err != nil {
-		return result, err
-	}
-	for _, line := range strings.Split(strings.TrimSpace(desc), "\n") {
-		if name, _, ok := strings.Cut(line, separator); ok {
-			result.Columns = append(result.Columns, name)
-		}
-	}
-	out, err := t.psql(ctx, pgStatementTimeout+"BEGIN READ ONLY;\n"+pset+sql+";\nROLLBACK;\n", vars, false)
-	if err != nil {
-		return result, err
-	}
-	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
-		fields := strings.Split(line, separator)
-		if len(fields) != len(result.Columns) && len(result.Rows) > 0 {
-			// A value over several lines goes on in the next line.
-			last := result.Rows[len(result.Rows)-1]
-			last[len(last)-1] = fmt.Sprint(last[len(last)-1]) + "\n" + line
-			continue
-		}
-		row := make([]any, len(fields))
-		for index, field := range fields {
-			row[index] = field
-		}
-		result.Rows = append(result.Rows, row)
-	}
-	return result, nil
-}
-
-// pgRows reads json_agg of rows as columns and rows in the order Postgres
-// gave them. Numbers stay exact; a JSON or array value comes as its text.
-func pgRows(out string) ([]string, [][]any, error) {
-	columns := []string{}
-	rows := [][]any{}
-	decoder := json.NewDecoder(strings.NewReader(out))
-	decoder.UseNumber()
-	if token, err := decoder.Token(); err != nil || token != json.Delim('[') {
-		return columns, rows, fmt.Errorf("read the rows: unexpected %v", token)
-	}
-	for decoder.More() {
-		if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
-			return columns, rows, fmt.Errorf("read the rows: unexpected %v", token)
-		}
-		row := []any{}
-		for index := 0; decoder.More(); index++ {
-			key, err := decoder.Token()
-			if err != nil {
-				return columns, rows, err
-			}
-			var value json.RawMessage
-			if err := decoder.Decode(&value); err != nil {
-				return columns, rows, err
-			}
-			if len(rows) == 0 {
-				columns = append(columns, fmt.Sprint(key))
-			}
-			row = append(row, pgValue(value))
-		}
-		if _, err := decoder.Token(); err != nil {
-			return columns, rows, err
-		}
-		rows = append(rows, row)
-	}
-	return columns, rows, nil
-}
-
-// pgValue turns one JSON value of a row into null, a number or text.
-func pgValue(value json.RawMessage) any {
-	trimmed := bytes.TrimSpace(value)
-	switch {
-	case len(trimmed) == 0 || string(trimmed) == "null":
-		return nil
-	case trimmed[0] == '"':
-		var text string
-		_ = json.Unmarshal(trimmed, &text)
-		return text
-	case trimmed[0] == '{' || trimmed[0] == '[':
-		var compact bytes.Buffer
-		if json.Compact(&compact, trimmed) == nil {
-			return compact.String()
-		}
-		return string(trimmed)
-	case string(trimmed) == "true" || string(trimmed) == "false":
-		return string(trimmed) == "true"
-	default:
-		return json.Number(trimmed)
-	}
-}
-
-var pgTag = regexp.MustCompile(`^(?:INSERT \d+|UPDATE|DELETE|MERGE) (\d+)$`)
-
-// pgChanges adds up the rows the command tags of a write report.
-func pgChanges(out string) int64 {
-	var changes int64
-	scanner := bufio.NewScanner(strings.NewReader(out))
-	for scanner.Scan() {
-		if match := pgTag.FindStringSubmatch(strings.TrimSpace(scanner.Text())); match != nil {
-			n, _ := strconv.ParseInt(match[1], 10, 64)
-			changes += n
-		}
-	}
-	return changes
-}
-
-// pgScan walks SQL as Postgres reads it and calls mark for every ? and ;
-// outside string literals, quoted identifiers, dollar quotes and comments.
-// A backslash outside a literal is refused: psql would run it as a command,
-// such as \! for a shell.
-func pgScan(sql string, mark func(index int, char byte)) error {
-	index := 0
-	for index < len(sql) {
-		char := sql[index]
-		var err error
-		switch {
-		case char == '\'':
-			index, err = skipString(sql, index)
-		case char == '"':
-			index, err = skipQuotedName(sql, index)
-		case char == '$' && (index == 0 || !isWord(sql[index-1])):
-			index, err = skipDollarQuote(sql, index)
-		case strings.HasPrefix(sql[index:], "--"):
-			index, err = skipLineComment(sql, index)
-		case strings.HasPrefix(sql[index:], "/*"):
-			index, err = skipBlockComment(sql, index)
-		case char == '\\':
-			return errBackslashCommand
-		case char == '?' || char == ';':
-			mark(index, char)
-			index++
-		default:
-			index++
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-var errBackslashCommand = errors.New(`backslash commands are not allowed`)
-
-// skipString returns the index after the string literal that starts at
-// start. A doubled quote stays inside it. In a string with an E prefix a
-// backslash also keeps the next character inside it.
-func skipString(sql string, start int) (int, error) {
-	escapes := start > 0 && (sql[start-1] == 'E' || sql[start-1] == 'e') && (start < 2 || !isWord(sql[start-2]))
-	index := start + 1
-	for index < len(sql) {
-		switch {
-		case escapes && sql[index] == '\\':
-			index += 2
-		case strings.HasPrefix(sql[index:], "''"):
-			index += 2
-		case sql[index] == '\'':
-			return index + 1, nil
-		default:
-			index++
-		}
-	}
-	return 0, errors.New("the SQL has a string that does not end")
-}
-
-// skipQuotedName returns the index after the "quoted name" that starts at
-// start. A doubled quote stays inside it.
-func skipQuotedName(sql string, start int) (int, error) {
-	index := start + 1
-	for index < len(sql) {
-		switch {
-		case strings.HasPrefix(sql[index:], `""`):
-			index += 2
-		case sql[index] == '"':
-			return index + 1, nil
-		default:
-			index++
-		}
-	}
-	return 0, errors.New("the SQL has a quoted name that does not end")
-}
-
-// skipDollarQuote returns the index after the $tag$ quote that starts at
-// start. A $ that starts no tag is one plain character.
-func skipDollarQuote(sql string, start int) (int, error) {
-	tag := dollarTag(sql[start:])
-	if tag == "" {
-		return start + 1, nil
-	}
-	body := start + len(tag)
-	end := strings.Index(sql[body:], tag)
-	if end < 0 {
-		return 0, errors.New("the SQL has a dollar quote that does not end")
-	}
-	return body + end + len(tag), nil
-}
-
-// skipLineComment returns the index after the -- comment that starts at
-// start, which ends at the end of its line. A backslash in it is refused.
-func skipLineComment(sql string, start int) (int, error) {
-	length := strings.IndexByte(sql[start:], '\n')
-	if length < 0 {
-		length = len(sql) - start
-	}
-	comment := sql[start : start+length]
-	if strings.Contains(comment, `\`) {
-		return 0, errBackslashCommand
-	}
-	return start + length + 1, nil
-}
-
-// skipBlockComment returns the index after the /* comment that starts at
-// start. Comments nest in Postgres. A backslash in one is refused.
-func skipBlockComment(sql string, start int) (int, error) {
-	depth := 1
-	index := start + 2
-	for index < len(sql) && depth > 0 {
-		switch {
-		case sql[index] == '\\':
-			return 0, errBackslashCommand
-		case strings.HasPrefix(sql[index:], "/*"):
-			depth++
-			index += 2
-		case strings.HasPrefix(sql[index:], "*/"):
-			depth--
-			index += 2
-		default:
-			index++
-		}
-	}
-	if depth > 0 {
-		return 0, errors.New("the SQL has a comment that does not end")
-	}
-	return index, nil
-}
-
-func isWord(char byte) bool {
-	return char == '_' || char >= '0' && char <= '9' || char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z'
-}
-
-// dollarTag returns the $tag$ or $$ that starts text, or "".
-func dollarTag(text string) string {
-	for i := 1; i < len(text); i++ {
-		if text[i] == '$' {
-			return text[:i+1]
-		}
-		if !isWord(text[i]) || i == 1 && text[i] >= '0' && text[i] <= '9' {
-			return ""
-		}
-	}
-	return ""
-}
-
-// pgBind puts the params into the places of the ? marks: as psql
-// variables :'p1', :'p2' that psql quotes as literals, or NULL for a nil.
-// Nothing a param holds becomes SQL. Without params the SQL stays as it is,
-// so the Postgres operators ?, ?| and ?& keep working there.
-func pgBind(sql string, params []any) (string, map[string]string, error) {
-	var marks []int
-	err := pgScan(sql, func(index int, char byte) {
-		if char == '?' {
-			marks = append(marks, index)
-		}
-	})
-	if err != nil {
-		return "", nil, err
-	}
-	if len(params) == 0 {
-		return sql, nil, nil
-	}
-	if len(marks) != len(params) {
-		return "", nil, fmt.Errorf("the SQL has %d ? marks for %d params", len(marks), len(params))
-	}
-	vars := map[string]string{}
-	var bound strings.Builder
-	last := 0
-	for index, mark := range marks {
-		bound.WriteString(sql[last:mark])
-		last = mark + 1
-		param := params[index]
-		if param == nil {
-			bound.WriteString("NULL")
-			continue
-		}
-		name := "p" + strconv.Itoa(index+1)
-		switch value := param.(type) {
-		case string:
-			vars[name] = value
-		case bool:
-			vars[name] = strconv.FormatBool(value)
-		case float64:
-			vars[name] = strconv.FormatFloat(value, 'f', -1, 64)
-		case json.Number:
-			vars[name] = value.String()
-		default:
-			vars[name] = fmt.Sprint(value)
-		}
-		if strings.ContainsRune(vars[name], 0) {
-			return "", nil, errors.New("a param holds a NUL byte")
-		}
-		bound.WriteString(":'" + name + "'")
-	}
-	bound.WriteString(sql[last:])
-	return bound.String(), vars, nil
-}
-
-// pgMultiple reports whether SQL holds more than one statement.
-func pgMultiple(sql string) bool {
-	multiple := false
-	_ = pgScan(sql, func(index int, char byte) {
-		if char == ';' && strings.TrimSpace(sql[index+1:]) != "" {
-			multiple = true
-		}
-	})
-	return multiple
-}
-
-// pgDump writes a pg_dump of the database in its custom format, which is
-// compressed, to file.
-func (t pgTarget) dump(ctx context.Context, file *os.File) error {
-	return t.exec(ctx, nil, file, "pg_dump", "-Fc", "-h", pgSocket, "-U", t.user, "-d", t.database)
-}
-
-// restoreDump puts a dump back into the database in one transaction: it
-// drops what the dump holds and creates it again, or changes nothing.
-func (t pgTarget) restoreDump(ctx context.Context, file string) error {
-	in, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	// A lock it cannot get within a minute fails the restore instead of
-	// waiting for good: the app's other services are stopped meanwhile.
-	return t.exec(ctx, in, io.Discard, "env", "PGOPTIONS=-c lock_timeout=60s", "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction", "--exit-on-error", "-h", pgSocket, "-U", t.user, "-d", t.database)
-}

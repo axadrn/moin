@@ -1,0 +1,16 @@
+package pages
+
+import "github.com/axadrn/moin/cloud/internal/ui/components"
+
+// CloudConnect is /cloud/connect: the one command that connects a
+// server. The token goes from the CLI to the server, never through a
+// page.
+templ CloudConnect(c Cloud) {
+	@cloudApp(c, "Connect a server", "Overview") {
+		@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: "/cloud"}, Title: "Connect a server"})
+		@components.Card(components.CardProps{}) {
+			<p class="moin-text moin-muted">Run this on your laptop, with the name of the server in your SSH config. The token goes straight to the server and never shows here. The server reports within a minute.</p>
+			@components.Command(components.CommandProps{Text: connectCommand("my-server")})
+		}
+	}
+}

@@ -1,0 +1,57 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// homeWatcherRows are what the watcher table compares, in order.
+var homeWatcherRows = []string{
+	"You hear when your server dies",
+	"Uptime checks every minute, instead of UptimeRobot",
+	"What happened, on your phone",
+	"A copy a hacked server can't delete",
+	"Off-site copies without a bucket to set up",
+	"Email alerts without your own mail server",
+	"Nothing to run, update or watch",
+}
+
+// homeWatcherColumns are the three ways, with what each answers to the
+// rows above.
+var homeWatcherColumns = []components.CompareColumn{
+	{
+		Name: "No watcher", Caption: "Free",
+		Cells:      []components.CompareCell{{Mark: "no"}, {Mark: "no"}, {Mark: "no"}, {Mark: "part", Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "yes"}},
+		ActionHref: "/docs/getting-started", ActionText: "Get started",
+	},
+	{
+		Name: "Self-hosted", Caption: "Free, your own machine",
+		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "part", Note: "Lock your bucket"}, {Mark: "no"}, {Mark: "no"}, {Mark: "no"}},
+		ActionHref: "/docs/watcher#set-one-up", ActionText: "Run your own",
+	},
+	{
+		Name: brand.Name + " cloud", Caption: "$7 a month or $49 a year. The launch price stays yours.", Badge: "Recommended", Featured: true,
+		Cells:      []components.CompareCell{{Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes", Note: "Built in"}, {Mark: "yes"}, {Mark: "yes"}, {Mark: "yes"}},
+		ActionHref: "/login", ActionText: "Start free", ActionNote: homeTrial,
+	},
+}
+
+// HomePricing is the three ways to run moin side by side, with their
+// prices: no watcher, your own, and moin cloud.
+templ HomePricing() {
+	<section id="pricing" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Free. Or free of worries.", Line: "Deploys, backups and alerts work alone. A watcher adds the rest."})
+		@components.Compare(components.CompareProps{Rows: homeWatcherRows, Columns: homeWatcherColumns, Reverse: true})
+		<div class="moin-stack" data-gap="2" data-center>
+			@components.PillLink(components.PillLinkProps{Href: homeFreeYear}) {
+				Get a year free
+			}
+			<p class="moin-small moin-muted">Report a bug or an idea. If it gets in, the year is yours.</p>
+		</div>
+	</section>
+}
+
+// homeFreeYear is where the free year of moin cloud is explained, for
+// now the discussions of the repo.
+const homeFreeYear = layouts.GitHubURL + "/discussions"

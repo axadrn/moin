@@ -1,0 +1,83 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/model"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// DocsHome is /docs, like a support site: every page under its topic, a
+// card of rows each, at reading width. No sidebar and no search of its
+// own: the magnifier of the navbar searches the docs.
+templ DocsHome(groups []model.DocGroup) {
+	@layouts.Home(layouts.SEOProps{
+		Title:        "Docs",
+		Description:  "Get started, every guide and the reference of " + brand.Name + ".",
+		Path:         "/docs",
+		MarkdownPath: "/docs.md",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Docs", Line: "Get started. Every guide. The reference."})
+				<div class="moin-narrow moin-stack">
+					for _, group := range groups {
+						@components.Card(components.CardProps{Title: group.Title}) {
+							@components.List(templ.Attributes{"data-wrap": true}) {
+								for _, page := range group.Pages {
+									@components.Item(components.ItemProps{Href: docsPageURL(page), Name: page.Title, Note: page.Description})
+								}
+							}
+						}
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+// Docs is one page: the centered head, then one column in the middle,
+// short enough to read, and a row to the next page. The search is in the
+// navbar.
+templ Docs(page *model.DocPage, groups []model.DocGroup, next *model.DocPage) {
+	@layouts.Home(layouts.SEOProps{
+		Title:        page.Title + " · Docs",
+		Description:  page.Description,
+		Path:         ctxkeys.URLPath(ctx),
+		MarkdownPath: docsMarkdownURL(page),
+	}) {
+		@templ.Raw(docsJSONLD(page, ctxkeys.RenderConfig(ctx).AppURL))
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: page.Title})
+				<article class="moin-narrow">
+					@components.Prose(components.ProseProps{HTML: page.HTMLContent})
+				</article>
+				if next != nil {
+					<div class="moin-narrow">
+						@components.Card(components.CardProps{}) {
+							@components.List() {
+								@components.Item(components.ItemProps{Href: docsPageURL(next)}) {
+									<div class="moin-fill moin-truncate moin-strong"><span class="moin-muted">Next: </span>{ next.Title }</div>
+								}
+							}
+						}
+					</div>
+				}
+				@components.More(components.MoreProps{Href: docsMarkdownURL(page), Text: "This page as Markdown"})
+			</section>
+		</main>
+	}
+}
+
+func docsPageURL(page *model.DocPage) string {
+	if page == nil || page.Slug == "" {
+		return "/docs"
+	}
+	return "/docs/" + page.Slug
+}
+
+func docsMarkdownURL(page *model.DocPage) string {
+	return docsPageURL(page) + ".md"
+}

@@ -1,0 +1,46 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// Changelog is every version of moin, newest first: its In short, and the
+// full notes one click away. The newest starts open.
+templ Changelog(releases []service.Release) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Changelog",
+		Description: "What changed in moin, newest first. Every release with what is new, what is fixed and how to update.",
+		Path:        "/changelog",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Changelog", Line: "What changed in each version. Newest first."})
+				<div class="moin-narrow">
+					@components.Card(components.CardProps{}) {
+						<ol class="moin-timeline">
+							for i, release := range releases {
+								<li id={ release.Anchor() }>
+									<span class="moin-strong">{ release.Version }</span>
+									<span class="moin-small moin-muted">{ release.Date.Format("January 2, 2006") }</span>
+									<div class="moin-text moin-muted">
+										@components.Prose(components.ProseProps{HTML: release.InShortHTML})
+									</div>
+									<div class="moin-text">
+										@components.Expand(components.ExpandProps{Name: "Full notes", Quiet: true, Open: i == 0}) {
+											<div class="moin-foreground">
+												@components.Prose(components.ProseProps{HTML: release.Notes})
+											</div>
+										}
+									</div>
+								</li>
+							}
+						</ol>
+					}
+				</div>
+				@components.More(components.MoreProps{Href: "/changelog.xml", Text: "Follow with RSS"})
+			</section>
+		</main>
+	}
+}

@@ -38,18 +38,17 @@ Everyone, maintainers too:
 
 The title follows [Conventional Commits](https://www.conventionalcommits.org):
 `feat:`, `fix:`, `docs:`, `chore:`, `refactor:` or `test:`, an optional
-scope, short. Like `fix(tui): say stopping at once`. The description is
+scope, short. Like `fix(cli): say stopping at once`. The description is
 plain text: no bold, no headings. Commits on your branch can say anything.
 They get squashed.
 
 What happens after the merge, deploys, releases and versions:
-[How moin ships](https://moin.run/docs/reference/shipping).
+[How moin ships](https://moin.run/docs/shipping).
 
 ## License
 
-Your contribution comes in under the Apache License 2.0, so the project can
-keep choosing its license later. You keep the copyright. The pull request
-template says so in one line. Leave it in.
+moin is Apache-2.0. Your contribution comes in under the same license. You
+keep the copyright.
 
 ## Never commit
 

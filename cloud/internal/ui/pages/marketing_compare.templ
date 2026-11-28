@@ -1,0 +1,15 @@
+package pages
+
+import "github.com/axadrn/moin/cloud/internal/ui/components"
+
+// ---------------------------------------------------------------- home
+// HomeCompare is the comparison on the home page: four facts, each tool
+// side by side. The row where the others do more stays in: it makes the
+// others believable.
+templ HomeCompare() {
+	<section id="compare" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Next to the others.", Line: "Fact by fact. From their own docs."})
+		@components.Compare(homeCompare())
+		@components.More(components.MoreProps{Href: "/compare", Text: "Every fact with its source"})
+	</section>
+}

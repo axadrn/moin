@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"regexp"
-	"strings"
 	"time"
 )
 
@@ -29,11 +28,6 @@ func NewCopyID(at time.Time) string {
 	return at.UTC().Format(CopyIDLayout) + "-" + fmt.Sprintf("%06d", 1+rand.IntN(999999))
 }
 
-// BeforeCopyID is the ID of the copies taken at at just before a deploy
-// or an edit, the hub finds them by: the digits 000000, which no other
-// copy has.
-func BeforeCopyID(at time.Time) string { return at.UTC().Format(CopyIDLayout) + "-000000" }
-
 // CopyTime is the time in a copy's ID.
 func CopyTime(id string) (time.Time, bool) {
 	if !copyID.MatchString(id) {
@@ -48,33 +42,4 @@ func CopyTime(id string) (time.Time, bool) {
 func ValidCopyID(id string) bool {
 	_, ok := CopyTime(id)
 	return ok
-}
-
-// MaxRefLength is the longest branch, tag or commit name moin accepts.
-const MaxRefLength = 255
-
-// ValidRefName reports whether name is a branch, tag or commit name by
-// git's rules (git check-ref-format), plus two of moin: at most 255 bytes,
-// and no leading dash, so a name is never read as a command line flag.
-func ValidRefName(name string) bool {
-	if name == "" || len(name) > MaxRefLength || name == "@" {
-		return false
-	}
-	if strings.HasPrefix(name, "-") || strings.HasPrefix(name, "/") || strings.HasSuffix(name, "/") || strings.HasSuffix(name, ".") {
-		return false
-	}
-	if strings.Contains(name, "..") || strings.Contains(name, "//") || strings.Contains(name, "@{") {
-		return false
-	}
-	for _, r := range name {
-		if r < 0x20 || r == 0x7f || strings.ContainsRune(" ~^:?*[\\", r) {
-			return false
-		}
-	}
-	for _, part := range strings.Split(name, "/") {
-		if strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
-			return false
-		}
-	}
-	return true
 }

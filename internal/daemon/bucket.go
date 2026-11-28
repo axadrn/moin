@@ -1,12 +1,9 @@
 package daemon
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"log/slog"
-	"maps"
+	"net/http"
 	"path"
 	"slices"
 	"strings"
@@ -15,15 +12,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/protocol"
 )
 
-// The user's bucket holds the backups (see backup.go), each app in
-// <path>/<workspace>/<app>/<app ID>/.
+// The user's bucket holds the backups (see backup.go), each database in
+// <path>/<server>/<app>/<database>/.
 
-func s3Client(bucket *protocol.Bucket) *s3.Client {
+func s3Client(bucket *Bucket) *s3.Client {
 	region, endpoint := bucket.Region, bucket.Endpoint
 	if region == "" {
 		region = "us-east-1"
@@ -34,105 +32,67 @@ func s3Client(bucket *protocol.Bucket) *s3.Client {
 	return s3.New(s3.Options{Region: region, Credentials: credentials.NewStaticCredentialsProvider(bucket.AccessKey, bucket.SecretKey, ""), BaseEndpoint: aws.String(endpoint), UsePathStyle: bucket.Endpoint != ""})
 }
 
-// backupConfig answers backup.config: every bucket must be one the rules
-// allow. Each gets the secret key the server keeps for it.
-func (r *runner) backupConfig(message protocol.Message, rules *protocol.Rules) {
-	var config protocol.BackupConfig
-	if err := message.Decode(&config); err != nil {
-		r.fail(message, err)
-		return
-	}
-	for _, bucket := range append([]*protocol.Bucket{config.Bucket}, slices.Collect(maps.Values(config.AppBuckets))...) {
-		err := checkBucket(rules, r.rulesFile, bucket)
-		if err == nil && bucket != nil && bucket.Workspace == "" {
-			err = errors.New("start backups: a bucket has no workspace folder, update the hub")
-		}
-		if err != nil {
-			r.fail(message, err)
-			return
-		}
-		if bucket != nil {
-			bucket.SecretKey = r.security.bucketKey(bucket.ID)
-		}
-	}
-	r.apps.keepIDs(config.Apps)
-	r.backups.configure(config)
-	go r.backups.tick(context.Background())
-	r.send(protocol.TypeOK, message.RequestID, nil)
-}
+// lockCheckText is what the object of the lock check says, to whoever
+// finds it in the bucket.
+const lockCheckText = build.Name + " writes this file to check whether the bucket is locked. In a locked bucket it stays until the lock ends.\n"
 
-// bucketSet answers bucket.set (BucketSet): a bucket the rules allow, and a
-// test file that goes in and out with the key, before the server keeps it.
-func (r *runner) bucketSet(ctx context.Context, message protocol.Message, rules *protocol.Rules) {
-	answer(r, message, protocol.TypeOK, func(request protocol.BucketSet) (any, error) {
-		bucket := request.Bucket
-		if err := checkBucket(rules, r.rulesFile, &bucket); err != nil {
-			return nil, err
-		}
-		if bucket.ID == "" || bucket.Workspace == "" {
-			return nil, errors.New("the bucket has no ID or workspace folder: update the hub")
-		}
-		bucket.SecretKey = request.SecretKey
-		if bucket.SecretKey == "" {
-			bucket.SecretKey = r.security.bucketKey(bucket.ID)
-		}
-		if bucket.SecretKey == "" {
-			return nil, errors.New("this server has no secret key for the bucket: enter it")
-		}
-		if err := testBucket(ctx, bucket); err != nil {
-			slog.Info("bucket check failed", "bucket", bucket.Name, "error", err)
-			return nil, fmt.Errorf("moin could not write to the bucket with these keys: %s", lastLine(err.Error()))
-		}
-		slog.Info("bucket key set", "bucket", bucket.Name)
-		return nil, r.security.setSecret(protocol.BucketSecret(bucket.ID), bucket.SecretKey)
-	})
-}
-
-// testBucket writes and deletes a small object in the workspace's folder,
-// which needs the same rights as backups.
-func testBucket(ctx context.Context, bucket protocol.Bucket) error {
+// checkBucket writes a small object into the server's folder, which needs
+// the same rights as a backup, and tries to delete it again. locked says
+// the bucket refused: a lock keeps the copies, also from a hacked server
+// with the same keys. Every check writes the same key, so a bucket that
+// deletes keeps no such object. A bucket that refuses to overwrite the one
+// from an earlier check gets one more per check, with the time in its name.
+func checkBucket(ctx context.Context, config Config) (locked bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	client := s3Client(&bucket)
-	key := strings.TrimLeft(path.Join(bucket.Path, bucket.Workspace, "."+build.Name+"-check"), "/")
-	_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(key), Body: bytes.NewReader([]byte(build.Name))})
-	if err != nil {
-		return err
+	bucket := config.Bucket
+	client := s3Client(bucket)
+	name := aws.String(bucket.Bucket)
+	key := aws.String(strings.TrimLeft(path.Join(bucket.Path, config.Name, build.Name+"-lock-check"), "/"))
+	put, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: name, Key: key, Body: strings.NewReader(lockCheckText)})
+	if refused(err) {
+		if _, there := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: name, Key: key}); there != nil {
+			return false, err
+		}
+		// An earlier check left the object, and the bucket keeps it. That
+		// is a lock only when these keys can write at all: a read-only key
+		// is refused too. So write one under a new name.
+		fresh := aws.String(*key + "-" + time.Now().UTC().Format("20060102-150405"))
+		if _, again := client.PutObject(ctx, &s3.PutObjectInput{Bucket: name, Key: fresh, Body: strings.NewReader(lockCheckText)}); again != nil {
+			return false, err
+		}
+		return true, nil
 	}
-	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket.Bucket), Key: aws.String(key)})
-	return err
+	if err != nil {
+		return false, err
+	}
+	// In a bucket with versions, as under S3 Object Lock, a delete without
+	// the version only hides the object. Deleting its version deletes it.
+	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: name, Key: key, VersionId: put.VersionId})
+	if !refused(err) {
+		return false, err
+	}
+	// A bucket with versions keeps this one, whatever is written over it.
+	// The version "null" is no such version: the next write replaces it.
+	if version := aws.ToString(put.VersionId); version != "" && version != "null" {
+		return true, nil
+	}
+	// Without versions, keys that can't delete can still wipe a copy by
+	// writing over it. Only a bucket that refuses that too is locked.
+	_, err = client.PutObject(ctx, &s3.PutObjectInput{Bucket: name, Key: key, Body: strings.NewReader(lockCheckText)})
+	if !refused(err) {
+		return false, err
+	}
+	return true, nil
 }
 
-// backupLink answers backup.link (BackupLink) unless the rules say
-// data: off: a download reads the app's data through moin, like SQL does.
-func (r *runner) backupLink(ctx context.Context, request protocol.BackupLink, rules *protocol.Rules) (protocol.BackupLinkResult, error) {
-	if rules != nil && rules.DataOff {
-		return protocol.BackupLinkResult{}, refused(r.rulesFile, "data: off")
+// refused says the bucket said no: the keys lack the right, or a lock
+// keeps the object. A bucket that is busy or broken said no such thing.
+func refused(err error) bool {
+	var answer smithy.APIError
+	if errors.As(err, &answer) && slices.Contains([]string{"AccessDenied", "InvalidRequest"}, answer.ErrorCode()) {
+		return true
 	}
-	return r.backups.link(ctx, request)
-}
-
-// link signs a link to download a copy (BackupLink), with the key of the
-// app's bucket, so the hub never holds it.
-func (b *backups) link(ctx context.Context, request protocol.BackupLink) (protocol.BackupLinkResult, error) {
-	database, err := b.one(request.App, request.Database)
-	if err != nil {
-		return protocol.BackupLinkResult{}, err
-	}
-	bucket, folder, err := b.where(request.App, database)
-	if err != nil {
-		return protocol.BackupLinkResult{}, err
-	}
-	key := copyKey(folder, request.Copy, database)
-	name := request.Name + "-" + path.Base(folder) + "-" + path.Base(*key)
-	link, err := s3.NewPresignClient(s3Client(bucket)).PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket:                     aws.String(bucket.Bucket),
-		Key:                        key,
-		ResponseContentDisposition: aws.String(`attachment; filename="` + name + `"`),
-	}, s3.WithPresignExpires(protocol.BackupLinkLife))
-	if err != nil {
-		return protocol.BackupLinkResult{}, err
-	}
-	slog.Info("backup link", "app", request.App, "database", database.Path, "copy", request.Copy)
-	return protocol.BackupLinkResult{Link: link.URL}, nil
+	var response *smithyhttp.ResponseError
+	return errors.As(err, &response) && (response.HTTPStatusCode() == http.StatusForbidden || response.HTTPStatusCode() == http.StatusConflict)
 }

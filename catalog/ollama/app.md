@@ -1,6 +1,6 @@
 ---
 name: Ollama
-pitch: Run open models like Llama, Qwen and Mistral on your own server.
+pitch: Run open models on your own server. Llama. Qwen. Mistral.
 category: AI
 website: https://ollama.com
 source: github.com/ollama/ollama

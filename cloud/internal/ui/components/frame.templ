@@ -1,0 +1,86 @@
+package components
+
+import (
+	"strconv"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+)
+
+// AppFootProps is an AppFoot: its quiet links.
+type AppFootProps struct {
+	Links []FooterLink
+}
+
+// AppFoot is the last line of an app's page: quiet links, the theme
+// switch at its end.
+templ AppFoot(p AppFootProps) {
+	<footer class="moin-page moin-app-foot">
+		for _, link := range p.Links {
+			<a href={ templ.SafeURL(link.Href) }>{ link.Label }</a>
+		}
+		<span class="moin-fill"></span>
+		@ModeSwitch()
+	</footer>
+}
+
+// AuthProps is an Auth frame: the links of its foot.
+type AuthProps struct {
+	Links []FooterLink
+}
+
+// Auth is the frame of signing in and the pages around it: the wordmark
+// at the top, one narrow column in the middle of the screen, the foot at
+// the bottom. What you press in the column is as wide as it.
+templ Auth(p AuthProps) {
+	<div class="moin-auth">
+		<header class="moin-page moin-row">
+			<a href="/" class="moin-row" aria-label={ brand.Name + " home" }>
+				@Wordmark(WordmarkProps{Mark: true})
+			</a>
+		</header>
+		<main class="moin-auth-main">
+			{ children... }
+		</main>
+		@AppFoot(AppFootProps{Links: p.Links})
+	</div>
+}
+
+// BarRow is one row of Bars: its name, a quiet note after it, the number,
+// and its share of the whole in percent.
+type BarRow struct {
+	Label, Note, Value string
+	Share              int64
+}
+
+// BarsProps is Bars. Columns 2 sets them in two columns on a wide screen,
+// the first half of the rows down the first column, the rest down the
+// second; in a Card they line up with the columns of Stats above.
+type BarsProps struct {
+	Rows    []BarRow
+	Columns int
+}
+
+// Bars are a few counts, the biggest first, each with a thin bar as wide
+// as its share.
+templ Bars(p BarsProps) {
+	<ol
+		class="moin-bars"
+		if p.Columns == 2 {
+			data-cols="2"
+			style={ templ.SafeCSS("--bars-rows:" + strconv.Itoa((len(p.Rows)+1)/2)) }
+		}
+	>
+		for _, row := range p.Rows {
+			<li>
+				<span>
+					{ row.Label }
+					if row.Note != "" {
+						<span class="moin-muted">{ row.Note }</span>
+					}
+				</span>
+				<span class="moin-digits">{ row.Value }</span>
+				<span class="moin-bars-bar" aria-hidden="true"><span style={ templ.SafeCSS("width:" + barWidth(row.Share)) }></span></span>
+			</li>
+		}
+	</ol>
+}

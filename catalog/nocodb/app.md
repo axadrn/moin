@@ -1,6 +1,6 @@
 ---
 name: NocoDB
-pitch: Spreadsheets your team loves, on a real database.
+pitch: Spreadsheets your team loves. On a real database.
 category: Productivity
 website: https://nocodb.com
 source: github.com/nocodb/nocodb

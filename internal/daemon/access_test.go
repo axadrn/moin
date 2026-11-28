@@ -169,28 +169,6 @@ func TestAppRoomNested(t *testing.T) {
 	}
 }
 
-func TestServerAccessRule(t *testing.T) {
-	rules, err := parseRules("server-access: on\n", "rules")
-	if err != nil || !rules.ServerAccess {
-		t.Fatalf("rules = %+v, %v", rules, err)
-	}
-	if lines := rules.Lines(); len(lines) != 1 || lines[0] != "server-access: on" {
-		t.Fatalf("lines = %v", lines)
-	}
-	if _, err := parseRules("server-access: yes\n", "rules"); err == nil {
-		t.Fatal("took server-access: yes")
-	}
-	rules, err = parseRules("mounts: /mnt/media, /srv/photos\n", "rules")
-	if err != nil || strings.Join(rules.Mounts, " ") != "/mnt/media /srv/photos" || rules.Lines()[0] != "mounts: /mnt/media, /srv/photos" {
-		t.Fatalf("rules = %+v, %v", rules, err)
-	}
-	for _, wrong := range []string{"mounts: media\n", "mounts: /mnt/../etc\n", "mounts: /mnt/\n"} {
-		if _, err := parseRules(wrong, "rules"); err == nil {
-			t.Errorf("took %q", wrong)
-		}
-	}
-}
-
 // TestDataFolderThroughLink makes no folder, as root, through a link a
 // container left in the data folders.
 func TestDataFolderThroughLink(t *testing.T) {

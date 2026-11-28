@@ -1,141 +1,118 @@
 package cli
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"filippo.io/age"
+
+	"github.com/axadrn/moin/internal/alert"
+	"github.com/axadrn/moin/protocol"
 )
 
-// TestBackupsList shows how each database stands and the moments to go
-// back to, with the commands for both.
-func TestBackupsList(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"databases":[
-		{"database":"/data/app.db","copied_at":"` + time.Now().Add(-12*time.Minute).UTC().Format(time.RFC3339) + `","checked_at":"` + time.Now().Add(-2*time.Hour).UTC().Format(time.RFC3339) + `","moments":[
-			{"id":"before-v12","label":"Before v12","at":"2026-11-07T09:30:00Z","kind":"deploy"}]},
-		{"database":"postgres-db","kind":"postgres","error":"dial tcp: i/o timeout","problem":"The bucket can't be reached.","moments":[]}]}`}}
-	code, stdout, stderr := runCLI(t, api, "backups", "shop")
-	if code != 0 {
-		t.Fatalf("code %d, stderr %q", code, stderr)
+// encryptedCopy is body as a copy lies in the bucket: gzipped for SQLite,
+// and encrypted for key.
+func encryptedCopy(t *testing.T, body string, zipped bool, key *age.X25519Identity) []byte {
+	t.Helper()
+	var copy bytes.Buffer
+	encrypted, err := age.Encrypt(&copy, key.Recipient())
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, want := range []string{"last copy 12m ago · checked 2h ago", "before-v12", "Before v12", "Nov 7 09:30 UTC", "The bucket can't be reached.", "copied hourly, kept 7 days", "moin restore shop --to <moment>", "moin backup download shop", "--every 15m|1h|1d"} {
-		if !strings.Contains(stdout, want) {
-			t.Errorf("no %q in\n%s", want, stdout)
-		}
+	if zipped {
+		zip := gzip.NewWriter(encrypted)
+		zip.Write([]byte(body))
+		zip.Close()
+	} else {
+		encrypted.Write([]byte(body))
 	}
-	for _, gone := range []string{"snapshot", "point in time", "dial tcp", "nothing to go back to"} {
-		if strings.Contains(strings.ToLower(stdout), gone) {
-			t.Errorf("still says %q", gone)
-		}
+	encrypted.Close()
+	return copy.Bytes()
+}
+
+// Confirming your key opens a copy on your laptop: it passes only with
+// the key the copy was made for, on a copy that is whole and a database.
+func TestOpenCopy(t *testing.T) {
+	yours, _ := age.GenerateX25519Identity()
+	other, _ := age.GenerateX25519Identity()
+	rows := strings.Repeat("rows ", 20000)
+	sqlite := encryptedCopy(t, sqliteStart+rows, true, yours)
+	postgres := encryptedCopy(t, postgresStart+rows, false, yours)
+	if err := openCopy(bytes.NewReader(sqlite), false, yours); err != nil {
+		t.Errorf("a SQLite copy: %v", err)
+	}
+	if err := openCopy(bytes.NewReader(postgres), true, yours); err != nil {
+		t.Errorf("a Postgres copy: %v", err)
+	}
+	if err := openCopy(bytes.NewReader(sqlite), false, other); err == nil || !strings.Contains(err.Error(), "the key does not open this copy") {
+		t.Errorf("another key: %v", err)
+	}
+	if err := openCopy(bytes.NewReader(sqlite[:len(sqlite)/2]), false, yours); err == nil {
+		t.Error("half a copy passed")
+	}
+	if err := openCopy(bytes.NewReader(postgres[:len(postgres)-1]), true, yours); err == nil {
+		t.Error("a copy cut short by one byte passed")
+	}
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "an error page", false, yours)), true, yours); err == nil {
+		t.Error("something that is no database passed")
 	}
 }
 
-// TestBackupSchedule: --every and --keep change only
-// what they name; a wrong value never reaches the hub.
-func TestBackupSchedule(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/apps/shop/backups": `{"bucket":"main","every_minutes":60,"keep_days":7,"databases":[]}`,
-		"PUT /api/v1/apps/shop/backups": `{"every_minutes":15,"keep_days":7}`,
-	}}
-	code, stdout, stderr := runCLI(t, api, "backups", "shop", "--every", "15m")
-	if code != 0 || !strings.Contains(stdout, "shop is copied every 15 minutes, each copy kept 7 days") {
-		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+// A check that failed still names the last copy that restored.
+func TestCheckLineNamesTheProvenCopy(t *testing.T) {
+	now := time.Now()
+	checked := now.Add(-time.Hour)
+	line := checkLine(protocol.DatabaseBackup{CheckedAt: &checked, CheckError: "the copy B did not restore: broken", CheckedCopy: "A"}, now)
+	if !strings.Contains(line, "the copy B did not restore") || !strings.Contains(line, "The last copy that restored fine: A") {
+		t.Errorf("line = %q", line)
 	}
-	if body := api.body("PUT /api/v1/apps/shop/backups"); !strings.Contains(body, `"every_minutes":15`) || !strings.Contains(body, `"keep_days":7`) {
-		t.Fatalf("sent %s", body)
-	}
-	for _, wrong := range [][]string{{"--every", "5m"}, {"--keep", "2d"}} {
-		api := &fakeAPI{answers: map[string]string{"GET /api/v1/apps/shop/backups": `{"every_minutes":60,"keep_days":7}`}}
-		if code, _, _ := runCLI(t, api, append([]string{"backups", "shop"}, wrong...)...); code == 0 || api.seen("PUT /api/v1/apps/shop/backups") {
-			t.Errorf("%v passed", wrong)
-		}
+	line = checkLine(protocol.DatabaseBackup{CheckedAt: &checked, CheckError: "could not read the copy B"}, now)
+	if !strings.Contains(line, "No copy restored fine yet") {
+		t.Errorf("line = %q", line)
 	}
 }
 
-// TestRestoreNeedsAMoment: without --to, and without the app's name
-// typed out, nothing reaches the hub; --yes is not enough.
-func TestRestoreNeedsAMoment(t *testing.T) {
-	api := &fakeAPI{}
-	code, _, stderr := runCLI(t, api, "restore", "shop", "--confirm", "shop")
-	if code == 0 || !strings.Contains(stderr, "--to before-v12") || len(api.requests) > 0 {
-		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
-	}
-	code, _, stderr = runCLI(t, api, "restore", "shop", "--to", "before-v12")
-	if code == 0 || !strings.Contains(stderr, "--confirm shop") || len(api.requests) > 0 {
-		t.Fatalf("without --confirm: code %d, stderr %q, requests %v", code, stderr, api.requests)
-	}
-	if moment, at := restoreTarget("14:01", time.Date(2026, 11, 7, 20, 0, 0, 0, time.UTC)); moment != "" || at == nil || !at.Equal(time.Date(2026, 11, 7, 14, 1, 0, 0, time.UTC)) {
-		t.Errorf("14:01 = %q %v", moment, at)
-	}
-	if moment, at := restoreTarget("2026-11-07T14:01:42Z", time.Now()); at == nil || at.Second() != 0 || moment != "" {
-		t.Errorf("a time goes to the minute: %v", at)
-	}
-	if moment, at := restoreTarget(" before-v12 ", time.Now()); moment != "before-v12" || at != nil {
-		t.Errorf("a moment = %q %v", moment, at)
-	}
-}
-
-// TestBackupDownload saves the newest copy from the bucket into the
-// current folder; --link prints the link instead.
-func TestBackupDownload(t *testing.T) {
-	bucket := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("X-Amz-Signature") == "" {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		_, _ = w.Write([]byte("the copy"))
-	}))
-	defer bucket.Close()
-	link := bucket.URL + "/ws/shop/id/data-app.db/copies/20261107T140200Z.db.gz?X-Amz-Signature=x"
-	api := &fakeAPI{answers: map[string]string{
-		"POST /api/v1/apps/shop/backups/download": `{"app":"shop","database":"/data/app.db","copy":"20261107T140200Z","at":"2026-11-07T14:02:00Z","size":8,"link":"` + link + `"}`,
-	}}
+// TestAddEmailAlert: the password of an email alert comes from stdin and
+// goes to the server on ssh's stdin. It is never a flag, and never an
+// argument of ssh, which other users of a machine can see.
+func TestAddEmailAlert(t *testing.T) {
 	dir := t.TempDir()
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
-	os.Chdir(dir)
-	code, stdout, stderr := runCLI(t, api, "backup", "download", "shop")
-	if code != 0 || !strings.Contains(stdout, "Saved shop-data-app.db-20261107T140200Z.db.gz") {
-		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
+	sent, runs := filepath.Join(dir, "sent"), filepath.Join(dir, "runs")
+	fake := "#!/bin/sh\necho \"$@\" >> " + runs + "\nread -r line\nprintf '%s' \"$line\" > " + sent + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "ssh"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	body, err := os.ReadFile(filepath.Join(dir, "shop-data-app.db-20261107T140200Z.db.gz"))
-	if err != nil || string(body) != "the copy" {
-		t.Fatalf("saved %q %v", body, err)
-	}
-	code, stdout, _ = runCLI(t, api, "backup", "download", "shop", "--link", "--to", "before-v12")
-	if code != 0 || !strings.Contains(stdout, link) || !strings.Contains(api.body("POST /api/v1/apps/shop/backups/download"), `"moment":"before-v12"`) {
-		t.Fatalf("--link: code %d, stdout %q", code, stdout)
-	}
-	code, _, stderr = runCLI(t, api, "backup", "shop")
-	if code == 0 || !strings.Contains(stderr, "backup download") {
-		t.Fatalf("backup without download: code %d, stderr %q", code, stderr)
-	}
-}
+	t.Setenv("PATH", dir)
+	args := []string{"prod", "email", "--to", "ada@example.com", "--smtp", "smtp.example.com:587", "--user", "alerts@example.com"}
 
-// TestRestoreWaitsForTheDaemon: a restore runs on its own on the hub;
-// the CLI follows it until it is done, and says why it failed.
-func TestRestoreWaitsForTheDaemon(t *testing.T) {
-	api := &fakeAPI{answers: map[string]string{
-		"POST /api/v1/apps/shop/restores":   `{"id":"r1","state":"running","to":"Before v12"}`,
-		"GET /api/v1/apps/shop/restores/r1": `{"id":"r1","state":"failed","to":"Before v12","error":"swap the data: disk full. The copy from before is undo-20261107T140200Z"}`,
-	}}
-	code, _, stderr := runCLI(t, api, "restore", "shop", "--to", "before-v12", "--confirm", "shop")
-	if code == 0 || !strings.Contains(stderr, "disk full") || !strings.Contains(api.body("POST /api/v1/apps/shop/restores"), `"confirm":"shop"`) || !strings.Contains(stderr, "undo-20261107T140200Z") || !api.seen("GET /api/v1/apps/shop/restores/r1") {
-		t.Fatalf("code %d, stderr %q, requests %v", code, stderr, api.requests)
+	if err := addAlert(context.Background(), args, strings.NewReader("secret-password\n"), io.Discard); err != nil {
+		t.Fatal(err)
 	}
-}
+	var got alert.Destination
+	data, _ := os.ReadFile(sent)
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("the server got %q: %v", data, err)
+	}
+	want := alert.Destination{Kind: "email", To: "ada@example.com", SMTP: "smtp.example.com:587", User: "alerts@example.com", Password: "secret-password"}
+	if got != want {
+		t.Errorf("the server got %+v, want %+v", got, want)
+	}
+	if ran, _ := os.ReadFile(runs); strings.Contains(string(ran), "secret-password") || !strings.Contains(string(ran), "'alerts' 'add'") {
+		t.Errorf("ssh ran with %q", ran)
+	}
 
-// body is the newest request that starts with want, with its body.
-func (f *fakeAPI) body(want string) string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for index := len(f.requests) - 1; index >= 0; index-- {
-		if strings.HasPrefix(f.requests[index], want) {
-			return f.requests[index]
-		}
+	if err := addAlert(context.Background(), args, strings.NewReader(""), io.Discard); err == nil {
+		t.Error("an email alert without a password: want an error")
 	}
-	return ""
+	if err := addAlert(context.Background(), append(args, "--password", "secret-password"), strings.NewReader(""), io.Discard); err == nil {
+		t.Error("--password is a flag: want an error")
+	}
 }

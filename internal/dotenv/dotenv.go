@@ -94,25 +94,26 @@ func Format(env map[string]string) string {
 var quote = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`, "\r", `\r`).Replace
 
 // Change is what replacing the env vars with others does, by key, sorted.
-// Replaced are the keys there were and that come again: moin never reads a
-// value back, so it cannot tell a new value from the same one.
+// Replaced are the keys that stay with another value.
 type Change struct {
 	Added    []string `json:"added"`
 	Replaced []string `json:"replaced"`
 	Removed  []string `json:"removed"`
 }
 
-// Diff compares the keys there are with the env vars that replace them.
-func Diff(current []string, next map[string]string) Change {
+// Diff compares the env vars there are with those that replace them.
+func Diff(old, next map[string]string) Change {
 	change := Change{Added: []string{}, Replaced: []string{}, Removed: []string{}}
 	for _, key := range slices.Sorted(maps.Keys(next)) {
-		if slices.Contains(current, key) {
-			change.Replaced = append(change.Replaced, key)
-		} else {
+		value, ok := old[key]
+		switch {
+		case !ok:
 			change.Added = append(change.Added, key)
+		case value != next[key]:
+			change.Replaced = append(change.Replaced, key)
 		}
 	}
-	for _, key := range slices.Sorted(slices.Values(current)) {
+	for _, key := range slices.Sorted(maps.Keys(old)) {
 		if _, ok := next[key]; !ok {
 			change.Removed = append(change.Removed, key)
 		}

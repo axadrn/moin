@@ -1,6 +1,6 @@
 ---
 name: Appsmith
-pitch: Build internal tools and admin panels in hours, not weeks.
+pitch: Build internal tools and admin panels. In hours. Not weeks.
 category: Developer tools
 website: https://www.appsmith.com
 source: github.com/appsmithorg/appsmith

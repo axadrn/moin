@@ -20,7 +20,7 @@ import (
 func composeRelease(t *testing.T, a *apps, config map[string]any, detected protocol.Detected, start protocol.DeployStart, running map[string]string) (string, error) {
 	t.Helper()
 	app := "my-app"
-	start.App, start.Name, start.Number = app, app, 2
+	start.App, start.Number = app, 2
 	release := &release{start: start, dir: a.releaseDir(app, 2), composeJSON: filepath.Join(a.releaseDir(app, 2), "compose.json"),
 		config: config, running: running, envFile: a.envFile(app), env: map[string]string{"DB_PASSWORD": "s3cret-value"}}
 	if err := os.MkdirAll(release.dir, 0o700); err != nil {
@@ -65,12 +65,11 @@ func webBuild(src string) map[string]any {
 }
 
 // TestComposeFileRunsAnywhere: the compose file of an app with a build, a
-// database, data, a config folder from the repo, domains and a password
-// names no path of the server, keeps ${NAME} without its value, and brings
+// database, data, a config folder from the repo and domains names no path of the server, keeps ${NAME} without its value, and brings
 // the proxy, so its domains and HTTPS run elsewhere too.
 func TestComposeFileRunsAnywhere(t *testing.T) {
 	dir := t.TempDir()
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	a.proxyMode = func() string { return "direct" }
 	src := filepath.Join(a.releaseDir("my-app", 1), "src")
 	config := map[string]any{
@@ -96,18 +95,13 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 		"volumes":  map[string]any{"pg": map[string]any{"name": "moin-my-app_pg"}},
 		"networks": map[string]any{"default": map[string]any{"name": "moin-my-app_default"}},
 	}
-	hash := "ada:$2a$04$abcdefghijklmnopqrstuuJ0c7bQzZ1zCq3Yd0c6bVq1n8m9E2Qe"
-	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}, Canonical: "example.com", Password: hash}
+	domains := &protocol.Domains{Domains: []string{"example.com", "www.example.com"}}
 	text := mustCompose(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, protocol.DeployStart{Domains: domains}, nil)
 
-	for _, leak := range []string{dir, "s3cret-value", "abcdefghijklmnopqrstuuJ0c7bQzZ1zCq3Yd0c6bVq1n8m9E2Qe", "external"} {
+	for _, leak := range []string{dir, "s3cret-value", "external"} {
 		if strings.Contains(text, leak) {
 			t.Errorf("the compose file holds %q:\n%s", leak, text)
 		}
-	}
-	// compose reads $$ as $: the redirect keeps it, as compose.json does.
-	if !strings.Contains(text, "replacement: https://example.com$${3}") {
-		t.Errorf("the canonical redirect lost its $$:\n%s", text)
 	}
 	if !strings.Contains(text, "postgres://app:${DB_PASSWORD}@db/app") || !strings.HasPrefix(text, "name: my-app\nservices:\n") {
 		t.Errorf("the compose file lost ${DB_PASSWORD} or its order:\n%s", text)
@@ -144,14 +138,11 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 			t.Errorf("web lacks %s: %s", want, mounts)
 		}
 	}
-	if got := web.Labels["traefik.http.middlewares.moin-my-app-auth.basicauth.usersfile"]; got != proxyUsers {
-		t.Errorf("the password is read from %q", got)
-	}
 	if file.Services["db"].Image != "postgres:17" {
 		t.Errorf("db runs %q", file.Services["db"].Image)
 	}
 	proxy := file.Services[proxyService]
-	if proxy.Image != proxyImage || len(proxy.Ports) != 2 || !strings.Contains(text, "./htpasswd:/htpasswd:ro") || !strings.Contains(text, "certificatesresolvers.le.acme") {
+	if proxy.Image != proxyImage || len(proxy.Ports) != 2 || !strings.Contains(text, "certificatesresolvers.le.acme") {
 		t.Errorf("the proxy is not as moin runs it: %+v", proxy)
 	}
 	if file.Networks[proxyNetwork]["name"] != proxyNetwork {
@@ -162,7 +153,7 @@ func TestComposeFileRunsAnywhere(t *testing.T) {
 // TestComposeFileWithoutDomains has no proxy, and the Dockerfile moin
 // wrote into the compose file of a Go repo stays in it.
 func TestComposeFileWithoutDomains(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"build": map[string]any{"context": src, "dockerfile_inline": goDockerfile(src, []byte("go 1.26\n"))}}}}
 	text := mustCompose(t, a, config, protocol.Detected{Kind: "go", Service: "web", Port: 8080}, protocol.DeployStart{}, nil)
@@ -174,7 +165,7 @@ func TestComposeFileWithoutDomains(t *testing.T) {
 // TestComposeFileOfRailpack keeps the image moin built: the plan of a
 // Railpack build is not in the repo. Its secrets go with the build.
 func TestComposeFileOfRailpack(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	config := map[string]any{"services": map[string]any{"web": map[string]any{
 		"build": map[string]any{"context": src, "dockerfile": "../" + railpackPlan, "args": map[string]any{"BUILDKIT_SYNTAX": railpackFrontend}},
@@ -189,7 +180,7 @@ func TestComposeFileOfRailpack(t *testing.T) {
 // the running release, so compose.json names moin's image, not the build.
 // The compose file builds from "." again, from base.json.
 func TestComposeFileAfterARestart(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 1), "src")
 	text := mustCompose(t, a, webBuild(src), protocol.Detected{Kind: "dockerfile", Service: "web", Port: 8080}, protocol.DeployStart{}, map[string]string{"web": "moin-my-app-web:1"})
 	compose, _ := os.ReadFile(filepath.Join(a.releaseDir("my-app", 2), "compose.json"))
@@ -204,7 +195,7 @@ func TestComposeFileAfterARestart(t *testing.T) {
 // TestComposeFileOfAnImageDeploy keeps the image CI built for a service the
 // repo builds, pinned as it was deployed.
 func TestComposeFileOfAnImageDeploy(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	image := "ghcr.io/me/my-app@sha256:" + strings.Repeat("a", 64)
 	text := mustCompose(t, a, webBuild(src), protocol.Detected{Kind: "dockerfile", Service: "web", Port: 8080}, protocol.DeployStart{Image: image}, nil)
@@ -217,7 +208,7 @@ func TestComposeFileOfAnImageDeploy(t *testing.T) {
 // proxy as moin-traefik; with both names taken, the file is not made, and
 // no service is replaced.
 func TestComposeFileProxyName(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	domains := protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"example.com"}}}
 	config := webBuild(src)
@@ -246,7 +237,7 @@ func TestComposeFileProxyName(t *testing.T) {
 // server, so its routers stay with moin. The domains keep theirs, and an
 // app reached only there gets no proxy.
 func TestComposeFileLeavesTheInstantAddress(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	detected := protocol.Detected{Kind: "compose", Service: "web", Port: 8080}
 	instant := protocol.Domains{Instant: "sslip.io", InstantIP: "203.0.113.7"}
@@ -268,7 +259,7 @@ func TestComposeFileLeavesTheInstantAddress(t *testing.T) {
 // TestComposeFileOnATunnelServer says in its first line that the proxy
 // takes ports 80 and 443 here, which a tunnel server opens none of.
 func TestComposeFileOnATunnelServer(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	a.proxyMode = func() string { return "tunnel" }
 	src := filepath.Join(a.releaseDir("my-app", 2), "src")
 	text := mustCompose(t, a, webBuild(src), protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"example.com"}}}, nil)
@@ -294,78 +285,21 @@ func TestBuildAgainDropsTheSecretsHash(t *testing.T) {
 	}
 }
 
-// beta34Server copies testdata/beta34, the apps folder beta.34 left
-// behind, to a new state folder, with its paths, and moves the env as the
-// daemon does when it starts.
-func beta34Server(t *testing.T) *apps {
-	t.Helper()
-	dir := t.TempDir()
-	err := filepath.WalkDir("testdata/beta34", func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
-		}
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dir, strings.TrimPrefix(path, "testdata/beta34"))
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			return err
-		}
-		return os.WriteFile(target, []byte(strings.ReplaceAll(string(body), "/var/lib/moin/", dir+"/")), 0o600)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a := newApps(dir, nil)
-	a.moveOldEnvs(t.Context())
-	return a
-}
-
-// TestComposeFileOfABeta34Restart: beta.34 wrote the values into
-// base.json, and a restart takes its compose file from there, so the
-// Postgres password of miniflux is in it. That file stays on the server.
-func TestComposeFileOfABeta34Restart(t *testing.T) {
-	a := beta34Server(t)
-	// Postgres's data, which the release mounts.
-	if err := os.MkdirAll(filepath.Join(a.appDir("feeds"), "volumes", "data", "postgres"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	release, err := a.newRelease(protocol.DeployStart{App: "feeds", Name: "feeds", Number: 3}, nil, func(string, ...any) {})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := a.prepareRelease(t.Context(), release); err != nil {
-		t.Fatal(err)
-	}
-	saveJSON(filepath.Join(release.dir, "detected.json"), release.detected)
-	text, err := a.composeFile("feeds", 3)
-	if err == nil || !strings.Contains(err.Error(), "it holds the value of DB_PASSWORD") || text != "" {
-		t.Fatalf("the compose file of a restart from beta.34: %v\n%s", err, text)
-	}
-	if strings.Contains(err.Error(), "db-password-value") {
-		t.Errorf("the error shows the value: %v", err)
-	}
-}
-
 // TestComposeFileHoldsNoSecret: a compose file that holds a value of the
-// app's env, or its password hash, is not made. A value where the deploy
+// app's env is not made. A value where the deploy
 // fills it in on purpose, such as the version in the image or a domain in
 // the proxy's labels, is fine, and so is a short one.
 func TestComposeFileHoldsNoSecret(t *testing.T) {
-	hash := "$2y$05$" + strings.Repeat("h", 53)
 	for _, test := range []struct {
 		name, url string
-		password  bool
 		held      string
 	}{
-		{"names", "postgres://u:${DB_PASSWORD}@db/x", true, ""},
-		{"value", "postgres://u:s3cret$value@db/x", false, "the value of DB_PASSWORD"},
-		{"value as compose writes it", "postgres://u:s3cret$$value@db/x", false, "the value of DB_PASSWORD"},
-		{"hash", "postgres://u:${DB_PASSWORD}@db/x?h=$$2y$$05$$" + strings.Repeat("h", 53), true, "the hash of the app's password"},
+		{"names", "postgres://u:${DB_PASSWORD}@db/x", ""},
+		{"value", "postgres://u:s3cret$value@db/x", "the value of DB_PASSWORD"},
+		{"value as compose writes it", "postgres://u:s3cret$$value@db/x", "the value of DB_PASSWORD"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			a := newApps(t.TempDir(), nil)
+			a := newApps(t.TempDir())
 			env := map[string]string{"DB_PASSWORD": "s3cret$value", "VERSION": "2026.10.3", "DOMAIN": "my-app.example.com", "DEBUG": "true"}
 			if _, err := a.setEnv(protocol.EnvSet{App: "my-app", Set: env}); err != nil {
 				t.Fatal(err)
@@ -375,9 +309,6 @@ func TestComposeFileHoldsNoSecret(t *testing.T) {
 				"environment": map[string]any{"DATABASE_URL": test.url, "LOG": "true"},
 			}}}
 			start := protocol.DeployStart{Domains: &protocol.Domains{Domains: []string{"my-app.example.com"}}}
-			if test.password {
-				start.Domains.Password = "ada:" + hash
-			}
 			text, err := composeRelease(t, a, config, protocol.Detected{Kind: "compose", Service: "web", Port: 8080}, start, nil)
 			if test.held == "" {
 				if err != nil || !strings.Contains(text, "${DB_PASSWORD}") {

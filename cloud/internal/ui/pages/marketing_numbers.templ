@@ -1,0 +1,78 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/counts"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+	"github.com/axadrn/moin/internal/human"
+	"strconv"
+)
+
+// HomeNumbers are the numbers of the landing page: the stars on GitHub
+// (githubrepo.Stars, "" while unknown), the downloads of its releases
+// (0 while unknown), and what moin cloud counted.
+// Sample marks made-up numbers, which only development shows.
+type HomeNumbers struct {
+	Stars     string
+	Downloads int64
+	Totals    counts.Totals
+	Sample    bool
+}
+
+// numberRow is one line of counts: a name, and its month, year and all.
+type numberRow struct {
+	Name   string
+	Period counts.Period
+}
+
+// numberRows are the counts that have counted something; a count of 0
+// says nothing yet, so it stays away.
+func numberRows(t counts.Totals) []numberRow {
+	var rows []numberRow
+	for _, row := range []numberRow{
+		{"Deploys", t.Deploys},
+	} {
+		if row.Period.Total > 0 {
+			rows = append(rows, row)
+		}
+	}
+	return rows
+}
+
+// homeNumbers are the numbers we have, counted, never guessed. A number
+// not counted yet stays away.
+templ homeNumbers(n HomeNumbers) {
+	{{ rows := numberRows(n.Totals) }}
+	<section id="numbers" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Counted. Not guessed.", Line: "No telemetry. These are all the numbers we have."})
+		if n.Sample {
+			<div class="moin-row" data-center>
+				@components.Chip("Sample data · development only")
+			</div>
+		}
+		@components.Stats() {
+			if n.Stars != "" {
+				@components.Stat(components.StatProps{Label: "Stars", Value: n.Stars}) {
+					On GitHub.
+				}
+			}
+			if n.Downloads > 0 {
+				@components.Stat(components.StatProps{Label: "Downloads", Value: human.Count(n.Downloads)}) {
+					Of every release.
+				}
+			}
+			if n.Totals.Servers > 0 {
+				@components.Stat(components.StatProps{Label: "Servers", Value: strconv.FormatInt(n.Totals.Servers, 10)}) {
+					On { brand.Name } cloud, with { strconv.FormatInt(n.Totals.Apps, 10) } apps.
+				}
+			}
+			for _, row := range rows {
+				@components.Stat(components.StatProps{Label: row.Name, Value: human.Count(row.Period.Total)}) {
+					{ human.Count(row.Period.Month) } this month.
+				}
+			}
+		}
+		@components.More(components.MoreProps{Href: layouts.GitHubURL, Text: "Star on GitHub"})
+	</section>
+}

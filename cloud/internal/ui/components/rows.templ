@@ -1,0 +1,63 @@
+package components
+
+import "strconv"
+
+// RowsProps is Rows: the names of the columns. Their number sets the
+// grid; the first column is the widest. Top lines every cell up at the
+// top, for cells of a few lines.
+type RowsProps struct {
+	Head []string
+	Top  bool
+}
+
+// Rows are a compact table: one line per thing, the columns lined up. In a
+// Card it runs to the card's edges. On a phone each row folds: the first
+// cell on a line of its own, the rest quiet under it.
+templ Rows(p RowsProps) {
+	<div class="moin-rows" role="table" data-cols={ strconv.Itoa(len(p.Head)) } data-top?={ p.Top }>
+		<div class="moin-rows-head" role="row">
+			for _, name := range p.Head {
+				<span role="columnheader">{ name }</span>
+			}
+		</div>
+		{ children... }
+	</div>
+}
+
+// RowProps is one Row. Href makes the whole row a link.
+type RowProps struct {
+	Href string
+}
+
+// Row is one line of Rows. Children are its cells, one Cell each.
+templ Row(p RowProps) {
+	if p.Href != "" {
+		<a href={ templ.SafeURL(p.Href) } class="moin-rows-row" role="row">
+			{ children... }
+		</a>
+	} else {
+		<div class="moin-rows-row" role="row">
+			{ children... }
+		</div>
+	}
+}
+
+// Cell is one cell of a Row.
+templ Cell() {
+	<span class="moin-rows-cell" role="cell">
+		{ children... }
+	</span>
+}
+
+// RowsMoreProps is RowsMore: where the rest is.
+type RowsMoreProps struct {
+	Href string
+}
+
+// RowsMore is the last line of Rows that leads to all of them. Children
+// say how many.
+templ RowsMore(p RowsMoreProps) {
+	<a href={ templ.SafeURL(p.Href) } class="moin-rows-more">
+		{ children... }
+	</a>
+}

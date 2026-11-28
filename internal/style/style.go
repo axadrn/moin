@@ -1,14 +1,12 @@
 // Package style is the look of moin in the terminal: the brand and status
-// colors of the web UI (hub/DESIGN.md), symbols and text styles. The
-// TUI and the CLI both use it, so a status looks the same everywhere.
+// colors, symbols and text styles, so a status looks the same everywhere.
 package style
 
 import (
-	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
-	"github.com/axadrn/moin/internal/client"
 )
 
 // Colors carry status only; the brand is monochrome, like the web UI. The
@@ -115,42 +113,6 @@ func Badge(status Status, text string) string {
 	return Of(status).Render(Symbol(status) + " " + text)
 }
 
-// Server is the status badge of a server: ● online, ○ waiting, ✗ offline.
-func Server(server client.Server) string {
-	word := server.Status()
-	return Badge(StatusOf(word), word)
-}
-
-// App is the status badge of an app: ● live v3, ◐ deploying v4,
-// ✗ failed v4 · v3 live, ○ new.
-func App(app client.App) string {
-	switch {
-	case app.LatestNumber == 0:
-		return Badge(StatusIdle, "new")
-	case app.LatestStatus == "running":
-		return Badge(StatusRunning, fmt.Sprintf("deploying v%d", app.LatestNumber))
-	case app.Stopped:
-		return Badge(StatusIdle, fmt.Sprintf("stopped v%d", app.LiveNumber))
-	case app.LatestStatus == "failed" && app.LiveNumber > 0:
-		return Badge(StatusFailed, fmt.Sprintf("failed v%d", app.LatestNumber)) + Muted.Render(fmt.Sprintf(" · v%d live", app.LiveNumber))
-	case app.LatestStatus == "failed":
-		return Badge(StatusFailed, fmt.Sprintf("failed v%d", app.LatestNumber))
-	}
-	return Badge(StatusLive, fmt.Sprintf("live v%d", app.LiveNumber))
-}
-
-// Deploy is the status badge of one deploy of an app: the live one is
-// ● live, older good ones ✓ succeeded.
-func Deploy(deploy client.Deploy, liveNumber int) string {
-	switch {
-	case deploy.Status == "succeeded" && deploy.Number == liveNumber:
-		return Badge(StatusLive, "live")
-	case deploy.Status == "succeeded":
-		return Badge(StatusDone, "succeeded")
-	}
-	return Badge(StatusOf(deploy.Status), deploy.Status)
-}
-
 // steps are how the daemon's own deploy log lines start (logf in
 // internal/daemon/apps.go); every other line is tool output.
 var steps = []string{"downloading the source", "pulling ", "detected ", "building", "starting", "rolling back to ", "database ", "health check ", "deploy failed: "}
@@ -188,4 +150,34 @@ func Step(text string) string {
 		return Danger.Render(SymbolFailed + " " + text)
 	}
 	return Muted.Render(SymbolStep) + " " + text
+}
+
+// SplitAppLog splits a line of an app's logs, as docker compose logs
+// --timestamps prints it, like "web-1  | 2026-11-27T16:39:08.672Z hello",
+// into the container, the time as docker wrote it and the text. A part
+// it does not find stays empty, and the text keeps the rest.
+func SplitAppLog(line string) (container, stamp, text string) {
+	text = strings.TrimRight(line, "\r\n")
+	if name, after, ok := strings.Cut(text, " | "); ok {
+		container, text = strings.TrimSpace(name), after
+	}
+	first, after, _ := strings.Cut(text, " ")
+	if _, err := time.Parse(time.RFC3339Nano, first); err == nil {
+		stamp, text = first, after
+	}
+	return container, stamp, text
+}
+
+// AppLog renders a line of an app's logs for people: the time in the
+// terminal's time zone and the container dimmed, the text as it is.
+func AppLog(line string) string {
+	container, stamp, text := SplitAppLog(line)
+	head := container
+	if at, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
+		head = strings.TrimSpace(at.Local().Format("15:04:05") + " " + container)
+	}
+	if head == "" {
+		return text
+	}
+	return Dim.Render(head) + "  " + text
 }

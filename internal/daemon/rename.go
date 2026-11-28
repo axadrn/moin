@@ -11,13 +11,10 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// An app lives in its folder, the name it was created with, which never
-// changes. Its Compose project is its name now, so docker ps shows
-// my-app-web-1; the project file in the folder says which one runs. Its
-// named volumes have fixed names, kept in volumes.json, so a rename never
-// loses data: moin-<app ID>-<volume>, or for an app from before renames
-// the name compose gave it, moin-<folder>_<volume>. Its networks follow
-// the project.
+// An app lives in its folder, its name. Its Compose project is its name
+// too, so docker ps shows my-app-web-1; the project file in the folder
+// says which one runs. Its named volumes have fixed names, kept in
+// volumes.json: moin-<folder>_<volume>. Its networks follow the project.
 
 // projectOf is the Compose project the app runs as: the project file, or
 // for an app from before renames moin-<folder>.
@@ -29,18 +26,9 @@ func (a *apps) projectOf(app string) string {
 	return project(app)
 }
 
-// nameOf is the name a deploy gives the app's project: its name now, or
-// its folder from a hub that sends none.
-func nameOf(start protocol.DeployStart) string {
-	if protocol.ValidAppName(start.Name) {
-		return start.Name
-	}
-	return start.App
-}
-
-// switchProject makes name the app's project before it starts. After a
-// rename it takes the containers of the old project down first, so
-// nothing runs twice; volumes and images stay. A project another app of
+// switchProject makes name the app's project before it starts. When it
+// ran as another project, such as moin-<folder>, it takes those
+// containers down first, so nothing runs twice; volumes and images stay. A project another app of
 // this server runs as is refused.
 func (a *apps) switchProject(ctx context.Context, app, name string, logf func(string, ...any)) error {
 	old := a.projectOf(app)
@@ -60,9 +48,8 @@ func (a *apps) switchProject(ctx context.Context, app, name string, logf func(st
 }
 
 // volumeName is the fixed name of a named volume of the app, chosen once
-// and kept in volumes.json: the name compose gave it before renames when
-// that volume exists, else moin-<app ID>-<volume>.
-func (a *apps) volumeName(ctx context.Context, app, appID, volume string) string {
+// and kept in volumes.json: the name compose gave it before renames.
+func (a *apps) volumeName(app, volume string) string {
 	file := filepath.Join(a.appDir(app), "volumes.json")
 	names := map[string]string{}
 	body, _ := os.ReadFile(file)
@@ -71,9 +58,6 @@ func (a *apps) volumeName(ctx context.Context, app, appID, volume string) string
 		return name
 	}
 	name := project(app) + "_" + volume
-	if _, err := a.output(ctx, "docker", "volume", "inspect", name); err != nil && appIDPattern.MatchString(appID) {
-		name = ourName + "-" + strings.ReplaceAll(appID, "-", "") + "-" + volume
-	}
 	names[volume] = name
 	saveJSON(file, names)
 	return name
@@ -148,7 +132,7 @@ func (a *apps) pinFile(ctx context.Context, start protocol.DeployStart, composeJ
 	if err := json.Unmarshal(body, &config); err != nil {
 		return err
 	}
-	pinNames(config, start.App, nameOf(start), func(volume string) string { return a.volumeName(ctx, start.App, start.AppID, volume) })
+	pinNames(config, start.App, start.App, func(volume string) string { return a.volumeName(start.App, volume) })
 	body, err = json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err

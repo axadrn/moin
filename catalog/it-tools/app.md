@@ -1,6 +1,6 @@
 ---
 name: IT Tools
-pitch: Over 80 handy tools for developers, in one tab.
+pitch: Over 80 handy tools for developers. In one tab.
 category: Developer tools
 website: "https://it-tools.tech"
 source: github.com/CorentinTh/it-tools

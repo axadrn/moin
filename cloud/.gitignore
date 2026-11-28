@@ -1,0 +1,27 @@
+# Binaries
+/bin/
+/site
+*.test
+*.out
+
+# Settings
+.env
+.env.tpl
+
+# Generated files
+*_templ.go
+
+# The moin binaries the image builds for a release
+/downloads/
+
+# Local leftovers: tmp/, and data/ from when the hub had a database
+/tmp/
+/data/
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+*.log

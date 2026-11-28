@@ -1,6 +1,6 @@
 ---
 name: Gatus
-pitch: A status page and uptime checks, from one small file.
+pitch: A status page and uptime checks. From one small file.
 category: Monitoring
 website: https://gatus.io
 source: github.com/TwiN/gatus

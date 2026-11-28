@@ -1,0 +1,96 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/human"
+	"strconv"
+)
+
+// CloudPlanProps is the plan page: the plan, and what the workspace uses
+// of it.
+type CloudPlanProps struct {
+	Cloud   Cloud
+	Servers int
+	Stored  int64
+	Limit   int64
+}
+
+// CloudPlan is /cloud/plan: the plan, what it includes, the way to pay
+// or to Stripe's portal, and the free year to win.
+templ CloudPlan(p CloudPlanProps) {
+	{{ plan := p.Cloud.Plan }}
+	@cloudApp(p.Cloud, "Plan", "Plan") {
+		@components.Header(components.HeaderProps{Title: "Plan"})
+		<p class="moin-text moin-muted">One price for the whole workspace. Every server, every app.</p>
+		@components.Card(components.CardProps{}) {
+			<div class="moin-row" data-wrap data-gap="3">
+				@components.Status(components.StatusProps{State: plan.State})
+				<h2 class="moin-heading">{ plan.Name }</h2>
+				<span class="moin-text moin-muted">{ plan.Note }</span>
+			</div>
+			<p class="moin-text moin-muted">{ plan.Text }</p>
+			if plan.Subscribe {
+				<form method="post" action="/cloud/subscribe" class="moin-row" data-gap="3" data-wrap>
+					@components.Button(components.ButtonProps{Type: "submit", Kind: components.Primary, Attrs: templ.Attributes{"name": "interval", "value": "yearly"}}) {
+						$49 a year
+					}
+					@components.Button(components.ButtonProps{Type: "submit", Attrs: templ.Attributes{"name": "interval", "value": "monthly"}}) {
+						$7 a month
+					}
+				</form>
+			}
+			if plan.Billing {
+				<div>
+					@components.Button(components.ButtonProps{Href: "/cloud/billing", Kind: billingKind(plan.Subscribe)}) {
+						Billing
+					}
+				</div>
+			}
+		}
+		@components.Card(components.CardProps{}) {
+			@components.List() {
+				@components.Item(components.ItemProps{Name: "Alerts by mail"}) {
+					@onOff(plan.AlertsOn)
+				}
+				@components.Item(components.ItemProps{Name: "Copies your servers can't delete"}) {
+					@onOff(plan.AlertsOn)
+				}
+				@components.Item(components.ItemProps{Name: "Billing"}) {
+					<span class="moin-item-value">Stripe, for businesses. Cancel any time.</span>
+				}
+				@components.Item(components.ItemProps{Name: "Servers"}) {
+					<span class="moin-item-value">{ strconv.Itoa(p.Servers) }</span>
+				}
+				@components.Item(components.ItemProps{Name: "Stored copies"}) {
+					<span class="moin-item-value">{ human.Size(float64(p.Stored)) } of { human.Size(float64(p.Limit)) }</span>
+				}
+			}
+		}
+		@components.Card(components.CardProps{Title: "Win a free year"}) {
+			<p class="moin-text moin-muted">Report a bug or an idea. If it gets in, the year is yours.</p>
+			<div>
+				@components.Button(components.ButtonProps{Href: cloudFreeYear, Attrs: templ.Attributes{"target": "_blank", "rel": "noopener"}}) {
+					Report one
+				}
+			</div>
+		}
+	}
+}
+
+// onOff says whether a part of the plan is on.
+templ onOff(on bool) {
+	if on {
+		@components.Status(components.StatusProps{State: components.StateLive, Text: "on"})
+	} else {
+		@components.Status(components.StatusProps{State: components.StateFailed, Text: "off"})
+	}
+}
+
+// billingKind is the Billing button's kind: the one that stands out when
+// there is nothing to subscribe.
+func billingKind(subscribe bool) components.Kind {
+	if subscribe {
+		return ""
+	}
+	return components.Primary
+}

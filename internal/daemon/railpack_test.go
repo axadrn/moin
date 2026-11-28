@@ -120,7 +120,7 @@ func TestFinishGivesRailpackItsSecrets(t *testing.T) {
 // TestSetEnv: env.set writes values compose reads back exactly into the
 // app's one env file, 0600; a key it removes is gone from the file.
 func TestSetEnv(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	_, err := a.setEnv(protocol.EnvSet{App: "shop", Set: map[string]string{"B": "it's \"q\" \\ $HOME ${X}\nline\r", "A": "1", "OLD": "gone"}})
 	if err != nil {
 		t.Fatal(err)
@@ -128,14 +128,6 @@ func TestSetEnv(t *testing.T) {
 	keys, err := a.setEnv(protocol.EnvSet{App: "shop", Remove: []string{"OLD"}})
 	if err != nil || !slices.Equal(keys.Keys, []string{"A", "B"}) || keys.ChangedAt.IsZero() {
 		t.Fatalf("keys = %+v, %v", keys, err)
-	}
-	// Hello names the keys of every app, never a value.
-	hello := Hello(filepath.Dir(a.dir))
-	if !slices.Equal(hello.Env["shop"].Keys, []string{"A", "B"}) || !hello.Env["shop"].ChangedAt.Equal(keys.ChangedAt) {
-		t.Fatalf("hello env = %+v", hello.Env)
-	}
-	if body, _ := json.Marshal(hello); strings.Contains(string(body), "line") {
-		t.Fatalf("hello carries a value: %s", body)
 	}
 	body, _ := os.ReadFile(a.envFile("shop"))
 	want := "A=\"1\"\nB=\"it's \\\"q\\\" \\\\ \\$HOME \\${X}\\nline\\r\"\n"

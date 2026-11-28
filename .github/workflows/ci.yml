@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Generate templ files
-        working-directory: hub
+        working-directory: cloud
         run: go tool templ generate
 
       - name: Check module declarations
@@ -46,13 +46,62 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # A local S3 for the copies of moin cloud. A service container can't
+      # pass `server -s3`, so it starts here.
+      - name: Start an S3 bucket
+        run: |
+          docker run -d -p 127.0.0.1:19100:8333 chrislusf/seaweedfs:4.50@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860 server -s3
+          for i in $(seq 60); do curl -s -o /dev/null http://127.0.0.1:19100 && exit 0; sleep 1; done
+          exit 1
+
       - name: Test with race detector
+        env:
+          MOIN_TEST_S3: http://127.0.0.1:19100
         run: go test -race ./...
 
-      # Real Docker: no file of the daemon but app.env and htpasswd holds a
+      # The copies tests skip without the bucket. The grep fails the step
+      # when they skipped, are gone or renamed.
+      - name: Test that the copies ran
+        env:
+          MOIN_TEST_S3: http://127.0.0.1:19100
+        run: |
+          go test -count=1 -run '^(TestCopyRoundTrip|TestPrune)$' -v ./cloud/internal/copies/ ./cloud/internal/routes/ > "$RUNNER_TEMP/copies.log" 2>&1 || { cat "$RUNNER_TEMP/copies.log"; exit 1; }
+          grep -- '--- PASS: TestCopyRoundTrip' "$RUNNER_TEMP/copies.log"
+          grep -- '--- PASS: TestPrune' "$RUNNER_TEMP/copies.log"
+
+      # Real Docker: no file of the daemon but app.env holds a
       # secret of an app, and no message it sends does. The grep fails the
       # step when the test is gone or renamed, as -run alone would pass.
       - name: Test that no env value leaks
         run: |
           go test -tags docker -run '^TestNoEnvValueLeaks$' -v ./internal/daemon/ > "$RUNNER_TEMP/leak.log" 2>&1 || { cat "$RUNNER_TEMP/leak.log"; exit 1; }
           grep -- '--- PASS: TestNoEnvValueLeaks' "$RUNNER_TEMP/leak.log"
+
+  # The promises of backups, against real SQLite, real Postgres and a local
+  # S3. The grep fails the step when a test skipped, is gone or renamed.
+  backups:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Start an S3 bucket
+        run: |
+          docker run -d -p 127.0.0.1:19100:8333 chrislusf/seaweedfs:4.50@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860 server -s3
+          for i in $(seq 60); do curl -s -o /dev/null http://127.0.0.1:19100 && exit 0; sleep 1; done
+          exit 1
+
+      - name: Test the backups
+        env:
+          MOIN_TEST_S3: http://127.0.0.1:19100
+        run: |
+          go test -tags docker -count=1 -run '^TestBackup' -v ./internal/daemon/ > "$RUNNER_TEMP/backups.log" 2>&1 || { cat "$RUNNER_TEMP/backups.log"; exit 1; }
+          grep -- '--- PASS: TestBackupSQLite' "$RUNNER_TEMP/backups.log"
+          grep -- '--- PASS: TestBackupPostgres' "$RUNNER_TEMP/backups.log"

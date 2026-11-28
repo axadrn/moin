@@ -1,0 +1,110 @@
+package components
+
+import "strconv"
+
+// State is one of the states every status in moin shows as.
+type State string
+
+const (
+	StateLive    State = "live"
+	StateRunning State = "running"
+	StateWaiting State = "waiting"
+	StateDone    State = "done"
+	StateFailed  State = "failed"
+	StateIdle    State = "idle"
+)
+
+// DotProps is a Dot.
+type DotProps struct {
+	State State
+	Attrs templ.Attributes
+}
+
+// Dot is the state alone, next to the words that name it.
+templ Dot(p DotProps) {
+	<i class="moin-dot" data-state={ string(p.State) } { p.Attrs... }></i>
+}
+
+// Chip is a short label next to a name, like "Launch price".
+templ Chip(text string) {
+	<span class="moin-chip">{ text }</span>
+}
+
+// PillLinkProps is a PillLink: where it goes and its words.
+type PillLinkProps struct {
+	Href string
+}
+
+// PillLink is a link on a quiet pill, with an arrow after its words, for
+// the one thing a section wants you to do next. Children are the words.
+templ PillLink(p PillLinkProps) {
+	<a href={ templ.SafeURL(p.Href) } class="moin-pill">
+		{ children... }
+		<span aria-hidden="true">→</span>
+	</a>
+}
+
+// StatusProps is a Status: the state, the word that names it, and a quiet
+// note after it, like a version. Pill puts it on a small pill of its own,
+// for a row of them.
+type StatusProps struct {
+	State State
+	Text  string
+	Note  string
+	Pill  bool
+}
+
+// Status is a state as a dot and a word, everywhere a state shows.
+templ Status(p StatusProps) {
+	<span class="moin-status" data-state={ string(p.State) } data-pill?={ p.Pill }>
+		@Dot(DotProps{State: p.State})
+		if p.Text != "" {
+			<span>{ p.Text }</span>
+		}
+		if p.Note != "" {
+			<span class="moin-muted">{ p.Note }</span>
+		}
+	</span>
+}
+
+// MeterProps is a Meter: how full, in percent.
+type MeterProps struct {
+	Percent int
+	Label   string
+}
+
+// Meter is a thin bar as full as Percent.
+templ Meter(p MeterProps) {
+	<span class="moin-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={ strconv.Itoa(p.Percent) } aria-label={ p.Label }>
+		<span style={ templ.SafeCSS("width:" + strconv.Itoa(max(0, min(100, p.Percent))) + "%") }></span>
+	</span>
+}
+
+// MarkProps is a Mark: yes, part, no, unknown, or "" for a blank that
+// keeps the words in line.
+type MarkProps struct {
+	Kind string
+}
+
+// Mark is a round answer as high as a line: a check, a dash, a cross or
+// a question mark.
+templ Mark(p MarkProps) {
+	switch p.Kind {
+		case "yes":
+			<span role="img" aria-label="Yes" class="moin-mark" data-kind="yes">
+				@Icon("check")
+			</span>
+		case "part":
+			<span role="img" aria-label="Partly" class="moin-mark" data-kind="part">
+				<svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+			</span>
+		case "no":
+			<span role="img" aria-label="No" class="moin-mark" data-kind="no">
+				@Icon("x")
+			</span>
+		case "unknown":
+			<span role="img" aria-label="Not documented" class="moin-mark" data-kind="no">?</span>
+		default:
+			<span aria-hidden="true" class="moin-mark"></span>
+	}
+}

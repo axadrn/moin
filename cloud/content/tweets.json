@@ -1,0 +1,732 @@
+[
+ {
+  "id": "1980245233339408596",
+  "url": "https://x.com/dhh/status/1980245233339408596",
+  "name": "DHH",
+  "handle": "dhh",
+  "avatar": "https://pbs.twimg.com/profile_images/2093715898204884992/goERjC9G_200x200.jpg",
+  "verified": true,
+  "date": "2025-10-20T12:10:29.000Z",
+  "likes": 3737,
+  "replies": 112,
+  "topic": "vps",
+  "text": "Cloud marketing convinced a generation of programmers that the scariest thing in the world was to connect their own server to the internet. All so they could be sold and resold the same centralized dependencies at huge markups.\nhttps://t.co/2JlPY9Pcz0 https://t.co/yB9ZBPJr0J",
+  "range": [
+   0,
+   251
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/2JlPY9Pcz0",
+    "href": "https://www.youtube.com/watch?v=-cEn_83zRFw&t=1306s",
+    "shown": "youtube.com/watch?v=-cEn_8\u2026",
+    "at": [
+     228,
+     251
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/yB9ZBPJr0J",
+    "at": [
+     252,
+     275
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/G3s-a0kWMAAvBGx.jpg",
+   "width": 1716,
+   "height": 1446
+  },
+  "card": null
+ },
+ {
+  "id": "2113587042185576853",
+  "url": "https://x.com/levelsio/status/2113587042185576853",
+  "name": "@levelsio",
+  "handle": "levelsio",
+  "avatar": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_200x200.jpg",
+  "verified": true,
+  "date": "2026-10-23T11:03:14.000Z",
+  "likes": 6514,
+  "replies": 164,
+  "topic": "hacked",
+  "text": "Maybe important to repost this now that everyone is getting hacked\n\nIf you have a VPS, I recommend you to get if off the public internet and into a Tailscale network and Cloudflare Tunnel ASAP\n\nIt doesn't matter you have SSH key login, this is about exploits and vulnerabilities",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1849868071462371448",
+  "url": "https://x.com/ThePrimeagen/status/1849868071462371448",
+  "name": "ThePrimeagen",
+  "handle": "ThePrimeagen",
+  "avatar": "https://pbs.twimg.com/profile_images/1924503772094517249/DfKkH0ph_200x200.jpg",
+  "verified": true,
+  "date": "2024-10-25T17:38:11.000Z",
+  "likes": 1459,
+  "replies": 21,
+  "topic": "vps",
+  "text": "dhh saved more money leaving the cloud than most startups will ever make",
+  "range": [
+   0,
+   72
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "826591961444384768",
+  "url": "https://x.com/gitlabstatus/status/826591961444384768",
+  "name": "GitLab.com Status",
+  "handle": "gitlabstatus",
+  "avatar": "https://pbs.twimg.com/profile_images/1519350424519819264/dNHlMw0E_200x200.jpg",
+  "verified": false,
+  "date": "2017-02-01T00:44:15.000Z",
+  "likes": 2300,
+  "replies": 354,
+  "topic": "backups",
+  "text": "We accidentally deleted production data and might have to restore from backup. Google Doc with live notes https://t.co/EVRbHzYlk8",
+  "range": [
+   0,
+   129
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/EVRbHzYlk8",
+    "href": "https://docs.google.com/document/d/1GCK53YDcBWQveod9kfzW-VCxIABGiryG7_z_6jHdVik/pub",
+    "shown": "docs.google.com/document/d/1GC\u2026",
+    "at": [
+     106,
+     129
+    ]
+   }
+  ],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2019821067553108379",
+  "url": "https://x.com/KaiLentit/status/2019821067553108379",
+  "name": "Kai Lentit (e/xcel)",
+  "handle": "KaiLentit",
+  "avatar": "https://pbs.twimg.com/profile_images/1713593323724648448/-8FoGqbh_200x200.jpg",
+  "verified": true,
+  "date": "2026-02-06T17:10:43.000Z",
+  "likes": 6239,
+  "replies": 123,
+  "topic": "complexity",
+  "text": "'Just use a VPS' bro. \n\nIt's just a 1-click, 2222-step install. https://t.co/YSzJpHawCC",
+  "range": [
+   0,
+   63
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/YSzJpHawCC",
+    "at": [
+     64,
+     87
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/amplify_video_thumb/2019819673001287680/img/KsJVsu6thd97547x.jpg",
+   "width": 720,
+   "height": 1280
+  },
+  "card": null
+ },
+ {
+  "id": "1541892021312430083",
+  "url": "https://x.com/GergelyOrosz/status/1541892021312430083",
+  "name": "Gergely Orosz",
+  "handle": "GergelyOrosz",
+  "avatar": "https://pbs.twimg.com/profile_images/673095429748350976/ei5eeouV_200x200.png",
+  "verified": true,
+  "date": "2022-06-28T21:11:19.000Z",
+  "likes": 3985,
+  "replies": 257,
+  "topic": "vps",
+  "text": "Can we acknowledge how ridiculous it is that startups and even individuals can bankrupt themselves...\n\n... with an AWS bill?\n\nI cannot fathom why Amazon does not do anything meaningful to allow setting e.g. limits on accounts. Why do we need to hear stories like this on repeat? https://t.co/B7EMYPXA0j",
+  "range": [
+   0,
+   278
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/B7EMYPXA0j",
+    "at": [
+     279,
+     302
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/FWXmg5pXgAQHyiv.jpg",
+   "width": 980,
+   "height": 1156
+  },
+  "card": null
+ },
+ {
+  "id": "1842611651083747754",
+  "url": "https://x.com/leerob/status/1842611651083747754",
+  "name": "Lee Robinson",
+  "handle": "leerob",
+  "avatar": "https://pbs.twimg.com/profile_images/1862717563311968256/xfgt1L9l_200x200.jpg",
+  "verified": true,
+  "date": "2024-10-05T17:03:46.000Z",
+  "likes": 3258,
+  "replies": 261,
+  "topic": "vps",
+  "text": "GM.\n\nI just deployed Next.js, Postgres, and Nginx to a $4 VPS.\n\nTime for a tutorial?",
+  "range": [
+   0,
+   84
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1418233593504092161",
+  "url": "https://x.com/iamdevloper/status/1418233593504092161",
+  "name": "I Am Devloper",
+  "handle": "iamdevloper",
+  "avatar": "https://pbs.twimg.com/profile_images/1178631635606151168/yIlrcg4o_200x200.jpg",
+  "verified": true,
+  "date": "2021-07-22T15:36:52.000Z",
+  "likes": 868,
+  "replies": 13,
+  "topic": "backups",
+  "text": "me: and this is the backup procedure I have in place for the system\n\nauditor: have you tested you can restore the system from these backups?\n\nme: https://t.co/U2infjt8U6",
+  "range": [
+   0,
+   145
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/U2infjt8U6",
+    "at": [
+     146,
+     169
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/tweet_video_thumb/E66TmbvWEAIXSqP.jpg",
+   "width": 240,
+   "height": 172
+  },
+  "card": null
+ },
+ {
+  "id": "1940515314837676234",
+  "url": "https://x.com/theo/status/1940515314837676234",
+  "name": "Theo - t3.gg",
+  "handle": "theo",
+  "avatar": "https://pbs.twimg.com/profile_images/2106484435382333440/vXOVE8EX_200x200.jpg",
+  "verified": true,
+  "date": "2025-07-02T20:57:58.000Z",
+  "likes": 5933,
+  "replies": 119,
+  "topic": "vps",
+  "text": "Figma makes $220m a year in revenue\nFigma spends $110m a year on AWS\n\nFigma is just an AWS wrapper",
+  "range": [
+   0,
+   98
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1907118122596979149",
+  "url": "https://x.com/TheHackersNews/status/1907118122596979149",
+  "name": "The Hacker News",
+  "handle": "TheHackersNews",
+  "avatar": "https://pbs.twimg.com/profile_images/1597647879811657728/FLgHrLHy_200x200.jpg",
+  "verified": false,
+  "date": "2025-04-01T17:09:27.000Z",
+  "likes": 73,
+  "replies": 1,
+  "topic": "hacked",
+  "text": "\ud83d\udd25 1,500+ PostgreSQL servers hacked for crypto mining.\n\nA threat group tracked as JINX-0126 is exploiting publicly exposed PostgreSQL instances with weak passwords.\n\nWhat\u2019s happening:\n\u2022 Malware: PG_MEM (fileless, evasive)\n\u2022 Goal: Deploy XMRig miner\n\u2022 Victims: Over 1,500 https://t.co/q2O22fNevA",
+  "range": [
+   0,
+   270
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/q2O22fNevA",
+    "at": [
+     270,
+     293
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/Gndx0EWaMAQWBWg.jpg",
+   "width": 2048,
+   "height": 783
+  },
+  "card": null
+ },
+ {
+  "id": "1779966993971753158",
+  "url": "https://x.com/mitchellh/status/1779966993971753158",
+  "name": "Mitchell Hashimoto",
+  "handle": "mitchellh",
+  "avatar": "https://pbs.twimg.com/profile_images/2082830624415698944/bRo7PB2S_200x200.jpg",
+  "verified": true,
+  "date": "2024-04-15T20:16:16.000Z",
+  "likes": 1367,
+  "replies": 44,
+  "topic": "vps",
+  "text": "Cloud pricing applied to literally anything else, i.e. the coffee shop: coffee is $5, but if you stay it\u2019s free and we charge $0.06/minute unless you\u2019re using internet then it\u2019s $0.09/minute. First timers get 30 minutes free. Talking to others in the cafe is free. Voice calls",
+  "range": [
+   0,
+   276
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2071789861703401900",
+  "url": "https://x.com/thdxr/status/2071789861703401900",
+  "name": "dax",
+  "handle": "thdxr",
+  "avatar": "https://pbs.twimg.com/profile_images/1602333093485891584/mmVqjFNI_200x200.jpg",
+  "verified": true,
+  "date": "2026-06-30T02:56:09.000Z",
+  "likes": 1937,
+  "replies": 127,
+  "topic": "vps",
+  "text": "we started renting big bare metal servers and slicing them up into VMs for each person on our team\n\nthis is basically the setup i've personally used for years now - esp useful with an opencode server running in there\n\nif this goes well we'll make this a public product",
+  "range": [
+   0,
+   268
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1495282091608608771",
+  "url": "https://x.com/nixcraft/status/1495282091608608771",
+  "name": "nixCraft \ud83d\udc27",
+  "handle": "nixcraft",
+  "avatar": "https://pbs.twimg.com/profile_images/1209802752819261440/jvir-xNm_200x200.jpg",
+  "verified": false,
+  "date": "2022-02-20T06:20:06.000Z",
+  "likes": 1706,
+  "replies": 22,
+  "topic": "backups",
+  "text": "Remember, RAID is not a backup. Also /backups/ directory on the same bare metal server is not backup. Your verified backup must be offsite with a 3-2-1 policy. Do you know how much time it takes to restore your data? If not, find out. DR is a serious business. \n\n#Daily #Reminder https://t.co/p83GGEW8ch",
+  "range": [
+   0,
+   279
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/p83GGEW8ch",
+    "at": [
+     280,
+     303
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/FMBO_56UYAEYJbQ.jpg",
+   "width": 460,
+   "height": 412
+  },
+  "card": null
+ },
+ {
+  "id": "1847239536939520461",
+  "url": "https://x.com/shl/status/1847239536939520461",
+  "name": "Sahil Lavingia",
+  "handle": "shl",
+  "avatar": "https://pbs.twimg.com/profile_images/1885323625542127616/-8EVOv3W_200x200.jpg",
+  "verified": true,
+  "date": "2024-10-18T11:33:20.000Z",
+  "likes": 947,
+  "replies": 94,
+  "topic": "vps",
+  "text": "Gumroad spends $600,000/year on AWS and I think we could get that down to about $180,000/year by leaving\n\n$420,000/year * 20 P/E ratio = $8m\n\nSenior software engineer = $500k/year\n\n$7.5m in value created for shareholders \ud83c\udf89",
+  "range": [
+   0,
+   223
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1770803425074204694",
+  "url": "https://x.com/CodingGarden/status/1770803425074204694",
+  "name": "CJ (Coding Garden)",
+  "handle": "CodingGarden",
+  "avatar": "https://pbs.twimg.com/profile_images/1757983289581711360/Ixdquv-7_200x200.jpg",
+  "verified": true,
+  "date": "2024-03-21T13:23:31.000Z",
+  "likes": 64,
+  "replies": 4,
+  "topic": "hacked",
+  "text": "I started a series over on @syntaxfm  about self hosting on your own server. The first video is about setting up and locking down a Virtual Private Server (VPS).\n\nWatch \ud83c\udf7f: https://t.co/a2cYZbs33a https://t.co/dk6srs3MKr",
+  "range": [
+   0,
+   196
+  ],
+  "truncated": false,
+  "links": [
+   {
+    "url": "https://t.co/a2cYZbs33a",
+    "href": "https://www.youtube.com/watch?v=Q1Y_g0wMwww",
+    "shown": "youtube.com/watch?v=Q1Y_g0\u2026",
+    "at": [
+     172,
+     195
+    ]
+   }
+  ],
+  "mentions": [
+   {
+    "handle": "syntaxfm",
+    "at": [
+     27,
+     36
+    ]
+   }
+  ],
+  "media": [
+   {
+    "url": "https://t.co/dk6srs3MKr",
+    "at": [
+     196,
+     219
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/GJMoSqNWoAAzLAS.jpg",
+   "width": 2880,
+   "height": 1620
+  },
+  "card": null
+ },
+ {
+  "id": "1689668326384164864",
+  "url": "https://x.com/fireship_dev/status/1689668326384164864",
+  "name": "Fireship",
+  "handle": "fireship_dev",
+  "avatar": "https://pbs.twimg.com/profile_images/1436819851566219267/HEffZjvP_200x200.jpg",
+  "verified": true,
+  "date": "2023-08-10T16:01:36.000Z",
+  "likes": 2223,
+  "replies": 41,
+  "topic": "vps",
+  "text": "Pro Tip\n\nBe like me\n\nSetup a Google Cloud budget alert for $0.00\n\nIt\u2019s useful if you like to shit your pants once a month https://t.co/JpkNKpZ186",
+  "range": [
+   0,
+   121
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/JpkNKpZ186",
+    "at": [
+     122,
+     145
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/F3Lm-pXawAAcTCJ.jpg",
+   "width": 1304,
+   "height": 896
+  },
+  "card": null
+ },
+ {
+  "id": "2009667755876987204",
+  "url": "https://x.com/jasonfried/status/2009667755876987204",
+  "name": "Jason Fried",
+  "handle": "jasonfried",
+  "avatar": "https://pbs.twimg.com/profile_images/3413742921/0e9ef95e76c4a965b9b177fa2267d6c1_200x200.png",
+  "verified": true,
+  "date": "2026-01-09T16:45:05.000Z",
+  "likes": 2015,
+  "replies": 42,
+  "topic": "vps",
+  "text": "Jeremy, a 19-year veteran of 37signals, calmly walks through the process moving 5+ petabytes of data and billions of individual files off AWS and onto our own on-prem storage setup without a second of downtime.\n\nThe how, the time, and the tooling, it's all in here. Watch: https://t.co/XlvYQCq1Nq",
+  "range": [
+   0,
+   272
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/XlvYQCq1Nq",
+    "at": [
+     273,
+     296
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/amplify_video_thumb/2009656207469146112/img/gBVKEZCM-7E-V3YM.jpg",
+   "width": 1280,
+   "height": 720
+  },
+  "card": null
+ },
+ {
+  "id": "1677483984438149120",
+  "url": "https://x.com/SwiftOnSecurity/status/1677483984438149120",
+  "name": "SwiftOnSecurity",
+  "handle": "SwiftOnSecurity",
+  "avatar": "https://pbs.twimg.com/profile_images/2017073252984619009/qN6VFao-_200x200.jpg",
+  "verified": true,
+  "date": "2023-07-08T01:05:22.000Z",
+  "likes": 2084,
+  "replies": 40,
+  "topic": "backups",
+  "text": "A story.\n\nAn enterprise data application has been down for a day. 60 people from the company contractors and vendor have been on and off the same 24/7 service bridge call trying to fix it.\n\nThey are currently waiting for a restore process and have been for hours. \n\nThen I log in.",
+  "range": [
+   0,
+   280
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2021264135229464914",
+  "url": "https://x.com/wesbos/status/2021264135229464914",
+  "name": "Wes Bos",
+  "handle": "wesbos",
+  "avatar": "https://pbs.twimg.com/profile_images/877525007185858562/7G9vGTca_200x200.jpg",
+  "verified": true,
+  "date": "2026-02-10T16:44:57.000Z",
+  "likes": 242,
+  "replies": 29,
+  "topic": "vps",
+  "text": "What do you think this $46k bill breaks down into?\n\nI dug into the site and its aggressively cached and images aren't hosted on Vercel.\n\nSome quick math makes it line up with being mostly Bandwidth (Fast Data Transfer) and Edge Requests",
+  "range": [
+   0,
+   236
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "2120113523321946355",
+  "url": "https://x.com/dannypostma/status/2120113523321946355",
+  "name": "Danny Postma",
+  "handle": "dannypostma",
+  "avatar": "https://pbs.twimg.com/profile_images/1587046912490090496/kuBUqNkb_200x200.jpg",
+  "verified": true,
+  "date": "2026-11-10T11:17:08.000Z",
+  "likes": 720,
+  "replies": 82,
+  "topic": "vps",
+  "text": "i now understand why @levelsio likes to host on his own VPS\n\nso much faster to get stuff online\n\nespecially when launching tons of products",
+  "range": [
+   0,
+   139
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [
+   {
+    "handle": "levelsio",
+    "at": [
+     21,
+     30
+    ]
+   }
+  ],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1879934945902411820",
+  "url": "https://x.com/iximiuz/status/1879934945902411820",
+  "name": "Ivan Velichko",
+  "handle": "iximiuz",
+  "avatar": "https://pbs.twimg.com/profile_images/1417581014273122314/2CBEkT0b_200x200.jpg",
+  "verified": true,
+  "date": "2025-01-16T16:53:13.000Z",
+  "likes": 952,
+  "replies": 19,
+  "topic": "hacked",
+  "text": "docker run -p 8080:80 nginx:alpine\n\n...is the same as\n\ndocker run -p 0.0.0.0:8080:80 nginx:alpine\n\nThe command opens port 8080 on all server interfaces, including the public ones (if any).\n\nWhy is it bad? If you close all ports by default using something like ufw, Docker's",
+  "range": [
+   0,
+   273
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ },
+ {
+  "id": "1776267308366962907",
+  "url": "https://x.com/marclou/status/1776267308366962907",
+  "name": "Marc Lou",
+  "handle": "marclou",
+  "avatar": "https://pbs.twimg.com/profile_images/2081903460199641088/YZJqLn39_200x200.jpg",
+  "verified": true,
+  "date": "2024-04-05T15:15:02.000Z",
+  "likes": 903,
+  "replies": 100,
+  "topic": "vps",
+  "text": "Vercel: our pricing is too high\nAlso Vercel: let's double your monthly bill\n\nDid I miss something? https://t.co/ILOv8JSzqQ",
+  "range": [
+   0,
+   98
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/ILOv8JSzqQ",
+    "at": [
+     99,
+     122
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/GKaRs9uawAAJtvT.jpg",
+   "width": 1320,
+   "height": 858
+  },
+  "card": null
+ },
+ {
+  "id": "1997293892090183772",
+  "url": "https://x.com/duborges/status/1997293892090183772",
+  "name": "Eduardo Borges",
+  "handle": "duborges",
+  "avatar": "https://pbs.twimg.com/profile_images/1841183953199235073/vu43psbH_200x200.jpg",
+  "verified": true,
+  "date": "2025-12-06T13:15:46.000Z",
+  "likes": 4961,
+  "replies": 260,
+  "topic": "hacked",
+  "text": "i've been hacked\n\nand traced the malware's wallet to see how much money they actually made from this new exploit\n\n(if you use Next.js/React, READ THIS!)\n\nI woke up to a terrifying email from Hetzner: \"Netscan Detected.\"\n\nmy server was blocked and a botnet was using my IP to https://t.co/CbyjNB93at",
+  "range": [
+   0,
+   274
+  ],
+  "truncated": true,
+  "links": [],
+  "mentions": [],
+  "media": [
+   {
+    "url": "https://t.co/CbyjNB93at",
+    "at": [
+     275,
+     298
+    ]
+   }
+  ],
+  "photo": {
+   "url": "https://pbs.twimg.com/media/G7fP6drXsAAQlVW.jpg",
+   "width": 1542,
+   "height": 925
+  },
+  "card": null
+ },
+ {
+  "id": "1917310045588496583",
+  "url": "https://x.com/eastdakota/status/1917310045588496583",
+  "name": "Matthew Prince \ud83c\udf25",
+  "handle": "eastdakota",
+  "avatar": "https://pbs.twimg.com/profile_images/2332322635/zhx7hflmmcxdaj0tk9f8_200x200.jpeg",
+  "verified": true,
+  "date": "2025-04-29T20:08:31.000Z",
+  "likes": 488,
+  "replies": 38,
+  "topic": "vps",
+  "text": "It\u2019s so strange to me how AWS defies the natural tendency of tech to make things cheaper over time and instead either holds customer prices high as their underlying costs drop (e.g., egress) or starts charging for things like cold starts creating no incentive for them to improve.",
+  "range": [
+   0,
+   280
+  ],
+  "truncated": false,
+  "links": [],
+  "mentions": [],
+  "media": [],
+  "photo": null,
+  "card": null
+ }
+]

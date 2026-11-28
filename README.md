@@ -1,34 +1,27 @@
-<p align="center">
-  <img src="hub/assets/img/og.png" alt="moin. Deploy anything. Lose nothing." width="100%">
-</p>
+# moin
 
-Deploy anything. Lose nothing. Your apps on your servers. Backups on your schedule. Checked every day. For SQLite and Postgres, with web, CLI, terminal UI and MCP.
+Deploy anything. Lose nothing.
 
-All of moin is open source, in this repo. The daemon runs as root on your server, and you can read every line: [`internal/daemon`](internal/daemon). Host it yourself for free, with every feature.
+One command puts your app on your own server. Your backups are restored and checked every day. Nothing but your SSH key can command your server.
 
 ```bash
-moin login              # log in through the browser
-moin servers add web-1  # prints the one-line install for your server
-moin deploy             # ✓ moin. your app is live
-moin                    # the live terminal UI
+curl -fsSL https://moin.run/cli.sh | sh
+cd my-app
+moin deploy my-server   # ✓ my-app v1 is live: https://my-app.203-0-113-7.sslip.io
+moin                    # every server, every app, what needs you
+moin backups my-app     # the copies, and the last restore check
 ```
 
-The daemon on your server only dials out. Nothing listens for moin.
+If `ssh my-server` works, `moin deploy my-server` works. No account, no dashboard, no Docker on your laptop.
+
+A watcher on another machine alerts you when a server goes silent. moin cloud is the watcher we run: `moin watcher connect my-server`. It keeps a copy of every database that a hacked server can't delete.
 
 ## Documentation
 
-Everything else is in the docs: [moin.run/docs](https://moin.run/docs), or `/docs` on your own hub. They are the source of truth.
+Everything else is in the docs: [moin.run/docs](https://moin.run/docs).
 
 News on X: [@usemoin](https://x.com/usemoin).
 
-## Build
-
-```bash
-go install github.com/axadrn/moin/cmd/moin@latest
-```
-
-The hub is in [`hub`](hub).
-
 ## License
 
-Open source: [what the licenses cover](https://moin.run/docs/faq#is-moin-open-source). See also [CONTRIBUTING.md](CONTRIBUTING.md). The license covers the code, not the name or the logo: see [TRADEMARKS.md](TRADEMARKS.md).
+Open source, all of it: [what the license covers](https://moin.run/docs/faq#is-moin-open-source). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). The name and the logo: [TRADEMARKS.md](TRADEMARKS.md).

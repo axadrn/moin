@@ -12,6 +12,9 @@ import (
 	"strings"
 	"syscall"
 
+	// The SQLite driver, for database/sql.
+	_ "modernc.org/sqlite"
+
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/protocol"
 )
@@ -280,13 +283,13 @@ func (e *sqliteEngine) Recover(ctx context.Context, mark restoreMark) (bool, err
 func (e *sqliteEngine) Check(ctx context.Context, from source) error {
 	dir, err := e.tempDir("check", from.size)
 	if err != nil {
-		return err
+		return notChecked{err}
 	}
 	defer os.RemoveAll(dir)
 	file := filepath.Join(dir, "check.db")
 	out, err := os.Create(file)
 	if err != nil {
-		return err
+		return notChecked{err}
 	}
 	if err := errors.Join(gunzipCopy(from, out), out.Close()); err != nil {
 		return err
@@ -323,18 +326,15 @@ func (e *sqliteEngine) Drop(ctx context.Context, id string) error {
 	return nil
 }
 
-// sweepTemp removes what older versions of moin left next to the database
-// live in root: copies, checks and the folder they kept for Litestream.
-func sweepTemp(root *os.Root, live string) {
-	dir := filepath.Dir(live)
-	_ = root.RemoveAll(filepath.Join(dir, "."+filepath.Base(live)+"-litestream"))
-	for _, what := range []string{"copy", "check"} {
-		left, _ := filepath.Glob(filepath.Join(root.Name(), dir, "."+tempName(what+"-*")))
-		for _, path := range left {
-			if name, err := filepath.Rel(root.Name(), path); err == nil {
-				_ = root.RemoveAll(name)
-			}
-		}
+// matchOwnerOf gives the database name in root and its -wal and -shm files
+// the owner in info.
+func matchOwnerOf(root *os.Root, name string, info os.FileInfo) {
+	owner, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return
+	}
+	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
+		_ = root.Lchown(name+suffix, int(owner.Uid), int(owner.Gid))
 	}
 }
 

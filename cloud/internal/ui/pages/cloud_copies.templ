@@ -1,0 +1,146 @@
+package pages
+
+import (
+	"time"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/workspace"
+	"github.com/axadrn/moin/internal/human"
+	"strconv"
+)
+
+// CloudCopiesProps is the copies of a workspace in moin cloud: the ones
+// shown, how many there are in all, the bytes they take of the limit, the
+// servers that sent any, and the one picked.
+type CloudCopiesProps struct {
+	Cloud   Cloud
+	Copies  []workspace.Copy
+	All     int
+	More    string
+	Stored  int64
+	Limit   int64
+	Keep    time.Duration
+	Servers []string
+	Server  string
+}
+
+// CloudCopies is /cloud/copies: the copies the servers sent, newest
+// first. A server can add one, never delete one.
+templ CloudCopies(p CloudCopiesProps) {
+	@cloudApp(p.Cloud, "Copies", "Copies") {
+		@components.Header(components.HeaderProps{Title: "Copies"})
+		<p class="moin-text moin-muted">Copies your servers can add but never delete, encrypted on the server. Each stays { strconv.Itoa(int(p.Keep.Hours() / 24)) } days.</p>
+		if !p.Cloud.Plan.AlertsOn {
+			@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "No new copies", Lines: []string{"Your " + p.Cloud.Plan.Note + ". The copies here stay until they expire."}}) {
+				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/cloud/plan"}) {
+					Turn copies on
+				}
+			}
+		}
+		@components.Stats() {
+			@components.Stat(components.StatProps{Label: "Stored", Value: human.Size(float64(p.Stored))}) {
+				<span>of { human.Size(float64(p.Limit)) }</span>
+				@components.Meter(components.MeterProps{Percent: share(p.Stored, p.Limit), Label: "Storage used"})
+			}
+			@components.Stat(components.StatProps{Label: "Copies", Value: strconv.Itoa(p.All)}) {
+				<span>{ plural(len(p.Servers), "server") }</span>
+			}
+			@components.Stat(components.StatProps{Label: "Newest", Value: newest(p.Copies)}) {
+				if len(p.Copies) > 0 {
+					@components.Status(components.StatusProps{State: components.StateDone, Text: p.Copies[0].App + " on " + p.Copies[0].Server})
+				} else {
+					<span>none yet</span>
+				}
+			}
+		}
+		if len(p.Servers) > 1 {
+			@components.Tabs(components.TabsProps{Label: "Server", Tabs: serverTabs(p.Servers, p.Server)})
+		}
+		if len(p.Copies) == 0 {
+			@components.Card(components.CardProps{Title: "No copies yet"}) {
+				<p class="moin-text moin-muted">A server sends one after each backup, once it has a bucket and reports here. Set the bucket from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } bucket set my-server</code></p>
+			}
+		} else {
+			@components.Card(components.CardProps{}) {
+				@components.Rows(components.RowsProps{Head: []string{"App", "Server", "Made", "Size", "Kept until"}}) {
+					for _, c := range p.Copies {
+						@components.Row(components.RowProps{}) {
+							@components.Cell() {
+								<span>
+									{ c.App }
+									if c.Database != c.App {
+										<span class="moin-muted">{ c.Database }</span>
+									}
+								</span>
+							}
+							@components.Cell() {
+								{ c.Server }
+							}
+							@components.Cell() {
+								{ day(c.MadeAt) }
+							}
+							@components.Cell() {
+								<span class="moin-digits">{ human.Size(float64(c.Size)) }</span>
+							}
+							@components.Cell() {
+								kept until { c.MadeAt.Add(p.Keep).Format("Jan 2") }
+							}
+						}
+					}
+					if p.More != "" {
+						@components.RowsMore(components.RowsMoreProps{Href: p.More}) {
+							Show all { strconv.Itoa(p.All) } copies
+						}
+					}
+				}
+			}
+		}
+		<p class="moin-small moin-muted">Your key opens them, moin cloud can't. Restore one from your laptop: <code class="moin-mono moin-foreground">{ brand.Name } restore my-app</code></p>
+	}
+}
+
+// serverTabs pick the copies of one server, or of all.
+func serverTabs(servers []string, open string) []components.Tab {
+	tabs := []components.Tab{{Label: "All servers", Href: "/cloud/copies", Active: open == ""}}
+	for _, server := range servers {
+		tabs = append(tabs, components.Tab{Label: server, Href: "/cloud/copies?server=" + server, Active: open == server})
+	}
+	return tabs
+}
+
+// share is used of limit in percent.
+func share(used, limit int64) int {
+	if limit <= 0 {
+		return 0
+	}
+	return int(used * 100 / limit)
+}
+
+// newest is the time of the newest copy, or a dash.
+func newest(copies []workspace.Copy) string {
+	if len(copies) == 0 {
+		return "–"
+	}
+	return copies[0].MadeAt.Local().Format("15:04")
+}
+
+// day is when a copy was made, as a person says it: Today, 04:00.
+func day(t time.Time) string {
+	t = t.Local()
+	now := time.Now()
+	switch {
+	case sameDay(t, now):
+		return "Today, " + t.Format("15:04")
+	case sameDay(t, now.AddDate(0, 0, -1)):
+		return "Yesterday, " + t.Format("15:04")
+	}
+	return t.Format("Jan 2, 15:04")
+}
+
+// sameDay says whether a and b are on the same date.
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}

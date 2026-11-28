@@ -1,0 +1,12 @@
+package layouts
+
+// Home is the layout of every page of the site: the navbar, the page, the
+// footer and the search.
+templ Home(seo SEOProps) {
+	@Base(seo) {
+		@Navbar()
+		{ children... }
+		@Footer()
+		@SiteSearch()
+	}
+}

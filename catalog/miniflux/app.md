@@ -1,6 +1,6 @@
 ---
 name: Miniflux
-pitch: A fast, quiet feed reader. No noise, no tracking.
+pitch: A fast and quiet feed reader. No noise. No tracking.
 category: Reading
 website: "https://miniflux.app"
 source: github.com/miniflux/v2

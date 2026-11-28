@@ -1,0 +1,76 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ctxkeys"
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// Blog is /blog: every post, newest first. The posts are about the work
+// around moin: deploying, servers, backups and security.
+templ Blog(posts []service.BlogPost) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Blog",
+		Description: "Deploying, servers, backups and security. Short posts on running your own apps, from the people who build " + brand.Name + ".",
+		Path:        "/blog",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Blog", Line: "Short posts on running your own apps."})
+				@blogList(posts)
+				@components.More(components.MoreProps{Href: "/blog.xml", Text: "Follow with RSS"})
+			</section>
+		</main>
+	}
+}
+
+// BlogPost is one post: its title, its date, the text, then the other
+// posts and the way in.
+templ BlogPost(post service.BlogPost, posts []service.BlogPost) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       post.Title,
+		Description: post.Description,
+		Path:        "/blog/" + post.Slug,
+	}) {
+		@templ.Raw(blogJSONLD(post, ctxkeys.RenderConfig(ctx).AppURL))
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: post.Title, Line: post.Date.Format("January 2, 2006")})
+				<article class="moin-narrow">
+					@components.Prose(components.ProseProps{HTML: post.HTML})
+				</article>
+			</section>
+			if others := blogOthers(posts, post.Slug, 3); len(others) > 0 {
+				<section class="moin-band">
+					@components.BandHead(components.BandHeadProps{Title: "From the blog.", Line: "Short posts on running your own apps."})
+					@blogList(others)
+					@components.More(components.MoreProps{Href: "/blog", Text: "See all"})
+				</section>
+			}
+			@HomeEnd()
+		</main>
+	}
+}
+
+templ blogList(posts []service.BlogPost) {
+	@components.Card(components.CardProps{}) {
+		@components.List() {
+			for _, post := range posts {
+				@components.Item(components.ItemProps{Href: "/blog/" + post.Slug, Name: post.Title, Note: post.Date.Format("January 2, 2006")})
+			}
+		}
+	}
+}
+
+// blogOthers are up to n posts other than this one, newest first.
+func blogOthers(posts []service.BlogPost, slug string, n int) []service.BlogPost {
+	var others []service.BlogPost
+	for _, post := range posts {
+		if post.Slug != slug && len(others) < n {
+			others = append(others, post)
+		}
+	}
+	return others
+}

@@ -1,10 +1,6 @@
 package daemon
 
-import (
-	"strings"
-
-	"github.com/axadrn/moin/internal/build"
-)
+import "github.com/axadrn/moin/internal/build"
 
 // The names the daemon gives things on a server, all from build.Name.
 const (
@@ -27,11 +23,6 @@ const (
 // start of the names of its images and routers. The project it runs as
 // now is apps.projectOf.
 func project(app string) string { return ourName + "-" + app }
-
-// appOfProject is the app a Compose project belongs to.
-func appOfProject(project string) (string, bool) {
-	return strings.CutPrefix(project, ourName+"-")
-}
 
 // tempName starts the names of temporary files and folders.
 func tempName(what string) string { return ourName + "-" + what }

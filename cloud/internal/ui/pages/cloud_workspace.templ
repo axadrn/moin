@@ -1,0 +1,242 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/watcher"
+	"strconv"
+)
+
+// CloudOverviewProps is the overview of a workspace: its bar, and what
+// its watcher sees.
+type CloudOverviewProps struct {
+	Cloud Cloud
+	View  watcher.View
+}
+
+// CloudOverview is /cloud: what needs you, the servers, the alerts and
+// the last proven restores. It only reads: nothing on it changes a server.
+templ CloudOverview(p CloudOverviewProps) {
+	@cloudApp(p.Cloud, "Overview", "Overview") {
+		if len(p.View.Servers) == 0 {
+			@components.Header(components.HeaderProps{Title: "Overview"})
+		} else {
+			@components.Header(components.HeaderProps{Title: "Overview"}) {
+				@components.Button(components.ButtonProps{Href: "/cloud/connect"}) {
+					Connect a server
+				}
+			}
+		}
+		@alertsOff(p.Cloud.Plan)
+		if len(p.View.Servers) == 0 {
+			@cloudFirstRun(p.Cloud.Plan)
+		} else {
+			<p class="moin-text moin-muted">{ reportHere(len(p.View.Servers)) }</p>
+			if len(p.View.NeedsYou) > 0 {
+				@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "Needs you", Lines: p.View.NeedsYou}) {
+					if red := firstRed(p.View.Servers); red != "" {
+						@components.Button(components.ButtonProps{Href: serverHref(red)}) {
+							Open { red }
+						}
+					}
+				}
+			}
+			@overviewStats(summarize(p.View.Servers))
+			<section class="moin-section">
+				<div class="moin-section-head"><h2>Servers</h2></div>
+				<div class="moin-grid">
+					for _, server := range p.View.Servers {
+						@serverCard(server)
+					}
+				</div>
+			</section>
+			@alertsCard(p.View.Outages, 5, "/cloud/alerts")
+			@backupsCard(p.View.Checks)
+		}
+		<p class="moin-small moin-muted moin-center">
+			Win a free year: <a href={ templ.SafeURL(cloudFreeYear) } class="moin-link" target="_blank" rel="noopener">report a bug or an idea</a>. If it gets in, the year is yours.
+		</p>
+	}
+}
+
+// alertsOff is the notice that the plan sends no alerts, with the way to
+// turn them on.
+templ alertsOff(plan Plan) {
+	if !plan.AlertsOn {
+		@components.Notice(components.NoticeProps{State: components.StateFailed, Title: "Alerts are off", Lines: []string{"Your " + plan.Note + ". Servers still report, nobody gets a mail."}}) {
+			@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/cloud/plan"}) {
+				Turn alerts on
+			}
+		}
+	}
+}
+
+// cloudFirstRun is the overview before the first server: the one command,
+// and the wait for its first report.
+templ cloudFirstRun(plan Plan) {
+	@components.Card(components.CardProps{Title: "Connect your first server"}) {
+		<p class="moin-text moin-muted">Run this on your laptop, with the name of the server in your SSH config. It signs you in, and the server reports here every minute. When it goes silent, you get a mail.</p>
+		@components.Command(components.CommandProps{Text: connectCommand("my-server")})
+		@components.Status(components.StatusProps{State: components.StateRunning, Text: "Waiting for the first report"})
+		<p class="moin-small moin-muted">{ plan.Text }</p>
+	}
+}
+
+// overviewStats are the four numbers of a workspace: servers, apps,
+// backups and knocks.
+templ overviewStats(s summary) {
+	@components.Stats() {
+		@components.Stat(components.StatProps{Label: "Servers", Value: strconv.Itoa(s.Servers)}) {
+			if s.Silent > 0 {
+				@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(s.Silent) + " silent"})
+			} else {
+				@components.Status(components.StatusProps{State: components.StateLive, Text: "all reporting"})
+			}
+		}
+		@components.Stat(components.StatProps{Label: "Apps", Value: strconv.Itoa(s.Apps)}) {
+			switch  {
+				case s.Apps == 0:
+					<span>none yet</span>
+				case s.Stopped > 0:
+					@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(s.Stopped) + " stopped"})
+				default:
+					@components.Status(components.StatusProps{State: components.StateLive, Text: "all running"})
+			}
+		}
+		@components.Stat(components.StatProps{Label: "Backups", Value: strconv.Itoa(s.Fine), Of: "/" + strconv.Itoa(s.Databases)}) {
+			switch  {
+				case s.Databases == 0:
+					<span>no database yet</span>
+				case s.FirstRed != "":
+					@components.Status(components.StatusProps{State: components.StateFailed, Text: s.FirstRed + " needs you"})
+				default:
+					@components.Status(components.StatusProps{State: components.StateDone, Text: "copied and proven"})
+			}
+		}
+		@components.Stat(components.StatProps{Label: "Knocks today", Value: human.Count(s.KnocksToday)}) {
+			<span class="moin-digits">{ human.Count(s.KnocksYr) } this year</span>
+		}
+	}
+}
+
+// serverCard is one server on the overview: its state, its apps as
+// pills, and three facts. The whole card opens the server.
+templ serverCard(server watcher.ServerView) {
+	{{ c := serverCount(server) }}
+	@components.Card(components.CardProps{Href: serverHref(server.Name)}) {
+		<div class="moin-row" data-between data-top>
+			<div class="moin-stack" data-gap="1">
+				<div class="moin-row" data-wrap data-gap="3">
+					<span class="moin-heading">{ server.Name }</span>
+					if n := len(problemsOf(server)); n > 0 {
+						@components.Status(components.StatusProps{State: components.StateFailed, Text: strconv.Itoa(n) + " needs you"})
+					}
+				</div>
+				<span class="moin-small moin-muted">
+					if server.Version != "" {
+						{ server.Version } ·
+					}
+					{ server.State }
+				</span>
+			</div>
+			@components.Status(components.StatusProps{State: serverState(server), Text: serverWord(server)})
+		</div>
+		if len(server.Apps) > 0 {
+			<div class="moin-row" data-wrap data-gap="2">
+				for _, app := range server.Apps {
+					@components.Status(components.StatusProps{State: okState(app.OK), Text: app.Name, Note: app.State, Pill: true})
+				}
+			</div>
+		}
+		@components.Values() {
+			@components.Value(components.ValueProps{Name: "Backups"}) {
+				if c.Databases == 0 {
+					none
+				} else {
+					{ strconv.Itoa(c.Fine) } of { strconv.Itoa(c.Databases) } fine
+				}
+			}
+			@components.Value(components.ValueProps{Name: "Domains"}) {
+				{ strconv.Itoa(c.Up) } of { strconv.Itoa(c.Domains) } up
+			}
+			@components.Value(components.ValueProps{Name: "Knocks today"}) {
+				<span class="moin-digits">{ human.Count(c.KnocksToday) }</span>
+			}
+		}
+	}
+}
+
+// alertsCard is the outages, newest first: a silent server or a domain
+// that was down from outside. At most n, and a way to all of them when
+// more says where.
+templ alertsCard(outages []watcher.OutageView, n int, more string) {
+	@components.Card(components.CardProps{Title: "Alerts"}) {
+		if len(outages) == 0 {
+			<p class="moin-text moin-muted">None. A mail goes out when a server goes silent or a domain is down from outside.</p>
+		} else {
+			@outageRows(first(outages, n)) {
+				if more != "" && len(outages) > n {
+					@components.RowsMore(components.RowsMoreProps{Href: more}) {
+						See all { strconv.Itoa(len(outages)) } alerts
+					}
+				}
+			}
+		}
+	}
+}
+
+// outageRows are outages, one row each. Children end the rows.
+templ outageRows(outages []watcher.OutageView) {
+	@components.Rows(components.RowsProps{Head: []string{"What", "From", "How long"}}) {
+		for _, outage := range outages {
+			@components.Row(components.RowProps{}) {
+				@components.Cell() {
+					@components.Status(components.StatusProps{State: outageState(outage.Open), Text: outage.What})
+				}
+				@components.Cell() {
+					{ outage.From }
+				}
+				@components.Cell() {
+					{ outageNote(outage) }
+				}
+			}
+		}
+		{ children... }
+	}
+}
+
+// backupsCard is the newest restore check of each database.
+templ backupsCard(checks []watcher.CheckView) {
+	@components.Card(components.CardProps{Title: "Backups"}) {
+		if len(checks) == 0 {
+			<p class="moin-text moin-muted">No restore check yet. Each server restores the newest copy of every database once a day, and says how it went.</p>
+		} else {
+			@checkRows(newestChecks(checks)) {
+				@components.RowsMore(components.RowsMoreProps{Href: "/cloud/copies"}) {
+					Copies in { brand.Name } cloud
+				}
+			}
+		}
+	}
+}
+
+// checkRows are restore checks, one row each. Children end the rows.
+templ checkRows(checks []watcher.CheckView) {
+	@components.Rows(components.RowsProps{Head: []string{"Database", "Ran", "Result"}}) {
+		for _, check := range checks {
+			@components.Row(components.RowProps{}) {
+				@components.Cell() {
+					@components.Status(components.StatusProps{State: checkState(check.OK), Text: check.What})
+				}
+				@components.Cell() {
+					{ check.At }
+				}
+				@components.Cell() {
+					{ check.Result }
+				}
+			}
+		}
+		{ children... }
+	}
+}

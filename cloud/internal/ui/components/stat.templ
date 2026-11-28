@@ -1,0 +1,52 @@
+package components
+
+// Stats are a few big numbers side by side on one surface, a line
+// between them. Two a row on a phone.
+templ Stats() {
+	<div class="moin-stats">
+		{ children... }
+	</div>
+}
+
+// StatProps is one Stat: its name, the number, and what it is out of,
+// like "/3".
+type StatProps struct {
+	Label string
+	Value string
+	Of    string
+}
+
+// Stat is one number of Stats. Children say a word more under it.
+templ Stat(p StatProps) {
+	<div class="moin-stat">
+		<span class="moin-stat-label">{ p.Label }</span>
+		<span class="moin-stat-value moin-digits">{ p.Value }<small>{ p.Of }</small></span>
+		if templ.GetChildren(ctx) != nil {
+			<div class="moin-stat-note">
+				{ children... }
+			</div>
+		}
+	</div>
+}
+
+// ValueProps is one Value: what it is.
+type ValueProps struct {
+	Name string
+}
+
+// Values are a few short facts in a row, each a quiet name over its value.
+templ Values() {
+	<dl class="moin-values">
+		{ children... }
+	</dl>
+}
+
+// Value is one fact of Values. Children are the value.
+templ Value(p ValueProps) {
+	<div>
+		<dt>{ p.Name }</dt>
+		<dd>
+			{ children... }
+		</dd>
+	</div>
+}

@@ -1,9 +1,0 @@
-# The hub on its own server, behind a Cloudflare Tunnel. No port is open.
-# cloudflared gets the tunnel's token and nothing else.
-services:
-  cloudflared:
-    image: cloudflare/cloudflared:2026.10.3
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}

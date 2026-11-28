@@ -1,6 +1,6 @@
 ---
 name: Plausible
-pitch: Simple, privacy-friendly web analytics. No cookies.
+pitch: Simple web analytics that respect privacy. No cookies.
 category: Analytics
 website: "https://plausible.io"
 source: github.com/plausible/analytics

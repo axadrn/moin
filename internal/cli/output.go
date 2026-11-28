@@ -1,11 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -14,7 +13,6 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 	"github.com/charmbracelet/colorprofile"
@@ -25,6 +23,16 @@ import (
 // NO_COLOR, plain text for pipes and CI.
 func terminal(w io.Writer) io.Writer {
 	return colorprofile.NewWriter(w, os.Environ())
+}
+
+// raw is w without terminal's writer, which takes out or changes colors a
+// terminal cannot show. Bytes from a server, like a copy, the output of
+// exec or an app's logs, go out through it as they are.
+func raw(w io.Writer) io.Writer {
+	if colors, ok := w.(*colorprofile.Writer); ok {
+		return colors.Forward
+	}
+	return w
 }
 
 // isTTY reports whether w is a terminal, so spinners and symbols make sense.
@@ -84,30 +92,30 @@ func hint(w io.Writer, lead, next string) {
 var errReported = errors.New("reported")
 
 // printError writes an error as ✗ and a sentence that says what to do.
+// On a terminal it wraps at spaces, never in a word.
 func printError(w io.Writer, err error) {
-	message := explain(err)
-	fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" "+commands(w, message))
+	message := commands(w, explain(err))
+	if isTTY(w) {
+		lines := strings.Split(lipgloss.NewStyle().Width(terminalWidth()-2).Render(message), "\n")
+		for index := range lines {
+			lines[index] = strings.TrimRight(lines[index], " ")
+		}
+		message = strings.Join(lines, "\n  ")
+	}
+	fmt.Fprintln(w, style.Danger.Render(style.SymbolFailed)+" "+message)
 }
 
 // explain turns an error into a sentence: capitalized, with the command to
 // run when there is one.
 func explain(err error) string {
-	var urlErr *url.Error
-	var netErr *net.OpError
-	var apiErr *client.Error
-	switch {
-	case errors.Is(err, client.ErrNotLoggedIn):
-		return fmt.Sprintf("Not logged in. Run `%s login`, or set %s in CI", build.Name, client.TokenVariable)
-	case errors.As(err, &apiErr) && apiErr.Code == "not_found" && apiErr.Message == "The app was not found." && picked.name != "":
-		return fmt.Sprintf("There is no app %s; the name came from %s. Name another with --app, or see yours with `%s apps`", picked.name, picked.from, build.Name)
-	case errors.As(err, &urlErr) && errors.As(err, &netErr):
-		host := urlErr.URL
-		if parsed, parseErr := url.Parse(urlErr.URL); parseErr == nil {
-			host = parsed.Scheme + "://" + parsed.Host
-		}
-		return fmt.Sprintf("Cannot reach the hub at %s. Check the connection, or log in to another with `%s login --url <url>`", host, build.Name)
-	}
 	return sentence(err.Error())
+}
+
+// printJSON writes value as indented JSON, for --json.
+func printJSON(w io.Writer, value any) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(value)
 }
 
 // sentence capitalizes the first word, but not one like "v4" or the name
@@ -121,7 +129,8 @@ func sentence(text string) string {
 }
 
 // table writes aligned columns. The header is muted on a terminal; cells may
-// carry colors.
+// carry colors. On a terminal the last column is cut to its width, so a
+// row never wraps.
 func table(w io.Writer, header []string, rows [][]string) {
 	widths := make([]int, len(header))
 	for _, row := range append([][]string{header}, rows...) {
@@ -129,10 +138,20 @@ func table(w io.Writer, header []string, rows [][]string) {
 			widths[column] = max(widths[column], lipgloss.Width(cell))
 		}
 	}
+	room := 0
+	if isTTY(w) {
+		room = terminalWidth()
+		for _, width := range widths[:len(widths)-1] {
+			room -= width + 3
+		}
+	}
 	line := func(row []string) string {
 		cells := make([]string, len(row))
 		for column, cell := range row {
 			if column == len(row)-1 {
+				if room > 10 {
+					cell = clip(cell, room)
+				}
 				cells[column] = cell
 				continue
 			}
@@ -155,31 +174,55 @@ func badge(w io.Writer, styled, plain string) string {
 	return plain
 }
 
-// progress prints a deploy log as it streams: daemon steps with →, tool
-// output indented and dimmed. On a terminal a spinner with the current step
-// and the time so far stays on the last line.
+// progress prints a log as it streams, like the log of a deploy.
+//
+// On a terminal every step of the server gets one line: a spinner while
+// it runs, then ✓ and how long it took. The tool output of the running
+// step, like docker's build lines, shows as its last few lines, dimmed,
+// and goes away when the step is done. When it fails, the lines that say
+// why stay on the screen.
+//
+// Without a terminal, as in CI, every line is printed as it comes.
 type progress struct {
-	w       io.Writer
-	tty     bool
-	started time.Time
+	w   io.Writer
+	tty bool
 
 	mu      sync.Mutex
 	current string
+	since   time.Time
+	tail    []string
 	frame   int
-	drawn   bool
+	drawn   int
 	stop    chan struct{}
 	stopped chan struct{}
 }
 
+// task runs work as one step: a spinner while it runs, then ✓ or ✗
+// and how long it took.
+func task(w io.Writer, text string, work func() error) error {
+	p := newProgress(w, text)
+	err := work()
+	p.end(err != nil)
+	return err
+}
+
+// liveLines is how many tool lines show under the running step; keptLines
+// how many stay on the screen when it fails.
+const (
+	liveLines = 4
+	keptLines = 12
+)
+
 func newProgress(w io.Writer, current string) *progress {
-	p := &progress{w: w, tty: isTTY(w), started: time.Now(), current: current, stop: make(chan struct{}), stopped: make(chan struct{})}
+	p := &progress{w: w, tty: isTTY(w), current: current, since: time.Now(), stop: make(chan struct{}), stopped: make(chan struct{})}
 	if !p.tty {
+		fmt.Fprintln(w, style.Step(current))
 		close(p.stopped)
 		return p
 	}
 	go func() {
 		defer close(p.stopped)
-		ticker := time.NewTicker(120 * time.Millisecond)
+		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {
@@ -188,6 +231,7 @@ func newProgress(w io.Writer, current string) *progress {
 			case <-ticker.C:
 				p.mu.Lock()
 				p.frame++
+				p.clear()
 				p.draw()
 				p.mu.Unlock()
 			}
@@ -196,7 +240,7 @@ func newProgress(w io.Writer, current string) *progress {
 	return p
 }
 
-// line prints one log line above the spinner.
+// line takes one line of the log.
 func (p *progress) line(raw string) {
 	text, isStep := style.LogLine(raw)
 	if text == "" {
@@ -204,57 +248,106 @@ func (p *progress) line(raw string) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if !p.tty {
+		if isStep {
+			fmt.Fprintln(p.w, style.Step(text))
+		} else {
+			fmt.Fprintln(p.w, "    "+style.Noise(text))
+		}
+		return
+	}
 	p.clear()
-	if isStep {
-		p.current = text
+	switch {
+	case !isStep:
+		p.tail = append(p.tail, text)
+		if len(p.tail) > keptLines {
+			p.tail = p.tail[len(p.tail)-keptLines:]
+		}
+	case strings.HasSuffix(text, " is live"):
+		// The result says it, with the address.
+		p.finish(false)
+	case strings.HasPrefix(text, "deploy failed"):
+		p.finish(true)
 		fmt.Fprintln(p.w, style.Step(text))
-	} else {
-		fmt.Fprintln(p.w, "    "+style.Noise(text))
+	default:
+		p.finish(false)
+		p.current, p.since = text, time.Now()
 	}
 	p.draw()
 }
 
-// draw writes the spinner line; the caller holds mu.
-func (p *progress) draw() {
-	if !p.tty {
+// finish writes the running step as done, or as failed with the lines
+// that say why; the caller holds mu.
+func (p *progress) finish(failed bool) {
+	if p.current == "" {
 		return
 	}
+	took := ""
+	if since := time.Since(p.since); since >= time.Second {
+		took = style.Muted.Render("  " + human.Duration(since))
+	}
+	if failed {
+		for _, line := range p.tail {
+			fmt.Fprintln(p.w, "    "+style.Noise(clip(line, max(terminalWidth()-5, 10))))
+		}
+		fmt.Fprintln(p.w, style.Danger.Render(style.SymbolFailed)+" "+p.current+took)
+	} else {
+		fmt.Fprintln(p.w, style.Success.Render(style.SymbolDone)+" "+p.current+took)
+	}
+	p.current, p.tail = "", nil
+}
+
+// draw writes the spinner with the running step and its last tool lines;
+// the caller holds mu.
+func (p *progress) draw() {
+	if !p.tty || p.current == "" {
+		return
+	}
+	// One row each: a wrapped line would not clear.
+	width := terminalWidth()
 	frame := style.Spinner[p.frame%len(style.Spinner)]
-	elapsed := ""
-	if since := time.Since(p.started); since >= time.Second {
-		elapsed = " · " + human.Duration(since)
+	took := ""
+	if since := time.Since(p.since); since >= time.Second {
+		took = "  " + human.Duration(since)
 	}
-	// One row only: a wrapped spinner line would not clear.
-	width := 80
-	if columns, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && columns > 0 {
-		width = columns
+	lines := []string{style.Warning.Render(frame) + " " + clip(p.current, max(width-2-len(took), 10)) + style.Muted.Render(took)}
+	for _, line := range p.tail[max(len(p.tail)-liveLines, 0):] {
+		lines = append(lines, "    "+style.Dim.Render(clip(line, max(width-5, 10))))
 	}
-	current := clip(p.current, max(width-3-len(elapsed), 10))
-	fmt.Fprint(p.w, "\r\x1b[2K"+style.Warning.Render(frame)+" "+current+style.Muted.Render(elapsed))
-	p.drawn = true
+	fmt.Fprint(p.w, strings.Join(lines, "\n"))
+	p.drawn = len(lines)
 }
 
-// clear removes the spinner line; the caller holds mu.
+// clear removes what draw wrote; the caller holds mu.
 func (p *progress) clear() {
-	if p.drawn {
-		fmt.Fprint(p.w, "\r\x1b[2K")
-		p.drawn = false
+	if p.drawn == 0 {
+		return
 	}
+	fmt.Fprint(p.w, "\r\x1b[2K"+strings.Repeat("\x1b[1A\x1b[2K", p.drawn-1))
+	p.drawn = 0
 }
 
-// end stops the spinner and leaves the log as it is.
-func (p *progress) end() {
+// end stops the spinner and writes the last step as done, or as failed.
+func (p *progress) end(failed bool) {
 	if p.tty {
 		close(p.stop)
 	}
 	<-p.stopped
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.clear()
-	p.mu.Unlock()
+	if p.tty {
+		p.finish(failed)
+	}
 }
 
-func (p *progress) elapsed() string {
-	return human.Duration(time.Since(p.started))
+// terminalWidth is how many columns the terminal has, 80 when it does
+// not say.
+func terminalWidth() int {
+	if columns, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && columns > 0 {
+		return columns
+	}
+	return 80
 }
 
 // clip cuts text to width cells and ends it with … when it was longer.

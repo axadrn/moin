@@ -1,0 +1,170 @@
+package markdown
+
+import (
+	"bytes"
+
+	"github.com/axadrn/moin/cloud/internal/model"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
+	goldmarkhtml "github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
+	"go.abhg.dev/goldmark/frontmatter"
+)
+
+type Parser struct {
+	md goldmark.Markdown
+}
+
+// NewParser reads the markdown of the site.
+func NewParser() *Parser {
+	md := goldmark.New(
+		goldmark.WithExtensions(
+			extension.GFM,
+			extension.Footnote,
+			extension.Typographer,
+			&frontmatter.Extender{},
+			codeExtension{},
+		),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
+		),
+		goldmark.WithRendererOptions(
+			goldmarkhtml.WithHardWraps(),
+			goldmarkhtml.WithXHTML(),
+			// Above the GFM table renderer, which registers at 500.
+			renderer.WithNodeRenderers(util.Prioritized(scrollTables{}, 100)),
+		),
+	)
+
+	return &Parser{
+		md: md,
+	}
+}
+
+func (p *Parser) Parse(source []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	err := p.md.Convert(source, &buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// ParseParts renders pieces of markdown that end up on one page: a heading
+// ID is used once across all of them.
+func (p *Parser) ParseParts(sources [][]byte) ([][]byte, error) {
+	ids := parser.NewContext().IDs()
+	parts := make([][]byte, 0, len(sources))
+	for _, source := range sources {
+		var buf bytes.Buffer
+		err := p.md.Convert(source, &buf, parser.WithContext(parser.NewContext(parser.WithIDs(ids))))
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, buf.Bytes())
+	}
+	return parts, nil
+}
+
+func (p *Parser) ParseWithFrontmatter(source []byte) (content []byte, meta map[string]any, err error) {
+	context := parser.NewContext()
+	var buf bytes.Buffer
+
+	err = p.md.Convert(source, &buf, parser.WithContext(context))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	data := frontmatter.Get(context)
+	if data == nil {
+		meta = make(map[string]any)
+	} else {
+		err = data.Decode(&meta)
+		if err != nil {
+			meta = make(map[string]any)
+		}
+	}
+
+	return buf.Bytes(), meta, nil
+}
+
+func (p *Parser) ExtractFrontmatter(source []byte) map[string]any {
+	context := parser.NewContext()
+	p.md.Parser().Parse(text.NewReader(source), parser.WithContext(context))
+
+	data := frontmatter.Get(context)
+	if data == nil {
+		return make(map[string]any)
+	}
+
+	var meta map[string]any
+	err := data.Decode(&meta)
+	if err != nil {
+		return make(map[string]any)
+	}
+	return meta
+}
+
+func (p *Parser) ExtractHeadings(source []byte) []model.DocHeading {
+	doc := p.md.Parser().Parse(text.NewReader(source))
+	headings := make([]model.DocHeading, 0)
+
+	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		heading, ok := n.(*ast.Heading)
+		if !ok || heading.Level < 2 || heading.Level > 3 {
+			return ast.WalkContinue, nil
+		}
+
+		idAttr, ok := heading.Attribute([]byte("id"))
+		if !ok {
+			return ast.WalkContinue, nil
+		}
+
+		text := extractNodeText(heading, source)
+		if text == "" {
+			return ast.WalkContinue, nil
+		}
+
+		id, ok := idAttr.([]byte)
+		if !ok || len(id) == 0 {
+			return ast.WalkContinue, nil
+		}
+
+		headings = append(headings, model.DocHeading{
+			ID:    string(id),
+			Text:  text,
+			Level: heading.Level,
+		})
+
+		return ast.WalkContinue, nil
+	})
+
+	return headings
+}
+
+func extractNodeText(node ast.Node, source []byte) string {
+	var textBuf bytes.Buffer
+
+	var walk func(ast.Node)
+	walk = func(current ast.Node) {
+		for child := current.FirstChild(); child != nil; child = child.NextSibling() {
+			if textNode, ok := child.(*ast.Text); ok {
+				textBuf.Write(textNode.Segment.Value(source))
+				continue
+			}
+			walk(child)
+		}
+	}
+
+	walk(node)
+
+	return textBuf.String()
+}

@@ -1,0 +1,94 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/tweets"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+)
+
+// Posts from X say the problem; moin is the answer. Nobody in them talks
+// about moin, and the page never says they do.
+
+// ---------------------------------------------------------------- home
+// HomeVoices is the section after the hero: the posts in one row that
+// moves slowly to the left, then the answer.
+templ HomeVoices(posts []tweets.Tweet) {
+	<section class="moin-band" aria-label="Posts from X">
+		<div class="moin-page moin-stack">
+			@components.BandHead(components.BandHeadProps{Title: "Everyone is moving to a VPS.", Line: "Not everyone closes the door."})
+		</div>
+		// site.js moves the row and lets a hand drag it.
+		<div class="moin-page">
+			<div class="moin-marquee" data-marquee>
+				<div class="moin-marquee-row">
+					<div class="moin-marquee-track">
+						for _, post := range posts {
+							@tweetCard(post)
+						}
+					</div>
+					// The second copy makes the loop seamless; screen readers and
+					// the keyboard skip it.
+					<div class="moin-marquee-track" aria-hidden="true" inert>
+						for _, post := range posts {
+							@tweetCard(post)
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+// ---------------------------------------------------------------- card
+// tweetCard is a post as X shows it, every card the same size: who wrote
+// it, the words cut to fit, what people did with it. The link to the post
+// stretches over the whole card and has no words, the X mark says it; the
+// links inside sit on top.
+templ tweetCard(post tweets.Tweet) {
+	<article class="moin-tweet">
+		<header class="moin-tweet-head">
+			<img class="moin-tweet-face" src={ post.Avatar } alt="" width="32" height="32" loading="lazy" decoding="async"/>
+			<div class="moin-tweet-who">
+				<span class="moin-tweet-name">
+					<span class="moin-truncate">{ post.Name }</span>
+					if post.Verified {
+						@tweetVerified()
+					}
+				</span>
+				<span class="moin-tweet-meta moin-truncate">
+					{ "@" + post.Handle } · <time datetime={ post.Date.Format("2006-01-02") }>{ post.Day() }</time>
+				</span>
+			</div>
+			<i class="moin-icon moin-icon-x-logo" data-size="s" aria-hidden="true"></i>
+		</header>
+		<p class="moin-tweet-text">
+			for _, part := range post.Parts() {
+				if part.Href != "" {
+					<a href={ templ.SafeURL(part.Href) } class="moin-tweet-inner" rel="noopener nofollow" target="_blank">{ part.Text }</a>
+				} else {
+					{ part.Text }
+				}
+			}
+		</p>
+		<footer class="moin-tweet-foot">
+			<span>{ tweetCount(post.Likes, "like", "likes") }</span>
+			<span>{ tweetCount(post.Replies, "reply", "replies") }</span>
+			<a href={ templ.SafeURL(post.URL) } class="moin-tweet-view" rel="noopener" target="_blank" aria-label={ "The post of @" + post.Handle + " on X" }></a>
+		</footer>
+	</article>
+}
+
+// tweetCount is a count with its word: 1 reply, 3.7K likes.
+func tweetCount(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return tweets.Count(n) + " " + many
+}
+
+// tweetVerified is the small check next to a verified name.
+templ tweetVerified() {
+	<svg class="moin-tweet-check" viewBox="0 0 24 24" width="16" height="16" role="img" aria-label="Verified">
+		<circle cx="12" cy="12" r="11" fill="currentColor"></circle>
+		<path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="var(--card)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+	</svg>
+}

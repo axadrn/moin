@@ -1,0 +1,89 @@
+package layouts
+
+import "github.com/axadrn/moin/cloud/internal/ui/components"
+
+// SiteSearch is the one search of the public site, in the middle of the
+// screen like the app's palette: the magnifier of the navbar, ⌘K, ctrl+k
+// or / open it on every public page. It finds the docs and the catalog;
+// the server answers (/search, pages.SiteSearchOptions). The arrows or
+// ctrl+j / ctrl+k pick, Enter opens, Escape or a click outside closes.
+templ SiteSearch() {
+	<dialog id="site-search" class="moin-palette" aria-label="Search">
+		<div class="moin-palette-box">
+			<form method="get" action="/search" role="search" class="moin-input-icon">
+				<label for="site-search-input" class="moin-sr-only">Search the docs and the catalog</label>
+				@components.Icon("search")
+				@components.Input(components.InputProps{ID: "site-search-input", Name: "q", Type: "search", Placeholder: "Search the docs and the catalog", Attrs: templ.Attributes{
+					"autocomplete":      "off",
+					"spellcheck":        "false",
+					"role":              "combobox",
+					"aria-expanded":     "true",
+					"aria-controls":     "site-search-results",
+					"aria-autocomplete": "list",
+					"hx-get":            "/search",
+					"hx-trigger":        "input changed delay:80ms, open",
+					"hx-target":         "#site-search-results",
+					"hx-swap":           "innerHTML",
+					"hx-sync":           "this:replace",
+				}})
+			</form>
+			<div id="site-search-results" role="listbox" aria-label="Answers" class="moin-palette-list"></div>
+		</div>
+	</dialog>
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const dialog = () => document.getElementById("site-search");
+			const field = () => document.getElementById("site-search-input");
+			const options = () => [...dialog().querySelectorAll("[role=option]")];
+			const typing = (target) => target instanceof Element && target.closest("input, textarea, select, [contenteditable]");
+			const pick = (option) => {
+				for (const each of options()) each.setAttribute("aria-selected", String(each === option));
+				option?.scrollIntoView({ block: "nearest" });
+			};
+			const open = () => {
+				if (dialog().open) return;
+				dialog().showModal();
+				field().select();
+				// The answers for what is typed, or the first steps.
+				htmx.trigger(field(), "open");
+			};
+			document.addEventListener("click", (event) => {
+				if (event.target.closest("[data-site-search-open]")) {
+					event.preventDefault();
+					open();
+				} else if (event.target === dialog()) dialog().close();
+				else if (event.target.closest("#site-search [role=option]")) dialog().close();
+			});
+			document.addEventListener("mouseover", (event) => {
+				const option = event.target.closest("#site-search [role=option]");
+				if (option && option.getAttribute("aria-selected") !== "true") pick(option);
+			});
+			document.addEventListener("keydown", (event) => {
+				const ctrl = event.ctrlKey && !event.metaKey;
+				if (!dialog().open) {
+					if ((event.key === "k" && (event.metaKey || event.ctrlKey)) || (event.key === "/" && !typing(event.target))) {
+						event.preventDefault();
+						open();
+					}
+					return;
+				}
+				if (event.target !== field()) return;
+				const down = event.key === "ArrowDown" || (ctrl && (event.key === "j" || event.key === "n"));
+				const up = event.key === "ArrowUp" || (ctrl && (event.key === "k" || event.key === "p"));
+				const list = options();
+				const at = list.findIndex((option) => option.getAttribute("aria-selected") === "true");
+				// Escape closes at once; a search field would only empty itself.
+				if ((event.key === "k" && event.metaKey) || event.key === "Escape") {
+					event.preventDefault();
+					dialog().close();
+				} else if (down || up) {
+					event.preventDefault();
+					pick(list[(at + (down ? 1 : -1) + list.length) % list.length]);
+				} else if (event.key === "Enter") {
+					event.preventDefault();
+					(list[at] || list[0])?.click();
+				}
+			});
+		})();
+	</script>
+}

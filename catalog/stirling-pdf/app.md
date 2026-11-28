@@ -1,6 +1,6 @@
 ---
 name: Stirling-PDF
-pitch: Every PDF tool you need, without uploading to strangers.
+pitch: Every PDF tool you need. No uploading to strangers.
 category: Documents
 website: "https://www.stirlingpdf.com"
 source: github.com/Stirling-Tools/Stirling-PDF

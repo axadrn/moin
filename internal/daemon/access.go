@@ -12,10 +12,10 @@ import (
 
 // An app runs in its own room on the server: its containers, its data
 // folders, its named volumes and its networks. A compose file may only use
-// the settings below, so whoever controls the hub cannot deploy a container
-// that reaches into the server. Anything not listed is refused, also a
-// setting Docker adds later, unless the server's rules have
-// server-access: on, which only root on the server can write.
+// the settings below, so whoever can push to a repo the server follows
+// cannot deploy a container that reaches into the server. Anything not
+// listed is refused, also a setting Docker adds later, unless the server's
+// config has server_access: true, which only root on the server can write.
 
 // serviceKeys are the settings a service may use. Those marked "checked"
 // have their value checked in checkService.
@@ -138,14 +138,14 @@ type appRoom struct {
 const beyondTheApp = "this reaches beyond the app, so the server refuses it"
 
 // checkCompose refuses a release whose compose file reaches beyond its
-// app, unless the server's rules allow it with server-access: on. It reads
+// app, unless the server's config allows it with server_access: true. It reads
 // the compose file as it will run, after moin filled it in, so it holds for
 // every deploy: new source, an image, new env or a rollback. Its places,
 // the settings that say where a service runs, are filled in already
 // (takePlaces); a ${VAR} Docker would fill in in another setting it checks
 // fails the check, as it could become anything.
 func (a *apps) checkCompose(release *release) error {
-	if release.rules != nil && release.rules.ServerAccess {
+	if release.server.ServerAccess {
 		return nil
 	}
 	config, err := readJSON(release.composeJSON)
@@ -154,7 +154,7 @@ func (a *apps) checkCompose(release *release) error {
 	}
 	room := a.roomOf(release, config)
 	if reason := room.check(config); reason != "" {
-		return fmt.Errorf("%s: %s. Allow it with server-access: on in %s", reason, beyondTheApp, RulesFile())
+		return fmt.Errorf("%s: %s. Allow it with server_access: true in %s", reason, beyondTheApp, ConfigFile())
 	}
 	return nil
 }
@@ -167,13 +167,11 @@ func (a *apps) roomOf(release *release, config map[string]any) appRoom {
 		dataDir:     resolved(filepath.Join(a.appDir(app), "volumes")),
 		releasesDir: resolved(filepath.Join(a.appDir(app), "releases")),
 		volumes:     a.volumeNames(app),
-		project:     nameOf(release.start),
+		project:     release.start.App,
 		envFile:     a.envFile(app),
 	}
-	if release.rules != nil {
-		for _, folder := range release.rules.Mounts {
-			room.mounts = append(room.mounts, resolved(folder))
-		}
+	for _, folder := range release.server.Mounts {
+		room.mounts = append(room.mounts, resolved(folder))
 	}
 	if current := a.current(app); current > 0 && current != release.start.Number {
 		running, _ := readJSON(filepath.Join(a.releaseDir(app, current), "compose.json"))
@@ -384,7 +382,7 @@ func (r appRoom) checkMount(mount map[string]any) string {
 		return ""
 	}
 	if !r.inData(target) && !r.inMounts(target) {
-		return "mounts " + source + ", which is not a folder of the app. Allow a folder of the server with mounts: <folder> in " + RulesFile()
+		return "mounts " + source + ", which is not a folder of the app. Allow a folder of the server with mounts: <folder> in " + ConfigFile()
 	}
 	for _, folder := range r.writable {
 		if target != folder && within(folder, target) {

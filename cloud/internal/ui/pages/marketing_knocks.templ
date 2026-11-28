@@ -1,0 +1,108 @@
+package pages
+
+import (
+	"cmp"
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/internal/human"
+	"github.com/axadrn/moin/internal/report"
+	"net/url"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+// HomeKnocks are the knocks of the site's own server: what its firewall
+// dropped, as its last report to moin cloud said. Sample marks made-up
+// numbers, which only development shows.
+type HomeKnocks struct {
+	report.Knocks
+	Sample bool
+}
+
+// knockRow is one port of today: the name people know it by, its port
+// numbers, its knocks and its share of today.
+type knockRow struct {
+	Label, Ports string
+	Count        int64
+	Share        int64
+}
+
+// knockRows are the eight ports with the most knocks today, the most
+// first, named as report.KnockPorts names them.
+func knockRows(k report.Knocks) []knockRow {
+	var rows []knockRow
+	for name, count := range k.TodayByName {
+		row := knockRow{Label: "Other ports", Count: count}
+		if k.Today > 0 {
+			row.Share = count * 100 / k.Today
+		}
+		for _, port := range report.KnockPorts {
+			if port.Name == name {
+				row.Label = port.Label
+				var numbers []string
+				for _, number := range port.Ports {
+					numbers = append(numbers, strconv.Itoa(number))
+				}
+				row.Ports = strings.Join(numbers, ", ")
+			}
+		}
+		rows = append(rows, row)
+	}
+	slices.SortFunc(rows, func(a, b knockRow) int {
+		return cmp.Or(cmp.Compare(b.Count, a.Count), cmp.Compare(a.Label, b.Label))
+	})
+	return rows[:min(8, len(rows))]
+}
+
+// knockBars are rows of knocks as Bars.
+func knockBars(rows []knockRow) []components.BarRow {
+	var bars []components.BarRow
+	for _, row := range rows {
+		bars = append(bars, components.BarRow{Label: row.Label, Note: row.Ports, Value: human.Count(row.Count), Share: row.Share})
+	}
+	return bars
+}
+
+// siteHost is the site's own address without https://, like moin.run.
+func siteHost(site string) string {
+	if u, err := url.Parse(site); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return site
+}
+
+// homeKnocks is the proof after zero trust: the site's own server, every
+// knock dropped. Four numbers, then the ports bots tried most today.
+templ homeKnocks(k HomeKnocks) {
+	{{ rows := knockRows(k.Knocks) }}
+	<section id="knocks" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Knock knock.", Line: "Bots at " + siteHost(brand.Site) + "'s door. Right now. Nobody answers."})
+		if k.Sample {
+			<div class="moin-row" data-center>
+				@components.Chip("Sample data · development only")
+			</div>
+		}
+		@components.Card(components.CardProps{}) {
+			@components.Stats() {
+				@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)}) {
+					All dropped.
+				}
+				@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)}) {
+					Nothing answered.
+				}
+				@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)}) {
+					Since the first count.
+				}
+				if len(rows) > 0 {
+					@components.Stat(components.StatProps{Label: "Most tried", Value: rows[0].Label}) {
+						{ strconv.FormatInt(rows[0].Share, 10) }% of today.
+					}
+				}
+			}
+			if len(rows) > 0 {
+				@components.Bars(components.BarsProps{Rows: knockBars(rows), Columns: 2})
+			}
+		}
+	</section>
+}

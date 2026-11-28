@@ -39,7 +39,7 @@ func tarball(t *testing.T, files map[string]string) []byte {
 func TestUnpackRefusesPathsOutsideTheSource(t *testing.T) {
 	for _, name := range []string{"../evil", "a/../../evil", "/etc/evil"} {
 		dir := t.TempDir()
-		err := unpack(bytes.NewReader(tarball(t, map[string]string{name: "x"})), filepath.Join(dir, "src"), false)
+		err := unpack(bytes.NewReader(tarball(t, map[string]string{name: "x"})), filepath.Join(dir, "src"))
 		if name == "/etc/evil" {
 			// An absolute name lands inside the source directory.
 			if _, statErr := os.Stat(filepath.Join(dir, "src", "etc", "evil")); err != nil || statErr != nil {
@@ -286,34 +286,22 @@ func TestRestartRebuildsMissingImages(t *testing.T) {
 }
 
 func TestRouterLabels(t *testing.T) {
-	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}, Canonical: "blog.example.com", Password: "me:$2y$05$abc"})
+	detected, err := route("blog", protocol.Detected{Service: "web", Port: 8080}, &protocol.Domains{Domains: []string{"Blog.example.com", "www.blog.example.com"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detected.Domains[0] != "blog.example.com" || detected.Canonical != "blog.example.com" || !detected.Password {
+	if detected.Domains[0] != "blog.example.com" {
 		t.Fatalf("detected = %+v", detected)
 	}
 	config := map[string]any{"services": map[string]any{"web": map[string]any{"image": "x"}}}
 	service := config["services"].(map[string]any)["web"].(map[string]any)
-	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, canonical: detected.Canonical, port: detected.Port, usersFile: proxyUsersFile("blog", 2)})
+	addRouters(config, service, routes{app: "blog", router: project("blog"), domains: detected.Domains, port: detected.Port})
 	labels := service["labels"].(map[string]any)
 	if labels["traefik.http.routers.moin-blog.rule"] != "Host(`blog.example.com`) || Host(`www.blog.example.com`)" {
 		t.Fatalf("rule = %v", labels["traefik.http.routers.moin-blog.rule"])
 	}
-	if labels["traefik.http.routers.moin-blog.middlewares"] != "moin-blog-canonical,moin-blog-auth" {
-		t.Fatalf("middlewares = %v", labels["traefik.http.routers.moin-blog.middlewares"])
-	}
-	if labels["traefik.http.middlewares.moin-blog-auth.basicauth.usersfile"] != "/apps/blog/releases/2/htpasswd" {
-		t.Fatalf("auth = %v", labels["traefik.http.middlewares.moin-blog-auth.basicauth.usersfile"])
-	}
-	if labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"] != `^https?://(www\.blog\.example\.com)(:[0-9]+)?(.*)` {
-		t.Fatalf("regex = %v", labels["traefik.http.middlewares.moin-blog-canonical.redirectregex.regex"])
-	}
 	if _, ok := service["networks"].(map[string]any)[proxyNetwork]; !ok {
 		t.Fatal("the main service is not on the proxy network")
-	}
-	if _, err := route("blog", protocol.Detected{}, &protocol.Domains{Domains: []string{"blog.example.com"}, Canonical: "www.blog.example.com"}); err == nil {
-		t.Fatal("a canonical domain that is not one of the domains must fail")
 	}
 	if _, err := route("blog", protocol.Detected{}, &protocol.Domains{Domains: []string{"not a domain"}}); err == nil {
 		t.Fatal("a bad domain must fail")
@@ -342,8 +330,9 @@ func TestStartKeepsTheCrashInTheDeployLog(t *testing.T) {
 	}
 }
 
-// A daemon that died during a deploy tells the hub how it ended when it
-// starts, and only starts the app if the new version never became current.
+// A deploy whose command stopped is ended by the daemon, which only starts
+// the app if the new version never became current. One that still runs
+// holds the app's lock and is left alone.
 func TestDeployTheDaemonDiedIn(t *testing.T) {
 	calls := filepath.Join(t.TempDir(), "calls")
 	fakeCommand(t, "docker", "echo \"$*\" >> "+calls+"\n")
@@ -351,18 +340,15 @@ func TestDeployTheDaemonDiedIn(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		current     int
-		wantOK      bool
-		wantError   string
 		wantStarted string
 	}{
-		{"the new version never became current", 12, false, "the daemon stopped during this deploy; v12 is running again", "releases/12/compose.json --progress plain up -d --remove-orphans"},
-		{"the new version is already current", 13, true, "", ""},
-		{"the very first deploy", 0, false, "the daemon stopped during this deploy", ""},
+		{"the new version never became current", 12, "releases/12/compose.json --progress plain up -d --remove-orphans"},
+		{"the new version is already current", 13, ""},
+		{"the very first deploy", 0, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			os.Remove(calls)
-			var sent []protocol.DeployDone
-			a := &apps{dir: t.TempDir(), send: func(_ protocol.MessageType, _ string, data any) { sent = append(sent, data.(protocol.DeployDone)) }}
+			a := newApps(t.TempDir())
 			if err := writeState(a.noteFile("blog"), deployNote{ID: "d1", Number: 13}); err != nil {
 				t.Fatal(err)
 			}
@@ -371,10 +357,13 @@ func TestDeployTheDaemonDiedIn(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			unlock := a.lock("blog")
 			a.recoverDeploys(context.Background())
-			if len(sent) != 1 || sent[0].DeployID != "d1" || sent[0].OK != test.wantOK || sent[0].Error != test.wantError {
-				t.Fatalf("told the hub %+v", sent)
+			if !exists(a.noteFile("blog")) {
+				t.Fatal("a deploy that still runs was ended")
 			}
+			unlock()
+			a.recoverDeploys(context.Background())
 			if exists(a.noteFile("blog")) {
 				t.Error("the note is still there")
 			}
@@ -446,8 +435,8 @@ func TestStartWaitsForTheHealthcheck(t *testing.T) {
 }
 
 // TestComposeJSONKeepsNames: the compose.json of a release names each env
-// value as ${NAME} and holds no password hash: those live in app.env and
-// in the release's htpasswd. The places are as the deploy filled them in,
+// value as ${NAME}: the values live in app.env. The places are as the
+// deploy filled them in,
 // and labels a compose file wrote as a list keep their values.
 func TestComposeJSONKeepsNames(t *testing.T) {
 	config := map[string]any{"services": map[string]any{"web": map[string]any{
@@ -466,14 +455,14 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 	mapLists(config)
 	takePlaces(config, filled)
 	dir := t.TempDir()
-	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}, Password: "ada:$2y$05$hash"}}
+	start := protocol.DeployStart{App: "shop", Number: 2, Domains: &protocol.Domains{Domains: []string{"shop.example.net"}}}
 	release := &release{start: start, dir: dir, config: config, composeJSON: filepath.Join(dir, "compose.json"), envFile: "/state/apps/shop/app.env", env: map[string]string{"DB_PASSWORD": "s3cret"}}
 	release.detected, _ = route("shop", protocol.Detected{Service: "web", Port: 8080}, start.Domains)
 	if err := finish(release); err != nil {
 		t.Fatal(err)
 	}
 	body, _ := os.ReadFile(release.composeJSON)
-	for _, leak := range []string{"s3cret", "t0ken", "$2y$05$hash"} {
+	for _, leak := range []string{"s3cret", "t0ken"} {
 		if strings.Contains(string(body), leak) {
 			t.Errorf("compose.json holds %q:\n%s", leak, body)
 		}
@@ -500,13 +489,8 @@ func TestComposeJSONKeepsNames(t *testing.T) {
 	if web.Build["context"] != "/src/app" || web.Image != "moin-shop-web:2" || web.Volumes[0].Source != "/src/data" || web.Volumes[0].Type != "bind" {
 		t.Errorf("places: %+v", web)
 	}
-	if web.Labels["traefik.http.middlewares.moin-shop-auth.basicauth.usersfile"] != "/apps/shop/releases/2/htpasswd" {
+	if web.Labels["traefik.http.routers.moin-shop.rule"] != "Host(`shop.example.net`)" {
 		t.Errorf("labels: %v", web.Labels)
-	}
-	hash, _ := os.ReadFile(filepath.Join(dir, "htpasswd"))
-	info, err := os.Stat(filepath.Join(dir, "htpasswd"))
-	if string(hash) != "ada:$2y$05$hash\n" || err != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("htpasswd = %q, %v", hash, err)
 	}
 }
 
@@ -553,7 +537,7 @@ func TestTakePlaces(t *testing.T) {
 // release they took the compose file from. prune keeps that release while
 // a kept one names its source, also past the last builds it keeps.
 func TestPruneKeepsNamedSources(t *testing.T) {
-	a := newApps(t.TempDir(), nil)
+	a := newApps(t.TempDir())
 	app := "prune-sources"
 	source := filepath.Join(a.releaseDir(app, 1), "src")
 	for number := 1; number <= protocol.KeepReleases+2; number++ {

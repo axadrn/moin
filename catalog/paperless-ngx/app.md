@@ -1,6 +1,6 @@
 ---
 name: Paperless-ngx
-pitch: Scan it, find it. Every paper document, searchable.
+pitch: Scan it. Find it. Every paper document searchable.
 category: Documents
 website: "https://docs.paperless-ngx.com"
 source: github.com/paperless-ngx/paperless-ngx

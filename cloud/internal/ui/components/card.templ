@@ -1,0 +1,47 @@
+package components
+
+// CardProps is a Card with its title.
+type CardProps struct {
+	Title string
+	// Href makes the whole card a link. Ink is the one card that stands out.
+	// Roomy is the one card that closes a page, with more room around it.
+	Href  string
+	Ink   bool
+	Roomy bool
+	Attrs templ.Attributes
+}
+
+// Card is a block with one topic.
+templ Card(p CardProps) {
+	if p.Href != "" {
+		<a href={ templ.SafeURL(p.Href) } class="moin-card" data-ink?={ p.Ink } data-roomy?={ p.Roomy } { p.Attrs... }>
+			{ children... }
+		</a>
+	} else {
+		<section class="moin-card" data-ink?={ p.Ink } data-roomy?={ p.Roomy } { p.Attrs... }>
+			if p.Title != "" {
+				<div class="moin-card-head">
+					<h2 class="moin-heading">{ p.Title }</h2>
+				</div>
+			}
+			{ children... }
+		</section>
+	}
+}
+
+// FactProps is a Fact: its name, a short note under it, and Href to make
+// the whole card a link.
+type FactProps struct {
+	Name string
+	Note string
+	Href string
+}
+
+// Fact is a card with one fact: a name a step bigger than text, and a
+// short note close under it.
+templ Fact(p FactProps) {
+	@Card(CardProps{Href: p.Href, Attrs: templ.Attributes{"data-gap": "1"}}) {
+		<span class="moin-fact-name">{ p.Name }</span>
+		<span class="moin-text moin-muted">{ p.Note }</span>
+	}
+}

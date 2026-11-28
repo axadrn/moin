@@ -3,9 +3,9 @@
 **/.env
 go.work
 go.work.sum
-hub/tmp
-hub/data
-hub/downloads
-hub/node_modules
+cloud/tmp
+cloud/data
+cloud/downloads
+cloud/node_modules
 /moin
 /dist

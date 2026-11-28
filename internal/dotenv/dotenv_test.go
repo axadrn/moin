@@ -25,18 +25,17 @@ func TestParse(t *testing.T) {
 	}
 }
 
-// Diff needs only the keys there are: every key that comes again is
-// replaced, whatever its value was.
+// Diff compares by value: a key that keeps its value is no change.
 func TestDiff(t *testing.T) {
-	change := Diff([]string{"KEEP", "GONE"}, map[string]string{"KEEP": "1", "NEW": "1"})
+	change := Diff(map[string]string{"KEEP": "1", "SAME": "1", "GONE": "1"}, map[string]string{"KEEP": "2", "SAME": "1", "NEW": "1"})
 	if strings.Join(change.Added, ",") != "NEW" || strings.Join(change.Replaced, ",") != "KEEP" || strings.Join(change.Removed, ",") != "GONE" {
 		t.Errorf("Diff = %+v", change)
 	}
 	if change.String() != "adds NEW; replaces KEEP; removes GONE" {
 		t.Errorf("String = %q", change)
 	}
-	if !Diff(nil, map[string]string{}).None() {
-		t.Error("no env vars replaced by none change something")
+	if !Diff(map[string]string{"A": "1"}, map[string]string{"A": "1"}).None() {
+		t.Error("the same env changes something")
 	}
 }
 

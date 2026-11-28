@@ -5,369 +5,96 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/client"
 	"github.com/axadrn/moin/internal/style"
-	"github.com/axadrn/moin/protocol"
 )
 
-// domainCommands are the subcommands of domains. Any other first argument
-// is the app whose domains to list.
-var domainCommands = []string{"add", "rm", "canonical"}
-
-// domains lists the domains of an app with their DNS state, and adds,
-// removes or picks the canonical one.
+// domains is `moin domains [app]`, and `moin domains add|rm [app]
+// <domain>`, which start the app again with its new domains, without a
+// build.
 func domains(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	command := ""
-	if len(args) > 0 && slices.Contains(domainCommands, args[0]) {
-		command, args = args[0], args[1:]
+	if len(args) > 0 && (args[0] == "add" || args[0] == "rm") {
+		return changeDomain(ctx, args[0], args[1:], stdin, stdout)
 	}
-	usage := map[string]string{
-		"add":       "domains add [--app <app>] [--service <service>] <domain> ...",
-		"rm":        "domains rm [--app <app>] [--service <service>] <domain> ... [--yes]",
-		"canonical": "domains canonical [--app <app>] <domain|none>",
-	}[command]
-	if usage == "" {
-		usage = "domains [app]"
+	flags := newFlags("domains", "domains [app] [-s server] [--json], or domains add|rm [app] <domain>").withServer().withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
 	}
-	flags := newFlags(strings.TrimSpace("domains "+command), usage).withApp()
-	if command == "rm" {
+	app, _, err := appArgs(flags, 0)
+	if err != nil {
+		return err
+	}
+	return onApp(ctx, flags, app, func(server string) error {
+		var list []string
+		if err := sshJSON(ctx, server, []string{"domains", app}, nil, &list); err != nil {
+			return err
+		}
+		if flags.json() {
+			return printJSON(stdout, list)
+		}
+		if len(list) == 0 {
+			fmt.Fprintln(stdout, app+" has no domains yet, only its instant address.")
+		}
+		for _, domain := range list {
+			fmt.Fprintln(stdout, domain)
+		}
+		hint(stdout, "Add one with", build.Name+" domains add "+app+" "+app+".example.com")
+		return nil
+	})
+}
+
+// changeDomain adds or removes one domain. Left out, it is asked on a
+// terminal.
+func changeDomain(ctx context.Context, verb string, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("domains "+verb, "domains "+verb+" [app] <domain> [-s server]").withServer()
+	if verb == "rm" {
+		flags.usage += " [-y]"
 		flags.withYes()
 	}
-	service := ""
-	if command == "add" || command == "rm" {
-		flags.StringVar(&service, "service", "", "a service of compose.yml other than the main one")
-	}
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	api, err := apiClient()
+	// The domain may be left out, to be asked: an app name has no dot, a
+	// domain has one.
+	others := 1
+	if flags.NArg() < 2 && !strings.Contains(flags.Arg(0), ".") {
+		others = 0
+	}
+	app, rest, err := appArgs(flags, others)
 	if err != nil {
 		return err
 	}
-	if command == "" {
-		if flags.NArg() > 1 {
-			return flags.wrong()
-		}
-		name, err := flags.app(flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		return printDomains(ctx, api, name, stdout)
-	}
-	name, err := flags.app("")
-	if err != nil {
-		return err
-	}
-	detail, err := api.App(ctx, name)
-	if err != nil {
-		return err
-	}
-	list, canonical := detail.App.Domains, detail.App.Canonical
-	if service != "" {
-		list = slices.Clone(detail.App.ServiceDomains[service])
-	}
-	switch command {
-	case "add":
-		if flags.NArg() == 0 {
-			return flags.wrong()
-		}
-		for _, domain := range flags.Args() {
-			if !slices.Contains(list, strings.ToLower(domain)) {
-				list = append(list, domain)
-			}
-		}
-	case "rm":
-		if flags.NArg() == 0 {
-			return flags.wrong()
-		}
-		err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove %s from %s? Visitors there stop reaching it.", strings.Join(flags.Args(), ", "), name))
-		if err != nil {
-			return err
-		}
-		list = slices.DeleteFunc(list, func(domain string) bool { return slices.Contains(flags.Args(), domain) })
-		if slices.Contains(flags.Args(), canonical) {
-			canonical = ""
-		}
-	case "canonical":
-		if flags.NArg() != 1 {
-			return flags.wrong()
-		}
-		canonical = flags.Arg(0)
-		if canonical == "none" {
-			canonical = ""
-		}
-	}
-	var change client.Change
-	if service != "" {
-		change, err = api.SetServiceDomains(ctx, name, service, list)
-	} else {
-		change, err = api.SetDomains(ctx, name, list, canonical)
-	}
-	if err != nil {
-		return err
-	}
-	reportChange(ctx, api, name, change, stdout)
-	return printDomains(ctx, api, name, stdout)
-}
-
-func printDomains(ctx context.Context, api *client.Client, name string, stdout io.Writer) error {
-	checks, err := api.CheckDomains(ctx, name)
-	if err != nil {
-		return err
-	}
-	// The instant address, when it can tell.
-	detail, _ := api.App(ctx, name)
-	if detail.App.Instant != "" && len(checks) > 0 {
-		defer fmt.Fprintln(stdout, "  "+style.Muted.Render("Instant address: "+detail.App.Instant))
-	}
-	if len(checks) == 0 {
-		if detail.App.Instant != "" {
-			fmt.Fprintln(stdout, "  "+name+" answers at its instant address "+detail.App.Instant+" until it has a domain.")
-		}
-		hint(stdout, name+" has no domains yet. Add one:", build.Name+" domains add my-app.example.com www.my-app.example.com")
-		return nil
-	}
-	rows := make([][]string, 0, len(checks))
-	advice := ""
-	for _, check := range checks {
-		advice = check.Advice
-		state := badge(stdout, style.Badge(style.StatusLive, "points here"), "points here")
-		if !check.Points {
-			state = badge(stdout, style.Badge(style.StatusWaiting, "set DNS"), "set DNS")
-		}
-		roles := []string{}
-		if check.Service != "" {
-			roles = append(roles, "service "+check.Service)
-		}
-		if check.Canonical {
-			roles = append(roles, "canonical")
-		}
-		role := strings.Join(roles, ", ")
-		rows = append(rows, []string{check.Domain, state, strings.Join(check.Found, " "), role})
-	}
-	table(stdout, []string{"DOMAIN", "DNS", "RESOLVES TO", ""}, rows)
-	if advice != "" {
-		fmt.Fprintln(stdout)
-		fmt.Fprintln(stdout, "  "+style.Muted.Render("Each domain needs an "+advice+"."))
-	}
-	return nil
-}
-
-// instantCommands are the subcommands of instant; anything else is the app.
-var instantCommands = append(slices.Clone(protocol.InstantProviders), "off")
-
-// passwordUser is the username of the password moin makes for an app.
-const passwordUser = build.Name
-
-// instant shows the app's instant address, or picks its provider or off.
-func instant(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("instant", "instant [app]; instant sslip.io|nip.io|off [app]").withApp()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	command, argument := "", flags.Arg(0)
-	if slices.Contains(instantCommands, flags.Arg(0)) {
-		command, argument = flags.Arg(0), flags.Arg(1)
-	}
-	if flags.NArg() > 2 || (command == "" && flags.NArg() > 1) {
-		return flags.wrong()
-	}
-	name, err := flags.app(argument)
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	if command != "" {
-		change, err := api.SetInstant(ctx, name, command)
-		if err != nil {
-			return err
-		}
-		if !change.Unchanged {
-			if command == "off" {
-				done(stdout, "%s has no instant address now.", name)
-			} else {
-				done(stdout, "%s gets its instant address from %s now.", name, command)
-			}
-		}
-		reportChange(ctx, api, name, change, stdout)
-	}
-	address, err := api.Instant(ctx, name)
-	if err != nil {
-		return err
-	}
-	if address.URL == "" {
-		fmt.Fprintln(stdout, name+" has no instant address. "+address.Reason)
-		if address.Provider == "off" {
-			hint(stdout, "Turn it on with", build.Name+" instant sslip.io "+name)
-		}
-		return nil
-	}
-	table(stdout, []string{"", ""}, [][]string{{"address", address.URL}, {"provider", address.Provider}})
-	if command == "" {
-		hint(stdout, "Another provider, if this one is down:", build.Name+" instant nip.io "+name)
-	}
-	return nil
-}
-
-// password turns the app's password on, for its domains and its instant
-// address, or off with off. Without a password on stdin moin makes one
-// and prints it once.
-func password(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("password", "password [--user moin] [app], a password on stdin or none to let moin make one; password off [app] [--yes]").withApp().withYes()
-	user := flags.String("user", passwordUser, "username for the password prompt in the browser")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	off := flags.Arg(0) == "off"
-	argument := flags.Arg(0)
-	if off {
-		argument = flags.Arg(1)
-	}
-	if flags.NArg() > 2 || (!off && flags.NArg() > 1) {
-		return flags.wrong()
-	}
-	name, err := flags.app(argument)
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	if off {
-		detail, err := api.App(ctx, name)
-		if err != nil {
-			return err
-		}
-		if !detail.App.Password {
-			done(stdout, "Nothing changed: %s has no password.", name)
-			return nil
-		}
-		err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Turn the password of %s off? Anyone with the link can open its domains and its instant address.", name))
-		if err != nil {
-			return err
-		}
-		change, err := api.RemovePassword(ctx, name)
-		if err != nil {
-			return err
-		}
-		if change.Unchanged {
-			done(stdout, "Nothing changed: %s has no password.", name)
-			return nil
-		}
-		done(stdout, "%s asks for no password now.", name)
-		reportChange(ctx, api, name, change, stdout)
-		return nil
-	}
-	if isTerminal(stdin) {
-		fmt.Fprintf(stdout, "Password for %s (user %s), empty to let %s make one: ", name, *user, build.Name)
-	}
-	secret, err := readSecret(stdin)
-	if isTerminal(stdin) {
-		fmt.Fprintln(stdout)
-	}
-	if err != nil {
-		return err
-	}
-	if *user == "" {
-		*user = passwordUser
-	}
-	answer, err := api.SetPassword(ctx, name, *user, secret)
-	if err != nil {
-		return err
-	}
-	if answer.Unchanged {
-		done(stdout, "Nothing changed: %s asks for user %s and this password already.", name, *user)
-		return nil
-	}
-	done(stdout, "The domains and the instant address of %s ask for user %s and the password now.", name, *user)
-	printPassword(stdout, *user, answer.Password)
-	reportChange(ctx, api, name, answer.Change, stdout)
-	return nil
-}
-
-// restart starts the live deploy again with the env and domains as they
-// are now; start runs a stopped app the same way.
-func restart(ctx context.Context, command string, args []string, stdout io.Writer) error {
-	flags := newFlags(command, command+" [app]").withApp()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() > 1 {
-		return flags.wrong()
-	}
-	name, err := flags.app(flags.Arg(0))
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	run, title := api.Restart, "Restart"
-	if command == "start" {
-		run, title = api.Start, "Start"
-	}
-	started, err := run(ctx, name)
-	var apiErr *client.Error
-	if errors.As(err, &apiErr) && apiErr.Code == "already_running" {
-		done(stdout, "%s is already running. Nothing changed.", name)
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return follow(ctx, api, name, started, title, false, stdout)
-}
-
-// stop takes the app offline until it starts again. Its data stays.
-func stop(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := newFlags("stop", "stop [app] [--yes]").withApp().withYes()
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() > 1 {
-		return flags.wrong()
-	}
-	name, err := flags.app(flags.Arg(0))
-	if err != nil {
-		return err
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	err = confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Stop %s? It is offline until you start it; its data stays.", name))
-	if err != nil {
-		return err
-	}
-	err = api.Stop(ctx, name)
-	if err != nil {
-		return err
-	}
-	done(stdout, "Stopped %s. It stays off, also after a reboot", style.Bold.Render(name))
-	hint(stdout, "Run it again with", build.Name+" start "+name)
-	return nil
-}
-
-// reportChange says when a saved change applies: saving never restarts an
-// app.
-func reportChange(ctx context.Context, api *client.Client, name string, change client.Change, stdout io.Writer) {
+	var domain string
 	switch {
-	case change.Unchanged:
-		done(stdout, "Nothing changed.")
-	case change.App.Stopped:
-		hint(stdout, "It applies when the app starts:", build.Name+" start "+name)
-	case change.App.LiveNumber == 0:
-		hint(stdout, "It applies with the first deploy:", build.Name+" deploy "+name)
+	case len(rest) == 1:
+		domain = rest[0]
+	case !isTerminal(stdin):
+		return flags.wrong()
 	default:
-		hint(stdout, "It applies when the app restarts. Now:", build.Name+" restart "+name)
+		if domain, err = ask(stdin, stdout, "Domain, like "+app+".example.com:", ""); err != nil {
+			return err
+		}
+		if domain == "" {
+			return errors.New("no domain, nothing changed")
+		}
 	}
+	if verb == "rm" {
+		if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Take %s off %s? Visitors there get no answer.", domain, app)); err != nil {
+			return err
+		}
+	}
+	return onApp(ctx, flags, app, func(server string) error {
+		if _, err := runRelease(ctx, server, []string{"domains", verb, app, domain}, nil, stdout, "starting "+app+" with its domains"); err != nil {
+			return err
+		}
+		if verb == "rm" {
+			done(stdout, "%s no longer answers on %s", app, domain)
+			return nil
+		}
+		done(stdout, "%s answers on https://%s", app, domain)
+		fmt.Fprintln(stdout, "  "+style.Muted.Render("Point the DNS of "+domain+" to "+server+": an A record with its IP. The certificate follows by itself."))
+		return nil
+	})
 }

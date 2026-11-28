@@ -1,0 +1,120 @@
+package layouts
+
+import (
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+)
+
+import "github.com/axadrn/moin/cloud/internal/brand"
+import "github.com/axadrn/moin/cloud/internal/ctxkeys"
+
+type SEOProps struct {
+	Title        string
+	Description  string
+	Path         string
+	NoIndex      bool
+	MarkdownPath string
+}
+
+templ Base(props ...SEOProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			if len(props) > 0 {
+				@seo(props[0])
+			} else {
+				<title>{ brand.Name }</title>
+			}
+			<link rel="icon" href="/favicon.ico" sizes="32x32"/>
+			<link rel="icon" href={ components.AssetURL("/assets/img/favicon.svg") } type="image/svg+xml"/>
+			<link rel="apple-touch-icon" href={ components.AssetURL("/assets/img/apple-touch-icon.png") }/>
+			<link rel="manifest" href={ components.AssetURL("/assets/manifest.json") }/>
+			// The text font loads with the stylesheet, not after it, so the
+			// first paint is already in Geist.
+			<link rel="preload" href={ components.AssetURL("/assets/fonts/geist/geist-variable.woff2") } as="font" type="font/woff2" crossorigin/>
+			<link href={ components.AssetURL("/assets/css/site.css") } rel="stylesheet"/>
+			// htmx answers the search palette (SiteSearch).
+			<meta name="htmx-config" content={ `{"history":"reload","inlineScriptNonce":"` + templ.GetNonce(ctx) + `"}` }/>
+			<script src={ components.AssetURL("/assets/js/htmx-4.0.0.min.js") }></script>
+			<script defer nonce={ templ.GetNonce(ctx) } src={ components.AssetURL("/assets/js/site.js") }></script>
+			// A link starts loading when the pointer rests on it, so the page
+			// is there on the click (Chrome and Edge; others ignore it).
+			<script type="speculationrules" nonce={ templ.GetNonce(ctx) }>
+				{"prefetch":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/*\\?*"}}]},"eagerness":"moderate"}]}
+			</script>
+			@themeScript()
+			@Analytics()
+		</head>
+		<body>
+			{ children... }
+		</body>
+	</html>
+}
+
+templ seo(props SEOProps) {
+	{{ cfg := ctxkeys.RenderConfig(ctx) }}
+	{{ baseURL := cfg.AppURL }}
+	{{ appName := brand.Name }}
+	{{ appTagline := brand.Tagline }}
+	{{ fullTitle := props.Title + " · " + appName }}
+	@templ.Fragment("seo-title") {
+		<title id="page-title" hx-swap-oob="true">{ fullTitle }</title>
+	}
+	<meta name="description" content={ props.Description }/>
+	// Author
+	<meta name="author" content={ appName }/>
+	// Robots Tags
+	if props.NoIndex {
+		<meta name="robots" content="noindex, nofollow"/>
+	} else {
+		<meta name="robots" content="index, follow"/>
+	}
+	// Canonical URL
+	<link rel="canonical" href={ baseURL + props.Path }/>
+	<link rel="describedby" href="/llms.txt"/>
+	if props.MarkdownPath != "" {
+		@templ.Fragment("seo-markdown") {
+			<link id="seo-markdown" rel="alternate" type="text/markdown" href={ props.MarkdownPath } hx-swap-oob="outerHTML"/>
+		}
+	}
+	// OpenGraph Tags
+	<meta property="og:title" content={ fullTitle }/>
+	<meta property="og:description" content={ props.Description }/>
+	<meta property="og:type" content="website"/>
+	<meta property="og:url" content={ baseURL + props.Path }/>
+	<meta property="og:site_name" content={ appName }/>
+	// OpenGraph Image
+	<meta property="og:image" content={ baseURL + components.AssetURL("/assets/img/og.png") }/>
+	<meta property="og:image:width" content="1200"/>
+	<meta property="og:image:height" content="630"/>
+	<meta property="og:image:alt" content={ appName + ": " + appTagline }/>
+	// Twitter Card
+	<meta name="twitter:card" content="summary_large_image"/>
+	<meta name="twitter:site" content={ "@" + XHandle }/>
+	<meta name="twitter:title" content={ fullTitle }/>
+	<meta name="twitter:description" content={ props.Description }/>
+	<meta name="twitter:image" content={ baseURL + components.AssetURL("/assets/img/og.png") }/>
+	<meta name="twitter:image:alt" content={ appName + ": " + appTagline }/>
+	// Theme Color
+	<meta name="theme-color" content="#000000"/>
+}
+
+// themeScript sets the mode before the first paint: what this browser
+// chose with the switch in the footer, else what the system says.
+templ themeScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(() => {
+			const media = matchMedia("(prefers-color-scheme: dark)");
+			window.applyMode = (mode) => {
+				const root = document.documentElement;
+				root.classList.toggle("dark", mode === "dark" || (mode === "system" && media.matches));
+				root.classList.toggle("light", mode === "light");
+				root.style.colorScheme = mode === "system" ? "" : mode;
+			};
+			let mode = "system";
+			try { mode = localStorage.getItem("moin-mode") || "system"; } catch {}
+			applyMode(mode);
+		})();
+	</script>
+}

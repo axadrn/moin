@@ -1,6 +1,6 @@
 ---
 name: Directus
-pitch: Turn your database into an API and an admin app, instantly.
+pitch: Turn your database into an API and an admin app. Instantly.
 category: Developer tools
 website: https://directus.io
 source: github.com/directus/directus

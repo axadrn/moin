@@ -4,10 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // TestPinNames: the volumes compose named after the project get their
@@ -56,31 +53,25 @@ func TestPinNames(t *testing.T) {
 	}
 }
 
-// TestVolumeNames: a new app's volume is named after its ID, once, and
-// keeps that name; an app from before renames keeps the name compose
-// gave it (TestRenameDocker).
+// TestVolumeNames: a volume is named once, as compose names it for the
+// app's first project, and keeps that name.
 func TestVolumeNames(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
-	app, id := "volume-test-"+strings.ToLower(filepath.Base(t.TempDir())), "0f8e2c4a-1b3d-4e5f-8a9b-0c1d2e3f4a5b"
-	if err := os.MkdirAll(a.appDir(app), 0o700); err != nil {
+	a := newApps(t.TempDir())
+	if err := os.MkdirAll(a.appDir("shop"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
-	if got := a.volumeName(ctx, app, id, "data"); got != "moin-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b-data" {
+	if got := a.volumeName("shop", "data"); got != "moin-shop_data" {
 		t.Fatalf("volume = %s", got)
 	}
-	if got := a.volumeName(ctx, app, "", "data"); got != "moin-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b-data" {
-		t.Fatalf("the second time volume = %s, want the one kept", got)
-	}
-	if got := a.volumeNames(app); len(got) != 1 || got[0] != "moin-0f8e2c4a1b3d4e5f8a9b0c1d2e3f4a5b-data" {
+	if got := a.volumeNames("shop"); len(got) != 1 || got[0] != "moin-shop_data" {
 		t.Fatalf("volume names = %v", got)
 	}
 }
 
 // TestProjectOf: an app runs as the project its file names, an app from
-// before renames as moin-<folder>; a deploy names it by its name now.
+// before as moin-<folder>.
 func TestProjectOf(t *testing.T) {
-	a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+	a := newApps(t.TempDir())
 	if got := a.projectOf("blog"); got != "moin-blog" {
 		t.Fatalf("project = %s", got)
 	}
@@ -92,12 +83,6 @@ func TestProjectOf(t *testing.T) {
 	}
 	if got := a.projectOf("blog"); got != "journal" {
 		t.Fatalf("project = %s", got)
-	}
-	if got := nameOf(protocol.DeployStart{App: "blog", Name: "diary"}); got != "diary" {
-		t.Fatalf("name = %s", got)
-	}
-	if got := nameOf(protocol.DeployStart{App: "blog"}); got != "blog" {
-		t.Fatalf("name from an older hub = %s", got)
 	}
 	// A project another app runs as is refused.
 	if err := os.MkdirAll(a.appDir("notes"), 0o700); err != nil {

@@ -1,0 +1,56 @@
+package pages
+
+import "github.com/axadrn/moin/cloud/internal/ui/components"
+
+// CloudSettingsProps is the settings page: the account, and what went
+// wrong when deleting it.
+type CloudSettingsProps struct {
+	Cloud   Cloud
+	Problem string
+}
+
+// CloudSettings shows the account, signs out, and deletes the account
+// after typing its mail.
+templ CloudSettings(p CloudSettingsProps) {
+	@cloudApp(p.Cloud, "Settings", "Settings") {
+		@components.Header(components.HeaderProps{Title: "Settings"})
+		@components.Card(components.CardProps{Title: "Account"}) {
+			<p class="moin-text">{ p.Cloud.Mail }</p>
+			<p class="moin-small moin-muted">Your mail is your account. GitHub and the link by mail both sign in to it, when the mail is the same.</p>
+		}
+		@components.Card(components.CardProps{Title: "Sign out"}) {
+			<p class="moin-text moin-muted">Ends the session in this browser. The CLI stays signed in.</p>
+			<form method="post" action="/logout">
+				@components.Button(components.ButtonProps{Type: "submit"}) {
+					Sign out
+				}
+			</form>
+		}
+		@components.Card(components.CardProps{Title: "Delete account"}) {
+			<p class="moin-text moin-muted">This cancels your subscription, then deletes the workspace, the tokens of its servers and every session. Your servers keep running; their reports get no answer. Copies of backups stay under their 14-day lock and expire by themselves.</p>
+			<form method="post" action="/cloud/delete" class="moin-stack" data-gap="3">
+				<label for="mail" class="moin-small moin-muted">Type { p.Cloud.Mail } to confirm</label>
+				@components.Input(components.InputProps{ID: "mail", Name: "mail", Type: "email", Attrs: templ.Attributes{"required": true, "autocomplete": "off"}})
+				if p.Problem != "" {
+					<p class="moin-message" data-state="failed" role="alert">{ p.Problem }</p>
+				}
+				<div>
+					@components.Button(components.ButtonProps{Type: "submit", Kind: components.Danger}) {
+						Delete account
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+// CloudDeleted says the account is gone.
+templ CloudDeleted() {
+	@cloudAuth("Account deleted") {
+		<h1 class="moin-title">Account deleted</h1>
+		<p class="moin-text moin-muted">The workspace and its sessions are gone. Copies of backups expire by themselves within 14 days.</p>
+		@components.Button(components.ButtonProps{Href: "/"}) {
+			Back to home
+		}
+	}
+}

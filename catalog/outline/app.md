@@ -1,6 +1,6 @@
 ---
 name: Outline
-pitch: Your team's wiki, fast and beautiful. Like Notion for docs.
+pitch: Your team's wiki. Fast and beautiful. Like Notion for docs.
 category: Documents
 website: https://www.getoutline.com
 source: github.com/outline/outline

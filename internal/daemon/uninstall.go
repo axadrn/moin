@@ -13,7 +13,7 @@ import (
 	"github.com/axadrn/moin/protocol"
 )
 
-// Where install.sh puts the daemon.
+// Where moin lives on a server.
 var (
 	unitFile      = "/etc/systemd/system/" + build.Name + "-daemon.service"
 	installedPath = "/usr/local/bin/" + build.Name
@@ -21,35 +21,26 @@ var (
 
 // Uninstall removes the daemon from this server: its systemd service, its
 // binary and its state in dir. The apps keep running with their data, the
-// proxy, the tunnel and the firewall, unless withApps: then it takes all of
-// them down too, data included. It returns what stays on the server.
+// proxy and the tunnel, unless withApps: then it takes all of
+// them down too, data included, and the config with the keys of the
+// bucket and the server's backup key. It returns what stays on the server.
 func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string, ...any)) ([]string, error) {
-	// legacyUnit is there when the server never moved from the agent.
-	units := map[string]string{build.Name + "-daemon": unitFile, legacyUnit: legacyUnitFile}
-	var installed []string
-	for unit, file := range units {
-		if _, err := os.Stat(file); err == nil {
-			installed = append(installed, unit)
+	if _, err := os.Stat(unitFile); err == nil {
+		if os.Geteuid() != 0 {
+			return nil, errors.New("run it as root, or put sudo in front: sudo " + build.Name + " daemon uninstall")
 		}
-	}
-	if len(installed) > 0 && os.Geteuid() != 0 {
-		return nil, errors.New("run it as root, or put sudo in front: sudo " + build.Name + " daemon uninstall")
-	}
-	for _, unit := range installed {
+		unit := build.Name + "-daemon"
 		logf("stopping the %s service", unit)
 		_ = exec.CommandContext(ctx, "systemctl", "disable", "--now", unit).Run()
-		if err := os.Remove(units[unit]); err != nil {
+		if err := os.Remove(unitFile); err != nil {
 			return nil, err
 		}
-	}
-	if len(installed) > 0 {
 		_ = exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
 	}
-	var err error
 
-	a := newApps(dir, nil)
+	a := newApps(dir)
 	appNames := a.names()
-	_, err = exec.LookPath("docker")
+	_, err := exec.LookPath("docker")
 	hasDocker := err == nil
 	if withApps {
 		for _, app := range appNames {
@@ -83,7 +74,25 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 		if err != nil {
 			return nil, err
 		}
+		// The config holds the keys of the bucket. The copies in the bucket
+		// stay, and your own backup key still opens them.
+		logf("removing the config with the keys of the bucket, and the server's backup key, in %s", filepath.Dir(ConfigFile()))
+		for _, file := range []string{ConfigFile(), serverKeyFile()} {
+			if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+		}
+		// The folder goes when nothing else is in it.
+		_ = os.Remove(filepath.Dir(ConfigFile()))
 	} else {
+		// moin unlock goes with moin, so nothing may stay closed behind
+		// it: port 22 opens. The tunnel keeps carrying the web.
+		if file, _ := loadServerFile(dir); file.SSHOnTailscale || file.Firewall {
+			if err := OpenSSHHere(ctx); err != nil {
+				return nil, err
+			}
+			logf("port 22 is open to the internet again, and the firewall is off")
+		}
 		entries, _ := os.ReadDir(dir)
 		for _, entry := range entries {
 			// The apps keep their data and the proxy its certificates.
@@ -116,11 +125,11 @@ func Uninstall(ctx context.Context, dir string, withApps bool, logf func(string,
 	}
 	if !withApps && hasDocker {
 		if _, err := a.output(ctx, "docker", "inspect", proxyName); err == nil {
-			kept = append(kept, "the proxy container "+proxyName+", and the tunnel and firewall when they were on")
+			kept = append(kept, "the proxy container "+proxyName+", and the tunnel when it was on")
 		}
 	}
-	if _, err := os.Stat(RulesFile()); err == nil {
-		kept = append(kept, "your rules in "+RulesFile())
+	if _, err := os.Stat(ConfigFile()); err == nil {
+		kept = append(kept, "the config in "+ConfigFile()+", which holds the keys of the bucket, and the server's backup key next to it")
 	}
 	if hasDocker {
 		kept = append(kept, "Docker")

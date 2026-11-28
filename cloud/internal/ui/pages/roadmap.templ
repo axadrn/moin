@@ -1,0 +1,52 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/service"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// Roadmap is docs/roadmap.md as cards: one per heading, each item a row,
+// a link to its docs when it has one.
+templ Roadmap(roadmap service.Roadmap) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       roadmap.Title,
+		Description: roadmap.Description,
+		Path:        "/roadmap",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: roadmap.Title, Line: roadmap.Lead})
+				<div class="moin-narrow moin-stack">
+					for _, section := range roadmap.Sections {
+						@components.Card(components.CardProps{Title: section.Title}) {
+							@components.List(templ.Attributes{"data-wrap": true}) {
+								for _, entry := range section.Entries {
+									@components.Item(components.ItemProps{Href: entry.Href}) {
+										<div class="moin-item-text">
+											if entry.Name != "" {
+												<div class="moin-item-name">
+													@templ.Raw(entry.Name)
+												</div>
+											}
+											if entry.Name == "" {
+												<div class="moin-item-name">
+													@templ.Raw(entry.Text)
+												</div>
+											} else if entry.Text != "" {
+												<div class="moin-item-note">
+													@templ.Raw(entry.Text)
+												</div>
+											}
+										</div>
+									}
+								}
+							}
+						}
+					}
+				</div>
+				@components.More(components.MoreProps{Href: "/changelog", Text: "What changed so far"})
+			</section>
+		</main>
+	}
+}

@@ -46,7 +46,7 @@ func TestSQLiteLinks(t *testing.T) {
 	defer root.Close()
 	var zipped bytes.Buffer
 	writer := gzip.NewWriter(&zipped)
-	writer.Write([]byte("bytes from the hub"))
+	writer.Write([]byte("bytes from a stranger"))
 	writer.Close()
 	engine := &sqliteEngine{database: through}
 	err = engine.buildChecked(context.Background(), root, source{copy: &zipped, size: 1}, name+".moin-restore")

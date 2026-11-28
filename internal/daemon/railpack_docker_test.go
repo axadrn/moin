@@ -48,7 +48,7 @@ func TestRailpackDocker(t *testing.T) {
 			for file, body := range files {
 				os.WriteFile(filepath.Join(src, file), []byte(body), 0o644)
 			}
-			a := newApps(t.TempDir(), func(protocol.MessageType, string, any) {})
+			a := newApps(t.TempDir())
 			app := "rptest-" + name
 			env := map[string]string{"BUILD_TOKEN": "s3cr3t-value"}
 			if _, err := a.setEnv(protocol.EnvSet{App: app, Set: env}); err != nil {

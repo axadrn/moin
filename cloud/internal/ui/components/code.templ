@@ -1,0 +1,67 @@
+package components
+
+// CodeProps is a block of code with a copy button.
+type CodeProps struct {
+	ID   string
+	Text string
+}
+
+// Code prints text to read and copy.
+templ Code(p CodeProps) {
+	<div class="moin-code">
+		<button type="button" class="moin-copy" data-copy data-copy-target={ "#" + p.ID } aria-label="Copy the code">
+			<i class="moin-icon moin-icon-copy"></i>
+		</button>
+		<pre id={ p.ID } tabindex="0">{ p.Text }</pre>
+	</div>
+}
+
+// CommandProps is a Command.
+type CommandProps struct {
+	Text string
+}
+
+// Command is one terminal command to copy.
+templ Command(p CommandProps) {
+	<div class="moin-command">
+		<code>{ p.Text }</code>
+		<button type="button" class="moin-copy" data-copy={ p.Text } aria-label="Copy the command">
+			<i class="moin-icon moin-icon-copy"></i>
+		</button>
+	</div>
+}
+
+// TerminalLine is one line of a terminal: what it is, and its text.
+// Kind is "prompt" (what you type), "step" (→), "done" (✓), "failed"
+// (✗), "ask" (a question), "hint" (a next command) or "" for output.
+type TerminalLine struct {
+	Kind string
+	Text string
+}
+
+// TerminalProps is a Terminal. Play shows the lines one after the other,
+// once, when the page opens.
+type TerminalProps struct {
+	Title string
+	Lines []TerminalLine
+	Play  bool
+	// Wrap breaks a line wider than the window, as a narrow terminal does.
+	Wrap bool
+}
+
+// Terminal shows real CLI output in a terminal window, for the landing
+// page.
+templ Terminal(p TerminalProps) {
+	<figure class="moin-terminal" data-play?={ p.Play } data-wrap?={ p.Wrap } aria-label={ p.Title }>
+		<div class="moin-terminal-bar" aria-hidden="true">
+			<i></i><i></i><i></i>
+			<span>{ p.Title }</span>
+		</div>
+		<div class="moin-terminal-body">
+			for i, line := range p.Lines {
+				<div class="moin-terminal-line" data-kind={ line.Kind } style={ terminalDelay(i) }>{ line.Text }</div>
+			}
+			<div class="moin-terminal-line moin-terminal-cursor" data-kind="prompt" style={ terminalDelay(len(p.Lines)) }>$ </div>
+		</div>
+	</figure>
+}

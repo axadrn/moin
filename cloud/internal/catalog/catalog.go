@@ -1,0 +1,171 @@
+// Package catalog is the list of open source apps moin deploys with one
+// command, as the site shows them. Each entry is a folder in catalog/ at
+// the root of the repo: app.md with what the app is, compose.yml with how
+// it runs, and an optional logo.svg.
+package catalog
+
+import (
+	"errors"
+	"fmt"
+	"html/template"
+	"io/fs"
+	"path"
+	"regexp"
+	"slices"
+	"strings"
+
+	catalogfiles "github.com/axadrn/moin/catalog"
+	"github.com/axadrn/moin/cloud/internal/markdown"
+)
+
+// Entry is one app of the catalog.
+type Entry struct {
+	Slug     string
+	Name     string
+	Pitch    string
+	Category string
+	Website  string
+	// Source is the app's own repository, such as github.com/umami-software/umami.
+	Source  string
+	License string
+	// Image is the image the version picks the tag of, without a tag.
+	Image string
+	// Database is the app's database: postgres and sqlite, which moin backs
+	// up, or mysql, mongodb or clickhouse, which it does not yet; empty
+	// for none.
+	Database string
+	// Login says how to sign in the first time, if the app has a default.
+	Login string
+	// Body is the description as HTML.
+	Body    template.HTML
+	Compose []byte
+	// Logo is the project's logo, logo.svg or logo.png, and LogoType its
+	// media type; none shows the first letter instead.
+	Logo     []byte
+	LogoType string
+}
+
+// Categories in the order the catalog shows them.
+var Categories = []string{"AI", "Analytics", "Automation", "Monitoring", "Communication", "Websites", "Productivity", "Documents", "Reading", "Developer tools", "Security", "Marketing", "Finance", "Media"}
+
+var (
+	slugPattern  = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$`)
+	imagePattern = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)+$|^[a-z0-9._-]+(/[a-z0-9._-]+)*$`)
+)
+
+// Load reads every entry of files, a folder each, sorted by name.
+func Load(files fs.FS) ([]Entry, error) {
+	folders, err := fs.ReadDir(files, ".")
+	if err != nil {
+		return nil, err
+	}
+	parser := markdown.NewParser()
+	var entries []Entry
+	for _, folder := range folders {
+		if !folder.IsDir() {
+			continue
+		}
+		entry, err := loadEntry(parser, files, folder.Name(), folder.Name())
+		if err != nil {
+			return nil, fmt.Errorf("catalog %s: %w", folder.Name(), err)
+		}
+		entries = append(entries, entry)
+	}
+	slices.SortFunc(entries, func(a, b Entry) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) })
+	return entries, nil
+}
+
+func loadEntry(parser *markdown.Parser, files fs.FS, dir, slug string) (Entry, error) {
+	if !slugPattern.MatchString(slug) {
+		return Entry{}, errors.New("the folder name is not a slug: lowercase letters, digits and dashes")
+	}
+	source, err := fs.ReadFile(files, path.Join(dir, "app.md"))
+	if err != nil {
+		return Entry{}, err
+	}
+	body, meta, err := parser.ParseWithFrontmatter(source)
+	if err != nil {
+		return Entry{}, err
+	}
+	text := func(key string) string {
+		value, _ := meta[key].(string)
+		return strings.TrimSpace(value)
+	}
+	entry := Entry{
+		Slug: slug, Name: text("name"), Pitch: text("pitch"), Category: text("category"),
+		Website: text("website"), Source: text("source"), License: text("license"),
+		Image: text("image"), Database: text("database"), Login: text("login"),
+		Body: template.HTML(body),
+	}
+	entry.Compose, err = fs.ReadFile(files, path.Join(dir, "compose.yml"))
+	if err != nil {
+		return Entry{}, err
+	}
+	for _, logo := range []struct{ file, kind string }{{"logo.svg", "image/svg+xml"}, {"logo.png", "image/png"}} {
+		body, err := fs.ReadFile(files, path.Join(dir, logo.file))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return Entry{}, err
+		}
+		entry.Logo, entry.LogoType = body, logo.kind
+		break
+	}
+	return entry, entry.validate()
+}
+
+func (e Entry) validate() error {
+	switch {
+	case e.Name == "" || e.Pitch == "":
+		return errors.New("name and pitch are required")
+	case !slices.Contains(Categories, e.Category):
+		return fmt.Errorf("category %q is none of %s", e.Category, strings.Join(Categories, ", "))
+	case !imagePattern.MatchString(e.Image):
+		return fmt.Errorf("image %q is not an image without a tag", e.Image)
+	case !strings.Contains(string(e.Compose), e.Image+":${"+catalogfiles.VersionVar+"}"):
+		return fmt.Errorf("compose.yml must run %s:${%s}", e.Image, catalogfiles.VersionVar)
+	case e.Database != "" && databaseNames[e.Database] == "":
+		return errors.New("database is postgres, sqlite, mysql, mongodb, clickhouse or empty")
+	case !strings.HasPrefix(e.Website, "https://"):
+		return errors.New("website must be an https:// link")
+	}
+	return nil
+}
+
+// databaseNames are the databases an entry may name, as people write them.
+var databaseNames = map[string]string{
+	"postgres": "Postgres", "sqlite": "SQLite",
+	"mysql": "MySQL", "mongodb": "MongoDB", "clickhouse": "ClickHouse",
+}
+
+// BackedUp reports whether moin backs up the app's database.
+func (e Entry) BackedUp() bool {
+	return e.Database == "postgres" || e.Database == "sqlite"
+}
+
+// DatabaseName is the app's database as people write it, such as MySQL.
+func (e Entry) DatabaseName() string { return databaseNames[e.Database] }
+
+// DatabaseNote says plainly what moin does with the app's database: empty
+// for one moin backs up or for no database, a sentence for the others.
+func (e Entry) DatabaseNote() string {
+	if e.Database == "" || e.BackedUp() {
+		return ""
+	}
+	if e.Database == "mysql" {
+		return "Runs on MySQL: moin backups for MySQL come next."
+	}
+	return "Runs on " + e.DatabaseName() + ": moin doesn't back it up yet."
+}
+
+// Similar are up to n other apps of e's category, in the order of entries.
+func Similar(entries []Entry, e Entry, n int) []Entry {
+	var similar []Entry
+	for _, other := range entries {
+		if other.Category == e.Category && other.Slug != e.Slug && len(similar) < n {
+			similar = append(similar, other)
+		}
+	}
+	return similar
+}

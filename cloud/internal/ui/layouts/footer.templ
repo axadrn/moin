@@ -1,0 +1,70 @@
+package layouts
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/compare"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+)
+
+// footerColumns are the links of the site footer. The maker's other open
+// source projects sit next to moin, as one family.
+var footerColumns = []components.FooterColumn{
+	{Title: "Product", Links: []components.FooterLink{
+		{Label: "Docs", Href: "/docs"},
+		{Label: "Catalog", Href: "/catalog"},
+		{Label: "Pricing", Href: "/#pricing"},
+		{Label: "Blog", Href: "/blog"},
+		{Label: "Changelog", Href: "/changelog"},
+		{Label: "Roadmap", Href: "/roadmap"},
+	}},
+	{Title: "Open source", Links: []components.FooterLink{
+		{Label: brand.Name + " on GitHub", Href: GitHubURL, External: true},
+		{Label: "shadcn-templ", Href: "https://shadcn-templ.com/?ref=moin-footer", External: true},
+		{Label: "goilerplate", Href: "https://goilerplate.com/?ref=moin-footer", External: true},
+	}},
+	{Title: "Company", Links: []components.FooterLink{
+		{Label: brand.Name + " on X", Href: XURL, External: true},
+		{Label: "Brand", Href: "/brand"},
+		{Label: "Terms", Href: "/legal/terms"},
+		{Label: "Privacy", Href: "/legal/privacy"},
+	}},
+	{Title: "Compare", Links: compareLinks()},
+}
+
+// compareLinks are every comparison and the page with all of them.
+func compareLinks() []components.FooterLink {
+	links := make([]components.FooterLink, 0, len(compare.Competitors)+1)
+	for _, competitor := range compare.Competitors {
+		links = append(links, components.FooterLink{Label: brand.Name + " vs " + competitor.Name, Href: "/compare/" + competitor.Slug})
+	}
+	return append(links, components.FooterLink{Label: "All comparisons", Href: "/compare"})
+}
+
+// Footer is the site footer: the wordmark and the promise, the columns, then
+// a line with the company and the maker.
+templ Footer() {
+	@components.Footer(components.FooterProps{Columns: footerColumns, End: footerEnd()}) {
+		<a href="/" aria-label={ brand.Name + " home" }>
+			@components.Wordmark(components.WordmarkProps{Mark: true})
+		</a>
+		<p>
+			Deploy anything.
+			<br/>
+			Lose nothing.
+		</p>
+		<a href={ templ.SafeURL("mailto:" + brand.SupportEmail) } class="moin-link">{ brand.SupportEmail }</a>
+	}
+}
+
+templ footerEnd() {
+	<span>© { strconv.Itoa(time.Now().Year()) } { brand.Company }</span>
+	<span class="moin-row" data-gap="4">
+		<span>Made by <a href="https://x.com/axadrn" target="_blank" rel="me noopener" class="moin-link">Axel Adrian</a></span>
+		// The theme lives here only: the navbar keeps the places and the one
+		// way in.
+		@components.ModeSwitch()
+	</span>
+}

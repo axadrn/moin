@@ -1,0 +1,193 @@
+package pages
+
+import (
+	"net/url"
+	"strings"
+
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/catalog"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// Catalog is the public catalog: open source apps to run on your own
+// server, under their category.
+templ Catalog(entries []catalog.Entry) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Self-host open source apps on your own server",
+		Description: "Umami, n8n, Grafana, Nextcloud, Vaultwarden and more on your own server with one command. Their databases backed up.",
+		Path:        "/catalog",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Catalog", Line: "Open source apps for your own server. One command each. Their databases backed up."})
+				for _, category := range catalog.Categories {
+					{{ apps := inCategory(entries, category) }}
+					if len(apps) > 0 {
+						@components.Card(components.CardProps{Title: category}) {
+							@components.List() {
+								for _, app := range apps {
+									@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: catalogIcon(app, false), Name: app.Name, Note: app.Pitch})
+								}
+							}
+						}
+					}
+				}
+				@components.More(components.MoreProps{Href: "/docs/catalog", Text: "How the catalog works"})
+			</section>
+			@HomeEnd()
+		</main>
+	}
+}
+
+// CatalogApp is the public page of one catalog app: what it is and the
+// command that deploys it; its compose.yml with what moin backs up and its
+// links; the apps like it; the way in. All of it comes from its folder in
+// the catalog.
+templ CatalogApp(entry catalog.Entry, similar []catalog.Entry, appURL string) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Self-host " + entry.Name + " with Docker Compose",
+		Description: catalogDescription(entry),
+		Path:        "/catalog/" + entry.Slug,
+	}) {
+		@templ.Raw(catalogJSONLD(entry, appURL+"/catalog/"+entry.Slug))
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Icon: catalogIcon(entry, true), Title: entry.Name, Line: entry.Pitch})
+				<div class="moin-row" data-center>
+					@components.Command(components.CommandProps{Text: brand.Name + " deploy my-server --catalog " + entry.Slug})
+				</div>
+				if entry.Body != "" {
+					<article class="moin-narrow">
+						@components.Prose(components.ProseProps{HTML: string(entry.Body)})
+					</article>
+				}
+			</section>
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Title: "What " + brand.Name + " deploys.", Line: "Its compose.yml. " + brand.Name + " fills in the version and new secrets."})
+				<div class="moin-narrow moin-stack">
+					@components.Code(components.CodeProps{ID: "catalog-compose", Text: string(entry.Compose)})
+					@components.Card(components.CardProps{}) {
+						@components.List(templ.Attributes{"data-wrap": true}) {
+							if entry.Database != "" {
+								@components.Item(components.ItemProps{Name: "Backups", Note: catalogBackup(entry)})
+							}
+							if entry.Login != "" {
+								@components.Item(components.ItemProps{Name: "First sign-in", Note: entry.Login})
+							}
+							@catalogLink("Website", websiteHost(entry.Website), entry.Website, false)
+							if entry.Source != "" {
+								@catalogLink("Source", entry.License, "https://"+entry.Source, false)
+							}
+							@catalogLink("Image", entry.Image, imageURL(entry.Image), true)
+						}
+					}
+				</div>
+			</section>
+			if len(similar) > 0 {
+				<section class="moin-band">
+					@components.BandHead(components.BandHeadProps{Title: "More " + entry.Category + "."})
+					@components.Card(components.CardProps{}) {
+						@components.List() {
+							for _, app := range similar {
+								@components.Item(components.ItemProps{Href: "/catalog/" + app.Slug, Lead: catalogIcon(app, false), Name: app.Name, Note: app.Pitch})
+							}
+						}
+					}
+					@components.More(components.MoreProps{Href: "/catalog", Text: "The whole catalog"})
+				</section>
+			}
+			@HomeEnd()
+		</main>
+	}
+}
+
+// catalogLink is a row that opens another site in a new tab: what it is,
+// its value, and ↗.
+templ catalogLink(label, value, href string, mono bool) {
+	@components.Item(components.ItemProps{Href: href, External: true}) {
+		<span class="moin-strong">{ label }</span>
+		<span class={ "moin-item-value moin-end", templ.KV("moin-mono", mono) }>{ value }</span>
+	}
+}
+
+// catalogIcon is an app's logo, or its first letter when it has none
+// (CatalogHandler.Logo).
+func catalogIcon(entry catalog.Entry, large bool) templ.Component {
+	return components.AppIcon(components.AppIconProps{Logo: "/catalog/" + entry.Slug + "/logo", Large: large})
+}
+
+func inCategory(entries []catalog.Entry, category string) []catalog.Entry {
+	var apps []catalog.Entry
+	for _, entry := range entries {
+		if entry.Category == category {
+			apps = append(apps, entry)
+		}
+	}
+	return apps
+}
+
+// catalogBackup says what moin backs up of an app, from its database.
+func catalogBackup(entry catalog.Entry) string {
+	if !entry.BackedUp() {
+		return entry.DatabaseNote()
+	}
+	return brand.Name + " copies its " + entry.DatabaseName() + " database into your own bucket on a schedule. Every day it checks that a copy restores."
+}
+
+// catalogDescription is what search shows for an app's page. It promises
+// a backup only for an app whose database moin backs up.
+func catalogDescription(entry catalog.Entry) string {
+	if entry.BackedUp() {
+		return entry.Name + ": " + entry.Pitch + " One command to your own server. Its database backed up."
+	}
+	return entry.Name + ": " + entry.Pitch + " One command to your own server, with HTTPS."
+}
+
+// catalogJSONLD describes the app for search engines, as JSON-LD.
+func catalogJSONLD(entry catalog.Entry, url string) string {
+	return jsonLD(map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "SoftwareApplication",
+		"name":                entry.Name,
+		"description":         entry.Pitch,
+		"applicationCategory": entry.Category,
+		"operatingSystem":     "Linux, Docker",
+		"url":                 url,
+		"sameAs":              entry.Website,
+		"license":             entry.License,
+		"offers":              map[string]any{"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+	})
+}
+
+// websiteHost is the host of an app's website, for its row: grafana.com.
+func websiteHost(website string) string {
+	u, err := url.Parse(website)
+	if err != nil || u.Host == "" {
+		return website
+	}
+	return strings.TrimPrefix(u.Host, "www.")
+}
+
+// imageURL is the registry page of an image: Docker Hub for a plain name
+// (wordpress, grafana/grafana), quay.io's repository page, and the image
+// itself on another registry: ghcr.io sends a browser on to its package
+// page.
+func imageURL(image string) string {
+	host, path, found := strings.Cut(image, "/")
+	if found && (strings.ContainsAny(host, ".:") || host == "localhost") {
+		switch host {
+		case "docker.io", "index.docker.io", "registry-1.docker.io":
+			image = path
+		case "quay.io":
+			return "https://quay.io/repository/" + path
+		default:
+			return "https://" + image
+		}
+	}
+	image = strings.TrimPrefix(image, "library/")
+	if !strings.Contains(image, "/") {
+		return "https://hub.docker.com/_/" + image
+	}
+	return "https://hub.docker.com/r/" + image
+}

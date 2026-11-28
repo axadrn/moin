@@ -1,6 +1,6 @@
 ---
 name: Jellyfin
-pitch: Your movies, shows and music. Like Netflix, on your server.
+pitch: Your movies and shows. Your music too. Like Netflix on your server.
 category: Media
 website: https://jellyfin.org
 source: github.com/jellyfin/jellyfin

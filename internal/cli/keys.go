@@ -1,0 +1,163 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/axadrn/moin/internal/build"
+	"github.com/axadrn/moin/internal/daemon"
+	"github.com/axadrn/moin/internal/style"
+)
+
+// keys is `moin keys <server>`: the SSH keys that may log in as root,
+// which is who may run moin there. `keys add` and `keys rm` change them.
+func keys(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) > 0 && args[0] == "add" {
+		return addKey(ctx, args[1:], stdin, stdout)
+	}
+	if len(args) > 0 && args[0] == "rm" {
+		return removeKey(ctx, args[1:], stdin, stdout)
+	}
+	flags := newFlags("keys", "keys <server> [--json], or keys add <server> <file.pub>, or keys rm <server> <name>").withJSON()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, _, err := flags.serverArgs(stdin, 0)
+	if err != nil {
+		return err
+	}
+	var list []daemon.Key
+	if err := sshJSON(ctx, server, []string{"keys"}, nil, &list); err != nil {
+		return err
+	}
+	if flags.json() {
+		return printJSON(stdout, list)
+	}
+	rows := [][]string{}
+	for _, key := range list {
+		name := key.Comment
+		if name == "" {
+			name = badge(stdout, style.Muted.Render("no name"), "-")
+		}
+		rows = append(rows, []string{name, style.Muted.Render(key.Fingerprint)})
+	}
+	table(stdout, []string{"NAME", "FINGERPRINT"}, rows)
+	fmt.Fprintln(stdout)
+	hint(stdout, "Each key may log in as root and run "+build.Name+". Add one with", build.Name+" keys add "+server+" anna.pub")
+	return nil
+}
+
+// addKey adds the public key in a .pub file. Left out, it is asked on a
+// terminal.
+func addKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("keys add", "keys add <server> <file.pub>")
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, rest, err := flags.serverArgs(stdin, 1)
+	if err != nil {
+		return err
+	}
+	var file string
+	switch {
+	case len(rest) == 1:
+		file = rest[0]
+	case !isTerminal(stdin):
+		return flags.wrong()
+	default:
+		if file, err = askKeyFile(stdin, stdout); err != nil {
+			return err
+		}
+	}
+	body, err := os.ReadFile(file)
+	if err != nil || !isPublicKey(body) {
+		return fmt.Errorf("%s is not a public SSH key: pass the .pub file, like ~/.ssh/id_ed25519.pub, never the private key", file)
+	}
+	var key daemon.Key
+	if err := sshJSON(ctx, server, []string{"keys", "add"}, bytes.NewReader(body), &key); err != nil {
+		return err
+	}
+	done(stdout, "%s may log in to %s as root now", keyName(key), server)
+	return nil
+}
+
+// askKeyFile asks for the .pub file. Enter takes ~/.ssh/id_ed25519.pub,
+// when it is there. A path that starts with ~/ is in your home folder.
+func askKeyFile(stdin io.Reader, stdout io.Writer) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	suggested := "~/.ssh/id_ed25519.pub"
+	if _, err := os.Stat(filepath.Join(home, ".ssh", "id_ed25519.pub")); err != nil {
+		suggested = ""
+	}
+	file, err := ask(stdin, stdout, "Public key file:", suggested)
+	if err != nil {
+		return "", err
+	}
+	if file == "" {
+		return "", errors.New("no file, nothing changed")
+	}
+	if rest, ok := strings.CutPrefix(file, "~/"); ok {
+		file = filepath.Join(home, rest)
+	}
+	return file, nil
+}
+
+// isPublicKey reports whether body looks like a .pub file: one line that
+// starts with a key type. A private key never leaves this computer.
+func isPublicKey(body []byte) bool {
+	line := strings.TrimSpace(string(body))
+	if strings.Contains(line, "\n") {
+		return false
+	}
+	return strings.HasPrefix(line, "ssh-") || strings.HasPrefix(line, "ecdsa-") || strings.HasPrefix(line, "sk-")
+}
+
+// removeKey removes a key by its name, the comment at its end, or its
+// fingerprint. The server refuses the key this session logged in with.
+func removeKey(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	flags := newFlags("keys rm", "keys rm <server> <name or fingerprint> [-y]").withYes()
+	if err := flags.parse(args); err != nil {
+		return err
+	}
+	server, rest, err := flags.serverArgs(stdin, 1)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
+		return flags.wrong()
+	}
+	name := rest[0]
+	if err := confirm(stdin, stdout, flags.yes(), fmt.Sprintf("Remove the key %s from %s? It can no longer log in.", name, server)); err != nil {
+		return err
+	}
+	// The session's own address comes from the server's shell: sudo would
+	// drop $SSH_CONNECTION.
+	line := hereLine("keys", "rm", name) + ` --session "$SSH_CONNECTION"`
+	out, err := sshOutput(ctx, server, line, nil)
+	if err != nil {
+		return err
+	}
+	var key daemon.Key
+	if err := readAnswer(server, out, &key); err != nil {
+		return err
+	}
+	done(stdout, "%s can no longer log in to %s", keyName(key), server)
+	return nil
+}
+
+// keyName is the name of a key, or its fingerprint when it has none.
+func keyName(key daemon.Key) string {
+	if key.Comment == "" {
+		return "The key " + key.Fingerprint
+	}
+	return key.Comment
+}

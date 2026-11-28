@@ -1,0 +1,130 @@
+package pages
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/axadrn/moin/cloud/internal/catalog"
+	"github.com/axadrn/moin/cloud/internal/model"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// SiteHit is what the search of the public site finds: a docs page, a
+// section of one (it opens at its heading), or an app of the catalog.
+type SiteHit struct {
+	Title string
+	// Where is the topic of a page, the page of a section, or "Catalog".
+	Where string
+	Href  string
+}
+
+// FindSite is the one search of the public site, behind the magnifier of
+// the navbar: the apps whose name matches first, then the docs. Without a
+// query it is the first steps and the catalog.
+func FindSite(groups []model.DocGroup, apps []catalog.Entry, query string, limit int) []SiteHit {
+	if strings.TrimSpace(query) == "" {
+		var out []SiteHit
+		if len(groups) > 0 {
+			out = FindDocs(groups[:1], "", 0)
+		}
+		return append(out, SiteHit{Title: "Catalog", Where: "Open source apps you deploy with one command", Href: "/catalog"})
+	}
+	var out []SiteHit
+	for _, app := range apps {
+		if matches(query, app.Name) {
+			out = append(out, SiteHit{Title: app.Name, Where: "Catalog", Href: "/catalog/" + app.Slug})
+		}
+	}
+	out = append(out, FindDocs(groups, query, limit)...)
+	return out[:min(len(out), limit)]
+}
+
+// FindDocs is what the search finds in the docs: the pages whose title and
+// the sections whose heading match query, pages first and at most limit.
+// Without a query it is every page.
+func FindDocs(groups []model.DocGroup, query string, limit int) []SiteHit {
+	var pages, sections []SiteHit
+	for _, group := range groups {
+		for _, page := range group.Pages {
+			if matches(query, page.Title) {
+				pages = append(pages, SiteHit{page.Title, group.Title, docsPageURL(page)})
+			}
+			if strings.TrimSpace(query) == "" {
+				continue
+			}
+			for _, heading := range page.Headings {
+				if heading.Level == 2 && matches(query, heading.Text) {
+					sections = append(sections, SiteHit{heading.Text, page.Title, docsPageURL(page) + "#" + heading.ID})
+				}
+			}
+		}
+	}
+	hits := append(pages, sections...)
+	if strings.TrimSpace(query) == "" {
+		return hits
+	}
+	return hits[:min(len(hits), limit)]
+}
+
+// matches says every word of query is in text, in any case. An empty
+// query matches everything.
+func matches(query, text string) bool {
+	text = strings.ToLower(text)
+	for _, word := range strings.Fields(strings.ToLower(query)) {
+		if !strings.Contains(text, word) {
+			return false
+		}
+	}
+	return true
+}
+
+// SiteSearchOptions are the answers in the palette of the public site
+// (layouts.SiteSearch), the first one picked so Enter opens it.
+templ SiteSearchOptions(query string, hits []SiteHit) {
+	if len(hits) == 0 {
+		<p class="moin-message">Nothing found for “{ query }”.</p>
+	}
+	for i, hit := range hits {
+		<a
+			href={ templ.SafeURL(hit.Href) }
+			role="option"
+			aria-selected={ strconv.FormatBool(i == 0) }
+			class="moin-option"
+		>
+			<span class="moin-fill moin-truncate moin-strong">{ hit.Title }</span>
+			<span class="moin-small moin-muted moin-truncate">{ hit.Where }</span>
+		</a>
+	}
+}
+
+// SearchPage is /search: the search without JavaScript, where the
+// magnifier of the navbar leads. With JavaScript the magnifier opens the
+// palette instead.
+templ SearchPage(query string, hits []SiteHit) {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Search",
+		Description: "Search the docs and the catalog of moin.",
+		Path:        "/search",
+		NoIndex:     true,
+	}) {
+		<main class="moin-page moin-narrow moin-content">
+			@components.Header(components.HeaderProps{Title: "Search"})
+			<form method="get" action="/search" role="search">
+				<label for="search-q" class="moin-sr-only">Search</label>
+				@components.Input(components.InputProps{Attrs: templ.Attributes{"id": "search-q", "name": "q", "type": "search", "value": query, "placeholder": "Search the docs and the catalog", "autocomplete": "off", "spellcheck": "false"}})
+			</form>
+			if strings.TrimSpace(query) != "" && len(hits) == 0 {
+				<p class="moin-text moin-muted">Nothing found for “{ query }”.</p>
+			} else {
+				@components.Card(components.CardProps{}) {
+					@components.List() {
+						for _, hit := range hits {
+							@components.Item(components.ItemProps{Href: hit.Href, Name: hit.Title, Note: hit.Where})
+						}
+					}
+				}
+			}
+		</main>
+	}
+}

@@ -3,36 +3,28 @@ package cli
 import (
 	"strings"
 	"testing"
+
+	"github.com/axadrn/moin/internal/daemon"
 )
 
-// TestStatus: moin status exits 0 when all is good and 1 when something
-// needs you, so scripts and CI can check it.
-func TestStatus(t *testing.T) {
-	good := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/status": `{"ok":true,"issues":[],"updates":[{"app":"stats","name":"Umami","version":"3.4.1","latest":"3.5.0"}],"counts":{"apps":2,"apps_live":2,"servers":1,"servers_online":1,"databases":2,"backups_checked":2}}`,
-	}}
-	code, stdout, stderr := runCLI(t, good, "status")
-	if code != 0 {
-		t.Fatalf("all good: code %d, stderr %q", code, stderr)
-	}
-	for _, want := range []string{"All good.", "2 of 2 apps live", "stats", "3.4.1 → 3.5.0"} {
-		if !strings.Contains(stdout, want) {
-			t.Errorf("no %q in %q", want, stdout)
+func TestPrintNeedsShowsWhatTheServerSaid(t *testing.T) {
+	rows := []serverRow{{server: "prod", status: daemon.Status{
+		PublicSSH: true,
+		Watchers:  []string{"https://watcher.example.com"},
+		Needs: []daemon.Need{
+			{Text: "shop: postgres has no backup yet.", Command: "moin bucket set prod"},
+			{Text: "shop: the restore check failed. The last proven copy is from November 26.", Command: "moin backups shop"},
+		},
+	}}}
+	var out strings.Builder
+	printNeeds(terminal(&out), rows)
+	for _, want := range []string{
+		"! prod: port 22 is open to the internet.\n  `moin secure prod`",
+		"! shop: postgres has no backup yet.\n  `moin bucket set prod`",
+		"The last proven copy is from November 26.\n  `moin backups shop`",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("printNeeds wrote\n%s\nwant %q", out.String(), want)
 		}
-	}
-	bad := &fakeAPI{answers: map[string]string{
-		"GET /api/v1/status": `{"ok":false,"issues":[{"kind":"server.down","target":"web-1","detail":"offline: its apps may be down","path":"/servers/x/security","since":null},{"kind":"daemon.behind","target":"web-2","detail":"daemon v1.0.0, update pending","path":"/servers","since":null}],"updates":[],"counts":{"apps":1,"apps_live":0,"servers":2,"servers_online":1,"databases":0,"backups_checked":0}}`,
-	}}
-	code, stdout, _ = runCLI(t, bad, "status")
-	if code != 1 {
-		t.Errorf("needs you: code %d", code)
-	}
-	for _, want := range []string{"2 things need you", "web-1", "offline: its apps may be down", "web-2"} {
-		if !strings.Contains(stdout, want) {
-			t.Errorf("no %q in %q", want, stdout)
-		}
-	}
-	if code, _, _ := runCLI(t, good, "status", "extra"); code == 0 {
-		t.Error("status with an argument ran")
 	}
 }

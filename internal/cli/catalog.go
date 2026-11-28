@@ -4,171 +4,90 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
-	"slices"
+	"io/fs"
 	"strings"
-	"time"
 
+	"github.com/axadrn/moin/catalog"
 	"github.com/axadrn/moin/internal/build"
-	"github.com/axadrn/moin/internal/client"
-	"github.com/axadrn/moin/internal/human"
 	"github.com/axadrn/moin/internal/style"
 )
 
-// catalog lists the catalog, shows one app with its versions, or installs
-// one: catalog, catalog <app>, catalog install <app> --server <server>.
-func catalog(ctx context.Context, args []string, stdout io.Writer) error {
-	if len(args) > 0 && args[0] == "install" {
-		return catalogInstall(ctx, args[1:], stdout)
-	}
-	flags := newFlags("catalog", "catalog [app]")
+// catalogEntry is one app of the catalog, from its app.md.
+type catalogEntry struct {
+	Name     string `json:"name"`
+	Title    string `json:"title"`
+	Pitch    string `json:"pitch"`
+	Category string `json:"category"`
+	Website  string `json:"website"`
+	Login    string `json:"login,omitempty"`
+}
+
+// catalogList is `moin catalog`: the open source apps built into moin,
+// each deployed with `moin deploy <server> --catalog <name>`.
+func catalogList(ctx context.Context, args []string, stdout io.Writer) error {
+	flags := newFlags("catalog", "catalog [--json]").withJSON()
 	if err := flags.parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() > 1 {
+	if flags.NArg() > 0 {
 		return flags.wrong()
 	}
-	api, err := apiClient()
+	entries, err := catalogEntries()
 	if err != nil {
 		return err
 	}
-	if flags.NArg() == 1 {
-		entry, err := api.CatalogApp(ctx, flags.Arg(0))
-		if err != nil {
-			return err
-		}
-		printCatalogApp(stdout, entry)
-		return nil
+	if flags.json() {
+		return printJSON(stdout, entries)
 	}
-	entries, err := api.Catalog(ctx)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	rows := make([][]string, 0, len(entries))
+	rows := [][]string{}
 	for _, entry := range entries {
-		latest := style.Muted.Render("-")
-		if entry.Latest != nil {
-			latest = entry.Latest.Tag
-			if entry.Latest.Date != nil {
-				latest += style.Muted.Render(", " + human.Ago(*entry.Latest.Date, now))
-			}
-		}
-		rows = append(rows, []string{entry.Slug, entry.Category, latest, dash(entry.Database), entry.Pitch})
+		rows = append(rows, []string{style.Bold.Render(entry.Name), entry.Category, style.Muted.Render(entry.Pitch)})
 	}
-	table(stdout, []string{"APP", "CATEGORY", "NEWEST", "DATABASE", "WHAT IT IS"}, rows)
-	hint(stdout, "Install one with", build.Name+" catalog install <app> --server <server>")
-	return nil
-}
-
-// printCatalogApp shows a catalog app and its versions, newest first.
-func printCatalogApp(stdout io.Writer, entry client.CatalogEntry) {
-	fmt.Fprintln(stdout, style.Bold.Render(entry.Name)+" "+entry.Pitch)
-	fmt.Fprintln(stdout, style.Muted.Render(entry.Website+" · "+entry.License+" · "+entry.Image))
-	switch entry.Database {
-	case "postgres":
-		fmt.Fprintln(stdout, "Its Postgres: copied into your bucket hourly, checked every day.")
-	case "sqlite":
-		fmt.Fprintln(stdout, "Its SQLite: copied into your bucket hourly, checked every day.")
-	default:
-		if entry.DatabaseNote != "" {
-			fmt.Fprintln(stdout, entry.DatabaseNote)
-		}
-	}
-	if entry.Login != "" {
-		fmt.Fprintln(stdout, entry.Login)
-	}
+	table(stdout, []string{"NAME", "WHAT", "ABOUT"}, rows)
 	fmt.Fprintln(stdout)
-	now := time.Now()
-	shown := entry.Versions
-	if len(shown) > 15 {
-		shown = shown[:15]
-	}
-	rows := make([][]string, 0, len(shown))
-	for _, version := range shown {
-		date := style.Muted.Render("-")
-		if version.Date != nil {
-			date = version.Date.Local().Format("2006-01-02") + style.Muted.Render(", "+human.Ago(*version.Date, now))
-		}
-		rows = append(rows, []string{version.Tag, date})
-	}
-	if len(rows) == 0 {
-		fmt.Fprintln(stdout, style.Muted.Render("No versions read from the registry yet. Try again in a minute."))
-	} else {
-		table(stdout, []string{"VERSION", "RELEASED"}, rows)
-		if more := len(entry.Versions) - len(shown); more > 0 {
-			fmt.Fprintln(stdout, style.Muted.Render(fmt.Sprintf("and %d older", more)))
-		}
-	}
-	if entry.NeedsDomain {
-		hint(stdout, "It needs a domain. Install it with", build.Name+" catalog install "+entry.Slug+" --server <server> --domain <domain>")
-		return
-	}
-	hint(stdout, "Install it with", build.Name+" catalog install "+entry.Slug+" --server <server>")
-}
-
-// catalogInstall installs a catalog app and follows its first deploy.
-func catalogInstall(ctx context.Context, args []string, stdout io.Writer) error {
-	flags := newFlags("catalog install", "catalog install <app> --server <server> [--version <tag>] [--name <name>] [--domain <domain>]")
-	server := flags.String("server", "", "the server to install it on")
-	version := flags.String("version", "", "a version from moin catalog <app>; default the newest")
-	name := flags.String("name", "", "the app name; default the catalog app's")
-	domain := flags.String("domain", "", "a domain for the app")
-	if err := flags.parse(args); err != nil {
-		return err
-	}
-	if flags.NArg() != 1 || strings.TrimSpace(*server) == "" {
-		return flags.wrong()
-	}
-	api, err := apiClient()
-	if err != nil {
-		return err
-	}
-	installed, err := api.InstallCatalogApp(ctx, flags.Arg(0), client.CatalogInstall{Server: *server, Version: *version, Name: *name, Domain: *domain})
-	if err != nil {
-		return err
-	}
-	err = follow(ctx, api, installed.App.Name, installed.Deploy, "Deploy", false, stdout)
-	// Env values are write-only: this is the one time these are shown, so
-	// they show also when the deploy failed.
-	if len(installed.Login) > 0 || installed.Password != "" {
-		fmt.Fprintln(stdout, "  "+style.Warning.Render("Keep this in your password manager now: it is shown only this once."))
-		if installed.Password != "" {
-			fmt.Fprintln(stdout, "  the app's password: user "+passwordUser+", password "+installed.Password)
-		}
-		for _, key := range slices.Sorted(maps.Keys(installed.Login)) {
-			fmt.Fprintln(stdout, "  "+key+style.Muted.Render("=")+installed.Login[key])
-		}
-	}
-	if err != nil {
-		return err
-	}
-	entry, err := api.CatalogApp(ctx, flags.Arg(0))
-	if err == nil && entry.DatabaseNote != "" {
-		fmt.Fprintln(stdout, "  "+entry.DatabaseNote)
-	}
-	if err == nil && entry.Login != "" {
-		fmt.Fprintln(stdout, "  "+entry.Login)
-	}
-	if *domain == "" {
-		hint(stdout, "Give it a domain with", build.Name+" domains add --app "+installed.App.Name+" <domain>")
-	}
+	hint(stdout, "Deploy one with", build.Name+" deploy <server> --catalog umami")
 	return nil
 }
 
-// updateApp sets a catalog app to a version, the newest by default, and
-// follows the deploy.
-func updateApp(ctx context.Context, app, version string, stdout io.Writer) error {
-	api, err := apiClient()
+// catalogEntries reads every app.md of the catalog, sorted by name.
+func catalogEntries() ([]catalogEntry, error) {
+	folders, err := fs.ReadDir(catalog.Files, ".")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if version != "" {
-		fmt.Fprintln(stdout, style.Muted.Render("An older version may not undo the migrations of a newer one; moin backups lists the moment before the update to go back to."))
+	entries := []catalogEntry{}
+	for _, folder := range folders {
+		body, err := fs.ReadFile(catalog.Files, folder.Name()+"/app.md")
+		if err != nil {
+			continue
+		}
+		fields := frontMatter(string(body))
+		entries = append(entries, catalogEntry{
+			Name:     folder.Name(),
+			Title:    fields["name"],
+			Pitch:    fields["pitch"],
+			Category: fields["category"],
+			Website:  fields["website"],
+			Login:    fields["login"],
+		})
 	}
-	updated, err := api.UpdateApp(ctx, app, version)
-	if err != nil {
-		return err
+	return entries, nil
+}
+
+// frontMatter reads the "key: value" lines between the --- lines at the
+// top of an app.md.
+func frontMatter(text string) map[string]string {
+	fields := map[string]string{}
+	block, ok := strings.CutPrefix(text, "---\n")
+	if !ok {
+		return fields
 	}
-	return follow(ctx, api, updated.App.Name, updated.Deploy, "Update", false, stdout)
+	block, _, _ = strings.Cut(block, "\n---")
+	for line := range strings.Lines(block) {
+		key, value, ok := strings.Cut(line, ":")
+		if ok {
+			fields[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), `"`)
+		}
+	}
+	return fields
 }

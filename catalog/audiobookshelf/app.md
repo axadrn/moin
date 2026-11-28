@@ -1,6 +1,6 @@
 ---
 name: Audiobookshelf
-pitch: Your audiobooks and podcasts, streamed to every device.
+pitch: Your audiobooks and podcasts. Streamed to every device.
 category: Media
 website: https://www.audiobookshelf.org
 source: github.com/advplyr/audiobookshelf

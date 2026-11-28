@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/axadrn/moin/protocol"
 )
 
 // TestCleanupDocker builds four tiny images and checks what cleanup takes:
@@ -39,7 +37,7 @@ func TestCleanupDocker(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = exec.Command("docker", "rm", "-f", "moin-test-cleanup-stopped").Run() })
 
-	a := newApps(dir, func(protocol.MessageType, string, any) {})
+	a := newApps(dir)
 	release := a.releaseDir("shop", 2)
 	if err := os.MkdirAll(release, 0o755); err != nil {
 		t.Fatal(err)
