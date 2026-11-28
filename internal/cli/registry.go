@@ -119,7 +119,7 @@ func bringImage(ctx context.Context, server, image string, stdout io.Writer) err
 		return task(stdout, "pulling image "+image+" on "+server, func() error {
 			why, err := pullImage(ctx, server, image)
 			if why != "" {
-				return fmt.Errorf("%s cannot pull %s, and this computer has no such image. Docker said: %s. A private registry needs a login: `%s registry set %s <registry> <user>`", server, image, why, build.Name, server)
+				return fmt.Errorf("the image %s is in no registry %s can pull from, and not on this computer. Docker said: %s. A private registry needs a login: `%s registry set %s <registry> <user>`", image, server, why, build.Name, server)
 			}
 			return err
 		})

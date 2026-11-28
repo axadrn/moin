@@ -102,7 +102,7 @@ func SetRegistryHere(ctx context.Context, login Registry) error {
 	}
 	_, err := registryDocker(ctx, strings.NewReader(login.Token), args...)
 	if err != nil {
-		return fmt.Errorf("%s did not take the login: %w", login.Registry, err)
+		return fmt.Errorf("the login was refused by %s: %w", login.Registry, err)
 	}
 	return nil
 }
