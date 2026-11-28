@@ -14,18 +14,21 @@ templ Legal(page *service.LegalPage) {
 		Description: page.Description,
 		Path:        "/legal/" + page.Slug,
 	}) {
-		<main class="moin-page moin-content">
-			@components.Header(components.HeaderProps{Title: page.Title})
-			<div class="moin-stack" data-gap="3">
-				@components.Tabs(components.TabsProps{ID: "legal", Label: "Legal", Tabs: []components.Tab{
-					{Label: "Terms of Service", Href: "/legal/terms", Active: page.Slug == "terms"},
-					{Label: "Privacy Policy", Href: "/legal/privacy", Active: page.Slug == "privacy"},
-				}})
-				<p class="moin-small moin-muted">Last updated { page.LastUpdated }</p>
-			</div>
-			<article class="moin-narrow">
-				@components.Prose(components.ProseProps{HTML: page.Content})
-			</article>
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: page.Title, Line: "Last updated " + page.LastUpdated + "."})
+				<div class="moin-narrow moin-stack" data-gap="6">
+					<div class="moin-row" data-center>
+						@components.Tabs(components.TabsProps{ID: "legal", Label: "Legal", Tabs: []components.Tab{
+							{Label: "Terms of Service", Href: "/legal/terms", Active: page.Slug == "terms"},
+							{Label: "Privacy Policy", Href: "/legal/privacy", Active: page.Slug == "privacy"},
+						}})
+					</div>
+					<article>
+						@components.Prose(components.ProseProps{HTML: page.Content})
+					</article>
+				</div>
+			</section>
 		</main>
 	}
 }

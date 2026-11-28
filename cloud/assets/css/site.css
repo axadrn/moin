@@ -400,6 +400,8 @@
   /* A page made of bands starts with its head: less room above it, under
      the bar. */
   main.moin-page > .moin-band:first-child { padding-block-start: var(--page-head, 4rem); }
+  /* Text to read in a band: as wide as it reads well, in the middle. */
+  .moin-band > .moin-narrow { width: 100%; margin-inline: auto; }
   @media (min-width: 40rem) {
     .moin-band { --band: 11rem; }
     main.moin-page { --page-head: 6rem; }
@@ -980,6 +982,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* A list whose notes are sentences: they wrap instead of ending in "…". */
+  .moin-list[data-wrap] :is(.moin-item-name, .moin-item-note) { white-space: normal; text-wrap: pretty; }
   /* A hint says what the item is about, in a sentence that wraps. */
   .moin-item-value {
     flex: none;

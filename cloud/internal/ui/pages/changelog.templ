@@ -14,32 +14,33 @@ templ Changelog(releases []service.Release) {
 		Description: "What changed in moin, newest first. Every release with what is new, what is fixed and how to update.",
 		Path:        "/changelog",
 	}) {
-		<main class="moin-page moin-content">
-			@components.Header(components.HeaderProps{Title: "Changelog"}) {
-				@components.Button(components.ButtonProps{Href: "/changelog.xml"}) {
-					RSS
-				}
-			}
-			@components.Card(components.CardProps{}) {
-				<ol class="moin-timeline">
-					for i, release := range releases {
-						<li id={ release.Anchor() }>
-							<span class="moin-strong">{ release.Version }</span>
-							<span class="moin-small moin-muted">{ release.Date.Format("January 2, 2006") }</span>
-							<div class="moin-text moin-muted">
-								@components.Prose(components.ProseProps{HTML: release.InShortHTML})
-							</div>
-							<div class="moin-text">
-								@components.Expand(components.ExpandProps{Name: "Full notes", Quiet: true, Open: i == 0}) {
-									<div class="moin-foreground">
-										@components.Prose(components.ProseProps{HTML: release.Notes})
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Changelog", Line: "What changed in each version. Newest first."})
+				<div class="moin-narrow">
+					@components.Card(components.CardProps{}) {
+						<ol class="moin-timeline">
+							for i, release := range releases {
+								<li id={ release.Anchor() }>
+									<span class="moin-strong">{ release.Version }</span>
+									<span class="moin-small moin-muted">{ release.Date.Format("January 2, 2006") }</span>
+									<div class="moin-text moin-muted">
+										@components.Prose(components.ProseProps{HTML: release.InShortHTML})
 									</div>
-								}
-							</div>
-						</li>
+									<div class="moin-text">
+										@components.Expand(components.ExpandProps{Name: "Full notes", Quiet: true, Open: i == 0}) {
+											<div class="moin-foreground">
+												@components.Prose(components.ProseProps{HTML: release.Notes})
+											</div>
+										}
+									</div>
+								</li>
+							}
+						</ol>
 					}
-				</ol>
-			}
+				</div>
+				@components.More(components.MoreProps{Href: "/changelog.xml", Text: "Follow with RSS"})
+			</section>
 		</main>
 	}
 }

@@ -16,19 +16,18 @@ templ Blog(posts []service.BlogPost) {
 		Description: "Deploying, servers, backups and security. Short posts on running your own apps, from the people who build " + brand.Name + ".",
 		Path:        "/blog",
 	}) {
-		<main class="moin-page moin-narrow moin-content">
-			@components.Header(components.HeaderProps{Title: "Blog"}) {
-				@components.Button(components.ButtonProps{Href: "/blog.xml"}) {
-					RSS
-				}
-			}
-			@blogList(posts)
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Blog", Line: "Short posts on running your own apps."})
+				@blogList(posts)
+				@components.More(components.MoreProps{Href: "/blog.xml", Text: "Follow with RSS"})
+			</section>
 		</main>
 	}
 }
 
 // BlogPost is one post: its title, its date, the text, then the other
-// posts.
+// posts and the way in.
 templ BlogPost(post service.BlogPost, posts []service.BlogPost) {
 	@layouts.Home(layouts.SEOProps{
 		Title:       post.Title,
@@ -36,20 +35,21 @@ templ BlogPost(post service.BlogPost, posts []service.BlogPost) {
 		Path:        "/blog/" + post.Slug,
 	}) {
 		@templ.Raw(blogJSONLD(post, ctxkeys.RenderConfig(ctx).AppURL))
-		<main class="moin-page moin-narrow moin-content">
-			@components.Header(components.HeaderProps{Back: components.Back{Label: "Blog", Href: "/blog"}, Title: post.Title})
-			<p class="moin-small moin-muted">{ post.Date.Format("January 2, 2006") }</p>
-			<article>
-				@components.Prose(components.ProseProps{HTML: post.HTML})
-			</article>
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: post.Title, Line: post.Date.Format("January 2, 2006")})
+				<article class="moin-narrow">
+					@components.Prose(components.ProseProps{HTML: post.HTML})
+				</article>
+			</section>
 			if others := blogOthers(posts, post.Slug, 3); len(others) > 0 {
-				<section class="moin-section">
-					<div class="moin-section-head">
-						<h2>More from the blog</h2>
-					</div>
+				<section class="moin-band">
+					@components.BandHead(components.BandHeadProps{Title: "From the blog.", Line: "Short posts on running your own apps."})
 					@blogList(others)
+					@components.More(components.MoreProps{Href: "/blog", Text: "See all"})
 				</section>
 			}
+			@HomeEnd()
 		</main>
 	}
 }

@@ -13,7 +13,7 @@ moin is in beta. It runs real sites today. There are no dates.
 - **Backups** of every SQLite and Postgres database into your own bucket. Every day one copy is restored and read. Restore, and undo a restore. [Backups](/docs/backups)
 - **A watcher** on another server. It knows your apps by itself, and alerts when a server goes silent or a domain is down. [Watcher](/docs/watcher)
 - **Updates you run**: no update ever runs by itself. Each release is signed. [Security](/docs/security#updates)
-- **The team** is the SSH keys on the server. [The team](/docs/security#the-team)
+- **The team**: the SSH keys on the server. [The team](/docs/security#the-team)
 - **The catalog**: open source apps like Umami, n8n and Vaultwarden, with backups like any app. [Catalog](/docs/catalog)
 - **A terminal UI**: `moin` on a terminal shows every server and app, live, with logs and backups. [CLI](/docs/cli#the-terminal-ui)
 - **`--json`** on every reading command, for scripts and AI agents. [CLI](/docs/cli)

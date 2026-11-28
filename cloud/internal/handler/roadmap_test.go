@@ -16,11 +16,12 @@ import (
 // roadmapContent is a docs/roadmap.md as the site reads it.
 func roadmapContent(t *testing.T) fs.FS {
 	t.Helper()
-	return fstest.MapFS{"docs/roadmap.md": {Data: []byte("---\ntitle: Roadmap\ndescription: What comes next\n---\n\nWhat moin does.\n\n## Now\n\n- **Deploys**: with [Deploy](/docs/deploy) and `moin status`.\n\n## Later\n\n- **Watcher**: see [#1](https://github.com/axadrn/moin/issues/1).\n")}}
+	return fstest.MapFS{"docs/roadmap.md": {Data: []byte("---\ntitle: Roadmap\ndescription: What comes next\n---\n\nWhat moin does.\n\n## Now\n\n- **Deploys**: with [Deploy](/docs/deploy) and `moin status`.\n- **`--json`** on every reading command. [CLI](/docs/cli)\n\n## Later\n\n- **Watcher**: see [#1](https://github.com/axadrn/moin/issues/1).\n")}}
 }
 
 // TestRoadmapIsCardsFromTheDocsPage: every heading of docs/roadmap.md is a
-// card with its list as a timeline, and the links in the text still work.
+// card with its list as rows, an item that ends with a link is a link
+// itself, and the links in the text still work.
 func TestRoadmapIsCardsFromTheDocsPage(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	Roadmap(roadmapContent(t))(recorder, httptest.NewRequest(http.MethodGet, "/roadmap", nil))
@@ -29,8 +30,9 @@ func TestRoadmapIsCardsFromTheDocsPage(t *testing.T) {
 		t.Fatalf("status %d", recorder.Code)
 	}
 	for _, want := range []string{
-		`class="moin-timeline"`, ">Now</h2>", ">Later</h2>",
-		`<span class="moin-strong">Deploys</span>`,
+		">Now</h2>", ">Later</h2>", "What moin does.",
+		`<div class="moin-item-name">Deploys</div>`,
+		`<a href="/docs/cli" class="moin-item">`, "<code>--json</code>",
 		`<a href="/docs/deploy">Deploy</a>`,
 		`<a href="https://github.com/axadrn/moin/issues/1">#1</a>`,
 		"<code>moin status</code>",

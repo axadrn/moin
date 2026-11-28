@@ -31,15 +31,16 @@ templ NotFound() {
 // back, and the code as a log line.
 templ StatusPage(title, description, line string) {
 	@layouts.Home(layouts.SEOProps{Title: title, Description: description, Path: ctxkeys.URLPath(ctx), NoIndex: true}) {
-		<main class="moin-page moin-narrow moin-content">
-			@components.Header(components.HeaderProps{Title: title})
-			<p class="moin-text moin-muted">{ description }</p>
-			<div>
-				@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/"}) {
-					Back to home
-				}
-			</div>
-			<p class="moin-small moin-mono moin-muted moin-break">{ line }</p>
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: title, Line: description})
+				<div class="moin-stack" data-gap="3" data-center>
+					@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/"}) {
+						Back to home
+					}
+					<p class="moin-small moin-mono moin-muted moin-break moin-center">{ line }</p>
+				</div>
+			</section>
 		</main>
 	}
 }
