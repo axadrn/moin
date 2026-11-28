@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -199,5 +200,61 @@ func TestPrivateWebhookRefused(t *testing.T) {
 	}
 	if called {
 		t.Error("a webhook at a private address was called")
+	}
+}
+
+// together is a mailer where every mail waits for the other one: two
+// mails go out only when both are sent at the same time.
+type together struct {
+	arrived sync.WaitGroup
+}
+
+func (m *together) Send(ctx context.Context, _ mailer.Message) error {
+	m.arrived.Done()
+	both := make(chan struct{})
+	go func() { m.arrived.Wait(); close(both) }()
+	select {
+	case <-both:
+		return nil
+	case <-time.After(5 * time.Second):
+		return errors.New("the other mail never started")
+	}
+}
+
+// Every workspace is ticked at the same time: one whose alerts go out
+// slowly does not hold up the alerts of the others.
+func TestTickAtOnce(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "cloud.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	store := workspace.NewStore(database)
+	mails := &together{}
+	mails.arrived.Add(2)
+	ws := New(store, counts.New(database), mails, "https://cloud.example.com", [32]byte{1})
+	unsent := `{"unsent":[{"to":{"kind":"mail"},"message":{"title":"prod stopped reporting"}}]}`
+	for _, mail := range []string{"ada@example.com", "grace@example.com"} {
+		space, _ := store.SignIn(mail)
+		if _, err := store.ConnectServer(space.ID, "prod"); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.StartTrial(space.ID, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.SaveWatcherState(space.ID, ws.seal(space.ID, []byte(unsent))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := ws.Load(); err != nil {
+		t.Fatal(err)
+	}
+	ws.tick(t.Context())
+	for id, w := range ws.all() {
+		var saved string
+		w.Save(func(state []byte) error { saved = string(state); return nil })
+		if strings.Contains(saved, "stopped reporting") {
+			t.Errorf("the alert of workspace %s did not go out: one tick waited for the other", id)
+		}
 	}
 }

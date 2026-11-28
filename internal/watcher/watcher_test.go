@@ -3,12 +3,14 @@ package watcher
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -579,8 +581,11 @@ func TestReportAlerts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var mu sync.Mutex
 	sent := map[string][]alert.Destination{}
 	w.Send = func(_ context.Context, to alert.Destination, m alert.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
 		sent[m.Server] = append(sent[m.Server], to)
 		return nil
 	}
@@ -599,7 +604,7 @@ func TestReportAlerts(t *testing.T) {
 		srv.Received = time.Now().Add(-10 * time.Minute)
 	}
 	w.Tick(t.Context())
-	if !slices.Equal(sent["prod"], []alert.Destination{chat, own}) {
+	if got := sent["prod"]; len(got) != 2 || !slices.Contains(got, chat) || !slices.Contains(got, own) {
 		t.Errorf("prod alerted to %+v", sent["prod"])
 	}
 	if !slices.Equal(sent["web-1"], []alert.Destination{own}) {
@@ -670,5 +675,47 @@ func TestReportedGoesPublicOnly(t *testing.T) {
 	}
 	if got := reported.state.Servers["prod"].Report.Alerts; len(got) != 0 {
 		t.Errorf("kept the alerts %+v", got)
+	}
+}
+
+// Every destination gets its alerts at the same time: a slow one does not
+// hold up the others. One destination gets its alerts in order, and none
+// after the first that failed.
+func TestSendAllAtOnce(t *testing.T) {
+	slow := alert.Destination{Kind: "webhook", URL: "https://slow.example.com/hook"}
+	fast := alert.Destination{Kind: "webhook", URL: "https://fast.example.com/hook"}
+	dead := alert.Destination{Kind: "webhook", URL: "https://dead.example.com/hook"}
+	w, err := New([]string{"prod"}, []alert.Destination{slow, fast, dead}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fastGotIt := make(chan struct{})
+	var mu sync.Mutex
+	var tried []string
+	w.Send = func(_ context.Context, to alert.Destination, m alert.Message) error {
+		mu.Lock()
+		tried = append(tried, to.URL+" "+m.Title)
+		mu.Unlock()
+		switch to {
+		case slow:
+			select {
+			case <-fastGotIt:
+			case <-time.After(5 * time.Second):
+				t.Error("the slow destination held up the fast one")
+			}
+		case fast:
+			close(fastGotIt)
+		case dead:
+			return errors.New("no answer")
+		}
+		return nil
+	}
+	first, second := alert.Message{Title: "first"}, alert.Message{Title: "second"}
+	failed := w.sendAll(t.Context(), []unsent{{To: slow, Message: first}, {To: dead, Message: first}, {To: fast, Message: first}, {To: dead, Message: second}})
+	if !slices.Equal(failed, []unsent{{To: dead, Message: first}, {To: dead, Message: second}}) {
+		t.Errorf("failed = %+v", failed)
+	}
+	if len(tried) != 3 || slices.Contains(tried, dead.URL+" second") {
+		t.Errorf("tried = %v", tried)
 	}
 }

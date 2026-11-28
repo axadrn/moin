@@ -141,23 +141,36 @@ func (w *Watcher) Tick(ctx context.Context) {
 }
 
 // sendAll sends each alert and returns the ones that did not go out.
-// After one failure a destination gets nothing more this round, so a dead
-// one does not hold up the others.
+// Every destination is sent to at the same time, so a slow one only
+// makes itself late.
 func (w *Watcher) sendAll(ctx context.Context, todo []unsent) []unsent {
-	var failed []unsent
-	down := map[alert.Destination]bool{}
+	var destinations []alert.Destination
+	alerts := map[alert.Destination][]unsent{}
 	for _, u := range todo {
-		if down[u.To] {
-			failed = append(failed, u)
-			continue
+		if alerts[u.To] == nil {
+			destinations = append(destinations, u.To)
 		}
+		alerts[u.To] = append(alerts[u.To], u)
+	}
+	failed := make([][]unsent, len(destinations))
+	var wait sync.WaitGroup
+	for i, to := range destinations {
+		wait.Go(func() { failed[i] = w.sendInOrder(ctx, alerts[to]) })
+	}
+	wait.Wait()
+	return slices.Concat(failed...)
+}
+
+// sendInOrder sends the alerts of one destination, oldest first. At the
+// first that does not go out it stops, and returns that one and the rest.
+func (w *Watcher) sendInOrder(ctx context.Context, alerts []unsent) []unsent {
+	for i, u := range alerts {
 		if err := w.send(ctx, u); err != nil {
 			slog.Error("alert not sent, trying again soon", "kind", u.To.Kind, "title", u.Message.Title, "error", err)
-			down[u.To] = true
-			failed = append(failed, u)
+			return alerts[i:]
 		}
 	}
-	return failed
+	return nil
 }
 
 // send sends one alert through one of two doors. A destination of the

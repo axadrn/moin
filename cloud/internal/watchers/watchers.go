@@ -284,12 +284,14 @@ func (ws *Watchers) all() map[string]*watcher.Watcher {
 	return all
 }
 
-// tick ticks every watcher, one after the other: a tick only sends the
-// alerts that are due.
+// tick ticks every watcher at the same time: a workspace whose alerts go
+// out slowly only makes itself late.
 func (ws *Watchers) tick(ctx context.Context) {
+	var wait sync.WaitGroup
 	for _, w := range ws.all() {
-		w.Tick(ctx)
+		wait.Go(func() { w.Tick(ctx) })
 	}
+	wait.Wait()
 }
 
 // visit visits the domains of every watcher at once; the Visitor keeps
