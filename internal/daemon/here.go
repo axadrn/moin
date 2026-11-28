@@ -178,7 +178,7 @@ func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out i
 		a.markFailed(start.App, start.Number)
 		return Result{App: start.App, Release: start.Number}, err
 	}
-	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: addresses(detected)}
+	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: a.addresses(detected)}
 	for _, database := range detected.Databases {
 		result.Databases = append(result.Databases, database.Engine())
 	}
@@ -189,13 +189,22 @@ func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out i
 
 // addresses are the app's https addresses: its domains, then its instant
 // address.
-func addresses(detected protocol.Detected) []string {
+func (a *apps) addresses(detected protocol.Detected) []string {
 	list := []string{}
-	for _, domain := range detected.Domains {
+	for _, domain := range a.reachable(detected) {
 		list = append(list, "https://"+domain)
 	}
-	if detected.Instant != "" {
-		list = append(list, "https://"+detected.Instant)
+	return list
+}
+
+// reachable are the domains of an app the internet reaches: its own, then
+// its instant address. Behind a Cloudflare Tunnel ports 80 and 443 are
+// closed, so the instant address answers nobody: it is left out.
+func (a *apps) reachable(detected protocol.Detected) []string {
+	list := slices.Clone(detected.Domains)
+	tunnel := a.proxyMode != nil && a.proxyMode() == "tunnel"
+	if detected.Instant != "" && !tunnel {
+		list = append(list, detected.Instant)
 	}
 	return list
 }

@@ -281,3 +281,26 @@ func TestReport(t *testing.T) {
 		t.Fatalf("missed = %d", w.missed)
 	}
 }
+
+// Behind a Cloudflare Tunnel ports 80 and 443 are closed, so the instant
+// address answers nobody. The report leaves it out, or a watcher visits
+// it and says the app is down. The status leaves it out too.
+func TestTunnelHidesTheInstantAddress(t *testing.T) {
+	a := newApps(t.TempDir())
+	os.MkdirAll(a.releaseDir("shop", 1), 0o700)
+	os.WriteFile(filepath.Join(a.appDir("shop"), "current"), []byte("1"), 0o600)
+	saveJSON(filepath.Join(a.releaseDir("shop", 1), "detected.json"), protocol.Detected{Domains: []string{"shop.example.com"}, Instant: "shop.203-0-113-7.sslip.io"})
+	w := newWatch(a)
+	a.proxyMode = func() string { return "direct" }
+	if got := strings.Join(w.reportApp("shop", appContainers{}, nil).Domains, " "); got != "shop.example.com shop.203-0-113-7.sslip.io" {
+		t.Fatalf("direct: domains = %q", got)
+	}
+	a.proxyMode = func() string { return "tunnel" }
+	if got := strings.Join(w.reportApp("shop", appContainers{}, nil).Domains, " "); got != "shop.example.com" {
+		t.Fatalf("tunnel: domains = %q", got)
+	}
+	detected, _ := a.live("shop")
+	if got := strings.Join(a.addresses(detected), " "); got != "https://shop.example.com" {
+		t.Fatalf("tunnel: addresses = %q", got)
+	}
+}

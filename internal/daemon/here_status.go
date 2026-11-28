@@ -69,7 +69,7 @@ func StatusHere(ctx context.Context, dir string) Status {
 			Name:      app,
 			Release:   release,
 			Running:   a.running(ctx, app),
-			Addresses: addresses(detected),
+			Addresses: a.addresses(detected),
 			Password:  a.hasPassword(app),
 		})
 	}

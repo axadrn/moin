@@ -222,11 +222,7 @@ func (w *watch) report(ctx context.Context, config Config, containers map[string
 // reportApp is one app in a report.
 func (w *watch) reportApp(app string, containers appContainers, statuses []protocol.DatabaseBackup) report.App {
 	detected, _ := w.apps.live(app)
-	domains := slices.Clone(detected.Domains)
-	if detected.Instant != "" {
-		domains = append(domains, detected.Instant)
-	}
-	a := report.App{Name: app, Release: w.apps.current(app), Running: containers.running, Domains: domains, Databases: []report.Database{}}
+	a := report.App{Name: app, Release: w.apps.current(app), Running: containers.running, Domains: w.apps.reachable(detected), Databases: []report.Database{}}
 	a.Stopped = !a.Running && w.apps.stoppedOnPurpose(app)
 	for _, status := range statuses {
 		a.Databases = append(a.Databases, reportDatabase(status))
