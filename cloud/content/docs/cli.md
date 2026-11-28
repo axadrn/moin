@@ -27,28 +27,37 @@ When something is missing and you are on a terminal, moin asks: a list to pick f
 
 ## The terminal UI
 
-`moin` alone, on a terminal, opens the terminal UI. Every server and every app, live. Every server is asked again every 5 seconds.
+`moin` alone, on a terminal, opens the terminal UI. Every server is asked again every 5 seconds.
 
 ```bash
 moin
 ```
 
-Pick an app and press Enter: its backups, and its logs as they come.
+It has three tabs. The top line says which one is open and what needs you.
+
+- **Apps**: every app, by server, with its state and release. On the right: its address, its deploys and its backups.
+- **Servers**: every server, with its apps, its watchers, its SSH and its knocks.
+- **Backups**: every app with a database, its copies and the last restore check.
+
+Pick an app and press Enter: its logs, following. `esc` goes back.
 
 | Key | What it does |
 | --- | --- |
-| `↑` `↓`, or `k` `j` | select an app |
-| `enter` | its logs, following, and its backups |
-| `esc` | back to every app |
+| `↑` `↓`, or `k` `j` | select |
+| `tab`, or `1` `2` `3` | the next tab: Apps, Servers, Backups |
+| `enter` | an app: its logs. A server: its apps. A copy: restore it |
+| `esc` | back from the logs |
 | `r` | restart the app, after you say `y` |
-| `b` | go back to an older release, after you say `y` |
+| `b` | go back to an older deploy: pick one, then say `y` |
+| `c` | a copy of the app's databases now |
+| `R` | put a database back to a copy: pick one, then say `y` |
 | `o` | open the app's address in your browser |
-| `?` | the keys |
+| `?` | the keys. Any key closes them |
 | `q` | quit |
 
-The terminal UI is only a view on the same commands. Deploy from the app's folder with `moin deploy`. Everything else is a command below.
+Each step that changes a server asks first, then shows a spinner. The same actions are the commands below. Deploy from the app's folder with `moin deploy`.
 
-Without servers, or without a terminal, `moin` prints the table instead. So does `moin apps`.
+Before your first deploy, `moin` shows three steps: `cd my-app`, `moin deploy <server>`, `moin`. Without a terminal, `moin` prints the table instead. So does `moin apps`.
 
 ## Status
 
@@ -60,11 +69,26 @@ Without servers, or without a terminal, `moin` prints the table instead. So does
 | `moin servers add <server>` | add a server you deployed to before, like on a new laptop. A first deploy adds it too |
 | `moin servers rm <server>` | take a server off your list. Nothing changes on it |
 
-Under the table, `moin` says what needs you, each with the command that settles it:
+Under the table, `moin` says what needs you. Each thing is one line with a `!`, and under it the command that settles it:
 
-- In red: port 22 open to the internet, an app with no backup yet, a backup that did not restore, a backup key you have not made or confirmed, Tailscale that does not run, a Tailscale key that expires within two weeks.
-- In yellow: a server no watcher watches, an app that does not run.
+```text
+SERVER     APP    DEPLOY   STATE       DOMAIN
+prod       shop   v4       ● running   https://shop.203-0-113-7.sslip.io
+
+! shop: no backup yet.
+  moin bucket set prod
+! prod: port 22 is open to the internet.
+  moin secure prod
+! prod reports to no watcher. Nobody notices when it is gone.
+  moin watcher connect prod <url> <token>
+```
+
+- An app that does not run, an app with no backup yet, a daily check that did not prove today's copy, a backup key you have not made or confirmed.
+- Port 22 open to the internet, Tailscale that does not run, a Tailscale key that expires within two weeks.
+- A server that no watcher watches, or one that does not answer.
 - Muted: the knocks of the day. [Knocks](/docs/security#knocks)
+
+In the terminal UI the same lines show on the Servers tab.
 
 ## Deploy
 
