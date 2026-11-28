@@ -49,7 +49,7 @@ After the trial your servers still report, and the page still shows them. But no
 
 ## Price
 
-$7 a month, or $49 a year, for the whole workspace. Every server, every app.
+$7 a month, or $49 a year, for the whole workspace. Every server, every app. The launch price stays yours. Your apps never leave your server.
 
 - Subscribe on [moin.run/cloud](/cloud). The checkout is Stripe's.
 - For businesses only.

@@ -77,41 +77,31 @@ func siteHost(site string) string {
 templ homeKnocks(k HomeKnocks) {
 	{{ rows := knockRows(k.Knocks) }}
 	<section id="knocks" class="moin-band">
-		@homeHead("Right now on "+siteHost(brand.Site)+".", "Every knock on a closed port. All dropped.")
+		@homeHead("Knock knock.", "Bots at "+siteHost(brand.Site)+"'s door. Right now. Nobody answers.")
 		if k.Sample {
 			<div class="moin-row" data-center>
 				@components.Chip("Sample data · development only")
 			</div>
 		}
 		@components.Stats() {
-			@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)}) {
-				All dropped.
-			}
+			@components.Stat(components.StatProps{Label: "Today", Value: human.Count(k.Today)})
 			@components.Stat(components.StatProps{Label: "This year", Value: human.Count(k.Year)}) {
 				Nothing answered.
 			}
 			@components.Stat(components.StatProps{Label: "Total", Value: human.Count(k.Total)}) {
 				Since the first count.
 			}
-			if len(rows) > 0 {
-				@components.Stat(components.StatProps{Label: "Most tried", Value: rows[0].Label}) {
-					{ strconv.FormatInt(rows[0].Share, 10) }% of today.
-				}
-			}
 		}
 		if len(rows) > 0 {
 			@knockList(rows)
 		}
-		<p class="moin-text moin-muted moin-center">
-			Every { brand.Name } server counts its knocks. See yours: <code class="moin-mono moin-foreground">{ brand.Name } knocks</code>
-		</p>
 	</section>
 }
 
 // knockList is the card of the ports bots tried most today: the name and
 // its ports, the count, and a thin bar as wide as its share.
 templ knockList(rows []knockRow) {
-	@components.Card(components.CardProps{Title: "Most tried today"}) {
+	@components.Card(components.CardProps{}) {
 		@components.Bars(components.BarsProps{Rows: knockBars(rows)})
 	}
 }

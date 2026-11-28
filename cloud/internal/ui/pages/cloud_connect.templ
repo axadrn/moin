@@ -9,9 +9,8 @@ templ CloudConnect(c Cloud) {
 	@cloudApp(c, "Connect a server", "Overview") {
 		@components.Header(components.HeaderProps{Back: components.Back{Label: "Overview", Href: "/cloud"}, Title: "Connect a server"})
 		@components.Card(components.CardProps{}) {
-			<p class="moin-text moin-muted">Run this on your laptop, with the name of the server in your SSH config. It gives the server a token, and the server reports here within a minute.</p>
+			<p class="moin-text moin-muted">Run this on your laptop, with the name of the server in your SSH config. The token goes straight to the server and never shows here. The server reports within a minute.</p>
 			@components.Command(components.CommandProps{Text: connectCommand("my-server")})
-			<p class="moin-small moin-muted">The token goes straight to the server. It never shows here.</p>
 		}
 	}
 }

@@ -134,11 +134,9 @@ templ HomeLoseNothing() {
 		<div class="moin-grid" data-fit style="--min: 24rem">
 			<div class="moin-stack" data-gap="3" data-fill>
 				@components.Terminal(components.TerminalProps{Title: "~ — moin backups my-app", Lines: homeBackups, Wrap: true})
-				<p class="moin-small moin-muted">SQLite and Postgres. A copy before every deploy.</p>
 			</div>
 			<div class="moin-stack" data-gap="3" data-fill>
 				@homeChat()
-				<p class="moin-small moin-muted">A dead server can't tell you. A watcher can.</p>
 			</div>
 		</div>
 		@homeMore("/docs/backups", "How backups work")
@@ -193,10 +191,6 @@ templ homeAlert(title, text, at string) {
 templ HomeNobodyGetsIn() {
 	<section id="security" class="moin-band">
 		@homeHead("Zero trust deploys.", "No dashboard holds a key to your server. Not even ours.")
-		<div class="moin-row" data-center data-wrap data-gap="2">
-			@components.Chip("Tailscale")
-			@components.Chip("Cloudflare Tunnel")
-		</div>
 		@components.Card(components.CardProps{}) {
 			@homeRoads()
 			@homeRoadsTall()
@@ -205,11 +199,10 @@ templ HomeNobodyGetsIn() {
 			@components.Feature(components.FeatureProps{Icon: "shield", Title: "No open ports", Note: "Only 80 and 443. SSH closes after the first deploy."})
 			@components.Feature(components.FeatureProps{Icon: "route", Title: "SSH over Tailscale", Note: "In your tailnet, built in."})
 			@components.Feature(components.FeatureProps{Icon: "cloud", Title: "Cloudflare Tunnel", Note: "Visitors through a tunnel. No port at all."})
-			@components.Feature(components.FeatureProps{Icon: "ban", Title: "Nothing of moin listens", Note: "It counts every knock."})
+			@components.Feature(components.FeatureProps{Icon: "ban", Title: "Nothing of moin listens", Note: "It counts every knock. 0 bytes sent to us."})
 			@components.Feature(components.FeatureProps{Icon: "refresh", Title: "No surprise updates", Note: "Your server updates when you say so."})
-			@components.Feature(components.FeatureProps{Icon: "eye", Title: "A hacked watcher can't command", Note: "It can read. It can't command."})
+			@components.Feature(components.FeatureProps{Icon: "eye", Title: "A hacked watcher is harmless", Note: "It can read. It can't command."})
 		}
-		@components.Fact(components.FactProps{Name: "0 bytes", Note: "Sent to us by the free software. Read the source.", Href: layouts.GitHubURL})
 		@homeMore("/docs/security", "Security in detail")
 	</section>
 }
@@ -297,9 +290,9 @@ templ homeRoadsTall() {
 // homeBlog is the newest posts of the blog, as the list /blog shows.
 templ homeBlog(posts []service.BlogPost) {
 	<section id="blog" class="moin-band">
-		@homeHead("Latest writing.", "Short posts on running your own apps.")
+		@homeHead("From the blog.", "Short posts on running your own apps.")
 		@blogList(posts)
-		@homeMore("/blog", "See all")
+		@homeMore("/blog", "All posts")
 	</section>
 }
 

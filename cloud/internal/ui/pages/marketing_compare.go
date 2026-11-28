@@ -27,17 +27,17 @@ func homeCompare() components.CompareProps {
 	for _, row := range rows {
 		p.Rows = append(p.Rows, compare.Rows[row].Label)
 	}
-	column := func(name, href string, featured bool, cell func(row int) compare.Cell) components.CompareColumn {
-		col := components.CompareColumn{Name: name, Href: href, Featured: featured}
+	column := func(name string, featured bool, cell func(row int) compare.Cell) components.CompareColumn {
+		col := components.CompareColumn{Name: name, Featured: featured}
 		for _, row := range rows {
 			c := cell(row)
-			col.Cells = append(col.Cells, components.CompareCell{Mark: string(c.Mark), Href: c.Source, Title: c.Short})
+			col.Cells = append(col.Cells, components.CompareCell{Mark: string(c.Mark), Title: c.Short})
 		}
 		return col
 	}
-	p.Columns = append(p.Columns, column(brand.Name, "", true, func(row int) compare.Cell { return compare.Rows[row].Ours }))
+	p.Columns = append(p.Columns, column(brand.Name, true, func(row int) compare.Cell { return compare.Rows[row].Ours }))
 	for _, competitor := range compare.Competitors {
-		p.Columns = append(p.Columns, column(competitor.Name, "/compare/"+competitor.Slug, false, func(row int) compare.Cell { return competitor.Cells[row] }))
+		p.Columns = append(p.Columns, column(competitor.Name, false, func(row int) compare.Cell { return competitor.Cells[row] }))
 	}
 	return p
 }

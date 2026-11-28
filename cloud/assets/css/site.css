@@ -1862,6 +1862,14 @@
     line-height: 2.5rem;
     overflow-wrap: anywhere;
   }
+  /* In a Card the stats run to its top and sides, one surface with what
+     follows, a hairline between. */
+  .moin-card > .moin-stats {
+    margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .moin-card > .moin-stats + * { margin-block-start: calc(-1 * var(--space-2)); }
   .moin-stat-value > small {
     color: var(--muted-foreground);
     font-size: 1.25rem;

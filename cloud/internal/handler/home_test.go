@@ -43,7 +43,7 @@ func TestHomeBlog(t *testing.T) {
 		}
 		last = at
 	}
-	if !strings.Contains(body, `<a href="/blog" class="moin-link moin-foreground">See all</a>`) {
+	if !strings.Contains(body, `<a href="/blog" class="moin-link moin-foreground">All posts</a>`) {
 		t.Error("no link to /blog")
 	}
 }

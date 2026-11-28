@@ -55,6 +55,9 @@ templ CloudPlan(p CloudPlanProps) {
 				@components.Item(components.ItemProps{Name: "Copies your servers can't delete"}) {
 					@onOff(plan.AlertsOn)
 				}
+				@components.Item(components.ItemProps{Name: "Billing"}) {
+					<span class="moin-item-value">Stripe, for businesses. Cancel any time.</span>
+				}
 				@components.Item(components.ItemProps{Name: "Servers"}) {
 					<span class="moin-item-value">{ strconv.Itoa(p.Servers) }</span>
 				}
@@ -71,7 +74,6 @@ templ CloudPlan(p CloudPlanProps) {
 				}
 			</div>
 		}
-		<p class="moin-small moin-muted">For businesses. Stripe sells it and sends the invoice. Cancel any time.</p>
 	}
 }
 

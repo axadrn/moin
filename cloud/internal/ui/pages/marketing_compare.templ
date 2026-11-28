@@ -14,9 +14,8 @@ import (
 // the others do more stays in: it makes the others believable.
 templ HomeCompare() {
 	<section id="compare" class="moin-band">
-		@homeHead("Next to the others.", "Fact by fact, from their own docs.")
+		@homeHead("Next to the others.", "Fact by fact. From their own docs.")
 		@components.Compare(homeCompare())
-		<p class="moin-small moin-muted moin-center">uncloud and Kamal run an app on several servers, without downtime. { brand.Name } runs it on one.</p>
 		@homeMore("/compare", "Every fact, with its source")
 	</section>
 }

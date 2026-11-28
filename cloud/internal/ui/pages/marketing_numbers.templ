@@ -4,7 +4,6 @@ import (
 	"github.com/axadrn/moin/cloud/internal/brand"
 	"github.com/axadrn/moin/cloud/internal/counts"
 	"github.com/axadrn/moin/cloud/internal/ui/components"
-	"github.com/axadrn/moin/cloud/internal/ui/layouts"
 	"github.com/axadrn/moin/internal/human"
 	"strconv"
 )
@@ -45,7 +44,7 @@ func numberRows(t counts.Totals) []numberRow {
 templ homeNumbers(n HomeNumbers) {
 	{{ rows := numberRows(n.Totals) }}
 	<section id="numbers" class="moin-band">
-		@homeHead("Counted, not guessed.", "No telemetry. These are all the numbers we have.")
+		@homeHead("Counted. Not guessed.", "No telemetry. These are all the numbers we have.")
 		if n.Sample {
 			<div class="moin-row" data-center>
 				@components.Chip("Sample data · development only")
@@ -54,12 +53,12 @@ templ homeNumbers(n HomeNumbers) {
 		@components.Stats() {
 			if n.Stars != "" {
 				@components.Stat(components.StatProps{Label: "Stars", Value: n.Stars}) {
-					<a href={ templ.SafeURL(layouts.GitHubURL) } class="moin-link">On GitHub.</a>
+					On GitHub.
 				}
 			}
 			if n.Downloads > 0 {
 				@components.Stat(components.StatProps{Label: "Downloads", Value: human.Count(n.Downloads)}) {
-					<a href={ templ.SafeURL(layouts.GitHubURL + "/releases") } class="moin-link">Of every release, on GitHub.</a>
+					Of every release, on GitHub.
 				}
 			}
 			if n.Totals.Servers > 0 {

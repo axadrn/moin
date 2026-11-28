@@ -1,15 +1,9 @@
 package pages
 
-import (
-	"github.com/axadrn/moin/cloud/internal/brand"
-	"github.com/axadrn/moin/cloud/internal/tweets"
-)
+import "github.com/axadrn/moin/cloud/internal/tweets"
 
 // Posts from X say the problem; moin is the answer. Nobody in them talks
 // about moin, and the page never says they do.
-
-// homeAnswer is the answer under the posts.
-var homeAnswer = "That's why " + brand.Name + " closes the door after your first deploy."
 
 // ---------------------------------------------------------------- home
 // HomeVoices is the section after the hero: the posts in one row that
@@ -35,9 +29,6 @@ templ HomeVoices(posts []tweets.Tweet) {
 					}
 				</div>
 			</div>
-		</div>
-		<div class="moin-page">
-			<p class="moin-text moin-muted moin-center">{ homeAnswer }</p>
 		</div>
 	</section>
 }

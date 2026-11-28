@@ -158,6 +158,10 @@ Short, concrete, active. Say what happens: "Deploy v4 of blog is live", not
 "Your deployment has been successfully completed". Show the command people
 type next.
 
+Titles and subtitles carry no commas. Short sentences with full stops:
+"Deploy anything. Lose nothing." A section has one title and at most one
+short subtitle.
+
 Who speaks:
 
 - Blog: Axel writes it, as "I", with his name as the author.
