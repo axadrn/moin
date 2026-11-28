@@ -37,8 +37,8 @@ func TestPostgresImage(t *testing.T) {
 
 // TestDatabasesFindsPostgres: a service that runs Postgres is a database,
 // keyed postgres-<service>, after the SQLite files, and so is one that
-// runs MySQL or MariaDB, keyed mysql-<service>; MongoDB is seen and cannot
-// be backed up.
+// runs MySQL or MariaDB, keyed mysql-<service>, or MongoDB, keyed
+// mongo-<service>.
 func TestDatabasesFindsPostgres(t *testing.T) {
 	dir := t.TempDir()
 	composeJSON := filepath.Join(dir, "compose.json")
@@ -54,16 +54,17 @@ func TestDatabasesFindsPostgres(t *testing.T) {
 	want := []protocol.Database{
 		{Path: "postgres-analytics", Kind: "postgres", Service: "analytics"},
 		{Path: "postgres-db", Kind: "postgres", Service: "db"},
+		{Path: "mongo-docs", Kind: "mongo", Service: "docs"},
 		{Path: "mysql-legacy", Kind: "mysql", Service: "legacy"},
 		{Path: "mysql-wiki", Kind: "mysql", Service: "wiki"},
 	}
 	if !reflect.DeepEqual(found, want) {
 		t.Errorf("found %+v, want %+v", found, want)
 	}
-	if protocol.CopyFile("x", found[0].Kind, false) != "copies/x.dump.age" || protocol.CopyFile("x", found[2].Kind, false) != "copies/x.sql.gz.age" || protocol.CopyFile("x", "", true) != "copies/x.db.gz" {
+	if protocol.CopyFile("x", found[0].Kind, false) != "copies/x.dump.age" || protocol.CopyFile("x", found[3].Kind, false) != "copies/x.sql.gz.age" || protocol.CopyFile("x", found[2].Kind, false) != "copies/x.archive.gz.age" || protocol.CopyFile("x", "", true) != "copies/x.db.gz" {
 		t.Error("copy file endings")
 	}
-	if len(noBackup) != 1 || noBackup[0].Path != "mongo-docs" {
+	if len(noBackup) != 0 {
 		t.Errorf("cannot back up %+v", noBackup)
 	}
 }

@@ -46,30 +46,36 @@ func TestOpenCopy(t *testing.T) {
 	rows := strings.Repeat("rows ", 20000)
 	sqlite := encryptedCopy(t, sqliteStart+rows, true, yours)
 	postgres := encryptedCopy(t, postgresStart+rows, false, yours)
-	if err := openCopy(bytes.NewReader(sqlite), false, yours); err != nil {
+	if err := openCopy(bytes.NewReader(sqlite), "", yours); err != nil {
 		t.Errorf("a SQLite copy: %v", err)
 	}
-	if err := openCopy(bytes.NewReader(postgres), true, yours); err != nil {
+	if err := openCopy(bytes.NewReader(postgres), "postgres", yours); err != nil {
 		t.Errorf("a Postgres copy: %v", err)
 	}
 	for _, start := range []string{"-- MySQL dump 10.13\n", "/*M!999999\\- enable the sandbox mode */\n"} {
-		if err := openCopy(bytes.NewReader(encryptedCopy(t, start+rows, true, yours)), false, yours); err != nil {
+		if err := openCopy(bytes.NewReader(encryptedCopy(t, start+rows, true, yours)), "mysql", yours); err != nil {
 			t.Errorf("a MySQL copy that starts %q: %v", start, err)
 		}
 	}
-	if err := openCopy(bytes.NewReader(encryptedCopy(t, "an error page that is long enough", true, yours)), false, yours); err == nil {
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "\x6d\xe2\x99\x81"+rows, true, yours)), "mongo", yours); err != nil {
+		t.Errorf("a MongoDB copy: %v", err)
+	}
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "short", true, yours)), "mongo", yours); err == nil {
+		t.Error("a few bytes that are no database passed")
+	}
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "an error page that is long enough", true, yours)), "mysql", yours); err == nil {
 		t.Error("gzipped text that is no database passed")
 	}
-	if err := openCopy(bytes.NewReader(sqlite), false, other); err == nil || !strings.Contains(err.Error(), "the key does not open this copy") {
+	if err := openCopy(bytes.NewReader(sqlite), "", other); err == nil || !strings.Contains(err.Error(), "the key does not open this copy") {
 		t.Errorf("another key: %v", err)
 	}
-	if err := openCopy(bytes.NewReader(sqlite[:len(sqlite)/2]), false, yours); err == nil {
+	if err := openCopy(bytes.NewReader(sqlite[:len(sqlite)/2]), "", yours); err == nil {
 		t.Error("half a copy passed")
 	}
-	if err := openCopy(bytes.NewReader(postgres[:len(postgres)-1]), true, yours); err == nil {
+	if err := openCopy(bytes.NewReader(postgres[:len(postgres)-1]), "postgres", yours); err == nil {
 		t.Error("a copy cut short by one byte passed")
 	}
-	if err := openCopy(bytes.NewReader(encryptedCopy(t, "an error page", false, yours)), true, yours); err == nil {
+	if err := openCopy(bytes.NewReader(encryptedCopy(t, "an error page", false, yours)), "postgres", yours); err == nil {
 		t.Error("something that is no database passed")
 	}
 }

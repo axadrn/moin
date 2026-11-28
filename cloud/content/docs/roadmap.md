@@ -10,7 +10,7 @@ moin is in beta. It runs real sites today. There are no dates.
 ## Now
 
 - **Deploy** over SSH, with your key. From your folder, an image from your registry or your laptop, or the catalog. A failed deploy brings the last good one back. [Deploy](/docs/deploy)
-- **Backups** of every SQLite, Postgres, MySQL and MariaDB database into your own bucket. Every day one copy is restored and read. Restore, and undo a restore. [Backups](/docs/backups)
+- **Backups** of every SQLite, Postgres, MySQL, MariaDB and MongoDB database into your own bucket. Every day one copy is restored and read. Restore, and undo a restore. [Backups](/docs/backups)
 - **A watcher** on another server. It knows your apps by itself, and alerts when a server goes silent or a domain is down. [Watcher](/docs/watcher)
 - **Updates you run**: no update ever runs by itself. Each release is signed. [Security](/docs/security#updates)
 - **The team**: the SSH keys on the server. [The team](/docs/security#the-team)

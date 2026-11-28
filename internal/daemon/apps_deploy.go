@@ -471,12 +471,8 @@ func (a *apps) afterStart(ctx context.Context, release *release) {
 // logDatabases tells the deploy log what moin backs up and what it cannot.
 func logDatabases(detected protocol.Detected, logf func(string, ...any)) {
 	for _, database := range detected.Databases {
-		if database.Postgres() {
-			logf("database %s (Postgres, service %s)", database.Path, database.Service)
-			continue
-		}
-		if database.MySQL() {
-			logf("database %s (MySQL, service %s)", database.Path, database.Service)
+		if database.Service != "" {
+			logf("database %s (%s, service %s)", database.Path, database.Engine(), database.Service)
 			continue
 		}
 		logf("database %s (%s)", database.Path, database.HostPath)

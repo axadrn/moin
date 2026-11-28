@@ -306,7 +306,7 @@ func ConfirmBackupKeyHere(public string) error {
 type KeyCopy struct {
 	App      string `json:"app"`
 	Database string `json:"database"`
-	Postgres bool   `json:"postgres"`
+	Kind     string `json:"kind"`
 	Copy     string `json:"copy"`
 }
 
@@ -324,7 +324,7 @@ func KeyCopyHere(ctx context.Context, dir string, out io.Writer) (*KeyCopy, erro
 		for _, database := range databases {
 			size, err := b.engine(app, database).Size(ctx)
 			if err == nil && (smallest == nil || size < smallestSize) {
-				smallest, smallestDatabase, smallestSize = &KeyCopy{App: app, Database: database.Path, Postgres: database.Postgres()}, database, size
+				smallest, smallestDatabase, smallestSize = &KeyCopy{App: app, Database: database.Path, Kind: database.Kind}, database, size
 			}
 		}
 	}

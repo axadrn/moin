@@ -66,7 +66,7 @@ func backups(ctx context.Context, args []string, stdout io.Writer) error {
 			return printJSON(stdout, databases)
 		}
 		if len(databases) == 0 {
-			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL or MariaDB service.")
+			fmt.Fprintln(stdout, app+" has no database "+build.Name+" can copy: no SQLite file on a volume, no Postgres, MySQL, MariaDB or MongoDB service.")
 			return nil
 		}
 		copies := false
@@ -406,7 +406,7 @@ func fetchAndOpen(ctx context.Context, server string, copy daemon.KeyCopy, key a
 		line := hereLine("bucket", "key", "send", copy.App, "--database", copy.Database, "--copy", copy.Copy)
 		writer.CloseWithError(sshRun(ctx, server, line, nil, writer, os.Stderr))
 	}()
-	return openCopy(reader, copy.Postgres, key)
+	return openCopy(reader, copy.Kind, key)
 }
 
 // The first bytes of what a copy holds: a SQLite file, or a pg_dump in
@@ -416,20 +416,26 @@ const (
 	postgresStart = "PGDMP"
 )
 
-var mysqlStarts = []string{"-- ", "/*"}
+// copyStarts are the first bytes of what a copy of each kind holds, once
+// it is decrypted and, but for Postgres, unzipped: a SQLite file, a
+// pg_dump, a dump of MySQL or MariaDB, which starts with a comment, or an
+// archive of mongodump.
+var copyStarts = map[string][]string{
+	"":                        {sqliteStart},
+	protocol.DatabasePostgres: {postgresStart},
+	protocol.DatabaseMySQL:    {"-- ", "/*"},
+	protocol.DatabaseMongo:    {"\x6d\xe2\x99\x81"},
+}
 
-// openCopy decrypts a copy with key and reads it to its end: a gzipped
-// SQLite file, a gzipped dump of MySQL or MariaDB, or a dump of Postgres.
-// Every part of it is checked on the way, so a copy that is cut short or
-// changed does not pass.
-func openCopy(encrypted io.Reader, postgres bool, key age.Identity) error {
+// openCopy decrypts a copy of a database of kind with key and reads it to
+// its end. Every part of it is checked on the way, so a copy that is cut
+// short or changed does not pass.
+func openCopy(encrypted io.Reader, kind string, key age.Identity) error {
 	plain, err := daemon.DecryptCopy(encrypted, key)
 	if err != nil {
 		return err
 	}
-	start := postgresStart
-	if !postgres {
-		start = sqliteStart
+	if kind != protocol.DatabasePostgres {
 		if plain, err = gzip.NewReader(plain); err != nil {
 			return fmt.Errorf("what it holds is not a database: %w", err)
 		}
@@ -438,8 +444,8 @@ func openCopy(encrypted io.Reader, postgres bool, key age.Identity) error {
 	if _, err := io.ReadFull(plain, first); err != nil {
 		return fmt.Errorf("it ends before a database starts: %w", err)
 	}
-	mysql := !postgres && slices.ContainsFunc(mysqlStarts, func(start string) bool { return strings.HasPrefix(string(first), start) })
-	if string(first) != start && !mysql {
+	starts := func(start string) bool { return strings.HasPrefix(string(first[:read]), start) }
+	if !slices.ContainsFunc(copyStarts[kind], starts) {
 		return errors.New("what it holds is not a database")
 	}
 	_, err = io.Copy(io.Discard, plain)

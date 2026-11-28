@@ -45,7 +45,8 @@ import (
 //	                      the live one kept as the undo
 //
 // backup_sqlite.go copies with VACUUM INTO, backup_postgres.go with
-// pg_dump, backup_mysql.go with mysqldump or mariadb-dump.
+// pg_dump, backup_mysql.go with mysqldump or mariadb-dump,
+// backup_mongo.go with mongodump.
 type engine interface {
 	// Copy writes a full copy of the live database to w.
 	Copy(ctx context.Context, w io.Writer) error
@@ -186,11 +187,13 @@ func (b *backups) saveStates() {
 }
 
 func (b *backups) engine(app string, database protocol.Database) engine {
-	if database.Postgres() {
+	switch database.Kind {
+	case protocol.DatabasePostgres:
 		return &postgresEngine{b: b, app: app, database: database}
-	}
-	if database.MySQL() {
+	case protocol.DatabaseMySQL:
 		return &mysqlEngine{b: b, app: app, database: database}
+	case protocol.DatabaseMongo:
+		return newMongoEngine(b, app, database)
 	}
 	return &sqliteEngine{b: b, app: app, database: database}
 }

@@ -22,10 +22,11 @@ type Detected struct {
 }
 
 // Database is a database of an app: a SQLite file the daemon found on one
-// of the app's mounts, or, with Kind "postgres" or "mysql", a compose
-// service that runs Postgres, MySQL or MariaDB. Path names a SQLite file
-// in the container; for a service it is postgres-<service> or
-// mysql-<service>, and HostPath is empty. Older daemons send no Kind.
+// of the app's mounts, or, with another Kind, a compose service that runs
+// Postgres, MySQL or MariaDB, MongoDB, ClickHouse, or Redis or Valkey.
+// Path names a SQLite file in the container; for a service it is
+// <kind>-<service>, like postgres-db, and HostPath is empty. Older
+// daemons send no Kind.
 // Name is a database of a Postgres service besides the one POSTGRES_DB
 // names, which backups copy too; its Path is postgres-<service>/<name>.
 type Database struct {
@@ -58,3 +59,33 @@ func (d Database) MySQL() bool { return d.Kind == DatabaseMySQL }
 
 // MySQLKey is the name of a MySQL or MariaDB service's database in moin.
 func MySQLKey(service string) string { return "mysql-" + service }
+
+// The Kind of a MongoDB service, of a ClickHouse service, and of a Redis
+// or Valkey service that keeps its data.
+const (
+	DatabaseMongo      = "mongo"
+	DatabaseClickHouse = "clickhouse"
+	DatabaseRedis      = "redis"
+)
+
+// ServiceKey is the name of the database of a service in moin, for one of
+// the three kinds above: mongo-<service>, clickhouse-<service>,
+// redis-<service>.
+func ServiceKey(kind, service string) string { return kind + "-" + service }
+
+// Engine is what runs the database, as moin says it to people.
+func (d Database) Engine() string {
+	switch d.Kind {
+	case DatabasePostgres:
+		return "Postgres"
+	case DatabaseMySQL:
+		return "MySQL"
+	case DatabaseMongo:
+		return "MongoDB"
+	case DatabaseClickHouse:
+		return "ClickHouse"
+	case DatabaseRedis:
+		return "Redis"
+	}
+	return "SQLite"
+}

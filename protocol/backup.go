@@ -63,9 +63,9 @@ type BackupRestore struct {
 const Encrypted = ".age"
 
 // CopyFile is the copy id in the folder of a database of kind: a gzipped
-// SQLite file, a pg_dump in its custom format, or a gzipped dump of MySQL
-// or MariaDB, encrypted with age. plain names a copy from before every
-// copy was encrypted.
+// SQLite file, a pg_dump in its custom format, a gzipped dump of MySQL or
+// MariaDB, or a gzipped archive of mongodump, encrypted with age. plain
+// names a copy from before every copy was encrypted.
 func CopyFile(id, kind string, plain bool) string {
 	name := "copies/" + id + ".db.gz"
 	switch kind {
@@ -73,6 +73,8 @@ func CopyFile(id, kind string, plain bool) string {
 		name = "copies/" + id + ".dump"
 	case DatabaseMySQL:
 		name = "copies/" + id + ".sql.gz"
+	case DatabaseMongo:
+		name = "copies/" + id + ".archive.gz"
 	}
 	if plain {
 		return name

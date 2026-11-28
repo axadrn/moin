@@ -180,14 +180,7 @@ func (a *apps) deployHere(ctx context.Context, start protocol.DeployStart, out i
 	}
 	result := Result{App: start.App, Release: start.Number, From: start.FromNumber, Addresses: addresses(detected)}
 	for _, database := range detected.Databases {
-		switch {
-		case database.Postgres():
-			result.Databases = append(result.Databases, "Postgres")
-		case database.MySQL():
-			result.Databases = append(result.Databases, "MySQL")
-		default:
-			result.Databases = append(result.Databases, "SQLite")
-		}
+		result.Databases = append(result.Databases, database.Engine())
 	}
 	slices.Sort(result.Databases)
 	result.Databases = slices.Compact(result.Databases)

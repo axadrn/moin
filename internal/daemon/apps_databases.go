@@ -20,8 +20,8 @@ const noBackupText = "moin cannot back up this database"
 
 // scanDatabases finds what a release keeps its data in. The first list is
 // what moin backs up: every SQLite file on a mounted folder and every
-// Postgres, MySQL and MariaDB service. The second is what looks like a
-// database but moin cannot back up.
+// Postgres, MySQL, MariaDB and MongoDB service. The second is what looks
+// like a database but moin cannot back up.
 func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protocol.Database, []protocol.Database, error) {
 	body, err := os.ReadFile(composeJSON)
 	if err != nil {
@@ -51,9 +51,12 @@ func (a *apps) scanDatabases(ctx context.Context, composeJSON string) ([]protoco
 			databases = append(databases, protocol.Database{Path: protocol.MySQLKey(name), Kind: protocol.DatabaseMySQL, Service: name})
 			continue
 		}
-		kind := a.otherDatabase(ctx, config, service)
-		if kind != "" {
-			noBackup = append(noBackup, protocol.Database{Path: kind + "-" + name, Kind: kind, Service: name})
+		if kind := serviceDatabase(service); kind != "" {
+			databases = append(databases, protocol.Database{Path: protocol.ServiceKey(kind, name), Kind: kind, Service: name})
+			continue
+		}
+		if a.unknownPostgres(ctx, config, service) {
+			noBackup = append(noBackup, protocol.Database{Path: protocol.PostgresKey(name), Kind: protocol.DatabasePostgres, Service: name})
 		}
 	}
 	return databases, noBackup, nil
@@ -93,19 +96,15 @@ func addSQLiteFiles(databases []protocol.Database, folder, target string) []prot
 	return databases
 }
 
-// otherDatabase names the kind of database a service runs when moin
-// cannot back it up, "" when it runs none of those: a known image, or a
+// unknownPostgres says a service runs a Postgres moin cannot back up: a
 // Postgres data folder in a mount of an image moin does not know.
-func (a *apps) otherDatabase(ctx context.Context, config composeConfig, service composeService) string {
-	if plainImage(service.Image) == "mongo" {
-		return "mongo"
-	}
+func (a *apps) unknownPostgres(ctx context.Context, config composeConfig, service composeService) bool {
 	for _, mount := range service.Volumes {
 		if hasPostgresData(a.mountFolder(ctx, config, mount)) {
-			return "postgres"
+			return true
 		}
 	}
-	return ""
+	return false
 }
 
 // hasPostgresData says a Postgres keeps its data in folder, at most two
@@ -153,6 +152,17 @@ func postgresImage(image string) bool {
 func mysqlImage(image string) bool {
 	name := plainImage(image)
 	return name == "mysql" || name == "mariadb"
+}
+
+// serviceDatabase is the kind of database a service runs, for the kinds
+// besides Postgres and MySQL, "" when it runs none: the official image
+// from Docker Hub, with any tag or digest.
+func serviceDatabase(service composeService) string {
+	switch plainImage(service.Image) {
+	case "mongo":
+		return protocol.DatabaseMongo
+	}
+	return ""
 }
 
 // sqliteFiles returns the files under dir, three levels deep, that are

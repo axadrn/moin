@@ -39,7 +39,7 @@ On your server, under `/var/lib/moin/apps/<app>/volumes`, and in Docker's named 
 
 ## Does moin back up my files?
 
-No. moin backs up databases: SQLite, Postgres, MySQL and MariaDB. [Backups](/docs/backups)
+No. moin backs up databases: SQLite, Postgres, MySQL, MariaDB and MongoDB. [Backups](/docs/backups)
 
 ## Can my team deploy?
 
