@@ -73,7 +73,9 @@ they are `components.Wordmark` with `Mark`: the mark as high as the i with
 its dot, one o-counter before the m. The favicon is the mark drawn again by
 hand for 16 and 32 pixels, in ink on nothing. The app icons and the avatar
 are the mark in white on the ink. The OG image uses the same shapes. The
-story behind the name is Why moin in the FAQ.
+files to download, black and white, SVG and PNG, are in `assets/brand`,
+made from these two and shown at `/brand` with the colors, the type and
+the voice. The story behind the name is Why moin in the FAQ.
 
 ## Geometry
 

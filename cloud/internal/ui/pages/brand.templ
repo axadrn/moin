@@ -1,0 +1,320 @@
+package pages
+
+import (
+	"github.com/axadrn/moin/cloud/internal/brand"
+	"github.com/axadrn/moin/cloud/internal/ui/components"
+	"github.com/axadrn/moin/cloud/internal/ui/layouts"
+)
+
+// Brand is /brand: why the name and the mark, the files to download and how
+// to use them, the colors, the type, the parts of the site, live, and how
+// moin speaks. Everything on it is drawn from the real thing.
+templ Brand() {
+	@layouts.Home(layouts.SEOProps{
+		Title:       "Brand",
+		Description: "The " + brand.Name + " mark and wordmark as SVG and PNG. The colors, the type, the parts of the site and how " + brand.Name + " speaks.",
+		Path:        "/brand",
+	}) {
+		<main class="moin-page">
+			<section class="moin-band">
+				@components.BandHead(components.BandHeadProps{Page: true, Title: "Brand.", Line: "How " + brand.Name + " looks and speaks. Take what you need."})
+				@brandStory()
+			</section>
+			@brandMarks()
+			@brandColor()
+			@brandType()
+			@brandKit()
+			@brandVoiceRules()
+			<section class="moin-band">
+				<div class="moin-row" data-center>
+					<p class="moin-lead moin-center">Press or partnership: <span class="moin-foreground">{ brand.SupportEmail }</span></p>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+// brandStory is where the name and the mark come from, next to the mark
+// with its sun coming up.
+templ brandStory() {
+	@components.Card(components.CardProps{Roomy: true}) {
+		<div class="moin-grid moin-brand-story" data-cols="1-2">
+			<div class="moin-brand-sunrise">
+				@brandSunrise()
+			</div>
+			<div class="moin-stack" data-gap="6">
+				<h2 class="moin-title">Why { brand.Name }.</h2>
+				<p class="moin-lead" data-large>
+					<span class="moin-foreground">{ brand.Name } is how Hamburg says hello.</span>
+					In the morning. At midnight. One word for every hour.
+				</p>
+				<p class="moin-lead" data-large>
+					<span class="moin-foreground">Hamburg is a harbor.</span>
+					Boxes come in. Boxes go out. Nothing gets lost. Your apps are boxes too. { brand.Name } ships them to your server. A watcher keeps watch.
+				</p>
+				<p class="moin-lead" data-large>
+					<span class="moin-foreground">The mark is a porthole.</span>
+					A round ship window with the sun on the sea. Every time you deploy it comes up again.
+				</p>
+			</div>
+		</div>
+	}
+}
+
+// brandSunrise is the mark with its sun rising over the horizon, once,
+// when the page opens. Still with reduced motion.
+templ brandSunrise() {
+	<svg class="moin-sunrise" viewBox="0 0 24 24" role="img" aria-label={ "The " + brand.Name + " mark: the sun on the horizon in a porthole" }>
+		<defs>
+			<clipPath id="sunrise-sky">
+				<rect width="24" height="12"></rect>
+			</clipPath>
+			<mask id="sunrise-cut">
+				<rect width="24" height="24" fill="#fff"></rect>
+				<g clip-path="url(#sunrise-sky)">
+					<circle class="moin-sunrise-sun" cx="12" cy="12" r="8" fill="#000"></circle>
+				</g>
+			</mask>
+		</defs>
+		<circle cx="12" cy="12" r="12" fill="currentColor" mask="url(#sunrise-cut)"></circle>
+	</svg>
+}
+
+// brandMark is the mark in the color of the text, Size high.
+templ brandMark(size string) {
+	<svg viewBox="0 0 24 24" height={ size } width={ size } fill="currentColor" aria-hidden="true">
+		<path fill-rule="evenodd" d={ brandMarkPath }></path>
+	</svg>
+}
+
+// brandMarks are the files of assets/brand on their grounds, how much room
+// they need, how small they go, and what never to do with them.
+templ brandMarks() {
+	<section id="logo" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Logo.", Line: "Black on light. White on dark. Use the files as they are."})
+		for _, d := range brandDrawings {
+			<div class="moin-grid" data-cols="2">
+				@components.Ground(components.GroundProps{Scheme: "light", Caption: d.Name + " on light", Files: brandFiles(d.File, "black")}) {
+					<img src={ components.AssetURL("/assets/brand/" + d.File + "-black.svg") } alt={ brand.Name + " " + d.Name + " in black" }/>
+				}
+				@components.Ground(components.GroundProps{Scheme: "dark", Caption: d.Name + " on dark", Files: brandFiles(d.File, "white")}) {
+					<img src={ components.AssetURL("/assets/brand/" + d.File + "-white.svg") } alt={ brand.Name + " " + d.Name + " in white" }/>
+				}
+			</div>
+		}
+		<div class="moin-grid" data-cols="2">
+			@components.Ground(components.GroundProps{Caption: "Room around it: half the mark"}) {
+				@brandClearSpace()
+			}
+			@components.Ground(components.GroundProps{Caption: "Never smaller than 16 px"}) {
+				<div class="moin-row" data-gap="8" data-baseline>
+					for _, size := range []string{"16", "24", "32", "48"} {
+						<div class="moin-stack" data-gap="3" data-center>
+							@brandMark(size)
+							<span class="moin-small moin-mono moin-muted">{ size } px</span>
+						</div>
+					}
+				</div>
+			}
+		</div>
+		<div class="moin-bento">
+			@components.Ground(components.GroundProps{Caption: "Don't stretch it", Verdict: "no"}) {
+				<svg viewBox="0 0 24 24" preserveAspectRatio="none" width="112" height="48" fill="currentColor" aria-hidden="true">
+					<path fill-rule="evenodd" d={ brandMarkPath }></path>
+				</svg>
+			}
+			@components.Ground(components.GroundProps{Caption: "Don't recolor it", Verdict: "no"}) {
+				<svg viewBox="0 0 24 24" width="80" height="80" fill="var(--running)" aria-hidden="true">
+					<path fill-rule="evenodd" d={ brandMarkPath }></path>
+				</svg>
+			}
+			@components.Ground(components.GroundProps{Caption: "Don't add effects", Verdict: "no"}) {
+				<svg viewBox="-6 -6 36 36" width="104" height="104" fill="currentColor" aria-hidden="true">
+					<defs>
+						<filter id="brand-glow" x="-50%" y="-50%" width="200%" height="200%">
+							<feDropShadow dx="1.5" dy="2" stdDeviation="1.5" flood-color="currentColor" flood-opacity="0.45"></feDropShadow>
+						</filter>
+					</defs>
+					<path fill-rule="evenodd" d={ brandMarkPath } filter="url(#brand-glow)" transform="rotate(-14 12 12)"></path>
+				</svg>
+			}
+			@components.Ground(components.GroundProps{Caption: "Don't change the font", Verdict: "no"}) {
+				<span class="moin-brand-wrong-font">{ brand.Name }.</span>
+			}
+		</div>
+	</section>
+}
+
+// brandClearSpace draws the room the mark needs: half its width on every
+// side, as a dashed line around it.
+templ brandClearSpace() {
+	<svg class="moin-brand-space" viewBox="0 0 160 120" width="192" height="144" aria-hidden="true">
+		<rect x="32.5" y="12.5" width="95" height="95" rx="4" fill="none" stroke="currentColor" stroke-dasharray="3 3" opacity="0.45"></rect>
+		<rect x="56.5" y="36.5" width="47" height="47" fill="none" stroke="currentColor" opacity="0.2"></rect>
+		<g transform="translate(56.5 36.5) scale(1.9583)">
+			<path fill="currentColor" fill-rule="evenodd" d={ brandMarkPath }></path>
+		</g>
+		<g fill="currentColor" font-family="var(--font-mono)" font-size="10" text-anchor="middle" opacity="0.6">
+			<text x="44.5" y="63">½</text>
+			<text x="115.5" y="63">½</text>
+			<text x="80" y="27">½</text>
+			<text x="80" y="99">½</text>
+		</g>
+	</svg>
+}
+
+// brandColor is every color of the theme, light and dark, then the four
+// that say a state.
+templ brandColor() {
+	<section id="color" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Color.", Line: "Black and white. Color only says how things are."})
+		<div class="moin-bento">
+			for _, swatch := range brandNeutrals {
+				@components.Swatch(swatch)
+			}
+		</div>
+		<div class="moin-bento">
+			for _, swatch := range brandStates {
+				@components.Swatch(swatch)
+			}
+		</div>
+	</section>
+}
+
+// brandType is the two fonts and the type scale, set live.
+templ brandType() {
+	<section id="type" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Type.", Line: "Geist for words. Geist Mono for the terminal."})
+		<div class="moin-grid" data-cols="2">
+			@components.Card(components.CardProps{}) {
+				<span class="moin-huge moin-brand-glyphs">Aa</span>
+				<div class="moin-stack" data-gap="1">
+					<span class="moin-heading">Geist</span>
+					<span class="moin-text moin-muted">Every word. From the display to the smallest note.</span>
+				</div>
+			}
+			@components.Card(components.CardProps{}) {
+				<span class="moin-huge moin-mono moin-brand-glyphs">$_</span>
+				<div class="moin-stack" data-gap="1">
+					<span class="moin-heading">Geist Mono</span>
+					<span class="moin-text moin-muted">The terminal. Commands and code.</span>
+				</div>
+			}
+		</div>
+		@components.Card(components.CardProps{}) {
+			@components.Specimen(components.SpecimenProps{Name: "Display", Note: "Geist 800 · up to 92 px"}) {
+				<span class="moin-display">Deploy anything.</span>
+			}
+			@components.Specimen(components.SpecimenProps{Name: "Statement", Note: "Geist 600 · 48 px"}) {
+				<span class="moin-statement">Lose nothing.</span>
+			}
+			@components.Specimen(components.SpecimenProps{Name: "Title", Note: "Geist 600 · 30 px"}) {
+				<span class="moin-title">Your servers</span>
+			}
+			@components.Specimen(components.SpecimenProps{Name: "Lead", Note: "Geist 400 · 18 px"}) {
+				<span class="moin-lead">Every backup proven. Every day.</span>
+			}
+			@components.Specimen(components.SpecimenProps{Name: "Body", Note: "Geist 400 · 16 px"}) {
+				<span>{ brand.Name } restores the newest copy every morning and reads it.</span>
+			}
+			@components.Specimen(components.SpecimenProps{Name: "Small", Note: "Geist 400 · 12 px"}) {
+				<span class="moin-small moin-muted">30 days free. No card.</span>
+			}
+			@components.Specimen(components.SpecimenProps{Name: "Mono", Note: "Geist Mono 400 · 14 px"}) {
+				<span class="moin-text moin-mono">$ { brand.Name } deploy my-server</span>
+			}
+		}
+		@components.More(components.MoreProps{Href: "https://vercel.com/font", Text: "Get Geist"})
+	</section>
+}
+
+// brandKit is the parts every page is built from, rendered by the real
+// components.
+templ brandKit() {
+	<section id="kit" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "The kit.", Line: "The real parts. Not pictures of them."})
+		<div class="moin-grid" data-cols="2">
+			@components.Card(components.CardProps{Title: "Buttons"}) {
+				<div class="moin-row" data-gap="2" data-wrap>
+					@components.Button(components.ButtonProps{Kind: components.Primary, Href: "/docs/getting-started"}) {
+						Get started
+					}
+					@components.Button(components.ButtonProps{Href: layouts.GitHubURL}) {
+						@components.Icon("git-hub")
+						Star on GitHub
+					}
+					@components.Button(components.ButtonProps{Quiet: true, Href: "/docs"}) {
+						Docs
+					}
+					@components.Button(components.ButtonProps{Href: "/search", Icon: true, Attrs: templ.Attributes{"data-site-search-open": true, "aria-label": "Search"}}) {
+						@components.Icon("search")
+					}
+				</div>
+			}
+			@components.Card(components.CardProps{Title: "Status"}) {
+				<div class="moin-row" data-gap="2" data-wrap>
+					@components.Status(components.StatusProps{State: components.StateLive, Text: "live"})
+					@components.Status(components.StatusProps{State: components.StateRunning, Text: "deploying"})
+					@components.Status(components.StatusProps{State: components.StateFailed, Text: "failed"})
+					@components.Status(components.StatusProps{State: components.StateIdle, Text: "new"})
+					@components.Chip("Launch price")
+				</div>
+			}
+		</div>
+		<div class="moin-grid" data-cols="2">
+			@components.Fact(components.FactProps{Name: "Every backup proven", Note: "Restored and read every day.", Href: "/docs/backups"})
+			@components.Fact(components.FactProps{Name: "No open ports", Note: "Only 80 and 443.", Href: "/docs/security"})
+		</div>
+		@components.Compare(brandCompare())
+		@components.Terminal(components.TerminalProps{Title: "~ — " + brand.Name + " backups my-app", Lines: homeBackups, Wrap: true})
+		@components.Stats() {
+			@components.Stat(components.StatProps{Label: "Brand colors", Value: "1"}) {
+				The ink.
+			}
+			@components.Stat(components.StatProps{Label: "Status colors", Value: "4"}) {
+				Live. Running. Failed. Idle.
+			}
+			@components.Stat(components.StatProps{Label: "Accent colors", Value: "0"}) {
+				Not one.
+			}
+			@components.Stat(components.StatProps{Label: "Fonts", Value: "2"}) {
+				Geist and Geist Mono.
+			}
+		}
+		@components.Card(components.CardProps{Title: "Space in pixels"}) {
+			@components.Bars(brandSpaceBars())
+		}
+		@components.More(components.MoreProps{Href: layouts.GitHubURL + "/tree/main/cloud/internal/ui/components", Text: "The parts on GitHub"})
+	</section>
+}
+
+// brandVoiceRules is how moin speaks: each rule with what it sounds like
+// and what it never does.
+templ brandVoiceRules() {
+	<section id="voice" class="moin-band">
+		@components.BandHead(components.BandHeadProps{Title: "Voice.", Line: "Say it short. Say it plain."})
+		@components.Card(components.CardProps{}) {
+			@components.Rows(components.RowsProps{Head: []string{"Rule", "Do", "Don't"}, Top: true}) {
+				for _, rule := range brandVoice {
+					@components.Row(components.RowProps{}) {
+						@components.Cell() {
+							<span class="moin-strong">{ rule.Rule }</span>
+						}
+						@components.Cell() {
+							<span class="moin-row" data-gap="2" data-top>
+								@components.Mark(components.MarkProps{Kind: "yes"})
+								<span>{ rule.Do }</span>
+							</span>
+						}
+						@components.Cell() {
+							<span class="moin-row" data-gap="2" data-top>
+								@components.Mark(components.MarkProps{Kind: "no"})
+								<span>{ rule.Dont }</span>
+							</span>
+						}
+					}
+				}
+			}
+		}
+	</section>
+}

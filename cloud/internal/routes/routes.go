@@ -56,6 +56,7 @@ func New(cfg *config.Config, cloud *handler.Cloud) (http.Handler, error) {
 	mux.HandleFunc("GET /catalog/{slug}/logo", catalogPages.Logo)
 	mux.HandleFunc("GET /compare", handler.CompareIndex)
 	mux.HandleFunc("GET /compare/{name}", handler.Compare)
+	mux.HandleFunc("GET /brand", handler.Brand)
 	mux.HandleFunc("GET /legal/{page}", handler.Legal(texts))
 	// The script that installs moin. The binary comes from the newest
 	// release on GitHub, like every download of moin.

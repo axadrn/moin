@@ -2598,3 +2598,112 @@
     .moin-feature > .moin-stack { align-items: center; }
   }
 }
+
+@layer moin-components {
+  /* A drawing on its ground: light, dark, or the page's own. A ground with a
+     scheme keeps it whatever the page's theme, so the kit inside it too. */
+  .moin-ground {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px var(--border);
+    overflow: hidden;
+  }
+  [data-scheme="light"] { color-scheme: light; }
+  [data-scheme="dark"] { color-scheme: dark; }
+  .moin-ground[data-scheme="dark"] { background: var(--background); }
+  .moin-ground-art {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    min-height: 13rem;
+    padding: var(--space-8) var(--pad);
+  }
+  .moin-ground-art > img { height: 4.5rem; max-width: 80%; object-fit: contain; }
+  .moin-ground-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: calc(var(--press) + 2 * var(--space-3));
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  @media (max-width: 39.99rem) {
+    .moin-ground-art { min-height: 10rem; }
+    .moin-ground-art > img { height: 3.5rem; }
+  }
+
+  /* A color, light and dark side by side, each drawn from its token. */
+  .moin-swatch {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-2) var(--space-2) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+  }
+  .moin-swatch-chips,
+  .moin-swatch-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  /* The outline is drawn over both halves, so a white half shows on a white
+     card. */
+  .moin-swatch-chips {
+    height: 6rem;
+    overflow: hidden;
+    border-radius: calc(var(--radius-lg) - var(--space-2));
+    outline: 1px solid var(--border);
+    outline-offset: -1px;
+  }
+  .moin-swatch-chips > span { background: var(--swatch); }
+  .moin-swatch-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-inline: var(--space-3);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .moin-swatch-values { font-size: 0.75rem; line-height: 1rem; }
+  @media (max-width: 39.99rem) {
+    .moin-swatch-chips { height: 4rem; }
+    .moin-swatch-text { padding-inline: var(--space-2); }
+  }
+
+  /* One size of type: its name and setting, then the size, live. */
+  .moin-specimen {
+    display: grid;
+    gap: var(--space-3);
+    padding-block: var(--space-6);
+    border-top: 1px solid var(--border);
+  }
+  .moin-specimen:first-child { border-top: 0; padding-block-start: 0; }
+  .moin-specimen:last-child { padding-block-end: 0; }
+  .moin-specimen-sample { min-width: 0; overflow-wrap: break-word; }
+  @media (min-width: 48rem) {
+    .moin-specimen { grid-template-columns: 12rem minmax(0, 1fr); align-items: center; gap: var(--space-6); }
+  }
+}
+
+/* The brand page: the mark with its sun coming up, the glyphs of the two
+   fonts, and the wordmark set in a font it must never be set in. */
+.moin-brand-story { align-items: center; gap: var(--space-8); }
+.moin-brand-sunrise { display: grid; place-items: center; }
+.moin-sunrise { width: min(100%, 15rem); height: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .moin-sunrise-sun { animation: moin-sunrise 2.4s var(--ease) 0.3s both; }
+}
+@keyframes moin-sunrise {
+  from { transform: translateY(8px); }
+}
+.moin-brand-glyphs { font-weight: 600; letter-spacing: -0.04em; }
+.moin-brand-wrong-font { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 3rem; line-height: 1; }

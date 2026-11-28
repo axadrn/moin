@@ -1,0 +1,98 @@
+package components
+
+// The parts of a brand page: a drawing on its ground, a color, and a line
+// of type.
+
+// Download is one file of a Ground: what the button says, where the file
+// is, and the name it saves as.
+type Download struct {
+	Label string
+	Href  string
+	Name  string
+}
+
+// GroundProps is a Ground. Scheme is "light" or "dark" to show the drawing
+// on that ground whatever the page's theme, empty for the page's own.
+// Caption names it, Verdict "no" marks it as what not to do. Files are
+// its downloads.
+type GroundProps struct {
+	Scheme  string
+	Caption string
+	Verdict string
+	Files   []Download
+}
+
+// Ground shows a drawing, its children, in the middle of a ground, with a
+// caption and its downloads under it.
+templ Ground(p GroundProps) {
+	<figure class="moin-ground" data-scheme={ p.Scheme }>
+		<div class="moin-ground-art">
+			{ children... }
+		</div>
+		<figcaption class="moin-ground-foot">
+			<span class="moin-row" data-gap="2">
+				if p.Verdict != "" {
+					@Mark(MarkProps{Kind: p.Verdict})
+				}
+				<span>{ p.Caption }</span>
+			</span>
+			if len(p.Files) > 0 {
+				<span class="moin-row" data-gap="2">
+					for _, file := range p.Files {
+						@Button(ButtonProps{Href: file.Href, Attrs: templ.Attributes{"download": file.Name, "aria-label": "Download " + file.Name}}) {
+							{ file.Label }
+						}
+					}
+				</span>
+			}
+		</figcaption>
+	</figure>
+}
+
+// SwatchProps is a Swatch: its name, the token in site.css without the
+// dashes, and its value in the light and in the dark theme.
+type SwatchProps struct {
+	Name  string
+	Token string
+	Light string
+	Dark  string
+}
+
+// Swatch is one color of the theme, light and dark side by side, each
+// drawn from the token itself.
+templ Swatch(p SwatchProps) {
+	<figure class="moin-swatch" style={ templ.SafeCSS("--swatch:var(--" + p.Token + ")") }>
+		<div class="moin-swatch-chips" aria-hidden="true">
+			<span data-scheme="light"></span>
+			<span data-scheme="dark"></span>
+		</div>
+		<figcaption class="moin-swatch-text">
+			<span class="moin-strong">{ p.Name }</span>
+			<span class="moin-mono moin-muted">{ "--" + p.Token }</span>
+			<span class="moin-swatch-values moin-mono moin-muted">
+				<span>{ p.Light }</span>
+				<span>{ p.Dark }</span>
+			</span>
+		</figcaption>
+	</figure>
+}
+
+// SpecimenProps is a Specimen: the name of a size and how it is set.
+type SpecimenProps struct {
+	Name string
+	Note string
+}
+
+// Specimen is one size of type: its name and how it is set, then the
+// size itself, live, as children. A few in a Card make a type scale.
+templ Specimen(p SpecimenProps) {
+	<div class="moin-specimen">
+		<div class="moin-stack" data-gap="1">
+			<span class="moin-strong">{ p.Name }</span>
+			<span class="moin-small moin-mono moin-muted">{ p.Note }</span>
+		</div>
+		<div class="moin-specimen-sample">
+			{ children... }
+		</div>
+	</div>
+}
