@@ -102,7 +102,7 @@ func needsOf(state string, tailnet Tailnet, now time.Time) []tailnetNeed {
 	if state != "Running" {
 		return []tailnetNeed{{
 			key:     "tailnet/down",
-			title:   "Tailscale does not run, and SSH only comes through it",
+			title:   "Tailscale does not run. SSH only comes through it",
 			text:    "In your provider's web console, start it with `tailscale up`, or open port 22 with `" + installedPath + " unlock`.",
 			command: "tailscale up",
 		}}
@@ -110,7 +110,7 @@ func needsOf(state string, tailnet Tailnet, now time.Time) []tailnetNeed {
 	if !tailnet.KeyExpiry.IsZero() && tailnet.KeyExpiry.Sub(now) < keyExpiryWarning {
 		return []tailnetNeed{{
 			key:     "tailnet/key",
-			title:   "the Tailscale key expires on " + tailnet.KeyExpiry.Format("January 2") + ", then SSH through the tailnet stops",
+			title:   "the Tailscale key expires on " + tailnet.KeyExpiry.Format("January 2") + ". Then SSH through the tailnet stops",
 			text:    KeyExpiryHint(tailnet.Name),
 			command: tailscaleMachines,
 		}}

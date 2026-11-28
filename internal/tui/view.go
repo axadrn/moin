@@ -613,8 +613,8 @@ func (m *model) keys() string {
 func helpLines() []string {
 	keys := [][2]string{
 		{"↑ ↓  j k", "select"},
-		{"tab  1 2 3", "apps, servers, backups"},
-		{"enter", "an app's logs, a server's apps, a restore"},
+		{"tab  1 2 3", "switch the tab"},
+		{"enter", "open the row"},
 		{"esc", "back from the logs"},
 		{"r", "restart the app"},
 		{"b", "go back to an older deploy"},
