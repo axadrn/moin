@@ -101,6 +101,27 @@ that is a step darker than the page, as in iOS.
 Never a card in a card. Marketing illustrations (terminal, chat, the
 product frame) keep their own shapes.
 
+### Pages
+
+Every page of the site is built like the landing page: sections
+(`moin-band`), one gap between them, each opening with `BandHead` in the
+middle. A page's first section is its head: `BandHead` with `Page`, its
+title the page's h1. moin cloud keeps its app frame.
+
+- A section has ONE title and at most ONE short subtitle. No
+  sub-subtitles, no titles inside a section. A group inside a section is
+  the title of its card or a group line of a table, not a heading.
+- At most one link per section: `More`, quiet, under it. Rows and cards
+  that are links are content.
+- Nothing gets lost to these rules: extra text folds into the content
+  (table rows, list items, card lines) or moves to the docs page the one
+  link points to.
+- Two widths: the page (`moin-page`, lists, tables, cards) and reading
+  width (`moin-narrow`, in the middle: articles, docs, legal, changelog).
+- A page that sells ends with the landing's own end, `HomeEnd`.
+- A comparison is the `Compare` part, the moin column featured, as on the
+  landing.
+
 ## Navigation
 
 Every page is a full page load; there is no hx-boost and no client router.
