@@ -150,9 +150,11 @@ func (ws *Watchers) of(id string) (*watcher.Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A state that does not open, like one saved before states were
+	// encrypted, is dropped: the next reports build it again.
 	saved, err := ws.open(id, sealed)
 	if err != nil {
-		return nil, fmt.Errorf("workspace %s: %w", id, err)
+		slog.Warn("starting the watcher with nothing saved", "workspace", id, "error", err)
 	}
 	w, err := watcher.New(servers, []alert.Destination{{Kind: mailKind}}, saved)
 	if err != nil {

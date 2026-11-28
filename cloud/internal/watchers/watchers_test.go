@@ -137,9 +137,38 @@ func TestStateEncrypted(t *testing.T) {
 	if view, err := again.View(space.ID); err != nil || len(view.Servers) != 1 || view.Servers[0].Name != "prod" {
 		t.Errorf("view = %+v, %v", view, err)
 	}
-	other := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{2})
-	if err := other.Load(); err == nil || !strings.Contains(err.Error(), "SECRETS_KEY") {
-		t.Errorf("another key: %v", err)
+}
+
+// A saved state that does not open, like a plain one from before states
+// were encrypted, does not stop the site: that watcher starts with
+// nothing, and the next save is encrypted.
+func TestPlainStateDropped(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "cloud.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	store := workspace.NewStore(database)
+	space, _ := store.SignIn("ada@example.com")
+	token, _ := store.ConnectServer(space.ID, "prod")
+	plain := `{"servers":{"prod":{"report":{"server":"prod","version":"v0.9.0"}}}}`
+	if err := store.SaveWatcherState(space.ID, []byte(plain)); err != nil {
+		t.Fatal(err)
+	}
+	ws := New(store, counts.New(database), &outbox{}, "https://cloud.example.com", [32]byte{1})
+	if err := ws.Load(); err != nil {
+		t.Fatalf("a plain state stopped the site: %v", err)
+	}
+	if view, err := ws.View(space.ID); err != nil || len(view.Servers) != 1 || view.Servers[0].Version != "" {
+		t.Errorf("view = %+v, %v", view, err)
+	}
+	if err := ws.Receive(token, report.Report{Server: "prod", Version: "v1.0.0", EverySeconds: 60}); err != nil {
+		t.Fatal(err)
+	}
+	ws.save()
+	sealed, _ := store.WatcherState(space.ID)
+	if state, err := ws.open(space.ID, sealed); err != nil || !strings.Contains(string(state), "v1.0.0") {
+		t.Errorf("the next save: %s, %v", state, err)
 	}
 }
 
