@@ -487,7 +487,7 @@ func testBackupPostgres(t *testing.T, image string) {
 	for _, database := range test.b.databases(test.ctx, app) {
 		paths = append(paths, database.Path)
 	}
-	if strings.Join(paths, ",") != "postgres-db,postgres-db/analytics,postgres-db/postgres" {
+	if strings.Join(paths, ",") != "postgres-db,postgres-db/analytics" {
 		t.Fatalf("the databases of the service: %v", paths)
 	}
 	shop := test.database
@@ -499,7 +499,7 @@ func testBackupPostgres(t *testing.T, image string) {
 	if copies := test.copies(); len(copies) != 1 {
 		t.Fatalf("the first copy of analytics: %+v", copies)
 	}
-	if listed, err := test.listed(); err != nil || len(listed) != 3 || listed[1].Database != "postgres-db/analytics" {
+	if listed, err := test.listed(); err != nil || len(listed) != 2 || listed[1].Database != "postgres-db/analytics" {
 		t.Fatalf("the list: %+v %v", listed, err)
 	}
 	firstVisit := test.copies()[0]
