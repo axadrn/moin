@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/axadrn/moin/internal/daemon"
 	"github.com/axadrn/moin/internal/tui"
 )
 
@@ -28,6 +29,10 @@ func openTUI(ctx context.Context, stdout io.Writer) error {
 		Releases: appReleases,
 		Restart:  restartApp,
 		Rollback: rollBack,
-		Explain:  explain,
+		Backup:   backupNow,
+		Restore: func(ctx context.Context, server, app, database, to string, said io.Writer) (daemon.Restored, error) {
+			return restoreCopy(ctx, server, app, database, to, "", nil, said)
+		},
+		Explain: explain,
 	})
 }

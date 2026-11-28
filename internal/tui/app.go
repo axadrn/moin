@@ -2,20 +2,17 @@ package tui
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"io"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/axadrn/moin/protocol"
 )
 
 // keptLines is how many log lines the app screen keeps.
 const keptLines = 500
 
-// appScreen is one app opened with enter: its logs, following, and its
-// backups.
+// appScreen is one app opened with enter: its logs, following.
 type appScreen struct {
 	key    appKey
 	screen int
@@ -26,10 +23,6 @@ type appScreen struct {
 	logs []string
 	// logsEnded says why the logs stopped, empty while they follow.
 	logsEnded string
-
-	backups       []protocol.DatabaseBackup
-	backupsLoaded bool
-	backupsError  string
 }
 
 // logLineMsg is one line of an app's logs.
@@ -44,15 +37,7 @@ type logsEndMsg struct {
 	err    error
 }
 
-// backupsMsg is how an app's databases are backed up.
-type backupsMsg struct {
-	screen    int
-	databases []protocol.DatabaseBackup
-	err       error
-	said      string
-}
-
-// openApp shows the app's screen and starts its logs and backups.
+// openApp shows the app's logs and follows them.
 func (m *model) openApp(key appKey) tea.Cmd {
 	m.screens++
 	ctx, cancel := context.WithCancel(m.ctx)
@@ -63,19 +48,13 @@ func (m *model) openApp(key appKey) tea.Cmd {
 		cancel()
 		reader.Close()
 	}}
-	screen, logs, backups := m.screens, m.cli.Logs, m.cli.Backups
-	follow := func() tea.Msg {
+	screen, logs := m.screens, m.cli.Logs
+	return func() tea.Msg {
 		go func() {
 			writer.CloseWithError(logs(ctx, key.server, key.app, writer))
 		}()
 		return nextLine(lines, screen)()
 	}
-	load := func() tea.Msg {
-		var said bytes.Buffer
-		databases, err := backups(ctx, key.server, key.app, &said)
-		return backupsMsg{screen: screen, databases: databases, err: err, said: said.String()}
-	}
-	return tea.Batch(follow, load)
 }
 
 // closeApp goes back to the list and stops the logs.
@@ -124,17 +103,6 @@ func (m *model) gotLogsEnd(msg logsEndMsg) {
 	app.logsEnded = "The logs ended."
 	if msg.err != nil {
 		app.logsEnded = "The logs stopped: " + m.why(msg.err, strings.Join(app.logs, "\n"))
-	}
-}
-
-func (m *model) gotBackups(msg backupsMsg) {
-	app := m.shown(msg.screen)
-	if app == nil {
-		return
-	}
-	app.backups, app.backupsLoaded = msg.databases, true
-	if msg.err != nil {
-		app.backupsError = m.why(msg.err, msg.said)
 	}
 }
 

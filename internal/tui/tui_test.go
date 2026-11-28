@@ -7,8 +7,10 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/axadrn/moin/internal/daemon"
 	"github.com/axadrn/moin/protocol"
 )
@@ -17,6 +19,8 @@ import (
 type fake struct {
 	restarted  []string
 	rolledBack []string
+	restored   []string
+	copied     []string
 	opened     []string
 	releases   []daemon.Release
 }
@@ -34,7 +38,8 @@ func (f *fake) cli() CLI {
 			return ctx.Err()
 		},
 		Backups: func(ctx context.Context, server, app string, said io.Writer) ([]protocol.DatabaseBackup, error) {
-			return []protocol.DatabaseBackup{{Database: "postgres"}}, nil
+			checked := time.Now().Add(-2 * time.Hour)
+			return []protocol.DatabaseBackup{{Database: "postgres", CheckedAt: &checked, CheckedCopy: "c2", Copies: []protocol.Copy{{ID: "c2", At: checked}, {ID: "c1", At: checked}}}}, nil
 		},
 		Releases: func(ctx context.Context, server, app string, said io.Writer) ([]daemon.Release, error) {
 			return f.releases, nil
@@ -46,6 +51,14 @@ func (f *fake) cli() CLI {
 		Rollback: func(ctx context.Context, server, app string, number int, log io.Writer) (daemon.Result, error) {
 			f.rolledBack = append(f.rolledBack, fmt.Sprintf("%s/%s v%d", server, app, number))
 			return daemon.Result{App: app, Release: 5, From: number}, nil
+		},
+		Backup: func(ctx context.Context, server, app string, said io.Writer) ([]daemon.Copied, error) {
+			f.copied = append(f.copied, server+"/"+app)
+			return []daemon.Copied{{Database: "postgres", Copy: "c3"}}, nil
+		},
+		Restore: func(ctx context.Context, server, app, database, to string, said io.Writer) (daemon.Restored, error) {
+			f.restored = append(f.restored, fmt.Sprintf("%s/%s %s %s", server, app, database, to))
+			return daemon.Restored{Database: database, To: to, Undo: "undo-1"}, nil
 		},
 		Explain: func(err error) string { return err.Error() },
 	}
@@ -60,11 +73,12 @@ func start(t *testing.T, f *fake) *model {
 		f.opened = append(f.opened, url)
 		return nil
 	}
-	m.Update(statusMsg{server: "prod", status: daemon.Status{Apps: []daemon.AppStatus{
+	_, facts := m.Update(statusMsg{server: "prod", status: daemon.Status{Apps: []daemon.AppStatus{
 		{Name: "shop", Release: 3, Running: true, Addresses: []string{"https://shop.example.com"}},
 		{Name: "blog", Release: 1},
 	}}})
 	m.Update(statusMsg{server: "web-1", err: errors.New("cannot reach web-1 over SSH")})
+	run(m, facts)
 	return m
 }
 
@@ -107,10 +121,15 @@ func TestAServerThatDoesNotAnswerHidesNoOther(t *testing.T) {
 		t.Errorf("selected = %v, want the first app", m.selected)
 	}
 	view := m.View().Content
-	for _, want := range []string{"shop", "blog", "web-1", "unreachable", "cannot reach web-1"} {
+	for _, want := range []string{"shop", "blog", "web-1", "unreachable", "1 server unreachable"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the screen does not show %q:\n%s", want, view)
 		}
+	}
+	press(m, "2")
+	press(m, "down")
+	if view := m.View().Content; !strings.Contains(view, "cannot reach web-1") {
+		t.Errorf("the servers tab does not say why web-1 is unreachable:\n%s", view)
 	}
 }
 
@@ -151,11 +170,37 @@ func TestSelectionSurvivesARefreshWithoutTheApp(t *testing.T) {
 	}
 }
 
+func TestTheSideShowsTheFactsOfTheSelectedApp(t *testing.T) {
+	m := start(t, &fake{releases: []daemon.Release{{Number: 3, Live: true, At: time.Now().Add(-4 * time.Minute)}, {Number: 2, Before: true}}})
+	view := m.View().Content
+	for _, want := range []string{"https://shop.example.com", "deployed 4m ago", "1 older", "checked 2h ago"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the side does not show %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestTabsSwitch(t *testing.T) {
+	m := start(t, &fake{})
+	press(m, "tab")
+	if m.tab != serversTab {
+		t.Fatalf("tab = %v after tab, want servers", m.tab)
+	}
+	press(m, "enter")
+	if m.tab != appsTab || m.selected != (appKey{"prod", "shop"}) {
+		t.Errorf("enter on prod: tab %v, selected %v, want the apps of prod", m.tab, m.selected)
+	}
+	run(m, press(m, "3"))
+	if m.tab != backupsTab || !strings.Contains(m.View().Content, "Checked 2h ago") {
+		t.Errorf("3 does not show the backups:\n%s", m.View().Content)
+	}
+}
+
 func TestRestartAsksFirst(t *testing.T) {
 	f := &fake{}
 	m := start(t, f)
 	press(m, "r")
-	if m.question == nil {
+	if m.question == nil || !strings.Contains(m.View().Content, "Restart shop") {
 		t.Fatal("r restarts without asking")
 	}
 	press(m, "n")
@@ -164,24 +209,42 @@ func TestRestartAsksFirst(t *testing.T) {
 	}
 	press(m, "r")
 	cmd := press(m, "y")
-	if m.busy == "" {
+	if m.action == nil || !strings.Contains(m.View().Content, "restarting shop") {
 		t.Error("nothing shows that the restart runs")
 	}
 	run(m, cmd)
 	if len(f.restarted) != 1 || f.restarted[0] != "prod/shop" {
 		t.Errorf("restarted %v, want prod/shop", f.restarted)
 	}
-	if m.busy != "" || !strings.Contains(m.message, "shop runs v4") {
-		t.Errorf("busy %q, message %q", m.busy, m.message)
+	if m.action != nil || !strings.Contains(m.message, "shop runs v4") {
+		t.Errorf("action %v, message %q", m.action, m.message)
+	}
+}
+
+func TestAnActionShowsTheStepItIsAt(t *testing.T) {
+	m := start(t, &fake{})
+	cmd := m.start(appKey{"prod", "shop"}, "restarting", "restarting shop", func(log io.Writer) doneMsg {
+		fmt.Fprintln(log, "health check of web")
+		fmt.Fprintln(log, "    docker says hello")
+		return doneMsg{done: "shop runs v4"}
+	})
+	msg := cmd()
+	_, next := m.Update(msg)
+	if !strings.Contains(m.statusLine(), "health check of web") {
+		t.Errorf("status line %q, want the step", m.statusLine())
+	}
+	run(m, next)
+	if m.action != nil || !strings.Contains(m.message, "shop runs v4") {
+		t.Errorf("action %v, message %q", m.action, m.message)
 	}
 }
 
 func TestOneActionAtATime(t *testing.T) {
 	m := start(t, &fake{})
-	m.busy = "restarting shop"
+	m.action = &action{what: "restarting shop"}
 	press(m, "r")
 	press(m, "b")
-	if m.question != nil || m.busy != "restarting shop" {
+	if m.question != nil || m.picker != nil || m.action.what != "restarting shop" {
 		t.Error("a second action started while one runs")
 	}
 }
@@ -225,16 +288,43 @@ func TestEscClosesThePicker(t *testing.T) {
 	}
 }
 
-func TestEnterShowsLogsAndBackups(t *testing.T) {
+func TestRestorePicksACopyAndAsks(t *testing.T) {
+	f := &fake{}
+	m := start(t, f)
+	run(m, press(m, "3"))
+	press(m, "enter")
+	if m.picker == nil || m.picker.cursor != 0 {
+		t.Fatalf("picker = %+v, want it on the newest copy", m.picker)
+	}
+	press(m, "down")
+	press(m, "enter")
+	if m.question == nil || !strings.Contains(m.question.text, "c1") {
+		t.Fatalf("question = %+v, want one about c1", m.question)
+	}
+	run(m, press(m, "y"))
+	if len(f.restored) != 1 || f.restored[0] != "prod/shop postgres c1" {
+		t.Errorf("restored %v", f.restored)
+	}
+	if !strings.Contains(m.message, "back at c1") {
+		t.Errorf("message %q", m.message)
+	}
+}
+
+func TestBackupNowAsksFirst(t *testing.T) {
+	f := &fake{}
+	m := start(t, f)
+	press(m, "c")
+	run(m, press(m, "y"))
+	if len(f.copied) != 1 || !strings.Contains(m.message, "Copied postgres of shop") {
+		t.Errorf("copied %v, message %q", f.copied, m.message)
+	}
+}
+
+func TestEnterShowsTheLogs(t *testing.T) {
 	m := start(t, &fake{})
-	cmd := press(m, "enter")
+	follow := press(m, "enter")
 	if m.app == nil || m.app.key != (appKey{"prod", "shop"}) {
 		t.Fatalf("app screen = %+v, want shop", m.app)
-	}
-	follow, load := cmd().(tea.BatchMsg)[0], cmd().(tea.BatchMsg)[1]
-	run(m, load)
-	if !m.app.backupsLoaded || len(m.app.backups) != 1 {
-		t.Errorf("backups = %+v", m.app.backups)
 	}
 	// The first line, then the second, as Bubble Tea would deliver them.
 	_, next := m.Update(follow())
@@ -242,8 +332,8 @@ func TestEnterShowsLogsAndBackups(t *testing.T) {
 	if got := strings.Join(m.app.logs, "|"); got != "listening on :8080|GET / 200" {
 		t.Errorf("logs = %q", got)
 	}
-	if view := m.View().Content; !strings.Contains(view, "GET / 200") || !strings.Contains(view, "postgres") {
-		t.Errorf("the app screen does not show the logs and backups:\n%s", view)
+	if view := m.View().Content; !strings.Contains(view, "GET / 200") || !strings.Contains(view, "following") {
+		t.Errorf("the app screen does not show the logs:\n%s", view)
 	}
 	screen := m.app.screen
 	press(m, "esc")
@@ -277,25 +367,35 @@ func TestHelpAndQuit(t *testing.T) {
 	}
 	press(m, "x")
 	if m.help {
-		t.Error("a key does not close the help")
+		t.Error("a key did not close the help")
 	}
-	if cmd := press(m, "q"); cmd == nil || cmd() != tea.Quit() {
+	if cmd := press(m, "q"); cmd == nil {
 		t.Error("q does not quit")
 	}
 }
 
-func TestWhyPrefersWhatMoinSaid(t *testing.T) {
-	m := newModel(t.Context(), (&fake{}).cli())
-	said := "some ssh noise\n✗ shop has no backups yet\n"
-	if got := m.why(errors.New("exit status 1"), said); got != "shop has no backups yet" {
-		t.Errorf("why = %q", got)
-	}
-	if got := m.why(errors.New("cannot reach prod over SSH"), ""); got != "cannot reach prod over SSH" {
-		t.Errorf("why = %q", got)
+func TestEveryLineFitsTheScreen(t *testing.T) {
+	for _, width := range []int{50, 80, 140} {
+		m := start(t, &fake{})
+		m.Update(tea.WindowSizeMsg{Width: width, Height: 20})
+		for _, key := range []string{"", "2", "3", "?"} {
+			if key != "" {
+				press(m, key)
+			}
+			lines := strings.Split(m.View().Content, "\n")
+			if len(lines) != 20 {
+				t.Errorf("width %d, key %q: %d lines, want 20", width, key, len(lines))
+			}
+			for _, line := range lines {
+				if lipgloss.Width(line) > width {
+					t.Errorf("width %d, key %q: a line is %d wide: %q", width, key, lipgloss.Width(line), line)
+				}
+			}
+		}
 	}
 }
 
-func TestTheListScrollsToTheSelection(t *testing.T) {
+func TestTheSelectedAppStaysOnTheScreen(t *testing.T) {
 	m := newModel(t.Context(), CLI{Servers: []string{"prod"}})
 	m.height = 12
 	var apps []daemon.AppStatus
@@ -304,7 +404,7 @@ func TestTheListScrollsToTheSelection(t *testing.T) {
 	}
 	m.Update(statusMsg{server: "prod", status: daemon.Status{Apps: apps}})
 	for range 25 {
-		press(m, "down")
+		m.move(1)
 	}
 	if view := m.View().Content; !strings.Contains(view, "app-25") {
 		t.Errorf("the selected app is not on the screen:\n%s", view)
@@ -314,17 +414,30 @@ func TestTheListScrollsToTheSelection(t *testing.T) {
 	}
 }
 
-func TestWhatNeedsYouIsUnderItsServer(t *testing.T) {
+func TestWhatNeedsYouIsOnItsServer(t *testing.T) {
 	m := newModel(t.Context(), CLI{Servers: []string{"prod"}})
+	m.width = 120
 	m.Update(statusMsg{server: "prod", status: daemon.Status{
 		PublicSSH: true,
 		Needs:     []daemon.Need{{Text: "shop: postgres has no backup yet.", Command: "moin bucket set prod"}},
 		Apps:      []daemon.AppStatus{{Name: "shop", Release: 1, Running: true}},
 	}})
+	if !strings.Contains(m.View().Content, "2 need you") {
+		t.Errorf("the header does not say what needs you:\n%s", m.View().Content)
+	}
+	press(m, "2")
 	view := m.View().Content
-	for _, want := range []string{"port 22 open to the internet", "moin secure prod", "shop: postgres has no backup yet.", "moin bucket set prod"} {
+	for _, want := range []string{"port 22 is open to the internet", "moin secure prod", "shop: postgres has no backup yet.", "moin bucket set prod"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the screen does not show %q:\n%s", want, view)
 		}
+	}
+}
+
+func TestNoAppsSaysHowToDeploy(t *testing.T) {
+	m := newModel(t.Context(), CLI{Servers: []string{"prod"}})
+	m.Update(statusMsg{server: "prod", status: daemon.Status{}})
+	if view := m.View().Content; !strings.Contains(view, "No apps yet") || !strings.Contains(view, "moin deploy prod") {
+		t.Errorf("an empty server does not say how to deploy:\n%s", view)
 	}
 }

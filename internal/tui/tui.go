@@ -1,7 +1,8 @@
 // Package tui is `moin` on a terminal: every server and its apps, live,
-// and the logs and backups of one app. It is only a view. Every answer
-// comes from the same functions as the CLI's commands, which the CLI
-// hands it in CLI.
+// with tabs for apps, servers and backups, the facts of the selected one
+// beside the list, and the logs of an app. It is only a view. Every
+// answer comes from the same functions as the CLI's commands, which the
+// CLI hands it in CLI.
 package tui
 
 import (
@@ -32,6 +33,11 @@ type CLI struct {
 	Restart func(ctx context.Context, server, app string, log io.Writer) (daemon.Result, error)
 	// Rollback runs an older release again, as `moin rollback --to`.
 	Rollback func(ctx context.Context, server, app string, number int, log io.Writer) (daemon.Result, error)
+	// Backup takes a copy of the app's databases now, as `moin backup`.
+	Backup func(ctx context.Context, server, app string, said io.Writer) ([]daemon.Copied, error)
+	// Restore puts a database of the app back to a copy, as `moin
+	// restore --to`.
+	Restore func(ctx context.Context, server, app, database, to string, said io.Writer) (daemon.Restored, error)
 	// Explain turns an error into the sentence the CLI shows.
 	Explain func(error) string
 }
