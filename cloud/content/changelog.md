@@ -25,7 +25,7 @@ November 28, 2026
 **In short:** Every database a catalog app needs is backed up now (MySQL, MariaDB, MongoDB, ClickHouse, Redis), a new page adds up the subscriptions you can cancel, and what beta.38 lost is back: env before the first deploy, `moin compose`, the app password, `moin sql`, deploy logs and more.
 
 ### New
-- **Kill your SaaS subscriptions**: [A new page](/kill-your-saas-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts the open source app for each on your server.
+- **Kill your SaaS subscriptions**: [A new page](/kill-your-saas-subscriptions) adds up what you pay for Slack, Notion, Zapier and more, and gives the one command that puts an app you host yourself for each on your server.
 - **MySQL and MariaDB backups**: moin finds a `mysql` or `mariadb` service in your `compose.yml` and backs it up like Postgres: encrypted copies, the daily restore check, restore and undo.
 - **MongoDB backups**: moin finds a `mongo` service in your `compose.yml` and backs up every database in it, with the same check, restore and undo.
 - **ClickHouse backups**: moin finds a `clickhouse` service in your `compose.yml`, like the one of Plausible, and backs up every database in it. No disk to set up.
