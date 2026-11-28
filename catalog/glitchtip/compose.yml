@@ -1,0 +1,35 @@
+services:
+  web:
+    image: glitchtip/glitchtip:${VERSION}
+    expose: ["8000"]
+    command: ./bin/run-all-in-one.sh
+    environment:
+      GLITCHTIP_DOMAIN: ${APP_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgres://glitchtip:${DB_PASSWORD}@db:5432/glitchtip
+      VALKEY_URL: redis://valkey:6379
+      DEFAULT_FROM_EMAIL: glitchtip@localhost
+      ENABLE_USER_REGISTRATION: "true"
+    volumes:
+      - ./data/uploads:/code/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_started
+  valkey:
+    image: valkey/valkey:9
+  db:
+    image: postgres:17
+    command: ["postgres", "-c", "max_locks_per_transaction=512"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: glitchtip
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

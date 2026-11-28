@@ -1,0 +1,9 @@
+services:
+  web:
+    image: docuseal/docuseal:${VERSION}
+    expose: ["3000"]
+    command: sh -c "unset VERSION && exec /app/bin/bundle exec puma -C /app/config/puma.rb --dir /app"
+    environment:
+      HOST: ${APP_DOMAIN}
+    volumes:
+      - ./data:/data
